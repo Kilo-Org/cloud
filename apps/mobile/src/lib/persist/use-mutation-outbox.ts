@@ -45,6 +45,9 @@ export type OutboxRowInput = {
  *   `needsReconcile` to its own scope.
  * - `needsReconcile` surfaces the `reconcile-first` rows that must show a card
  *   instead of auto-POSTing. `remove` and `refresh` keep that list current.
+ *   `remove` resolves `false` and keeps the row visible (so its reconcile card
+ *   stays) when the durable delete did not commit: a row that is still stored
+ *   must never read as settled.
  */
 export function useMutationOutbox() {
   const { userId, isLoading } = useCurrentUserId();
@@ -182,13 +185,20 @@ export function useMutationOutbox() {
   );
 
   const remove = useCallback(
-    async (fingerprint: string): Promise<void> => {
+    async (fingerprint: string): Promise<boolean> => {
       if (!userId) {
-        return;
+        return true;
       }
-      await removeOutboxRow(userId, fingerprint);
+      const removed = await removeOutboxRow(userId, fingerprint);
+      // Only a committed delete may drop the row: a row that is still stored
+      // must stay visible, or its reconcile card vanishes while a relaunch
+      // reads the row back.
+      if (!removed) {
+        return false;
+      }
       rowsRef.current = rowsRef.current.filter(r => r.fingerprint !== fingerprint);
       setRows(previous => previous.filter(r => r.fingerprint !== fingerprint));
+      return true;
     },
     [userId]
   );

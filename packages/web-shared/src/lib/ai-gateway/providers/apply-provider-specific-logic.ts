@@ -1,6 +1,5 @@
 import * as z from 'zod';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
-import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   type GatewayResponsesRequest,
   type OpenRouterChatCompletionRequest,
@@ -57,16 +56,15 @@ import {
   fixResponsesRequest,
   mapReasoningDetailsToReasoning,
   mapReasoningDetailsToReasoningContent,
-  replaceReasoningObjectWithReasoningEffort,
   scrubOpenCodeSpecificProperties,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
-import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import type { CustomPricing } from '@kilocode/db/schema-types';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { applyGeminiReasoningRequestTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/google-reasoning';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gateway/providers/add-missing-tool-schema-enum-types';
@@ -80,86 +78,6 @@ import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
-
-function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
-  const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
-  const google = isRecord(extraContent.google) ? extraContent.google : {};
-  value.extra_content = {
-    ...extraContent,
-    google: {
-      ...google,
-      thought_signature: signature,
-    },
-  };
-}
-
-function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
-  for (const message of request.messages) {
-    if (!isRecord(message)) {
-      continue;
-    }
-
-    delete message.thoughtSignature;
-    delete message.reasoning;
-
-    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
-    const toolCallsById = new Map<string, Record<string, unknown>>();
-    for (const toolCall of toolCalls) {
-      const legacySignature = toolCall.thoughtSignature;
-      delete toolCall.thoughtSignature;
-      if (typeof legacySignature === 'string') {
-        setGeminiThoughtSignature(toolCall, legacySignature);
-      }
-      // First write wins, so a duplicate id keeps the earliest tool call.
-      if (typeof toolCall.id === 'string' && !toolCallsById.has(toolCall.id)) {
-        toolCallsById.set(toolCall.id, toolCall);
-      }
-    }
-
-    const reasoningDetails = message.reasoning_details;
-    delete message.reasoning_details;
-    if (!Array.isArray(reasoningDetails)) {
-      continue;
-    }
-
-    for (const detail of reasoningDetails) {
-      if (
-        !isRecord(detail) ||
-        detail.type !== ReasoningDetailType.Encrypted ||
-        typeof detail.data !== 'string' ||
-        detail.format !== ReasoningFormat.GoogleGeminiV1
-      ) {
-        continue;
-      }
-
-      const toolCall = typeof detail.id === 'string' ? toolCallsById.get(detail.id) : undefined;
-      setGeminiThoughtSignature(toolCall ?? message, detail.data);
-    }
-  }
-}
-
-function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest) {
-  const reasoningEffort = request.reasoning_effort;
-  const extra = request as typeof request & { google?: unknown };
-  delete extra.reasoning_effort;
-
-  if (reasoningEffort !== 'none') {
-    const existingGoogle = isRecord(extra.google) ? extra.google : {};
-    extra.google = {
-      ...existingGoogle,
-      thinking_config: {
-        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
-        include_thoughts: true,
-      },
-      // Without streaming, thoughts and answer share one content string, and
-      // only these tags separate them. Streams flag thought chunks instead, and
-      // asking for tags there would also put the closing tag in the answer.
-      ...(request.stream !== true ? { thought_tag_marker: GEMINI_THOUGHT_TAG_MARKER } : {}),
-    };
-  }
-
-  mapGeminiReasoningDetails(request);
-}
 
 /**
  * Claude goes to Anthropic and OpenAI models go to Amazon Bedrock only for
@@ -300,7 +218,7 @@ export function applyReasoningDetailsTransform(
 
   switch (provider.responseTransforms) {
     case ReasoningDetailsTransform.GeminiThought:
-      applyGeminiReasoningTransform(requestToMutate.body);
+      applyGeminiReasoningRequestTransform(requestToMutate.body);
       break;
     case ReasoningDetailsTransform.ReasoningContent:
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
@@ -318,20 +236,35 @@ export function applyReasoningDetailsTransform(
   }
 }
 
-export async function applyProviderSpecificLogic(
-  provider: Provider,
-  requestedModel: string,
-  requestToMutate: GatewayRequest,
-  extraHeaders: Record<string, string>,
-  userByok: BYOKResult[] | null,
-  originalHeaders: FraudDetectionHeaders,
-  userId: string,
-  organizationId: string | null,
-  sessionId: string | null,
-  taskId: string | null,
-  isNonTrialEnterprise: boolean,
-  dataRegion: OrganizationDataRegion | null
-) {
+export type ApplyProviderSpecificLogicInput = {
+  provider: Provider;
+  requestedModel: string;
+  requestToMutate: GatewayRequest;
+  extraHeaders: Record<string, string>;
+  userByok: BYOKResult[] | null;
+  originalHeaders: FraudDetectionHeaders;
+  userId: string;
+  organizationId: string | null;
+  sessionId: string | null;
+  taskId: string | null;
+  isNonTrialEnterprise: boolean;
+  dataRegion: OrganizationDataRegion | null;
+};
+
+export async function applyProviderSpecificLogic({
+  provider,
+  requestedModel,
+  requestToMutate,
+  extraHeaders,
+  userByok,
+  originalHeaders,
+  userId,
+  organizationId,
+  sessionId,
+  taskId,
+  isNonTrialEnterprise,
+  dataRegion,
+}: ApplyProviderSpecificLogicInput) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
   // do not override what the request and their account ask for, and the
   // gateway's paid server features bill that account rather than Kilo's.

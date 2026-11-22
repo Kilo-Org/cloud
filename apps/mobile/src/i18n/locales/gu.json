@@ -309,6 +309,7 @@
     "hideBalance": "બેલેન્સ છુપાવો",
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",
+    "availableToSpendInOrganization": "આ સંસ્થામાં ખર્ચવા માટે ઉપલબ્ધ",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
     "signOutMessage": "તમારા વર્કસ્પેસનો ઉપયોગ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "deleteAccountTitle": "એકાઉન્ટ કાઢી નાખવું છે?",
@@ -450,6 +451,17 @@
       "location": "Vertex સ્થાન",
       "clientEmail": "સર્વિસ એકાઉન્ટ ઇમેઇલ",
       "privateKey": "સર્વિસ એકાઉન્ટ પ્રાઇવેટ કી",
+      "privateKeyBlockRequired": "BEGIN લીટીથી END લીટી સુધીનો આખો કી બ્લોક પેસ્ટ કરો.",
+      "privateKeyEncrypted": "આ કી બ્લોક પાસફ્રેઝથી સુરક્ષિત છે. પાસફ્રેઝ વગરની સર્વિસ એકાઉન્ટ કી પેસ્ટ કરો.",
+      "names": {
+        "codestral": "ફક્ત જૂનું Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT વડે સાઇન ઇન કરો)",
+        "xiaomi": "Xiaomi (વપરાશ મુજબ ચુકવણી)",
+        "zai": "Z.ai (વપરાશ મુજબ ચુકવણી)",
+        "bedrockByok": "Amazon Bedrock (સીધું)",
+        "vertexByok": "Google Vertex AI (સીધું)"
+      },
       "modelMappings": "મોડેલ મેપિંગ",
       "modelMappingsDescription": "ગેટવે મોડેલને કસ્ટમ ડિપ્લોયમેન્ટ નામ પર મોકલો.",
       "mappingTitle": "મેપિંગ {{number}}",
@@ -544,7 +556,10 @@
     "changelogFixesPolish": "સમગ્ર એપમાં ભૂલ સુધારા અને સુધારણાઓ.",
     "changelogAreas": {
       "signIn": "સાઇન-ઇન",
-      "profileOrganizations": "પ્રોફાઇલ તથા સંસ્થાઓ"
+      "profileOrganizations": "પ્રોફાઇલ તથા સંસ્થાઓ",
+      "chat": "ચેટ",
+      "notifications": "સૂચનાઓ",
+      "integrations": "ઇન્ટિગ્રેશન્સ"
     }
   },
   "preferences": {
@@ -2550,7 +2565,7 @@
       "searchPlaceholder": "રિપોઝિટરીઓ શોધો",
       "noMatches": "કોઈ મેળ નથી",
       "noRepositories": "કોઈ રિપોઝિટરી ઉપલબ્ધ નથી",
-      "noRepositoriesDescription": "તમારા એકાઉન્ટ સાથે કોઈ રિપોઝિટરી કનેક્ટ થયેલી નથી.",
+      "noRepositoriesDescription": "રિપોઝિટરીઓ લોડ કરવા માટે GitHub અથવા GitLab જોડો.",
       "loading": "લોડ થઈ રહ્યું છે…",
       "accessibility": "રિપોઝિટરી: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "વેબ પર બિલિંગ સેટિંગ્સ",
       "changePlan": "પ્લાન બદલો",
       "buySeats": "સીટો ખરીદો",
-      "managedOnWeb": "પ્લાન, સીટો અને ઑટો ટોપ-અપનું સંચાલન વેબ પર થાય છે.",
+      "managedOnWeb": "પ્લાન, સીટો અને ઑટો ટોપ-અપનું સંચાલન kilo.ai પર થાય છે.",
       "setupAutoTopUp": "ઑટો ટોપ-અપ સેટ કરો",
       "manageAutoTopUp": "ઑટો ટોપ-અપ મેનેજ કરો",
       "opensOnWeb": "વેબ પર ખુલે છે"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "તમે એક…",
       "tools": "સાધનો",
       "wholeToolRule": "આ એજન્ટ એક જ સમયે દરેક સાધન પર એક નિયમ લાગુ કરે છે: {{rule}}. આ સ્વિચ ફક્ત વાંચન માટે છે.",
+      "toolRule": "સંગ્રહિત નિયમ: {{rule}}",
       "visibility": "દૃશ્યતા",
       "visibilityPrimary": "પ્રાથમિક — પીકરમાં બતાવેલ છે",
       "visibilitySubagent": "સબએજન્ટ — ફક્ત અન્ય એજન્ટો પાસેથી કૉલ કરી શકાય છે",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "ક્રેડિટ કપાત",
       "emptyDescription": "ક્રેડિટ ખરીદીઓ, રસીદો અને વપરાશ અહીં દેખાશે.",
       "emptyTitle": "કોઈ ક્રેડિટ ઇતિહાસ નથી",
+      "expiredGrant": "સમયસીમા સમાપ્ત: {{description}}",
       "googlePlayReceipt": "Google Playની રસીદ",
       "kind": {
         "adjustment": "સમાયોજન",
         "balanceNeutral": "બેલેન્સ પર અસર નહીં",
         "deduction": "કપાત",
         "grant": "ક્રેડિટ અનુદાન",
+        "promotionalCredits": "પ્રમોશનલ ક્રેડિટ",
         "welcomeCredits": "સ્વાગત ક્રેડિટ",
         "purchase": "ખરીદી"
+      },
+      "program": {
+        "adminBulkGrant": "એડમિન ક્રેડિટ અનુદાન",
+        "contributorChampion": "ફાળો આપનાર ચેમ્પિયન ક્રેડિટ",
+        "feedback": "પ્રતિસાદ ક્રેડિટ",
+        "influencer": "ઇન્ફ્લુઅન્સર ક્રેડિટ",
+        "ossMonthlyReset": "ઓપન સોર્સ પ્રાયોજક સહાય રીસેટ",
+        "ossSponsorship": "ઓપન સોર્સ પ્રાયોજક સહાય ક્રેડિટ",
+        "pullRequest": "પુલ રિક્વેસ્ટ ક્રેડિટ",
+        "usageIssue": "વપરાશ સમસ્યા ક્રેડિટ",
+        "vibeDay": "વાઇબ ડે ક્રેડિટ"
       },
       "purchaseFallback": "ક્રેડિટ ખરીદી",
       "receipt": "રસીદ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}}ની રસીદ ખોલો",
       "receiptUnavailable": "આ ખરીદી માટે રસીદ ઉપલબ્ધ નથી.",
-      "retentionLimit": "સૌથી તાજેતરનો ક્રેડિટ ઇતિહાસ દર્શાવવામાં આવે છે."
+      "retentionLimit": "સૌથી તાજેતરનો ક્રેડિટ ઇતિહાસ દર્શાવવામાં આવે છે.",
+      "voidedGrant": "રદ કરેલ: {{description}}"
     },
     "title": "ક્રેડિટ ખરીદો",
     "description": "ક્રેડિટ એ Kilo એપમાં AI કોડિંગ સત્રો ચલાવવા માટે તમારા Kilo બેલેન્સમાં ઉમેરાતી એકવારની ખરીદી છે. સ્ટોર તમારા ખાતામાંથી ચાર્જ લે છે અને સ્ટોર ચુકવણીની પુષ્ટિ કર્યા પછી ક્રેડિટ ઉમેરાય છે.",
@@ -5088,6 +5118,20 @@
       "eu": "યુરોપિયન યુનિયન",
       "au": "ઓસ્ટ્રેલિયા",
       "jp": "જાપાન"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "પસંદગીઓ શોધો",
+    "noMatches": "મેળ ખાતી કોઈ પસંદગી નથી",
+    "emptyDescription": "પસંદગીનું બીજું નામ અથવા કીવર્ડ અજમાવો.",
+    "resultsStatus": "મળેલી પસંદગીઓ: {{resultCount}}",
+    "keywords": {
+      "signOut": "બહાર નીકળો|ખાતામાંથી બહાર નીકળો",
+      "appearance": "દેખાવ|રંગ યોજના",
+      "appUnlock": "ચહેરાની ઓળખ|આંગળીની છાપ",
+      "language": "ભાષા|અનુવાદ",
+      "notifications": "સૂચનાઓ|ચેતવણીઓ",
+      "privacy": "ગોપનીયતા|વિશ્લેષણ|પ્રવૃત્તિ પર નજર"
     }
   }
 }

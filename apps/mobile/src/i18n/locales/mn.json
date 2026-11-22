@@ -309,6 +309,7 @@
     "hideBalance": "Үлдэгдэл нуух",
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",
+    "availableToSpendInOrganization": "Энэ байгууллагад зарцуулах боломжтой",
     "signOutTitle": "Гарах уу?",
     "signOutMessage": "Ажлын орчиндоо хандахын тулд дахин нэвтрэх шаардлагатай.",
     "deleteAccountTitle": "Бүртгэлийг устгах уу?",
@@ -450,6 +451,17 @@
       "location": "Vertex байршил",
       "clientEmail": "Service account-ийн имэйл",
       "privateKey": "Service account-ийн хувийн түлхүүр",
+      "privateKeyBlockRequired": "Түлхүүрийн блокийг бүхэлд нь, BEGIN мөрөөс END мөр хүртэл буулгана уу.",
+      "privateKeyEncrypted": "Энэ түлхүүрийн блок нууц хэллэгээр хамгаалагдсан байна. Нууц хэллэггүй Service account-ийн түлхүүр буулгана уу.",
+      "names": {
+        "codestral": "Зөвхөн хуучин Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT-ээр нэвтрэх)",
+        "xiaomi": "Xiaomi (ашигласны дагуу төлөх)",
+        "zai": "Z.ai (ашигласны дагуу төлөх)",
+        "bedrockByok": "Amazon Bedrock (шууд)",
+        "vertexByok": "Google Vertex AI (шууд)"
+      },
       "modelMappings": "Загварын харгалзуулалт",
       "modelMappingsDescription": "Gateway загварыг өөрийн deployment нэр рүү илгээх.",
       "mappingTitle": "Харгалзуулалт {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Дараах хэсгүүдэд засвар, сайжруулалт хийгдсэн: {{areas}}.",
     "changelogFixesPolish": "Апп даяар засвар, сайжруулалт хийгдсэн.",
     "changelogAreas": {
-      "signIn": "Нэвтрэх",
-      "profileOrganizations": "Профайл ба байгууллагууд"
+      "signIn": "нэвтрэх",
+      "profileOrganizations": "профайл ба байгууллагууд",
+      "chat": "чат",
+      "notifications": "мэдэгдэл",
+      "integrations": "интеграцууд"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Кодын сан хайх",
       "noMatches": "Тохирох илэрц алга",
       "noRepositories": "Ашиглах боломжтой кодын сан алга",
-      "noRepositoriesDescription": "Таны бүртгэлд холбосон кодын сан алга.",
+      "noRepositoriesDescription": "Кодын санг ачаалахын тулд GitHub эсвэл GitLab бүртгэлээ холбоно уу.",
       "loading": "Ачаалж байна…",
       "accessibility": "Кодын сан: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Вэб дээрх төлбөр тооцооны тохиргоо",
       "changePlan": "Төлөвлөгөө өөрчлөх",
       "buySeats": "Хэрэглэгчийн эрх авах",
-      "managedOnWeb": "Төлөвлөгөө, хэрэглэгчийн эрх болон автомат цэнэглэлт вэб дээр удирдагддаг.",
+      "managedOnWeb": "Төлөвлөгөө, хэрэглэгчийн эрх болон автомат цэнэглэлт kilo.ai дээр удирдагддаг.",
       "setupAutoTopUp": "Автомат цэнэглэлт тохируулах",
       "manageAutoTopUp": "Автомат цэнэглэлт удирдах",
       "opensOnWeb": "Вэб дээр нээгдэнэ"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Та бол …",
       "tools": "Багаж хэрэгсэл",
       "wholeToolRule": "Энэ агент бүх багаж хэрэгсэлд нэг дүрмийг нэгэн зэрэг хэрэглэнэ: {{rule}}. Эдгээр унтраалга нь зөвхөн уншигдах боломжтой.",
+      "toolRule": "Хадгалагдсан дүрэм: {{rule}}",
       "visibility": "Харагдах байдал",
       "visibilityPrimary": "Үндсэн — сонгогч дээр харуулав",
       "visibilitySubagent": "Дэд агент — зөвхөн бусдаас дуудах боломжтой",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Кредитийн хасалт",
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
       "emptyTitle": "Кредитийн түүх алга",
+      "expiredGrant": "Хугацаа нь дууссан: {{description}}",
       "googlePlayReceipt": "Google Play-н баримт",
       "kind": {
         "adjustment": "Залруулга",
         "balanceNeutral": "Үлдэгдэлд нөлөөгүй",
         "deduction": "Хасалт",
         "grant": "Кредит олголт",
+        "promotionalCredits": "Урамшууллын кредит",
         "welcomeCredits": "Тавтай морилын кредит",
         "purchase": "Худалдан авалт"
+      },
+      "program": {
+        "adminBulkGrant": "Админы кредит олголт",
+        "contributorChampion": "Хувь нэмэр оруулагчийн аваргын кредит",
+        "feedback": "Санал хүсэлтийн кредит",
+        "influencer": "Инфлюенсер кредит",
+        "ossMonthlyReset": "Нээлттэй эхийн кредитийг сар бүр шинэчлэх",
+        "ossSponsorship": "Нээлттэй эхийн ивээн тэтгэлгийн кредит",
+        "pullRequest": "Нэгтгэх хүсэлтийн кредит",
+        "usageIssue": "Хэрэглээний асуудлын кредит",
+        "vibeDay": "Vibe Day кредит"
       },
       "purchaseFallback": "Кредит худалдан авалт",
       "receipt": "Баримт",
       "receiptA11y": "Баримтыг нээх: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна.",
-      "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна."
+      "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна.",
+      "voidedGrant": "Хүчингүй болгосон: {{description}}"
     },
     "title": "Кредит худалдан авах",
     "description": "Кредит нь Kilo App дээр AI кодчилолын сессүүдийг ажиллуулахын тулд таны Kilo үлдэгдэлд нэмэгддэг нэг удаагийн худалдан авалт юм. Дэлгүүр таны данснаас төлбөр авч, дэлгүүр төлбөрийг баталгаажуулсны дараа кредит нэмэгдэнэ.",
@@ -5088,6 +5118,20 @@
       "eu": "Европын Холбоо",
       "au": "Австрали",
       "jp": "Япон"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Тохиргоо хайх",
+    "noMatches": "Тохирох тохиргоо олдсонгүй",
+    "emptyDescription": "Өөр тохиргооны нэр эсвэл түлхүүр үгээр хайж үзнэ үү.",
+    "resultsStatus": "Олдсон тохиргоо: {{resultCount}}",
+    "keywords": {
+      "signOut": "гарах|бүртгэлээс гарах",
+      "appearance": "загвар|өнгөний схем|бараан горим",
+      "appUnlock": "биометр|царай таних|хурууны хээ",
+      "language": "хэл|орчуулга",
+      "notifications": "мэдэгдэл|сануулга",
+      "privacy": "дүн шинжилгээ|мөрдөх|нууцлал"
     }
   }
 }

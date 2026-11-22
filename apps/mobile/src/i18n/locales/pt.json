@@ -311,6 +311,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
+    "availableToSpendInOrganization": "Disponível para gastar nesta organização",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -452,6 +453,17 @@
       "location": "Localização Vertex",
       "clientEmail": "Email da conta de serviço",
       "privateKey": "Chave privada da conta de serviço",
+      "privateKeyBlockRequired": "Cola o bloco completo da chave, desde a linha BEGIN até à linha END.",
+      "privateKeyEncrypted": "Este bloco da chave está protegido por uma frase-passe. Cola uma chave de conta de serviço que não tenha frase-passe.",
+      "names": {
+        "codestral": "Apenas Codestral antigo",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Iniciar sessão com ChatGPT)",
+        "xiaomi": "Xiaomi (pagamento conforme a utilização)",
+        "zai": "Z.ai (pagamento conforme a utilização)",
+        "bedrockByok": "Amazon Bedrock (direto)",
+        "vertexByok": "Google Vertex AI (direto)"
+      },
       "modelMappings": "Mapeamentos de modelos",
       "modelMappingsDescription": "Envia um modelo do gateway para um nome de implementação personalizado.",
       "mappingTitle": "Mapeamento {{number}}",
@@ -545,8 +557,11 @@
     "changelogFixesIn": "Correções e melhorias em {{areas}}.",
     "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
     "changelogAreas": {
-      "signIn": "Início de sessão",
-      "profileOrganizations": "Perfil & organizações"
+      "signIn": "início de sessão",
+      "profileOrganizations": "perfil & organizações",
+      "chat": "conversa",
+      "notifications": "notificações",
+      "integrations": "integrações"
     }
   },
   "preferences": {
@@ -2650,7 +2665,7 @@
       "searchPlaceholder": "Pesquisar repositórios",
       "noMatches": "Sem resultados",
       "noRepositories": "Nenhum repositório disponível",
-      "noRepositoriesDescription": "Nenhum repositório está ligado à sua conta.",
+      "noRepositoriesDescription": "Para carregar repositórios, ligue uma conta do GitHub ou do GitLab.",
       "loading": "A carregar…",
       "accessibility": "Repositório: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3564,7 +3579,7 @@
       "manageOnWeb": "Definições de faturação na Web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar lugares",
-      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos na Web.",
+      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos em kilo.ai.",
       "setupAutoTopUp": "Configurar carregamento automático",
       "manageAutoTopUp": "Gerir carregamento automático",
       "opensOnWeb": "Abre na web"
@@ -4544,6 +4559,7 @@
       "promptPlaceholder": "És um…",
       "tools": "Ferramentas",
       "wholeToolRule": "Este agente aplica uma regra a todas as ferramentas de uma só vez: {{rule}}. Esses interruptores são somente leitura.",
+      "toolRule": "Regra armazenada: {{rule}}",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primário — mostrado no seletor",
       "visibilitySubagent": "Subagente — só pode ser invocado por outros",
@@ -4653,20 +4669,34 @@
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras, recibos e uso de créditos aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
+      "expiredGrant": "Expirado: {{description}}",
       "googlePlayReceipt": "Recibo do Google Play",
       "kind": {
         "adjustment": "Ajuste",
         "balanceNeutral": "Sem efeito no saldo",
         "deduction": "Dedução",
         "grant": "Concessão de créditos",
+        "promotionalCredits": "Créditos promocionais",
         "welcomeCredits": "Créditos de boas-vindas",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessão de créditos pelo administrador",
+        "contributorChampion": "Crédito de campeão contribuidor",
+        "feedback": "Crédito por comentários",
+        "influencer": "Crédito de influencer",
+        "ossMonthlyReset": "Renovação do patrocínio de código aberto",
+        "ossSponsorship": "Crédito de patrocínio de código aberto",
+        "pullRequest": "Crédito por PR",
+        "usageIssue": "Crédito por problema de utilização",
+        "vibeDay": "Crédito por Vibe Day"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
-      "retentionLimit": "A mostrar o histórico de créditos mais recente."
+      "retentionLimit": "A mostrar o histórico de créditos mais recente.",
+      "voidedGrant": "Anulado: {{description}}"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
@@ -5262,6 +5292,20 @@
       "eu": "União Europeia",
       "au": "Austrália",
       "jp": "Japão"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Pesquisar nas preferências",
+    "noMatches": "Nenhuma preferência encontrada",
+    "emptyDescription": "Experimente outro nome de preferência ou palavra-chave.",
+    "resultsStatus": "Preferências encontradas: {{resultCount}}",
+    "keywords": {
+      "signOut": "sair|terminar sessão",
+      "appearance": "tema|cores|modo escuro",
+      "appUnlock": "biometria|rosto|impressão digital",
+      "language": "idioma|língua|tradução",
+      "notifications": "alertas|avisos|notificações",
+      "privacy": "análise de dados|rastreio|privacidade"
     }
   }
 }

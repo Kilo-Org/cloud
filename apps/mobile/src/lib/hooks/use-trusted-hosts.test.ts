@@ -29,9 +29,9 @@ function flushMicrotasks(): Promise<void> {
   });
 }
 
-// The store is a module-level singleton that latches its one disk read, so a
-// fresh module graph gives a truly cold store whose preload-then-read can be
-// exercised end to end.
+// The store is a module-level singleton that starts one disk read when it is
+// constructed, so a fresh module graph gives a truly cold store whose read can
+// be exercised end to end.
 async function freshTrustedHosts(): Promise<typeof TrustedHostsModule> {
   vi.resetModules();
   const mod = import('./use-trusted-hosts');

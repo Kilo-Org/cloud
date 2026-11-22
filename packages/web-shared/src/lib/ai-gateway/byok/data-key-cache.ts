@@ -1,35 +1,28 @@
 import { createHash } from 'crypto';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
-import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
+import {
+  byokDataKeyBinding,
+  type ByokKmsContext,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { byokDataKeyRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 
 /**
- * How long a decrypted data key may be served without asking the KMS service again. Revoking
- * KMS access to a key therefore takes up to this long to reach inference.
+ * How long a cached data key keeps opening the ciphertext, so a revoked key reaches inference
+ * within this window at most. A hit skips *waiting* for the KMS reply, not the request: every
+ * decrypt still issues it.
  */
 export const BYOK_DATA_KEY_CACHE_TTL_SECONDS = 5 * 60;
 
 /**
- * The cache entry is addressed by everything the KMS service binds a data key to: the wrapped
- * key, the KMS key that wrapped it, and the owner context. A rotated or replaced key stores a
- * new wrapped data key, so a stale entry is never read; it just expires. Hashing keeps
- * identifiers out of Redis keys.
+ * The digest covers exactly the binding `/decrypt` sends, so a field added to that request is also
+ * addressed by the cache. A rotated or replaced key stores a new wrapped data key, so a stale entry
+ * is never read; it just expires. Hashing keeps identifiers out of Redis keys.
  */
 function cacheKey(envelope: BYOKApiKeyEnvelope, context: ByokKmsContext) {
   const digest = createHash('sha256')
-    .update(
-      JSON.stringify([
-        context.key_id,
-        context.owner_type,
-        context.owner_id,
-        context.provider_id,
-        envelope.wrapped_dek,
-        envelope.kms_key_id,
-        envelope.kms_key_version,
-      ])
-    )
+    .update(JSON.stringify(byokDataKeyBinding(envelope, context)))
     .digest('hex');
   return byokDataKeyRedisKey(digest);
 }

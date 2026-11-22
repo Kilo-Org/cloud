@@ -11,7 +11,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 jest.mock('@/lib/organizations/organization-auth');
@@ -29,7 +29,7 @@ const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModel
 const mockedGetModelIdToProviderSlugsIndex = jest.mocked(getModelIdToProviderSlugsIndex);
 const mockedGetProviderSlugsForModel = jest.mocked(getProviderSlugsForModel);
 
-function makeOpenRouterModel(id: string): OpenRouterModel {
+function makeOpenRouterModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,

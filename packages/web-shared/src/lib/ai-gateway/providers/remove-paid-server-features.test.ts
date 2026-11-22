@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { removePaidServerFeatures } from './remove-paid-server-features';
+import {
+  removePaidServerFeatures,
+  requestsPaidServerFeatures,
+} from './remove-paid-server-features';
 
 const MODEL = 'vendor/model:free';
 const FREE_PDF_PARSER = { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } };
@@ -151,5 +154,25 @@ describe('removePaidServerFeatures', () => {
     expect(request.body.tools).toEqual([functionTool]);
     expect(request.body.plugins).toEqual([FREE_PDF_PARSER]);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('removes a paid plugin nested one level deep, which the predicate also reports', () => {
+    const request = makeChatRequest({ plugins: [[{ id: 'web' }]] });
+
+    expect(requestsPaidServerFeatures(request)).toBe(true);
+    removePaidServerFeatures(makeProvider(), MODEL, request, 'user-1');
+
+    // The nested array is the element the predicate calls paid, and the mutator drops it whole.
+    expect(request.body.plugins).toEqual([FREE_PDF_PARSER]);
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed paid server features from free or BYOK request',
+      {
+        userId: 'user-1',
+        model: MODEL,
+        requestKind: 'chat_completions',
+        removedPlugins: [[{ id: 'web' }]],
+        removedToolTypes: [],
+      }
+    );
   });
 });

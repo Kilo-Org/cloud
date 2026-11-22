@@ -334,9 +334,11 @@ observable behavior is the same.
    sound and vibration explicitly; user changes to notification settings remain
    authoritative. An install with the old low-importance channel MUST migrate
    to a new channel id because Android keeps channel importance after creation.
-2. The system MUST key the notification by the session id, through a stable
-   notification id derived from it, so an update replaces that session's
-   notification and never another session's.
+2. The system MUST key the notification by the whole session id, so an update
+   replaces that session's notification and never another session's. Android
+   keys a notification by the pair (tag, id), so the session id is the tag and
+   the id names nothing on its own; each session's actions MUST carry the same
+   whole id on their intents, so a session owns its action records.
 3. The system MUST request the promoted-ongoing Live Update where the platform
    allows it (Android 16.1 or later, with the user's Live Updates setting on),
    and MUST fall back to an ordinary ongoing notification everywhere else. It

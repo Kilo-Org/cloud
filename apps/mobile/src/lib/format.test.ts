@@ -15,9 +15,20 @@ import {
   formatNumber,
   formatPrefixedMoney,
   formatPrefixedUsd,
+  formatSignedPrefixedMoney,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
 } from './format';
+
+/** The shape `formatPrefixedMoney` pins, and the four-digit shape below it. */
+const TWO_DIGITS = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+} satisfies Intl.NumberFormatOptions;
+const FOUR_DIGITS = {
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+} satisfies Intl.NumberFormatOptions;
 
 describe('formatPrefixedUsd', () => {
   it("leads the prefixed amount with the symbol and the locale's own sign", () => {
@@ -36,6 +47,42 @@ describe('formatPrefixedUsd', () => {
     const ar = formatPrefixedUsd(0, 'ar');
     expect(ar.startsWith('$')).toBe(true);
     expect(ar).not.toContain('\u00A0');
+  });
+
+  it('writes a negative that rounds to zero as the locale’s own unsigned zero', () => {
+    // The five inputs the two-decimal shape has to get right, side by side.
+    const twoDigits = [
+      [0, '$0.00'],
+      [-0, '$0.00'],
+      [-0.001, '$0.00'],
+      [0.004, '$0.00'],
+      [-5, '-$5.00'],
+    ] as const;
+    for (const [amount, expected] of twoDigits) {
+      expect(formatPrefixedUsd(amount, 'en-US', TWO_DIGITS)).toBe(expected);
+    }
+    // The locale's own zero, digits, separators and direction marks included.
+    for (const locale of ['de-DE', 'pt-BR', 'hi', 'ar-EG', 'fa']) {
+      expect(formatPrefixedUsd(-0.004, locale, TWO_DIGITS)).toBe(
+        `$${formatNumber(0, locale, TWO_DIGITS)}`
+      );
+    }
+    // The same input at four digits is a real amount, so it keeps its sign, and
+    // below the fourth digit it rounds back to that unsigned zero.
+    expect(formatPrefixedUsd(-0.001, 'en-US', FOUR_DIGITS)).toBe('-$0.0010');
+    expect(formatPrefixedUsd(-0.00004, 'en-US', FOUR_DIGITS)).toBe('$0.0000');
+  });
+
+  it('keeps a visible debit signed and refuses a caller plus', () => {
+    // A half cent rounds to a cent at these digits, so the debit is visible.
+    expect(formatPrefixedUsd(-0.005, 'en-US', TWO_DIGITS)).toBe('-$0.01');
+    expect(formatPrefixedUsd(-0.5, 'de-DE', TWO_DIGITS)).toBe('-$0,50');
+    // The plus is the ledger shape's job: a caller asking for one cannot sign
+    // an ordinary money figure, and cannot sign a rounded zero back into a plus.
+    expect(formatPrefixedUsd(5, 'en-US', { ...TWO_DIGITS, signDisplay: 'always' })).toBe('$5.00');
+    expect(formatPrefixedUsd(-0.004, 'en-US', { ...TWO_DIGITS, signDisplay: 'exceptZero' })).toBe(
+      '$0.00'
+    );
   });
 });
 
@@ -60,10 +107,45 @@ describe('formatPrefixedMoney', () => {
     expect(formatPrefixedMoney(-5, 'sv').startsWith('\u2212$')).toBe(true);
   });
 
+  it('drops the sign from a negative that rounds to zero cents', () => {
+    expect(formatPrefixedMoney(-0.004, 'en-US')).toBe('$0.00');
+    expect(formatPrefixedMoney(-0.004, 'de-DE')).toBe('$0,00');
+    // A half cent still rounds to a cent, and keeps its sign.
+    expect(formatPrefixedMoney(-0.005, 'en-US')).toBe('-$0.01');
+  });
+
   it('writes the symbol first and no separating space in a right-to-left language', () => {
     const ar = formatPrefixedMoney(1234.5, 'ar');
     expect(ar.startsWith('$')).toBe(true);
     expect(ar).not.toContain('\u00A0');
+  });
+});
+
+describe('formatSignedPrefixedMoney', () => {
+  it('says the direction of a credit, a debit and a zero', () => {
+    expect(formatSignedPrefixedMoney(12.5, 'en-US')).toBe('+$12.50');
+    expect(formatSignedPrefixedMoney(-5, 'sv')).toBe('\u2212$5,00');
+    // A zero moved nothing, so it takes no direction mark at all — and neither
+    // does a debit the formatter rounds to that zero.
+    expect(formatSignedPrefixedMoney(0, 'en-US')).toBe('$0.00');
+    expect(formatSignedPrefixedMoney(-0, 'en-US')).toBe('$0.00');
+    expect(formatSignedPrefixedMoney(-0.004, 'en-US')).toBe('$0.00');
+    // A half cent is visible, so it keeps the direction it holds.
+    expect(formatSignedPrefixedMoney(-0.005, 'en-US')).toBe('-$0.01');
+    expect(formatSignedPrefixedMoney(0.005, 'en-US')).toBe('+$0.01');
+  });
+
+  it('keeps each locale’s digits, separators and minus glyph', () => {
+    expect(formatSignedPrefixedMoney(1234.5, 'de-DE')).toBe('+$1.234,50');
+    expect(formatSignedPrefixedMoney(0, 'ar-EG')).toBe('$٠٫٠٠');
+  });
+
+  it('drops the directional literal ICU writes beside a sign', () => {
+    // Arabic is where ICU adds it; the caller's isolate already pins the run,
+    // and a spoken label reads the bare figure.
+    expect(formatSignedPrefixedMoney(12.5, 'ar')).toBe('+$12.50');
+    // The ordinary shapes keep their bytes: this shape owns the strip.
+    expect(formatPrefixedMoney(12.5, 'ar')).toBe('$12.50');
   });
 });
 

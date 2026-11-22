@@ -309,6 +309,7 @@
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
+    "availableToSpendInOrganization": "Beschikbaar om te besteden in deze organisatie",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -450,6 +451,17 @@
       "location": "Vertex-locatie",
       "clientEmail": "E-mailadres van serviceaccount",
       "privateKey": "Privésleutel van serviceaccount",
+      "privateKeyBlockRequired": "Plak het hele sleutelblok, van de BEGIN-regel tot de END-regel.",
+      "privateKeyEncrypted": "Dit sleutelblok is met een wachtwoordzin beveiligd. Plak een serviceaccountsleutel zonder wachtwoordzin.",
+      "names": {
+        "codestral": "Alleen verouderde Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Aanmelden met ChatGPT)",
+        "xiaomi": "Xiaomi (betalen naar gebruik)",
+        "zai": "Z.ai (betalen naar gebruik)",
+        "bedrockByok": "Amazon Bedrock (rechtstreeks)",
+        "vertexByok": "Google Vertex AI (rechtstreeks)"
+      },
       "modelMappings": "Modelkoppelingen",
       "modelMappingsDescription": "Stuur een gatewaymodel door naar een aangepaste deploymentnaam.",
       "mappingTitle": "Koppeling {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Oplossingen en verbeteringen in {{areas}}.",
     "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
     "changelogAreas": {
-      "signIn": "Inloggen",
-      "profileOrganizations": "Profiel & organisaties"
+      "signIn": "inloggen",
+      "profileOrganizations": "profiel & organisaties",
+      "chat": "gesprek",
+      "notifications": "meldingen",
+      "integrations": "integraties"
     }
   },
   "preferences": {
@@ -1985,7 +2000,7 @@
       "searchPlaceholder": "Coderepository's zoeken",
       "noMatches": "Geen resultaten",
       "noRepositories": "Geen repositories beschikbaar",
-      "noRepositoriesDescription": "Er zijn geen repositories aan je account gekoppeld.",
+      "noRepositoriesDescription": "Koppel een GitHub- of GitLab-account om repositories te laden.",
       "loading": "Laden…",
       "accessibility": "Gekozen repository: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3432,7 +3447,7 @@
       "manageOnWeb": "Factureringsinstellingen op het web",
       "changePlan": "Plan wijzigen",
       "buySeats": "Licenties kopen",
-      "managedOnWeb": "Het plan, de licenties en automatisch opwaarderen worden op het web beheerd.",
+      "managedOnWeb": "Het plan, de licenties en automatisch opwaarderen worden op kilo.ai beheerd.",
       "setupAutoTopUp": "Automatisch opwaarderen instellen",
       "manageAutoTopUp": "Automatisch opwaarderen beheren",
       "opensOnWeb": "Opent op het web"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Je bent een…",
       "tools": "Hulpmiddelen",
       "wholeToolRule": "Deze agent past in één keer één regel toe op alle hulpmiddelen: {{rule}}. Deze schakelaars zijn alleen-lezen.",
+      "toolRule": "Opgeslagen regel: {{rule}}",
       "visibility": "Zichtbaarheid",
       "visibilityPrimary": "Primair — weergegeven in de kiezer",
       "visibilitySubagent": "Subagent — alleen opvraagbaar door anderen",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Tegoedafschrijving",
       "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
       "emptyTitle": "Geen tegoedgeschiedenis",
+      "expiredGrant": "Verlopen: {{description}}",
       "googlePlayReceipt": "Bon in Google Play",
       "kind": {
         "adjustment": "Correctie",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Afschrijving",
         "grant": "Tegoedtoekenning",
+        "promotionalCredits": "Promotietegoed",
         "welcomeCredits": "Welkomsttegoed",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Tegoedtoekenning door beheerder",
+        "contributorChampion": "Tegoed voor bijdragerskampioen",
+        "feedback": "Feedbacktegoed",
+        "influencer": "Influencertegoed",
+        "ossMonthlyReset": "Maandelijkse herinstelling van opensource-sponsoring",
+        "ossSponsorship": "Tegoed voor opensource-sponsoring",
+        "pullRequest": "PR-tegoed",
+        "usageIssue": "Tegoed voor gebruiksprobleem",
+        "vibeDay": "Vibe-dagtegoed"
       },
       "purchaseFallback": "Tegoedaankoop",
       "receipt": "Bon",
       "receiptA11y": "Open de bon voor {{description}}, {{amount}}, van {{date}}",
       "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop.",
-      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven."
+      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven.",
+      "voidedGrant": "Geannuleerd: {{description}}"
     },
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
@@ -5088,6 +5118,20 @@
       "eu": "Europese Unie",
       "au": "Australië",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Voorkeuren zoeken",
+    "noMatches": "Geen overeenkomende voorkeuren",
+    "emptyDescription": "Probeer een andere naam of een ander trefwoord.",
+    "resultsStatus": "Gevonden voorkeuren: {{resultCount}}",
+    "keywords": {
+      "signOut": "afmelden|uitloggen",
+      "appearance": "thema|kleurenschema|donkere modus",
+      "appUnlock": "biometrie|gezichtsherkenning|vingerafdruk",
+      "language": "taal|vertaling",
+      "notifications": "waarschuwingen|pushmeldingen",
+      "privacy": "analyse|volgen|gegevens"
     }
   }
 }

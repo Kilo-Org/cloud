@@ -70,6 +70,13 @@ vi.mock('react-native-reanimated', () => ({
   FadeOut: { duration: () => ({}) },
 }));
 
+// The pull's hook reads the motion policy, whose real module needs reanimated's
+// `useReducedMotion` and the battery; this stub keeps the suite's animations and
+// the policy's answer under the suite's control.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+}));
+
 // The host keeps every prop the caller hands it, so the suite reads the list's
 // own `refreshControl` instead of a forwarded gesture. The footer is mounted
 // under the host, the way the real list renders it, so the pagination notes the
@@ -89,11 +96,16 @@ vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',
   Loader2: 'Loader2',
   Lock: 'Lock',
+  RotateCcw: 'RotateCcw',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
 }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
+// The static band's reserve belongs to the reduced-motion policy; this suite
+// asserts where the screen mounts it and which control it carries.
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
@@ -103,6 +115,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#71717a' }),
+  useMutedDisabledInk: () => '#71717a',
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
@@ -249,6 +262,40 @@ describe('InvoiceListScreen pull to refresh', () => {
       await Promise.resolve();
     });
     expect(query.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws the static band above the rows with the same control', async () => {
+    // Under reduced motion the band is the pull's visible half, and it sits
+    // beside the list rather than in its header: a header band would move the
+    // first row down at rest and scroll away with the rows.
+    const query = settledQuery();
+    const view = await mount([invoice], query);
+
+    const bands = view.renderer.root.findAllByType('RefreshProgress' as ElementType);
+    expect(bands).toHaveLength(1);
+    const [list] = view.renderer.root.findAllByType('FlashList' as ElementType);
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    expect(bands[0]?.props.refreshControl).toBe(list.props.refreshControl);
+    expect(list.props.ListHeaderComponent).toBeUndefined();
+  });
+
+  it('draws no band of its own while the skeleton or a first-page error is the body', async () => {
+    // Neither branch carries a pull control, so neither may reserve the band;
+    // the empty state's centered scroller draws its own.
+    const loading = settledQuery();
+    loading.isPending = true;
+    const skeleton = await mount([], loading);
+    expect(skeleton.renderer.root.findAllByType('RefreshProgress' as ElementType)).toHaveLength(0);
+    skeleton.unmount();
+    mounted = undefined;
+
+    const failed = settledQuery();
+    failed.isError = true;
+    failed.data = undefined;
+    const view = await mount([], failed);
+    expect(view.renderer.root.findAllByType('RefreshProgress' as ElementType)).toHaveLength(0);
   });
 });
 

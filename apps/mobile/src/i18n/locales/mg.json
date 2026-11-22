@@ -309,6 +309,7 @@
     "hideBalance": "Afeno ny ambim-bola",
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
+    "availableToSpendInOrganization": "Azo ampiasaina ho fandaniana ao amin'ity fikambanana ity",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",
@@ -450,6 +451,17 @@
       "location": "Toerana Vertex",
       "clientEmail": "Mailakan'ny service account",
       "privateKey": "Lakile manokan'ny service account",
+      "privateKeyBlockRequired": "Apetaho ny lakile manontolo, manomboka amin'ny andalana BEGIN ka hatramin'ny andalana END.",
+      "privateKeyEncrypted": "Ity lakile manontolo ity dia voaro amin'ny andian-teny miafina. Apetaho ny lakile manokan'ny service account tsy misy andian-teny miafina.",
+      "names": {
+        "codestral": "Codestral taloha ihany",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Midira amin'ny ChatGPT)",
+        "xiaomi": "Xiaomi (fandoavana araka ny fampiasana)",
+        "zai": "Z.ai (fandoavana araka ny fampiasana)",
+        "bedrockByok": "Amazon Bedrock (mivantana)",
+        "vertexByok": "Google Vertex AI (mivantana)"
+      },
       "modelMappings": "Fampifandraisana modely",
       "modelMappingsDescription": "Alefaso any amin'ny anaran'ny deployment manokana ny modelin'ny gateway.",
       "mappingTitle": "Fampifandraisana {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
     "changelogFixesPolish": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
     "changelogAreas": {
-      "signIn": "Fidirana",
-      "profileOrganizations": "Mombamomba sy fikambanana"
+      "signIn": "fidirana",
+      "profileOrganizations": "mombamomba sy fikambanana",
+      "chat": "resaka",
+      "notifications": "fampandrenesana",
+      "integrations": "fampifandraisana"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Fikarohana tahirin-kaody",
       "noMatches": "Tsy misy mifanaraka",
       "noRepositories": "Tsy misy tahirin-kaody azo ampiasaina",
-      "noRepositoriesDescription": "Tsy misy tahirin-kaody mifandray amin'ny kaontinao.",
+      "noRepositoriesDescription": "Mba hahazoana tahirin-kaody, ampifandraiso amin'ny GitHub na GitLab.",
       "loading": "Maka angona…",
       "accessibility": "Tahirin-kaody: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Fikirakiran'ny faktiora amin'ny tranonkala",
       "changePlan": "Ovao ny drafitra",
       "buySeats": "Mividiana toerana",
-      "managedOnWeb": "Tantanina amin'ny tranonkala ny drafitra, ny toerana ary ny famenoana ho azy.",
+      "managedOnWeb": "Tantanina ao amin'ny kilo.ai ny drafitra, ny toerana ary ny famenoana ho azy.",
       "setupAutoTopUp": "Alamino ny famenoana ho azy",
       "manageAutoTopUp": "Tantano ny famenoana ho azy",
       "opensOnWeb": "Misokatra ao amin'ny tranonkala"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Ianao dia…",
       "tools": "Fitaovana",
       "wholeToolRule": "Ity agent ity dia mampihatra fitsipika iray amin'ny fitaovana rehetra indray mandeha: {{rule}}. Vakiana fotsiny ireo mpifamadihana ireo.",
+      "toolRule": "Fitsipika voatahiry: {{rule}}",
       "visibility": "Fahitana",
       "visibilityPrimary": "Kilonga — aseho ao amin'ny mpanangona",
       "visibilitySubagent": "Subagent — azo antsoina amin'ny hafa ihany",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Fanalana kredita",
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
       "emptyTitle": "Tsy misy tantaran'ny kredita",
+      "expiredGrant": "Lany fe-potoana: {{description}}",
       "googlePlayReceipt": "Rosia avy amin'ny Google Play",
       "kind": {
         "adjustment": "Fanitsiana",
         "balanceNeutral": "Tsy manova ny sisa",
         "deduction": "Fanalana",
         "grant": "Kredita nomena",
+        "promotionalCredits": "Kireditra fanentanana",
         "welcomeCredits": "Kredita tongasoa",
         "purchase": "Fividianana"
+      },
+      "program": {
+        "adminBulkGrant": "Kredita nomen’ny mpitantana",
+        "contributorChampion": "Kredita tompondakan’ny mpandray anjara",
+        "feedback": "Kredita fanehoan-kevitra",
+        "influencer": "Kredita influencer",
+        "ossMonthlyReset": "Fanavaozana fanohanana rindranasa misokatra loharano",
+        "ossSponsorship": "Kredita fanohanana rindranasa misokatra loharano",
+        "pullRequest": "Kredita PR",
+        "usageIssue": "Kredita olana fampiasana",
+        "vibeDay": "Kredita Vibe Day"
       },
       "purchaseFallback": "Fividianana kredita",
       "receipt": "Rosia",
       "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity.",
-      "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra."
+      "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra.",
+      "voidedGrant": "Nofoanana: {{description}}"
     },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
@@ -5088,6 +5118,20 @@
       "eu": "Vondrona Eoropeana",
       "au": "Aostralia",
       "jp": "Japana"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Karohy ny safidy",
+    "noMatches": "Tsy misy safidy mifanaraka",
+    "emptyDescription": "Manandrama anaran-tsafidy na teny fikarohana hafa.",
+    "resultsStatus": "Safidy hita: {{resultCount}}",
+    "keywords": {
+      "signOut": "mivoaha|fivoahana",
+      "appearance": "bika|endrika|loko",
+      "appUnlock": "biometrika|tarehy|dian-tanana",
+      "language": "fiteny|fandikan-teny",
+      "notifications": "fampandrenesana|fanairana",
+      "privacy": "fanadihadiana|fanarahana"
     }
   }
 }

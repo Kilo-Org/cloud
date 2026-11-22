@@ -309,6 +309,7 @@
     "hideBalance": "Haftee dhoksi",
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
+    "availableToSpendInOrganization": "Dhaabbata kana keessatti baasuuf argama",
     "signOutTitle": "Keessaa baataa?",
     "signOutMessage": "Iddoo hojii keetti deebi'uuf ammas seenuu qabda.",
     "deleteAccountTitle": "Herrega haqxaa?",
@@ -450,6 +451,17 @@
       "location": "Bakka Vertex",
       "clientEmail": "Imeelii herrega tajaajilaa",
       "privateKey": "Furtuu dhuunfaa herrega tajaajilaa",
+      "privateKeyBlockRequired": "Boolloo furtuu guutuu, sarara BEGIN irraa hanga sarara END tti maxxansi.",
+      "privateKeyEncrypted": "Boolloon furtuu kun jecha darbiitiin eegamaa jira. Furtuu herrega tajaajilaa jecha darbii hin qabne maxxansi.",
+      "names": {
+        "codestral": "Codestral qofa kan duraa",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT fayyadamuun seeni)",
+        "xiaomi": "Xiaomi (akka fayyadamaatti kaffaluu)",
+        "zai": "Z.ai (akka fayyadamaatti kaffaluu)",
+        "bedrockByok": "Amazon Bedrock (kallattiin kaffalamu)",
+        "vertexByok": "Google Vertex AI (kallattiin kaffalamu)"
+      },
       "modelMappings": "Walqabsiisa moodeelaa",
       "modelMappingsDescription": "Moodeela gateway gara maqaa deployment addaatti ergi.",
       "mappingTitle": "Walqabsiisa {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Sirreeffamaa fi fooyya'iinsota {{areas}} keessatti.",
     "changelogFixesPolish": "Sirreeffamaa fi fooyya'iinsota appii guutuu keessatti.",
     "changelogAreas": {
-      "signIn": "Seenuu",
-      "profileOrganizations": "Piroofaayilii fi dhaabbilee"
+      "signIn": "seenuu",
+      "profileOrganizations": "piroofaayilii fi dhaabbilee",
+      "chat": "marii",
+      "notifications": "beeksisota",
+      "integrations": "walitti hidhamiinsota"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Barbaacha kuusaalee koodii",
       "noMatches": "Wanti walsimu hin jiru",
       "noRepositories": "Kuusaan koodii hin argamu",
-      "noRepositoriesDescription": "Kuusaawwan koodii herrega keetti walqabatan hin jiran.",
+      "noRepositoriesDescription": "Kuusaa koodii fe'uuf, herrega GitHub yookaan GitLab walitti hidhi.",
       "loading": "Fe'aa jira…",
       "accessibility": "Kuusaa koodii: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Qindaa'ina kaffaltii weebii irratti",
       "changePlan": "Karoora jijjiiri",
       "buySeats": "Bakka miseensotaa bitadhu",
-      "managedOnWeb": "Karoorri, bakki miseensotaa fi guutuun ofumaan weebii irratti bulchamu.",
+      "managedOnWeb": "Karoorri, bakki miseensotaa fi guutuun ofumaan kilo.ai irratti bulchamu.",
       "setupAutoTopUp": "Guutuu ofumaan qindeessi",
       "manageAutoTopUp": "Guutuu ofumaan bulchi",
       "opensOnWeb": "Weebii irratti bana"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Ati nama …",
       "tools": "Meeshaalee",
       "wholeToolRule": "Maajentiin kun seera tokko meeshaalee hunda irratti yeroo tokkotti hojiirra oolcha: {{rule}}. Qalqalloonni kunneen dubbisuu qofa danda'u.",
+      "toolRule": "Seera kuusame: {{rule}}",
       "visibility": "Mul’achuu",
       "visibilityPrimary": "Primary — kan agarsiifame picker keessatti",
       "visibilitySubagent": "Subagent — kanneen biroo irraa qofa kan waamamu",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Hir'isa kireeditii",
       "emptyDescription": "Bittaan kireeditii, nagaheewwanii fi itti fayyadamni asitti mul'atu.",
       "emptyTitle": "Seenaan kireeditii hin jiru",
+      "expiredGrant": "Yeroon isaa darbeera: {{description}}",
       "googlePlayReceipt": "Nagahee Google Play irraa",
       "kind": {
         "adjustment": "Sirreeffama",
         "balanceNeutral": "Haftee hin jijjiirre",
         "deduction": "Hir'isa",
         "grant": "Kireeditii kenname",
+        "promotionalCredits": "Kiriiditii beeksisaa",
         "welcomeCredits": "Kireeditii simannaa",
         "purchase": "Bittaa"
+      },
+      "program": {
+        "adminBulkGrant": "Kireeditii bulchaa kenname",
+        "contributorChampion": "Kireeditii hayyuu gumaachaa",
+        "feedback": "Kireeditii yaadaa",
+        "influencer": "Kireeditii infiluwensarii",
+        "ossMonthlyReset": "Haaromsa deeggarsa maallaqaa koodii banaa",
+        "ossSponsorship": "Kireeditii deeggarsa maallaqaa koodii banaa",
+        "pullRequest": "Kireeditii gaaffii walitti makuu",
+        "usageIssue": "Kireeditii rakkoo itti fayyadamaa",
+        "vibeDay": "Kireeditii Vibe Day"
       },
       "purchaseFallback": "Bittaa kireeditii",
       "receipt": "Nagahee",
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
       "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
-      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira."
+      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira.",
+      "voidedGrant": "Haqameera: {{description}}"
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
@@ -5088,6 +5118,20 @@
       "eu": "Gamtaa Awurooppaa",
       "au": "Awustraaliyaa",
       "jp": "Jaappaan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Barbaacha filannoowwanii",
+    "noMatches": "Filannoowwan walsiman hin jiran",
+    "emptyDescription": "Maqaa filannoo ykn jecha ijoo biraa yaali.",
+    "resultsStatus": "Filannoowwan argaman: {{resultCount}}",
+    "keywords": {
+      "signOut": "ba'uu|keessaa ba'uu",
+      "appearance": "bifa|halluu",
+      "appUnlock": "fuula|ashaaraa qubaa",
+      "language": "afaan|hiikkaa",
+      "notifications": "beeksisa|akeekkachiisa",
+      "privacy": "iccitii|xiinxala|hordoffii"
     }
   }
 }

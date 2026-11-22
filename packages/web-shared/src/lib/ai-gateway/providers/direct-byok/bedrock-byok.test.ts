@@ -1,7 +1,12 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { GatewayRequest } from '../openrouter/types';
-import { ReasoningDetailsTransform, type TransformRequestContext } from '../types';
-import awsBedrock, { parseAwsBedrockCredentials, resolveAwsBedrockUpstream } from './bedrock-byok';
+import { ReasoningDetailsTransform } from '../types';
+import type { DirectByokTransformRequestContext } from './types';
+import awsBedrock, {
+  getAwsBedrockEndpoint,
+  parseAwsBedrockCredentials,
+  resolveAwsBedrockUpstream,
+} from './bedrock-byok';
 
 const iamCredential = JSON.stringify({
   accessKeyId: 'AKIDEXAMPLE',
@@ -119,7 +124,14 @@ describe('awsBedrock definition', () => {
   function createContext(
     request: GatewayRequest,
     model = 'bedrock-byok/global.anthropic.claude-sonnet-4-6'
-  ): TransformRequestContext {
+  ): DirectByokTransformRequestContext {
+    // The served model is the one the request body names, with the endpoint its id implies.
+    const servedModelId = request.body.model;
+    if (servedModelId === undefined) throw new Error('the request names no model');
+    const servedModel = {
+      id: servedModelId,
+      endpoint: getAwsBedrockEndpoint({ id: servedModelId }),
+    };
     return {
       provider: {
         type: 'direct-byok',
@@ -133,6 +145,7 @@ describe('awsBedrock definition', () => {
         async transformRequest() {},
       },
       model,
+      directByokModel: servedModel,
       request,
       originalHeaders: EmptyFraudDetectionHeaders,
       extraHeaders: {},

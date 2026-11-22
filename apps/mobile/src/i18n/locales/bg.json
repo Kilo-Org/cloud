@@ -309,6 +309,7 @@
     "hideBalance": "Скрий наличността",
     "showBalance": "Покажи наличността",
     "balanceHidden": "Наличността е скрита",
+    "availableToSpendInOrganization": "Достъпно за разходване в тази организация",
     "signOutTitle": "Да се излезе ли от акаунта?",
     "signOutMessage": "Ще трябва да влезеш отново, за да имаш достъп до работното си пространство.",
     "deleteAccountTitle": "Да се изтрие ли акаунтът?",
@@ -450,6 +451,17 @@
       "location": "Местоположение във Vertex",
       "clientEmail": "Имейл на акаунта за услуга",
       "privateKey": "Частен ключ на акаунта за услуга",
+      "privateKeyBlockRequired": "Постави целия блок на ключа, от реда BEGIN до реда END.",
+      "privateKeyEncrypted": "Този блок на ключа е защитен с парола. Постави ключ на акаунт за услуга без парола.",
+      "names": {
+        "codestral": "Само за стар Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Влез с ChatGPT)",
+        "xiaomi": "Xiaomi (плащане според използването)",
+        "zai": "Z.ai (плащане според използването)",
+        "bedrockByok": "Amazon Bedrock (директно)",
+        "vertexByok": "Google Vertex AI (директно)"
+      },
       "modelMappings": "Съпоставяния на модели",
       "modelMappingsDescription": "Насочи gateway модел към персонализирано име на внедряване.",
       "mappingTitle": "Съпоставяне {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Поправки и подобрения в {{areas}}.",
     "changelogFixesPolish": "Поправки и подобрения в цялото приложение.",
     "changelogAreas": {
-      "signIn": "Вход",
-      "profileOrganizations": "Профил & организации"
+      "signIn": "вход",
+      "profileOrganizations": "профил & организации",
+      "chat": "чат",
+      "notifications": "известия",
+      "integrations": "интеграции"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Търсене на хранилища",
       "noMatches": "Няма съвпадения",
       "noRepositories": "Няма налични хранилища",
-      "noRepositoriesDescription": "Няма хранилища, свързани с твоя акаунт.",
+      "noRepositoriesDescription": "За да заредиш хранилища, свържи GitHub или GitLab.",
       "loading": "Зареждане…",
       "accessibility": "Хранилище: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Настройки на плащанията в уеб",
       "changePlan": "Смени плана",
       "buySeats": "Купи места",
-      "managedOnWeb": "Планът, местата и автоматичното зареждане се управляват в уеб.",
+      "managedOnWeb": "Планът, местата и автоматичното зареждане се управляват на kilo.ai.",
       "setupAutoTopUp": "Настрой автоматично зареждане",
       "manageAutoTopUp": "Управлявай автоматично зареждане",
       "opensOnWeb": "Отваря се в уеб версията"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "ти си…",
       "tools": "Инструменти",
       "wholeToolRule": "Този агент прилага едно правило към всеки инструмент наведнъж: {{rule}}. Тези превключватели са само за четене.",
+      "toolRule": "Запазено правило: {{rule}}",
       "visibility": "Видимост",
       "visibilityPrimary": "Основен — показва се в инструмента за избор",
       "visibilitySubagent": "Субагент — може да се извиква само от други",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Приспадане на кредити",
       "emptyDescription": "Покупките на кредити, разписките и използването ще се показват тук.",
       "emptyTitle": "Няма история на кредитите",
+      "expiredGrant": "Изтекъл срок: {{description}}",
       "googlePlayReceipt": "Разписка от Google Play",
       "kind": {
         "adjustment": "Корекция",
         "balanceNeutral": "Без промяна в баланса",
         "deduction": "Приспадане",
         "grant": "Безплатни кредити",
+        "promotionalCredits": "Промоционални кредити",
         "welcomeCredits": "Приветствени кредити",
         "purchase": "Покупка"
+      },
+      "program": {
+        "adminBulkGrant": "Кредити от администратор",
+        "contributorChampion": "Кредит за шампион сред сътрудниците",
+        "feedback": "Кредит за обратна връзка",
+        "influencer": "Кредит за инфлуенсъри",
+        "ossMonthlyReset": "Месечно нулиране на спонсорството за отворен код",
+        "ossSponsorship": "Кредит за спонсорство на отворен код",
+        "pullRequest": "Кредит за заявка за сливане",
+        "usageIssue": "Кредит за проблем с използването",
+        "vibeDay": "Кредит за Vibe day"
       },
       "purchaseFallback": "Покупка на кредити",
       "receipt": "Разписка",
       "receiptA11y": "Отваряне на разписката за {{description}}, {{amount}}, от {{date}}",
       "receiptUnavailable": "Няма налична разписка за тази покупка.",
-      "retentionLimit": "Показва се най-новата история на кредитите."
+      "retentionLimit": "Показва се най-новата история на кредитите.",
+      "voidedGrant": "Анулиран: {{description}}"
     },
     "title": "Купи кредити",
     "description": "Кредитите са еднократна покупка, добавена към вашия Kilo баланс за стартиране на AI сесии за кодиране в приложението Kilo. Магазинът таксува акаунта ви и кредитите се добавят, след като магазинът потвърди плащането.",
@@ -5088,6 +5118,20 @@
       "eu": "Европейски съюз",
       "au": "Австралия",
       "jp": "Япония"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Търсене в предпочитанията",
+    "noMatches": "Няма съвпадащи предпочитания",
+    "emptyDescription": "Опитайте да потърсите предпочитания по друго име или ключова дума.",
+    "resultsStatus": "Намерени предпочитания: {{resultCount}}",
+    "keywords": {
+      "signOut": "изход|излизане от профила",
+      "appearance": "тема|цветова схема",
+      "appUnlock": "биометрия|лицево разпознаване|пръстов отпечатък",
+      "language": "език|превод",
+      "notifications": "уведомления|сигнали|известия",
+      "privacy": "анализи|проследяване"
     }
   }
 }

@@ -229,6 +229,12 @@ const CreditDeductionSchema = z.object({
   description: z.string(),
   amount_mUsd: z.number(),
   kind: CreditDeductionKindSchema,
+  /**
+   * Why the row closed a grant, from its own category: an expiry or a
+   * voidance, null for every other deduction. A client titles such a row from
+   * it, so the title reads in the reader's language.
+   */
+  expiry: z.enum(['expired', 'voided']).nullable(),
   /** The grant this deduction closed, present for an expiry row. */
   purchase: z
     .object({
@@ -240,6 +246,8 @@ const CreditDeductionSchema = z.object({
       is_free: z.boolean(),
       /** The recorded purchase channel, null for legacy and internal grants. */
       credit_source: z.string().nullable(),
+      /** How the grant was earned; the client's row title is built from it. */
+      kind: CreditGrantReasonSchema,
     })
     .nullable(),
 });
@@ -331,6 +339,7 @@ type RawDeduction = {
   description: string;
   credit_category: string | null;
   amount_mUsd: number;
+  expiry: 'expired' | 'voided' | null;
   purchase: {
     id: string;
     date: string;
@@ -338,6 +347,7 @@ type RawDeduction = {
     amount_mUsd: number;
     is_free: boolean;
     credit_source: string | null;
+    kind: z.infer<typeof CreditGrantReasonSchema>;
   } | null;
 };
 
@@ -460,6 +470,7 @@ async function enrichDeductionsWithInstanceNames(
     description: string;
     amount_mUsd: number;
     kind: z.infer<typeof CreditDeductionKindSchema>;
+    expiry: RawDeduction['expiry'];
     purchase: RawDeduction['purchase'];
   }[]
 > {
@@ -551,6 +562,7 @@ async function enrichDeductionsWithInstanceNames(
       description,
       amount_mUsd: d.amount_mUsd,
       kind: getDeductionKind(d.credit_category),
+      expiry: d.expiry,
       purchase: d.purchase,
     };
   });

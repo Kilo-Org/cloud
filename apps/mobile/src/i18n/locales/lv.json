@@ -310,6 +310,7 @@
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
+    "availableToSpendInOrganization": "Pieejams iztērēšanai šajā organizācijā",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",
@@ -451,6 +452,17 @@
       "location": "Vertex atrašanās vieta",
       "clientEmail": "Pakalpojuma konta e-pasts",
       "privateKey": "Pakalpojuma konta privātā atslēga",
+      "privateKeyBlockRequired": "Ielīmē visu atslēgas bloku, no BEGIN rindas līdz END rindai.",
+      "privateKeyEncrypted": "Šis atslēgas bloks ir aizsargāts ar atslēgfrāzi. Ielīmē pakalpojuma konta atslēgu, kurai nav atslēgfrāzes.",
+      "names": {
+        "codestral": "Mantotais tikai Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Pierakstīties ar ChatGPT)",
+        "xiaomi": "Xiaomi (maksa pēc patēriņa)",
+        "zai": "Z.ai (maksa pēc patēriņa)",
+        "bedrockByok": "Amazon Bedrock (tieši)",
+        "vertexByok": "Google Vertex AI (tieši)"
+      },
       "modelMappings": "Modeļu kartējumi",
       "modelMappingsDescription": "Novirzi vārtejas modeli uz pielāgotu izvietojuma nosaukumu.",
       "mappingTitle": "Kartējums {{number}}",
@@ -544,8 +556,11 @@
     "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
     "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
     "changelogAreas": {
-      "signIn": "Pierakstīšanās",
-      "profileOrganizations": "Profils & organizācijas"
+      "signIn": "pierakstīšanās",
+      "profileOrganizations": "profils & organizācijas",
+      "chat": "tērzēšana",
+      "notifications": "paziņojumi",
+      "integrations": "integrācijas"
     }
   },
   "preferences": {
@@ -2598,7 +2613,7 @@
       "searchPlaceholder": "Meklēt repozitorijus",
       "noMatches": "Nav atbilstību",
       "noRepositories": "Nav pieejamu repozitoriju",
-      "noRepositoriesDescription": "Tavam kontam nav pievienotu repozitoriju.",
+      "noRepositoriesDescription": "Lai ielādētu repozitorijus, pievieno GitHub vai GitLab kontu.",
       "loading": "Ielādē…",
       "accessibility": "Repozitorijs: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3502,7 +3517,7 @@
       "manageOnWeb": "Norēķinu iestatījumi tīmeklī",
       "changePlan": "Mainīt plānu",
       "buySeats": "Pirkt vietas",
-      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti tīmeklī.",
+      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti vietnē kilo.ai.",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
       "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
       "opensOnWeb": "Tiek atvērts tīmeklī"
@@ -4465,6 +4480,7 @@
       "promptPlaceholder": "Tu esi…",
       "tools": "Rīki",
       "wholeToolRule": "Šis aģents vienlaikus piemēro vienu noteikumu visiem rīkiem: {{rule}}. Šie slēdži ir tikai lasāmi.",
+      "toolRule": "Saglabātais noteikums: {{rule}}",
       "visibility": "Redzamība",
       "visibilityPrimary": "Primārais — parādīts atlasītājā",
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",
@@ -4574,20 +4590,34 @@
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
+      "expiredGrant": "Termiņš beidzies: {{description}}",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Neietekmē atlikumu",
         "deduction": "Norakstīšana",
         "grant": "Kredītu piešķīrums",
+        "promotionalCredits": "Promocijas kredīti",
         "welcomeCredits": "Sveiciena kredīti",
         "purchase": "Pirkums"
+      },
+      "program": {
+        "adminBulkGrant": "Administratora kredītu piešķīrums",
+        "contributorChampion": "Līdzstrādnieku čempiona kredīts",
+        "feedback": "Kredīts par atsauksmi",
+        "influencer": "Influenceru kredīts",
+        "ossMonthlyReset": "OSS sponsorēšanas ikmēneša atiestatīšana",
+        "ossSponsorship": "OSS sponsorēšanas kredīts",
+        "pullRequest": "Kredīts par izmaiņu pieprasījumu",
+        "usageIssue": "Kredīts par lietojuma problēmu",
+        "vibeDay": "Vibe dienas kredīts"
       },
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
-      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture."
+      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture.",
+      "voidedGrant": "Anulēts: {{description}}"
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
@@ -5175,6 +5205,20 @@
       "eu": "Eiropas Savienība",
       "au": "Austrālija",
       "jp": "Japāna"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Iestatījumu meklēšana",
+    "noMatches": "Nav atbilstošu iestatījumu",
+    "emptyDescription": "Mēģiniet citu iestatījuma nosaukumu vai atslēgvārdu.",
+    "resultsStatus": "Atrastie iestatījumi: {{resultCount}}",
+    "keywords": {
+      "signOut": "izrakstīties|iziet|beigt sesiju",
+      "appearance": "tēma|krāsu shēma",
+      "appUnlock": "biometrija|sejas atpazīšana|pirksta nospiedums",
+      "language": "valoda|tulkojums",
+      "notifications": "brīdinājumi|paziņojumi",
+      "privacy": "analītika|izsekošana"
     }
   }
 }

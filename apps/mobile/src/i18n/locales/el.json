@@ -309,6 +309,7 @@
     "hideBalance": "Απόκρυψη υπολοίπου",
     "showBalance": "Εμφάνιση υπολοίπου",
     "balanceHidden": "Το υπόλοιπο είναι κρυφό",
+    "availableToSpendInOrganization": "Διαθέσιμο για δαπάνες σε αυτόν τον οργανισμό",
     "signOutTitle": "Αποσύνδεση;",
     "signOutMessage": "Θα χρειαστεί να συνδεθείς ξανά για να έχεις πρόσβαση στον χώρο εργασίας σου.",
     "deleteAccountTitle": "Διαγραφή λογαριασμού;",
@@ -450,6 +451,17 @@
       "location": "Τοποθεσία Vertex",
       "clientEmail": "Email λογαριασμού υπηρεσίας",
       "privateKey": "Ιδιωτικό κλειδί λογαριασμού υπηρεσίας",
+      "privateKeyBlockRequired": "Επικόλλησε ολόκληρο το μπλοκ του κλειδιού, από τη γραμμή BEGIN έως τη γραμμή END.",
+      "privateKeyEncrypted": "Αυτό το μπλοκ κλειδιού είναι προστατευμένο με φράση πρόσβασης. Επικόλλησε κλειδί λογαριασμού υπηρεσίας που δεν έχει φράση πρόσβασης.",
+      "names": {
+        "codestral": "Παλαιό Codestral μόνο",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Σύνδεση με ChatGPT)",
+        "xiaomi": "Xiaomi (χρέωση ανά χρήση)",
+        "zai": "Z.ai (χρέωση ανά χρήση)",
+        "bedrockByok": "Amazon Bedrock (απευθείας)",
+        "vertexByok": "Google Vertex AI (απευθείας)"
+      },
       "modelMappings": "Αντιστοιχίσεις μοντέλων",
       "modelMappingsDescription": "Δρομολόγησε ένα μοντέλο του gateway σε ένα προσαρμοσμένο όνομα deployment.",
       "mappingTitle": "Αντιστοίχιση {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Διορθώσεις και βελτιώσεις στα εξής: {{areas}}.",
     "changelogFixesPolish": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
     "changelogAreas": {
-      "signIn": "Σύνδεση",
-      "profileOrganizations": "Προφίλ & οργανισμοί"
+      "signIn": "σύνδεση",
+      "profileOrganizations": "προφίλ & οργανισμοί",
+      "chat": "συνομιλία",
+      "notifications": "ειδοποιήσεις",
+      "integrations": "ενσωματώσεις"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Αναζήτηση αποθετηρίων",
       "noMatches": "Δεν βρέθηκαν αποτελέσματα",
       "noRepositories": "Κανένα διαθέσιμο αποθετήριο",
-      "noRepositoriesDescription": "Δεν υπάρχουν αποθετήρια συνδεδεμένα με τον λογαριασμό σου.",
+      "noRepositoriesDescription": "Για να φορτώσεις αποθετήρια, σύνδεσε το GitHub ή το GitLab.",
       "loading": "Φόρτωση…",
       "accessibility": "Αποθετήριο: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Ρυθμίσεις χρέωσης στον ιστό",
       "changePlan": "Αλλαγή πλάνου",
       "buySeats": "Αγορά θέσεων",
-      "managedOnWeb": "Το πλάνο, οι θέσεις και η αυτόματη αναπλήρωση διαχειρίζονται στον ιστό.",
+      "managedOnWeb": "Το πλάνο, οι θέσεις και η αυτόματη αναπλήρωση διαχειρίζονται στο kilo.ai.",
       "setupAutoTopUp": "Ρύθμιση αυτόματης αναπλήρωσης",
       "manageAutoTopUp": "Διαχείριση αυτόματης αναπλήρωσης",
       "opensOnWeb": "Ανοίγει στον ιστότοπο"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Είσαι μια…",
       "tools": "Εργαλεία",
       "wholeToolRule": "Αυτός ο πράκτορας εφαρμόζει έναν κανόνα σε κάθε εργαλείο ταυτόχρονα: {{rule}}. Αυτοί οι διακόπτες είναι μόνο για ανάγνωση.",
+      "toolRule": "Αποθηκευμένος κανόνας: {{rule}}",
       "visibility": "Ορατότητα",
       "visibilityPrimary": "Κύριο — εμφανίζεται στο εργαλείο επιλογής",
       "visibilitySubagent": "Υποπράκτορας — καλείται μόνο από άλλους",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Αφαίρεση μονάδων",
       "emptyDescription": "Οι αγορές μονάδων, οι αποδείξεις και η χρήση θα εμφανίζονται εδώ.",
       "emptyTitle": "Δεν υπάρχει ιστορικό μονάδων",
+      "expiredGrant": "Έληξε: {{description}}",
       "googlePlayReceipt": "Απόδειξη από το Google Play",
       "kind": {
         "adjustment": "Προσαρμογή",
         "balanceNeutral": "Χωρίς επίδραση στο υπόλοιπο",
         "deduction": "Αφαίρεση",
         "grant": "Παροχή μονάδων",
+        "promotionalCredits": "Μονάδες προώθησης",
         "welcomeCredits": "Μονάδες καλωσορίσματος",
         "purchase": "Αγορά"
+      },
+      "program": {
+        "adminBulkGrant": "Παροχή μονάδων από διαχειριστή",
+        "contributorChampion": "Μονάδες κορυφαίου συνεισφέροντα",
+        "feedback": "Μονάδες για σχόλια",
+        "influencer": "Μονάδες από influencer",
+        "ossMonthlyReset": "Μηνιαία ανανέωση χορηγίας ανοικτού κώδικα",
+        "ossSponsorship": "Μονάδες χορηγίας ανοικτού κώδικα",
+        "pullRequest": "Μονάδες για αίτημα ενσωμάτωσης",
+        "usageIssue": "Μονάδες για ζήτημα χρήσης",
+        "vibeDay": "Μονάδες για την ημέρα Vibe"
       },
       "purchaseFallback": "Αγορά μονάδων",
       "receipt": "Απόδειξη",
       "receiptA11y": "Άνοιγμα της απόδειξης για {{description}}, {{amount}}, από {{date}}",
       "receiptUnavailable": "Δεν υπάρχει διαθέσιμη απόδειξη για αυτήν την αγορά.",
-      "retentionLimit": "Εμφανίζεται το πιο πρόσφατο ιστορικό μονάδων."
+      "retentionLimit": "Εμφανίζεται το πιο πρόσφατο ιστορικό μονάδων.",
+      "voidedGrant": "Ακυρωμένο: {{description}}"
     },
     "title": "Αγορά πιστώσεων",
     "description": "Οι πιστώσεις είναι μια εφάπαξ αγορά που προστίθεται στο υπόλοιπό σας Kilo για την εκτέλεση συνεδριών προγραμματισμού με AI στην Εφαρμογή Kilo. Το κατάστημα χρεώνει τον λογαριασμό σας και οι πιστώσεις προστίθενται αφού το κατάστημα επιβεβαιώσει την πληρωμή.",
@@ -5088,6 +5118,20 @@
       "eu": "Ευρωπαϊκή Ένωση",
       "au": "Αυστραλία",
       "jp": "Ιαπωνία"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Αναζήτηση προτιμήσεων",
+    "noMatches": "Δεν βρέθηκαν αντίστοιχες προτιμήσεις",
+    "emptyDescription": "Δοκιμάστε διαφορετικό όνομα προτίμησης ή λέξη-κλειδί.",
+    "resultsStatus": "Προτιμήσεις που βρέθηκαν: {{resultCount}}",
+    "keywords": {
+      "signOut": "αποσύνδεση|έξοδος",
+      "appearance": "θέμα|χρώματα|συνδυασμός χρωμάτων",
+      "appUnlock": "βιομετρικά|αναγνώριση προσώπου|δακτυλικό αποτύπωμα",
+      "language": "γλώσσα|μετάφραση",
+      "notifications": "ειδοποιήσεις|ενημερώσεις",
+      "privacy": "στατιστικά|παρακολούθηση|απόρρητο"
     }
   }
 }

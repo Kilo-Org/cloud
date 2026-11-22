@@ -31,7 +31,6 @@ import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   MAX_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
   parseOrgAutoTopUpThresholdCents,
-  DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
   SYSTEM_AUTO_TOP_UP_USER_ID,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
@@ -75,16 +74,77 @@ export type AutoTopUpEntity =
   | { type: 'user'; user: UserForBalance }
   | { type: 'organization'; organization: AutoTopUpOrganization };
 
+type BalanceFields = { total_microdollars_acquired: number; microdollars_used: number };
+
+/** The USD balance of an account row, in the one definition the module uses. */
+function balanceUsd(account: BalanceFields): number {
+  return (account.total_microdollars_acquired - account.microdollars_used) / 1_000_000;
+}
+
+function entityBalanceUsd(entity: AutoTopUpEntity): number {
+  return balanceUsd(entity.type === 'user' ? entity.user : entity.organization);
+}
+
+/**
+ * The owner column, owner id and log/email label of an entity. `AutoTopUpEntity` is the
+ * union that makes this narrowing, so it happens here once instead of in every caller.
+ */
+function entityIdentity(entity: AutoTopUpEntity): {
+  ownerColumn:
+    | typeof auto_top_up_configs.owned_by_user_id
+    | typeof auto_top_up_configs.owned_by_organization_id;
+  ownerId: string;
+  label: string;
+} {
+  return entity.type === 'user'
+    ? {
+        ownerColumn: auto_top_up_configs.owned_by_user_id,
+        ownerId: entity.user.id,
+        label: `user ${entity.user.id}`,
+      }
+    : {
+        ownerColumn: auto_top_up_configs.owned_by_organization_id,
+        ownerId: entity.organization.id,
+        label: `organization ${entity.organization.id}`,
+      };
+}
+
+/**
+ * The threshold in USD a charge is measured against: the stored org threshold, or the personal
+ * constant for a user. `organizationThresholdCents` is ignored for a user.
+ */
+function autoTopUpThresholdUsd(
+  entity: AutoTopUpEntity,
+  organizationThresholdCents?: number | null
+): number {
+  return entity.type === 'user'
+    ? AUTO_TOP_UP_THRESHOLD_DOLLARS
+    : orgThresholdDollars(organizationThresholdCents);
+}
+
+/**
+ * The ceiling the entry pre-check uses before the cheaper stored-threshold read: a user always
+ * compares against the personal constant, and an org cannot have configured a higher threshold
+ * than the constants allow.
+ */
+function maxAutoTopUpThresholdUsd(entity: AutoTopUpEntity): number {
+  return entity.type === 'user'
+    ? AUTO_TOP_UP_THRESHOLD_DOLLARS
+    : MAX_ORG_AUTO_TOP_UP_THRESHOLD_CENTS / 100;
+}
+
 function orgThresholdDollars(thresholdCents: number | null | undefined): number {
   return parseOrgAutoTopUpThresholdCents(thresholdCents) / 100;
 }
 
-async function getOrganizationAutoTopUpThresholdDollars(organizationId: string): Promise<number> {
+async function readOrganizationAutoTopUpThresholdCents(
+  organizationId: string
+): Promise<number | null | undefined> {
   const config = await db.query.auto_top_up_configs.findFirst({
     columns: { threshold_cents: true },
     where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
   });
-  return orgThresholdDollars(config?.threshold_cents);
+  return config?.threshold_cents;
 }
 
 async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<boolean> {
@@ -143,35 +203,25 @@ export async function maybePerformOrganizationAutoTopUp(
 }
 
 async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<void> {
-  const { auto_top_up_enabled, initialBalance_USD } =
+  const autoTopUpEnabled =
     entity.type === 'user'
-      ? {
-          auto_top_up_enabled: entity.user.auto_top_up_enabled,
-          initialBalance_USD:
-            (entity.user.total_microdollars_acquired - entity.user.microdollars_used) / 1_000_000,
-        }
-      : {
-          auto_top_up_enabled: entity.organization.auto_top_up_enabled,
-          initialBalance_USD:
-            (entity.organization.total_microdollars_acquired -
-              entity.organization.microdollars_used) /
-            1_000_000,
-        };
-  if (!auto_top_up_enabled) {
+      ? entity.user.auto_top_up_enabled
+      : entity.organization.auto_top_up_enabled;
+  if (!autoTopUpEnabled) {
     return;
   }
 
-  const maxThreshold =
-    entity.type === 'user'
-      ? AUTO_TOP_UP_THRESHOLD_DOLLARS
-      : MAX_ORG_AUTO_TOP_UP_THRESHOLD_CENTS / 100;
-  if (initialBalance_USD >= maxThreshold) {
+  const initialBalance_USD = entityBalanceUsd(entity);
+  if (initialBalance_USD >= maxAutoTopUpThresholdUsd(entity)) {
     return;
   }
   const threshold =
     entity.type === 'user'
-      ? AUTO_TOP_UP_THRESHOLD_DOLLARS
-      : await getOrganizationAutoTopUpThresholdDollars(entity.organization.id);
+      ? autoTopUpThresholdUsd(entity, null)
+      : autoTopUpThresholdUsd(
+          entity,
+          await readOrganizationAutoTopUpThresholdCents(entity.organization.id)
+        );
   if (initialBalance_USD >= threshold) {
     return;
   }
@@ -187,8 +237,7 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
 
   const traceId = randomUUID();
 
-  const entityId = entity.type === 'user' ? entity.user.id : entity.organization.id;
-  const entityLabel = entity.type === 'user' ? `user ${entityId}` : `organization ${entityId}`;
+  const { ownerId: entityId, label: entityLabel } = entityIdentity(entity);
 
   sentryLogger('auto-topup', 'info')('Auto-top-up triggered', {
     traceId,
@@ -230,11 +279,7 @@ async function performAutoTopUpForEntity(
   entity: AutoTopUpEntity,
   traceId: string
 ): Promise<AutoTopUpResult> {
-  const ownerColumn =
-    entity.type === 'user'
-      ? auto_top_up_configs.owned_by_user_id
-      : auto_top_up_configs.owned_by_organization_id;
-  const ownerId = entity.type === 'user' ? entity.user.id : entity.organization.id;
+  const { ownerColumn, ownerId, label: entityLabel } = entityIdentity(entity);
 
   // Atomically check and acquire lock in a single query using SQL NOW()
   const [config] = await db
@@ -287,10 +332,7 @@ async function performAutoTopUpForEntity(
       accountUsedMicrodollars,
       autoTopUpEnabled,
     } = await getEntityBalanceAndStripeCustomer(entity);
-    const threshold =
-      entity.type === 'user'
-        ? AUTO_TOP_UP_THRESHOLD_DOLLARS
-        : orgThresholdDollars(config.threshold_cents);
+    const threshold = autoTopUpThresholdUsd(entity, config.threshold_cents);
     if (!autoTopUpEnabled || currentBalance_USD >= threshold) {
       return failureResult(
         autoTopUpEnabled ? 'balance_already_sufficient' : 'auto_top_up_disabled'
@@ -302,8 +344,7 @@ async function performAutoTopUpForEntity(
       return failureResult('no_stripe_customer');
     }
 
-    const amountCents = config.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
-    const entityLabel = entity.type === 'user' ? `user ${ownerId}` : `organization ${ownerId}`;
+    const amountCents = config.amount_cents;
     // Bouncer's payer for an org charge is the org; the user id is the org's billing actor.
     const bouncerUserId =
       entity.type === 'user'
@@ -321,14 +362,14 @@ async function performAutoTopUpForEntity(
       invoiceMetadata.paid_credit_policy = getPaidCreditTerms('stripe', new Date());
 
       const flow = entity.type === 'user' ? 'personal_auto_top_up' : 'organization_auto_top_up';
+      const baseMetadata: Record<string, string> = {
+        ...invoiceMetadata,
+        serviceFeePrincipalMinor: String(amountCents),
+      };
       const invoice = await client.invoices.create({
         customer: stripe_customer_id,
         auto_advance: false,
-        metadata: {
-          ...invoiceMetadata,
-          serviceFeePrincipalMinor: String(amountCents),
-          serviceFeeFlow: flow,
-        },
+        metadata: { ...baseMetadata, serviceFeeFlow: flow },
         description: 'Kilo automatic top up',
       });
 
@@ -347,13 +388,7 @@ async function performAutoTopUpForEntity(
 
       try {
         await client.invoices.update(invoice.id, {
-          metadata: mergeServiceFeeCommercialMetadata(
-            {
-              ...invoiceMetadata,
-              serviceFeePrincipalMinor: String(amountCents),
-            },
-            preparedFee.commercialMetadata
-          ),
+          metadata: mergeServiceFeeCommercialMetadata(baseMetadata, preparedFee.commercialMetadata),
         });
       } catch (metadataError) {
         captureException(metadataError, {
@@ -407,10 +442,17 @@ async function performAutoTopUpForEntity(
         return successResult({ stripe_id: invoice.id });
       }
 
-      // Payment did not complete successfully (e.g. requires authentication).
-      const errorStatus = `unexpected_status_${paidInvoice.status}`;
-      await disableAutoTopUpForEntity(entity, errorStatus);
-      return failureResult(errorStatus);
+      // Payment did not complete successfully (e.g. requires authentication). The reason is the
+      // stable key `failureReasonMessages` owns; the raw status is diagnosis, not a message key.
+      logExceptInTest(`Auto-top-up invoice not paid for ${entityLabel}`, {
+        traceId,
+        entity_type: entity.type,
+        entity_id: ownerId,
+        invoice_id: invoice.id,
+        invoice_status: paidInvoice.status,
+      });
+      await disableAutoTopUpForEntity(entity, 'unexpected_invoice_status');
+      return failureResult('unexpected_invoice_status');
     } catch (error) {
       // StripeCardError = card was declined (insufficient funds, expired, etc.)
       // These are expected user-facing events, not engineering problems.
@@ -458,8 +500,7 @@ async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promi
   if (entity.type === 'user') {
     const freshUser = await findUserById(entity.user.id);
     if (!freshUser) throw new Error('User not found:' + entity.user.id);
-    const currentBalance_USD =
-      (freshUser.total_microdollars_acquired - freshUser.microdollars_used) / 1_000_000;
+    const currentBalance_USD = balanceUsd(freshUser);
     return {
       currentBalance_USD,
       stripe_customer_id: freshUser.stripe_customer_id,
@@ -470,8 +511,7 @@ async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promi
   } else {
     const freshOrg = await getOrganizationById(entity.organization.id);
     if (!freshOrg) throw new Error('Organization not found:' + entity.organization.id);
-    const currentBalance_USD =
-      (freshOrg.total_microdollars_acquired - freshOrg.microdollars_used) / 1_000_000;
+    const currentBalance_USD = balanceUsd(freshOrg);
     return {
       currentBalance_USD,
       stripe_customer_id: freshOrg.stripe_customer_id,
@@ -507,24 +547,30 @@ const failureReasonMessages = {
 type KnownFailureReason = keyof typeof failureReasonMessages;
 
 /**
+ * Stripe decline codes arrive as an open string, so one lookup decides both the message and
+ * whether the code is catalogued. Own keys only: an inherited name such as `toString` is not a
+ * failure reason, and the catalog owns the fallback message.
+ */
+function isKnownFailureReason(reason: string): reason is KnownFailureReason {
+  return Object.hasOwn(failureReasonMessages, reason);
+}
+
+function resolveFailureReason(reason: string): { message: string; isUnmappedCode: boolean } {
+  return isKnownFailureReason(reason)
+    ? { message: failureReasonMessages[reason], isUnmappedCode: false }
+    : { message: failureReasonMessages.unknown_error, isUnmappedCode: true };
+}
+
+/**
  * Disable auto-top-up for an entity (user or organization).
  */
 async function disableAutoTopUpForEntity(entity: AutoTopUpEntity, reason: string): Promise<void> {
-  const message =
-    failureReasonMessages[reason as KnownFailureReason] ?? failureReasonMessages.unknown_error;
-  const isUnmappedCode = !(reason in failureReasonMessages);
-  const entityLabel =
-    entity.type === 'user' ? `user ${entity.user.id}` : `organization ${entity.organization.id}`;
+  const { message, isUnmappedCode } = resolveFailureReason(reason);
+  const { ownerColumn, ownerId, label: entityLabel } = entityIdentity(entity);
 
   sentryLogger('auto-topup', 'info')(`Disabling auto-top-up for ${entityLabel}: ${reason}`, {
     ...(isUnmappedCode && { unmapped_code: reason }),
   });
-
-  const ownerColumn =
-    entity.type === 'user'
-      ? auto_top_up_configs.owned_by_user_id
-      : auto_top_up_configs.owned_by_organization_id;
-  const ownerId = entity.type === 'user' ? entity.user.id : entity.organization.id;
 
   // Update auto_top_up_configs (shared for both entity types)
   await db

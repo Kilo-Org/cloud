@@ -309,6 +309,7 @@
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
+    "availableToSpendInOrganization": "Bu kuruluşta harcanabilir",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",
@@ -450,6 +451,17 @@
       "location": "Vertex konumu",
       "clientEmail": "Hizmet hesabı e-postası",
       "privateKey": "Hizmet hesabı özel anahtarı",
+      "privateKeyBlockRequired": "Anahtar bloğunun tamamını BEGIN satırından END satırına kadar yapıştır.",
+      "privateKeyEncrypted": "Bu anahtar bloğu parola korumalı. Parolası olmayan bir hizmet hesabı anahtarı yapıştır.",
+      "names": {
+        "codestral": "Yalnızca eski Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ile oturum aç)",
+        "xiaomi": "Xiaomi (kullandıkça öde)",
+        "zai": "Z.ai (kullandıkça öde)",
+        "bedrockByok": "Amazon Bedrock (doğrudan)",
+        "vertexByok": "Google Vertex AI (doğrudan)"
+      },
       "modelMappings": "Model eşlemeleri",
       "modelMappingsDescription": "Bir gateway modelini özel bir dağıtım adına yönlendir.",
       "mappingTitle": "Eşleme {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
     "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
-      "signIn": "Oturum açma",
-      "profileOrganizations": "Profil & kuruluşlar"
+      "signIn": "oturum açma",
+      "profileOrganizations": "profil & kuruluşlar",
+      "chat": "sohbet",
+      "notifications": "bildirimler",
+      "integrations": "entegrasyonlar"
     }
   },
   "preferences": {
@@ -1985,7 +2000,7 @@
       "searchPlaceholder": "Depo ara",
       "noMatches": "Eşleşme yok",
       "noRepositories": "Kullanılabilir depo yok",
-      "noRepositoriesDescription": "Hesabına bağlı depo yok.",
+      "noRepositoriesDescription": "Depoları yüklemek için GitHub veya GitLab hesabını bağla.",
       "loading": "Yükleniyor…",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3432,7 +3447,7 @@
       "manageOnWeb": "Web'deki faturalandırma ayarları",
       "changePlan": "Planı değiştir",
       "buySeats": "Lisans satın al",
-      "managedOnWeb": "Plan, lisanslar ve otomatik yükleme web'de yönetilir.",
+      "managedOnWeb": "Plan, lisanslar ve otomatik yükleme kilo.ai adresinden yönetilir.",
       "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
       "manageAutoTopUp": "Otomatik yüklemeyi yönet",
       "opensOnWeb": "Web'de açılır"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Sen bir…",
       "tools": "Aletler",
       "wholeToolRule": "Bu ajan tüm aletlere aynı anda tek bir kural uygular: {{rule}}. Bu anahtarlar salt okunur.",
+      "toolRule": "Kayıtlı kural: {{rule}}",
       "visibility": "Görünürlük",
       "visibilityPrimary": "Birincil — seçicide gösterilir",
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Kredi düşümü",
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
       "emptyTitle": "Kredi geçmişi yok",
+      "expiredGrant": "Süresi doldu: {{description}}",
       "googlePlayReceipt": "Makbuz Google Play'de",
       "kind": {
         "adjustment": "Düzeltme",
         "balanceNeutral": "Bakiyeyi etkilemez",
         "deduction": "Düşüm",
         "grant": "Kredi hediyesi",
+        "promotionalCredits": "Promosyon kredileri",
         "welcomeCredits": "Hoş geldin kredisi",
         "purchase": "Satın alım"
+      },
+      "program": {
+        "adminBulkGrant": "Yönetici tarafından verilen kredi",
+        "contributorChampion": "Katkı şampiyonu kredisi",
+        "feedback": "Geri bildirim kredisi",
+        "influencer": "Etkileyici kredisi",
+        "ossMonthlyReset": "Açık kaynak sponsorluğu aylık sıfırlaması",
+        "ossSponsorship": "Açık kaynak sponsorluk kredisi",
+        "pullRequest": "Çekme isteği kredisi",
+        "usageIssue": "Kullanım sorunu kredisi",
+        "vibeDay": "Vibe day kredisi"
       },
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
       "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
-      "retentionLimit": "En son kredi geçmişi gösteriliyor."
+      "retentionLimit": "En son kredi geçmişi gösteriliyor.",
+      "voidedGrant": "İptal edildi: {{description}}"
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
@@ -5088,6 +5118,20 @@
       "eu": "Avrupa Birliği",
       "au": "Avustralya",
       "jp": "Japonya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Tercih ara",
+    "noMatches": "Eşleşen tercih bulunamadı",
+    "emptyDescription": "Farklı bir tercih adı veya anahtar kelime deneyin.",
+    "resultsStatus": "Bulunan tercihler: {{resultCount}}",
+    "keywords": {
+      "signOut": "çıkış|oturumu kapat|hesaptan çıkış",
+      "appearance": "tema|renk düzeni|koyu mod",
+      "appUnlock": "biyometri|yüz tanıma|parmak izi",
+      "language": "dil|çeviri",
+      "notifications": "uyarılar|anlık bildirimler",
+      "privacy": "analiz|takip|gizlilik"
     }
   }
 }

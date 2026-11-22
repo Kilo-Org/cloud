@@ -46,7 +46,8 @@ data-contract caveats, even when changed code is outside `packages/db`.
 | `pnpm typecheck` | Run repository TypeScript checks |
 | `pnpm lint` | Run repository lint checks |
 | `pnpm test` | Run the web suite and the repository script suites; not every package suite |
-| `pnpm validate` | Run typecheck, lint, test, and the dependency-cycle check |
+| `pnpm validate` | Run typecheck, lint, test, and the `apps/web` dependency-cycle check |
+| `pnpm web:dependency-cycle-check` | Run the dependency-cycle check over `apps/web` only |
 
 The root `package.json` `scripts` block lists what each aggregate command runs;
 `typecheck` and `lint` hand off to `scripts/typecheck-all.sh` and

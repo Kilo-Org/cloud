@@ -213,6 +213,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (app)/local-failure-copy-fixture.tsx	(app)/local-failure-copy-fixture	dev-fixture	ios	n/a	n/a	F:dev/local-failure-copy-fixture/all	n/a	n/a	n/a	n/a	none
 (app)/low-balance-alert-refusal-fixture.tsx	(app)/low-balance-alert-refusal-fixture	dev-fixture	android	n/a	n/a	F:dev/low-balance-alert-refusal-fixture	n/a	n/a	F:dev/low-balance-alert-refusal-fixture?billing=1	n/a	none
 (app)/low-balance-alert-refusal-fixture.tsx	(app)/low-balance-alert-refusal-fixture	dev-fixture	ios	n/a	n/a	F:dev/low-balance-alert-refusal-fixture	n/a	n/a	F:dev/low-balance-alert-refusal-fixture?billing=1	n/a	none
+(app)/mcp-form-sheet-fixture.tsx	(app)/mcp-form-sheet-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
+(app)/mcp-form-sheet-fixture.tsx	(app)/mcp-form-sheet-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (app)/model-catalog/[owner]/[repo].tsx	(app)/model-catalog/[owner]/[repo]	route	android	none	none	none	none	none	none	none	none
 (app)/model-catalog/[owner]/[repo].tsx	(app)/model-catalog/[owner]/[repo]	route	ios	none	none	none	none	none	none	none	none
 (app)/model-catalog/index.tsx	(app)/model-catalog	route	android	none	none	T2-G04b kiloapp:///(app)/model-catalog	none	B:T2-G04b (not-found/permission variants)	B:T2-G04b	none	B:T2-G04b

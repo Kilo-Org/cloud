@@ -311,6 +311,7 @@
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
+    "availableToSpendInOrganization": "Na voljo za porabo v tej organizaciji",
     "signOutTitle": "Želiš se odjaviti?",
     "signOutMessage": "Za dostop do delovnega prostora se moraš znova prijaviti.",
     "deleteAccountTitle": "Želiš izbrisati račun?",
@@ -452,6 +453,17 @@
       "location": "Lokacija Vertex",
       "clientEmail": "E-poštni naslov računa storitve",
       "privateKey": "Zasebni ključ računa storitve",
+      "privateKeyBlockRequired": "Prilepi celoten blok ključa, od vrstice BEGIN do vrstice END.",
+      "privateKeyEncrypted": "Ta blok ključa je zaščiten z geslom. Prilepi ključ računa storitve, ki nima gesla.",
+      "names": {
+        "codestral": "Samo za starejši Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prijavi se z računom ChatGPT)",
+        "xiaomi": "Xiaomi (plačilo po porabi)",
+        "zai": "Z.ai (plačilo po porabi)",
+        "bedrockByok": "Amazon Bedrock (neposredno)",
+        "vertexByok": "Google Vertex AI (neposredno)"
+      },
       "modelMappings": "Preslikave modelov",
       "modelMappingsDescription": "Preusmeri model prehoda na ime namestitve po meri.",
       "mappingTitle": "Preslikava {{number}}",
@@ -545,8 +557,11 @@
     "changelogFixesIn": "Popravki in izboljšave na področjih: {{areas}}.",
     "changelogFixesPolish": "Popravki in izboljšave v celotni aplikaciji.",
     "changelogAreas": {
-      "signIn": "Prijava",
-      "profileOrganizations": "Profil & organizacije"
+      "signIn": "prijava",
+      "profileOrganizations": "profil & organizacije",
+      "chat": "klepet",
+      "notifications": "obvestila",
+      "integrations": "integracije"
     }
   },
   "preferences": {
@@ -2650,7 +2665,7 @@
       "searchPlaceholder": "Iskanje repozitorijev",
       "noMatches": "Ni zadetkov",
       "noRepositories": "Ni razpoložljivih skladišč",
-      "noRepositoriesDescription": "Nobeno skladišče ni povezano s tvojim računom.",
+      "noRepositoriesDescription": "Za nalaganje skladišč poveži GitHub ali GitLab.",
       "loading": "Nalaganje…",
       "accessibility": "Skladišče: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3564,7 +3579,7 @@
       "manageOnWeb": "Nastavitve obračunavanja na spletu",
       "changePlan": "Spremeni načrt",
       "buySeats": "Kupi uporabniška mesta",
-      "managedOnWeb": "Načrt, uporabniška mesta in samodejno polnjenje se upravljajo na spletu.",
+      "managedOnWeb": "Načrt, uporabniška mesta in samodejno polnjenje se upravljajo na kilo.ai.",
       "setupAutoTopUp": "Nastavi samodejno polnjenje",
       "manageAutoTopUp": "Upravljaj samodejno polnjenje",
       "opensOnWeb": "Odpre se v spletu"
@@ -4544,6 +4559,7 @@
       "promptPlaceholder": "ti si …",
       "tools": "Orodja",
       "wholeToolRule": "Ta agent uporabi eno pravilo za vsa orodja hkrati: {{rule}}. Ta stikala so samo za branje.",
+      "toolRule": "Shranjeno pravilo: {{rule}}",
       "visibility": "Vidnost",
       "visibilityPrimary": "Primarno — prikazano v izbirniku",
       "visibilitySubagent": "Subagent — na klic samo od drugih",
@@ -4653,20 +4669,34 @@
       "deductionFallback": "Odbitek kreditov",
       "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",
       "emptyTitle": "Ni zgodovine kreditov",
+      "expiredGrant": "Poteklo: {{description}}",
       "googlePlayReceipt": "Potrdilo iz trgovine Google Play",
       "kind": {
         "adjustment": "Prilagoditev",
         "balanceNeutral": "Brez vpliva na stanje",
         "deduction": "Odbitek",
         "grant": "Dodelitev kreditov",
+        "promotionalCredits": "Promocijski krediti",
         "welcomeCredits": "Krediti dobrodošlice",
         "purchase": "Nakup"
+      },
+      "program": {
+        "adminBulkGrant": "Dodelitev kreditov s strani skrbnika",
+        "contributorChampion": "Kredit za prvaka med sodelujočimi",
+        "feedback": "Kredit za povratne informacije",
+        "influencer": "Kredit za vplivneže",
+        "ossMonthlyReset": "Mesečna ponastavitev sponzorstva odprtokodnih projektov",
+        "ossSponsorship": "Kredit za sponzorstvo odprtokodnih projektov",
+        "pullRequest": "Kredit za zahtevo za združitev",
+        "usageIssue": "Kredit zaradi težave s porabo",
+        "vibeDay": "Kredit za dan Vibe"
       },
       "purchaseFallback": "Nakup kreditov",
       "receipt": "Potrdilo",
       "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
       "receiptUnavailable": "Potrdilo za ta nakup ni na voljo.",
-      "retentionLimit": "Prikazana je najnovejša zgodovina kreditov."
+      "retentionLimit": "Prikazana je najnovejša zgodovina kreditov.",
+      "voidedGrant": "Razveljavljeno: {{description}}"
     },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
@@ -5262,6 +5292,20 @@
       "eu": "Evropska unija",
       "au": "Avstralija",
       "jp": "Japonska"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Iskanje nastavitev",
+    "noMatches": "Ni ustreznih nastavitev",
+    "emptyDescription": "Poskusi z drugim imenom nastavitve ali ključno besedo.",
+    "resultsStatus": "Najdene nastavitve: {{resultCount}}",
+    "keywords": {
+      "signOut": "odjava|odjavi se",
+      "appearance": "tema|barvna shema",
+      "appUnlock": "biometrija|prepoznavanje obraza|prstni odtis",
+      "language": "jezik|prevod",
+      "notifications": "opozorila|potisna obvestila",
+      "privacy": "analitika|sledenje"
     }
   }
 }

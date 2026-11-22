@@ -309,6 +309,7 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
+    "availableToSpendInOrganization": "Tillgängligt att spendera i den här organisationen",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",
@@ -450,6 +451,17 @@
       "location": "Vertex-plats",
       "clientEmail": "E-postadress för tjänstkonto",
       "privateKey": "Privat nyckel för tjänstkonto",
+      "privateKeyBlockRequired": "Klistra in hela nyckelblocket, från BEGIN-raden till END-raden.",
+      "privateKeyEncrypted": "Det här nyckelblocket är skyddat med en lösenfras. Klistra in en nyckel för tjänstkonto som inte har någon lösenfras.",
+      "names": {
+        "codestral": "Endast äldre Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Logga in med ChatGPT)",
+        "xiaomi": "Xiaomi (betala per användning)",
+        "zai": "Z.ai (betala per användning)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Modellmappningar",
       "modelMappingsDescription": "Dirigera en gatewaymodell till ett anpassat distributionsnamn.",
       "mappingTitle": "Mappning {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Korrigeringar och förbättringar i {{areas}}.",
     "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
     "changelogAreas": {
-      "signIn": "Inloggning",
-      "profileOrganizations": "Profil & organisationer"
+      "signIn": "inloggning",
+      "profileOrganizations": "profil & organisationer",
+      "chat": "chatt",
+      "notifications": "aviseringar",
+      "integrations": "integrationer"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Sök efter kodarkiv...",
       "noMatches": "Inga träffar",
       "noRepositories": "Inga kodarkiv tillgängliga",
-      "noRepositoriesDescription": "Inga kodarkiv är anslutna till ditt konto.",
+      "noRepositoriesDescription": "Anslut GitHub eller GitLab för att läsa in kodarkiv.",
       "loading": "Läser in…",
       "accessibility": "Kodarkiv: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Faktureringsinställningar på webben",
       "changePlan": "Byt plan",
       "buySeats": "Köp platser",
-      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på webben.",
+      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på kilo.ai.",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
       "opensOnWeb": "Öppnas på webben"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Du är en…",
       "tools": "Verktyg",
       "wholeToolRule": "Den här agenten tillämpar en regel på alla verktyg samtidigt: {{rule}}. Dessa reglage är skrivskyddade.",
+      "toolRule": "Sparad regel: {{rule}}",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Kreditavdrag",
       "emptyDescription": "Kreditköp, kvitton och användning visas här.",
       "emptyTitle": "Ingen kredithistorik",
+      "expiredGrant": "Utgånget: {{description}}",
       "googlePlayReceipt": "Kvitto från Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Avdrag",
         "grant": "Kredittilldelning",
+        "promotionalCredits": "Kampanjkrediter",
         "welcomeCredits": "Välkomstkrediter",
         "purchase": "Köp"
+      },
+      "program": {
+        "adminBulkGrant": "Administratörskredittilldelning",
+        "contributorChampion": "Bidragsgivarmästarkredit",
+        "feedback": "Feedbackkredit",
+        "influencer": "Influencerkredit",
+        "ossMonthlyReset": "Återställning av sponsring av öppen källkod",
+        "ossSponsorship": "Kredit för sponsring av öppen källkod",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Kredit för användningsproblem",
+        "vibeDay": "Vibe day-kredit"
       },
       "purchaseFallback": "Kreditköp",
       "receipt": "Kvitto",
       "receiptA11y": "Öppna kvittot för {{description}}, {{amount}}, från {{date}}",
       "receiptUnavailable": "Det finns inget kvitto för det här köpet.",
-      "retentionLimit": "Visar den senaste kredithistoriken."
+      "retentionLimit": "Visar den senaste kredithistoriken.",
+      "voidedGrant": "Makulerad: {{description}}"
     },
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
@@ -5088,6 +5118,20 @@
       "eu": "Europeiska unionen",
       "au": "Australien",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Sök inställningar",
+    "noMatches": "Inga matchande inställningar",
+    "emptyDescription": "Prova ett annat inställningsnamn eller sökord.",
+    "resultsStatus": "Hittade inställningar: {{resultCount}}",
+    "keywords": {
+      "signOut": "logga ut|utloggning",
+      "appearance": "tema|färgschema",
+      "appUnlock": "biometri|ansiktsigenkänning|fingeravtryck",
+      "language": "språk|översättning",
+      "notifications": "aviseringar|notiser|pushnotiser",
+      "privacy": "analys|statistik|spårning"
     }
   }
 }

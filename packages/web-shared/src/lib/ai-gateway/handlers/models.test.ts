@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
 import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -99,7 +99,7 @@ function request(headers?: Record<string, string>) {
   return new Request('http://localhost:3000/api/v1/models', { headers });
 }
 
-function makeModel(id: string): OpenRouterModel {
+function makeModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,
@@ -130,12 +130,12 @@ describe('GET /api/openrouter/models', () => {
     mockedGetUserByokProviderIds.mockResolvedValue([]);
     mockedGetDirectByokCatalogModelIds.mockResolvedValue(new Set());
     mockedTagOpenAiChatGptByokModels.mockImplementation(
-      (_userId: string, models: OpenRouterModel[]) => models
+      (_userId: string, models: OpenRouterCatalogModel[]) => models
     );
     mockedTagClaudeBillingByokModels.mockImplementation(
-      (_owner: unknown, models: OpenRouterModel[]) => models
+      (_owner: unknown, models: OpenRouterCatalogModel[]) => models
     );
-    mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
+    mockedGetAvailableModelsForOrganization.mockResolvedValue({ data: [] });
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
     mockedListUsableCustomRouters.mockResolvedValue([]);
@@ -253,7 +253,7 @@ describe('GET /api/openrouter/models', () => {
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [openAiModel, otherModel] });
     mockedAddUserByokAvailability.mockResolvedValue([openAiModel, otherModel]);
     mockedTagOpenAiChatGptByokModels.mockImplementation(
-      (_userId: string, models: OpenRouterModel[]) =>
+      (_userId: string, models: OpenRouterCatalogModel[]) =>
         models.map(model =>
           model.id === 'openai/gpt-5-nano' ? { ...model, hasUserByokAvailable: true } : model
         )

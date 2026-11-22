@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Tokeo jipya la usalama ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Hatari sana",
+      "high": "Juu",
+      "medium": "Wastani",
+      "low": "Chini"
+    },
     "securityFindingSlaWarning": {
       "title": "Onyo la SLA"
     },

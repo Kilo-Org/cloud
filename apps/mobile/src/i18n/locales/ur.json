@@ -309,6 +309,7 @@
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
+    "availableToSpendInOrganization": "اس تنظیم میں خرچ کرنے کے لیے دستیاب",
     "signOutTitle": "سائن آؤٹ کریں؟",
     "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔",
     "deleteAccountTitle": "اکاؤنٹ حذف کریں؟",
@@ -450,6 +451,17 @@
       "location": "Vertex مقام",
       "clientEmail": "سروس اکاؤنٹ ای میل",
       "privateKey": "سروس اکاؤنٹ کی نجی کلید",
+      "privateKeyBlockRequired": "پورا کلید بلاک پیسٹ کریں، BEGIN لائن سے END لائن تک۔",
+      "privateKeyEncrypted": "یہ کلید بلاک پاس فریز سے محفوظ ہے۔ ایسی سروس اکاؤنٹ کلید پیسٹ کریں جس میں کوئی پاس فریز نہ ہو۔",
+      "names": {
+        "codestral": "صرف پرانا Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT سے سائن ان کریں)",
+        "xiaomi": "Xiaomi (استعمال کے مطابق ادائیگی)",
+        "zai": "Z.ai (استعمال کے مطابق ادائیگی)",
+        "bedrockByok": "Amazon Bedrock (براہ راست)",
+        "vertexByok": "Google Vertex AI (براہ راست)"
+      },
       "modelMappings": "ماڈل میپنگز",
       "modelMappingsDescription": "گیٹ وے ماڈل کو حسب ضرورت ڈیپلائمنٹ نام پر بھیجیں۔",
       "mappingTitle": "میپنگ {{number}}",
@@ -544,7 +556,10 @@
     "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
     "changelogAreas": {
       "signIn": "سائن ان",
-      "profileOrganizations": "پروفائل و تنظیمیں"
+      "profileOrganizations": "پروفائل و تنظیمیں",
+      "chat": "چیٹ",
+      "notifications": "اطلاعات",
+      "integrations": "انٹیگریشنز"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "ریپوزٹریز کی تلاش",
       "noMatches": "کوئی نتیجہ نہیں ملا",
       "noRepositories": "کوئی ریپوزٹری دستیاب نہیں",
-      "noRepositoriesDescription": "آپ کے اکاؤنٹ سے کوئی ریپوزٹری منسلک نہیں ہے۔",
+      "noRepositoriesDescription": "ریپوزٹریز لوڈ کرنے کے لیے GitHub یا GitLab کو منسلک کریں۔",
       "loading": "لوڈ ہو رہا ہے…",
       "accessibility": "ریپوزٹری: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "ویب پر بلنگ سیٹنگز",
       "changePlan": "پلان تبدیل کریں",
       "buySeats": "سیٹیں خریدیں",
-      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ ویب پر منظم کیے جاتے ہیں۔",
+      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ kilo.ai پر منظم کیے جاتے ہیں۔",
       "setupAutoTopUp": "خودکار ٹاپ اپ سیٹ اپ کریں",
       "manageAutoTopUp": "خودکار ٹاپ اپ کا انتظام کریں",
       "opensOnWeb": "ویب پر کھلتا ہے"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "آپ ایک…",
       "tools": "اوزار",
       "wholeToolRule": "یہ ایجنٹ بیک وقت ہر اوزار پر ایک اصول لاگو کرتا ہے: {{rule}}۔ یہ سوئچز صرف پڑھنے کے لیے ہیں۔",
+      "toolRule": "محفوظ اصول: {{rule}}",
       "visibility": "مرئیت",
       "visibilityPrimary": "پرائمری — چننے والے میں دکھایا گیا ہے۔",
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "کریڈٹ کی کٹوتی",
       "emptyDescription": "کریڈٹ کی خریداریاں، رسیدیں اور استعمال یہاں نظر آئیں گے۔",
       "emptyTitle": "کریڈٹ کی کوئی تاریخچہ نہیں",
+      "expiredGrant": "میعاد ختم ہو گئی: {{description}}",
       "googlePlayReceipt": "Google Play کی رسید",
       "kind": {
         "adjustment": "ترمیم",
         "balanceNeutral": "بیلنس پر اثر نہیں",
         "deduction": "کٹوتی",
         "grant": "مفت کریڈٹ",
+        "promotionalCredits": "پروموشنل کریڈٹس",
         "welcomeCredits": "خوش آمدید کریڈٹ",
         "purchase": "خریداری"
+      },
+      "program": {
+        "adminBulkGrant": "منتظم کا کریڈٹ عطیہ",
+        "contributorChampion": "شراکت دار چیمپئن کریڈٹ",
+        "feedback": "رائے کا کریڈٹ",
+        "influencer": "انفلوئنسر کریڈٹ",
+        "ossMonthlyReset": "اوپن سورس کریڈٹس کا ماہانہ ری سیٹ",
+        "ossSponsorship": "اوپن سورس کفالت کا کریڈٹ",
+        "pullRequest": "پل ریکویسٹ کریڈٹ",
+        "usageIssue": "استعمال کے مسئلے کا کریڈٹ",
+        "vibeDay": "Vibe Day کریڈٹ"
       },
       "purchaseFallback": "کریڈٹ کی خریداری",
       "receipt": "رسید",
       "receiptA11y": "{{description}}، {{amount}}، {{date}} کی رسید کھولیں",
       "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔",
-      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔"
+      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔",
+      "voidedGrant": "منسوخ: {{description}}"
     },
     "title": "کریڈٹس خریدیں",
     "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",
@@ -5088,6 +5118,20 @@
       "eu": "یورپی یونین",
       "au": "آسٹریلیا",
       "jp": "جاپان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ترجیحات کی تلاش",
+    "noMatches": "مماثل ترجیحات نہیں ملیں",
+    "emptyDescription": "کسی اور ترجیح کے نام یا کلیدی لفظ سے تلاش کریں۔",
+    "resultsStatus": "ملنے والی ترجیحات: {{resultCount}}",
+    "keywords": {
+      "signOut": "سائن آؤٹ|لاگ آؤٹ",
+      "appearance": "تھیم|رنگ|ظاہری شکل",
+      "appUnlock": "بایومیٹرکس|چہرے کی شناخت|انگلی کا نشان",
+      "language": "زبان|ترجمہ",
+      "notifications": "اطلاعات|الرٹس|نوٹیفکیشن",
+      "privacy": "تجزیات|ٹریکنگ|رازداری"
     }
   }
 }

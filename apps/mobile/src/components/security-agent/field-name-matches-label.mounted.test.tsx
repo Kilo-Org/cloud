@@ -106,7 +106,6 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  useRetrySecurityAgentCapability: () => ({ retry: vi.fn(), isRetrying: false }),
   useSecurityAgentConfig: () => ({
     data: {
       isEnabled: true,

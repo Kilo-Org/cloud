@@ -22,7 +22,9 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Plus: 'Plus' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ primaryForeground: '#FFFFFF' }),
+  useThemeColors: () => ({
+    primaryForeground: '#FFFFFF',
+  }),
 }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -146,5 +148,15 @@ describe('NewTaskButton', () => {
     await press();
 
     expect(state.push).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves the primary fill to the default variant and paints its ink', async () => {
+    await mount();
+
+    // The mocked Button does not resolve variant classes, so this suite pins
+    // the variant that supplies the fill; the Button suite pins its `bg-primary`.
+    expect(entry().props.variant).toBe('default');
+    expect(String(nodesOfType('Text')[0]?.props.className)).toContain('text-primary-foreground');
+    expect(nodesOfType('Plus')[0]?.props.color).toBe('#FFFFFF');
   });
 });

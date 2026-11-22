@@ -832,6 +832,32 @@ describe('AutoRoutingDecisionSchema variant compatibility', () => {
       false
     );
   });
+
+  it('reports each omitted field at its own path', () => {
+    const missingTableVersion = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      tableVersion: null,
+    });
+    expect(missingTableVersion.error?.issues.map(issue => issue.path)).toEqual([['tableVersion']]);
+
+    const missingSubtaskType = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      subtaskType: null,
+    });
+    expect(missingSubtaskType.error?.issues.map(issue => issue.path)).toEqual([['subtaskType']]);
+
+    const allMissing = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      taskType: null,
+      subtaskType: null,
+      tableVersion: null,
+    });
+    expect(allMissing.error?.issues.map(issue => issue.path)).toEqual([
+      ['taskType'],
+      ['subtaskType'],
+      ['tableVersion'],
+    ]);
+  });
 });
 
 describe('benchmark profile request entry bounds', () => {

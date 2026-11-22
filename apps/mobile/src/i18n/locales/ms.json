@@ -309,6 +309,7 @@
     "hideBalance": "Sembunyikan baki",
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",
+    "availableToSpendInOrganization": "Tersedia untuk dibelanjakan dalam organisasi ini",
     "signOutTitle": "Log keluar?",
     "signOutMessage": "Anda perlu log masuk semula untuk mengakses ruang kerja anda.",
     "deleteAccountTitle": "Padam akaun?",
@@ -450,6 +451,17 @@
       "location": "Lokasi Vertex",
       "clientEmail": "E-mel akaun perkhidmatan",
       "privateKey": "Kunci peribadi akaun perkhidmatan",
+      "privateKeyBlockRequired": "Tampal seluruh blok kunci, dari baris BEGIN hingga baris END.",
+      "privateKeyEncrypted": "Blok kunci ini dilindungi frasa laluan. Tampal kunci akaun perkhidmatan yang tiada frasa laluan.",
+      "names": {
+        "codestral": "Codestral legasi sahaja",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Log masuk dengan ChatGPT)",
+        "xiaomi": "Xiaomi (bayar mengikut penggunaan)",
+        "zai": "Z.ai (bayar mengikut penggunaan)",
+        "bedrockByok": "Amazon Bedrock (terus)",
+        "vertexByok": "Google Vertex AI (terus)"
+      },
       "modelMappings": "Pemetaan model",
       "modelMappingsDescription": "Halakan model gateway kepada nama deployment tersuai.",
       "mappingTitle": "Pemetaan {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Pembetulan dan penambahbaikan dalam {{areas}}.",
     "changelogFixesPolish": "Pembetulan dan penambahbaikan di seluruh aplikasi.",
     "changelogAreas": {
-      "signIn": "Log masuk",
-      "profileOrganizations": "Profil & organisasi"
+      "signIn": "log masuk",
+      "profileOrganizations": "profil & organisasi",
+      "chat": "sembang",
+      "notifications": "pemberitahuan",
+      "integrations": "integrasi"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Cari repositori",
       "noMatches": "Tiada padanan",
       "noRepositories": "Tiada repositori tersedia",
-      "noRepositoriesDescription": "Tiada repositori disambungkan ke akaun anda.",
+      "noRepositoriesDescription": "Untuk memuatkan repositori, sambungkan akaun GitHub atau GitLab.",
       "loading": "Memuatkan…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Tetapan pengebilan di web",
       "changePlan": "Tukar pelan",
       "buySeats": "Beli slot pengguna",
-      "managedOnWeb": "Pelan, slot pengguna dan tambah nilai automatik diurus di web.",
+      "managedOnWeb": "Pelan, slot pengguna dan tambah nilai automatik diurus di kilo.ai.",
       "setupAutoTopUp": "Sediakan tambah nilai automatik",
       "manageAutoTopUp": "Urus tambah nilai automatik",
       "opensOnWeb": "Dibuka di web"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Anda seorang…",
       "tools": "Alatan",
       "wholeToolRule": "Ejen ini menggunakan satu peraturan pada setiap alat sekali gus: {{rule}}. Suis ini adalah baca sahaja.",
+      "toolRule": "Peraturan tersimpan: {{rule}}",
       "visibility": "Keterlihatan",
       "visibilityPrimary": "Utama — ditunjukkan dalam pemilih",
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Potongan kredit",
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
       "emptyTitle": "Tiada sejarah kredit",
+      "expiredGrant": "Tamat tempoh: {{description}}",
       "googlePlayReceipt": "Resit daripada Google Play",
       "kind": {
         "adjustment": "Pelarasan",
         "balanceNeutral": "Neutral baki",
         "deduction": "Potongan",
         "grant": "Pemberian kredit",
+        "promotionalCredits": "Kredit promosi",
         "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
+      },
+      "program": {
+        "adminBulkGrant": "Pemberian kredit pentadbir",
+        "contributorChampion": "Kredit juara penyumbang",
+        "feedback": "Kredit maklum balas",
+        "influencer": "Kredit pempengaruh",
+        "ossMonthlyReset": "Pembaharuan penajaan OSS",
+        "ossSponsorship": "Kredit penajaan OSS",
+        "pullRequest": "Kredit PR",
+        "usageIssue": "Kredit isu penggunaan",
+        "vibeDay": "Kredit Vibe Day"
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
-      "retentionLimit": "Memaparkan sejarah kredit terkini."
+      "retentionLimit": "Memaparkan sejarah kredit terkini.",
+      "voidedGrant": "Dibatalkan: {{description}}"
     },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
@@ -5088,6 +5118,20 @@
       "eu": "Kesatuan Eropah",
       "au": "Australia",
       "jp": "Jepun"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cari keutamaan",
+    "noMatches": "Tiada keutamaan yang sepadan",
+    "emptyDescription": "Cuba nama keutamaan atau kata kunci lain.",
+    "resultsStatus": "Keutamaan ditemui: {{resultCount}}",
+    "keywords": {
+      "signOut": "log keluar|keluar akaun",
+      "appearance": "tema|skema warna",
+      "appUnlock": "biometrik|wajah|cap jari",
+      "language": "bahasa|terjemahan",
+      "notifications": "makluman|amaran|pemberitahuan",
+      "privacy": "analitik|penjejakan"
     }
   }
 }

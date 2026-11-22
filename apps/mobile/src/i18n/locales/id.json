@@ -309,6 +309,7 @@
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
+    "availableToSpendInOrganization": "Tersedia untuk dibelanjakan di organisasi ini",
     "signOutTitle": "Keluar?",
     "signOutMessage": "Kamu perlu masuk lagi untuk mengakses ruang kerjamu.",
     "deleteAccountTitle": "Hapus akun?",
@@ -450,6 +451,17 @@
       "location": "Lokasi Vertex",
       "clientEmail": "Email akun layanan",
       "privateKey": "Kunci pribadi akun layanan",
+      "privateKeyBlockRequired": "Tempel seluruh blok kunci, dari baris BEGIN sampai baris END.",
+      "privateKeyEncrypted": "Blok kunci ini dilindungi frasa sandi. Tempel kunci akun layanan yang tidak memiliki frasa sandi.",
+      "names": {
+        "codestral": "Hanya Codestral lama",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Masuk dengan ChatGPT)",
+        "xiaomi": "Xiaomi (bayar sesuai pemakaian)",
+        "zai": "Z.ai (bayar sesuai pemakaian)",
+        "bedrockByok": "Amazon Bedrock (langsung)",
+        "vertexByok": "Google Vertex AI (langsung)"
+      },
       "modelMappings": "Pemetaan model",
       "modelMappingsDescription": "Arahkan model gateway ke nama deployment kustom.",
       "mappingTitle": "Pemetaan {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Perbaikan dan peningkatan pada {{areas}}.",
     "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
     "changelogAreas": {
-      "signIn": "Masuk",
-      "profileOrganizations": "Profil & organisasi"
+      "signIn": "masuk",
+      "profileOrganizations": "profil & organisasi",
+      "chat": "obrolan",
+      "notifications": "notifikasi",
+      "integrations": "integrasi"
     }
   },
   "preferences": {
@@ -1989,7 +2004,7 @@
       "searchPlaceholder": "Cari repositori",
       "noMatches": "Tidak ada hasil yang cocok",
       "noRepositories": "Tidak ada repositori yang tersedia",
-      "noRepositoriesDescription": "Tidak ada repositori yang terhubung ke akunmu.",
+      "noRepositoriesDescription": "Hubungkan GitHub atau GitLab untuk memuat repositori.",
       "loading": "Memuat…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3432,7 +3447,7 @@
       "manageOnWeb": "Pengaturan penagihan di web",
       "changePlan": "Ubah paket",
       "buySeats": "Beli lisensi",
-      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di web.",
+      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di kilo.ai.",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
       "opensOnWeb": "Dibuka di web"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Anda adalah …",
       "tools": "Peralatan",
       "wholeToolRule": "Agen ini menerapkan satu aturan ke setiap Peralatan sekaligus: {{rule}}. Sakelar ini bersifat hanya-baca.",
+      "toolRule": "Aturan tersimpan: {{rule}}",
       "visibility": "Visibilitas",
       "visibilityPrimary": "Utama — ditampilkan di alat pilih",
       "visibilitySubagent": "Subagen — hanya dapat dihubungi dari orang lain",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Pengurangan kredit",
       "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
       "emptyTitle": "Tidak ada riwayat kredit",
+      "expiredGrant": "Kedaluwarsa: {{description}}",
       "googlePlayReceipt": "Tanda terima dari Google Play",
       "kind": {
         "adjustment": "Penyesuaian",
         "balanceNeutral": "Saldo tetap",
         "deduction": "Pengurangan",
         "grant": "Kredit gratis",
+        "promotionalCredits": "Kredit promosi",
         "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
+      },
+      "program": {
+        "adminBulkGrant": "Pemberian kredit admin",
+        "contributorChampion": "Kredit juara kontributor",
+        "feedback": "Kredit masukan",
+        "influencer": "Kredit influencer",
+        "ossMonthlyReset": "Pengaturan ulang sponsor sumber terbuka bulanan",
+        "ossSponsorship": "Kredit sponsor sumber terbuka",
+        "pullRequest": "Kredit PR",
+        "usageIssue": "Kredit masalah penggunaan",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
-      "retentionLimit": "Menampilkan riwayat kredit terbaru."
+      "retentionLimit": "Menampilkan riwayat kredit terbaru.",
+      "voidedGrant": "Dibatalkan: {{description}}"
     },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
@@ -5088,6 +5118,20 @@
       "eu": "Uni Eropa",
       "au": "Australia",
       "jp": "Jepang"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cari preferensi",
+    "noMatches": "Tidak ada preferensi yang cocok",
+    "emptyDescription": "Coba nama preferensi atau kata kunci lain.",
+    "resultsStatus": "Preferensi ditemukan: {{resultCount}}",
+    "keywords": {
+      "signOut": "keluar|keluar akun",
+      "appearance": "tema|skema warna",
+      "appUnlock": "biometrik|wajah|sidik jari",
+      "language": "bahasa|terjemahan",
+      "notifications": "peringatan|pemberitahuan",
+      "privacy": "analitik|pelacakan"
     }
   }
 }

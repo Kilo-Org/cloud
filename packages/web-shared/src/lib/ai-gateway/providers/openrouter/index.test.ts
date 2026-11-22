@@ -18,7 +18,7 @@ import {
   mockOpenRouterModels,
   withoutFillerModels,
 } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   AUTO_MODELS,
   AUTO_SMALL_TARGET_MODELS,
@@ -117,7 +117,7 @@ beforeEach(() => {
   resetOpenRouterModelsCaches();
 });
 
-function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
+function buildModel(overrides: Partial<OpenRouterCatalogModel> = {}): OpenRouterCatalogModel {
   return {
     id: 'vendor/model',
     name: 'Test Model',
@@ -683,7 +683,7 @@ describe('alias pricing', () => {
     };
   }
 
-  async function getCatalog(catalog: OpenRouterModel[] = [alias, target]) {
+  async function getCatalog(catalog: OpenRouterCatalogModel[] = [alias, target]) {
     global.fetch = jest.fn(() =>
       Promise.resolve(createMockResponse({ jsonData: cataloguePayload(catalog) }))
     ) as unknown as typeof fetch;

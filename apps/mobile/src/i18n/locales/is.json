@@ -309,6 +309,7 @@
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
+    "availableToSpendInOrganization": "Í boði til eyðslu í þessu fyrirtæki",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",
@@ -450,6 +451,17 @@
       "location": "Vertex-staðsetning",
       "clientEmail": "Netfang þjónustureiknings",
       "privateKey": "Einkalykill þjónustureiknings",
+      "privateKeyBlockRequired": "Límdu alla lyklablokkina, frá BEGIN línunni til END línunnar.",
+      "privateKeyEncrypted": "Þessi lyklablokk er varin með lykilsetningu. Límdu lykil þjónustureiknings sem hefur enga lykilsetningu.",
+      "names": {
+        "codestral": "Eldri Codestral-eingöngu",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Skrá sig inn með ChatGPT)",
+        "xiaomi": "Xiaomi (greiða eftir notkun)",
+        "zai": "Z.ai (greiða eftir notkun)",
+        "bedrockByok": "Amazon Bedrock (beint)",
+        "vertexByok": "Google Vertex AI (beint)"
+      },
       "modelMappings": "Líkanavarpanir",
       "modelMappingsDescription": "Beina gáttarlíkani á sérsniðið heiti uppsetningar.",
       "mappingTitle": "Vörpun {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Lagfæringar og endurbætur á eftirfarandi sviðum: {{areas}}.",
     "changelogFixesPolish": "Lagfæringar og endurbætur í öllu forritinu.",
     "changelogAreas": {
-      "signIn": "Innskráning",
-      "profileOrganizations": "Prófíll & stofnanir"
+      "signIn": "innskráning",
+      "profileOrganizations": "prófíll & stofnanir",
+      "chat": "spjall",
+      "notifications": "tilkynningar",
+      "integrations": "samþættingar"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Leita að kóðasöfnum",
       "noMatches": "Engar samsvaranir",
       "noRepositories": "Engin kóðasöfn tiltæk",
-      "noRepositoriesDescription": "Engin kóðasöfn eru tengd við reikninginn þinn.",
+      "noRepositoriesDescription": "Tengdu GitHub eða GitLab til að hlaða kóðasöfnum.",
       "loading": "Hleður…",
       "accessibility": "Kóðasafn: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Greiðslustillingar á vefnum",
       "changePlan": "Breyta áætlun",
       "buySeats": "Kaupa notendasæti",
-      "managedOnWeb": "Áætluninni, notendasætum og sjálfvirkri áfyllingu er stjórnað á vefnum.",
+      "managedOnWeb": "Áætluninni, notendasætum og sjálfvirkri áfyllingu er stjórnað á kilo.ai.",
       "setupAutoTopUp": "Setja upp sjálfvirka áfyllingu",
       "manageAutoTopUp": "Stjórna sjálfvirkri áfyllingu",
       "opensOnWeb": "Opnast á vefnum"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Þú ert a…",
       "tools": "Verkfæri",
       "wholeToolRule": "Þessi agent beitir einni reglu á öll verkfæri í einu: {{rule}}. Þessir rofar eru skrifvarðir.",
+      "toolRule": "Geymd regla: {{rule}}",
       "visibility": "Skyggni",
       "visibilityPrimary": "Aðal — sýnt í veljarann",
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Frádráttur inneignar",
       "emptyDescription": "Kaup á inneign, kvittanir og notkun birtast hér.",
       "emptyTitle": "Enginn inneignarferill",
+      "expiredGrant": "Útrunnið: {{description}}",
       "googlePlayReceipt": "Kvittun frá Google Play",
       "kind": {
         "adjustment": "Leiðrétting",
         "balanceNeutral": "Hefur ekki áhrif á stöðu",
         "deduction": "Frádráttur",
         "grant": "Úthlutuð inneign",
+        "promotionalCredits": "Kynningarinnieign",
         "welcomeCredits": "Velkomuinneign",
         "purchase": "Kaup"
+      },
+      "program": {
+        "adminBulkGrant": "Inneignarúthlutun stjórnanda",
+        "contributorChampion": "Inneign framlagsmeistara",
+        "feedback": "Inneign fyrir ábendingar",
+        "influencer": "Inneign áhrifavalds",
+        "ossMonthlyReset": "Mánaðarleg endurstilling OSS-inneignar",
+        "ossSponsorship": "Inneign OSS-styrks",
+        "pullRequest": "Inneign samrunabeiðni",
+        "usageIssue": "Inneign vegna notkunarvandamáls",
+        "vibeDay": "Vibe day inneign"
       },
       "purchaseFallback": "Kaup á inneign",
       "receipt": "Kvittun",
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
       "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
-      "retentionLimit": "Nýjasti inneignarferillinn er sýndur."
+      "retentionLimit": "Nýjasti inneignarferillinn er sýndur.",
+      "voidedGrant": "Ógilt: {{description}}"
     },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
@@ -5088,6 +5118,20 @@
       "eu": "Evrópusambandið",
       "au": "Ástralía",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Leita að kjörstillingum",
+    "noMatches": "Engar kjörstillingar fundust",
+    "emptyDescription": "Prófaðu annað heiti eða leitarorð.",
+    "resultsStatus": "Kjörstillingar sem fundust: {{resultCount}}",
+    "keywords": {
+      "signOut": "skrá út|útskráning",
+      "appearance": "þema|litasamsetning",
+      "appUnlock": "lífkenni|andlitsgreining|fingrafar",
+      "language": "tungumál|þýðing",
+      "notifications": "viðvaranir|tilkynningar|ýtitilkynningar",
+      "privacy": "notkunargreining|rakning"
     }
   }
 }

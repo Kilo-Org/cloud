@@ -309,6 +309,7 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
+    "availableToSpendInOrganization": "Në dispozicion për shpenzim në këtë organizatë",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -450,6 +451,17 @@
       "location": "Vendndodhja Vertex",
       "clientEmail": "Email-i i llogarisë së shërbimit",
       "privateKey": "Çelësi privat i llogarisë së shërbimit",
+      "privateKeyBlockRequired": "Ngjit të gjithë bllokun e çelësit, nga rreshti BEGIN deri në rreshtin END.",
+      "privateKeyEncrypted": "Ky bllok i çelësit është i mbrojtur me frazëkalim. Ngjit një çelës të llogarisë së shërbimit që nuk ka frazëkalim.",
+      "names": {
+        "codestral": "Vetëm Codestral i vjetëruar",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Hyr me ChatGPT)",
+        "xiaomi": "Xiaomi (paguaj sipas përdorimit)",
+        "zai": "Z.ai (paguaj sipas përdorimit)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Hartëzimet e modeleve",
       "modelMappingsDescription": "Drejto një model të gateway-t te një emër i personalizuar deployment-i.",
       "mappingTitle": "Hartëzimi {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
     "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
     "changelogAreas": {
-      "signIn": "Hyrja",
-      "profileOrganizations": "Profili & organizatat"
+      "signIn": "hyrja",
+      "profileOrganizations": "profili & organizatat",
+      "chat": "biseda",
+      "notifications": "njoftimet",
+      "integrations": "integrimet"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Kërko depo",
       "noMatches": "Asnjë përputhje",
       "noRepositories": "Asnjë depo e disponueshme",
-      "noRepositoriesDescription": "Asnjë depo nuk është e lidhur me llogarinë tënde.",
+      "noRepositoriesDescription": "Për të ngarkuar depot, lidhu me GitHub ose GitLab.",
       "loading": "Duke u ngarkuar…",
       "accessibility": "Depoja: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Cilësimet e faturimit në ueb",
       "changePlan": "Ndrysho planin",
       "buySeats": "Bli vende",
-      "managedOnWeb": "Plani, vendet dhe rimbushja automatike menaxhohen në ueb.",
+      "managedOnWeb": "Plani, vendet dhe rimbushja automatike menaxhohen në kilo.ai.",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
       "manageAutoTopUp": "Menaxho rimbushjen automatike",
       "opensOnWeb": "Hapet në ueb"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Ju jeni një…",
       "tools": "Mjetet",
       "wholeToolRule": "Ky agjent zbaton një rregull për të gjitha mjetet njëherësh: {{rule}}. Këto ndërprerës janë vetëm për lexim.",
+      "toolRule": "Rregull i ruajtur: {{rule}}",
       "visibility": "Dukshmëria",
       "visibilityPrimary": "Primar — tregohet në zgjedhës",
       "visibilitySubagent": "Subagent — i thirrur vetëm nga të tjerët",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Zbritje kredish",
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
       "emptyTitle": "Nuk ka historik kredish",
+      "expiredGrant": "Skaduar: {{description}}",
       "googlePlayReceipt": "Dëftesë nga Google Play",
       "kind": {
         "adjustment": "Rregullim",
         "balanceNeutral": "Pa ndikim në bilanc",
         "deduction": "Zbritje",
         "grant": "Kredi të dhuruara",
+        "promotionalCredits": "Kredite promocionale",
         "welcomeCredits": "Kredi mirëseardhjeje",
         "purchase": "Blerje"
+      },
+      "program": {
+        "adminBulkGrant": "Kredi të dhuruara nga administratori",
+        "contributorChampion": "Kredi për kampionin e kontribuesve",
+        "feedback": "Kredi për përshtypje",
+        "influencer": "Kredi influencuesi",
+        "ossMonthlyReset": "Rivendosje mujore OSS",
+        "ossSponsorship": "Kredi sponsorizimi OSS",
+        "pullRequest": "Kredi për kërkesë bashkimi",
+        "usageIssue": "Kredi për problem përdorimi",
+        "vibeDay": "Kredi Vibe day"
       },
       "purchaseFallback": "Blerje kredish",
       "receipt": "Dëftesë",
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
       "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
-      "retentionLimit": "Po shfaqet historiku i kredive më i fundit."
+      "retentionLimit": "Po shfaqet historiku i kredive më i fundit.",
+      "voidedGrant": "Anuluar: {{description}}"
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
@@ -5088,6 +5118,20 @@
       "eu": "Bashkimi Europian",
       "au": "Australi",
       "jp": "Japoni"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Kërkim preferencash",
+    "noMatches": "Asnjë preferencë që përputhet",
+    "emptyDescription": "Provoni një emër tjetër preference ose fjalë kyçe.",
+    "resultsStatus": "Preferenca të gjetura: {{resultCount}}",
+    "keywords": {
+      "signOut": "dil|dalje",
+      "appearance": "temë|skema e ngjyrave",
+      "appUnlock": "biometri|fytyrë|gjurmë gishti",
+      "language": "gjuhë|përkthim",
+      "notifications": "sinjalizime|njoftime",
+      "privacy": "analiza|gjurmim"
     }
   }
 }

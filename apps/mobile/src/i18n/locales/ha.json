@@ -309,6 +309,7 @@
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
+    "availableToSpendInOrganization": "Akwai don kashe kuɗi a wannan ƙungiyar",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",
@@ -450,6 +451,17 @@
       "location": "Wurin Vertex",
       "clientEmail": "Imel na asusun sabis",
       "privateKey": "Maɓallin sirri na asusun sabis",
+      "privateKeyBlockRequired": "Liƙa dukan shingen maɓallin, daga layin BEGIN zuwa layin END.",
+      "privateKeyEncrypted": "Wannan shingen maɓallin yana da kariya ta kalmar sirri. Liƙa maɓallin asusun sabis wanda ba shi da kalmar sirri.",
+      "names": {
+        "codestral": "Tsohon Codestral kawai",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Shiga da ChatGPT)",
+        "xiaomi": "Xiaomi (biya gwargwadon amfani)",
+        "zai": "Z.ai (biya gwargwadon amfani)",
+        "bedrockByok": "Amazon Bedrock (kai tsaye)",
+        "vertexByok": "Google Vertex AI (kai tsaye)"
+      },
       "modelMappings": "Taswirorin samfura",
       "modelMappingsDescription": "Tura samfurin gateway zuwa sunan deployment na musamman.",
       "mappingTitle": "Taswira {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Gyare-gyare da ingantawa a {{areas}}.",
     "changelogFixesPolish": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
     "changelogAreas": {
-      "signIn": "Shiga",
-      "profileOrganizations": "Bayanan martaba & ƙungiyoyi"
+      "signIn": "shiga",
+      "profileOrganizations": "bayanan martaba & ƙungiyoyi",
+      "chat": "tattaunawa",
+      "notifications": "sanarwa",
+      "integrations": "haɗe-haɗe"
     }
   },
   "preferences": {
@@ -2550,7 +2565,7 @@
       "searchPlaceholder": "Binciken ma'ajiyoyi",
       "noMatches": "Babu abin da ya dace",
       "noRepositories": "Babu ma'ajiyoyin da za a zaɓa",
-      "noRepositoriesDescription": "Babu ma'ajiyoyi da aka haɗa da asusunka.",
+      "noRepositoriesDescription": "Haɗa GitHub ko GitLab don loda ma'ajiyoyi.",
       "loading": "Ana loda…",
       "accessibility": "Ma'ajiya: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Saitunan biyan kuɗi a yanar gizo",
       "changePlan": "Canza tsari",
       "buySeats": "Sayi gurabe",
-      "managedOnWeb": "Ana sarrafa tsari, gurabe da ƙara kuɗi ta atomatik a yanar gizo.",
+      "managedOnWeb": "Ana sarrafa tsari, gurabe da ƙara kuɗi ta atomatik a kilo.ai.",
       "setupAutoTopUp": "Saita ƙara kuɗi ta atomatik",
       "manageAutoTopUp": "Sarrafa ƙara kuɗi ta atomatik",
       "opensOnWeb": "Yana buɗewa a yanar gizo"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Kai mataimaki ne…",
       "tools": "Kayan aiki",
       "wholeToolRule": "Wannan wakili yana amfani da doka ɗaya ga kowane kayan aiki a lokaci ɗaya: {{rule}}. Waɗannan maɓallan karantawa kawai ne.",
+      "toolRule": "Doka da aka adana: {{rule}}",
       "visibility": "Ganuwa",
       "visibilityPrimary": "Na farko — wanda aka nuna a cikin mai ɗaukar hoto",
       "visibilitySubagent": "Subagent — kawai kira daga wasu",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Cire kiredit",
       "emptyDescription": "Sayayyar kiredit, rasitai, da amfani za su bayyana a nan.",
       "emptyTitle": "Babu tarihin kiredit",
+      "expiredGrant": "Lokaci ya ƙare: {{description}}",
       "googlePlayReceipt": "Rasiti daga Google Play",
       "kind": {
         "adjustment": "Gyara",
         "balanceNeutral": "Ba ya canja ma'auni",
         "deduction": "Cirewa",
         "grant": "Kyautar kiredit",
+        "promotionalCredits": "Kiredit ɗin talla",
         "welcomeCredits": "Kiredit na maraba",
         "purchase": "Saye"
+      },
+      "program": {
+        "adminBulkGrant": "Kyautar kiredit daga mai gudanarwa",
+        "contributorChampion": "Kiredit na gwarzon mai ba da gudummawa",
+        "feedback": "Kiredit na ra'ayi",
+        "influencer": "Kiredit na mai tasiri",
+        "ossMonthlyReset": "Sake saitin OSS na wata-wata",
+        "ossSponsorship": "Kiredit na tallafin OSS",
+        "pullRequest": "Kiredit na buƙatar haɗa canje-canje",
+        "usageIssue": "Kiredit na matsalar amfani",
+        "vibeDay": "Kiredit na Vibe Day"
       },
       "purchaseFallback": "Sayen kiredit",
       "receipt": "Rasiti",
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
       "receiptUnavailable": "Babu rasiti don wannan sayayya.",
-      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan."
+      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan.",
+      "voidedGrant": "An soke: {{description}}"
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
@@ -5088,6 +5118,20 @@
       "eu": "Ƙungiyar Tarayyar Turai",
       "au": "Ostiraliya",
       "jp": "Jafan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Nemo zaɓuɓɓuka",
+    "noMatches": "Babu zaɓuɓɓukan da suka dace",
+    "emptyDescription": "Gwada wani sunan zaɓi ko kalmar nema.",
+    "resultsStatus": "Zaɓuɓɓukan da aka samu: {{resultCount}}",
+    "keywords": {
+      "signOut": "fita|fita daga asusu",
+      "appearance": "jigo|launi|kamanni",
+      "appUnlock": "bayanan halitta|fuska|sawun yatsa",
+      "language": "harshe|fassara",
+      "notifications": "sanarwa|faɗakarwa",
+      "privacy": "nazari|bibiyar bayanai|sirri"
     }
   }
 }

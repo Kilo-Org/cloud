@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Hitan'ny fiarovana vaovao ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Tena avo",
+      "high": "Avo",
+      "medium": "Antonony",
+      "low": "Ambany"
+    },
     "securityFindingSlaWarning": {
       "title": "Fampitandremana SLA"
     },

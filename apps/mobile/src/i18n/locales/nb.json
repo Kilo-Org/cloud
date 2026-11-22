@@ -309,6 +309,7 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
+    "availableToSpendInOrganization": "Tilgjengelig for forbruk i denne organisasjonen",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -450,6 +451,17 @@
       "location": "Vertex-plassering",
       "clientEmail": "E-postadresse for tjenestekonto",
       "privateKey": "Privat nøkkel for tjenestekonto",
+      "privateKeyBlockRequired": "Lim inn hele nøkkelblokken, fra BEGIN-linjen til END-linjen.",
+      "privateKeyEncrypted": "Denne nøkkelblokken er passfrasebeskyttet. Lim inn en nøkkel for tjenestekonto uten passfrase.",
+      "names": {
+        "codestral": "Kun eldre Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Logg inn med ChatGPT)",
+        "xiaomi": "Xiaomi (betal etter bruk)",
+        "zai": "Z.ai (betal etter bruk)",
+        "bedrockByok": "Amazon Bedrock (direkte)",
+        "vertexByok": "Google Vertex AI (direkte)"
+      },
       "modelMappings": "Modelltilordninger",
       "modelMappingsDescription": "Send en gateway-modell til et egendefinert deployment-navn.",
       "mappingTitle": "Tilordning {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
     "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
-      "signIn": "Innlogging",
-      "profileOrganizations": "Profil & organisasjoner"
+      "signIn": "innlogging",
+      "profileOrganizations": "profil & organisasjoner",
+      "chat": "samtale",
+      "notifications": "varsler",
+      "integrations": "integrasjoner"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "Søk etter kodelagre",
       "noMatches": "Ingen treff",
       "noRepositories": "Ingen kodelagre tilgjengelige",
-      "noRepositoriesDescription": "Ingen kodelagre er koblet til kontoen din.",
+      "noRepositoriesDescription": "For å laste inn kodelagre, koble til en GitHub- eller GitLab-konto.",
       "loading": "Laster inn…",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "Faktureringsinnstillinger på nettet",
       "changePlan": "Endre plan",
       "buySeats": "Kjøp brukerplasser",
-      "managedOnWeb": "Planen, brukerplassene og automatisk påfylling administreres på nettet.",
+      "managedOnWeb": "Planen, brukerplassene og automatisk påfylling administreres på kilo.ai.",
       "setupAutoTopUp": "Sett opp automatisk påfylling",
       "manageAutoTopUp": "Administrer automatisk påfylling",
       "opensOnWeb": "Åpnes på nettet"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Du er en…",
       "tools": "Verktøy",
       "wholeToolRule": "Denne agenten bruker én regel på alle verktøy samtidig: {{rule}}. Disse bryterne er skrivebeskyttede.",
+      "toolRule": "Lagret regel: {{rule}}",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primær — vist i velgeren",
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Kredittrekk",
       "emptyDescription": "Kjøp av kreditter, kvitteringer og forbruk vises her.",
       "emptyTitle": "Ingen kreditthistorikk",
+      "expiredGrant": "Utløpt: {{description}}",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldonøytral",
         "deduction": "Trekk",
         "grant": "Tildelte kreditter",
+        "promotionalCredits": "Kampanjekreditter",
         "welcomeCredits": "Velkomstkreditter",
         "purchase": "Kjøp"
+      },
+      "program": {
+        "adminBulkGrant": "Administratorkreditt",
+        "contributorChampion": "Bidragsytermesterkreditt",
+        "feedback": "Tilbakemeldingskreditt",
+        "influencer": "Påvirkerkreditt",
+        "ossMonthlyReset": "Nullstilling av støtte til åpen kildekode",
+        "ossSponsorship": "Kreditt for støtte til åpen kildekode",
+        "pullRequest": "PR-kreditt",
+        "usageIssue": "Kreditt for bruksproblem",
+        "vibeDay": "Vibe day-kreditt"
       },
       "purchaseFallback": "Kjøp av kreditter",
       "receipt": "Kvittering",
       "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet.",
-      "retentionLimit": "Viser den nyeste kreditthistorikken."
+      "retentionLimit": "Viser den nyeste kreditthistorikken.",
+      "voidedGrant": "Annullert: {{description}}"
     },
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
@@ -5088,6 +5118,20 @@
       "eu": "Den europeiske union",
       "au": "Australia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Søk etter innstillinger…",
+    "noMatches": "Ingen treff i innstillingene",
+    "emptyDescription": "Prøv et annet innstillingsnavn eller søkeord.",
+    "resultsStatus": "Innstillinger funnet: {{resultCount}}",
+    "keywords": {
+      "signOut": "logg ut|utlogging",
+      "appearance": "tema|fargeskjema|farger",
+      "appUnlock": "biometri|ansiktsgjenkjenning|fingeravtrykk",
+      "language": "språk|oversettelse",
+      "notifications": "varsler|pushvarsler",
+      "privacy": "analyse|sporing"
     }
   }
 }

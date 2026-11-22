@@ -309,6 +309,7 @@
     "hideBalance": "ಉಳಿಕೆ ಮರೆಮಾಡಿ",
     "showBalance": "ಉಳಿಕೆ ತೋರಿಸಿ",
     "balanceHidden": "ಉಳಿಕೆ ಮರೆಮಾಡಲಾಗಿದೆ",
+    "availableToSpendInOrganization": "ಈ ಸಂಸ್ಥೆಯಲ್ಲಿ ಖರ್ಚು ಮಾಡಲು ಲಭ್ಯವಿದೆ",
     "signOutTitle": "ಸೈನ್ ಔಟ್ ಮಾಡಬೇಕೆ?",
     "signOutMessage": "ನಿಮ್ಮ ಕಾರ್ಯಸ್ಥಳವನ್ನು ಪ್ರವೇಶಿಸಲು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಬೇಕು.",
     "deleteAccountTitle": "ಖಾತೆಯನ್ನು ಅಳಿಸಬೇಕೆ?",
@@ -450,6 +451,17 @@
       "location": "Vertex ಸ್ಥಳ",
       "clientEmail": "ಸೇವಾ ಖಾತೆಯ ಇಮೇಲ್",
       "privateKey": "ಸೇವಾ ಖಾತೆಯ ಖಾಸಗಿ ಕೀ",
+      "privateKeyBlockRequired": "BEGIN ಸಾಲಿನಿಂದ END ಸಾಲಿನವರೆಗಿನ ಸಂಪೂರ್ಣ ಕೀ ಬ್ಲಾಕ್ ಅನ್ನು ಪೇಸ್ಟ್ ಮಾಡಿ.",
+      "privateKeyEncrypted": "ಈ ಕೀ ಬ್ಲಾಕ್ ಪಾಸ್ಫ್ರೇಸ್‌ನಿಂದ ರಕ್ಷಿಸಲಾಗಿದೆ. ಪಾಸ್ಫ್ರೇಸ್ ಇಲ್ಲದ ಸೇವಾ ಖಾತೆಯ ಕೀಯನ್ನು ಪೇಸ್ಟ್ ಮಾಡಿ.",
+      "names": {
+        "codestral": "ಹಳೆಯ Codestral ಮಾತ್ರ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಿ)",
+        "xiaomi": "Xiaomi (ಬಳಕೆ ಆಧಾರಿತ ಪಾವತಿ)",
+        "zai": "Z.ai (ಬಳಕೆ ಆಧಾರಿತ ಪಾವತಿ)",
+        "bedrockByok": "Amazon Bedrock (ನೇರ)",
+        "vertexByok": "Google Vertex AI (ನೇರ)"
+      },
       "modelMappings": "ಮಾಡೆಲ್ ಮ್ಯಾಪಿಂಗ್‌ಗಳು",
       "modelMappingsDescription": "ಗೇಟ್‌ವೇ ಮಾಡೆಲ್ ಅನ್ನು ಕಸ್ಟಮ್ ಡಿಪ್ಲಾಯ್‌ಮೆಂಟ್ ಹೆಸರಿಗೆ ಕಳುಹಿಸಿ.",
       "mappingTitle": "ಮ್ಯಾಪಿಂಗ್ {{number}}",
@@ -544,7 +556,10 @@
     "changelogFixesPolish": "ಆ್ಯಪ್‌ನಾದ್ಯಂತ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು.",
     "changelogAreas": {
       "signIn": "ಸೈನ್ ಇನ್",
-      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಹಾಗೂ ಸಂಸ್ಥೆಗಳು"
+      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಹಾಗೂ ಸಂಸ್ಥೆಗಳು",
+      "chat": "ಚಾಟ್",
+      "notifications": "ಅಧಿಸೂಚನೆಗಳು",
+      "integrations": "ಏಕೀಕರಣಗಳು"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "ರೆಪೊಸಿಟರಿಗಳ ಹುಡುಕಾಟ",
       "noMatches": "ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಗಳಿಲ್ಲ",
       "noRepositories": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
-      "noRepositoriesDescription": "ನಿಮ್ಮ ಖಾತೆಗೆ ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ.",
+      "noRepositoriesDescription": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು GitHub ಅಥವಾ GitLab ಸಂಪರ್ಕಿಸಿ.",
       "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "accessibility": "ರೆಪೊಸಿಟರಿ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
       "changePlan": "ಯೋಜನೆ ಬದಲಾಯಿಸಿ",
       "buySeats": "ಸೀಟ್‌ಗಳನ್ನು ಖರೀದಿಸಿ",
-      "managedOnWeb": "ಯೋಜನೆ, ಸೀಟ್‌ಗಳು ಮತ್ತು ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ಅನ್ನು ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
+      "managedOnWeb": "ಯೋಜನೆ, ಸೀಟ್‌ಗಳು ಮತ್ತು ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ಅನ್ನು kilo.ai ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
       "setupAutoTopUp": "ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ಹೊಂದಿಸಿ",
       "manageAutoTopUp": "ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ನಿರ್ವಹಿಸಿ",
       "opensOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ತೆರೆಯುತ್ತದೆ"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "ನೀವು ಒಂದು …",
       "tools": "ಪರಿಕರಗಳು",
       "wholeToolRule": "ಈ ಏಜೆಂಟ್ ಎಲ್ಲಾ ಪರಿಕರಗಳಿಗೆ ಏಕಕಾಲದಲ್ಲಿ ಒಂದೇ ನಿಯಮವನ್ನು ಅನ್ವಯಿಸುತ್ತದೆ: {{rule}}. ಈ ಸ್ವಿಚ್‌ಗಳು ಓದಲು-ಮಾತ್ರ.",
+      "toolRule": "ಸಂಗ್ರಹಿಸಿದ ನಿಯಮ: {{rule}}",
       "visibility": "ಗೋಚರತೆ",
       "visibilityPrimary": "ಪ್ರಾಥಮಿಕ — ಪಿಕ್ಕರ್‌ನಲ್ಲಿ ತೋರಿಸಲಾಗಿದೆ",
       "visibilitySubagent": "ಸಬ್ಜೆಂಟ್ — ಇತರರಿಂದ ಮಾತ್ರ ಕರೆಯಬಹುದು",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "ಕ್ರೆಡಿಟ್ ಕಡಿತ",
       "emptyDescription": "ಕ್ರೆಡಿಟ್ ಖರೀದಿಗಳು, ರಸೀದಿಗಳು ಮತ್ತು ಬಳಕೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "emptyTitle": "ಕ್ರೆಡಿಟ್ ಇತಿಹಾಸವಿಲ್ಲ",
+      "expiredGrant": "ಅವಧಿ ಮುಗಿದಿದೆ: {{description}}",
       "googlePlayReceipt": "Google Play ನಿಂದ ರಸೀದಿ",
       "kind": {
         "adjustment": "ಹೊಂದಾಣಿಕೆ",
         "balanceNeutral": "ಬ್ಯಾಲೆನ್ಸ್ ಬದಲಾವಣೆ ಇಲ್ಲ",
         "deduction": "ಕಡಿತ",
         "grant": "ಕ್ರೆಡಿಟ್ ಅನುದಾನ",
+        "promotionalCredits": "ಪ್ರಚಾರ ಕ್ರೆಡಿಟ್‌ಗಳು",
         "welcomeCredits": "ಸ್ವಾಗತ ಕ್ರೆಡಿಟ್",
         "purchase": "ಖರೀದಿ"
+      },
+      "program": {
+        "adminBulkGrant": "ನಿರ್ವಾಹಕರ ಕ್ರೆಡಿಟ್ ಅನುದಾನ",
+        "contributorChampion": "ಕೊಡುಗೆದಾರ ಚಾಂಪಿಯನ್ ಕ್ರೆಡಿಟ್",
+        "feedback": "ಪ್ರತಿಕ್ರಿಯೆ ಕ್ರೆಡಿಟ್",
+        "influencer": "ಇನ್ಫ್ಲುಯೆನ್ಸರ್ ಕ್ರೆಡಿಟ್",
+        "ossMonthlyReset": "OSS ಮಾಸಿಕ ಮರುಹೊಂದಿಸುವಿಕೆ",
+        "ossSponsorship": "OSS ಪ್ರಾಯೋಜಕತ್ವ ಕ್ರೆಡಿಟ್",
+        "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಕ್ರೆಡಿಟ್",
+        "usageIssue": "ಬಳಕೆ ಸಮಸ್ಯೆಯ ಕ್ರೆಡಿಟ್",
+        "vibeDay": "Vibe day ಕ್ರೆಡಿಟ್"
       },
       "purchaseFallback": "ಕ್ರೆಡಿಟ್ ಖರೀದಿ",
       "receipt": "ರಸೀದಿ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ಗಾಗಿ ರಸೀದಿ ತೆರೆಯಿರಿ",
       "receiptUnavailable": "ಈ ಖರೀದಿಗೆ ರಸೀದಿ ಲಭ್ಯವಿಲ್ಲ.",
-      "retentionLimit": "ಅತ್ಯಂತ ಇತ್ತೀಚಿನ ಕ್ರೆಡಿಟ್ ಇತಿಹಾಸವನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ."
+      "retentionLimit": "ಅತ್ಯಂತ ಇತ್ತೀಚಿನ ಕ್ರೆಡಿಟ್ ಇತಿಹಾಸವನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
+      "voidedGrant": "ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ: {{description}}"
     },
     "title": "ಕ್ರೆಡಿಟ್ ಖರೀದಿಸಿ",
     "description": "ಕ್ರೆಡಿಟ್ ಎಂಬುದು Kilo App ನಲ್ಲಿ AI ಕೋಡಿಂಗ್ ಸೆಷನ್ಗಳನ್ನು ಚಲಾಯಿಸಲು ನಿಮ್ಮ Kilo ಬ್ಯಾಲೆನ್ಸ್ಗೆ ಸೇರಿಸುವ ಒಂದು-ಬಾರಿಯ ಖರೀದಿ. ಸ್ಟೋರ್ ನಿಮ್ಮ ಖಾತೆಗೆ ಶುಲ್ಕ ವಿಧಿಸುತ್ತದೆ ಮತ್ತು ಸ್ಟೋರ್ ಪಾವತಿಯನ್ನು ದೃಢೀಕರಿಸಿದ ನಂತರ ಕ್ರೆಡಿಟ್ ಸೇರಿಸಲಾಗುತ್ತದೆ.",
@@ -5088,6 +5118,20 @@
       "eu": "ಯುರೋಪಿಯನ್ ಒಕ್ಕೂಟ",
       "au": "ಆಸ್ಟ್ರೇಲಿಯಾ",
       "jp": "ಜಪಾನ್"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ಆದ್ಯತೆಗಳನ್ನು ಹುಡುಕಿ",
+    "noMatches": "ಹೊಂದಿಕೆಯಾಗುವ ಆದ್ಯತೆಗಳಿಲ್ಲ",
+    "emptyDescription": "ಬೇರೆ ಆದ್ಯತೆಯ ಹೆಸರು ಅಥವಾ ಹುಡುಕಾಟ ಪದ ಬಳಸಿ ಪ್ರಯತ್ನಿಸಿ.",
+    "resultsStatus": "ಕಂಡುಬಂದ ಆದ್ಯತೆಗಳು: {{resultCount}}",
+    "keywords": {
+      "signOut": "ನಿರ್ಗಮನ|ಹೊರಹೋಗು",
+      "appearance": "ನೋಟ|ಬಣ್ಣ|ವಿನ್ಯಾಸ",
+      "appUnlock": "ಮುಖ ಗುರುತು|ಬೆರಳಚ್ಚು",
+      "language": "ಭಾಷೆ|ಅನುವಾದ",
+      "notifications": "ಎಚ್ಚರಿಕೆಗಳು|ಅಧಿಸೂಚನೆಗಳು",
+      "privacy": "ಗೌಪ್ಯತೆ|ವಿಶ್ಲೇಷಣೆ|ಚಟುವಟಿಕೆಗಳ ನಿಗಾ"
     }
   }
 }

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "नवीन सुरक्षा निष्कर्ष ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "गंभीर",
+      "high": "उच्च",
+      "medium": "मध्यम",
+      "low": "कमी"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA चेतावणी"
     },

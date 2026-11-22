@@ -309,6 +309,7 @@
     "hideBalance": "بیلانس پټ کړئ",
     "showBalance": "بیلانس ښکاره کړئ",
     "balanceHidden": "بیلانس پټ دی",
+    "availableToSpendInOrganization": "په دې سازمان کې د لګښت لپاره شته",
     "signOutTitle": "له حسابه ووځم؟",
     "signOutMessage": "خپل کاري ځای ته د لاسرسي لپاره به بیا ننوتلو ته اړتیا ولرئ.",
     "deleteAccountTitle": "حساب ړنګ کړم؟",
@@ -450,6 +451,17 @@
       "location": "د Vertex ځای",
       "clientEmail": "د service account برېښنالیک",
       "privateKey": "د service account خصوصي کیلي",
+      "privateKeyBlockRequired": "د کیلي ټول بلاک پیسټ کړئ، له BEGIN کرښې څخه تر END کرښې پورې.",
+      "privateKeyEncrypted": "دا د کیلي بلاک په پاسفریز خوندي شوی دی. د service account هغه کیلي پیسټ کړئ چې پاسفریز نه لري.",
+      "names": {
+        "codestral": "پخوانی یوازې Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (د ChatGPT له لارې ننوځئ)",
+        "xiaomi": "Xiaomi (د کارونې پر بنسټ تادیه)",
+        "zai": "Z.ai (د کارونې پر بنسټ تادیه)",
+        "bedrockByok": "Amazon Bedrock (مستقیم)",
+        "vertexByok": "Google Vertex AI (مستقیم)"
+      },
       "modelMappings": "د ماډلونو نښلونې",
       "modelMappingsDescription": "د gateway یو ماډل یو دودیز deployment name ته واستوئ.",
       "mappingTitle": "نښلونه {{number}}",
@@ -544,7 +556,10 @@
     "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
     "changelogAreas": {
       "signIn": "ننوتل",
-      "profileOrganizations": "پروفایل و سازمانونه"
+      "profileOrganizations": "پروفایل و سازمانونه",
+      "chat": "خبرې اترې",
+      "notifications": "خبرتیاوې",
+      "integrations": "ادغامونه"
     }
   },
   "preferences": {
@@ -2546,7 +2561,7 @@
       "searchPlaceholder": "د زېرمتونونو لټون",
       "noMatches": "هېڅ پایله ونه موندل شوه",
       "noRepositories": "هېڅ زېرمتون نشته",
-      "noRepositoriesDescription": "ستاسو له حساب سره هېڅ زېرمتون نه دی نښلول شوی.",
+      "noRepositoriesDescription": "د زېرمتونونو د بارولو لپاره، GitHub یا GitLab حساب ونښلوئ.",
       "loading": "بارېږي…",
       "accessibility": "زېرمتون: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3440,7 +3455,7 @@
       "manageOnWeb": "په ویب کې د بیلینګ ترتیبات",
       "changePlan": "پلان بدل کړئ",
       "buySeats": "د غړیتوب ځایونه واخلئ",
-      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په ویب کې اداره کېږي.",
+      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په kilo.ai کې اداره کېږي.",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
       "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "تاسو یو…",
       "tools": "وسیلې",
       "wholeToolRule": "دا اجنټ په یو وخت کې پر هرې وسیلې یوه قاعده پلي کوي: {{rule}}. دا سویچونه یوازې د لوستلو وړ دي.",
+      "toolRule": "زېرمه شوې قاعده: {{rule}}",
       "visibility": "لید",
       "visibilityPrimary": "لومړني — په غوره کونکي کې ښودل شوي",
       "visibilitySubagent": "فرعي اجنټ — یوازې د نورو څخه د غوښتنې وړ",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "د کریډیټ کسر",
       "emptyDescription": "د کریډیټ پېرودنې، رسیدونه، او کارونه به دلته ښکاره شي.",
       "emptyTitle": "د کریډیټ تاریخچه نشته",
+      "expiredGrant": "مهلت یې تېر شو: {{description}}",
       "googlePlayReceipt": "له Google Play څخه رسید",
       "kind": {
         "adjustment": "سمون",
         "balanceNeutral": "په بیلانس بې اغېزې",
         "deduction": "کسر",
         "grant": "د کریډیټ ورکړه",
+        "promotionalCredits": "پروموشنل کریډیټ",
         "welcomeCredits": "د ښه راغلاست کریډیټ",
         "purchase": "پېرود"
+      },
+      "program": {
+        "adminBulkGrant": "د اډمین د کریډیټ ورکړه",
+        "contributorChampion": "د ونډه اخیستونکي اتل کریډیټ",
+        "feedback": "د نظر کریډیټ",
+        "influencer": "د انفلوینسر کریډیټ",
+        "ossMonthlyReset": "د پرانیستې سرچینې د کریډیټ میاشتنی بیا تنظیم",
+        "ossSponsorship": "د پرانیستې سرچینې د مالي ملاتړ کریډیټ",
+        "pullRequest": "د پل ریکویسټ کریډیټ",
+        "usageIssue": "د کارونې ستونزې کریډیټ",
+        "vibeDay": "د Vibe Day کریډیټ"
       },
       "purchaseFallback": "د کریډیټ پېرود",
       "receipt": "رسید",
       "receiptA11y": "د {{description}}، {{amount}}، {{date}} رسید پرانیزئ",
       "receiptUnavailable": "د دې پېرود لپاره رسید نشته.",
-      "retentionLimit": "تر ټولو وروستې د کریډیټ تاریخچه ښودل کېږي."
+      "retentionLimit": "تر ټولو وروستې د کریډیټ تاریخچه ښودل کېږي.",
+      "voidedGrant": "لغوه شوی: {{description}}"
     },
     "title": "کریډیټ وپېرئ",
     "description": "کریډیټ یو ځل پېرود دی چې ستاسو Kilo توازن ته په Kilo App کې د AI کوډ کولو ناستو چلولو لپاره زیاتېږي. پلورنځی ستاسو له حساب څخه پیسې اخلي او کریډیټ وروسته له هغه زیاتېږي چې پلورنځی تادیه تایید کړي.",
@@ -5088,6 +5118,20 @@
       "eu": "اروپایي اتحادیه",
       "au": "آسټرالیا",
       "jp": "جاپان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "د غوره توبونو لټون",
+    "noMatches": "سمون لرونکي غوره توبونه ونه موندل شول",
+    "emptyDescription": "د غوره توب بل نوم یا بله کلیدي کلمه وازمویئ.",
+    "resultsStatus": "موندل شوي غوره توبونه: {{resultCount}}",
+    "keywords": {
+      "signOut": "وتل|له حسابه وتل",
+      "appearance": "بڼه|رنګونه|تیاره بڼه",
+      "appUnlock": "بایومیټریک|د مخ پېژندنه|د ګوتې نښه",
+      "language": "ژبه|ژباړه",
+      "notifications": "خبرتیاوې|فوري خبرتیاوې",
+      "privacy": "شننه|تعقیب|محرمیت"
     }
   }
 }

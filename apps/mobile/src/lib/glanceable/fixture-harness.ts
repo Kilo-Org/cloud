@@ -69,6 +69,11 @@ const FIXTURE_APPROVAL_KEY = 'a'.repeat(64);
  */
 const FIXTURE_PERMISSION_ID = 'perm_fixture';
 
+/** A fixture that follows several rows lists their indices; a single row names one. */
+function isIndexList(index: number | readonly number[]): index is readonly number[] {
+  return Array.isArray(index);
+}
+
 /** The signed-in scope the publisher mount runs under, or null while none. */
 let scope: GlanceablePublisherContext | null = null;
 /** A fixture requested before a scope existed (cold launch, restore in flight). */
@@ -103,11 +108,27 @@ async function applySessionCardFixture(input: {
   now: number;
 }): Promise<void> {
   const { fixture, rows, ctx, now } = input;
-  // The fixture's follow replaces any real one: one session card surface at a time.
+  // The fixture's follow replaces any real one: the fixture owns the session cards.
   endAllSessionCards();
   const follow = fixture.follow;
-  const row = follow === undefined ? undefined : rows[follow.index];
-  if (follow === undefined || row === undefined) {
+  if (follow === undefined) {
+    return;
+  }
+  const index = follow.index;
+  // A listed index follows each row it names; a bare number is the single-row case below.
+  if (isIndexList(index)) {
+    // Several followed sessions, one card each: the rows as they stand, with no
+    // content push and no finish.
+    for (const rowIndex of index) {
+      const listed = rows[rowIndex];
+      if (listed !== undefined) {
+        log(`session card ${followSession(listed, ctx, now)}`);
+      }
+    }
+    return;
+  }
+  const row = rows[index];
+  if (row === undefined) {
     return;
   }
   const at = new Date(now).toISOString();
@@ -202,7 +223,7 @@ async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContex
   const fixtureRows = fixture.rows?.(now) ?? [];
   const approvableIndex = fixtureRows.findIndex(row => row.status === 'permission');
   const rows = fixtureRows.map((row, index) => ({
-    id: `glanceable-fixture-${index}`,
+    id: fixture.sessionIds?.[index] ?? `glanceable-fixture-${index}`,
     connectionId: CLOUD_AGENT_CONNECTION_ID,
     status: row.status,
     statusUpdatedAt: new Date(now - row.ago * 60_000).toISOString(),

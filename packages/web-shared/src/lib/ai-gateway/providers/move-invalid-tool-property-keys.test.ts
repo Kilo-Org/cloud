@@ -166,4 +166,54 @@ describe('moveInvalidToolPropertyKeys', () => {
 
     expect(request.body.tools).toEqual([{ name: 'f', input_schema: expectedSchema }]);
   });
+
+  it('moves chat completions properties on a tool whose strict is absent', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-opus-5.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [{ type: 'function', function: { name: 'f', parameters: invalidSchema() } }],
+      },
+    };
+
+    moveInvalidToolPropertyKeys(request);
+
+    expect(request.body.tools).toEqual([
+      { type: 'function', function: { name: 'f', parameters: expectedSchema } },
+    ]);
+  });
+
+  it('moves Responses properties on a tool whose strict is false', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'anthropic/claude-opus-5.5',
+        input: 'hello',
+        tools: [{ type: 'function', name: 'f', strict: false, parameters: invalidSchema() }],
+      },
+    };
+
+    moveInvalidToolPropertyKeys(request);
+
+    expect(request.body.tools).toEqual([
+      { type: 'function', name: 'f', strict: false, parameters: expectedSchema },
+    ]);
+  });
+
+  it('moves Messages properties on a tool whose strict is absent', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-opus-5.5',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [{ name: 'f', input_schema: invalidSchema() }],
+      },
+    };
+
+    moveInvalidToolPropertyKeys(request);
+
+    expect(request.body.tools).toEqual([{ name: 'f', input_schema: expectedSchema }]);
+  });
 });

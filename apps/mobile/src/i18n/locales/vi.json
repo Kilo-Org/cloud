@@ -309,6 +309,7 @@
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
+    "availableToSpendInOrganization": "Có thể chi tiêu trong tổ chức này",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -450,6 +451,17 @@
       "location": "Vị trí Vertex",
       "clientEmail": "Email tài khoản dịch vụ",
       "privateKey": "Khóa riêng tư của tài khoản dịch vụ",
+      "privateKeyBlockRequired": "Dán toàn bộ khối khóa, từ dòng BEGIN đến dòng END.",
+      "privateKeyEncrypted": "Khối khóa này được bảo vệ bằng cụm mật khẩu. Dán khóa tài khoản dịch vụ không có cụm mật khẩu.",
+      "names": {
+        "codestral": "Chỉ hỗ trợ Codestral cũ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Đăng nhập bằng ChatGPT)",
+        "xiaomi": "Xiaomi (trả theo mức sử dụng)",
+        "zai": "Z.ai (trả theo mức sử dụng)",
+        "bedrockByok": "Amazon Bedrock (trực tiếp)",
+        "vertexByok": "Google Vertex AI (trực tiếp)"
+      },
       "modelMappings": "Ánh xạ mô hình",
       "modelMappingsDescription": "Chuyển một mô hình gateway tới tên deployment tùy chỉnh.",
       "mappingTitle": "Ánh xạ {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Các bản sửa lỗi và cải tiến trong {{areas}}.",
     "changelogFixesPolish": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
     "changelogAreas": {
-      "signIn": "Đăng nhập",
-      "profileOrganizations": "Hồ sơ & tổ chức"
+      "signIn": "đăng nhập",
+      "profileOrganizations": "hồ sơ & tổ chức",
+      "chat": "trò chuyện",
+      "notifications": "thông báo",
+      "integrations": "tích hợp"
     }
   },
   "preferences": {
@@ -1985,7 +2000,7 @@
       "searchPlaceholder": "Tìm kho mã nguồn",
       "noMatches": "Không có kết quả phù hợp",
       "noRepositories": "Không có kho mã nào để chọn",
-      "noRepositoriesDescription": "Tài khoản của bạn chưa kết nối với kho mã nào.",
+      "noRepositoriesDescription": "Để tải kho mã, hãy kết nối GitHub hoặc GitLab.",
       "loading": "Đang tải…",
       "accessibility": "Kho mã: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3432,7 +3447,7 @@
       "manageOnWeb": "Cài đặt thanh toán trên web",
       "changePlan": "Đổi gói",
       "buySeats": "Mua suất sử dụng",
-      "managedOnWeb": "Gói, suất sử dụng và tự động nạp tiền được quản lý trên web.",
+      "managedOnWeb": "Gói, suất sử dụng và tự động nạp tiền được quản lý tại kilo.ai.",
       "setupAutoTopUp": "Thiết lập tự động nạp tiền",
       "manageAutoTopUp": "Quản lý tự động nạp tiền",
       "opensOnWeb": "Mở trên web"
@@ -4386,6 +4401,7 @@
       "promptPlaceholder": "Bạn là một…",
       "tools": "Công cụ",
       "wholeToolRule": "Tác nhân này áp dụng một quy tắc cho mọi công cụ cùng lúc: {{rule}}. Các công tắc này chỉ đọc.",
+      "toolRule": "Quy tắc đã lưu: {{rule}}",
       "visibility": "Khả năng hiển thị",
       "visibilityPrimary": "Chính — hiển thị trong bộ chọn",
       "visibilitySubagent": "Subagent — chỉ có thể gọi được từ người khác",
@@ -4495,20 +4511,34 @@
       "deductionFallback": "Khấu trừ tín dụng",
       "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",
       "emptyTitle": "Chưa có lịch sử tín dụng",
+      "expiredGrant": "Đã hết hạn: {{description}}",
       "googlePlayReceipt": "Biên lai từ Google Play",
       "kind": {
         "adjustment": "Điều chỉnh",
         "balanceNeutral": "Không ảnh hưởng số dư",
         "deduction": "Khấu trừ",
         "grant": "Tặng tín dụng",
+        "promotionalCredits": "Tín dụng khuyến mãi",
         "welcomeCredits": "Tín dụng chào mừng",
         "purchase": "Mua"
+      },
+      "program": {
+        "adminBulkGrant": "Tín dụng do quản trị viên tặng",
+        "contributorChampion": "Tín dụng nhà vô địch đóng góp",
+        "feedback": "Tín dụng góp ý",
+        "influencer": "Tín dụng người có ảnh hưởng",
+        "ossMonthlyReset": "Gia hạn tài trợ mã nguồn mở",
+        "ossSponsorship": "Tín dụng tài trợ mã nguồn mở",
+        "pullRequest": "Tín dụng yêu cầu hợp nhất",
+        "usageIssue": "Tín dụng sự cố sử dụng",
+        "vibeDay": "Tín dụng Vibe Day"
       },
       "purchaseFallback": "Mua tín dụng",
       "receipt": "Biên lai",
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
       "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
-      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất."
+      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất.",
+      "voidedGrant": "Đã hủy: {{description}}"
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
@@ -5088,6 +5118,20 @@
       "eu": "Liên minh châu Âu",
       "au": "Úc",
       "jp": "Nhật Bản"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Tìm tùy chọn",
+    "noMatches": "Không có tùy chọn phù hợp",
+    "emptyDescription": "Thử tên tùy chọn hoặc từ khóa khác.",
+    "resultsStatus": "Số tùy chọn tìm thấy: {{resultCount}}",
+    "keywords": {
+      "signOut": "đăng xuất|thoát tài khoản",
+      "appearance": "chủ đề|màu sắc|chế độ tối",
+      "appUnlock": "sinh trắc học|khuôn mặt|vân tay",
+      "language": "ngôn ngữ|bản dịch",
+      "notifications": "cảnh báo|thông báo đẩy",
+      "privacy": "phân tích|theo dõi"
     }
   }
 }

@@ -9,10 +9,11 @@ import {
 
 type VariantEffort = { key: string; effort: ReasoningEffort; isEffort: boolean };
 
-const ALWAYS_ON_VARIANTS: VariantEffort[] = [{ key: 'thinking', effort: 'high', isEffort: false }];
+const THINKING_VARIANT: VariantEffort = { key: 'thinking', effort: 'high', isEffort: false };
+const ALWAYS_ON_VARIANTS: VariantEffort[] = [THINKING_VARIANT];
 const TOGGLE_VARIANTS: VariantEffort[] = [
   { key: 'instant', effort: 'none', isEffort: false },
-  { key: 'thinking', effort: 'high', isEffort: false },
+  THINKING_VARIANT,
 ];
 
 function variantEfforts(options: readonly ReasoningOption[]): VariantEffort[] {

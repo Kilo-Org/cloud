@@ -312,6 +312,7 @@
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
+    "availableToSpendInOrganization": "Ar fáil le caitheamh san eagraíocht seo",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",
@@ -453,6 +454,17 @@
       "location": "Suíomh Vertex",
       "clientEmail": "Ríomhphost an chuntais seirbhíse",
       "privateKey": "Eochair phríobháideach an chuntais seirbhíse",
+      "privateKeyBlockRequired": "Greamaigh an bloc eochrach iomlán, ón líne BEGIN go dtí an líne END.",
+      "privateKeyEncrypted": "Tá an bloc eochrach seo cosanta ag pasfhrása. Greamaigh eochair chuntais seirbhíse nach bhfuil pasfhrása uirthi.",
+      "names": {
+        "codestral": "Codestral oidhreachta amháin",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Sínigh isteach le ChatGPT)",
+        "xiaomi": "Xiaomi (íoc de réir úsáide)",
+        "zai": "Z.ai (íoc de réir úsáide)",
+        "bedrockByok": "Amazon Bedrock (díreach)",
+        "vertexByok": "Google Vertex AI (díreach)"
+      },
       "modelMappings": "Mapálacha samhlacha",
       "modelMappingsDescription": "Seol samhail ón ngeata chuig ainm imscartha saincheaptha.",
       "mappingTitle": "Mapáil {{number}}",
@@ -546,8 +558,11 @@
     "changelogFixesIn": "Ceartúcháin agus feabhsuithe sna réimsí seo: {{areas}}.",
     "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
     "changelogAreas": {
-      "signIn": "Síniú isteach",
-      "profileOrganizations": "Próifíl & eagraíochtaí"
+      "signIn": "síniú isteach",
+      "profileOrganizations": "próifíl & eagraíochtaí",
+      "chat": "comhrá",
+      "notifications": "fógraí",
+      "integrations": "comhtháthuithe"
     }
   },
   "preferences": {
@@ -2706,7 +2721,7 @@
       "searchPlaceholder": "Cuardach stór",
       "noMatches": "Níl aon toradh ann",
       "noRepositories": "Níl aon stór ar fáil",
-      "noRepositoriesDescription": "Níl aon stór ceangailte le do chuntas.",
+      "noRepositoriesDescription": "Ceangail le GitHub nó le GitLab chun stór a lódáil.",
       "loading": "Ag lódáil…",
       "accessibility": "Stór: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3626,7 +3641,7 @@
       "manageOnWeb": "Socruithe billeála ar an ngréasán",
       "changePlan": "Athraigh an plean",
       "buySeats": "Ceannaigh suíocháin",
-      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ar an ngréasán.",
+      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ag kilo.ai.",
       "setupAutoTopUp": "Socraigh breisiú uathoibríoch",
       "manageAutoTopUp": "Bainistigh breisiú uathoibríoch",
       "opensOnWeb": "Osclaítear ar an ngréasán"
@@ -4623,6 +4638,7 @@
       "promptPlaceholder": "Is duine thú…",
       "tools": "Uirlisí",
       "wholeToolRule": "Cuireann an gníomhaire seo riail amháin i bhfeidhm ar gach uirlis ag an am céanna: {{rule}}. Tá na lasca seo inléite amháin.",
+      "toolRule": "Riail stóráilte: {{rule}}",
       "visibility": "Infheictheacht",
       "visibilityPrimary": "Bunscoile — a thaispeántar sa roghnóir",
       "visibilitySubagent": "Fo-ghníomhaire — inghlaoite ó dhaoine eile amháin",
@@ -4732,20 +4748,34 @@
       "deductionFallback": "Asbhaint chreidmheasa",
       "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",
       "emptyTitle": "Gan stair chreidmheasa",
+      "expiredGrant": "Imithe in éag: {{description}}",
       "googlePlayReceipt": "Admháil ó Google Play",
       "kind": {
         "adjustment": "Coigeartú",
         "balanceNeutral": "Neodrach don iarmhéid",
         "deduction": "Asbhaint",
         "grant": "Deontas creidmheasa",
+        "promotionalCredits": "Creidmheasanna poiblíochta",
         "welcomeCredits": "Creidmheas fáilte",
         "purchase": "Ceannach"
+      },
+      "program": {
+        "adminBulkGrant": "Deontas creidmheasa ó riarthóir",
+        "contributorChampion": "Creidmheas curadh na rannpháirtithe",
+        "feedback": "Creidmheas aiseolais",
+        "influencer": "Creidmheas tionchaire",
+        "ossMonthlyReset": "Athshocrú míosúil OSS",
+        "ossSponsorship": "Creidmheas urraíochta OSS",
+        "pullRequest": "Creidmheas iarratais tarraingthe",
+        "usageIssue": "Creidmheas fadhb úsáide",
+        "vibeDay": "Creidmheas Vibe day"
       },
       "purchaseFallback": "Ceannach creidmheasa",
       "receipt": "Admháil",
       "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
       "receiptUnavailable": "Níl admháil ar fáil don cheannach seo.",
-      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí."
+      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí.",
+      "voidedGrant": "Cealaithe: {{description}}"
     },
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
@@ -5349,6 +5379,20 @@
       "eu": "An tAontas Eorpach",
       "au": "An Astráil",
       "jp": "An tSeapáin"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cuardach roghanna",
+    "noMatches": "Níl aon roghanna ag teacht leis an gcuardach",
+    "emptyDescription": "Bain triail as ainm rogha eile nó eochairfhocal eile.",
+    "resultsStatus": "Roghanna aimsithe: {{resultCount}}",
+    "keywords": {
+      "signOut": "sínigh amach|logáil amach",
+      "appearance": "téama|scéim dathanna",
+      "appUnlock": "bithmhéadracht|aghaidh|méarlorg",
+      "language": "teanga|aistriúchán",
+      "notifications": "foláirimh|fógraí",
+      "privacy": "anailísíocht|rianú"
     }
   }
 }

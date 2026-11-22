@@ -1,6 +1,9 @@
 import { getWorkerDb } from '@kilocode/db/client';
 import { platform_integrations } from '@kilocode/db/schema';
-import { BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
+import {
+  BITBUCKET_MAX_REPOSITORY_ITEMS,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
+} from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -109,12 +112,16 @@ export type BitbucketRuntimeTokenResolverDependencies = {
 // The resolver only ever needs the one repository under review, so we look it up
 // directly and validate just that entry. Validating the whole array (and capping
 // its length) would reject the cache for any workspace larger than the cap even
-// though the target repository is present and well-formed.
+// though the target repository is present and well-formed. One length check
+// still runs first, so a stored row always has a known maximum scan cost.
 export function selectCachedBitbucketRepository(
   repositoriesValue: unknown,
   input: { workspaceUuid: string; repositoryUuid: string }
 ): CachedRepositoryLookupResult {
   if (!Array.isArray(repositoriesValue)) return { status: 'temporarily_unavailable' };
+  if (repositoriesValue.length > BITBUCKET_MAX_REPOSITORY_ITEMS) {
+    return { status: 'temporarily_unavailable' };
+  }
   const entries = repositoriesValue as unknown[];
   const match = entries.find(
     candidate =>

@@ -4,12 +4,13 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { authorizeGitLabProject as AuthorizeGitLabProject } from './gitlab-project-permission';
 import type { GitLabProjectAuthorization } from './gitlab-project-permission';
-import type { getIntegrationForOwner as GetIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import type { getAllIntegrationsForOwner as GetAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import type { isPlatformIntegrationHealthy as IsPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import type { getValidGitLabToken as GetValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import { GitLabAuthenticationError } from '@/lib/integrations/platforms/gitlab/adapter';
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  getIntegrationForOwner: jest.fn(),
+  getAllIntegrationsForOwner: jest.fn(),
 }));
 
 jest.mock('@/lib/integrations/core/health', () => ({
@@ -30,10 +31,10 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   }>('@/lib/integrations/platforms/gitlab/adapter').GitLabAuthenticationError,
 }));
 
-// The production lookup always answers a row or null; the declared type omits the
-// null, so the test mock names it explicitly to model "no connection".
-let mockGetIntegrationForOwner: jest.MockedFunction<
-  (...args: Parameters<typeof GetIntegrationForOwner>) => Promise<PlatformIntegration | null>
+// The production lookup answers every row of the owner, so the test mock names
+// the array shape explicitly.
+let mockGetAllIntegrationsForOwner: jest.MockedFunction<
+  (...args: Parameters<typeof GetAllIntegrationsForOwner>) => Promise<PlatformIntegration[]>
 >;
 let mockIsPlatformIntegrationHealthy: jest.MockedFunction<typeof IsPlatformIntegrationHealthy>;
 let mockGetValidGitLabToken: jest.MockedFunction<typeof GetValidGitLabToken>;
@@ -44,7 +45,7 @@ let authorizeGitLabProject: typeof AuthorizeGitLabProject;
 
 beforeAll(async () => {
   const platformIntegrations = await import('@/lib/integrations/db/platform-integrations');
-  mockGetIntegrationForOwner = jest.mocked(platformIntegrations.getIntegrationForOwner);
+  mockGetAllIntegrationsForOwner = jest.mocked(platformIntegrations.getAllIntegrationsForOwner);
   const health = await import('@/lib/integrations/core/health');
   mockIsPlatformIntegrationHealthy = jest.mocked(health.isPlatformIntegrationHealthy);
   const gitlabService = await import('@/lib/integrations/gitlab-service');
@@ -55,9 +56,13 @@ beforeAll(async () => {
 });
 
 /** A GitLab connection row whose stored instance is `instanceUrl`. */
-function gitlabConnection(instanceUrl: string | null = 'https://gitlab.com'): PlatformIntegration {
+function gitlabConnection(
+  instanceUrl: string | null = 'https://gitlab.com',
+  id = 'gitlab-integration-1'
+): PlatformIntegration {
   return {
-    id: 'gitlab-integration-1',
+    id,
+    platform: PLATFORM.GITLAB,
     metadata: instanceUrl === null ? null : { gitlab_instance_url: instanceUrl },
   } as PlatformIntegration;
 }
@@ -70,7 +75,7 @@ function refusalMarkdown(result: GitLabProjectAuthorization): string {
 describe('authorizeGitLabProject', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetIntegrationForOwner.mockResolvedValue(gitlabConnection());
+    mockGetAllIntegrationsForOwner.mockResolvedValue([gitlabConnection()]);
     mockIsPlatformIntegrationHealthy.mockReturnValue(true);
     mockGetValidGitLabToken.mockResolvedValue('requester-token');
     mockFetchGitLabProjectAccessLevel.mockResolvedValue(30);
@@ -87,7 +92,7 @@ describe('authorizeGitLabProject', () => {
         requesterUserId: 'user-1',
       })
     ).resolves.toEqual({ allowed: true });
-    expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockGetAllIntegrationsForOwner).not.toHaveBeenCalled();
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
   });
 
@@ -102,13 +107,15 @@ describe('authorizeGitLabProject', () => {
 
     expect(markdown).toContain('`group/project`');
     expect(markdown).toContain('GitLab connection in Kilo Code settings');
-    expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockGetAllIntegrationsForOwner).not.toHaveBeenCalled();
     expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
   });
 
   it('allows a project the requester holds Developer access to on the same instance', async () => {
-    mockGetIntegrationForOwner.mockResolvedValue(gitlabConnection('https://gitlab.example.test/'));
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      gitlabConnection('https://gitlab.example.test/'),
+    ]);
     mockFetchGitLabProjectAccessLevel.mockResolvedValue(30);
 
     await expect(
@@ -119,10 +126,7 @@ describe('authorizeGitLabProject', () => {
         requesterUserId: 'user-1',
       })
     ).resolves.toEqual({ allowed: true });
-    expect(mockGetIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user-1' },
-      PLATFORM.GITLAB
-    );
+    expect(mockGetAllIntegrationsForOwner).toHaveBeenCalledWith({ type: 'user', id: 'user-1' });
     expect(mockGetValidGitLabToken).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'gitlab-integration-1' }),
       { userId: 'user-1' }
@@ -179,8 +183,37 @@ describe('authorizeGitLabProject', () => {
     expect(markdown).toContain('write access');
   });
 
+  it('allows a project reached by the second of two healthy rows on different instances', async () => {
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      gitlabConnection('https://gitlab.com', 'gitlab-integration-gitlab-com'),
+      gitlabConnection('https://gitlab.example.test', 'gitlab-integration-self-managed'),
+    ]);
+    mockFetchGitLabProjectAccessLevel.mockResolvedValue(30);
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'team/project',
+        projectInstanceUrl: 'https://gitlab.example.test',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    ).resolves.toEqual({ allowed: true });
+    expect(mockGetValidGitLabToken).toHaveBeenCalledTimes(1);
+    expect(mockGetValidGitLabToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'gitlab-integration-self-managed' }),
+      { userId: 'user-1' }
+    );
+    expect(mockFetchGitLabProjectAccessLevel).toHaveBeenCalledWith(
+      'requester-token',
+      'team/project',
+      'https://gitlab.example.test'
+    );
+  });
+
   it('refuses a project when the requester connection is on another instance without reading its access level', async () => {
-    mockGetIntegrationForOwner.mockResolvedValue(gitlabConnection('https://gitlab.example.test'));
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      gitlabConnection('https://gitlab.example.test'),
+    ]);
 
     const markdown = refusalMarkdown(
       await authorizeGitLabProject({
@@ -196,10 +229,68 @@ describe('authorizeGitLabProject', () => {
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
   });
 
-  it('refuses a project when the requester connection differs only by base path', async () => {
-    mockGetIntegrationForOwner.mockResolvedValue(
-      gitlabConnection('https://gitlab.example.test/team-b')
+  it('refuses with the instance copy when healthy rows exist but none reaches the project instance', async () => {
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      gitlabConnection('https://gitlab.com', 'gitlab-integration-gitlab-com'),
+      gitlabConnection('https://gitlab.example.test/team-b', 'gitlab-integration-self-managed'),
+    ]);
+
+    const markdown = refusalMarkdown(
+      await authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.example.test/team-a',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
     );
+
+    expect(markdown).toContain('the GitLab instance your connection uses');
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it('skips a healthy row whose instance URL cannot be normalized', async () => {
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      gitlabConnection('http://gitlab.example.test', 'gitlab-integration-plain-http'),
+      gitlabConnection('https://gitlab.example.test', 'gitlab-integration-https'),
+    ]);
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.example.test',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    ).resolves.toEqual({ allowed: true });
+    expect(mockGetValidGitLabToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'gitlab-integration-https' }),
+      { userId: 'user-1' }
+    );
+  });
+
+  it('ignores a healthy row of another platform', async () => {
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      { ...gitlabConnection('https://gitlab.com'), platform: PLATFORM.GITHUB },
+    ]);
+
+    const markdown = refusalMarkdown(
+      await authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    );
+
+    expect(markdown).toContain('GitLab connection in Kilo Code settings');
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+  });
+
+  it('refuses a project when the requester connection differs only by base path', async () => {
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      gitlabConnection('https://gitlab.example.test/team-b'),
+    ]);
 
     const markdown = refusalMarkdown(
       await authorizeGitLabProject({
@@ -302,7 +393,7 @@ describe('authorizeGitLabProject', () => {
   });
 
   it('refuses a project when the requester has no GitLab connection', async () => {
-    mockGetIntegrationForOwner.mockResolvedValue(null);
+    mockGetAllIntegrationsForOwner.mockResolvedValue([]);
 
     const markdown = refusalMarkdown(
       await authorizeGitLabProject({
@@ -353,8 +444,27 @@ describe('authorizeGitLabProject', () => {
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
   });
 
+  it('refuses with the access copy when the access read rejects the credential', async () => {
+    mockFetchGitLabProjectAccessLevel.mockRejectedValue(
+      new GitLabAuthenticationError('group/project', 401, 'GitLab rejected the credential')
+    );
+
+    const markdown = refusalMarkdown(
+      await authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    );
+
+    expect(markdown).toContain('`group/project`');
+    expect(markdown).toContain('GitLab connection in Kilo Code settings');
+  });
+
   it('propagates an access level lookup error', async () => {
-    mockFetchGitLabProjectAccessLevel.mockRejectedValue(new Error('lookup failed'));
+    const failure = new Error('lookup failed');
+    mockFetchGitLabProjectAccessLevel.mockRejectedValue(failure);
 
     await expect(
       authorizeGitLabProject({
@@ -363,7 +473,7 @@ describe('authorizeGitLabProject', () => {
         organizationOwned: true,
         requesterUserId: 'user-1',
       })
-    ).rejects.toThrow('lookup failed');
+    ).rejects.toBe(failure);
   });
 
   it('refuses instead of throwing when the project instance URL is malformed', async () => {

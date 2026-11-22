@@ -1,7 +1,7 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
@@ -75,29 +75,52 @@ function readInstanceUrl(integration: Pick<PlatformIntegration, 'metadata'>): st
 }
 
 /**
- * The requester's own GitLab connection and the credential it stores. A row is
- * usable only when it is healthy: a suspended or reauthorization-required row
- * cannot answer for the account. A definitive credential refusal is null; every
- * other failure propagates, so the caller answers one retry reply and captures
- * the error instead of reporting it as this account's access.
+ * Why a requester has no connection that can answer for the project: the
+ * account holds no usable GitLab connection, or it holds connections that all
+ * reach another instance.
+ */
+type GitLabConnectionRefusal = { matched: false; reason: 'projectAccess' | 'instanceMismatch' };
+
+type RequesterGitLabConnection = { matched: true; token: string } | GitLabConnectionRefusal;
+
+/**
+ * The requester's own GitLab connection for the project's instance, with the
+ * credential it stores. A row is usable only when it is healthy: a suspended or
+ * reauthorization-required row cannot answer for the account. One account may
+ * hold several rows, one per instance, so the rows are read together and the
+ * row whose stored instance equals `projectInstance` is used. A row whose
+ * stored instance cannot be normalized is skipped. A definitive credential
+ * refusal is `projectAccess`; every other failure propagates, so the caller
+ * answers one retry reply and captures the error instead of reporting it as
+ * this account's access.
  */
 async function requesterGitLabConnection(
-  requesterUserId: string
-): Promise<{ integration: PlatformIntegration; token: string } | null> {
-  const integration = await getIntegrationForOwner(
-    { type: 'user', id: requesterUserId },
-    PLATFORM.GITLAB
+  requesterUserId: string,
+  projectInstance: string
+): Promise<RequesterGitLabConnection> {
+  const integrations = await getAllIntegrationsForOwner({ type: 'user', id: requesterUserId });
+  const healthy = integrations.filter(
+    integration =>
+      integration.platform === PLATFORM.GITLAB && isPlatformIntegrationHealthy(integration)
   );
-  if (!integration || !isPlatformIntegrationHealthy(integration)) {
-    return null;
+
+  const integration = healthy.find(row => {
+    try {
+      return normalizeGitLabInstanceUrl(readInstanceUrl(row)) === projectInstance;
+    } catch {
+      return false;
+    }
+  });
+  if (!integration) {
+    return { matched: false, reason: healthy.length === 0 ? 'projectAccess' : 'instanceMismatch' };
   }
 
   try {
     const token = await getValidGitLabToken(integration, { userId: requesterUserId });
-    return { integration, token };
+    return { matched: true, token };
   } catch (error) {
     if (!isGitLabCredentialRefusal(error)) throw error;
-    return null;
+    return { matched: false, reason: 'projectAccess' };
   }
 }
 
@@ -139,35 +162,41 @@ export async function authorizeGitLabProject(params: {
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
   }
 
-  // One row supplies both the instance and the credential, so the access read
-  // cannot pair an instance from one connection with a token from another.
-  const connection = await requesterGitLabConnection(requesterUserId);
-  if (!connection) {
-    return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
-  }
-  const requesterInstanceUrl = readInstanceUrl(connection.integration);
-
-  // Comparing the normalized URLs, base path included, keeps two self-managed
-  // instances apart that share a host. An unreadable value leaves the
-  // comparison unanswered, never allowed.
-  let requesterInstance: string;
+  // The project's instance is read once. Comparing the normalized URLs, base
+  // path included, keeps two self-managed instances apart that share a host. An
+  // unreadable value leaves the instance unanswered, never allowed.
+  let projectInstance: string;
   try {
-    const projectInstance = normalizeGitLabInstanceUrl(projectInstanceUrl);
-    requesterInstance = normalizeGitLabInstanceUrl(requesterInstanceUrl);
-    if (requesterInstance !== projectInstance) {
-      return { allowed: false, markdown: instanceMismatchMarkdown(project) };
-    }
+    projectInstance = normalizeGitLabInstanceUrl(projectInstanceUrl);
   } catch {
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
   }
 
+  // One row supplies both the instance and the credential, so the access read
+  // cannot pair an instance from one connection with a token from another.
+  const connection = await requesterGitLabConnection(requesterUserId, projectInstance);
+  if (!connection.matched) {
+    return {
+      allowed: false,
+      markdown:
+        connection.reason === 'instanceMismatch'
+          ? instanceMismatchMarkdown(project)
+          : projectAccessRequiredMarkdown(project),
+    };
+  }
+
   // Write access is read with the requester's own credential, so the answer
-  // covers the project the session will use on this instance.
-  const accessLevel = await fetchGitLabProjectAccessLevel(
-    connection.token,
-    project,
-    requesterInstance
-  );
+  // covers the project the session will use on this instance. A credential the
+  // provider rejects answers the access copy, because mentioning the bot again
+  // cannot change it; every other failure propagates to the caller's retry
+  // reply.
+  let accessLevel: number | null;
+  try {
+    accessLevel = await fetchGitLabProjectAccessLevel(connection.token, project, projectInstance);
+  } catch (error) {
+    if (!isGitLabCredentialRefusal(error)) throw error;
+    return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
+  }
   if (accessLevel === null || accessLevel < GITLAB_ACCESS_LEVELS.DEVELOPER) {
     return { allowed: false, markdown: projectWriteAccessRequiredMarkdown(project) };
   }

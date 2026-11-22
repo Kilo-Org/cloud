@@ -1979,6 +1979,8 @@ function readGitLabRepositorySizeBytes(data: unknown): number | null {
  * The access level the caller's own credential holds on one project, or null
  * when the project is not visible to it. `GITLAB_ACCESS_LEVELS` names the
  * values; Developer and above may write.
+ *
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401 or 403)
  */
 export async function fetchGitLabProjectAccessLevel(
   accessToken: string,
@@ -2008,6 +2010,13 @@ export async function fetchGitLabProjectAccessLevel(
       status: response.status,
       bodyExcerpt,
     });
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabAuthenticationError(
+        projectPath,
+        response.status,
+        `GitLab rejected the credential while reading the access level of project ${projectPath} (HTTP ${response.status}). Reconnect the GitLab integration and try again.`
+      );
+    }
     throw new Error(`GitLab project access level fetch failed: ${response.status}`);
   }
 

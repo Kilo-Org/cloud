@@ -20,8 +20,8 @@ import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 const mockGetGitHubIntegrationById =
   jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
-const mockGetIntegrationForOwner =
-  jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
+const mockGetAllIntegrationsForOwner =
+  jest.fn<(...args: unknown[]) => Promise<PlatformIntegration[]>>();
 const mockIsPlatformIntegrationHealthy = jest.fn<(...args: unknown[]) => boolean>();
 const mockGetValidGitLabToken = jest.fn<(...args: unknown[]) => Promise<string>>();
 const mockAuthorizeGitHubRepositoryFn = jest.fn<typeof AuthorizeGitHubRepository>();
@@ -88,7 +88,7 @@ jest.mock('@/lib/slack-bot/github-repository-context', () => ({
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getGitHubIntegrationById: (...args: unknown[]) => mockGetGitHubIntegrationById(...args),
-  getIntegrationForOwner: (...args: unknown[]) => mockGetIntegrationForOwner(...args),
+  getAllIntegrationsForOwner: (...args: unknown[]) => mockGetAllIntegrationsForOwner(...args),
 }));
 
 jest.mock('@/lib/integrations/core/health', () => ({
@@ -114,6 +114,11 @@ const mockFetchGitLabProjectAccessLevel = jest.fn<(...args: unknown[]) => Promis
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabProjectAccessLevel: (...args: unknown[]) => mockFetchGitLabProjectAccessLevel(...args),
   GITLAB_ACCESS_LEVELS: { GUEST: 10, REPORTER: 20, DEVELOPER: 30, MAINTAINER: 40, OWNER: 50 },
+  // The credential refusal classification checks this class, so the mock keeps
+  // the real one instead of an undefined binding.
+  GitLabAuthenticationError: jest.requireActual<{
+    GitLabAuthenticationError: unknown;
+  }>('@/lib/integrations/platforms/gitlab/adapter').GitLabAuthenticationError,
 }));
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -234,11 +239,14 @@ describe('spawnCloudAgentSession delegation', () => {
     });
     mockGetGitLabTokenForUser.mockResolvedValue('gitlab-token');
     mockGetGitLabTokenForOrganization.mockResolvedValue('gitlab-org-token');
-    mockGetIntegrationForOwner.mockResolvedValue({
-      ...userIntegration,
-      id: 'gitlab-association-1',
-      metadata: { gitlab_instance_url: 'https://gitlab.com' },
-    });
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      {
+        ...userIntegration,
+        id: 'gitlab-association-1',
+        platform: PLATFORM.GITLAB,
+        metadata: { gitlab_instance_url: 'https://gitlab.com' },
+      } as PlatformIntegration,
+    ]);
     mockIsPlatformIntegrationHealthy.mockReturnValue(true);
     mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
     mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
@@ -539,10 +547,7 @@ describe('spawnCloudAgentSession delegation', () => {
       'bot-user-1',
       'group/repo'
     );
-    expect(mockGetIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user-9' },
-      PLATFORM.GITLAB
-    );
+    expect(mockGetAllIntegrationsForOwner).toHaveBeenCalledWith({ type: 'user', id: 'user-9' });
     expect(mockGetValidGitLabToken).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'gitlab-association-1' }),
       { userId: 'user-9' }
@@ -563,7 +568,7 @@ describe('spawnCloudAgentSession delegation', () => {
   });
 
   it('refuses an organization Slack GitLab project when the requester has no GitLab connection', async () => {
-    mockGetIntegrationForOwner.mockResolvedValue(null);
+    mockGetAllIntegrationsForOwner.mockResolvedValue([]);
 
     const result = await spawnCloudAgentSession(
       { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
@@ -583,10 +588,7 @@ describe('spawnCloudAgentSession delegation', () => {
       'bot-user-1',
       'group/repo'
     );
-    expect(mockGetIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user-9' },
-      PLATFORM.GITLAB
-    );
+    expect(mockGetAllIntegrationsForOwner).toHaveBeenCalledWith({ type: 'user', id: 'user-9' });
     expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
     expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();

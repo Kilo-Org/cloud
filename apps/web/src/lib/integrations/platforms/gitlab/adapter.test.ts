@@ -1107,7 +1107,39 @@ describe('fetchGitLabProjectAccessLevel', () => {
     await expect(fetchGitLabProjectAccessLevel('test-token', 'group/project')).resolves.toBeNull();
   });
 
-  it('throws for non-404 failures', async () => {
+  it('throws GitLabAuthenticationError for a 401 response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: async () => 'Unauthorized',
+    });
+
+    const refusal = await fetchGitLabProjectAccessLevel('test-token', 'group/project').catch(
+      (error: unknown) => error
+    );
+
+    expect(refusal).toBeInstanceOf(GitLabAuthenticationError);
+    expect(refusal).toMatchObject({ statusCode: 401, projectId: 'group/project' });
+    expect((refusal as Error).message).toContain('Reconnect the GitLab integration');
+  });
+
+  it('throws GitLabAuthenticationError for a 403 response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      text: async () => 'Forbidden',
+    });
+
+    const refusal = await fetchGitLabProjectAccessLevel('test-token', 'group/project').catch(
+      (error: unknown) => error
+    );
+
+    expect(refusal).toBeInstanceOf(GitLabAuthenticationError);
+    expect(refusal).toMatchObject({ statusCode: 403, projectId: 'group/project' });
+    expect((refusal as Error).message).toContain('Reconnect the GitLab integration');
+  });
+
+  it('throws a plain error for other non-404 failures', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 500,

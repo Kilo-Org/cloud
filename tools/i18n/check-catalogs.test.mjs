@@ -1733,6 +1733,26 @@ test('rejects a push locale registry entry bound to another catalog', () => {
   );
 });
 
+test('reports an unparseable push locale registry as its parse error only', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en, 'ru': ru`,
+      ].join('\n'),
+    },
+  });
+  // The tree a refused parse yields is empty, so the registry walk would find no
+  // `pushCatalogs` and report a missing registry on top of the parse error that
+  // already names the cause. The rest of the audit still reports its own lines.
+  const text = found.join('\n');
+  assert.match(text, /packages\/notifications\/src\/i18n\.ts:3: cannot parse: /);
+  assert.doesNotMatch(text, /no push locale registry named/);
+  assert.match(text, /mobile\/ru: missing key "agents\.title"/);
+});
+
 test('rejects a push locale registry with no initializer', () => {
   const found = run({
     extraFiles: {

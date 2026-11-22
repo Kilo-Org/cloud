@@ -21,10 +21,11 @@ const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL');
 
 const DEFAULT_STREAM_TIMEOUT_MS = 15 * 60 * 1000;
 const COMPLETE_GRACE_MS = 1000; // Wait 1s after 'complete' for final events
-// The chat surface posts at most 2000 characters of a reply. Leave room for the
-// header, the error text and the omitted-line note so the newest detail lines
-// are the part that survives.
-const REPLY_DETAIL_BUDGET = 1500;
+// The chat surface posts at most 2000 characters of a reply, so the detail
+// lines are sized to whatever that leaves after the header, the error text and
+// the omitted-line note.
+const CHAT_REPLY_MAX_LENGTH = 2000;
+const OMITTED_NOTE_RESERVE = 40;
 
 /**
  * Resolve a (possibly relative) stream URL returned by initiateFromPreparedSession
@@ -398,13 +399,19 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   };
 
   if (hasError) {
-    // The chat surface posts only the first part of this reply, so build the
-    // details from the newest lines that fit the budget: a forward slice would
-    // spend the visible space on the oldest diagnostics.
-    const shown = newestLines(log.entries(), REPLY_DETAIL_BUDGET);
+    // The chat surface posts only the first part of this reply, so the detail
+    // lines take whatever the header, the error text and the note leave. The
+    // newest lines are the ones kept: a forward slice would spend the visible
+    // space on the oldest diagnostics.
+    const header = `Cloud Agent session ${sessionId} encountered errors:`;
+    const budget = Math.max(
+      0,
+      CHAT_REPLY_MAX_LENGTH - header.length - (errorMessage?.length ?? 0) - OMITTED_NOTE_RESERVE
+    );
+    const shown = newestLines(log.entries(), budget);
     const details = [errorMessage, missingNote(shown.length), ...shown].filter(Boolean).join('\n');
     return {
-      response: `Cloud Agent session ${sessionId} encountered errors:\n${details}`,
+      response: `${header}\n${details}`,
       sessionId,
       hasError: true,
       statusMessages: [...log.entries()],

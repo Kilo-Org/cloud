@@ -52,21 +52,18 @@ const MAX_PAGES = 10;
 const SEPARATOR = ' · ';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-/**
- * The list body's top pad, in dp: the app's native rem is 14 pt, so this is the
- * `pt-4` both branches have always carried. It stays one value for the skeleton
- * and for the rows that replace it, so the card does not move when the load
- * settles.
- */
-const LIST_TOP_PAD = 14;
 // The page gutter and the top pad live on the content container; the cells are
 // one continuous grouped card, so no per-cell inset and no gap between them.
-// The inset is the shared page gutter — the same one the header and the receipt
-// this list opens use — and both the loading branch and the settled list take
-// this one style, so the skeleton and the rows share their geometry.
+//
+// Both branches take this one style, so the skeleton keeps the geometry of the
+// rows that replace it: the gutter is the app's single page inset, the same one
+// the header and the receipt this list opens use, and the top pad is the 14pt
+// the loading branch's `pt-4` painted before (the native rem is 14pt). One
+// inset value for both axes is what stops the card moving 2dp sideways and 2dp
+// up the moment the first page settles.
 const listContentContainerStyle = {
   paddingHorizontal: SCREEN_GUTTER_DP,
-  paddingTop: LIST_TOP_PAD,
+  paddingTop: SCREEN_GUTTER_DP,
 } satisfies ViewStyle;
 
 /**

@@ -1986,7 +1986,11 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/entropy/seeded.ts` | A repeatable source, for a test or a replay |
 | `src/plugins/token/static.ts` | One token for the life of the process |
 | `src/plugins/tools/question.ts` | The question tool, and the asker a caller writes |
+| `src/plugins/tools/settings.ts` | The list and set tools over a caller's app-settings service |
 | `src/plugins/tools/subagent.ts` | The subagent tool: `openSession` from inside a tool |
+| `src/plugins/tools/time.ts` | The clock, and the one option a harness sets |
+| `src/plugins/tools/todo.ts` | The list of steps the model keeps for itself |
+| `src/plugins/tools/index.ts` | The `/plugins/tools` entry point. It names what it publishes rather than wildcarding the five modules above, and `index.test.ts` asserts the list |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/store/sqlite.ts` | Every query, written once for every platform |
 | `src/plugins/store/driver.ts` | The one-function seam an adapter fills, the write line, and `transact` |

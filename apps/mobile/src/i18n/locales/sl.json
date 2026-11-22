@@ -401,7 +401,7 @@
       "title": "Ključi ponudnikov",
       "rowSubtitle": "Uporabi lastno obračunavanje pri ponudniku",
       "orgDescription": "Ti ključi so v skupni rabi z vsemi v organizaciji, stroški pa se zaračunajo njenim računom pri ponudnikih.",
-      "viewOnly": "Ključe organizacije lahko spreminja samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
+      "viewOnly": "Ključe organizacije lahko spreminja samo njen lastnik, skrbnik ali skrbnik obračunavanja.",
       "description": "Zahteve prek teh ključev se zaračunajo tvojemu računu pri ponudniku namesto stanju v Kilo.",
       "managedByPlan": "Upravlja ga tvoj paket za kodiranje",
       "enableKey": "Omogoči ključ za {{provider}}",
@@ -1646,7 +1646,7 @@
       "empty": "Še ni pregledov z analitiko",
       "emptyDescription": "Analitika beleži dokončane preglede, dokler je omogočena za organizacijo.",
       "offTitle": "Analitika je za {{platform}} izklopljena",
-      "offDescription": "Lastniki, skrbniki in upravitelji obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
+      "offDescription": "Lastniki, skrbniki in skrbniki obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
       "couldNotLoad": "Analitike ni bilo mogoče naložiti",
       "trackedReviewsCaption": "Dokončani pregledi, ki so se zaključili v tem obdobju z vklopljeno analitiko. Pregledi v teku in neuspešni pregledi se nikoli ne štejejo.",
       "trackedReviewsUncounted": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
@@ -3533,7 +3533,7 @@
   "organization": {
     "auditLog": {
       "title": "Revizijski dnevnik",
-      "permissionDenied": "Revizijski dnevnik lahko bere samo lastnik, skrbnik ali upravitelj obračunavanja organizacije na načrtu Enterprise.",
+      "permissionDenied": "Revizijski dnevnik lahko bere samo lastnik, skrbnik ali skrbnik obračunavanja organizacije na načrtu Enterprise.",
       "emptyTitle": "Ni revizijskih dogodkov",
       "emptyDescription": "Tukaj so prikazana dejanja, izvedena v tej organizaciji.",
       "truncated": "Prikazani so najnovejši dogodki.",
@@ -3587,7 +3587,7 @@
     },
     "billing": {
       "title": "Obračunavanje",
-      "permissionDenied": "Obračunavanje organizacije si lahko ogledajo samo lastnik, skrbnik ali upravitelj obračunavanja.",
+      "permissionDenied": "Obračunavanje organizacije si lahko ogledajo samo lastnik, skrbnik ali skrbnik obračunavanja.",
       "subscription": "Naročnina",
       "state": "Status",
       "stateNone": "Ni naročnine",
@@ -3665,7 +3665,7 @@
       "pendingInvitation": "Ta e-poštni naslov že ima čakajoče povabilo.",
       "alreadyMember": "Ta oseba je že član te organizacije.",
       "seatsFull": "Vsa mesta so zasedena ({{used}}/{{total}}). Prosi lastnika organizacije, naj doda mesta, preden povabiš več članov.",
-      "seatsFullCanInviteBilling": "Vsa mesta so zasedena ({{used}}/{{total}}). Še vedno lahko povabiš upravitelje obračunavanja, ki ne zasedajo mesta.",
+      "seatsFullCanInviteBilling": "Vsa mesta so zasedena ({{used}}/{{total}}). Še vedno lahko povabiš skrbnike obračunavanja, ki ne zasedajo mesta.",
       "noSeatsAvailable": "Vsa mesta so zasedena. Prosi lastnika organizacije, naj doda mesta, preden povabiš več članov."
     },
     "invoices": {
@@ -3764,7 +3764,7 @@
       "emptyDescription": "Uporabite Prejšnja ura za ogled prejšnjih zahtev.",
       "emptyBoundDescription": "Dnevniki zahtev ne segajo dlje v preteklost.",
       "loadError": "Dnevnikov zahtev ni bilo mogoče naložiti.",
-      "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
+      "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali skrbnik obračunavanja.",
       "tokens": "{{input}} vhod · {{output}} izhod",
       "byok": "BYOK"
     },

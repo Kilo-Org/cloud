@@ -1026,7 +1026,7 @@
       "empty": "尚無含有分析資料的審查",
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
       "offTitle": "已關閉 {{platform}} 的分析",
-      "offDescription": "組織的帳務角色（擁有者、管理員與帳務管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
+      "offDescription": "組織的帳單角色（擁有者、管理員與帳單管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
       "couldNotLoad": "無法載入分析資料",
       "trackedReviewsCaption": "此期間內在啟用分析的狀態下完成的審查。執行中與失敗的審查一律不計入。",
       "trackedReviewsUncounted": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。",
@@ -3399,7 +3399,7 @@
   "organization": {
     "auditLog": {
       "title": "稽核記錄",
-      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳務管理員可以查看其稽核記錄。",
+      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳單管理員可以查看其稽核記錄。",
       "emptyTitle": "沒有稽核事件",
       "emptyDescription": "在此組織中執行的操作會顯示在這裡。",
       "truncated": "僅顯示最近的事件。",
@@ -3543,7 +3543,7 @@
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
       "seatsFull": "所有席位皆已使用（{{used}}/{{total}}）。請先請組織擁有者增加席位，再邀請更多成員。",
-      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳務管理員，他們不會佔用席位。",
+      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳單管理員，他們不會佔用席位。",
       "noSeatsAvailable": "所有席位皆已使用。請先請組織擁有者增加席位，再邀請更多成員。"
     },
     "invoices": {
@@ -3642,7 +3642,7 @@
       "emptyDescription": "使用「較早一小時」查看較早的請求。",
       "emptyBoundDescription": "請求記錄最早只到這裡。",
       "loadError": "無法載入請求記錄。",
-      "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
+      "permissionDenied": "只有組織的擁有者、管理員或帳單管理員可以查看其請求記錄。",
       "tokens": "輸入 {{input}} · 輸出 {{output}}",
       "byok": "BYOK"
     },

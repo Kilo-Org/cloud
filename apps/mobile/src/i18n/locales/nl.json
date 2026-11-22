@@ -399,7 +399,7 @@
       "title": "Providersleutels",
       "rowSubtitle": "Facturering via je eigen provider",
       "orgDescription": "Deze sleutels worden gedeeld met iedereen in de organisatie en gefactureerd aan de provideraccounts van de organisatie.",
-      "viewOnly": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de sleutels wijzigen.",
+      "viewOnly": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de sleutels wijzigen.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
       "managedByPlan": "Beheerd door je codeerabonnement",
       "enableKey": "Sleutel van {{provider}} inschakelen",
@@ -1026,7 +1026,7 @@
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
       "offTitle": "Statistieken staan uit voor {{platform}}",
-      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en facturatiemanagers) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
+      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en factuurbeheerders) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
       "couldNotLoad": "Kan statistieken niet laden",
       "trackedReviewsCaption": "Reviews die in deze periode zijn afgerond terwijl statistieken waren ingeschakeld. Lopende en mislukte reviews worden nooit meegeteld.",
       "trackedReviewsUncounted": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
@@ -3399,7 +3399,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditlogboek",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken.",
       "emptyTitle": "Geen auditgebeurtenissen",
       "emptyDescription": "Acties die in deze organisatie worden uitgevoerd, verschijnen hier.",
       "truncated": "De meest recente gebeurtenissen worden weergegeven.",
@@ -3642,7 +3642,7 @@
       "emptyDescription": "Gebruik Eerder uur om eerdere verzoeken te bekijken.",
       "emptyBoundDescription": "Verder terug gaan de verzoeklogboeken niet.",
       "loadError": "Kan verzoeklogboeken niet laden.",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
       "tokens": "{{input}} in · {{output}} uit",
       "byok": "BYOK"
     },

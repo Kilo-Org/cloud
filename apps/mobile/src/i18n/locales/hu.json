@@ -399,7 +399,7 @@
       "title": "Szolgáltatói kulcsok",
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
       "orgDescription": "Ezek a kulcsok a szervezet minden tagja számára közösek, és a költségek a szervezet szolgáltatói fiókjait terhelik.",
-      "viewOnly": "Csak a szervezet tulajdonosa, adminisztrátora vagy számlázási kezelője módosíthatja a szervezet kulcsait.",
+      "viewOnly": "Csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse módosíthatja a szervezet kulcsait.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
       "managedByPlan": "A kódolási csomagod kezeli",
       "enableKey": "A(z) {{provider}} kulcs engedélyezése",
@@ -3539,7 +3539,7 @@
       "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
       "alreadyMember": "Ez a személy már tagja ennek a szervezetnek.",
       "seatsFull": "Az összes hely foglalt ({{used}}/{{total}}). Kérj meg egy szervezettulajdonost, hogy adjon hozzá helyeket, mielőtt további tagokat hívnál meg.",
-      "seatsFullCanInviteBilling": "Az összes hely foglalt ({{used}}/{{total}}). Számlázási kezelőket továbbra is meghívhatsz, mivel ők nem foglalnak helyet.",
+      "seatsFullCanInviteBilling": "Az összes hely foglalt ({{used}}/{{total}}). Számlázási felelősöket továbbra is meghívhatsz, mivel ők nem foglalnak helyet.",
       "noSeatsAvailable": "Az összes hely foglalt. Kérj meg egy szervezettulajdonost, hogy adjon hozzá helyeket, mielőtt további tagokat hívnál meg."
     },
     "invoices": {
@@ -4977,7 +4977,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-őrkorlátok",
-    "permissionDenied": "Csak a szervezet tulajdonosai és rendszergazdái kezelhetik az AI-őrkorlátokat. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Csak a szervezet tulajdonosai és adminisztrátorai kezelhetik az AI-őrkorlátokat. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Az AI-őrkorlátok nincsenek engedélyezve",
     "unavailable": "A Kilo kérésre engedélyezi az AI-őrkorlátokat a szervezet számára. Írj a {{supportEmail}} címre, és a Kilo csapata bekapcsolja őket a szervezeted számára.",
     "contactSupport": "Kapcsolatfelvétel az ügyfélszolgálattal",
@@ -5119,7 +5119,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Vállalati funkció",
     "enterpriseOnly": "A szolgáltatók és modellek az Enterprise csomagban érhetők el.",
-    "readOnly": "Csak a szervezet tulajdonosai és rendszergazdái módosíthatják ezeket a beállításokat.",
+    "readOnly": "Csak a szervezet tulajdonosai és adminisztrátorai módosíthatják ezeket a beállításokat.",
     "loadError": "A szolgáltatókat és modelleket nem sikerült betölteni",
     "tabModels": "Modellek",
     "tabProviders": "Szolgáltatók",

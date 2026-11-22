@@ -400,7 +400,7 @@
       "title": "Clés de fournisseur",
       "rowSubtitle": "Utiliser votre propre facturation fournisseur",
       "orgDescription": "Ces clés sont partagées avec tous les membres de l'organisation et facturées sur ses comptes fournisseur.",
-      "viewOnly": "Seul un propriétaire, un administrateur ou un gestionnaire de facturation de l'organisation peut modifier ses clés.",
+      "viewOnly": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut modifier ses clés.",
       "description": "Les requêtes effectuées avec ces clés sont facturées sur votre compte fournisseur au lieu de votre solde Kilo.",
       "managedByPlan": "Gérée par votre forfait de code",
       "enableKey": "Activer la clé {{provider}}",
@@ -3606,7 +3606,7 @@
       "pendingInvitation": "Cette adresse e-mail a déjà une invitation en attente.",
       "alreadyMember": "Cette personne est déjà membre de cette organisation.",
       "seatsFull": "Toutes les places sont occupées ({{used}}/{{total}}). Demandez à un propriétaire de l'organisation d'ajouter des places avant d'inviter d'autres membres.",
-      "seatsFullCanInviteBilling": "Toutes les places sont occupées ({{used}}/{{total}}). Vous pouvez toujours inviter des gestionnaires de facturation, qui n'occupent pas de place.",
+      "seatsFullCanInviteBilling": "Toutes les places sont occupées ({{used}}/{{total}}). Vous pouvez toujours inviter des responsables de la facturation, qui n'occupent pas de place.",
       "noSeatsAvailable": "Toutes les places sont occupées. Demandez à un propriétaire de l'organisation d'ajouter des places avant d'inviter d'autres membres."
     },
     "invoices": {

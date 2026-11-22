@@ -4749,7 +4749,7 @@
     "enable": "Kostenpflichtige Zusammenfassungen aktivieren",
     "allContexts": "Persönliche und Organisations-Briefings bleiben getrennt.",
     "emptyHistory": "Keine gespeicherten Briefings",
-    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen. Bitte eine Organisationsbesitzerin oder einen Organisationsbesitzer, dies zu aktivieren.",
+    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen. Bitte einen Inhaber der Organisation, dies zu aktivieren.",
     "saved": "Briefing-Einstellungen gespeichert",
     "selectedSessions": "Ausgewählte Sitzungen",
     "snapshotPullRequests": "PRs in ausgewählten Sitzungen",

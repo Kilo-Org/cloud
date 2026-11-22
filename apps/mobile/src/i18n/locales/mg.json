@@ -399,7 +399,7 @@
       "title": "Lakilen'ny mpamatsy",
       "rowSubtitle": "Ampiasao ny fandoavam-bola amin'ny mpamatsinao",
       "orgDescription": "Iombonan'ny olona rehetra ao amin'ny fikambanana ireo lakile ireo ary aloa amin'ny kaontin'ny fikambanana ao amin'ny mpamatsy.",
-      "viewOnly": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny fandoavam-bola ihany no afaka manova ny lakileny.",
+      "viewOnly": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana faktiora ihany no afaka manova ny lakileny.",
       "description": "Ny fangatahana mampiasa ireo lakile ireo dia aloa amin'ny kaontinao ao amin'ny mpamatsy fa tsy amin'ny ambim-bola Kilo anananao.",
       "managedByPlan": "Tantanin'ny drafitra fandaharana anananao",
       "enableKey": "Alefaso ny lakilen'ny {{provider}}",
@@ -3461,7 +3461,7 @@
     },
     "billing": {
       "title": "Faktiora",
-      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpiandraikitra ny faktiora ihany no afaka mahita ny faktioran'ny fikambanana.",
+      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mahita ny faktioran'ny fikambanana.",
       "subscription": "Famandrihana",
       "state": "Toe-javatra",
       "stateNone": "Tsy misy famandrihana",
@@ -3539,7 +3539,7 @@
       "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
       "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity.",
       "seatsFull": "Efa ampiasaina avokoa ny toerana rehetra ({{used}}/{{total}}). Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny.",
-      "seatsFullCanInviteBilling": "Efa ampiasaina avokoa ny toerana rehetra ({{used}}/{{total}}). Mbola afaka manasa mpitantana ny fandoavam-bola ianao, izay tsy mibodo toerana.",
+      "seatsFullCanInviteBilling": "Efa ampiasaina avokoa ny toerana rehetra ({{used}}/{{total}}). Mbola afaka manasa mpitantana faktiora ianao, izay tsy mibodo toerana.",
       "noSeatsAvailable": "Efa ampiasaina avokoa ny toerana rehetra. Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny."
     },
     "invoices": {
@@ -3700,7 +3700,7 @@
       "nameRequired": "Ampidiro ny anaran'ny vondrona.",
       "nameTooLong": "Aza mihoatra ny 80 litera ny anarana.",
       "notFound": "Tsy misy intsony ity vondrona ity.",
-      "permissionDenied": "Ny tompon'ny fikambanana na ny mpitantany ihany no afaka manova ny vondrona ao aminy.",
+      "permissionDenied": "Ny tompon'ny fikambanana na ny mpitantana ihany no afaka manova ny vondrona ao aminy.",
       "searchMembers": "Karohy ny mpikambana",
       "selectAllVisible": "Safidio izay rehetra aseho"
     },

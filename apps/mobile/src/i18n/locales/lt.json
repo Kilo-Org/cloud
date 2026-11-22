@@ -401,7 +401,7 @@
       "title": "Teikėjų raktai",
       "rowSubtitle": "Naudoti savo teikėjo atsiskaitymą",
       "orgDescription": "Šie raktai bendrinami su visais organizacijos nariais, o užklausos apmokestinamos jos teikėjų paskyrose.",
-      "viewOnly": "Organizacijos raktus gali keisti tik jos savininkas, administratorius arba atsiskaitymų vadovas.",
+      "viewOnly": "Organizacijos raktus gali keisti tik jos savininkas, administratorius arba atsiskaitymų administratorius.",
       "description": "Užklausos, atliekamos su šiais raktais, apmokestinamos jūsų teikėjo paskyroje, o ne iš jūsų Kilo likučio.",
       "managedByPlan": "Valdoma pagal jūsų programavimo planą",
       "enableKey": "Įjungti {{provider}} raktą",
@@ -1646,7 +1646,7 @@
       "empty": "Dar nėra peržiūrų su analitika",
       "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
       "offTitle": "Analitika išjungta platformai {{platform}}",
-      "offDescription": "Analitiką gali įjungti organizacijos atsiskaitymo vaidmenys – savininkai, administratoriai ir atsiskaitymo tvarkytojai – organizacijos nustatymuose žiniatinklyje, kad būtų fiksuojamos užbaigtos peržiūros.",
+      "offDescription": "Analitiką gali įjungti organizacijos atsiskaitymo vaidmenys – savininkai, administratoriai ir atsiskaitymų administratoriai – organizacijos nustatymuose žiniatinklyje, kad būtų fiksuojamos užbaigtos peržiūros.",
       "couldNotLoad": "Nepavyko įkelti analitikos",
       "trackedReviewsCaption": "Užbaigtos peržiūros, kurios baigėsi šiame laikotarpyje su įjungta analitika. Vykstančios ir nepavykusios peržiūros niekada neskaičiuojamos.",
       "trackedReviewsUncounted": "Neįskaičiuota: {{displayCount}} iš {{displayTotal}} organizacijos užbaigtų peržiūrų, kurių rezultatas nebuvo užfiksuotas.",
@@ -3533,7 +3533,7 @@
   "organization": {
     "auditLog": {
       "title": "Audito žurnalas",
-      "permissionDenied": "Organizacijos audito žurnalą gali skaityti tik Enterprise plano organizacijos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "permissionDenied": "Organizacijos audito žurnalą gali skaityti tik Enterprise plano organizacijos savininkas, administratorius arba atsiskaitymų administratorius.",
       "emptyTitle": "Audito įvykių nėra",
       "emptyDescription": "Čia rodomi šioje organizacijoje atlikti veiksmai.",
       "truncated": "Rodomi naujausi įvykiai.",
@@ -3587,7 +3587,7 @@
     },
     "billing": {
       "title": "Atsiskaitymai",
-      "permissionDenied": "Organizacijos atsiskaitymų informaciją gali matyti tik jos savininkas, administratorius arba atsiskaitymų tvarkytojas.",
+      "permissionDenied": "Organizacijos atsiskaitymų informaciją gali matyti tik jos savininkas, administratorius arba atsiskaitymų administratorius.",
       "subscription": "Prenumerata",
       "state": "Būsena",
       "stateNone": "Prenumeratos nėra",
@@ -3665,7 +3665,7 @@
       "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
       "alreadyMember": "Šis asmuo jau yra šios organizacijos narys.",
       "seatsFull": "Visos vietos užimtos ({{used}}/{{total}}). Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių.",
-      "seatsFullCanInviteBilling": "Visos vietos užimtos ({{used}}/{{total}}). Vis tiek galite kviesti atsiskaitymų tvarkytojus, nes jie neužima vietos.",
+      "seatsFullCanInviteBilling": "Visos vietos užimtos ({{used}}/{{total}}). Vis tiek galite kviesti atsiskaitymų administratorius, nes jie neužima vietos.",
       "noSeatsAvailable": "Visos vietos užimtos. Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių."
     },
     "invoices": {
@@ -3764,7 +3764,7 @@
       "emptyDescription": "Norėdami pamatyti ankstesnes užklausas, naudokite „Ankstesnė valanda“.",
       "emptyBoundDescription": "Užklausų žurnalai toliau į praeitį nesiekia.",
       "loadError": "Nepavyko įkelti užklausų žurnalų.",
-      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų administratorius.",
       "tokens": "Įvestis {{input}} · išvestis {{output}}",
       "byok": "BYOK"
     },

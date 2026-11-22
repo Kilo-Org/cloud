@@ -401,7 +401,7 @@
       "title": "Klucze dostawców",
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
       "orgDescription": "Te klucze są współdzielone ze wszystkimi członkami organizacji, a koszty są rozliczane na jej kontach u dostawców.",
-      "viewOnly": "Tylko właściciel, administrator lub menedżer rozliczeń organizacji może zmieniać jej klucze.",
+      "viewOnly": "Tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji może zmieniać jej klucze.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
       "managedByPlan": "Zarządzany przez twój plan kodowania",
       "enableKey": "Włącz klucz {{provider}}",
@@ -1032,7 +1032,7 @@
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
       "offTitle": "Analityka jest wyłączona dla {{platform}}",
-      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i menedżerowie rozliczeń — aby rejestrować ukończone przeglądy.",
+      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i osoby zarządzające rozliczeniami — aby rejestrować ukończone przeglądy.",
       "couldNotLoad": "Nie udało się wczytać analityki",
       "trackedReviewsCaption": "Ukończone przeglądy, które zakończyły się w tym okresie przy włączonej analityce. Przeglądy w toku i zakończone niepowodzeniem nigdy nie są zliczane.",
       "trackedReviewsUncounted": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
@@ -3525,7 +3525,7 @@
   "organization": {
     "auditLog": {
       "title": "Dziennik audytu",
-      "permissionDenied": "Dziennik audytu może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji w planie Enterprise.",
+      "permissionDenied": "Dziennik audytu może przeglądać tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji w planie Enterprise.",
       "emptyTitle": "Brak zdarzeń audytu",
       "emptyDescription": "Tutaj pojawiają się działania podjęte w tej organizacji.",
       "truncated": "Wyświetlane są najnowsze zdarzenia.",
@@ -3579,7 +3579,7 @@
     },
     "billing": {
       "title": "Rozliczenia",
-      "permissionDenied": "Rozliczenia organizacji może zobaczyć tylko jej właściciel, administrator lub menedżer rozliczeń.",
+      "permissionDenied": "Rozliczenia organizacji może zobaczyć tylko jej właściciel, administrator lub osoba zarządzająca rozliczeniami.",
       "subscription": "Subskrypcja",
       "state": "Stan",
       "stateNone": "Brak subskrypcji",
@@ -3669,7 +3669,7 @@
       "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
       "alreadyMember": "Ta osoba jest już członkiem tej organizacji.",
       "seatsFull": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków.",
-      "seatsFullCanInviteBilling": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Nadal możesz zapraszać menedżerów rozliczeń, którzy nie zajmują miejsca.",
+      "seatsFullCanInviteBilling": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Nadal możesz zapraszać osoby zarządzające rozliczeniami, które nie zajmują miejsca.",
       "noSeatsAvailable": "Wszystkie miejsca są zajęte. Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków."
     },
     "invoices": {
@@ -3768,7 +3768,7 @@
       "emptyDescription": "Użyj przycisku Wcześniejsza godzina, aby wyświetlić wcześniejsze żądania.",
       "emptyBoundDescription": "Dzienniki żądań nie sięgają dalej wstecz.",
       "loadError": "Nie udało się wczytać dzienników żądań.",
-      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
+      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji.",
       "tokens": "{{input}} wej. · {{output}} wyj.",
       "byok": "BYOK"
     },

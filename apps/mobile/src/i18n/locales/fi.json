@@ -399,7 +399,7 @@
       "title": "Palveluntarjoajien avaimet",
       "rowSubtitle": "Käytä palveluntarjoajasi omaa laskutusta",
       "orgDescription": "Nämä avaimet jaetaan kaikille organisaation jäsenille, ja käyttö laskutetaan organisaation palveluntarjoajatileiltä.",
-      "viewOnly": "Vain organisaation omistaja, ylläpitäjä tai laskutuksen hallinnoija voi muuttaa sen avaimia.",
+      "viewOnly": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi muuttaa sen avaimia.",
       "description": "Näiden avainten kautta tehdyt pyynnöt laskutetaan palveluntarjoajasi tililtä Kilo-saldon sijaan.",
       "managedByPlan": "Hallitaan koodaustilauksesi kautta",
       "enableKey": "Ota palvelun {{provider}} avain käyttöön",
@@ -3539,7 +3539,7 @@
       "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
       "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen.",
       "seatsFull": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä.",
-      "seatsFullCanInviteBilling": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Voit edelleen kutsua laskutuksen hallinnoijia, sillä he eivät vie paikkaa.",
+      "seatsFullCanInviteBilling": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Voit edelleen kutsua laskutusvastaavia, sillä he eivät vie paikkaa.",
       "noSeatsAvailable": "Kaikki paikat ovat käytössä. Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä."
     },
     "invoices": {

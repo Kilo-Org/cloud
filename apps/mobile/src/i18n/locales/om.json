@@ -399,7 +399,7 @@
       "title": "Furtuuwwan dhiyeessaa",
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
       "orgDescription": "Furtuuwwan kunneen namoota dhaabbata keessa jiran hundaaf qoodamanii herrega dhiyeessaa dhaabbatichaatti kaffalamu.",
-      "viewOnly": "Abbaa dhaabbatichaa, bulchaa ykn hogganaa kaffaltii qofatu furtuuwwan isaa jijjiiruu danda'a.",
+      "viewOnly": "Abbaa dhaabbatichaa, bulchaa ykn bulchaa kaffaltii qofatu furtuuwwan isaa jijjiiruu danda'a.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
       "managedByPlan": "Karoora koodii keetiin bulfama",
       "enableKey": "Furtuu {{provider}} dandeessisi",
@@ -1588,7 +1588,7 @@
       "empty": "Ammatti sakatta'a istaatiksii qabu hin jiru",
       "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
       "offTitle": "Istaatiksiin {{platform}} cufameera",
-      "offDescription": "Taayitoonni kaffaltii dhaabbataa — abbootii, adminoota fi mannijaroota kaffaltii — istaatiksii banuu danda'u; kunis web irratti, qindeessa dhaabbataa keessatti, akka sakatto'awwan xumuraman galmeessaniitan.",
+      "offDescription": "Taayitoonni kaffaltii dhaabbataa — abbootii, bulchitootaa fi bulchitoonni kaffaltii — istaatiksii banuu danda'u; kunis web irratti, qindeessa dhaabbataa keessatti, akka sakatto'awwan xumuraman galmeessaniitan.",
       "couldNotLoad": "Istaatiksii fe'uun hin danda'amne",
       "trackedReviewsCaption": "Sakatto'awwan xumuraman yeroo kana keessatti istaatiksii banan xumuraman. Sakatto'awwan itti fufaanii fi sakatto'awwan hanqatan hin lakkaa'amanII.,",
       "trackedReviewsUncounted": "Hin lakkaa’aman: {{displayCount}} / {{displayTotal}} dhaabbataan qabu xumuraman bu’aan qabamee hin boolu.",
@@ -2012,7 +2012,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Akeekkachiisa Dependabot ofumaan walsimsiisuuf fi argamoota nageenyaa kuusaawwan koodii kee keessatti bulchuuf aplikeeshinii GitHub kan Kilo fe'i.",
-      "connectOwnerOnly": "Abbaa dhaabbataa ykn bulchitaa tokko {{platform}} walqabsiisuuf gaafadhu.",
+      "connectOwnerOnly": "Abbaa dhaabbataa ykn bulchaa tokko {{platform}} walqabsiisuuf gaafadhu.",
       "connectTitle": "Jalqabuuf GitHub walqabsiisi",
       "couldNotLoad": "Eejentii nageenyaa fe'uun hin danda'amne.",
       "installApp": "Aplikeeshinii GitHub fe'i",
@@ -3407,7 +3407,7 @@
   "organization": {
     "auditLog": {
       "title": "Galmee odiitii",
-      "permissionDenied": "Galmee odiitii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hoggantoota kaffaltii karoora Enterprise irra jiran qofa.",
+      "permissionDenied": "Galmee odiitii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii karoora Enterprise irra jiran qofa.",
       "emptyTitle": "Taateen odiitii hin jiru",
       "emptyDescription": "Tarkaanfiiwwan dhaabbata kana keessatti fudhataman asitti mul'atu.",
       "truncated": "Taateewwan dhihoo kana raawwataman agarsiifamaa jiru.",
@@ -3461,7 +3461,7 @@
     },
     "billing": {
       "title": "Kaffaltii",
-      "permissionDenied": "Kaffaltii dhaabbataa abbaa dhaabbataa, bulchaa ykn hoogganaa kaffaltii qofatu arguu danda'a.",
+      "permissionDenied": "Kaffaltii dhaabbataa abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii qofatu arguu danda'a.",
       "subscription": "Galmee tajaajilaa",
       "state": "Haala",
       "stateNone": "Galmeen tajaajilaa hin jiru",
@@ -3638,7 +3638,7 @@
       "emptyDescription": "Sa'aatii darbe fayyadamuun gaaffiiwwan darban ilaali.",
       "emptyBoundDescription": "Galmeewwan gaaffii kana caalaa duubatti hin deeman.",
       "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
-      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hogganaa kaffaltii qofa.",
+      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii qofa.",
       "tokens": "{{input}} seene · {{output}} ba'e",
       "byok": "BYOK"
     },

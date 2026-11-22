@@ -399,7 +399,7 @@
       "title": "Funguo za watoa huduma",
       "rowSubtitle": "Tumia malipo ya mtoa huduma wako",
       "orgDescription": "Funguo hizi zinashirikiwa na kila mtu katika shirika na zinatozwa kwenye akaunti zake za watoa huduma.",
-      "viewOnly": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kubadilisha funguo zake.",
+      "viewOnly": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kubadilisha funguo zake.",
       "description": "Maombi yanayopitia funguo hizi yanatozwa kwenye akaunti yako ya mtoa huduma badala ya salio lako la Kilo.",
       "managedByPlan": "Inasimamiwa na mpango wako wa uandishi wa msimbo",
       "enableKey": "Washa ufunguo wa {{provider}}",
@@ -1588,7 +1588,7 @@
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
-      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na wasimamizi wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu",
       "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
       "trackedReviewsUncounted": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
@@ -3407,7 +3407,7 @@
   "organization": {
     "auditLog": {
       "title": "Kumbukumbu za ukaguzi",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika lililo kwenye mpango wa Enterprise pekee anayeweza kusoma kumbukumbu zake za ukaguzi.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika lililo kwenye mpango wa Enterprise pekee anayeweza kusoma kumbukumbu zake za ukaguzi.",
       "emptyTitle": "Hakuna matukio ya ukaguzi",
       "emptyDescription": "Vitendo vinavyofanywa katika shirika hili huonekana hapa.",
       "truncated": "Inaonyesha matukio ya hivi karibuni zaidi.",
@@ -3461,7 +3461,7 @@
     },
     "billing": {
       "title": "Malipo",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kuona malipo yake.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kuona malipo yake.",
       "subscription": "Usajili",
       "state": "Hali",
       "stateNone": "Hakuna usajili",
@@ -3539,7 +3539,7 @@
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
       "seatsFull": "Nafasi zote zinatumika ({{used}}/{{total}}). Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi.",
-      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa malipo, ambao hawatumii nafasi.",
+      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa bili, ambao hawatumii nafasi.",
       "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {
@@ -3638,7 +3638,7 @@
       "emptyDescription": "Tumia Saa iliyotangulia ili kuona maombi ya awali.",
       "emptyBoundDescription": "Kumbukumbu za maombi haziendi nyuma zaidi ya hapa.",
       "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
       "tokens": "{{input}} ndani · {{output}} nje",
       "byok": "BYOK"
     },

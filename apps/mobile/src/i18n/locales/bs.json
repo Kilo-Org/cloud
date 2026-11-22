@@ -400,7 +400,7 @@
       "title": "Ključevi pružalaca",
       "rowSubtitle": "Koristi naplatu vlastitog pružaoca",
       "orgDescription": "Ovi ključevi se dijele sa svima u organizaciji i naplaćuju se na njene naloge kod pružalaca.",
-      "viewOnly": "Samo vlasnik organizacije, administrator ili menadžer naplate može mijenjati njene ključeve.",
+      "viewOnly": "Samo vlasnik organizacije, administrator ili menadžer za naplatu može mijenjati njene ključeve.",
       "description": "Zahtjevi putem ovih ključeva naplaćuju se na tvoj nalog kod pružaoca umjesto s tvog Kilo salda.",
       "managedByPlan": "Upravlja tvoj plan za kodiranje",
       "enableKey": "Omogući ključ za {{provider}}",
@@ -3470,7 +3470,7 @@
   "organization": {
     "auditLog": {
       "title": "Revizijski zapisnik",
-      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo njen vlasnik, administrator ili menadžer naplate.",
+      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo njen vlasnik, administrator ili menadžer za naplatu.",
       "emptyTitle": "Nema revizijskih događaja",
       "emptyDescription": "Ovdje se prikazuju radnje izvršene u ovoj organizaciji.",
       "truncated": "Prikazuju se najnoviji događaji.",
@@ -3524,7 +3524,7 @@
     },
     "billing": {
       "title": "Naplata",
-      "permissionDenied": "Naplatu mogu vidjeti samo vlasnik, administrator ili menadžer naplate organizacije.",
+      "permissionDenied": "Naplatu mogu vidjeti samo vlasnik, administrator ili menadžer za naplatu organizacije.",
       "subscription": "Pretplata",
       "state": "Status",
       "stateNone": "Nema pretplate",
@@ -3701,7 +3701,7 @@
       "emptyDescription": "Odaberite Raniji sat da biste vidjeli ranije zahtjeve.",
       "emptyBoundDescription": "Zapisi zahtjeva ne sežu dalje u prošlost.",
       "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
-      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo njen vlasnik, administrator ili menadžer naplate.",
+      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo njen vlasnik, administrator ili menadžer za naplatu.",
       "tokens": "Ulaz: {{input}} · Izlaz: {{output}}",
       "byok": "BYOK"
     },

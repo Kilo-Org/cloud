@@ -399,7 +399,7 @@
       "title": "Lyklar þjónustuveitna",
       "rowSubtitle": "Nota eigin greiðslur hjá þjónustuveitu",
       "orgDescription": "Þessum lyklum er deilt með öllum í fyrirtækinu og þeir eru gjaldfærðir á reikninga þess hjá þjónustuveitum.",
-      "viewOnly": "Aðeins eigandi, stjórnandi eða greiðslustjóri fyrirtækisins getur breytt lyklum þess.",
+      "viewOnly": "Aðeins eigandi, stjórnandi eða innheimtustjóri fyrirtækisins getur breytt lyklum þess.",
       "description": "Beiðnir með þessum lyklum eru gjaldfærðar á reikninginn þinn hjá þjónustuveitunni í stað Kilo-inneignarinnar þinnar.",
       "managedByPlan": "Stýrt af forritunaráskriftinni þinni",
       "enableKey": "Virkja lykilinn fyrir {{provider}}",
@@ -1588,7 +1588,7 @@
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
       "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
-      "offDescription": "Eigendur, stjórnendur og rekningastjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
+      "offDescription": "Eigendur, stjórnendur og innheimtustjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
       "couldNotLoad": "Tókst ekki að sækja tölfræðina",
       "trackedReviewsCaption": "Yfirferðir sem klárast á þessu tímabili, meðan tölfræðin er virk. Yfirferðir í gangi eða misheppnaðar teljast aldrei.",
       "trackedReviewsUncounted": "Ekki taldar: {{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast, niðurstöðan þeirra ekki skráð.",
@@ -3407,7 +3407,7 @@
   "organization": {
     "auditLog": {
       "title": "Endurskoðunarskrá",
-      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags á Enterprise-áætlun getur lesið endurskoðunarskrá þess.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða innheimtustjóri félags á Enterprise-áætlun getur lesið endurskoðunarskrá þess.",
       "emptyTitle": "Engir skráðir atburðir",
       "emptyDescription": "Aðgerðir sem eru framkvæmdar í þessu félagi birtast hér.",
       "truncated": "Sýnir nýjustu atburðina.",
@@ -3461,7 +3461,7 @@
     },
     "billing": {
       "title": "Greiðslur",
-      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félagsins getur séð greiðsluupplýsingar þess.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða innheimtustjóri félagsins getur séð greiðsluupplýsingar þess.",
       "subscription": "Áskrift",
       "state": "Staða",
       "stateNone": "Engin áskrift",
@@ -3638,7 +3638,7 @@
       "emptyDescription": "Notaðu „Fyrri klukkustund“ til að sjá fyrri beiðnir.",
       "emptyBoundDescription": "Beiðnaskrár ná ekki lengra aftur.",
       "loadError": "Ekki tókst að sækja beiðnaskrár.",
-      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða innheimtustjóri félags getur lesið beiðnaskrár þess.",
       "tokens": "{{input}} inn · {{output}} út",
       "byok": "BYOK"
     },

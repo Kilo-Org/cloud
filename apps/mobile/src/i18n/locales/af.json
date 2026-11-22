@@ -4725,7 +4725,7 @@
     "defaultModel": "Gebruik Kilo se verstekmodel",
     "duration": "Tydbeveiliging (minute)",
     "spendLimit": "Bestedingsbeveiliging (USD)",
-    "invalidSafeguards": "Voer positiewe, eindige tyd- en bestedingslimiete in.",
+    "invalidSafeguards": "Voer ’n positiewe getal binne die toegelate reeks in.",
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie. Verander die model of die perke, of probeer later weer.",
     "confirmPaid": "Aktiveer betaalde opsommings vir {{context}}?",

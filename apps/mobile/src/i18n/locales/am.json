@@ -4725,7 +4725,7 @@
     "defaultModel": "የKiloን ነባሪ ሞዴል ተጠቀም",
     "duration": "የጊዜ ጥበቃ (ደቂቃዎች)",
     "spendLimit": "የወጪ ጥበቃ (USD)",
-    "invalidSafeguards": "አዎንታዊ እና የተወሰኑ የጊዜ እና የወጪ ገደቦችን ያስገቡ።",
+    "invalidSafeguards": "በተፈቀደው ክልል ውስጥ ያለ አዎንታዊ ቁጥር ያስገቡ።",
     "estimate": "ግምት {{estimate}} · ከፍተኛ {{maximum}}",
     "estimateUnavailable": "ለእነዚህ ቅንብሮች የክፍያ ማጠቃለያ አይገኝም። ሞዴሉን ወይም ወሰኖችን ይቀይሩ፣ ወይም በኋላ ላይ እንደገና ይሞክሩ።",
     "confirmPaid": "ለ{{context}} የሚከፈልባቸው ማጠቃለያዎች ይንቁ?",

@@ -4893,7 +4893,7 @@
     "defaultModel": "Usar o modelo padrão do Kilo",
     "duration": "Limite de tempo (minutos)",
     "spendLimit": "Limite de gasto (USD)",
-    "invalidSafeguards": "Insira limites de tempo e gasto positivos e finitos.",
+    "invalidSafeguards": "Insira um número positivo dentro do intervalo permitido.",
     "estimate": "Estimativa {{estimate}} · máximo de {{maximum}}",
     "estimateUnavailable": "Um resumo pago não está disponível para estas configurações. Altere o modelo ou os limites, ou tente novamente mais tarde.",
     "confirmPaid": "Ativar resumos pagos para {{context}}?",

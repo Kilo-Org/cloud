@@ -4725,7 +4725,7 @@
     "defaultModel": "Kilonun standart modelindən istifadə et",
     "duration": "Vaxt limiti (dəqiqə)",
     "spendLimit": "Xərc limiti (USD)",
-    "invalidSafeguards": "Müsbət, sonlu vaxt və xərc limitləri daxil edin.",
+    "invalidSafeguards": "İcazə verilən aralıqda müsbət ədəd daxil edin.",
     "estimate": "Təxmin {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu parametrlər üçün ödənişli xülasə mövcud deyil. Modeli və ya limitləri dəyişin, yaxud bir az sonra yenidən cəhd edin.",
     "confirmPaid": "{{context}} üçün ödənişli xülasələr aktiv edilsin?",

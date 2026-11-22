@@ -4725,7 +4725,7 @@
     "defaultModel": "Erabili Kiloren eredu lehenetsia",
     "duration": "Denbora-muga (minutuak)",
     "spendLimit": "Gastu-muga (USD)",
-    "invalidSafeguards": "Sartu denbora- eta gastu-muga positibo eta finituak.",
+    "invalidSafeguards": "Sartu zenbaki positibo bat onartutako tartean.",
     "estimate": "Estimazioa {{estimate}} · gehienez {{maximum}}",
     "estimateUnavailable": "Ezarpen hauekin ez dago ordainpeko laburpenik erabilgarri. Aldatu eredua edo mugak, edo saiatu berriro geroago.",
     "estimatePricingUnavailable": "Eredu honen prezioa ez dago erabilgarri. Aukeratu beste eredu bat.",

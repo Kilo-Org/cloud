@@ -4725,7 +4725,7 @@
     "defaultModel": "Dùng mô hình mặc định của Kilo",
     "duration": "Giới hạn thời gian (phút)",
     "spendLimit": "Giới hạn chi phí (USD)",
-    "invalidSafeguards": "Nhập giới hạn thời gian và chi phí dương, hữu hạn.",
+    "invalidSafeguards": "Nhập một số dương trong phạm vi cho phép.",
     "estimate": "Ước tính {{estimate}} · tối đa {{maximum}}",
     "estimateUnavailable": "Không có bản tóm tắt trả phí cho các cài đặt này. Hãy đổi mô hình hoặc giới hạn, hoặc thử lại sau.",
     "confirmPaid": "Bật tóm tắt trả phí cho {{context}}?",

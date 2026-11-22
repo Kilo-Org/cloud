@@ -4725,7 +4725,7 @@
     "defaultModel": "Käytä Kilon oletusmallia",
     "duration": "Aikaraja (minuuttia)",
     "spendLimit": "Kuluraja (USD)",
-    "invalidSafeguards": "Anna positiiviset, äärelliset aika- ja kulurajat.",
+    "invalidSafeguards": "Anna positiivinen luku sallitulla alueella.",
     "estimate": "Arvio {{estimate}} · enintään {{maximum}}",
     "estimateUnavailable": "Maksullinen yhteenveto ei ole saatavilla näillä asetuksilla. Muuta mallia tai rajoja, tai yritä myöhemmin uudelleen.",
     "estimatePricingUnavailable": "Tämän mallin hinnoittelu ei ole käytettävissä. Valitse toinen malli.",

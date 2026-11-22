@@ -4725,7 +4725,7 @@
     "defaultModel": "Yi amfani da model na asali na Kilo",
     "duration": "Kariyar lokaci (mintuna)",
     "spendLimit": "Kariyar kashe kuɗi (USD)",
-    "invalidSafeguards": "Shigar da iyakokin lokaci da kashe kuɗi da suka fi sifili kuma suke da iyaka.",
+    "invalidSafeguards": "Shigar da lamba fiye da sifili cikin iyakar da aka yarda.",
     "estimate": "Kimanin {{estimate}} · iyaka mafi girma {{maximum}}",
     "estimateUnavailable": "Ba a samun taƙaitawar da ake biya don waɗannan saituna. Canza samfurin ko iyakoki, ko kuma sake gwadawa bayan ɗan lokaci.",
     "confirmPaid": "Kunna taƙaitawa ta biya don {{context}}?",

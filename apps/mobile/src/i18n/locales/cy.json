@@ -5061,7 +5061,7 @@
     "defaultModel": "Defnyddio model diofyn Kilo",
     "duration": "Terfyn amser (munudau)",
     "spendLimit": "Terfyn gwariant (USD)",
-    "invalidSafeguards": "Rhowch derfynau amser a gwariant positif a meidraidd.",
+    "invalidSafeguards": "Rhowch rif positif o fewn yr ystod a ganiateir.",
     "estimate": "Amcangyfrif {{estimate}} · uchafswm {{maximum}}",
     "estimateUnavailable": "Nid oes crynodeb taledig ar gael ar gyfer y gosodiadau hyn. Newidiwch y model neu'r terfynau, neu ceisiwch eto yn ddiweddarach.",
     "estimatePricingUnavailable": "Nid yw prisio'r model hwn ar gael. Dewiswch fodel arall.",

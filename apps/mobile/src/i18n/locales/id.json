@@ -4725,7 +4725,7 @@
     "defaultModel": "Gunakan model default Kilo",
     "duration": "Batas waktu (menit)",
     "spendLimit": "Batas biaya (USD)",
-    "invalidSafeguards": "Masukkan batas waktu dan biaya yang positif dan terbatas.",
+    "invalidSafeguards": "Masukkan angka positif dalam rentang yang diizinkan.",
     "estimate": "Estimasi {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk pengaturan ini. Ubah model atau batasnya, atau coba lagi nanti.",
     "confirmPaid": "Aktifkan ringkasan berbayar untuk {{context}}?",

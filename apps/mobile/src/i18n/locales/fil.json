@@ -4725,7 +4725,7 @@
     "defaultModel": "Gamitin ang default na model ng Kilo",
     "duration": "Limitasyon sa oras (minuto)",
     "spendLimit": "Limitasyon sa gastos (USD)",
-    "invalidSafeguards": "Maglagay ng mga positibong limitasyon sa oras at gastos na may hangganang halaga.",
+    "invalidSafeguards": "Maglagay ng positibong numero sa pinapayagang saklaw.",
     "estimate": "Tantiya {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Hindi available ang bayad na buod para sa mga setting na ito. Palitan ang modelo o ang mga limitasyon, o subukan itong muli mamaya.",
     "estimatePricingUnavailable": "Walang available na presyo para sa modelong ito. Pumili ng ibang modelo.",

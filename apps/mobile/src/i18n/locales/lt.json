@@ -4893,7 +4893,7 @@
     "defaultModel": "Naudoti numatytąjį Kilo modelį",
     "duration": "Laiko apribojimas (minutės)",
     "spendLimit": "Išlaidų apribojimas (USD)",
-    "invalidSafeguards": "Įveskite teigiamas, baigtines laiko ir išlaidų ribas.",
+    "invalidSafeguards": "Įveskite teigiamą skaičių leidžiamame intervale.",
     "estimate": "Apskaičiavimas {{estimate}} · daugiausia {{maximum}}",
     "estimateUnavailable": "Mokama santrauka šiems nustatymams neprieinama. Pakeiskite modelį arba ribas, arba pabandykite vėliau.",
     "confirmPaid": "{{context}}: įjungti mokamas santraukas?",

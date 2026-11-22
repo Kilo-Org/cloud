@@ -4893,7 +4893,7 @@
     "defaultModel": "Použít výchozí model Kilo",
     "duration": "Časový limit (minuty)",
     "spendLimit": "Limit útraty (USD)",
-    "invalidSafeguards": "Zadejte kladné konečné limity času a útraty.",
+    "invalidSafeguards": "Zadejte kladné číslo v povoleném rozsahu.",
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné. Změňte model nebo limity, případně to zkuste později.",
     "confirmPaid": "Povolit placená shrnutí pro {{context}}?",

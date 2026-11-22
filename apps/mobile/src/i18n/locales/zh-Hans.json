@@ -4725,7 +4725,7 @@
     "defaultModel": "使用 Kilo 默认模型",
     "duration": "时间保护上限（分钟）",
     "spendLimit": "花费保护上限（USD）",
-    "invalidSafeguards": "请输入有限的正数时间和花费上限。",
+    "invalidSafeguards": "请输入允许范围内的正数。",
     "estimate": "预估 {{estimate}} · 最高 {{maximum}}",
     "estimateUnavailable": "这些设置下无法获取付费摘要。请更换模型或调整限制，或稍后重试。",
     "confirmPaid": "为 {{context}} 启用付费摘要？",

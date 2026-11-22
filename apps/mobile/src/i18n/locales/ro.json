@@ -4809,7 +4809,7 @@
     "defaultModel": "Folosește modelul implicit Kilo",
     "duration": "Limită de timp (minute)",
     "spendLimit": "Limită de cheltuieli (USD)",
-    "invalidSafeguards": "Introdu limite de timp și de cheltuieli pozitive și finite.",
+    "invalidSafeguards": "Introdu un număr pozitiv în intervalul permis.",
     "estimate": "Estimare {{estimate}} · maxim {{maximum}}",
     "estimateUnavailable": "Nu este disponibil un rezumat plătit pentru aceste setări. Schimbă modelul sau limitele, ori încearcă din nou mai târziu.",
     "confirmPaid": "Activezi rezumatele plătite pentru {{context}}?",

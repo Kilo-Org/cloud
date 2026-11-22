@@ -4725,7 +4725,7 @@
     "defaultModel": "Përdor modelin e parazgjedhur të Kilo",
     "duration": "Kufiri i kohës (minuta)",
     "spendLimit": "Kufiri i shpenzimit (USD)",
-    "invalidSafeguards": "Fut kufij kohe dhe shpenzimi pozitivë dhe të fundëm.",
+    "invalidSafeguards": "Fut një numër pozitiv brenda intervalit të lejuar.",
     "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
     "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime. Ndrysho modelin ose kufijtë, ose provo përsëri më vonë.",
     "confirmPaid": "Të aktivizohen përmbledhjet me pagesë për {{context}}?",

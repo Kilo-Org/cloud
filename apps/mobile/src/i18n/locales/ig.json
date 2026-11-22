@@ -4725,7 +4725,7 @@
     "defaultModel": "Jiri ụdị ndabara Kilo",
     "duration": "Nchekwa oge (nkeji)",
     "spendLimit": "Nchekwa mmefu (USD)",
-    "invalidSafeguards": "Tinye oke oge na mmefu karịrị efu, nwere njedebe.",
+    "invalidSafeguards": "Tinye ọnụọgụ dị mma n'ime oke a na-anabata.",
     "estimate": "Atụmatụ {{estimate}} · kachasị {{maximum}}",
     "estimateUnavailable": "Nchịkọta a na-akwụ ụgwọ adịghị maka ntọala ndị a. Gbanwee ihe nlere ma ọ bụ oke ndị ahụ, ma ọ bụ nwaa ọzọ e mesịa.",
     "confirmPaid": "Kwado nchịkọta akwụ ụgwọ maka {{context}}?",

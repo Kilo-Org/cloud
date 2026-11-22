@@ -4725,7 +4725,7 @@
     "defaultModel": "A Kilo alapértelmezett modelljének használata",
     "duration": "Időkorlát (perc)",
     "spendLimit": "Költési korlát (USD)",
-    "invalidSafeguards": "Adj meg pozitív, véges idő- és költési korlátot.",
+    "invalidSafeguards": "Adj meg egy pozitív számot az engedélyezett tartományban.",
     "estimate": "Becsült {{estimate}} · legfeljebb {{maximum}}",
     "estimateUnavailable": "Fizetett összefoglaló nem elérhető ezekkel a beállításokkal. Változtasd meg a modellt vagy a korlátokat, vagy próbáld újra később.",
     "confirmPaid": "Engedélyezed a fizetős összefoglalókat ehhez: {{context}}?",

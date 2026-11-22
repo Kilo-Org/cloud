@@ -4725,7 +4725,7 @@
     "defaultModel": "Isticmaal moodeelka caadiga ah ee Kilo",
     "duration": "Ilaalinta waqtiga (daqiiqado)",
     "spendLimit": "Ilaalinta kharashka (USD)",
-    "invalidSafeguards": "Geli xadad waqti iyo kharash oo togan oo xaddidan.",
+    "invalidSafeguards": "Geli tiro togan oo ku jirta baaxadda la oggolaaday.",
     "estimate": "Qiimeyn {{estimate}} · ugu badnaan {{maximum}}",
     "estimateUnavailable": "Soo koobid lacag leh laguma heli karo dejimyadan. Beddel moodeelka ama xaddidaadaha, ama isku day mar dambe.",
     "confirmPaid": "Ma shidaysaa soo koobidda lacagta leh ee {{context}}?",

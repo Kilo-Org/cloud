@@ -4725,7 +4725,7 @@
     "defaultModel": "Lo àwòṣe àìyípadà Kilo",
     "duration": "Ààbò àkókò (ìṣẹ́jú)",
     "spendLimit": "Ààbò ìnáwó (USD)",
-    "invalidSafeguards": "Tẹ òpin àkókò àti ìnáwó tó jẹ́ rere, tó sì ní òpin.",
+    "invalidSafeguards": "Tẹ nọ́mbà rere sínú ààlà tí a gbà.",
     "estimate": "Ìsirò {{estimate}} · ti ó pọ̀jù {{maximum}}",
     "estimateUnavailable": "Àkópọ̀ tí a sanwó fún kò sí fún àwọn ètò yìí. Yí àwòṣe dà tàbí àwọn ààlà dà, tàbí gbìyànjú mọ̀ ní àmọ̀jú.",
     "confirmPaid": "Mú àkópọ̀ olówó ṣiṣẹ́ fún {{context}}?",

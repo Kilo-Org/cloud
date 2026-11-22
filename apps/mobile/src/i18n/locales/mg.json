@@ -4725,7 +4725,7 @@
     "defaultModel": "Ampiasao ny modely default an'i Kilo",
     "duration": "Fetra fotoana (minitra)",
     "spendLimit": "Fetra fandaniana (USD)",
-    "invalidSafeguards": "Ampidiro fetra fotoana sy fandaniana lehibe noho ny aotra sady voafetra.",
+    "invalidSafeguards": "Ampidiro isa tsara ao anatin'ny fetra ekena.",
     "estimate": "Vinavina {{estimate}} · ambony indrindra {{maximum}}",
     "estimateUnavailable": "Tsy misy famintinana andoavam-bola ho an'ireto fandrindrana ireto. Ovay ny maodely na ny fetra, na andramo indray any aoriana.",
     "confirmPaid": "Alefa ve ny famintinana andoavana ho an'i {{context}}?",

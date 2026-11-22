@@ -88,19 +88,12 @@ export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstima
   const { t, i18n } = useTranslation();
   switch (quote.kind) {
     case 'invalid': {
-      // The sentence now shows on the safeguard field at fault, so the line keeps
-      // no visible copy. It still announces: the wait this line owned is over,
-      // and that is what changed for a reader who cannot see the field's error.
-      // The reserved box is the line's own height, so moving the sentence to the
-      // field changes no measurement in the card.
-      return (
-        <View className="relative h-4">
-          <AccessibleStatus
-            message={t('agentBriefing.invalidSafeguards')}
-            className="absolute size-px overflow-hidden"
-          />
-        </View>
-      );
+      // The sentence shows on the safeguard field at fault, and that field's own
+      // status is its one announcement channel, so the line adds no second one:
+      // two live regions carrying the same sentence in one commit would be
+      // spoken twice. Only the height the quote occupied stays reserved, so a
+      // value that stops parsing moves no measurement in the card.
+      return <View className="h-4" />;
     }
     case 'estimating': {
       // The placeholder takes the estimate line's own height, so the card does

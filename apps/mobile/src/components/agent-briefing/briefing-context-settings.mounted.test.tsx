@@ -32,11 +32,17 @@ const paid = vi.hoisted(() => ({
   read: { offline: false, isError: false, isFetching: false },
   catalog: { isError: false, refetch: vi.fn() },
   appState: { currentState: 'active' },
+  // The fake cache: `estimate.value` is the fake server's answer, and
+  // `answerKey` is the key it settled on. Any other key has no answer of its
+  // own, so only a placeholder may stand the settled answer in for it. Without
+  // the card's `placeholderData`, a keystroke's new key therefore has no data.
+  answerKey: undefined as string | undefined,
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   paid.estimate.value = undefined;
+  paid.answerKey = undefined;
   paid.read = { offline: false, isError: false, isFetching: false };
   paid.catalog = { isError: false, refetch: vi.fn() };
   paid.appState.currentState = 'active';
@@ -74,22 +80,40 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@tanstack/react-query', () => ({
-  // The component only hands this to the real hook, which the mock replaces.
-  keepPreviousData: (previous: unknown) => previous,
+  // The component only hands this to the real hook, which the mock replaces. The
+  // mock marks a placeholder as present so the query stub below can tell a call
+  // that opted into keeping previous data from one that did not.
+  keepPreviousData: Symbol.for('keepPreviousData'),
   useMutation: () => ({ mutate: paid.mutate, isPending: false }),
-  useQuery: () => ({
-    data: paid.estimate.value,
-    isError: paid.read.isError,
-    isFetching: paid.read.isFetching,
-    refetch: paid.refetch,
-  }),
+  useQuery: (options: { queryKey: readonly unknown[]; placeholderData?: unknown }) => {
+    const key = JSON.stringify(options.queryKey);
+    // The first key the card reads is the one the fake server answered.
+    paid.answerKey ??= key;
+    // `paid.estimate.value` is the fake server's answer for the key it settled
+    // on; any other key has no answer of its own, and only a placeholder may
+    // stand the settled one in for it.
+    const settled = paid.answerKey === key ? paid.estimate.value : undefined;
+    const kept = options.placeholderData === undefined ? undefined : paid.estimate.value;
+    return {
+      data: settled === undefined ? kept : settled,
+      isError: paid.read.isError,
+      isFetching: paid.read.isFetching,
+      refetch: paid.refetch,
+    };
+  },
   useQueryClient: () => ({}),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentBriefing: {
       updateContextPreferences: { mutationOptions: () => ({}) },
-      estimateSummary: { queryOptions: () => ({ queryKey: ['agentBriefing', 'estimate'] }) },
+      // The real options key the read on the model and both limits, so a
+      // keystroke starts a new key here too.
+      estimateSummary: {
+        queryOptions: (input: unknown) => ({
+          queryKey: ['agentBriefing', 'estimate', JSON.stringify(input)],
+        }),
+      },
     },
   }),
 }));
@@ -199,12 +223,11 @@ it('hides the previous estimate when a field no longer parses', () => {
   expect(durationProps.reserveErrorMessages).toEqual(['Invalid limits']);
   expect(spendProps.error).toBeUndefined();
 
-  // The line keeps no visible copy in this phase: one announce-only status, so
-  // the end of the wait is still spoken.
-  const statuses = mounted.root.findAll(node => (node.type as string) === 'AccessibleStatus');
-  expect(statuses).toHaveLength(1);
-  expect(statuses[0]?.props.message).toBe('Invalid limits');
-  expect(statuses[0]?.props.className).toContain('absolute');
+  // The line adds no second announcement in this phase: the field's own status
+  // is the one channel, so no status node is rendered by the line itself.
+  expect(mounted.root.findAll(node => (node.type as string) === 'AccessibleStatus')).toHaveLength(
+    0
+  );
 
   const tree = JSON.stringify(mounted.toJSON());
   expect(tree).not.toContain('agentBriefing.estimate');
@@ -224,6 +247,8 @@ it('keeps the settled quote and the primary action while a keystroke re-reads', 
     estimateToken: 'kept-quote',
   };
   const mounted = mount(true);
+  // The fake server answered the key the card first read.
+  expect(paid.answerKey).toBeDefined();
   // A new query key is in flight; the previous quote is what the card holds.
   paid.read = { offline: false, isError: false, isFetching: true };
   const [durationField] = mounted.root.findAll(node => (node.type as string) === 'FormField');

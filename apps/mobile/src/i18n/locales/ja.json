@@ -4725,7 +4725,7 @@
     "defaultModel": "Kiloのデフォルトモデルを使用",
     "duration": "時間の上限(分)",
     "spendLimit": "支出の上限(USD)",
-    "invalidSafeguards": "正の有限な時間と支出の上限を入力してください。",
+    "invalidSafeguards": "許容範囲内の正の値を入力してください。",
     "estimate": "推定 {{estimate}} · 最大 {{maximum}}",
     "estimateUnavailable": "これらの設定では有料サマリーを利用できません。モデルや上限を変更するか、後でもう一度お試しください。",
     "confirmPaid": "{{context}}の有料要約を有効にしますか?",

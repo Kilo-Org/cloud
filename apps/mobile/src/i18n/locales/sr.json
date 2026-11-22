@@ -4809,7 +4809,7 @@
     "defaultModel": "Koristi Kilo podrazumevani model",
     "duration": "Vremensko ograničenje (minuti)",
     "spendLimit": "Ograničenje potrošnje (USD)",
-    "invalidSafeguards": "Unesite pozitivna, konačna ograničenja vremena i potrošnje.",
+    "invalidSafeguards": "Unesite pozitivan broj u dozvoljenom opsegu.",
     "estimate": "Procena {{estimate}} · najviše {{maximum}}",
     "estimateUnavailable": "Plaćeni rezime nije dostupan za ova podešavanja. Promenite model ili ograničenja, ili pokušajte ponovo kasnije.",
     "confirmPaid": "Omogućiti plaćene rezimee za {{context}}?",

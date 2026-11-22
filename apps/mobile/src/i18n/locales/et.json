@@ -4725,7 +4725,7 @@
     "defaultModel": "Kasuta Kilo vaikemudelit",
     "duration": "Ajapiirang (minutid)",
     "spendLimit": "Kulupiirang (USD)",
-    "invalidSafeguards": "Sisesta positiivsed ja lõplikud aja- ja kulupiirangud.",
+    "invalidSafeguards": "Sisesta positiivne arv lubatud vahemikus.",
     "estimate": "Hinnang {{estimate}} · maksimaalselt {{maximum}}",
     "estimateUnavailable": "Nende seadetega pole tasuline kokkuvõte saadaval. Muuda mudelit või piiranguid või proovi hiljem uuesti.",
     "estimatePricingUnavailable": "Selle mudeli hinnad pole saadaval. Vali teine mudel.",

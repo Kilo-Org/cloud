@@ -4725,7 +4725,7 @@
     "defaultModel": "Moodeela durtii Kilo fayyadami",
     "duration": "Eegumsa yeroo (daqiiqaa)",
     "spendLimit": "Eegumsa baasii (USD)",
-    "invalidSafeguards": "Daangaa yeroo fi baasii poozatiivii fi daangeffame galchi.",
+    "invalidSafeguards": "Lakkoofsa poozatiivii hanga hayyamame keessatti galchi.",
     "estimate": "Tilmaama {{estimate}} · daangaa ol'aanaa {{maximum}}",
     "estimateUnavailable": "Cuunfaan kaffaltii qindaa'inoota kanaaf hin argamu. Moodelii ykn daangoota jijjiiri, ykn booda irra deebi'ii yaali.",
     "confirmPaid": "Cuunfaa kaffaltii {{context}}f dandeessisuu?",

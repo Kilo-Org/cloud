@@ -4725,7 +4725,7 @@
     "defaultModel": "Tumia modeli chaguomsingi ya Kilo",
     "duration": "Kikomo cha muda (dakika)",
     "spendLimit": "Kikomo cha matumizi (USD)",
-    "invalidSafeguards": "Weka vikomo vya muda na matumizi vyenye thamani chanya na zenye ukomo.",
+    "invalidSafeguards": "Weka nambari chanya ndani ya kiwango kinachoruhusiwa.",
     "estimate": "Makadirio {{estimate}} · kiwango cha juu {{maximum}}",
     "estimateUnavailable": "Muhtasari wenye malipo haupatikani kwa mipangilio hii. Badilisha modeli au mipaka, au ujaribu tena baadaye.",
     "confirmPaid": "Washa muhtasari wa kulipia kwa {{context}}?",

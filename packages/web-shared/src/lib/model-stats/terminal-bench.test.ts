@@ -1,5 +1,22 @@
-import { describe, expect, it } from '@jest/globals';
-import { summarizeTerminalBench, terminalBenchFor } from './terminal-bench';
+import { beforeEach, describe, expect, it } from '@jest/globals';
+import type { ModelStats } from '@kilocode/db/schema';
+import {
+  getTerminalBenchSummaries,
+  summarizeTerminalBench,
+  terminalBenchFor,
+} from './terminal-bench';
+import { getModelStatsSnapshot } from './model-stats-cache';
+import type {
+  ModelStatsCacheEntry,
+  ModelStatsLoadClient,
+  ModelStatsSnapshot,
+} from './model-stats-cache';
+
+jest.mock('./model-stats-cache', () => ({
+  getModelStatsSnapshot: jest.fn(),
+}));
+
+const mockSnapshot = jest.mocked(getModelStatsSnapshot);
 
 const summary = { overallScore: 0.551, avgAttemptCostUsd: 53.37 };
 
@@ -34,18 +51,34 @@ function benchmarks(
   };
 }
 
-function row(overrides: Partial<Parameters<typeof summarizeTerminalBench>[0][number]> = {}) {
+type RowOverrides = Partial<Omit<ModelStats, 'benchmarks'>> & { benchmarks?: unknown };
+
+function row(overrides: RowOverrides = {}): ModelStatsCacheEntry {
   return {
-    openrouterId: 'openai/model',
-    isActive: true,
-    benchmarks: benchmarks(),
-    ...overrides,
+    stat: {
+      openrouterId: 'openai/model',
+      isActive: true,
+      isStealth: false,
+      benchmarks: benchmarks(),
+      ...overrides,
+    } as ModelStats,
+    verification: undefined,
   };
 }
 
+function snapshot(
+  entries: readonly ModelStatsCacheEntry[],
+  customLlmIds: ReadonlySet<string> = new Set()
+): ModelStatsSnapshot {
+  return { entries, observedAt: Date.now(), generation: 0, customLlmIds };
+}
+
+beforeEach(() => {
+  mockSnapshot.mockReset();
+});
+
 describe('summarizeTerminalBench', () => {
   it('publishes only eligible non-internal summaries', () => {
-    const stealth = { ...row({ openrouterId: 'stealth/model' }), isStealth: true };
     const nullable = {
       ...benchmarks(),
       artificialAnalysis: { liveCodeBench: null },
@@ -53,7 +86,7 @@ describe('summarizeTerminalBench', () => {
     const summaries = summarizeTerminalBench(
       [
         row(),
-        stealth,
+        row({ openrouterId: 'stealth/model', isStealth: true }),
         row({ openrouterId: 'nullable/model', benchmarks: nullable }),
         row({ openrouterId: 'Acme/Custom', benchmarks: benchmarks() }),
         row({ isActive: false }),
@@ -72,6 +105,91 @@ describe('summarizeTerminalBench', () => {
         ['nullable/model', summary],
       ])
     );
+  });
+});
+
+describe('getTerminalBenchSummaries', () => {
+  it('derives the summaries from one snapshot load', async () => {
+    mockSnapshot.mockResolvedValue(
+      snapshot(
+        [row(), row({ openrouterId: 'acme/custom' }), row({ isActive: false })],
+        new Set(['acme/custom'])
+      )
+    );
+
+    expect(await getTerminalBenchSummaries()).toEqual(new Map([['openai/model', summary]]));
+    expect(mockSnapshot).toHaveBeenCalledTimes(1);
+    expect(mockSnapshot).toHaveBeenCalledWith({ fromDb: undefined });
+  });
+
+  it('issues one snapshot load per call, never a load per row', async () => {
+    mockSnapshot.mockResolvedValue(
+      snapshot([
+        row(),
+        row({ openrouterId: 'short/model', benchmarks: benchmarks({ nAttempts: 4 }) }),
+        row({
+          openrouterId: 'uncosted/model',
+          benchmarks: benchmarks({ avgAttemptCostUsd: null }),
+        }),
+      ])
+    );
+
+    const first = await getTerminalBenchSummaries();
+    const second = await getTerminalBenchSummaries();
+
+    expect(first).toEqual(new Map([['openai/model', summary]]));
+    expect(second).toEqual(first);
+    expect(mockSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it('forwards the caller client to the snapshot load', async () => {
+    mockSnapshot.mockResolvedValue(snapshot([row()]));
+    const replica = { select: jest.fn() } as unknown as ModelStatsLoadClient;
+
+    await getTerminalBenchSummaries({ fromDb: replica });
+
+    expect(mockSnapshot.mock.calls).toHaveLength(1);
+    expect(mockSnapshot.mock.calls[0]?.[0]?.fromDb).toBe(replica);
+  });
+
+  it('computes the summaries once per snapshot, not once per call', async () => {
+    const shared = snapshot([row()]);
+    mockSnapshot.mockResolvedValue(shared);
+
+    const first = await getTerminalBenchSummaries();
+    const second = await getTerminalBenchSummaries();
+
+    expect(mockSnapshot).toHaveBeenCalledTimes(2);
+    expect(second).toBe(first);
+    expect(first).toEqual(new Map([['openai/model', summary]]));
+  });
+
+  it('builds a new map for a new snapshot after invalidation', async () => {
+    const before = snapshot([row()]);
+    const after = snapshot([
+      row({
+        openrouterId: 'anthropic/new-model',
+        benchmarks: benchmarks({ avgAttemptCostUsd: 12.5 }),
+      }),
+    ]);
+    mockSnapshot.mockResolvedValueOnce(before).mockResolvedValueOnce(after);
+
+    const first = await getTerminalBenchSummaries();
+    const second = await getTerminalBenchSummaries();
+
+    expect(second).not.toBe(first);
+    expect(first).toEqual(new Map([['openai/model', summary]]));
+    expect(second).toEqual(
+      new Map([
+        ['anthropic/new-model', { overallScore: summary.overallScore, avgAttemptCostUsd: 12.5 }],
+      ])
+    );
+  });
+
+  it('degrades to an empty map when the snapshot load rejects', async () => {
+    mockSnapshot.mockRejectedValue(new Error('snapshot unavailable'));
+
+    await expect(getTerminalBenchSummaries()).resolves.toEqual(new Map());
   });
 });
 

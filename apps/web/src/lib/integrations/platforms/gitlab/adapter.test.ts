@@ -10,7 +10,8 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 import { lookup } from 'dns/promises';
-import { EventEmitter } from 'events';
+import { EventEmitter, getEventListeners } from 'events';
+import { createServer, type Server } from 'http';
 import * as https from 'https';
 import { PassThrough } from 'stream';
 import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
@@ -46,6 +47,7 @@ import {
   updateProjectWebhook,
   fetchMRInlineComments,
   GITLAB_LISTING_TIMEOUT_MS,
+  GITLAB_REQUEST_TIMEOUT_MS,
   GITLAB_ACCESS_LEVELS,
   MAX_GITLAB_LISTING_BYTES,
   MAX_MR_NOTE_BODY_BYTES,
@@ -655,7 +657,7 @@ describe('fetchGitLabProjects', () => {
     }
   });
 
-  it('drops the deadline listener of a request once it settles', async () => {
+  it('keeps the request deadline listener for exactly one request and drops it on settle', async () => {
     mockHttpsRequest.mockImplementationOnce((_options, callback) => {
       const response = new PassThrough() as PassThrough & {
         statusCode?: number;
@@ -681,24 +683,33 @@ describe('fetchGitLabProjects', () => {
       });
       return request as never;
     });
-    const signal = {
-      aborted: false,
-      reason: undefined,
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-    } as unknown as AbortSignal;
+    // The caller signal a paginated read shares across its pages: every request merges its
+    // own deadline into it, so the settled request must leave no listener behind.
+    const caller = new AbortController();
+    const mergedSignals: AbortSignal[] = [];
+    const realAny = AbortSignal.any;
+    const anySpy = jest.spyOn(AbortSignal, 'any').mockImplementation((signals: AbortSignal[]) => {
+      const merged = realAny.call(AbortSignal, signals);
+      mergedSignals.push(merged);
+      return merged;
+    });
 
-    await fetchGitLabBoundToAddress(
-      {
-        url: new URL('https://gitlab.example.com/api/v4/projects'),
-        address: '93.184.216.34',
-        family: 4,
-      },
-      { signal }
-    );
+    try {
+      await fetchGitLabBoundToAddress(
+        {
+          url: new URL('https://gitlab.example.com/api/v4/projects'),
+          address: '93.184.216.34',
+          family: 4,
+        },
+        { signal: caller.signal }
+      );
+    } finally {
+      anySpy.mockRestore();
+    }
 
-    expect(signal.addEventListener).toHaveBeenCalledTimes(1);
-    expect(signal.removeEventListener).toHaveBeenCalledTimes(1);
+    expect(mergedSignals).toHaveLength(1);
+    expect(getEventListeners(caller.signal, 'abort')).toHaveLength(0);
+    expect(getEventListeners(mergedSignals[0], 'abort')).toHaveLength(0);
   });
 
   it('reports an error when a provider signals a huge x-total-pages with full pages', async () => {
@@ -765,6 +776,160 @@ describe('fetchGitLabProjects', () => {
       `GitLab pagination limit exceeded: branch listing returned more than ${MAX_GITLAB_LISTING_BYTES / (1024 * 1024)} MiB`
     );
     expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+});
+
+/**
+ * Every request the address-bound transport sends carries the per-request deadline. These
+ * tests use a real loopback socket because the transport owns the raw `http.request` path
+ * and `AbortSignal.timeout` fires on the platform timer queue, so each test waits on the
+ * promise the transport returns.
+ */
+describe('fetchGitLabBoundToAddress request deadline', () => {
+  /** The shortened deadline these tests substitute for GITLAB_REQUEST_TIMEOUT_MS. */
+  const TEST_DEADLINE_MS = 400;
+  /** Byte spacing of the streaming peer. */
+  const DRIP_INTERVAL_MS = 60;
+
+  let server: Server | undefined;
+  let drip: NodeJS.Timeout | undefined;
+  let bytesWritten = 0;
+
+  afterEach(async () => {
+    if (drip) {
+      clearInterval(drip);
+      drip = undefined;
+    }
+    const closing = server;
+    server = undefined;
+    if (!closing) {
+      return;
+    }
+    const closed = Promise.withResolvers<void>();
+    closing.close(() => closed.resolve());
+    closing.closeAllConnections();
+    await closed.promise;
+  });
+
+  /**
+   * A peer that emits headers and then one byte per interval while keeping the response open.
+   * `firstByte` resolves once the peer has sent part of the body, so a caller aborts after the
+   * response started.
+   */
+  async function startPacedServer(): Promise<{ port: number; firstByte: Promise<void> }> {
+    bytesWritten = 0;
+    const firstByte = Promise.withResolvers<void>();
+    const started = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.write('[');
+      bytesWritten = 1;
+      firstByte.resolve();
+      drip = setInterval(() => {
+        bytesWritten += 1;
+        response.write(' ');
+      }, DRIP_INTERVAL_MS);
+      response.on('close', () => {
+        if (drip) {
+          clearInterval(drip);
+          drip = undefined;
+        }
+      });
+    });
+    server = started;
+    const listening = Promise.withResolvers<void>();
+    started.listen(0, '127.0.0.1', () => listening.resolve());
+    await listening.promise;
+    const address = started.address();
+    if (address === null || typeof address === 'string') {
+      throw new Error('the paced server did not report a port');
+    }
+    return { port: address.port, firstByte: firstByte.promise };
+  }
+
+  /** Records every requested deadline and substitutes a short one for the test. */
+  function shortenDeadline(): { requestedMs: number[]; restore: () => void } {
+    const realTimeout = AbortSignal.timeout;
+    const requestedMs: number[] = [];
+    const spy = jest.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds?: number) => {
+      requestedMs.push(milliseconds ?? 0);
+      return realTimeout.call(AbortSignal, TEST_DEADLINE_MS);
+    });
+    return { requestedMs, restore: () => spy.mockRestore() };
+  }
+
+  /** The rejection the transport produced, or a failure if it resolved a response. */
+  function settleFailure(promise: Promise<Response>): Promise<unknown> {
+    return promise.then(
+      () => {
+        throw new Error('the paced response completed');
+      },
+      (error: unknown) => error
+    );
+  }
+
+  it('ends a paced response at the per-request deadline without a caller signal', async () => {
+    const { port } = await startPacedServer();
+    const { requestedMs, restore } = shortenDeadline();
+    const startedAt = Date.now();
+    try {
+      const failure = await settleFailure(
+        fetchGitLabBoundToAddress({
+          url: new URL(`http://gitlab.example.com:${port}/api/v4/user`),
+          address: '127.0.0.1',
+          family: 4,
+        })
+      );
+
+      expect(requestedMs).toEqual([GITLAB_REQUEST_TIMEOUT_MS]);
+      expect(failure).toBeInstanceOf(DOMException);
+      expect((failure as DOMException).name).toBe('TimeoutError');
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(TEST_DEADLINE_MS - 50);
+      expect(bytesWritten).toBeGreaterThan(1);
+    } finally {
+      restore();
+    }
+  });
+
+  it('keeps the deadline when the caller signal never aborts', async () => {
+    const { port } = await startPacedServer();
+    const { restore } = shortenDeadline();
+    const caller = new AbortController();
+    try {
+      const failure = await settleFailure(
+        fetchGitLabBoundToAddress(
+          {
+            url: new URL(`http://gitlab.example.com:${port}/api/v4/user`),
+            address: '127.0.0.1',
+            family: 4,
+          },
+          { signal: caller.signal }
+        )
+      );
+
+      expect((failure as DOMException).name).toBe('TimeoutError');
+      expect(caller.signal.aborted).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  it('rejects with the caller reason when the caller aborts first', async () => {
+    const { port, firstByte } = await startPacedServer();
+    const caller = new AbortController();
+    const reason = new Error('caller cancelled the read');
+
+    const response = fetchGitLabBoundToAddress(
+      {
+        url: new URL(`http://gitlab.example.com:${port}/api/v4/user`),
+        address: '127.0.0.1',
+        family: 4,
+      },
+      { signal: caller.signal }
+    );
+    await firstByte;
+    caller.abort(reason);
+
+    expect(await settleFailure(response)).toBe(reason);
   });
 });
 

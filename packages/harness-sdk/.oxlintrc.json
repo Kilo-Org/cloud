@@ -99,7 +99,7 @@
       }
     },
     {
-      "files": ["src/index.test.ts"],
+      "files": ["src/index.test.ts", "src/plugins/tools/index.test.ts"],
       "rules": {
         "import/no-namespace": "off"
       }

@@ -115,5 +115,5 @@ export const OpenRouterModelsResponseSchema = z.object({
 
 export type OpenRouterProvider = z.infer<typeof OpenRouterProviderSchema>;
 export type OpenRouterProvidersResponse = z.infer<typeof OpenRouterProvidersResponseSchema>;
-export type OpenRouterModel = z.infer<typeof OpenRouterModelSchema>;
+export type OpenRouterCatalogModel = z.infer<typeof OpenRouterModelSchema>;
 export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSchema>;

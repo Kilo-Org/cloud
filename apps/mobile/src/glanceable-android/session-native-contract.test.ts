@@ -132,6 +132,32 @@ describe('SessionNotifications', () => {
     expect(NOTIFICATIONS).not.toContain('setGroupSummary(true)');
   });
 
+  it('names a session through the shared identity, never through a derived id', () => {
+    // The notification pair and every action record carry the whole session id,
+    // so one session can never take another's card or another's action.
+    const gate = kotlin('ApprovalGate.kt');
+    const identity = kotlin('SessionNotificationIdentity.kt');
+    const post = body(NOTIFICATIONS, 'fun post(');
+    const cancel = body(NOTIFICATIONS, 'fun cancel(');
+    expect(post).toContain('SessionNotificationIdentity.tag(card.sessionId)');
+    expect(post).toContain('SessionNotificationIdentity.NOTIFICATION_ID');
+    expect(cancel).toContain('SessionNotificationIdentity.tag(sessionId)');
+    expect(cancel).toContain('SessionNotificationIdentity.NOTIFICATION_ID');
+    expect(body(NOTIFICATIONS, 'private fun quietIntent(')).toContain(
+      'SessionNotificationIdentity.sessionData(sessionId)'
+    );
+    expect(body(NOTIFICATIONS, 'private fun dismissIntent(')).toContain(
+      'SessionNotificationIdentity.sessionData(sessionId)'
+    );
+    expect(body(gate, 'fun intent(')).toContain(
+      'SessionNotificationIdentity.sessionData(sessionId)'
+    );
+    // Nothing outside the retirement helpers may derive an identity from a hash.
+    expect(identity).toContain('fun legacyNotificationId(');
+    expect(identity).toContain('fun legacyRequestCode(');
+    expect(NOTIFICATIONS).not.toContain('hashCode()');
+  });
+
   it('restores the persisted live card through the same native posting path', () => {
     const restore = body(NOTIFICATIONS, 'fun restore(');
     expect(restore).toContain('getString(KEY_PREFIX + sessionId, null) ?: return');
@@ -140,6 +166,17 @@ describe('SessionNotifications', () => {
     expect(restore).toContain('post(context, SessionNotificationCard()');
     expect(MODULE).toContain('AsyncFunction("restoreSession")');
     expect(MODULE).toContain('SessionNotifications.restore(context, sessionId)');
+  });
+
+  it('retires an earlier card before this post builds its own records', () => {
+    // The retirement acts only on records the earlier build left, so it runs
+    // before the post that builds this session's own records.
+    const post = body(NOTIFICATIONS, 'fun post(');
+    const retirement = post.indexOf('cancelLegacy(context, card.sessionId, card)');
+    const build = post.indexOf('val builder = builder(');
+    expect(retirement).toBeGreaterThan(-1);
+    expect(build).toBeGreaterThan(-1);
+    expect(retirement).toBeLessThan(build);
   });
 
   it('starts restoration even when registration loads after the app became active', () => {

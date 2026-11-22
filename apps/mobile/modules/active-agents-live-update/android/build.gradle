@@ -34,4 +34,6 @@ dependencies {
   // own Kotlin compile classpath. The app's React Gradle plugin puts the
   // runtime copy on the classpath, so compileOnly is enough.
   compileOnly 'com.facebook.react:react-android'
+  // The module's own JVM tests run without a device.
+  testImplementation 'junit:junit:4.13.2'
 }

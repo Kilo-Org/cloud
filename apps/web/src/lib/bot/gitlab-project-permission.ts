@@ -1,9 +1,11 @@
 import 'server-only';
+import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import { isGitLabReconnectRequiredError } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import {
   fetchGitLabProjectAccessLevel,
   GITLAB_ACCESS_LEVELS,
@@ -48,6 +50,18 @@ function isSameProject(left: string, right: string): boolean {
   return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
+/**
+ * Whether a credential failure is temporary: the token service could not answer
+ * now, and the same request can succeed later. The broker reports that case as
+ * `SERVICE_UNAVAILABLE`; a transport failure reaches here untyped. A definitive
+ * refusal — no connection, reconnect required, a rejected request — is not
+ * temporary, so the caller reports it as the access answer.
+ */
+function isGitLabCredentialAvailabilityError(error: unknown): boolean {
+  if (error instanceof TRPCError) return error.code === 'SERVICE_UNAVAILABLE';
+  return !isGitLabReconnectRequiredError(error);
+}
+
 /** The instance URL a GitLab connection stores, defaulting to gitlab.com. */
 function readInstanceUrl(integration: Pick<PlatformIntegration, 'metadata'>): string {
   const { metadata } = integration;
@@ -64,7 +78,9 @@ function readInstanceUrl(integration: Pick<PlatformIntegration, 'metadata'>): st
 /**
  * The requester's own GitLab connection and the credential it stores. A row is
  * usable only when it is healthy: a suspended or reauthorization-required row
- * cannot answer for the account.
+ * cannot answer for the account. A definitive credential refusal is null; an
+ * availability failure propagates, because it is temporary and the caller
+ * answers it with a retry.
  */
 async function requesterGitLabConnection(
   requesterUserId: string
@@ -80,7 +96,8 @@ async function requesterGitLabConnection(
   try {
     const token = await getValidGitLabToken(integration, { userId: requesterUserId });
     return { integration, token };
-  } catch {
+  } catch (error) {
+    if (isGitLabCredentialAvailabilityError(error)) throw error;
     return null;
   }
 }

@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { authorizeGitLabProject as AuthorizeGitLabProject } from './gitlab-project-permission';
@@ -238,6 +239,42 @@ describe('authorizeGitLabProject', () => {
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
   });
 
+  it('refuses with the access answer when the credential is definitively unavailable', async () => {
+    mockGetValidGitLabToken.mockRejectedValue(
+      new TRPCError({ code: 'NOT_FOUND', message: 'GitLab integration not found' })
+    );
+
+    const markdown = refusalMarkdown(
+      await authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    );
+
+    expect(markdown).toContain('GitLab connection in Kilo Code settings');
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it('propagates a temporarily unavailable credential so the caller can offer a retry', async () => {
+    const failure = new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'GitLab credentials are temporarily unavailable',
+    });
+    mockGetValidGitLabToken.mockRejectedValue(failure);
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    ).rejects.toBe(failure);
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+  });
+
   it('refuses a project when the requester has no GitLab connection', async () => {
     mockGetIntegrationForOwner.mockResolvedValue(null);
 
@@ -274,8 +311,10 @@ describe('authorizeGitLabProject', () => {
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
   });
 
-  it('refuses a project when the requester credential cannot be read', async () => {
-    mockGetValidGitLabToken.mockRejectedValue(new Error('credential unavailable'));
+  it('refuses a project when the requester credential is refused', async () => {
+    mockGetValidGitLabToken.mockRejectedValue(
+      new TRPCError({ code: 'UNAUTHORIZED', message: 'GitLab integration must be reconnected' })
+    );
 
     const markdown = refusalMarkdown(
       await authorizeGitLabProject({

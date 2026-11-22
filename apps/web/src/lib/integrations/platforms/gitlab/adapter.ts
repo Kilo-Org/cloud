@@ -302,18 +302,21 @@ export function fetchGitLabBoundToAddress(
   }
 
   const { promise, resolve, reject } = Promise.withResolvers<Response>();
-  const signal = init?.signal;
+  // Every request carries an absolute per-request deadline. A caller signal merges with it,
+  // so whichever settles first ends the request.
+  const requestTimeout = AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS);
+  const signal = init?.signal ? AbortSignal.any([init.signal, requestTimeout]) : requestTimeout;
   const onAbort = (): void => {
-    req.destroy(signal?.reason);
-    fail(signal?.reason);
+    req.destroy(signal.reason);
+    fail(signal.reason);
   };
   /** Settles the request and drops its deadline listener, so one read keeps one listener. */
   const settle = (value: Response): void => {
-    signal?.removeEventListener('abort', onAbort);
+    signal.removeEventListener('abort', onAbort);
     resolve(value);
   };
   const fail = (error: unknown): void => {
-    signal?.removeEventListener('abort', onAbort);
+    signal.removeEventListener('abort', onAbort);
     reject(error);
   };
 
@@ -370,15 +373,13 @@ export function fetchGitLabBoundToAddress(
     req.destroy(new Error('GitLab request timed out'));
   });
 
-  if (signal) {
-    if (signal.aborted) {
-      req.destroy(signal.reason);
-      fail(signal.reason);
-      return promise;
-    }
-
-    signal.addEventListener('abort', onAbort, { once: true });
+  if (signal.aborted) {
+    req.destroy(signal.reason);
+    fail(signal.reason);
+    return promise;
   }
+
+  signal.addEventListener('abort', onAbort, { once: true });
 
   if (body) {
     req.write(body);

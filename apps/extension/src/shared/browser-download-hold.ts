@@ -39,10 +39,16 @@ export interface DownloadStep {
   /** The noun a report tells the model to repeat: `click`, `navigation`. */
   readonly noun: string;
   /**
-   * The origin the gate bound this step's approval under: the sensitive element's or focused field's
-   * own frame origin when the gate classified one, and the call's origin otherwise.
+   * The origin a refusal names for this step: the origin of the call that ran it, which is what the
+   * model's next call is judged against.
    */
   readonly origin: string;
+  /**
+   * The origin the gate bound this step's approval under: the sensitive element's or focused field's
+   * own frame origin when the gate classified one. A file approval issued for this step binds it, so
+   * the retry carries the binding the gate recomputes.
+   */
+  readonly boundOrigin?: string | undefined;
   readonly session: string;
   readonly tabId: number;
   readonly toolName: string;

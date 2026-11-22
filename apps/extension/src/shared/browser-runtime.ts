@@ -2942,7 +2942,7 @@ export const createBrowserRuntime = ({
             ...(file.url === undefined
               ? {}
               : { need: needOfUrl(file.tabId, file.url, context.scope ?? 'page') }),
-            origin: step.origin,
+            origin: step.boundOrigin ?? step.origin,
             reason,
             session: step.session,
             tabId: step.tabId,
@@ -3005,7 +3005,7 @@ export const createBrowserRuntime = ({
             // Approval it holds buys the file this report names.
             element: step.element,
             ...(need === undefined ? {} : { need }),
-            origin: step.origin,
+            origin: step.boundOrigin ?? step.origin,
             reason: SENSITIVE_REASON.download,
             session: step.session,
             tabId: step.tabId,
@@ -3747,8 +3747,11 @@ export const createBrowserRuntime = ({
                 argumentHash: stepHash,
                 ...downloadStepText(stepToolName, stepArgumentsRecord),
                 element: preflight.sensitiveToken?.element,
-                // The origin the gate bound this call's approval under, which is its sensitive element's own frame.
-                origin: preflight.sensitiveToken?.origin ?? preflight.origin,
+                // The refusal names the call's own origin; a file approval binds the origin the gate classified.
+                origin: preflight.origin,
+                ...(preflight.sensitiveToken?.origin === undefined
+                  ? {}
+                  : { boundOrigin: preflight.sensitiveToken.origin }),
                 session: sessionKey,
                 // The tab the step runs on, which for `browser_tabs new` is the tab it opened: the repeat lands there.
                 tabId: runTabId,

@@ -68,6 +68,10 @@ jest.mock('@sentry/nextjs', () => ({
 
 import type { Owner } from '@/lib/integrations/core/types';
 import {
+  INSTALLATION_LOCK_WAIT_MS,
+  INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS,
+} from '@/lib/integrations/oauth/workspace-installation-lock';
+import {
   addDiscordReaction,
   DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
   DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
@@ -417,6 +421,24 @@ describe('discord-service previous guild release', () => {
     expect(lockStatements).toHaveLength(1);
     expect(lockStatements[0]).toContain(`integration-installation:discord:${guildId}`);
     expect(lockStatements[0]).not.toContain('integration-installation-owner');
+  });
+
+  it('bounds the locked section with two budgets that sum below the lock wait', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await releasePreviousDiscordGuild(owner, guildId);
+
+    const statements = mockTxExecute.mock.calls.map(([statement]) => statementText(statement));
+    const statementBudgets = statements.filter(text => text.includes('statement_timeout'));
+    expect(statementBudgets).toHaveLength(1);
+    expect(statementBudgets[0]).toContain(`'${INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS}ms'`);
+    expect(statements.some(text => text.includes("statement_timeout = '30s'"))).toBe(false);
+    expect(
+      statements.some(text => text.includes(`lock_timeout = '${INSTALLATION_LOCK_WAIT_MS}ms'`))
+    ).toBe(true);
+    expect(
+      INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS + DISCORD_RELEASE_REMOVAL_TIMEOUT_MS
+    ).toBeLessThan(INSTALLATION_LOCK_WAIT_MS);
   });
 
   it.each([204, 404])('leaves the server without reporting a %i answer', async status => {

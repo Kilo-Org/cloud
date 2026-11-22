@@ -62,11 +62,11 @@ export class DiscordGuildRebindNotAllowedError extends Error {
 const DISCORD_BOT_REMOVAL_TIMEOUT_MS = 10_000;
 
 /**
- * How long the release of a replaced server may take. The release runs inside
- * the installation lock, whose `lock_timeout` is 5s, so this must stay below it:
- * a request that outlasts the wait would make a concurrent connect abort.
+ * Budget for the release's removal request. It is the external-call half of the
+ * release's locked section, so with the lock's SQL budget it stays below the
+ * lock wait: 2s + 2s < 5s.
  */
-export const DISCORD_RELEASE_REMOVAL_TIMEOUT_MS = 4_000;
+export const DISCORD_RELEASE_REMOVAL_TIMEOUT_MS = 2_000;
 
 /**
  * The message the server puts on a Discord disconnect Discord did not confirm.

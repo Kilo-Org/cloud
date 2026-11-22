@@ -743,6 +743,7 @@
       "manageAccess": "إدارة صلاحيات الوصول",
       "bitbucketNoRepositoriesDescription": "لا توجد مستودعات متاحة في مساحة عمل Bitbucket هذه.",
       "gitlabNoRepositoriesDescription": "قد تحتاج إلى منح صلاحية الوصول إلى مزيد من المجموعات أو المشاريع على GitLab.",
+      "githubNoRepositoriesDescription": "تحقق من صلاحيات وصول تطبيق Kilo على GitHub إلى المستودعات، ثم حدّث القائمة.",
       "installGithubApp": "ثبّت تطبيق GitHub على المستودعات",
       "installGithubAppDescription": "امنح تطبيق Kilo على GitHub صلاحية الوصول إلى المستودعات التي تريد مراجعتها.",
       "repositoryAccess": "الوصول إلى المستودع",

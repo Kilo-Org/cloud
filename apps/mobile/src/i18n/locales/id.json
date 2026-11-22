@@ -735,6 +735,7 @@
       "manageAccess": "Kelola akses",
       "bitbucketNoRepositoriesDescription": "Tidak ada repositori yang tersedia di ruang kerja Bitbucket ini.",
       "gitlabNoRepositoriesDescription": "Kamu mungkin perlu memberikan akses ke lebih banyak grup atau proyek di GitLab.",
+      "githubNoRepositoriesDescription": "Periksa akses repositori untuk aplikasi Kilo di GitHub, lalu muat ulang.",
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
       "repositoryAccess": "akses repositori",

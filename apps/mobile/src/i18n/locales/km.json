@@ -1296,6 +1296,7 @@
       "manageAccess": "គ្រប់គ្រងសិទ្ធិចូលប្រើ",
       "bitbucketNoRepositoriesDescription": "គ្មានឃ្លាំងកូដដែលអាចប្រើបានក្នុងកន្លែងធ្វើការ Bitbucket នេះទេ។",
       "gitlabNoRepositoriesDescription": "អ្នកប្រហែលជាត្រូវផ្តល់សិទ្ធិចូលប្រើក្រុម ឬគម្រោងបន្ថែមនៅលើ GitLab។",
+      "githubNoRepositoriesDescription": "ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដរបស់កម្មវិធី Kilo សម្រាប់ GitHub រួចផ្ទុកបញ្ជីឡើងវិញ។",
       "installGithubApp": "ដំឡើងកម្មវិធី GitHub សម្រាប់ឃ្លាំងកូដ",
       "installGithubAppDescription": "ផ្តល់សិទ្ធិឱ្យកម្មវិធី GitHub របស់ Kilo ចូលប្រើឃ្លាំងកូដដែលអ្នកចង់ឱ្យត្រួតពិនិត្យ។",
       "repositoryAccess": "សិទ្ធិចូលប្រើឃ្លាំងកូដ",

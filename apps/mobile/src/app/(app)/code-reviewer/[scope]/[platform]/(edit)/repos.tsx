@@ -103,7 +103,15 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       ? classifyBitbucketConnection({ readiness: bitbucketReadiness, status: bitbucketStatus })
       : null;
   const statusFailure = bitbucketConnection?.kind === 'error' ? bitbucketConnection : null;
-  const reposLoading = reposQuery.isLoading || bitbucketConnection?.kind === 'loading';
+  // A paused read (offline with no cache) is pending while it fetches nothing, so
+  // `isLoading` is false while the list has no answer yet. The query's own
+  // `isPending` covers both: an unanswered list is not an empty one, so the empty
+  // state and its copy wait for the answer, exactly as the new-session picker
+  // keeps that shape on its loading state. Bitbucket resolves the same window
+  // through its own connection classification below.
+  const reposLoading =
+    (platform === 'bitbucket' ? reposQuery.isLoading : reposQuery.isPending) ||
+    bitbucketConnection?.kind === 'loading';
   const reposError = reposQuery.isError;
   const reposFetching = reposQuery.isFetching || statusFailure?.isRetrying === true;
   const refetchRepos = () => void reposQuery.refetch();
@@ -128,9 +136,10 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   // Without the GitHub app the account can review nothing, so the two modes
   // differ only in a setting nobody can act on: their picker above an install
   // prompt offers a choice that changes nothing. The prompt owns the body, as
-  // it does for the other platforms' empty surfaces.
-  const githubAppMissing =
-    platform === 'github' && githubRepos.data?.integrationInstalled === false;
+  // it does for the other platforms' empty surfaces. The same status decides
+  // the empty copy: only a confirmed missing app asks to install.
+  const githubIntegrationInstalled = githubRepos.data?.integrationInstalled;
+  const githubAppMissing = platform === 'github' && githubIntegrationInstalled === false;
   const { manageAccess, resync, resyncing } = useRepositoryAccessSync(scope, platform);
   // Bitbucket has no provider sync to force, so its pull re-reads the snapshot.
   const refreshing = platform === 'bitbucket' ? reposFetching : resyncing;
@@ -150,7 +159,9 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         time: timeAgo(parseTimestamp(syncedAt), undefined, now),
       })
     : null;
-  const emptyStateCopy = repositoryEmptyCopy(platform, t);
+  const emptyStateCopy = repositoryEmptyCopy(platform, t, {
+    githubAppInstalled: githubIntegrationInstalled,
+  });
 
   const setMode = (nextMode: 'all' | 'selected') => {
     save.mutate({ repositorySelectionMode: nextMode });

@@ -739,6 +739,7 @@
       "manageAccess": "Настроить доступ",
       "bitbucketNoRepositoriesDescription": "В этом рабочем пространстве Bitbucket нет доступных репозиториев.",
       "gitlabNoRepositoriesDescription": "Возможно, нужно предоставить доступ к дополнительным группам или проектам в GitLab.",
+      "githubNoRepositoriesDescription": "Проверьте доступ приложения Kilo к репозиториям GitHub и обновите список.",
       "installGithubApp": "Установка приложения GitHub для репозиториев",
       "installGithubAppDescription": "Предоставьте приложению Kilo для GitHub доступ к репозиториям, которые нужно проверять.",
       "repositoryAccess": "доступ к репозиторию",

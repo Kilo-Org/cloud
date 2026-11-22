@@ -735,6 +735,7 @@
       "manageAccess": "पहुँच प्रबंधित करें",
       "bitbucketNoRepositoriesDescription": "इस Bitbucket वर्कस्पेस में कोई रिपॉज़िटरी उपलब्ध नहीं है।",
       "gitlabNoRepositoriesDescription": "आपको GitLab पर और समूहों या प्रोजेक्ट तक पहुँच देने की ज़रूरत हो सकती है।",
+      "githubNoRepositoriesDescription": "जाँचें कि Kilo GitHub ऐप को रिपॉज़िटरी की पहुँच मिली है, फिर रीफ़्रेश करें।",
       "installGithubApp": "रिपॉज़िटरी पर GitHub ऐप इंस्टॉल करें",
       "installGithubAppDescription": "जिन रिपॉज़िटरी की समीक्षा करानी है, उन तक Kilo GitHub ऐप को पहुँच दें।",
       "repositoryAccess": "रिपॉज़िटरी तक पहुँच",

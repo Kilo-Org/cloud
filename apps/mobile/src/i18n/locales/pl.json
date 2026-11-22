@@ -739,6 +739,7 @@
       "manageAccess": "Zarządzaj dostępem",
       "bitbucketNoRepositoriesDescription": "W tym obszarze roboczym Bitbucket nie ma dostępnych repozytoriów.",
       "gitlabNoRepositoriesDescription": "Może być konieczne przyznanie dostępu do większej liczby grup lub projektów w serwisie GitLab.",
+      "githubNoRepositoriesDescription": "Sprawdź, czy aplikacja Kilo w GitHub ma do nich dostęp, a następnie odśwież listę.",
       "installGithubApp": "Zainstaluj aplikację GitHub dla repozytoriów",
       "installGithubAppDescription": "Przyznaj aplikacji Kilo w serwisie GitHub dostęp do repozytoriów, które chcesz poddać przeglądowi.",
       "repositoryAccess": "dostęp do repozytorium",

@@ -1296,6 +1296,7 @@
       "manageAccess": "Hozzáférés kezelése",
       "bitbucketNoRepositoriesDescription": "Ebben a Bitbucket-munkaterületben nem érhetők el kódtárak.",
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
+      "githubNoRepositoriesDescription": "Ellenőrizd, hogy a Kilo GitHub-alkalmazás hozzáfér-e az adattárakhoz, majd frissítsd a listát.",
       "installGithubApp": "GitHub-alkalmazás telepítése a kódtárakhoz",
       "installGithubAppDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az ellenőrizni kívánt kódtárakhoz.",
       "repositoryAccess": "hozzáférés a kódtárakhoz",

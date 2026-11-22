@@ -735,6 +735,7 @@
       "manageAccess": "접근 권한 관리",
       "bitbucketNoRepositoriesDescription": "이 Bitbucket 작업 영역에 사용 가능한 저장소가 없습니다.",
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
+      "githubNoRepositoriesDescription": "Kilo GitHub 앱의 저장소 접근 권한을 확인한 후 새로고침하세요.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
       "repositoryAccess": "저장소 접근 권한",

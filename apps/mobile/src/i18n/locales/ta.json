@@ -1296,6 +1296,7 @@
       "manageAccess": "அணுகலை நிர்வகிக்கவும்",
       "bitbucketNoRepositoriesDescription": "இந்த Bitbucket பணியிடத்தில் களஞ்சியங்கள் எதுவும் இல்லை.",
       "gitlabNoRepositoriesDescription": "GitLab-இல் கூடுதல் குழுக்கள் அல்லது திட்டங்களை அணுக அனுமதி வழங்க வேண்டியிருக்கலாம்.",
+      "githubNoRepositoriesDescription": "Kilo GitHub செயலிக்குக் களஞ்சியங்களை அணுக அனுமதி உள்ளதா எனச் சரிபார்த்துப் புதுப்பிக்கவும்.",
       "installGithubApp": "களஞ்சியங்களில் GitHub செயலியை நிறுவவும்",
       "installGithubAppDescription": "மதிப்பாய்வு செய்ய வேண்டிய களஞ்சியங்களை அணுக Kilo GitHub செயலிக்கு அனுமதி வழங்கவும்.",
       "repositoryAccess": "களஞ்சிய அணுகல்",

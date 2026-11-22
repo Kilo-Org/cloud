@@ -1296,6 +1296,7 @@
       "manageAccess": "पहुँच व्यवस्थापन गर्नुहोस्",
       "bitbucketNoRepositoriesDescription": "यो Bitbucket वर्कस्पेसमा कुनै रिपोजिटरी उपलब्ध छैन।",
       "gitlabNoRepositoriesDescription": "तपाईंले GitLab मा थप समूह वा परियोजनाहरूमा पहुँच दिनुपर्ने हुन सक्छ।",
+      "githubNoRepositoriesDescription": "Kilo GitHub एपलाई रिपोजिटरीमा पहुँच छ कि छैन जाँचेर सूची ताजा गर्नुहोस्।",
       "installGithubApp": "रिपोजिटरीहरूमा GitHub एप स्थापना गर्नुहोस्",
       "installGithubAppDescription": "तपाईंले समीक्षा गराउन चाहेका रिपोजिटरीहरूमा Kilo GitHub एपलाई पहुँच दिनुहोस्।",
       "repositoryAccess": "रिपोजिटरीको पहुँच",

@@ -1296,6 +1296,7 @@
       "manageAccess": "Hantera åtkomst",
       "bitbucketNoRepositoriesDescription": "Inga kodarkiv är tillgängliga i den här Bitbucket-arbetsytan.",
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
+      "githubNoRepositoriesDescription": "Kontrollera vilka kodarkiv Kilos GitHub-app har åtkomst till och uppdatera sedan listan.",
       "installGithubApp": "Installera GitHub-appen på kodarkiv",
       "installGithubAppDescription": "Ge Kilos GitHub-app åtkomst till de kodarkiv du vill få granskade.",
       "repositoryAccess": "åtkomst till kodarkiv",

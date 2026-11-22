@@ -1296,6 +1296,7 @@
       "manageAccess": "رسائی کا انتظام کریں",
       "bitbucketNoRepositoriesDescription": "اس Bitbucket ورک اسپیس میں کوئی ریپوزٹری دستیاب نہیں ہے۔",
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
+      "githubNoRepositoriesDescription": "چیک کریں کہ Kilo کی GitHub ایپ کو ریپوزٹریوں تک رسائی حاصل ہے، پھر فہرست تازہ کریں۔",
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo کی GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ کروانا چاہتے ہیں۔",
       "repositoryAccess": "ریپوزٹری تک رسائی",

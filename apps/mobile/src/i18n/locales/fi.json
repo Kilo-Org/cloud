@@ -1296,6 +1296,7 @@
       "manageAccess": "Hallinnoi käyttöoikeuksia",
       "bitbucketNoRepositoriesDescription": "Tässä Bitbucket-työtilassa ei ole saatavilla koodivarastoja.",
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
+      "githubNoRepositoriesDescription": "Tarkista Kilon GitHub-sovelluksen käyttöoikeudet koodivarastoihin ja päivitä sitten luettelo.",
       "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
       "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
       "repositoryAccess": "koodivaraston käyttöoikeus",

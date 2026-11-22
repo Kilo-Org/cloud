@@ -735,6 +735,7 @@
       "manageAccess": "管理存取權限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作區中沒有可用的存放庫。",
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
+      "githubNoRepositoriesDescription": "請檢查 Kilo GitHub 應用程式的儲存庫存取權限，再重新整理。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
       "repositoryAccess": "存放庫存取權限",

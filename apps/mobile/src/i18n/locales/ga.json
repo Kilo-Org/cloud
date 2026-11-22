@@ -1380,6 +1380,7 @@
       "manageAccess": "Bainistigh rochtain",
       "bitbucketNoRepositoriesDescription": "Níl aon stór ar fáil sa spás oibre Bitbucket seo.",
       "gitlabNoRepositoriesDescription": "Seans go mbeidh ort rochtain ar thuilleadh grúpaí nó tionscadal a thabhairt ar GitLab.",
+      "githubNoRepositoriesDescription": "Seiceáil an rochtain atá ag aip GitHub Kilo ar na stórtha, ansin athnuaigh an liosta.",
       "installGithubApp": "Suiteáil an aip GitHub ar stórtha",
       "installGithubAppDescription": "Tabhair rochtain d'aip GitHub Kilo ar na stórtha ar mhaith leat go ndéanfaí athbhreithniú orthu.",
       "repositoryAccess": "rochtain ar stórtha",

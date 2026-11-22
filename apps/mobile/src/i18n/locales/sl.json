@@ -1352,6 +1352,7 @@
       "manageAccess": "Upravljaj dostop",
       "bitbucketNoRepositoriesDescription": "V tem delovnem prostoru Bitbucket ni na voljo nobenega skladišča.",
       "gitlabNoRepositoriesDescription": "Morda moraš odobriti dostop do več skupin ali projektov na platformi GitLab.",
+      "githubNoRepositoriesDescription": "Preveri, ali ima aplikacija Kilo za GitHub dostop do skladišč, nato osveži seznam.",
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
       "repositoryAccess": "dostop do skladišč",

@@ -1296,6 +1296,7 @@
       "manageAccess": "Hayyama bulchi",
       "bitbucketNoRepositoriesDescription": "Iddoo hojii Bitbucket kana keessatti kuusaawwan koodii hin argaman.",
       "gitlabNoRepositoriesDescription": "GitLab irratti gareewwan ykn pirojektoota dabalataa argachuuf hayyama kennuun si barbaachisuu danda'a.",
+      "githubNoRepositoriesDescription": "Hayyama appilikeeshinii Kilo GitHub kuusaa koodii bira ga'uuf qabu ilaaliitii haaromsi.",
       "installGithubApp": "Aplikeeshinii GitHub kuusaawwan koodii irratti fe'i",
       "installGithubAppDescription": "Aplikeeshinii GitHub kan Kilo kuusaawwan koodii akka sakatta'aman barbaaddu argachuuf hayyama kenniif.",
       "repositoryAccess": "hayyama kuusaa koodii",

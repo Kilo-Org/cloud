@@ -1296,6 +1296,7 @@
       "manageAccess": "Jikwaa ikike ịnweta",
       "bitbucketNoRepositoriesDescription": "Enweghị ebe nchekwa dị na oghere ọrụ Bitbucket a.",
       "gitlabNoRepositoriesDescription": "O nwere ike ịdị mkpa inye ikike ịnweta otu ma ọ bụ ọrụ ndị ọzọ na GitLab.",
+      "githubNoRepositoriesDescription": "Lelee ikike ngwa Kilo GitHub nwere ịbanye na ha, wee bugharịa.",
       "installGithubApp": "Wụnye ngwa GitHub",
       "installGithubAppDescription": "Nye ngwa Kilo maka GitHub ikike ịnweta ebe nchekwa ịchọrọ ka a nyochaa.",
       "repositoryAccess": "ikike ịnweta ebe nchekwa",

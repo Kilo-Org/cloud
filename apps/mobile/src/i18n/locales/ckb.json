@@ -1296,6 +1296,7 @@
       "manageAccess": "دەستگەیشتن بەڕێوە ببە",
       "bitbucketNoRepositoriesDescription": "هیچ کۆگایەک لەم بۆشاییەی کار لە Bitbucket بەردەست نییە.",
       "gitlabNoRepositoriesDescription": "ڕەنگە پێویست بکات مۆڵەتی دەستگەیشتن بە گرووپ یان پڕۆژەی زیاتر لە GitLab بدەیت.",
+      "githubNoRepositoriesDescription": "مۆڵەتی دەستگەیشتنی ئەپی Kilo لە GitHub بە کۆگاکان بپشکنە، پاشان لیستەکە نوێ بکەرەوە.",
       "installGithubApp": "ئەپی GitHub لەسەر کۆگاکان دابمەزرێنە",
       "installGithubAppDescription": "مۆڵەت بدە بە ئەپی Kilo لە GitHub بگاتە ئەو کۆگایانەی دەتەوێت پێداچوونەوەیان بۆ بکرێت.",
       "repositoryAccess": "دەستگەیشتن بە کۆگا",

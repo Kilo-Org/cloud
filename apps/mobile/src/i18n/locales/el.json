@@ -1296,6 +1296,7 @@
       "manageAccess": "Διαχείριση πρόσβασης",
       "bitbucketNoRepositoriesDescription": "Δεν υπάρχουν διαθέσιμα αποθετήρια σε αυτόν τον χώρο εργασίας του Bitbucket.",
       "gitlabNoRepositoriesDescription": "Ίσως χρειαστεί να δώσεις πρόσβαση σε περισσότερες ομάδες ή έργα στο GitLab.",
+      "githubNoRepositoriesDescription": "Έλεγξε αν η εφαρμογή Kilo στο GitHub έχει πρόσβαση στα αποθετήρια και μετά ανανέωσε τη λίστα.",
       "installGithubApp": "Εγκατάσταση της εφαρμογής GitHub σε αποθετήρια",
       "installGithubAppDescription": "Δώσε στην εφαρμογή Kilo για το GitHub πρόσβαση στα αποθετήρια που θέλεις να ελέγχονται.",
       "repositoryAccess": "πρόσβαση σε αποθετήρια",

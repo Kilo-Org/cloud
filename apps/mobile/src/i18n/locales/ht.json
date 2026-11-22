@@ -1296,6 +1296,7 @@
       "manageAccess": "Jere aksè",
       "bitbucketNoRepositoriesDescription": "Pa gen depo ki disponib nan espas travay Bitbucket sa a.",
       "gitlabNoRepositoriesDescription": "Ou ka bezwen bay aksè nan plis gwoup oswa pwojè sou GitLab.",
+      "githubNoRepositoriesDescription": "Tcheke si aplikasyon Kilo pou GitHub la gen aksè nan depo yo, epi rafrechi lis la.",
       "installGithubApp": "Enstale aplikasyon GitHub la sou depo yo",
       "installGithubAppDescription": "Bay aplikasyon GitHub Kilo a aksè nan depo ou vle fè revize yo.",
       "repositoryAccess": "aksè nan depo yo",

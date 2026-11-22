@@ -1296,6 +1296,7 @@
       "manageAccess": "წვდომის მართვა",
       "bitbucketNoRepositoriesDescription": "Bitbucket-ის ამ სამუშაო სივრცეში ხელმისაწვდომი რეპოზიტორები არ არის.",
       "gitlabNoRepositoriesDescription": "შესაძლოა საჭირო იყოს GitLab-ზე დამატებით ჯგუფებსა და პროექტებზე წვდომის მინიჭება.",
+      "githubNoRepositoriesDescription": "შეამოწმეთ, აქვს თუ არა Kilo-ს GitHub აპს რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
       "installGithubApp": "GitHub აპის დაყენება რეპოზიტორებზე",
       "installGithubAppDescription": "მიანიჭე Kilo-ს GitHub აპს წვდომა იმ რეპოზიტორებზე, რომელთა შემოწმებაც გსურს.",
       "repositoryAccess": "რეპოზიტორზე წვდომა",

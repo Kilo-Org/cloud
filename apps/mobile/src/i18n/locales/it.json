@@ -704,6 +704,7 @@
       "manageAccess": "Gestisci l'accesso",
       "bitbucketNoRepositoriesDescription": "Non ci sono repository disponibili in questa area di lavoro di Bitbucket.",
       "gitlabNoRepositoriesDescription": "Potresti dover concedere l'accesso a più gruppi o progetti su GitLab.",
+      "githubNoRepositoriesDescription": "Controlla le autorizzazioni di accesso ai repository dell'app Kilo per GitHub, poi aggiorna l'elenco.",
       "installGithubApp": "Installa l'app GitHub sui repository",
       "installGithubAppDescription": "Concedi all'app GitHub di Kilo l'accesso ai repository che vuoi far esaminare.",
       "repositoryAccess": "accesso al repository",

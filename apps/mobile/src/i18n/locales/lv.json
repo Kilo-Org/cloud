@@ -1324,6 +1324,7 @@
       "manageAccess": "Pārvaldīt piekļuvi",
       "bitbucketNoRepositoriesDescription": "Šajā Bitbucket darbvietā nav pieejamu repozitoriju.",
       "gitlabNoRepositoriesDescription": "Iespējams, tev jāpiešķir piekļuve papildu grupām vai projektiem pakalpojumā GitLab.",
+      "githubNoRepositoriesDescription": "Pārbaudi Kilo GitHub lietotnes piekļuvi repozitorijiem, pēc tam atsvaidzini sarakstu.",
       "installGithubApp": "Instalē GitHub lietotni repozitorijos",
       "installGithubAppDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem, kuru kodu vēlies pārskatīt.",
       "repositoryAccess": "piekļuve repozitorijiem",

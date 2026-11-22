@@ -1408,6 +1408,7 @@
       "manageAccess": "Rheoli mynediad",
       "bitbucketNoRepositoriesDescription": "Nid oes unrhyw ystorfeydd ar gael yn y gweithle Bitbucket hwn.",
       "gitlabNoRepositoriesDescription": "Efallai y bydd angen i chi ganiatáu mynediad i fwy o grwpiau neu brosiectau ar GitLab.",
+      "githubNoRepositoriesDescription": "Gwiriwch fod gan ap GitHub Kilo fynediad i'r ystorfeydd, yna adnewyddwch.",
       "installGithubApp": "Gosod yr ap GitHub ar ystorfeydd",
       "installGithubAppDescription": "Rhowch fynediad i ap GitHub Kilo at yr ystorfeydd rydych am eu hadolygu.",
       "repositoryAccess": "mynediad i ystorfa",

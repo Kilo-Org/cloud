@@ -1296,6 +1296,7 @@
       "manageAccess": "അനുമതികൾ നിയന്ത്രിക്കുക",
       "bitbucketNoRepositoriesDescription": "ഈ Bitbucket വർക്ക്സ്പെയ്സിൽ റിപ്പോസിറ്ററികൾ ലഭ്യമല്ല.",
       "gitlabNoRepositoriesDescription": "GitLab-ൽ കൂടുതൽ ഗ്രൂപ്പുകളോ പ്രോജക്റ്റുകളോ ഉപയോഗിക്കാൻ അനുമതി നൽകേണ്ടിവന്നേക്കാം.",
+      "githubNoRepositoriesDescription": "Kilo GitHub ആപ്പിന് റിപ്പോസിറ്ററികൾ ഉപയോഗിക്കാനുള്ള അനുമതിയുണ്ടെന്ന് ഉറപ്പാക്കി പട്ടിക പുതുക്കുക.",
       "installGithubApp": "റിപ്പോസിറ്ററികളിൽ GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
       "installGithubAppDescription": "അവലോകനം ചെയ്യേണ്ട റിപ്പോസിറ്ററികൾ ഉപയോഗിക്കാൻ Kilo GitHub ആപ്പിന് അനുമതി നൽകുക.",
       "repositoryAccess": "റിപ്പോസിറ്ററി ഉപയോഗിക്കാനുള്ള അനുമതി",

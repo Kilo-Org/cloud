@@ -1324,6 +1324,7 @@
       "manageAccess": "Gestionează accesul",
       "bitbucketNoRepositoriesDescription": "Niciun depozit nu este disponibil în acest spațiu de lucru Bitbucket.",
       "gitlabNoRepositoriesDescription": "S-ar putea să fie nevoie să acorzi acces la mai multe grupuri sau proiecte pe GitLab.",
+      "githubNoRepositoriesDescription": "Verifică accesul aplicației Kilo pentru GitHub la depozite, apoi reîmprospătează lista.",
       "installGithubApp": "Instalează aplicația GitHub pe depozite",
       "installGithubAppDescription": "Acordă aplicației Kilo pentru GitHub acces la depozitele pe care vrei să le revizuiască.",
       "repositoryAccess": "acces la depozit",

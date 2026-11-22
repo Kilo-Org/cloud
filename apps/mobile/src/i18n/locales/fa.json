@@ -1296,6 +1296,7 @@
       "manageAccess": "مدیریت دسترسی",
       "bitbucketNoRepositoriesDescription": "در این فضای کاری Bitbucket مخزنی در دسترس نیست.",
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
+      "githubNoRepositoriesDescription": "دسترسی برنامهٔ Kilo در GitHub به مخزن‌ها را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
       "installGithubApp": "برنامه GitHub را روی مخازن نصب کنید",
       "installGithubAppDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازنی را بدهید که می‌خواهید بررسی شوند.",
       "repositoryAccess": "دسترسی به مخزن",

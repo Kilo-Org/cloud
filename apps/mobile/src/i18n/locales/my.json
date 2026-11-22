@@ -1296,6 +1296,7 @@
       "manageAccess": "ဝင်ရောက်ခွင့်ကို စီမံရန်",
       "bitbucketNoRepositoriesDescription": "ဤ Bitbucket လုပ်ငန်းခွင်တွင် အသုံးပြုနိုင်သော ကုဒ်သိုလှောင်ရာ မရှိပါ။",
       "gitlabNoRepositoriesDescription": "GitLab ရှိ နောက်ထပ်အဖွဲ့များ သို့မဟုတ် ပရောဂျက်များသို့ ဝင်ရောက်ခွင့်ပေးရန် လိုအပ်နိုင်သည်။",
+      "githubNoRepositoriesDescription": "Kilo GitHub အက်ပ်၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
       "installGithubApp": "ကုဒ်သိုလှောင်ရာများတွင် GitHub အက်ပ်ကို ထည့်သွင်းပါ",
       "installGithubAppDescription": "စစ်ဆေးစေလိုသော ကုဒ်သိုလှောင်ရာများသို့ Kilo GitHub အက်ပ်ကို ဝင်ရောက်ခွင့်ပေးပါ။",
       "repositoryAccess": "ကုဒ်သိုလှောင်ရာ ဝင်ရောက်ခွင့်",

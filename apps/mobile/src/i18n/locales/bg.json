@@ -1296,6 +1296,7 @@
       "manageAccess": "Управлявай достъпа",
       "bitbucketNoRepositoriesDescription": "Няма налични хранилища в това работно пространство на Bitbucket.",
       "gitlabNoRepositoriesDescription": "Може да се наложи да предоставиш достъп до повече групи или проекти в GitLab.",
+      "githubNoRepositoriesDescription": "Провери достъпа на приложението Kilo за GitHub до хранилищата, след което опресни списъка.",
       "installGithubApp": "Инсталирай приложението за GitHub в хранилищата",
       "installGithubAppDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата, които искаш да бъдат преглеждани.",
       "repositoryAccess": "достъп до хранилища",

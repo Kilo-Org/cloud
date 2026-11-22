@@ -1296,6 +1296,7 @@
       "manageAccess": "অ্যাক্সেস পরিচালনা করুন",
       "bitbucketNoRepositoriesDescription": "এই Bitbucket ওয়ার্কস্পেসে কোনো রিপোজিটরি নেই।",
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
+      "githubNoRepositoriesDescription": "Kilo GitHub অ্যাপের রিপোজিটরি অ্যাক্সেসের অনুমতি পরীক্ষা করে রিফ্রেশ করুন।",
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
       "repositoryAccess": "রিপোজিটরির অ্যাক্সেস",

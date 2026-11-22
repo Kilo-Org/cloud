@@ -1296,6 +1296,7 @@
       "manageAccess": "Halda juurdepääsu",
       "bitbucketNoRepositoriesDescription": "Selles Bitbucketi tööruumis pole hoidlaid saadaval.",
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
+      "githubNoRepositoriesDescription": "Kontrolli, kas Kilo GitHubi rakendusel on hoidlatele juurdepääs, ja värskenda seejärel loendit.",
       "installGithubApp": "GitHubi rakenduse paigaldamine",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
       "repositoryAccess": "juurdepääs hoidlatele",

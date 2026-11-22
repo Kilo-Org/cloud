@@ -4093,6 +4093,7 @@
         "network": "Niðurhalið kláraðist ekki. Athugaðu tenginguna þína og reyndu aftur.",
         "invalidFile": "Niðurhalaða skráin er ekki líkan sem þetta forrit getur keyrt, svo henni var eytt.",
         "checksum": "Niðurhalaða skráin passar ekki við uppgefna gátsummu sína, svo henni var eytt. Reyndu að hlaða henni niður aftur.",
+        "unreadable": "Þetta tæki gat ekki athugað niðurhaluðu skrána, svo henni var eytt. Reyndu að hlaða henni niður aftur.",
         "writeFailed": "Þetta tæki gat ekki vistað líkanið. Reyndu að hlaða því niður aftur."
       }
     },

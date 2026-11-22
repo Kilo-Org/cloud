@@ -4093,6 +4093,7 @@
         "network": "Gbígbà sílẹ̀ kò parí. Yẹ ìsopọ̀ rẹ wò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
         "invalidFile": "Fáìlì tí a gbà sílẹ̀ kì í ṣe awoṣe tí app yìí lè ṣiṣẹ́, nítorí náà a yọ ọ́ kúrò.",
         "checksum": "Fáìlì tí a gbà sílẹ̀ kò bá checksum rẹ̀ tí a tẹ̀ jáde mu, nítorí náà a yọ ọ́ kúrò. Tún gbìyànjú láti gbà á sílẹ̀.",
+        "unreadable": "Ẹ̀rọ yìí kò lè yẹ fáìlì tí a gbà sílẹ̀ wò, nítorí náà a yọ ọ́ kúrò. Tún gbìyànjú láti gbà á sílẹ̀.",
         "writeFailed": "Ẹ̀rọ yìí kò lè fipamọ́ awoṣe náà. Tún gbìyànjú láti gbà á sílẹ̀."
       }
     },

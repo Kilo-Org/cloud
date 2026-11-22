@@ -4167,6 +4167,7 @@
         "network": "Preuzimanje nije završeno. Proverite vezu i pokušajte ponovo.",
         "invalidFile": "Preuzeti fajl nije model koji ova aplikacija može da pokrene, pa je uklonjen.",
         "checksum": "Preuzeti fajl se ne poklapa sa objavljenom kontrolnom sumom, pa je uklonjen. Pokušajte ponovo da ga preuzmete.",
+        "unreadable": "Ovaj uređaj nije mogao da proveri preuzeti fajl, pa je uklonjen. Pokušajte ponovo da ga preuzmete.",
         "writeFailed": "Ovaj uređaj nije mogao da sačuva model. Pokušajte ponovo da ga preuzmete."
       }
     },

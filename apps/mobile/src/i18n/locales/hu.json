@@ -4093,6 +4093,7 @@
         "network": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot, és próbálja újra.",
         "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk.",
         "checksum": "A letöltött fájl nem egyezik a közzétett ellenőrzőösszegével, ezért eltávolítottuk. Próbálja meg újra a letöltést.",
+        "unreadable": "Ez az eszköz nem tudta ellenőrizni a letöltött fájlt, ezért eltávolítottuk. Próbálja meg újra a letöltést.",
         "writeFailed": "Ez az eszköz nem tudta elmenteni a modellt. Próbálja meg újra a letöltést."
       }
     },

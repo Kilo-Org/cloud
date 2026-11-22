@@ -4093,6 +4093,7 @@
         "network": "İndirme tamamlanamadı. Bağlantınızı denetleyip yeniden deneyin.",
         "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı.",
         "checksum": "İndirilen dosya yayımlanan sağlama toplamıyla eşleşmiyor, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin.",
+        "unreadable": "Bu cihaz indirilen dosyayı denetleyemedi, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin.",
         "writeFailed": "Bu cihaz modeli kaydedemedi. İndirmeyi yeniden deneyin."
       }
     },

@@ -4167,6 +4167,7 @@
         "network": "Le téléchargement ne s'est pas terminé. Vérifiez votre connexion et réessayez.",
         "invalidFile": "Le fichier téléchargé n'est pas un modèle que cette application peut exécuter ; il a donc été supprimé.",
         "checksum": "Le fichier téléchargé ne correspond pas à sa somme de contrôle publiée ; il a donc été supprimé. Réessayez le téléchargement.",
+        "unreadable": "Cet appareil n'a pas pu vérifier le fichier téléchargé ; il a donc été supprimé. Réessayez le téléchargement.",
         "writeFailed": "Cet appareil n'a pas pu enregistrer le modèle. Réessayez le téléchargement."
       }
     },

@@ -1,8 +1,10 @@
 import {
   type GgufDownloadProblem,
   type GgufInspect,
+  type GgufInspection,
   type GgufModelRecord,
   type GgufStorage,
+  type Settled,
 } from './gguf-records';
 import { type GgufTransfer, moveIntoPlace, PASSES, readVerified } from './gguf-transfers';
 
@@ -13,7 +15,7 @@ import { type GgufTransfer, moveIntoPlace, PASSES, readVerified } from './gguf-t
  */
 type GgufVerificationProblem = Extract<
   GgufDownloadProblem,
-  'checksum' | 'invalidFile' | 'writeFailed'
+  'checksum' | 'unreadable' | 'invalidFile' | 'writeFailed'
 >;
 
 export type GgufVerification =
@@ -31,6 +33,10 @@ export type GgufVerification =
  * The move that follows has three outcomes: a file in place ends the check with
  * the model's record, a move the device refused is `writeFailed`, and a file
  * that is neither partial nor in place is `invalidFile`.
+ *
+ * A read refused on the last pass ends the check with the refusal it was: a hash
+ * the device would not compute is `unreadable`, which says nothing about the
+ * bytes, and a load it refused is `invalidFile`.
  */
 export async function verifyModel(
   storage: GgufStorage,
@@ -48,19 +54,21 @@ export async function verifyModel(
   if (model === undefined) {
     return { ok: false, problem: 'invalidFile' };
   }
+  /** The last pass's answer, which decides what the final refusal reports. */
+  let last: Settled<GgufInspection> | 'unreadable' = { ok: false };
   for (let pass = 0; pass < PASSES; pass += 1) {
     // eslint-disable-next-line no-await-in-loop -- one file at a time bounds memory and CPU
     const read = await readVerified(storage, inspect, transfers);
     if (read === 'checksum') {
       return { ok: false, problem: 'checksum' };
     }
-    // A refused read is the one transient answer the second pass is for. A
-    // projector that reads no images cannot change between passes, so it ends
-    // verification here instead of hashing and loading the model again.
-    if (read.ok && projector !== undefined && !read.value.vision) {
-      return { ok: false, problem: 'invalidFile' };
-    }
-    if (read.ok) {
+    last = read;
+    if (read !== 'unreadable' && read.ok) {
+      // A projector that reads no images cannot change between passes, so it ends
+      // verification here instead of hashing and loading the model again.
+      if (projector !== undefined && !read.value.vision) {
+        return { ok: false, problem: 'invalidFile' };
+      }
       const move = moveIntoPlace(storage, transfers);
       if (move === 'refused') {
         return { ok: false, problem: 'writeFailed' };
@@ -83,5 +91,7 @@ export async function verifyModel(
       };
     }
   }
-  return { ok: false, problem: 'invalidFile' };
+  return last === 'unreadable'
+    ? { ok: false, problem: 'unreadable' }
+    : { ok: false, problem: 'invalidFile' };
 }

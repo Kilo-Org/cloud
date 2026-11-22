@@ -4093,6 +4093,7 @@
         "network": "Shkarkimi nuk përfundoi. Kontrollo lidhjen e internetit dhe provo përsëri.",
         "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq.",
         "checksum": "Skedari i shkarkuar nuk përputhet me shumën e kontrollit të publikuar, prandaj u hoq. Provoni ta shkarkoni përsëri.",
+        "unreadable": "Kjo pajisje nuk mundi ta kontrollojë skedarin e shkarkuar, prandaj u hoq. Provoni ta shkarkoni përsëri.",
         "writeFailed": "Kjo pajisje nuk mundi ta ruante modelin. Provoni ta shkarkoni përsëri."
       }
     },

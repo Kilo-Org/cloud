@@ -4093,6 +4093,7 @@
         "network": "Lataus ei valmistunut. Tarkista yhteytesi ja yritä uudelleen.",
         "invalidFile": "Ladattu tiedosto ei ole malli, jota tämä sovellus voi ajaa, joten se poistettiin.",
         "checksum": "Ladattu tiedosto ei vastaa julkaistua tarkistussummaansa, joten se poistettiin. Yritä latausta uudelleen.",
+        "unreadable": "Tämä laite ei voinut tarkistaa ladattua tiedostoa, joten se poistettiin. Yritä latausta uudelleen.",
         "writeFailed": "Tämä laite ei voinut tallentaa mallia. Yritä latausta uudelleen."
       }
     },

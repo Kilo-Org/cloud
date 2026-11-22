@@ -4241,6 +4241,7 @@
         "network": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a skúste to znova.",
         "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený.",
         "checksum": "Stiahnutý súbor sa nezhoduje so zverejneným kontrolným súčtom, preto bol odstránený. Skúste ho stiahnuť znova.",
+        "unreadable": "Toto zariadenie nedokázalo skontrolovať stiahnutý súbor, preto bol odstránený. Skúste ho stiahnuť znova.",
         "writeFailed": "Toto zariadenie nedokázalo uložiť model. Skúste ho stiahnuť znova."
       }
     },

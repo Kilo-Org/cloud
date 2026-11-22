@@ -4093,6 +4093,7 @@
         "network": "Downloadet blev ikke færdigt. Tjek din forbindelse, og prøv igen.",
         "invalidFile": "Den downloadede fil er ikke en model, som denne app kan køre, så den blev fjernet.",
         "checksum": "Den downloadede fil matcher ikke sin offentliggjorte kontrolsum, så den blev fjernet. Prøv at downloade igen.",
+        "unreadable": "Denne enhed kunne ikke tjekke den downloadede fil, så den blev fjernet. Prøv at downloade igen.",
         "writeFailed": "Denne enhed kunne ikke gemme modellen. Prøv at downloade igen."
       }
     },

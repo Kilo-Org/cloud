@@ -4315,6 +4315,7 @@
         "network": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
         "invalidFile": "Il-fajl imniżżel mhuwiex mudell li din l-app tista' tmexxi, għalhekk tneħħa.",
         "checksum": "Il-fajl imniżżel ma jaqbilx mal-checksum ippubblikat tiegħu, għalhekk tneħħa. Erġa' pprova t-tniżżil.",
+        "unreadable": "Dan l-apparat ma setax jiċċekkja l-fajl imniżżel, għalhekk tneħħa. Erġa' pprova t-tniżżil.",
         "writeFailed": "Dan l-apparat ma setax isalva l-mudell. Erġa' pprova t-tniżżil."
       }
     },

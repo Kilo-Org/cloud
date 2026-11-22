@@ -4241,6 +4241,7 @@
         "network": "A transferência não terminou. Verifique a sua ligação e tente novamente.",
         "invalidFile": "O ficheiro transferido não é um modelo que esta aplicação possa executar, por isso foi removido.",
         "checksum": "O ficheiro transferido não corresponde à soma de verificação publicada, por isso foi removido. Tente transferir novamente.",
+        "unreadable": "Este dispositivo não conseguiu verificar o ficheiro transferido, por isso foi removido. Tente transferir novamente.",
         "writeFailed": "Este dispositivo não conseguiu guardar o modelo. Tente transferir novamente."
       }
     },

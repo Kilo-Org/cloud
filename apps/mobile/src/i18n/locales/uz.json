@@ -4093,6 +4093,7 @@
         "network": "Yuklab olish tugallanmadi. Ulanishni tekshirib, qayta urinib ko‘ring.",
         "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi.",
         "checksum": "Yuklab olingan fayl e’lon qilingan nazorat summasiga mos kelmaydi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring.",
+        "unreadable": "Bu qurilma yuklab olingan faylni tekshira olmadi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring.",
         "writeFailed": "Bu qurilma modelni saqlay olmadi. Qayta yuklab olib ko‘ring."
       }
     },

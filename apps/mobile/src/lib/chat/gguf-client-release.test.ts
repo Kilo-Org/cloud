@@ -1,9 +1,16 @@
 /* eslint-disable typescript-eslint/consistent-type-assertions -- a llama.rn context is a JSI object: a test double can only be built by asserting its shape */
+/* eslint-disable max-lines -- one suite covers every teardown and release outcome, including the cause a release hands an answer, against one client harness */
 import { ModelError, type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
 import { Effect, Stream } from 'effect';
 import { expect, it, vi } from 'vitest';
 
-import { type GgufContext, ggufModelClient, RELEASE_WAIT_MS } from './gguf-client';
+import {
+  type GgufContext,
+  ggufModelClient,
+  type GgufReleaseCause,
+  RELEASE_WAIT_MS,
+} from './gguf-client';
+import { interruptedContext, problemOf } from './gguf-client-release.test-helpers';
 import { type GgufModelFile } from './gguf-records';
 import { LocalModelError } from './local-model-error';
 
@@ -356,4 +363,58 @@ it('reports a teardown that never settles instead of waiting on it forever', asy
   expect(next.at(-1)?.kind).toBe('done');
   expect(init).toHaveBeenCalledTimes(2);
   expect(timeline).toEqual(['open 1', 'freed first', 'open 2']);
+});
+
+/** Runs one answer until a release stops it, and reports the problem it ended as. */
+async function stoppedBy(cause: GgufReleaseCause | undefined, fileId?: string) {
+  const first = interruptedContext([], 'first');
+  const { client, release } = clientWith([first.context], []);
+  const answered = settle(collect(client.stream(request)));
+  await first.started;
+  await release(fileId, cause);
+  return problemOf(await answered);
+}
+
+it('ends an answer the background stopped as the background, not a model failure', async () => {
+  // The listener the app installs releases with the cause the system gave, and
+  // the words already streamed stay with the answer: only the copy changes.
+  expect(await stoppedBy('background')).toBe('background');
+});
+
+it('keeps a delete through the download store a model failure', async () => {
+  // `ggufDownloads` releases with the file it deletes and names no cause.
+  expect(await stoppedBy(undefined, 'a')).toBe('failed');
+});
+
+it('does not label an answer that starts after a background release', async () => {
+  const first = interruptedContext([], 'first');
+  const second = interruptedContext([], 'second');
+  const { client, release } = clientWith([first.context, second.context], []);
+
+  // A background release ends the first answer, and that answer consumes the cause.
+  const answered = settle(collect(client.stream(request)));
+  await first.started;
+  await release(undefined, 'background');
+  expect(problemOf(await answered)).toBe('background');
+
+  const next = settle(collect(client.stream(request)));
+  await second.started;
+  // A release that names nothing stops this one, so nothing labels it as the
+  // background: the cause belonged to the answer before it.
+  await release();
+  expect(problemOf(await next)).toBe('failed');
+});
+
+it('holds no cause for a background release that found no answer in flight', async () => {
+  const first = interruptedContext([], 'first');
+  const { client, release } = clientWith([first.context], []);
+
+  // The app goes to the background while nothing is answering: no answer can be
+  // labelled by it, and the next one starts clean.
+  await release(undefined, 'background');
+
+  const answered = settle(collect(client.stream(request)));
+  await first.started;
+  await release('a');
+  expect(problemOf(await answered)).toBe('failed');
 });

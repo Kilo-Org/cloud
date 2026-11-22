@@ -4093,6 +4093,7 @@
         "network": "Nedladdningen slutfördes inte. Kontrollera anslutningen och försök igen.",
         "invalidFile": "Den nedladdade filen är inte en modell som den här appen kan köra, så den har tagits bort.",
         "checksum": "Den nedladdade filen matchar inte sin publicerade kontrollsumma, så den har tagits bort. Försök ladda ner den igen.",
+        "unreadable": "Den här enheten kunde inte kontrollera den nedladdade filen, så den har tagits bort. Försök ladda ner den igen.",
         "writeFailed": "Den här enheten kunde inte spara modellen. Försök ladda ner den igen."
       }
     },

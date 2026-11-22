@@ -4093,6 +4093,7 @@
         "network": "Tsy vita ny fampidinana. Hamarino ny fifandraisanao ary andramo indray.",
         "invalidFile": "Tsy modely azon'ity rindranasa ity ampiasaina ny rakitra voampidina, ka nesorina izy.",
         "checksum": "Tsy mifanaraka amin'ny checksum navoaka ho azy ny rakitra voampidina, ka nesorina izy. Andramo indray ny fampidinana.",
+        "unreadable": "Tsy afaka nijery ny rakitra voampidina ity fitaovana ity, ka nesorina izy. Andramo indray ny fampidinana.",
         "writeFailed": "Tsy afaka nitahiry ny modely ity fitaovana ity. Andramo indray ny fampidinana."
       }
     },

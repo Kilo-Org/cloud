@@ -2494,6 +2494,7 @@ test('the web group checks its programs when the selection names them', t => {
   assert.deepEqual(result.commands, [
     'tsgo --noEmit -p apps/web/tsconfig.json --incremental false',
     'tsgo --noEmit -p scripts/web-env/tsconfig.json',
+    'tsgo --noEmit -p dev/tsconfig.json',
     'pnpm --filter @kilocode/storybook run typecheck',
   ]);
 });

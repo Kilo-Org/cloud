@@ -1975,6 +1975,91 @@ function readGitLabRepositorySizeBytes(data: unknown): number | null {
   return typeof repositorySize === 'number' ? repositorySize : null;
 }
 
+/**
+ * The access level the caller's own credential holds on one project, or null
+ * when the project is not visible to it. `GITLAB_ACCESS_LEVELS` names the
+ * values; Developer and above may write.
+ *
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401 or 403)
+ */
+export async function fetchGitLabProjectAccessLevel(
+  accessToken: string,
+  projectPath: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<number | null> {
+  const encodedPath = encodeURIComponent(projectPath);
+
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedPath}`, {
+      min_access_level: GITLAB_ACCESS_LEVELS.GUEST,
+    }),
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab project access level fetch failed:', {
+      status: response.status,
+      bodyExcerpt,
+    });
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabAuthenticationError(
+        projectPath,
+        response.status,
+        `GitLab rejected the credential while reading the access level of project ${projectPath} (HTTP ${response.status}). Reconnect the GitLab integration and try again.`
+      );
+    }
+    throw new Error(`GitLab project access level fetch failed: ${response.status}`);
+  }
+
+  return readGitLabAccessLevel(await response.json());
+}
+
+function readGitLabAccessLevel(data: unknown): number | null {
+  if (typeof data !== 'object' || data === null || !('permissions' in data)) {
+    return null;
+  }
+
+  const { permissions } = data;
+  if (typeof permissions !== 'object' || permissions === null) {
+    return null;
+  }
+
+  const levels: number[] = [];
+  if ('project_access' in permissions) {
+    const { project_access: projectAccess } = permissions;
+    if (
+      typeof projectAccess === 'object' &&
+      projectAccess !== null &&
+      'access_level' in projectAccess
+    ) {
+      const { access_level: accessLevel } = projectAccess;
+      if (typeof accessLevel === 'number') {
+        levels.push(accessLevel);
+      }
+    }
+  }
+  if ('group_access' in permissions) {
+    const { group_access: groupAccess } = permissions;
+    if (typeof groupAccess === 'object' && groupAccess !== null && 'access_level' in groupAccess) {
+      const { access_level: accessLevel } = groupAccess;
+      if (typeof accessLevel === 'number') {
+        levels.push(accessLevel);
+      }
+    }
+  }
+
+  return levels.length === 0 ? null : Math.max(...levels);
+}
+
 export type GitLabVersion = {
   version: string;
   revision: string;

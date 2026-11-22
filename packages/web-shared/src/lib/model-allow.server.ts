@@ -10,6 +10,10 @@ import {
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  VIRTUAL_PROVIDER,
+  withoutVirtualProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
 
@@ -32,8 +36,16 @@ export type ModelRestrictions = {
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
 /**
- * A custom LLM is exempt only for a grantee it is granted to: a Kilo admin
- * allowlisted that organization or group, which overrides organization policy.
+ * Whether `modelId` bypasses organization model and provider policy. Three
+ * classes do:
+ *
+ * - A custom LLM is exempt only for a grantee it is granted to: a Kilo admin
+ *   allowlisted that organization or group, which overrides organization policy.
+ * - Every `kilo-auto/` id is exempt. A router picks the model and provider per
+ *   request, so the policy applies to what it resolves to, not to the router id.
+ * - Every direct-BYOK model is exempt. The owner's own credential pays for the
+ *   request; a bespoke id bypasses the route access check, and a catalog-mode key
+ *   is decided per key provider by `isModelAllowedForProviderKey`.
  */
 export async function isModelRestrictionExempt(
   modelId: string,
@@ -72,6 +84,25 @@ export function hasActiveModelRestrictions(restrictions: ModelRestrictions): boo
   return restrictions.providerAllowList !== undefined || restrictions.modelDenyList.length > 0;
 }
 
+/**
+ * Routers listed under the snapshot-only virtual provider pick a real provider
+ * per request. Allowing `virtual` lets them route to every real provider that
+ * the same allow list permits; without one, they have nowhere to route.
+ *
+ * Both model-decision engines share this rule so the same restrictions always
+ * admit the same routes.
+ */
+export function getEligibleProviderRoutes(
+  modelProviders: ReadonlySet<string>,
+  allowedProviders: ReadonlySet<string>
+): Set<string> {
+  if (modelProviders.has(VIRTUAL_PROVIDER.slug) && allowedProviders.has(VIRTUAL_PROVIDER.slug)) {
+    const realProviders = withoutVirtualProvider([...allowedProviders]);
+    return new Set(realProviders.length > 0 ? [VIRTUAL_PROVIDER.slug, ...realProviders] : []);
+  }
+  return new Set([...modelProviders].filter(provider => allowedProviders.has(provider)));
+}
+
 export function createAllowPredicateFromProviderAllowList(
   modelDenyList: string[] | undefined,
   providerAllowList: string[] | undefined,
@@ -88,11 +119,16 @@ export function createAllowPredicateFromProviderAllowList(
     if (modelDenySet.has(normalizedModelId)) {
       return false;
     }
+    // Providers resolve only after the exemption and the deny list decide, so
+    // neither pays for a lookup. The organization-ceiling branch of
+    // `getEffectiveModelDecision` performs the same lookup (pinned providers
+    // first, then the snapshot) and calls the same rule, so both engines resolve
+    // providers here rather than one eagerly and one lazily.
     const providerSlugs =
       (await getModelInferenceProviders(modelId)) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
-    return [...providerSlugs].some(slug => providerAllowSet.has(slug));
+    return getEligibleProviderRoutes(providerSlugs, providerAllowSet).size > 0;
   };
 }
 

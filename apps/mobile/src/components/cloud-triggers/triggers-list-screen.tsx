@@ -26,10 +26,12 @@ import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { i18n } from '@/i18n';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { type CloudTriggerListRow } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerCreateHref, triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
+import { formatList } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -74,17 +76,26 @@ function TriggerRow({
   // roles) keeps its saved state but not a control the server would refuse.
   const showsInboundUrl = trigger.activationMode === 'webhook';
   const canToggle = trigger.canEdit === true;
+  // The row hosts a switch, so the press covers the leading tile and the text
+  // only: the switch owns its own touch and its own accessible node instead of
+  // sitting inside a button. The content press needs a name of its own, and the
+  // switch joins its caption to the trigger id through the shared list
+  // formatter, so a reader hears which trigger either control acts on.
   return (
     <View>
       <ConfigureRow
         icon={Workflow}
         title={trigger.triggerId}
         subtitle={details}
-        accessibilityLabel={trigger.triggerId}
+        pressTarget="content"
+        contentAccessibilityLabel={trigger.triggerId}
         onPress={onOpen}
         trailing={renderRowTrailing({
           kind: 'switch',
-          accessibilityLabel: t('cloudAgent.triggers.activeTitle'),
+          accessibilityLabel: formatList(
+            [t('cloudAgent.triggers.activeTitle'), trigger.triggerId],
+            i18n.language
+          ),
           value: trigger.isActive,
           onValueChange: onToggle,
           disabled: busy || !canToggle,

@@ -64,6 +64,8 @@ const state = vi.hoisted(() => ({
     isError: false,
     error: undefined as unknown,
   },
+  /** The readiness read's failure, which replaces the data with a denial. */
+  readinessError: undefined as unknown,
 }));
 
 /**
@@ -155,11 +157,11 @@ vi.mock('@/lib/hooks/use-bitbucket', async () => {
   const { useSyncExternalStore } = await import('react');
   return {
     useBitbucketReadiness: () => ({
-      data: state.readiness,
+      data: state.readinessError === undefined ? state.readiness : undefined,
       isPending: false,
-      isError: false,
+      isError: state.readinessError !== undefined,
       isFetching: false,
-      error: undefined,
+      error: state.readinessError,
       refetch: refetchMock.readiness,
     }),
     useBitbucketIntegrationStatus: () => {
@@ -279,6 +281,7 @@ export function resetSheetMocks(): void {
   state.isTrialExpiredForEnforcement = false;
   platformMock.OS = 'ios';
   state.readiness.integrationId = null;
+  state.readinessError = undefined;
   state.status.data = undefined;
   state.status.isPending = false;
   state.status.isError = false;

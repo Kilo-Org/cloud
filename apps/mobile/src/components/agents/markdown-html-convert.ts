@@ -254,7 +254,7 @@ function openTailStart(
  * text before it: a tag still streaming in, or a backslash waiting for the
  * character it escapes. No conversion of a value ending this way is final.
  */
-export function endsInsideOpenConstruct(value: string): boolean {
+function endsInsideOpenConstruct(value: string): boolean {
   return PARTIAL_TAG_AT_END.test(value) || (value.length > 0 && value.endsWith('\\'));
 }
 

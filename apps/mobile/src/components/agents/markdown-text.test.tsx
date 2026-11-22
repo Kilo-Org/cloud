@@ -26,11 +26,7 @@ import {
 import { isMarkdownImageLoadAllowed, requestMarkdownImageTrust } from './markdown-image-confirm';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { clearMarkdownParseCachesForTests } from './markdown-parse-cache';
-import {
-  extendsPreviousRaw,
-  MarkdownText,
-  publishConversion,
-} from './markdown-text';
+import { extendsPreviousRaw, MarkdownText, publishConversion } from './markdown-text';
 
 const EMPTY_SNAPSHOT: MarkdownHtmlSnapshot = {
   value: '',

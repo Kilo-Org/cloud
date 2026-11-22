@@ -41,7 +41,7 @@ export function LocalResetNoticeCard({ onDismiss }: { readonly onDismiss: () => 
       testID="chat-reset-notice"
       className="mx-4 mt-2 gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-4"
     >
-      <View className="flex-row items-start gap-2">
+      <View className="flex-row items-center gap-2">
         <Text className="min-w-0 flex-1 text-base font-medium text-warn">
           {t('modelChat.list.resetNoticeTitle')}
         </Text>

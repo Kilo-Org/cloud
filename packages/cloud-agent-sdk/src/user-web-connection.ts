@@ -672,19 +672,27 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
         return;
       }
 
-      connectPromise = tokenResult.then(openWithToken, rejectAuthFailure).finally(() => {
-        if (expectedGeneration !== generation) return;
-        clearInitialAuthTimeout();
-        connectPromise = null;
+      // Each attempt owns its latch and its deadline. A consumer may start a
+      // new attempt synchronously from `onError` or a signal listener; the
+      // attempt that just failed must then leave that attempt's latch and
+      // deadline alone, so both are released only while this attempt still
+      // owns them.
+      let attemptDeadline: ReturnType<typeof setTimeout> | null = null;
+      const attempt = tokenResult.then(openWithToken, rejectAuthFailure).finally(() => {
+        if (attemptDeadline !== null && initialAuthTimeout === attemptDeadline) {
+          clearInitialAuthTimeout();
+        }
+        if (connectPromise === attempt) connectPromise = null;
       });
+      connectPromise = attempt;
       initialAuthStartedAt = Date.now();
       // One bound for "the connection did not open": the same wait a queued
       // command tolerates. A token call that outlives it is abandoned so the
       // bounded retry series owns the failure, instead of a promise that never
       // settles parking every later retry and resume behind its latch.
-      initialAuthTimeout = setTimeout(() => {
+      attemptDeadline = setTimeout(() => {
+        if (destroyed || connectPromise !== attempt || expectedGeneration !== generation) return;
         initialAuthTimeout = null;
-        if (destroyed || expectedGeneration !== generation) return;
         // The token call never answered. Abandon this attempt the way a
         // superseded one is abandoned — the generation bump makes a ticket that
         // arrives later a no-op — then route into the same bounded backoff or
@@ -695,6 +703,7 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
         connectPromise = null;
         failAuthAttempt(generation);
       }, COMMAND_TIMEOUT_MS);
+      initialAuthTimeout = attemptDeadline;
     } catch {
       rejectAuthFailure();
     }

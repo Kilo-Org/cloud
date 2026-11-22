@@ -349,21 +349,17 @@ const SECURITY_REMEDIATION_PUSH_HEAD = 'git*push';
 // Each form pins the separator directly before the option and the `+`, and lets
 // the `*` absorb any run before it, so a run of any length and any mix of
 // spaces and tabs is covered.
+//
+// A shell joins adjacent quoted pieces into one argument, so quoting changes how
+// one token is read and cannot be bounded by counting its pieces. A push whose
+// text carries either quote is therefore refused rather than classified.
 const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}* -*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*\t-*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}* +*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*\t+*`,
-  // A quote changes how one token is read. The quote has to start the token, so
-  // an ordinary message that merely carries the word `push` is unaffected.
-  `${SECURITY_REMEDIATION_PUSH_HEAD}* '-*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}* "-*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}*\t'-*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}*\t"-*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}* '+*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}* "+*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}*\t'+*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}*\t"+*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*'*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*"*`,
 ];
 
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
@@ -396,11 +392,23 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git -?* config -?* --add *',
   'git -?* config -?* --replace-all *',
   'git -?* config -?* --unset *',
-  // The `-c key=value` form sets the same keys on the command line.
-  'git *-c *push*',
-  'git *-c *force*',
-  'git *-c *mirror*',
-  'git *-c *alias*',
+  // The `-c key=value` form sets the same keys on the command line. Each rule
+  // names the key itself, before its value, so a key that only contains the word
+  // keeps working.
+  'git -c *push=*',
+  'git -c *push.*=*',
+  'git -c *force=*',
+  'git -c *force.*=*',
+  'git -c *mirror=*',
+  'git -c *mirror.*=*',
+  'git -c *alias*=*',
+  'git *-c *push=*',
+  'git *-c *push.*=*',
+  'git *-c *force=*',
+  'git *-c *force.*=*',
+  'git *-c *mirror=*',
+  'git *-c *mirror.*=*',
+  'git *-c *alias*=*',
 ];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [

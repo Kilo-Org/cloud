@@ -485,6 +485,9 @@ describe('security-remediation push command guard policy', () => {
       'git -c remote.origin.push=+HEAD:refs/heads/main push',
       'git -c remote.origin.mirror=true push',
       "git -c alias.p='push --force' p",
+      'git push ""--force',
+      'git push ""+main',
+      "git push ''--force",
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
@@ -513,10 +516,10 @@ describe('security-remediation push command guard policy', () => {
       'git -C . config user.email',
       'git switch -c fix/thing',
       'git commit -m "tidy the retry path"',
-      'git commit -m "fix push handling"',
-      'git commit -m "mention --force in the guide"',
       'git -c user.name=e2e commit -m "tidy"',
       'git -c core.pager=cat status',
+      'git -c advice.pushUpdateRejected=false status',
+      'git -c core.hooksPath=/tmp commit -m "tidy"',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
     }

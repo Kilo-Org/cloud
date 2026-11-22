@@ -246,6 +246,30 @@ describe('native tool schema', () => {
     warn.mockRestore();
   });
 
+  it('names the optional argument itself when a required child of it fails', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { omitted } = nativeTools([
+      tool({
+        type: 'object',
+        properties: {
+          where: {
+            type: 'object',
+            properties: { lat: { $ref: '#/x' }, name: { type: 'string' } },
+            required: ['lat'],
+          },
+        },
+      }),
+    ]);
+    // The whole `where` argument is left out, so the record names it, not its child.
+    expect(omitted).toEqual([
+      { kind: 'argument', tool: 'tool', argument: 'where', reason: 'where.lat: $ref' },
+    ]);
+    expect(warn.mock.calls).toEqual([
+      ['[native-model] optional argument left out: tool.where: where.lat: $ref'],
+    ]);
+    warn.mockRestore();
+  });
+
   it('drops settings_set and keeps settings_list, for the real settings tool schemas', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const service = {

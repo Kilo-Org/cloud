@@ -178,11 +178,14 @@ function convertObject(node: SchemaNode, path: string): Converted {
       });
     } else if (required.has(name)) {
       return property;
-    } else {
-      /* The model cannot fill an optional key it is not shown; the tool still
-         works without it. The record names the exact argument that failed, so
-         an item inside an array reports its own path, not its parent's. */
+    } else if (property.path === argument || property.path.startsWith(`${argument}[`)) {
+      // The argument itself, or an item the model cannot express: name that path.
       omitted.push({ argument: property.path, reason: property.reason });
+    } else {
+      /* A required child of an optional argument failed, so the whole argument
+         is left out. The record names the argument and keeps the child's path
+         in the reason, which is the diagnostic copy. */
+      omitted.push({ argument, reason: refusedAt(property.path, property.reason) });
     }
   }
   return {

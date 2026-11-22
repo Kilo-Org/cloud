@@ -1,17 +1,25 @@
 /**
- * The one answer to "does this code point draw nothing of its own?".
+ * The two code-point rules that every blank-value answer in this package reads,
+ * so each has one spelling instead of one per caller.
  *
- * The filler code points are letters or symbols by category and still draw a
- * blank: the Hangul fillers U+115F, U+1160, U+3164 and U+FFA0, and the braille
- * blank U+2800. They are the shapes a blank value is usually padded with.
+ * The first rule is the fillers. They are letters or symbols by category and
+ * still draw a blank: the Hangul fillers U+115F, U+1160, U+3164 and U+FFA0, and
+ * the braille blank U+2800. They are the shapes a blank value is usually padded
+ * with.
  *
- * An unpaired surrogate counts as blank too. It is half a code point, has no
- * glyph, and printed text spells it `\uNNNN` rather than write a code unit that
- * cannot render. A surrogate pair is one ordinary code point and is not
- * covered: the pair draws whatever that code point draws.
+ * The second rule is the unpaired surrogate. It counts as blank: it is half a
+ * code point, has no glyph, and printed text spells it `\uNNNN` rather than
+ * write a code unit that cannot render. A surrogate pair is one ordinary code
+ * point and neither rule covers it; the pair draws whatever that code point
+ * draws.
  *
- * Both blank predicates and the display escaping read these rules, so the
- * package cannot answer the question two ways.
+ * The code points that are default-ignorable but neither a mark nor a format
+ * character (U+2065, U+FFF0–FFF8, the U+E0000–E0FFF tag block) are deliberately
+ * not covered. `hasVisibleText` keeps them visible and `hasVisibleGlyph` keeps
+ * them blank, which is the answer each gate already gave: counting them blank
+ * everywhere would start refusing organization names, directory-sync names and
+ * composer text that carry them. Deciding that for those gates is its own
+ * change, so the difference stays and is named here rather than left implicit.
  */
 export const BLANK_FILLER_CODE_POINTS: ReadonlySet<number> = new Set([
   0x115f, 0x1160, 0x2800, 0x3164, 0xffa0,

@@ -87,12 +87,13 @@ async function mount(): Promise<Renderer> {
   return tree.renderer;
 }
 
-function nodes(renderer: Renderer, testID: string) {
-  return renderer.root.findAll(node => node.props.testID === testID);
-}
-
 function queryErrors(renderer: Renderer) {
   return renderer.root.findAll(node => Object.is(node.type, 'QueryError'));
+}
+
+/** The invalid-link branch renders one node of this type; its props carry no testID. */
+function invalidLinks(renderer: Renderer) {
+  return renderer.root.findAll(node => Object.is(node.type, 'InvalidRouteState'));
 }
 
 /** The query notifications a settle schedules land in a timer, so flush inside act. */
@@ -133,7 +134,7 @@ describe('ReportReceiptScreen on a dropped connection', () => {
     expect(failure).toBeDefined();
     expect(failure?.props.variant).toBe('offline');
     expect(failure?.props.onRetry).toBeTypeOf('function');
-    expect(nodes(renderer, 'InvalidRouteState')).toHaveLength(0);
+    expect(invalidLinks(renderer)).toHaveLength(0);
   });
 
   it('keeps the invalid-link state for a receipt the server does not hold', async () => {
@@ -153,9 +154,7 @@ describe('ReportReceiptScreen on a dropped connection', () => {
     await settle();
 
     expect(queryErrors(renderer)).toHaveLength(0);
-    expect(renderer.root.findAll(node => Object.is(node.type, 'InvalidRouteState'))).toHaveLength(
-      1
-    );
+    expect(invalidLinks(renderer)).toHaveLength(1);
   });
 
   it('renders the receipt once the read answers', async () => {

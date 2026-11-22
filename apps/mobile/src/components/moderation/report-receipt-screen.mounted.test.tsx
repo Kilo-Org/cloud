@@ -324,7 +324,10 @@ describe('ReportReceiptScreen', () => {
     state.error = { data: { code: 'INTERNAL_SERVER_ERROR' }, message: 'Service unavailable' };
     const root = await mount();
 
-    expect(root.findAll(node => Object.is(node.type, QUERY_ERROR))).toHaveLength(1);
+    const [failure] = root.findAll(node => Object.is(node.type, QUERY_ERROR));
+    expect(failure).toBeDefined();
+    expect(failure?.props.variant).toBe('server');
+    expect(failure?.props.onRetry).toBeTypeOf('function');
   });
 
   it('reports a refused appeal', async () => {

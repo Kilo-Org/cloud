@@ -266,7 +266,7 @@ export function RepoBindingsScreen({
 
           {/* The form opens from the header's create control, so the slot holds
               the form or the sentence that names who may add one. */}
-          <ProfileManageSlot permission={profilePermission}>
+          <ProfileManageSlot permission={profilePermission} organizationId={organizationId}>
             {isAdding ? (
               <RepoBindingsAddForm
                 chosenRepo={chosenRepo}

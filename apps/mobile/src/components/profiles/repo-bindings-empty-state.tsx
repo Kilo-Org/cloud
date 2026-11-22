@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { CreditCard, GitBranch } from '@/components/ui/icons';
 import { type OrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
-import { trialRefusalCopyKey } from '@/lib/trial-refusal';
+import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 
 /**
  * What the repository-defaults screen shows when the context has no bindings and

@@ -142,6 +142,10 @@ function outcomeKind(
  *   remembered one; a row with no `failure` key at all cannot report it either
  *   way, so the remembered failure survives, which is what keeps a
  *   push-delivered `failed` card through a tray rebuild.
+ * - `permissionCommand` names the request `approvalKey` names, so it follows
+ *   that key rather than the absence policy: the remembered command carries
+ *   only while the key is the same one it was recorded under, and a new key
+ *   keeps only the command its own row states.
  * - Every text field is read through the shared display rule before it reaches
  *   the card, so a value from any producer draws as the line it stands for.
  */
@@ -158,7 +162,12 @@ export function buildSessionLiveActivityContentState(
   const finished = isFinishedSessionCardStatus(statusKind);
   const step = carried(row.currentStep, previous?.currentStep);
   const plan = carried(row.plan, previous?.plan);
-  const command = carried(row.permissionCommand, previous?.permissionCommand);
+  const command = carried(
+    row.permissionCommand,
+    approvalKey !== null && approvalKey === previous?.approvalKey
+      ? previous?.permissionCommand
+      : null
+  );
   return {
     sessionId: row.id,
     title: sessionLiveActivityTitle(row.title),

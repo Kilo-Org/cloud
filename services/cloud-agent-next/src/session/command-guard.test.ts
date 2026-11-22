@@ -525,6 +525,7 @@ describe('security-remediation push command guard policy', () => {
       'git switch -c fix/thing',
       'git -C . switch -c fix/thing',
       'git branch -c a b',
+      'git -C . branch -c a b',
       'git commit -m "tidy the retry path"',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');

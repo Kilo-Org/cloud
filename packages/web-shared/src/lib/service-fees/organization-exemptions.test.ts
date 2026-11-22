@@ -4,13 +4,13 @@ import {
   OrganizationServiceFeeExemptionError,
   getEffectiveOrganizationServiceFeeExemption,
   getOrganizationServiceFeeExemption,
-  normalizeOrganizationExemptionTimestamp,
   normalizeOrganizationServiceFeeExemptionReason,
   organizationServiceFeeExemptionLockKey,
   setOrganizationServiceFeeExemption,
   type OrganizationServiceFeeExemptionRecord,
   type OrganizationServiceFeeExemptionStore,
 } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import { toIsoTimestamp } from '@kilocode/web-shared/lib/service-fees/values';
 
 function createMemoryExemptionStore(options?: {
   activeOrganizationIds?: Iterable<string>;
@@ -69,7 +69,7 @@ const ORG_B = '22222222-2222-4222-8222-222222222222';
 
 describe('organization service fee exemptions', () => {
   test('normalizes production timestamptz text and trims reasons', () => {
-    expect(normalizeOrganizationExemptionTimestamp('2026-04-29 01:16:12.945+00')).toBe(
+    expect(toIsoTimestamp('2026-04-29 01:16:12.945+00', 'organization exemption')).toBe(
       '2026-04-29T01:16:12.945Z'
     );
     expect(normalizeOrganizationServiceFeeExemptionReason('  granted for nonprofit  ')).toBe(

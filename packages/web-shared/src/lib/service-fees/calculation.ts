@@ -5,8 +5,11 @@ import {
   SERVICE_FEE_RATE_DENOMINATOR,
 } from '@kilocode/web-shared/lib/service-fees/constants';
 import type { CalculateCumulativeFeeRefundInput } from '@kilocode/web-shared/lib/service-fees/types';
+import {
+  ISO_CURRENCY_PATTERN,
+  assertNonNegativeSafeInteger,
+} from '@kilocode/web-shared/lib/service-fees/values';
 
-const ISO_CURRENCY_PATTERN = /^[a-z]{3}$/;
 const ROUND_HALF_UP_OFFSET = BigInt(SERVICE_FEE_RATE_DENOMINATOR / 2);
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
 
@@ -124,13 +127,6 @@ function assertCurrency(currency: string, expectedCurrency: string): void {
   }
   if (currency !== expectedCurrency) {
     throw new Error(`line currency ${currency} does not match expected ${expectedCurrency}`);
-  }
-}
-
-function assertNonNegativeSafeInteger(value: number, label: string): void {
-  assertSafeInteger(value, label);
-  if (value < 0) {
-    throw new Error(`${label} must be a non-negative safe integer`);
   }
 }
 

@@ -13,6 +13,7 @@ import {
   CLAUDE_BILLING_BETA,
 } from '@kilocode/web-shared/lib/auth/claude/config';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { ClaudeBillingOwner } from './store';
 import { resolveConnectionConnector } from '../connector';
@@ -26,8 +27,18 @@ import { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
-export const CLAUDE_BILLING_REQUIRED_MESSAGE =
-  'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/linked-platforms.';
+/**
+ * The customer-facing message for a connection that exists but cannot bill. It
+ * owns its complete text, including the manage-connection pointer.
+ */
+export const CLAUDE_BILLING_REQUIRED_MESSAGE = `Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/linked-platforms. Manage the connection at ${APP_URL}/byok.`;
+
+/**
+ * Kilo's own missing server-side operator credential. It names no customer
+ * action, because no customer action fixes it.
+ */
+export const CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE =
+  "Claude billing is temporarily unavailable on Kilo's side, so this request could not be sent. Try again later.";
 
 /**
  * Shown when the account that linked an organization's connection is gone: the
@@ -222,7 +233,11 @@ export async function checkClaudeBilling(
     };
   }
   if (!isClaudeOperatorConfigured()) {
-    return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
+    return {
+      kind: 'unavailable',
+      message: CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE,
+      retryable: true,
+    };
   }
 
   const accessToken = await getClaudeOperatorToken();

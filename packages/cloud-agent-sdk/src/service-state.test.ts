@@ -2657,41 +2657,82 @@ describe('createServiceState', () => {
       });
     });
 
-    it('marks a server-truncated single-line message as cut', () => {
+    it('bounds a subject of 80 characters to 72 and marks the cut', () => {
       const state = createServiceState(makeConfig());
 
       state.process({
         type: 'autocommit_completed',
         success: true,
         ...localCommit,
-        commitMessage: 'fix: single line',
-        commitMessageTruncated: true,
+        commitMessage: 'x'.repeat(80),
       });
 
       expect(state.getStatus()).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: 'aaaaaaa · fix: single line…',
+        message: `aaaaaaa · ${'x'.repeat(72)}…`,
         commitHash: localCommit.commitHash,
       });
     });
 
-    it('adds no cut mark when only the body of a multi-line message was truncated', () => {
+    it('never ends the cut subject inside an emoji family sequence', () => {
       const state = createServiceState(makeConfig());
 
       state.process({
         type: 'autocommit_completed',
         success: true,
         ...localCommit,
-        commitMessageTruncated: true,
+        commitMessage: '👨‍👩‍👧‍👦'.repeat(40),
       });
 
-      expect(state.getStatus()).toEqual({
+      const status = state.getStatus();
+      expect(status).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: 'aaaaaaa · Actual commit',
+        message: `aaaaaaa · ${'👨‍👩‍👧‍👦'.repeat(10)}👨…`,
         commitHash: localCommit.commitHash,
       });
+      if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
+      const message = status.message;
+      expect(message.endsWith('…')).toBe(true);
+      const codePoints = Array.from(message.slice(0, -1)).map(char => char.codePointAt(0) ?? 0);
+      const lastKept = codePoints[codePoints.length - 1] ?? 0;
+      expect(lastKept).not.toBe(0x200d);
+      expect(lastKept >= 0x1f1e6 && lastKept <= 0x1f1ff).toBe(false);
+    });
+
+    it('keeps whole flag pairs when the cut lands inside a regional-indicator run', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...localCommit,
+        commitMessage: '🇵🇱'.repeat(50),
+      });
+
+      const status = state.getStatus();
+      expect(status).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: `aaaaaaa · ${'🇵🇱'.repeat(36)}…`,
+        commitHash: localCommit.commitHash,
+      });
+      if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
+      const message = status.message;
+      expect(message.endsWith('…')).toBe(true);
+      const kept = Array.from(message.slice(0, -1)).map(char => char.codePointAt(0) ?? 0);
+      const lastKept = kept[kept.length - 1] ?? 0;
+      expect(lastKept >= 0x1f1e6 && lastKept <= 0x1f1ff).toBe(true);
+      let regionalIndicators = 0;
+      while (
+        regionalIndicators < kept.length &&
+        (kept[kept.length - regionalIndicators - 1] ?? 0) >= 0x1f1e6 &&
+        (kept[kept.length - regionalIndicators - 1] ?? 0) <= 0x1f1ff
+      ) {
+        regionalIndicators += 1;
+      }
+      expect(regionalIndicators % 2).toBe(0);
     });
 
     it('shows the short hash alone when the message is empty', () => {

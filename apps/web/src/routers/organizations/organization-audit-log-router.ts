@@ -8,6 +8,7 @@ import { organization_audit_logs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, lt, gt, desc, asc, count, min, max, ilike, gte, lte, inArray } from 'drizzle-orm';
 import { AuditLogAction } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import type { AuditDetailColumn } from '@kilocode/app-shared/organizations';
 import {
   canCallerReadStaffAuditActors,
   maskKiloAdminActors,
@@ -32,6 +33,8 @@ type AuditLogWithPagination = {
   actor_email: string | null;
   actor_name: string | null;
   message: string;
+  /** The same event as values, for a reader that renders it in its language. */
+  details: AuditDetailColumn;
   created_at: string;
 };
 
@@ -87,6 +90,7 @@ export const organizationAuditLogRouter = createTRPCRouter({
           actor_email: organization_audit_logs.actor_email,
           actor_name: organization_audit_logs.actor_name,
           message: organization_audit_logs.message,
+          details: organization_audit_logs.details,
           created_at: organization_audit_logs.created_at,
         })
         .from(organization_audit_logs)

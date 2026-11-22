@@ -14,6 +14,9 @@ export async function tagClaudeBillingByokModels<
   T extends { id: string; hasUserByokAvailable?: boolean },
 >(owner: ClaudeBillingOwner, models: T[]): Promise<T[]> {
   if (!isClaudeOperatorConfigured()) return models;
+  // Deliberate: this runs on the hot models-list path and the badge is recomputed
+  // on later page loads, so a lagging replica only delays the badge. payer-state.ts
+  // reads the primary because a stale absent row there would switch payer.
   const connection = await getGrantedClaudeBillingConnection(owner, readDb);
   if (connection?.status !== ClaudeBillingConnectionStatus.Connected) return models;
 

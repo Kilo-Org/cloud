@@ -260,10 +260,13 @@ describe('plated disabled primary action contrast (WCAG non-text and text)', () 
       light: contrastRatio(lightColors.primaryDisabledAction, lightColors.background),
       dark: contrastRatio(darkColors.primaryDisabledAction, darkColors.background),
     } as const;
-    // Dark measures 2.64:1 and light 5.14:1; the floor is the larger share of
-    // the non-text minimum the plate can reach without outshining the page.
-    expect(ratios.dark, 'primary-disabled-action vs background (dark)').toBeGreaterThanOrEqual(2.6);
+    // The palette's own non-text floor for a control surface: the value
+    // `--control-idle` and the ring track are held to. Dark measures 3.18:1 and
+    // light 5.14:1.
     expect(ratios.light, 'primary-disabled-action vs background (light)').toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
+    expect(ratios.dark, 'primary-disabled-action vs background (dark)').toBeGreaterThanOrEqual(
       MIN_NON_TEXT_RATIO
     );
   });
@@ -278,11 +281,16 @@ describe('plated disabled primary action contrast (WCAG non-text and text)', () 
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: the plate stays well below the enabled brand fill', () => {
-    // A disabled action must never read as tappable. The enabled accent is the
-    // brightest thing on the dark page, so the plate keeps a wide margin.
-    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabledAction);
-    expect(separation).toBeGreaterThanOrEqual(5);
+  it('dark theme: the plate keeps its distance from the enabled brand fill', () => {
+    // A disabled action must never read as tappable. The dark accent is the
+    // brightest thing on the page, so the dark plate holds a full text ratio of
+    // headroom below it (4.50:1). Light has no such margin to defend: the light
+    // brand (#4f5a10) is dark enough that a plate carrying the white label this
+    // palette gives a disabled primary cannot sit a text ratio away from it at
+    // all, and the pair reads as dimmed-neutral against olive by hue rather than
+    // by weight. The light plate is the palette's own disabled primary.
+    const dark = contrastRatio(darkColors.primary, darkColors.primaryDisabledAction);
+    expect(dark, 'primary vs primary-disabled-action (dark)').toBeGreaterThanOrEqual(4.4);
   });
 });
 

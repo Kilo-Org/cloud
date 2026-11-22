@@ -57,7 +57,7 @@ export const darkColors = {
   primary: '#FFDD00',
   primaryForeground: '#1A1A10',
   primaryDisabled: '#8A8680',
-  primaryDisabledAction: '#5A564F',
+  primaryDisabledAction: '#66625B',
   secondary: '#1F1F24',
   secondaryForeground: '#F2F0EB',
   secondaryFill: '#44444A',

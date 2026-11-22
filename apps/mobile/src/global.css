@@ -36,10 +36,10 @@
   --primary-disabled: #6f6a61;
   /* Fill of a disabled primary action the caller declares its screen's one
    * primary action (a default-variant Button with `disabledFace="primary"`).
-   * Light keeps the palette's disabled primary, whose white label clears 4.5:1.
+   * Light keeps the palette's disabled primary, whose white label clears 5.4:1.
    * It is its own token because the dark plate that face needs differs from the
-   * dark `--primary-disabled`, which the shared Switch paints as its disabled
-   * on-track (see the dark block). */
+   * dark `--primary-disabled`, which is too bright a neutral to sit on the
+   * near-black page (see the dark block). */
   --primary-disabled-action: #6f6a61;
   --destructive: #b0483a;
   --destructive-foreground: #ffffff;
@@ -213,11 +213,12 @@
      * element and reads as an enabled control, while the muted surface the
      * shared disabled face paints (`--muted`, also `--secondary`) sits 1.2:1 off
      * the page and leaves a full-width plate without presence: a disabled Save
-     * beside an outlined Cancel read as no control at all. This step keeps the
-     * plate a visible object on the page (2.6:1) while it stays well below the
-     * enabled #ffdd00, and `--foreground` clears 6.4:1 on it. The palette's
-     * `--primary-disabled` stays with the Switch's disabled on-track. */
-    --primary-disabled-action: #5a564f;
+     * beside an outlined Cancel read as no control at all. This step is the
+     * smallest lift that clears the palette's own 3:1 non-text floor for a
+     * control surface (3.2:1 off the page) while it stays a full 4.5:1 below the
+     * enabled #ffdd00, so it cannot read as tappable, and `--foreground` clears
+     * 5.3:1 on it. A heavier plate would outshine the page it sits on. */
+    --primary-disabled-action: #66625b;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     /* The deep red the light scheme fills with, lifted just enough to stand off

@@ -199,11 +199,9 @@ const MUTED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-muted
  * page, `--muted` is 1.1:1 in light and 1.18:1 in dark, so a disabled Save in a
  * pinned footer read as no control at all beside the outlined Cancel sharing its
  * row — the reviewer of this screen reported exactly that. The plate stands
- * 5.1:1 off the light page and 2.6:1 off the dark one, stays 5.4:1 below the
- * enabled brand fill in dark so it never reads as tappable, and carries
- * `--primary-foreground` in light (5.4:1) and `--foreground` in dark (6.4:1).
- * `--primary-disabled` keeps its own job as the shared Switch's disabled
- * on-track, which is a grip on a track rather than a plate.
+ * 5.1:1 off the light page and 3.2:1 off the dark one, and stays 4.5:1 below the
+ * enabled brand fill in dark so it never reads as tappable, carrying
+ * `--primary-foreground` in light (5.4:1) and `--foreground` in dark (5.3:1).
  */
 const PLATED_DISABLED_FILL_CLASS = 'bg-primary-disabled-action';
 const PLATED_DISABLED_LABEL_CLASS =
@@ -240,6 +238,13 @@ type ButtonProps = Omit<React.ComponentProps<typeof Pressable>, 'children'> &
      * fill leaves at 1.1:1 off the page, beside an outlined Cancel that still
      * reads as a control. Ignored for a non-primary variant, a busy control and
      * an enabled one.
+     *
+     * The rule is placement, not weight: a `ScreenFooter` bar is the one surface
+     * whose primary action owns the bottom of the page and sits beside a
+     * control of another style, so its disabled face must be an object on the
+     * page. A form whose actions close a section, with nothing beside them at
+     * the page edge (the guardrails form), keeps `muted`; the muted pair is
+     * legible there and a heavy plate would compete with the page.
      */
     disabledFace?: 'muted' | 'primary';
   };

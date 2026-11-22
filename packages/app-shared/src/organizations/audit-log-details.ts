@@ -29,12 +29,13 @@ export type AuditRoleTag = (typeof AUDIT_ROLE_TAGS)[number];
 /**
  * The inference region an organization can pin.
  *
- * Read from the stored column's own schema rather than restated: a region this
- * module lacked would be written as a value the reader's validator rejects, and
- * the row would silently lose its detail. `OrganizationDataRegion` is the type
- * of `OrganizationSettings['data_region']`.
+ * This list is the single source. `OrganizationDataRegionSchema`, the schema of
+ * `OrganizationSettings['data_region']`, is built from this tuple in
+ * `@kilocode/db`, so a region added here cannot be written as a value this
+ * module's validator rejects — the alternative, restating the list in both
+ * packages, would silently drop a new region's detail back to the event name.
  */
-export const AUDIT_REGION_TAGS = ['us', 'eu', 'au', 'jp'] as const satisfies readonly string[];
+export const AUDIT_REGION_TAGS = ['us', 'eu', 'au', 'jp'] as const;
 export type AuditRegionTag = (typeof AUDIT_REGION_TAGS)[number];
 
 export const AUDIT_PLATFORM_TAGS = ['github', 'gitlab', 'bitbucket'] as const;

@@ -8,6 +8,7 @@ import {
   GATE_THRESHOLDS,
   REVIEW_STYLES,
 } from '@kilocode/app-shared/code-review';
+import { AUDIT_REGION_TAGS } from '@kilocode/app-shared/organizations';
 import * as z from 'zod';
 
 export const watchPrPolicySchema = z
@@ -1582,7 +1583,9 @@ export type OrganizationMcpConnectTarget =
   | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
 
 // The Vercel AI Gateway inference regions: https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
-export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
+// The region list lives in @kilocode/app-shared/organizations so the audit-log
+// detail reader and this stored schema cannot drift.
+export const OrganizationDataRegionSchema = z.enum(AUDIT_REGION_TAGS);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
 // How Kilo clients may drive a browser for this organization's members: anything the

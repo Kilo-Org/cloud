@@ -46,6 +46,7 @@ const stateActions = vi.hoisted(() => ({
     loading?: boolean;
     disabled?: boolean;
     testID?: string;
+    emphasis?: 'primary' | 'quiet';
   }[],
 }));
 
@@ -141,12 +142,14 @@ vi.mock('@/components/empty-state', async importOriginal => {
       loading,
       disabled,
       testID,
+      emphasis,
     }: {
       label: string;
       onPress: () => void;
       loading?: boolean;
       disabled?: boolean;
       testID?: string;
+      emphasis?: 'primary' | 'quiet';
     }) => {
       const busy = Boolean(loading);
       stateActions.rendered.push({
@@ -160,6 +163,7 @@ vi.mock('@/components/empty-state', async importOriginal => {
         loading,
         disabled: Boolean(disabled) || busy,
         testID,
+        emphasis,
       });
       return createElement('Text', {}, label);
     },
@@ -1953,6 +1957,28 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     const labels = renderFailedReview();
 
     expect(labels).toEqual(['Retry review']);
+  });
+
+  // `Open pull request` in the actions block is the screen's one primary action,
+  // so the conclusion card's recovery control takes the quiet outline face
+  // (DESIGN.md 'one primary action per surface'). Both controls the card owns
+  // hold the same weight, so the rule covers the settings link too.
+  it('renders the retry recovery control at the quiet emphasis', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    renderFailedReview();
+
+    const retry = stateActions.rendered.findLast(action => action.label === 'Retry review');
+    expect(retry?.emphasis).toBe('quiet');
+  });
+
+  it('renders the settings recovery control at the quiet emphasis', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+
+    renderFailedReview();
+
+    const fixSettings = stateActions.rendered.findLast(action => action.label === 'Fix settings');
+    expect(fixSettings?.emphasis).toBe('quiet');
   });
 
   it('offers no Retry for a review a newer commit replaced', () => {

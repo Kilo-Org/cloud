@@ -326,10 +326,14 @@ export function ReviewDetailScreen({
               ) : null}
               {retryAction === 'retry' ? (
                 <View className="self-start">
+                  {/* A recovery control is secondary: `Open pull request` in the
+                      actions block is the screen's one primary action, so this
+                      takes the quiet outline face instead of a second brand fill. */}
                   <StateAction
                     testID="review-detail-retry"
                     label={t('codeReviewer.reviewDetail.retryReview')}
                     icon={RotateCcw}
+                    emphasis="quiet"
                     loading={retriggerReview.isPending}
                     onPress={() => {
                       if (retriggerReview.isPending) {
@@ -352,6 +356,7 @@ export function ReviewDetailScreen({
                       testID="review-detail-fix-settings"
                       label={t('codeReviewer.reviewDetail.fixSettings')}
                       icon={Settings}
+                      emphasis="quiet"
                       onPress={() => {
                         pushOnce(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
                       }}

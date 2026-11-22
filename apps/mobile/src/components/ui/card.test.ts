@@ -23,9 +23,6 @@ describe('Card', () => {
     expect(classes).not.toContain('overflow-hidden');
   });
 
-  // Layered content (a home card's live and reserved layers) draws its own rows
-  // and their padding, so the card must not add a second inset or a gap the
-  // layers do not own; it only supplies the surface and clips to its radius.
   it('draws a padless surface that clips its full-bleed layers', () => {
     const classes = cardClasses({ children: 'Layers', padding: 'none' });
 

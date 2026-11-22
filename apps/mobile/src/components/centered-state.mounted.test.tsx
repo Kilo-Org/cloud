@@ -665,13 +665,6 @@ describe('CenteredState first-frame paint', () => {
   });
 
   it('holds the state until a pending native surface reports, then paints it placed', async () => {
-    // A pushed stack screen paints its surface insets 0/0 while the native
-    // geometry probe is still arriving; the probe's safe-area bottom then
-    // raises the band bottom and a state painted from the estimate jumped up
-    // half the band change after it first appeared (explorer:android
-    // layout-jump, Recent Reviews). A pending native surface is a band the
-    // estimate cannot place, so the state waits for the surface's frame — and
-    // its first painted placement already carries the reported insets.
     native.surface.frame = null;
     native.surface.bounds = null;
     native.surface.source = 'pending';

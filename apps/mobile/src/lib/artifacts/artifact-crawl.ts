@@ -34,6 +34,23 @@ export const MIRROR_SESSION_LIMIT = 50;
 export const MAX_ARTIFACT_BYTES = 25 * 1024 * 1024;
 
 /**
+ * How long the declared-length probe may take. The probe reads one response's
+ * headers, so it is a round trip, not a transfer: fifteen seconds covers a slow
+ * mobile handshake and still ends a dead request long before a foreground
+ * session would notice.
+ */
+export const ARTIFACT_PROBE_TIMEOUT_MS = 15_000;
+
+/**
+ * One total budget per artifact transfer, not a per-chunk idle timeout: the
+ * largest artifact the mirror keeps ({@link MAX_ARTIFACT_BYTES}, 25 MB) has to
+ * fit on a slow phone connection at roughly 700 kbps, and a transfer that
+ * stalls still ends the run well inside one foreground session instead of
+ * holding the cursor forever.
+ */
+export const ARTIFACT_DOWNLOAD_TIMEOUT_MS = 300_000;
+
+/**
  * The only network origin family a stored artifact URL may name: R2's S3 API
  * host, which is what every Kilo presign client mints
  * (`https://<account id>.r2.cloudflarestorage.com/<bucket>/<key>`). A stored URL
@@ -219,6 +236,64 @@ const DEFAULT_DEPS: ArtifactCrawlDeps = {
 /* eslint-enable @typescript-eslint/promise-function-async */
 
 /**
+ * Arm a deadline on `controller`: after `ms` the request it was given to is
+ * aborted. The returned function cancels the timer, so the caller clears it on
+ * every exit and no timer outlives the request it bounds.
+ */
+function abortAfter(controller: AbortController, ms: number): () => void {
+  const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
+    controller.abort();
+  }, ms);
+  return () => {
+    clearTimeout(timer);
+  };
+}
+
+/**
+ * Settle with `work`, or reject as soon as `signal` aborts. `fetch` rejects a
+ * pending request on abort, but a stream read or write it feeds takes no signal,
+ * and a request whose transport ignores the abort would otherwise hang the
+ * deadline. So the deadline is enforced here on the promise, not left to the
+ * transport. The side that loses the race is abandoned, so its rejection is
+ * kept handled, and the abort listener is removed once the race settles.
+ */
+async function raceAgainstAbort<T>(
+  work: Promise<T>,
+  signal: AbortSignal,
+  message: string
+): Promise<T> {
+  const settled = Promise.withResolvers<T>();
+  function settleWithError(error: unknown): void {
+    settled.reject(error instanceof Error ? error : new Error(message));
+  }
+  // The work's own outcome, whichever it is: this helper only adds the deadline,
+  // so a resolution and a rejection both pass through untouched. Awaiting here
+  // keeps both failures handled, including the transfer the deadline abandoned.
+  async function forwardWork(): Promise<void> {
+    try {
+      settled.resolve(await work);
+    } catch (error) {
+      settleWithError(error);
+    }
+  }
+  function onAbort(): void {
+    settleWithError(new Error(message));
+  }
+  // No await between the check and the listener, so an abort cannot be missed.
+  if (signal.aborted) {
+    onAbort();
+  } else {
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+  void forwardWork();
+  try {
+    return await settled.promise;
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
+
+/**
  * The full byte length declared by a URL, or null when unknown.
  *
  * Attachment URLs are signed for GET, so HEAD would fail signature validation.
@@ -226,16 +301,23 @@ const DEFAULT_DEPS: ArtifactCrawlDeps = {
  * Content-Length. Expo's streaming fetch lets us abort at the headers even if a
  * server ignores Range and sends a full response. Unknown lengths still get the
  * post-download size check below. A probe whose redirect chain leaves the
- * allowed origins reports nothing.
+ * allowed origins reports nothing, and the probe itself is bounded by
+ * {@link ARTIFACT_PROBE_TIMEOUT_MS}: a server that never answers makes the probe
+ * report nothing rather than hold the artifact.
  */
 async function probeContentLength(url: string): Promise<number | null> {
   const controller = new AbortController();
+  const clearDeadline = abortAfter(controller, ARTIFACT_PROBE_TIMEOUT_MS);
   try {
-    const response = await fetchAllowedArtifact(url, {
-      method: 'GET',
-      headers: { Range: 'bytes=0-0' },
-      signal: controller.signal,
-    });
+    const response = await raceAgainstAbort(
+      fetchAllowedArtifact(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+        signal: controller.signal,
+      }),
+      controller.signal,
+      'Artifact length probe timed out'
+    );
     if (response === null || !response.ok) {
       return null;
     }
@@ -251,6 +333,11 @@ async function probeContentLength(url: string): Promise<number | null> {
   } catch {
     return null;
   } finally {
+    clearDeadline();
+    // The deadline is the timer now, not this call: aborting here can only end a
+    // probe that already has its headers. It is still needed, because a server
+    // that ignores Range may be sending a body the probe never reads, and the
+    // abort releases that stream.
     controller.abort();
   }
 }
@@ -386,40 +473,153 @@ async function fetchAllowedArtifact(
 }
 
 /**
+ * Start a stream teardown without waiting for it. A transport that ignores
+ * `cancel()`, or a sink that never runs `abort()`, must not hold a lost
+ * deadline open, so the release is detached and its rejection swallowed: the
+ * transfer's own failure is what the caller has to see.
+ */
+function releaseQuietly(release: Promise<unknown>): void {
+  void (async () => {
+    try {
+      await release;
+    } catch {
+      // The stream is left as its transport ended it.
+    }
+  })();
+}
+
+/**
+ * Move one response body into one write stream, releasing both ends on any
+ * failure. The two ends are owned here — a reader and a writer acquired
+ * explicitly — rather than handed to `pipeTo`, which takes no signal: a pipe
+ * raced against the deadline stays locked after the race is lost, so the
+ * abandoned transfer could neither cancel the body nor abort the file handle,
+ * and the stall this bounds would hold the file open. Reading and writing in
+ * this loop lets each step settle against the abort, and lets the failure path
+ * below release both ends itself.
+ *
+ * Release never waits: a transport that ignores `cancel()` must not keep the
+ * deadline open, so the teardown promises are started and their rejections
+ * swallowed. Both locks are dropped afterwards, so a later attempt can reuse the
+ * streams and no release outlives the transfer.
+ */
+async function pumpArtifactBody(
+  body: ReadableStream<Uint8Array>,
+  destination: WritableStream<Uint8Array>,
+  signal: AbortSignal
+): Promise<void> {
+  const reader = body.getReader();
+  const writer = destination.getWriter();
+  try {
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop -- a stream is read one chunk after the previous one, which is the whole point
+      const { done, value } = await raceAgainstAbort(
+        reader.read(),
+        signal,
+        'Artifact download timed out'
+      );
+      if (done) {
+        break;
+      }
+      // eslint-disable-next-line no-await-in-loop -- each chunk is written before the next is read, so the body never sits in memory whole
+      await raceAgainstAbort(writer.write(value), signal, 'Artifact download timed out');
+    }
+    await raceAgainstAbort(writer.close(), signal, 'Artifact download timed out');
+  } catch (error) {
+    // A transfer the deadline raced out has nothing observing its other side, so
+    // both ends are released here. Neither release is awaited: the file handle
+    // must come back even from a transport that never answers, and the original
+    // failure is what the caller must see.
+    releaseQuietly(reader.cancel());
+    releaseQuietly(writer.abort());
+    throw error;
+  } finally {
+    releaseLockQuietly(reader);
+    releaseLockQuietly(writer);
+  }
+}
+
+/**
+ * Drop a reader's or writer's lock so the stream can be used again. A stream
+ * still tearing down after the deadline may refuse the release; the lock then
+ * belongs to the abandoned stream, and nothing the caller does with it, so a
+ * refusal must not raise over the transfer's own failure.
+ */
+function releaseLockQuietly(lock: { releaseLock: () => void }): void {
+  try {
+    lock.releaseLock();
+  } catch {
+    // The lock stays with the abandoned stream.
+  }
+}
+
+/**
  * Download an allowed artifact URL into `target`, following only redirects that
- * stay on the allowed origins; a refused hop leaves no bytes behind. The body is
- * piped through the file handle, so a download never sits in memory whole while
- * it is written, and every failure path releases the body.
+ * stay on the allowed origins; a refused hop leaves no bytes behind. The body
+ * streams through the file handle one chunk at a time, so a download never sits
+ * in memory whole, and {@link pumpArtifactBody} owns both ends of the transfer
+ * so every failure releases the file handle as well as the body.
+ *
+ * The whole transfer — headers and body — is bounded by
+ * {@link ARTIFACT_DOWNLOAD_TIMEOUT_MS} through one controller whose signal
+ * reaches every redirect hop and every step of the pump. An aborted transfer
+ * carries no response status, so {@link materializeArtifact} reads it as a
+ * temporary failure and the artifact is retried on the next run instead of
+ * stalling the cursor forever.
  */
 async function downloadAllowedArtifact(url: string, target: File): Promise<File> {
-  const response = await fetchAllowedArtifact(url, { method: 'GET' });
-  if (response === null) {
-    // A refused hop or an address the allowlist never admitted: the mirror will
-    // never fetch this shape, so no later run can succeed for it.
-    throw new ArtifactFetchFailure({ cause: 'missing', kind: 'terminal', status: null });
-  }
-  if (!response.ok) {
-    // The caller keeps no bytes from a failed status, so release the body rather
-    // than leaving the connection's stream unread.
-    await response.body?.cancel();
-    throw new ArtifactFetchFailure(failureForStatus(response.status));
-  }
+  const controller = new AbortController();
+  const clearDeadline = abortAfter(controller, ARTIFACT_DOWNLOAD_TIMEOUT_MS);
+  // A body this function still owes a release for: set once the status is kept
+  // and cleared as soon as the pump owns it. The pump releases its own ends, so
+  // only a body no pump acquired is left to the catch below.
+  let unattachedBody: ReadableStream<Uint8Array> | null = null;
   try {
+    const response = await raceAgainstAbort(
+      fetchAllowedArtifact(url, { method: 'GET', signal: controller.signal }),
+      controller.signal,
+      'Artifact download timed out'
+    );
+    if (response === null) {
+      // A refused hop or an address the allowlist never admitted: the mirror will
+      // never fetch this shape, so no later run can succeed for it.
+      throw new ArtifactFetchFailure({ cause: 'missing', kind: 'terminal', status: null });
+    }
+    if (!response.ok) {
+      // The caller keeps no bytes from a failed status, so release the body rather
+      // than leaving the connection's stream unread. The release is detached: a
+      // transport that ignores `cancel()` must not hold the deadline open past
+      // the failure it caused.
+      if (response.body !== null) {
+        releaseQuietly(response.body.cancel());
+      }
+      throw new ArtifactFetchFailure(failureForStatus(response.status));
+    }
+    const body = response.body ?? new Blob([]).stream();
+    unattachedBody = body;
     // `writableStream()` opens a write-only handle: iOS throws when the file does
     // not exist, and neither platform truncates there. Creating it first makes
     // the staging path a fresh empty file, so a leftover of the same name cannot
     // leave a tail behind the new bytes.
     target.create({ intermediates: true, overwrite: true });
-    await (response.body ?? new Blob([]).stream()).pipeTo(target.writableStream());
+    const destination = target.writableStream();
+    // Both ends are acquired, so the pump takes the body over from here: it
+    // aborts the destination and cancels the body itself, and no failed transfer
+    // is left holding the file handle.
+    unattachedBody = null;
+    await pumpArtifactBody(body, destination, controller.signal);
     return target;
   } catch (error) {
-    try {
-      await response.body?.cancel();
-    } catch {
-      // A failed pipe already released the stream, so nothing is left to cancel.
+    // A body no pump acquired has never been read, so release it here. A transport
+    // that ignores cancel must not keep this failure waiting, so the release is
+    // started and not awaited, and its rejection is swallowed.
+    if (unattachedBody !== null) {
+      releaseQuietly(unattachedBody.cancel());
     }
     deleteQuietly(target);
     throw error;
+  } finally {
+    clearDeadline();
   }
 }
 

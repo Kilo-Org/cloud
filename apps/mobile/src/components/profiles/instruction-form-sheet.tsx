@@ -80,7 +80,10 @@ function InstructionNameHintLine({ hint, nameError }: InstructionNameHintLinePro
       {/* The rule sentence holds the row's height in native layout, invisible,
           so the row never depends on which line shows. The preview may be
           longer than the rule once a name folds to a long slug, so it stays one
-          line with an ellipsis and always fits the room the rule reserved. */}
+          line and always fits the room the rule reserved. Its ellipsis sits in
+          the middle, the app's treatment for an identifier: the stored file
+          name is the only new information on the line, so both its ends stay
+          readable, including in the catalogs that put the slug last. */}
       <Text
         className="text-xs opacity-0"
         accessibilityElementsHidden
@@ -92,7 +95,7 @@ function InstructionNameHintLine({ hint, nameError }: InstructionNameHintLinePro
       {shown ? (
         <View className="absolute inset-x-0 top-0">
           {hint.kind === 'preview' ? (
-            <Text variant="muted" className="text-xs" numberOfLines={1}>
+            <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
               {t('profiles.instructionNamePreview', { name: hint.slug })}
             </Text>
           ) : (

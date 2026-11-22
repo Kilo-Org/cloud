@@ -2171,7 +2171,7 @@
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም።",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
-      "pastSessions": "ያለፉ ክፈለ ጊዜዎች",
+      "pastSessions": "ያለፉ ክፍለ ጊዜዎች",
       "sectionAccessibility_one": "{{title}}: {{displayCount}} ክፍለ ጊዜ",
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ክፍለ ጊዜዎች",
       "sectionAccessibility": "{{title}}: {{displayCount}} ክፍለ ጊዜዎች",

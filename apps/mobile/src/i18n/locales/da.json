@@ -522,6 +522,7 @@
       "receiptLabel": "Kvittering",
       "copyReceiptId": "Kopier kvitterings-id",
       "appealLabel": "Klage",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Modtaget",
       "triageOpen": "Under behandling",
       "triageActioned": "Taget til følge",
@@ -555,7 +556,7 @@
       "title": "Anmeldelser",
       "rowSubtitle": "Dine indsendte anmeldelser og deres resultater",
       "emptyTitle": "Ingen anmeldelser endnu",
-      "emptyDescription": "Anmeldelser, du indsender fra en kommentar eller et AI-svar, vises her.",
+      "emptyDescription": "Anmeldelser, du indsender fra en kommentar i en pull request-diskussion eller fra et AI-svar i en agentsession, vises her sammen med resultatet.",
       "couldNotLoad": "Kunne ikke indlæse dine anmeldelser",
       "capped": "Viser dine seneste anmeldelser."
     },

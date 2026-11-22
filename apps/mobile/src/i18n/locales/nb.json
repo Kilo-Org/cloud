@@ -522,6 +522,7 @@
       "receiptLabel": "Kvittering",
       "copyReceiptId": "Kopier kvitterings-ID",
       "appealLabel": "Klage",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Mottatt",
       "triageOpen": "Under behandling",
       "triageActioned": "Tatt til følge",
@@ -555,7 +556,7 @@
       "title": "Rapporter",
       "rowSubtitle": "Rapporter du har sendt inn, og resultatene deres",
       "emptyTitle": "Ingen rapporter ennå",
-      "emptyDescription": "Rapporter du sender inn fra en kommentar eller en AI-respons, vises her.",
+      "emptyDescription": "Rapporter du sender inn fra en kommentar i en diskusjon i en pull request, eller fra en AI-respons i en agentøkt, vises her sammen med resultatet.",
       "couldNotLoad": "Kunne ikke laste inn rapportene dine",
       "capped": "Viser de nyeste rapportene dine."
     },

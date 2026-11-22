@@ -522,6 +522,7 @@
       "receiptLabel": "Resibo",
       "copyReceiptId": "Kopyahin ang id ng resibo",
       "appealLabel": "Apela",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Natanggap",
       "triageOpen": "Sinusuri",
       "triageActioned": "Pinagtibay",
@@ -555,7 +556,7 @@
       "title": "Mga ulat",
       "rowSubtitle": "Mga ulat na isinumite mo at ang mga resulta nito",
       "emptyTitle": "Wala pang ulat",
-      "emptyDescription": "Lalabas dito ang mga ulat na isusumite mo mula sa isang komento o tugon ng AI.",
+      "emptyDescription": "Lalabas dito ang mga ulat na isusumite mo mula sa isang komento sa talakayan ng pull request o sa tugon ng AI sa sesyon ng ahente, kasama ang resulta ng mga ito.",
       "couldNotLoad": "Hindi ma-load ang mga ulat mo",
       "capped": "Ipinapakita ang mga pinakabago mong ulat."
     },

@@ -522,6 +522,7 @@
       "receiptLabel": "Alındı",
       "copyReceiptId": "Alındı kimliğini kopyala",
       "appealLabel": "İtiraz",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Alındı",
       "triageOpen": "İnceleniyor",
       "triageActioned": "Haklı bulundu",
@@ -555,7 +556,7 @@
       "title": "Raporlar",
       "rowSubtitle": "Gönderdiğiniz raporlar ve sonuçları",
       "emptyTitle": "Henüz rapor yok",
-      "emptyDescription": "Bir yorumdan veya bir yapay zeka yanıtından gönderdiğiniz raporlar burada görünür.",
+      "emptyDescription": "Bir pull request tartışmasındaki yorumdan veya bir ajan oturumundaki yapay zeka yanıtından gönderdiğiniz raporlar, sonuçlarıyla birlikte burada görünür.",
       "couldNotLoad": "Raporlarınız yüklenemedi",
       "capped": "En son raporlarınız gösteriliyor."
     },

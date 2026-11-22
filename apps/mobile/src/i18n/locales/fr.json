@@ -523,6 +523,7 @@
       "receiptLabel": "Accusé de réception",
       "copyReceiptId": "Copier l'identifiant de l'accusé de réception",
       "appealLabel": "Recours",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel) : {{status}}",
       "triageReceived": "Reçu",
       "triageOpen": "En cours d'examen",
       "triageActioned": "Retenu",
@@ -556,7 +557,7 @@
       "title": "Signalements",
       "rowSubtitle": "Signalements que vous avez déposés et leurs résultats",
       "emptyTitle": "Aucun signalement pour l'instant",
-      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire ou d'une réponse de l'IA apparaissent ici.",
+      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire dans une discussion de pull request, ou d'une réponse de l'IA dans une session d'agent, apparaissent ici avec leur résultat.",
       "couldNotLoad": "Impossible de charger vos signalements",
       "capped": "Affichage de vos signalements les plus récents."
     },

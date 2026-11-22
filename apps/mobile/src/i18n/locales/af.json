@@ -522,6 +522,7 @@
       "receiptLabel": "Ontvangsbewys",
       "copyReceiptId": "Kopieer ontvangsbewys-ID",
       "appealLabel": "Appèl",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ontvang",
       "triageOpen": "Word hersien",
       "triageActioned": "Gehandhaaf",
@@ -555,7 +556,7 @@
       "title": "Verslae",
       "rowSubtitle": "Verslae wat jy ingedien het en die uitkomste daarvan",
       "emptyTitle": "Nog geen verslae nie",
-      "emptyDescription": "Verslae wat jy van 'n kommentaar of 'n KI-antwoord indien, verskyn hier.",
+      "emptyDescription": "Verslae wat jy uit 'n kommentaar in 'n pull request-bespreking of uit 'n KI-antwoord in 'n agentsessie indien, verskyn hier saam met die uitkoms daarvan.",
       "couldNotLoad": "Kon nie jou verslae laai nie",
       "capped": "Wys jou mees onlangse verslae."
     },

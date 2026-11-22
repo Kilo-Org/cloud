@@ -522,6 +522,7 @@
       "receiptLabel": "Kvittun",
       "copyReceiptId": "Afrita auðkenni kvittunar",
       "appealLabel": "Áfrýjun",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Móttekin",
       "triageOpen": "Í yfirferð",
       "triageActioned": "Tekin til greina",
@@ -555,7 +556,7 @@
       "title": "Tilkynningar",
       "rowSubtitle": "Tilkynningar sem þú sendir inn og niðurstöður þeirra",
       "emptyTitle": "Engar tilkynningar ennþá",
-      "emptyDescription": "Tilkynningar sem þú sendir inn úr athugasemd eða svari frá gervigreind birtast hér.",
+      "emptyDescription": "Tilkynningar sem þú sendir inn úr athugasemd í PR-umræðu eða úr svari gervigreindar í lotu umboðsmanns birtast hér ásamt niðurstöðu þeirra.",
       "couldNotLoad": "Ekki tókst að hlaða tilkynningunum þínum",
       "capped": "Sýni nýjustu tilkynningarnar þínar."
     },

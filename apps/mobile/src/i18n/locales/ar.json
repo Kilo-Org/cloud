@@ -526,6 +526,7 @@
       "receiptLabel": "الإيصال",
       "copyReceiptId": "نسخ معرّف الإيصال",
       "appealLabel": "الطعن",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "تم الاستلام",
       "triageOpen": "قيد المراجعة",
       "triageActioned": "تم قبول البلاغ",
@@ -559,7 +560,7 @@
       "title": "البلاغات",
       "rowSubtitle": "البلاغات التي قدّمتها ونتائجها",
       "emptyTitle": "لا توجد بلاغات بعد",
-      "emptyDescription": "تظهر هنا البلاغات التي تقدّمها من تعليق أو من استجابة ذكاء اصطناعي.",
+      "emptyDescription": "تظهر هنا البلاغات التي تقدّمها من تعليق في نقاش طلب سحب أو من رد ذكاء اصطناعي في جلسة وكيل، مع نتيجة كل بلاغ.",
       "couldNotLoad": "تعذّر تحميل بلاغاتك",
       "capped": "يتم عرض أحدث بلاغاتك."
     },

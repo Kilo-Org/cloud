@@ -522,6 +522,7 @@
       "receiptLabel": "受付",
       "copyReceiptId": "受付IDをコピー",
       "appealLabel": "異議申し立て",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "受付済み",
       "triageOpen": "審査中",
       "triageActioned": "認められました",
@@ -555,7 +556,7 @@
       "title": "通報一覧",
       "rowSubtitle": "通報した内容とその結果",
       "emptyTitle": "通報はまだありません",
-      "emptyDescription": "コメントまたはAIの回答から通報した内容がここに表示されます。",
+      "emptyDescription": "プルリクエストのディスカッションのコメント、またはエージェントのセッションでのAIの応答から通報した内容が、その結果とともにここに表示されます。",
       "couldNotLoad": "通報を読み込めませんでした",
       "capped": "最新の通報を表示しています。"
     },

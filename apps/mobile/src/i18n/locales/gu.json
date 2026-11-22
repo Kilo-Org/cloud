@@ -522,6 +522,7 @@
       "receiptLabel": "રસીદ",
       "copyReceiptId": "રસીદ ID કૉપી કરો",
       "appealLabel": "અપીલ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "પ્રાપ્ત થયો",
       "triageOpen": "સમીક્ષા હેઠળ",
       "triageActioned": "માન્ય રખાયો",
@@ -555,7 +556,7 @@
       "title": "રિપોર્ટ્સ",
       "rowSubtitle": "તમે ફાઇલ કરેલા રિપોર્ટ્સ અને તેમના પરિણામો",
       "emptyTitle": "હજી સુધી કોઈ રિપોર્ટ નથી",
-      "emptyDescription": "તમે કોમેન્ટ અથવા AI પ્રતિસાદ પરથી ફાઇલ કરેલા રિપોર્ટ્સ અહીં દેખાશે.",
+      "emptyDescription": "તમે પુલ રિક્વેસ્ટની ચર્ચામાંની કોમેન્ટમાંથી, અથવા એજન્ટના સત્રમાં એઆઈ જવાબમાંથી ફાઇલ કરેલા રિપોર્ટ્સ તેમના પરિણામ સાથે અહીં દેખાય છે.",
       "couldNotLoad": "તમારા રિપોર્ટ્સ લોડ કરી શકાયા નથી",
       "capped": "તમારા સૌથી તાજેતરના રિપોર્ટ્સ બતાવી રહ્યા છીએ."
     },

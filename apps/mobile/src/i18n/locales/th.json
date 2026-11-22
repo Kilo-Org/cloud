@@ -522,6 +522,7 @@
       "receiptLabel": "ใบรับ",
       "copyReceiptId": "คัดลอก ID ใบรับ",
       "appealLabel": "การอุทธรณ์",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ได้รับแล้ว",
       "triageOpen": "กำลังตรวจสอบ",
       "triageActioned": "ยืนยันตามรายงาน",
@@ -555,7 +556,7 @@
       "title": "รายงาน",
       "rowSubtitle": "รายงานที่คุณส่งและผลลัพธ์",
       "emptyTitle": "ยังไม่มีรายงาน",
-      "emptyDescription": "รายงานที่คุณส่งจากความคิดเห็นหรือจากคำตอบของ AI จะแสดงที่นี่.",
+      "emptyDescription": "รายงานที่คุณส่งจากความคิดเห็นในการสนทนาใน pull request หรือจากคำตอบของ AI ในเซสชันเอเจนต์ จะแสดงที่นี่พร้อมผลลัพธ์.",
       "couldNotLoad": "ไม่สามารถโหลดรายงานของคุณได้",
       "capped": "กำลังแสดงรายงานล่าสุดของคุณ."
     },

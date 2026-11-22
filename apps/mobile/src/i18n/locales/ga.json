@@ -525,6 +525,7 @@
       "receiptLabel": "Admháil",
       "copyReceiptId": "Cóipeáil aitheantas na hadmhála",
       "appealLabel": "Achomharc",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Faighte",
       "triageOpen": "Á athbhreithniú",
       "triageActioned": "Seasadh leis",
@@ -558,7 +559,7 @@
       "title": "Tuairiscí",
       "rowSubtitle": "Na tuairiscí a chuir tú isteach agus a dtorthaí",
       "emptyTitle": "Níl aon tuairiscí ann fós",
-      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht nó ó fhreagra AI.",
+      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht i bplé ar iarratas tarraingthe nó ó fhreagra AI i seisiún gníomhaire, mar aon lena dtoradh.",
       "couldNotLoad": "Níorbh fhéidir do chuid tuairiscí a lódáil",
       "capped": "Ag taispeáint do chuid tuairiscí is déanaí."
     },

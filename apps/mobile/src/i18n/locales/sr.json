@@ -523,6 +523,7 @@
       "receiptLabel": "Potvrda",
       "copyReceiptId": "Kopiraj ID potvrde",
       "appealLabel": "Žalba",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Primljeno",
       "triageOpen": "U razmatranju",
       "triageActioned": "Usvojeno",
@@ -556,7 +557,7 @@
       "title": "Prijave",
       "rowSubtitle": "Prijave koje ste podneli i njihovi ishodi",
       "emptyTitle": "Još nema prijava",
-      "emptyDescription": "Prijave koje podnesete iz komentara ili AI odgovora prikazuju se ovde.",
+      "emptyDescription": "Prijave koje podnesete iz komentara u diskusiji o pull requestu ili iz AI odgovora u sesiji agenta prikazuju se ovde zajedno sa ishodom.",
       "couldNotLoad": "Nije moguće učitati vaše prijave",
       "capped": "Prikazane su vaše najnovije prijave."
     },

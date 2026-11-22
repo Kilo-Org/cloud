@@ -522,6 +522,7 @@
       "receiptLabel": "Kvitto",
       "copyReceiptId": "Kopiera kvittoid",
       "appealLabel": "Överklagande",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Mottagen",
       "triageOpen": "Granskas",
       "triageActioned": "Bifallen",
@@ -555,7 +556,7 @@
       "title": "Anmälningar",
       "rowSubtitle": "Anmälningar du skickat in och deras utfall",
       "emptyTitle": "Inga anmälningar än",
-      "emptyDescription": "Anmälningar du skickar in från en kommentar eller ett AI-svar visas här.",
+      "emptyDescription": "Anmälningar du skickar in från en kommentar i en diskussion om en pull request, eller från ett AI-svar i en agentsession, visas här tillsammans med utfallet.",
       "couldNotLoad": "Det gick inte att läsa in dina anmälningar",
       "capped": "Visar dina senaste anmälningar."
     },

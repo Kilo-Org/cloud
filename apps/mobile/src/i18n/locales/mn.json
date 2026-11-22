@@ -522,6 +522,7 @@
       "receiptLabel": "Баримт",
       "copyReceiptId": "Баримтын ID хуулах",
       "appealLabel": "Давж заалдах",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Хүлээн авсан",
       "triageOpen": "Хянагдаж байна",
       "triageActioned": "Батлагдсан",
@@ -555,7 +556,7 @@
       "title": "Мэдэгдэл",
       "rowSubtitle": "Таны илгээсэн мэдэгдэл ба тэдгээрийн үр дүн",
       "emptyTitle": "Одоогоор мэдэгдэл байхгүй",
-      "emptyDescription": "Сэтгэгдэл эсвэл AI-ийн хариултаас илгээсэн мэдэгдэл энд харагдана.",
+      "emptyDescription": "Pull request-ийн хэлэлцүүлэг дэх сэтгэгдэл эсвэл агентын сесс дэх хиймэл оюуны хариултаас илгээсэн мэдэгдэл үр дүнгийнхөө хамт энд харагдана.",
       "couldNotLoad": "Таны мэдэгдлийг ачаалж чадсангүй",
       "capped": "Таны хамгийн сүүлийн мэдэгдлүүдийг харуулж байна."
     },

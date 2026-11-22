@@ -522,6 +522,7 @@
       "receiptLabel": "Akwụkwọ nnata",
       "copyReceiptId": "Detuo ID akwụkwọ nnata",
       "appealLabel": "Mkpegharị",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Anatara",
       "triageOpen": "Na-enyocha",
       "triageActioned": "Akwadoro",
@@ -555,7 +556,7 @@
       "title": "Akụkọ",
       "rowSubtitle": "Akụkọ ndị i debara na nsonaazụ ha",
       "emptyTitle": "Enweghị akụkọ ruo ugbu a",
-      "emptyDescription": "Akụkọ ị na-edeba site na nkọwa ma ọ bụ nzaghachi AI na-apụta ebe a.",
+      "emptyDescription": "Akụkọ ị na-edeba site na nkọwa n'ime mkparịta ụka PR, ma ọ bụ site na azịza AI n'ime nnọkọ onye nnọchi anya, na-apụta ebe a tinyere nsonaazụ ya.",
       "couldNotLoad": "Enweghị ike ibudata akụkọ gị",
       "capped": "Na-egosi akụkọ gị ndị kacha ọhụrụ."
     },

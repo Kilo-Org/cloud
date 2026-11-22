@@ -525,6 +525,7 @@
       "receiptLabel": "Irċevuta",
       "copyReceiptId": "Ikkopja l-id tal-irċevuta",
       "appealLabel": "Appell",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Riċevut",
       "triageOpen": "Qed jiġi rieżaminat",
       "triageActioned": "Milqugħ",
@@ -558,7 +559,7 @@
       "title": "Rapporti",
       "rowSubtitle": "Rapporti li ppreżentajt u l-eżiti tagħhom",
       "emptyTitle": "Għad m'hemmx rapporti",
-      "emptyDescription": "Rapporti li tippreżenta minn kumment jew minn risposta tal-AI jidhru hawn.",
+      "emptyDescription": "Rapporti li tippreżenta minn kumment f'diskussjoni ta' pull request, jew minn risposta tal-AI f'sessjoni tal-aġent, jidhru hawn flimkien mal-eżitu tagħhom.",
       "couldNotLoad": "Ir-rapporti tiegħek ma setgħux jitgħabbew",
       "capped": "Qed jintwerew l-aktar rapporti reċenti tiegħek."
     },

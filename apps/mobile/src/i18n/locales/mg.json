@@ -522,6 +522,7 @@
       "receiptLabel": "Porofo",
       "copyReceiptId": "Adikao ny ID amin'ny porofo",
       "appealLabel": "Fampakarana",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Voaray",
       "triageOpen": "Eo am-pandinihana",
       "triageActioned": "Nekena",
@@ -555,7 +556,7 @@
       "title": "Tatitra",
       "rowSubtitle": "Ny tatitra nampidirinao sy ny vokany",
       "emptyTitle": "Mbola tsy misy tatitra",
-      "emptyDescription": "Ny tatitra ampidirinao avy amin'ny fanehoan-kevitra na ny valin'ny AI dia miseho eto.",
+      "emptyDescription": "Ny tatitra ampidirinao avy amin'ny fanehoan-kevitra ao amin'ny resaka pull request, na avy amin'ny valin'ny AI ao amin'ny fotoam-piasan'ny mpanampy, dia miseho eto miaraka amin'ny vokany.",
       "couldNotLoad": "Tsy afaka naka ny tatitrao",
       "capped": "Mampiseho ny tatitrao farany indrindra."
     },

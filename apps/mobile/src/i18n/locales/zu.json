@@ -522,6 +522,7 @@
       "receiptLabel": "Irisidi",
       "copyReceiptId": "Kopisha i-ID yerisidi",
       "appealLabel": "Isikhalo",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Wamukelwe",
       "triageOpen": "Uyabuyekezwa",
       "triageActioned": "Usekelwe",
@@ -555,7 +556,7 @@
       "title": "Imibiko",
       "rowSubtitle": "Imibiko oyifakile kanye nemiphumela yayo",
       "emptyTitle": "Ayikho imibiko okwamanje",
-      "emptyDescription": "Imibiko oyifaka kusukela kumazwana noma empendulweni ye-AI ivela lapha.",
+      "emptyDescription": "Imibiko oyifaka kusukela kumazwana engxoxweni ye-pull request noma empendulweni ye-AI eseshini yomenzeli ivela lapha kanye nomphumela wayo.",
       "couldNotLoad": "Akukwazekanga ukulayisha imibiko yakho",
       "capped": "Kuboniswa imibiko yakho yamuva kakhulu."
     },

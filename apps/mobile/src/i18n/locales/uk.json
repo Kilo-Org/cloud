@@ -524,6 +524,7 @@
       "receiptLabel": "Підтвердження",
       "copyReceiptId": "Копіювати ідентифікатор підтвердження",
       "appealLabel": "Оскарження",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Отримано",
       "triageOpen": "На розгляді",
       "triageActioned": "Задоволено",
@@ -557,7 +558,7 @@
       "title": "Скарги",
       "rowSubtitle": "Подані вами скарги та їхні результати",
       "emptyTitle": "Скарг ще немає",
-      "emptyDescription": "Скарги, подані з коментаря або відповіді ШІ, з'являються тут.",
+      "emptyDescription": "Скарги, подані з коментаря в обговоренні pull request або з відповіді ШІ в сеансі агента, з'являтимуться тут разом із результатом.",
       "couldNotLoad": "Не вдалося завантажити ваші скарги",
       "capped": "Показано ваші останні скарги."
     },

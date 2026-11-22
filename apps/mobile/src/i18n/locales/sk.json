@@ -524,6 +524,7 @@
       "receiptLabel": "Potvrdenie",
       "copyReceiptId": "Kopírovať ID potvrdenia",
       "appealLabel": "Odvolanie",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Prijaté",
       "triageOpen": "Posudzuje sa",
       "triageActioned": "Opodstatnené",
@@ -557,7 +558,7 @@
       "title": "Nahlásenia",
       "rowSubtitle": "Nahlásenia, ktoré si podal, a ich výsledky",
       "emptyTitle": "Zatiaľ žiadne nahlásenia",
-      "emptyDescription": "Nahlásenia, ktoré podáš z komentára alebo z odpovede AI, sa zobrazia tu.",
+      "emptyDescription": "Nahlásenia, ktoré podáš z komentára v diskusii k pull requestu alebo z odpovede AI v relácii agenta, sa zobrazia tu aj s ich výsledkom.",
       "couldNotLoad": "Nepodarilo sa načítať tvoje nahlásenia",
       "capped": "Zobrazujú sa tvoje najnovšie nahlásenia."
     },

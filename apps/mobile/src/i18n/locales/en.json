@@ -614,6 +614,7 @@
       "receiptLabel": "Receipt",
       "copyReceiptId": "Copy receipt ID",
       "appealLabel": "Appeal",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Received",
       "triageOpen": "In review",
       "triageActioned": "Upheld",
@@ -647,7 +648,7 @@
       "title": "Reports",
       "rowSubtitle": "Reports you filed and their outcomes",
       "emptyTitle": "No reports yet",
-      "emptyDescription": "Reports you file from a comment or an AI response appear here.",
+      "emptyDescription": "Reports you file from a comment in a pull request discussion, or from an AI response in an agent session, appear here with their outcome.",
       "couldNotLoad": "Could not load your reports",
       "capped": "Showing your most recent reports."
     },

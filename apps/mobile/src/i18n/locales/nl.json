@@ -522,6 +522,7 @@
       "receiptLabel": "Ontvangstbewijs",
       "copyReceiptId": "Ontvangstbewijs-ID kopiëren",
       "appealLabel": "Bezwaar",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ontvangen",
       "triageOpen": "In behandeling",
       "triageActioned": "Gegrond",
@@ -555,7 +556,7 @@
       "title": "Meldingen",
       "rowSubtitle": "Meldingen die je hebt ingediend en hun uitkomsten",
       "emptyTitle": "Nog geen meldingen",
-      "emptyDescription": "Meldingen die je vanuit een reactie of een AI-antwoord indient, verschijnen hier.",
+      "emptyDescription": "Meldingen die je indient vanuit een opmerking in een pull request-discussie of vanuit een AI-antwoord in de sessie van een agent, verschijnen hier met hun uitkomst.",
       "couldNotLoad": "Kon je meldingen niet laden",
       "capped": "Je ziet je meest recente meldingen."
     },

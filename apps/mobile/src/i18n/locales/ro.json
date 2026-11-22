@@ -523,6 +523,7 @@
       "receiptLabel": "Confirmare",
       "copyReceiptId": "Copiază ID-ul confirmării",
       "appealLabel": "Contestație",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Primit",
       "triageOpen": "În analiză",
       "triageActioned": "Admis",
@@ -556,7 +557,7 @@
       "title": "Raportări",
       "rowSubtitle": "Raportările trimise de tine și rezultatele lor",
       "emptyTitle": "Nicio raportare încă",
-      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu sau dintr-un răspuns AI apar aici.",
+      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu într-o discuție despre un pull request sau dintr-un răspuns AI într-o sesiune de agent apar aici împreună cu rezultatul lor.",
       "couldNotLoad": "Nu am putut încărca raportările tale",
       "capped": "Sunt afișate cele mai recente raportări ale tale."
     },

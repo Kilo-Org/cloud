@@ -524,6 +524,7 @@
       "receiptLabel": "Potvrzení",
       "copyReceiptId": "Kopírovat ID potvrzení",
       "appealLabel": "Odvolání",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Přijato",
       "triageOpen": "Posuzuje se",
       "triageActioned": "Uznáno",
@@ -557,7 +558,7 @@
       "title": "Nahlášení",
       "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
       "emptyTitle": "Zatím žádná nahlášení",
-      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "emptyDescription": "Nahlášení, která podáte z komentáře v diskuzi k pull requestu nebo z odpovědi AI v relaci agenta, se zde zobrazí včetně výsledku.",
       "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
       "capped": "Zobrazují se vaše nejnovější nahlášení."
     },

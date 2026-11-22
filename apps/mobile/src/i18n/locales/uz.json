@@ -522,6 +522,7 @@
       "receiptLabel": "Kvitansiya",
       "copyReceiptId": "Kvitansiya identifikatorini nusxalash",
       "appealLabel": "Apellyatsiya",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Qabul qilindi",
       "triageOpen": "Ko'rib chiqilmoqda",
       "triageActioned": "Tasdiqlandi",
@@ -555,7 +556,7 @@
       "title": "Shikoyatlar",
       "rowSubtitle": "Yuborgan shikoyatlaringiz va ularning natijalari",
       "emptyTitle": "Hozircha shikoyatlar yo'q",
-      "emptyDescription": "Izoh yoki AI javobidan yuborgan shikoyatlaringiz shu yerda ko'rinadi.",
+      "emptyDescription": "Pull request muhokamasidagi izohdan yoki agent sessiyasidagi sun'iy intellekt javobidan yuborgan shikoyatlaringiz natijalari bilan birga shu yerda ko'rinadi.",
       "couldNotLoad": "Shikoyatlaringizni yuklab bo'lmadi",
       "capped": "Eng so'nggi shikoyatlaringiz ko'rsatilmoqda."
     },

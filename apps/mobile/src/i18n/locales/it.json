@@ -523,6 +523,7 @@
       "receiptLabel": "Ricevuta",
       "copyReceiptId": "Copia ID ricevuta",
       "appealLabel": "Ricorso",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ricevuta",
       "triageOpen": "In revisione",
       "triageActioned": "Accolta",
@@ -556,7 +557,7 @@
       "title": "Segnalazioni",
       "rowSubtitle": "Le segnalazioni che hai inviato e i loro esiti",
       "emptyTitle": "Ancora nessuna segnalazione",
-      "emptyDescription": "Le segnalazioni che invii da un commento o da una risposta AI compaiono qui.",
+      "emptyDescription": "Le segnalazioni che invii da un commento in una discussione di una pull request, oppure da una risposta AI in una sessione dell'agente, compaiono qui con il loro esito.",
       "couldNotLoad": "Impossibile caricare le tue segnalazioni",
       "capped": "Vengono mostrate le tue segnalazioni più recenti."
     },

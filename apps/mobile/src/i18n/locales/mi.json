@@ -522,6 +522,7 @@
       "receiptLabel": "Rīhīti",
       "copyReceiptId": "Tāruatia te rīhīti ID",
       "appealLabel": "Pīra",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Kua tae mai",
       "triageOpen": "Kei te arotakengia",
       "triageActioned": "Kua whakamanahia",
@@ -555,7 +556,7 @@
       "title": "Ngā pūrongo",
       "rowSubtitle": "Ngā pūrongo i tukuna e koe me ō rātou otinga",
       "emptyTitle": "Kāore anō he pūrongo",
-      "emptyDescription": "Ka puta ki konei ngā pūrongo ka tukuna e koe mai i tētahi kōrero, mai i tētahi whakautu AI rānei.",
+      "emptyDescription": "Ka puta ki konei, me ō rātou otinga, ngā pūrongo ka tukuna e koe mai i tētahi kōrero i tētahi matapakinga PR, mai i tētahi whakautu AI rānei i tētahi wātū māngai.",
       "couldNotLoad": "Kāore i taea te uta i ō pūrongo",
       "capped": "E whakaatu ana i ō pūrongo hou rawa."
     },

@@ -522,6 +522,7 @@
       "receiptLabel": "Risiti",
       "copyReceiptId": "Nakili kitambulisho cha risiti",
       "appealLabel": "Rufaa",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Imepokelewa",
       "triageOpen": "Inakaguliwa",
       "triageActioned": "Imekubaliwa",
@@ -555,7 +556,7 @@
       "title": "Ripoti",
       "rowSubtitle": "Ripoti ulizowasilisha na matokeo yake",
       "emptyTitle": "Hakuna ripoti bado",
-      "emptyDescription": "Ripoti unazowasilisha kutoka kwa maoni au jibu la AI zinaonekana hapa.",
+      "emptyDescription": "Ripoti unazowasilisha kutoka kwa maoni katika mjadala wa pull request, au kutoka kwa jibu la AI katika kikao cha wakala, zinaonekana hapa pamoja na matokeo yake.",
       "couldNotLoad": "Imeshindwa kupakia ripoti zako",
       "capped": "Inaonyesha ripoti zako za hivi karibuni."
     },

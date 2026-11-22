@@ -524,6 +524,7 @@
       "receiptLabel": "Potwierdzenie",
       "copyReceiptId": "Skopiuj identyfikator potwierdzenia",
       "appealLabel": "Odwołanie",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Otrzymano",
       "triageOpen": "W trakcie rozpatrywania",
       "triageActioned": "Uwzględniono",
@@ -557,7 +558,7 @@
       "title": "Zgłoszenia",
       "rowSubtitle": "Zgłoszenia, które złożyłeś, i ich wyniki",
       "emptyTitle": "Nie masz jeszcze zgłoszeń",
-      "emptyDescription": "Zgłoszenia złożone z komentarza lub odpowiedzi AI pojawiają się tutaj.",
+      "emptyDescription": "Zgłoszenia złożone z komentarza w dyskusji o pull requeście lub z odpowiedzi AI w sesji agenta pojawiają się tutaj wraz z ich wynikiem.",
       "couldNotLoad": "Nie udało się wczytać twoich zgłoszeń",
       "capped": "Wyświetlane są twoje najnowsze zgłoszenia."
     },

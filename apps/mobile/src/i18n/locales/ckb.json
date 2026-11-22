@@ -522,6 +522,7 @@
       "receiptLabel": "پسوولە",
       "copyReceiptId": "ناسنامەی پسوولەکە کۆپی بکە",
       "appealLabel": "تانە",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "وەرگیرا",
       "triageOpen": "لە پێداچوونەوەدایە",
       "triageActioned": "پەسەند کرا",
@@ -555,7 +556,7 @@
       "title": "ڕاپۆرتەکان",
       "rowSubtitle": "ڕاپۆرتە نێردراوەکانت و ئەنجامەکانیان",
       "emptyTitle": "هێشتا هیچ ڕاپۆرتێک نییە",
-      "emptyDescription": "ئەو ڕاپۆرتانەی لە لێدوانێک یان وەڵامێکی AI بنێریت لێرە دەردەکەون.",
+      "emptyDescription": "ئەو ڕاپۆرتانەی لە لێدوانێک لە گفتوگۆیەکی pull request یان لە وەڵامێکی AI لە سێشنی ئەجێنت بنێریت، لەگەڵ ئەنجامەکەیان لێرە دەردەکەون.",
       "couldNotLoad": "نەتوانرا ڕاپۆرتەکانت بار بکرێن",
       "capped": "نوێترین ڕاپۆرتەکانت پیشان دەدرێن."
     },

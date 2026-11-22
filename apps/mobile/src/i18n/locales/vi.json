@@ -522,6 +522,7 @@
       "receiptLabel": "Biên nhận",
       "copyReceiptId": "Sao chép mã biên nhận",
       "appealLabel": "Kháng nghị",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Đã tiếp nhận",
       "triageOpen": "Đang xem xét",
       "triageActioned": "Được chấp nhận",
@@ -555,7 +556,7 @@
       "title": "Báo cáo",
       "rowSubtitle": "Các báo cáo bạn đã gửi và kết quả của chúng",
       "emptyTitle": "Chưa có báo cáo nào",
-      "emptyDescription": "Các báo cáo bạn gửi từ bình luận hoặc phản hồi của AI sẽ xuất hiện ở đây.",
+      "emptyDescription": "Các báo cáo bạn gửi từ bình luận trong thảo luận pull request hoặc từ phản hồi của AI trong phiên tác nhân sẽ xuất hiện ở đây cùng với kết quả của chúng.",
       "couldNotLoad": "Không thể tải báo cáo của bạn",
       "capped": "Đang hiển thị các báo cáo gần đây nhất của bạn."
     },

@@ -522,6 +522,7 @@
       "receiptLabel": "Visszaigazolás",
       "copyReceiptId": "Visszaigazolás azonosítójának másolása",
       "appealLabel": "Fellebbezés",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Beérkezett",
       "triageOpen": "Felülvizsgálat alatt",
       "triageActioned": "Megalapozott",
@@ -555,7 +556,7 @@
       "title": "Bejelentések",
       "rowSubtitle": "A benyújtott bejelentéseid és eredményeik",
       "emptyTitle": "Még nincsenek bejelentések",
-      "emptyDescription": "A hozzászólásból vagy AI-válaszból benyújtott bejelentések itt jelennek meg.",
+      "emptyDescription": "Azok a bejelentések, amelyeket egy pull request-megbeszélés hozzászólásából vagy egy ügynök munkamenetében adott AI-válaszból nyújtasz be, az eredményükkel együtt itt jelennek meg.",
       "couldNotLoad": "Nem sikerült betölteni a bejelentéseidet",
       "capped": "A legutóbbi bejelentéseid láthatók."
     },

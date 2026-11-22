@@ -523,6 +523,7 @@
       "receiptLabel": "Apstiprinājums",
       "copyReceiptId": "Kopēt apstiprinājuma ID",
       "appealLabel": "Pārsūdzība",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Saņemts",
       "triageOpen": "Tiek izskatīts",
       "triageActioned": "Apstiprināts",
@@ -556,7 +557,7 @@
       "title": "Ziņojumi",
       "rowSubtitle": "Jūsu iesniegtie ziņojumi un to rezultāti",
       "emptyTitle": "Vēl nav ziņojumu",
-      "emptyDescription": "Šeit parādīsies ziņojumi, kurus iesniedzat no komentāra vai AI atbildes.",
+      "emptyDescription": "Ziņojumi, kurus iesniedzat no komentāra PR diskusijā vai no AI atbildes aģenta sesijā, šeit parādās kopā ar to rezultātu.",
       "couldNotLoad": "Neizdevās ielādēt jūsu ziņojumus",
       "capped": "Tiek rādīti jūsu jaunākie ziņojumi."
     },

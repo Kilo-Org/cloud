@@ -522,6 +522,7 @@
       "receiptLabel": "রসিদ",
       "copyReceiptId": "রসিদের আইডি কপি করুন",
       "appealLabel": "আপিল",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "প্রাপ্ত",
       "triageOpen": "রিভিউ চলছে",
       "triageActioned": "বহাল রাখা হয়েছে",
@@ -555,7 +556,7 @@
       "title": "রিপোর্ট",
       "rowSubtitle": "আপনার জমা দেওয়া রিপোর্ট এবং সেগুলোর ফলাফল",
       "emptyTitle": "এখনো কোনো রিপোর্ট নেই",
-      "emptyDescription": "মন্তব্য বা AI প্রতিক্রিয়া থেকে আপনি যে রিপোর্ট জমা দেন, সেগুলো এখানে দেখা যাবে।",
+      "emptyDescription": "পুল রিকোয়েস্টের আলোচনার একটি মন্তব্য থেকে বা এজেন্ট সেশনে AI-এর উত্তর থেকে আপনি যে রিপোর্ট জমা দেন, সেগুলো ফলাফলসহ এখানে দেখা যাবে।",
       "couldNotLoad": "আপনার রিপোর্ট লোড করা যায়নি",
       "capped": "আপনার সাম্প্রতিকতম রিপোর্টগুলো দেখানো হচ্ছে।"
     },

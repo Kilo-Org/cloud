@@ -524,6 +524,7 @@
       "receiptLabel": "Potrdilo",
       "copyReceiptId": "Kopiraj ID potrdila",
       "appealLabel": "Pritožba",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Prejeto",
       "triageOpen": "V pregledu",
       "triageActioned": "Utemeljeno",
@@ -557,7 +558,7 @@
       "title": "Prijave",
       "rowSubtitle": "Prijave, ki si jih oddal, in njihovi izidi",
       "emptyTitle": "Ni še nobene prijave",
-      "emptyDescription": "Prijave, ki jih oddaš iz komentarja ali odgovora AI, se prikažejo tukaj.",
+      "emptyDescription": "Prijave, ki jih oddaš iz komentarja v razpravi o zahtevi za združitev ali iz odgovora AI v seji agenta, se prikažejo tukaj skupaj z izidom.",
       "couldNotLoad": "Tvojih prijav ni bilo mogoče naložiti",
       "capped": "Prikazane so tvoje najnovejše prijave."
     },

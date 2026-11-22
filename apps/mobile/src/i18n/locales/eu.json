@@ -522,6 +522,7 @@
       "receiptLabel": "Agiria",
       "copyReceiptId": "Kopiatu agiriaren IDa",
       "appealLabel": "Helegitea",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Jasota",
       "triageOpen": "Berrikusten",
       "triageActioned": "Baietsita",
@@ -555,7 +556,7 @@
       "title": "Salaketak",
       "rowSubtitle": "Aurkeztu zenituen salaketak eta horien emaitzak",
       "emptyTitle": "Oraindik ez dago salaketarik",
-      "emptyDescription": "Iruzkin batetik edo AI baten erantzun batetik aurkezten dituzun salaketak hemen agertzen dira.",
+      "emptyDescription": "Pull request eztabaida bateko iruzkin batetik edo agentearen saio bateko AIaren erantzun batetik aurkezten dituzun salaketak beren emaitzarekin agertzen dira hemen.",
       "couldNotLoad": "Ezin izan dira zure salaketak kargatu",
       "capped": "Zure azken salaketak erakusten ari gara."
     },

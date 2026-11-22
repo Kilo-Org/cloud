@@ -21,7 +21,7 @@ export function readCacheScope(userId: string): string {
  * both of which outlive the read cache, so sign-out's `cache:<userId>:` sweep
  * and a `SCHEMA_VERSION` bump must not reach them.
  */
-export const DELIVERY_SCOPE_PREFIX = 'delivery:';
+const DELIVERY_SCOPE_PREFIX = 'delivery:';
 
 /** One user's delivery-record scope: account-scoped, not schema-versioned. */
 export function deliveryScope(userId: string): string {

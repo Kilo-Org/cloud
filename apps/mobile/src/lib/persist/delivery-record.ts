@@ -35,7 +35,7 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * tombstone keeps the key present so the older, unread record is never
  * recreated from a stale legacy blob.
  */
-export const DELIVERY_TOMBSTONE_JSON = '{"items":[],"complete":false}';
+const DELIVERY_TOMBSTONE_JSON = '{"items":[],"complete":false}';
 
 /** What one record holds, plus whether it still holds everything it once did. */
 export type DeliveryRecordRead<T> = {

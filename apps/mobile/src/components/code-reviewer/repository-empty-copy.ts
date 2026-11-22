@@ -44,9 +44,7 @@ export function repositoryEmptyCopy(
 ): EmptyCopyKeys {
   const copy =
     platform === 'github'
-      ? GITHUB_EMPTY_COPY_KEYS[
-          options?.githubAppInstalled === false ? 'notInstalled' : 'installed'
-        ]
+      ? GITHUB_EMPTY_COPY_KEYS[options?.githubAppInstalled === false ? 'notInstalled' : 'installed']
       : EMPTY_COPY_KEYS[platform];
   return { title: t(copy.title), description: t(copy.description) };
 }

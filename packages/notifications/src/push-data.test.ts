@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { pushDataSchema } from './push-data';
+import { ANSWER_DRAFT_MAX_LENGTH, pushDataSchema } from './push-data';
 
 describe('pushDataSchema agent_briefing', () => {
   it('accepts only the privacy-minimal available-report list route', () => {
@@ -334,6 +334,26 @@ describe('pushDataSchema cloud_agent_session', () => {
       answerDraft: 'Use the staging bucket for the export.',
     };
     expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('accepts an answer draft at the length the schema declares', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      answerDraft: 'x'.repeat(ANSWER_DRAFT_MAX_LENGTH),
+    };
+
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('refuses an answer draft past the schema bound', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'cloud_agent_session',
+        cliSessionId: 'cli1',
+        answerDraft: 'x'.repeat(ANSWER_DRAFT_MAX_LENGTH + 1),
+      }).success
+    ).toBe(false);
   });
 
   it('parses a session without an answerDraft and keeps the field absent', () => {

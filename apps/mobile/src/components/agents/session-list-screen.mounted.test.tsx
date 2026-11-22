@@ -2274,7 +2274,7 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(compact()).toBe(false);
 
-    //...no longer holds it once Dynamic Type grows the title, the hint and the
+    // ...no longer holds it once Dynamic Type grows the title, the hint and the
     // action, so the state must drop the icon bubble and tighten the gaps.
     state.fontScale = 2;
     await renderScreen();
@@ -2343,7 +2343,7 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(compact()).toBe(false);
 
-    //...no longer holds it once reduced motion reserves RefreshProgress's h-9
+    // ...no longer holds it once reduced motion reserves RefreshProgress's h-9
     // box (31.5dp) inside the band, so the state must go compact instead of
     // running its hint and Clear action under the bar.
     state.reducedMotion = true;

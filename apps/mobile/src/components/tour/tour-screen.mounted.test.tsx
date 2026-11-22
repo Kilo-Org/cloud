@@ -15,7 +15,7 @@ const routerBack = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 // The hand-off's router. A literal `router.replace` swaps the tour and the
 // new-session page in one native-stack commit, which crashes Android Fabric
-//, so the shell must route the hand-off through the stack-safe
+// so the shell must route the hand-off through the stack-safe
 // replace instead.
 const stackSafeReplace = vi.hoisted(() => vi.fn());
 // Models the navigator's own history: false means the tour is the app's first

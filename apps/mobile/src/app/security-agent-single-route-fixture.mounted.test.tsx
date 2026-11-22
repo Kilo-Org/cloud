@@ -18,12 +18,8 @@ type Params = { scope?: string | string[]; suffix?: string };
 const params = vi.hoisted((): Params => ({}));
 
 vi.mock('expo-router', () => ({
+  useRouter: () => router,
   useLocalSearchParams: () => params,
-}));
-// The hand-off goes through the stack-safe replace hook, so the double stands
-// in for it and the assertions below pin the destination it is handed.
-vi.mock('@/lib/navigation/stack-safe-replace', () => ({
-  useStackSafeReplace: () => router,
 }));
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;

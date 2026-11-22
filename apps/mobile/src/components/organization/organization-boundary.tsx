@@ -115,8 +115,7 @@ export function OrganizationBoundary({
         onPress={() => {
           // Leaving for Profile swaps this boundary's screen out, so it goes
           // through the push-then-retire hook: a literal `router.replace` swaps
-          // both in one native-stack commit and crashes Android Fabric
-          //.
+          // both in one native-stack commit and crashes Android Fabric.
           stackSafeRouter.replace(PROFILE_TAB_HREF);
         }}
       />

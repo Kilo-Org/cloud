@@ -132,8 +132,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     if (target.kind === 'pop') {
       router.back();
     } else {
-      // A swap here is the Android Fabric crash `stack-safe-replace` avoids
-      //, so the findings list is pushed and this route retired.
+      // A swap here is the Android Fabric crash `stack-safe-replace` avoids,
+      // so the findings list is pushed and this route retired.
       stackSafeRouter.replace(target.href);
     }
   };

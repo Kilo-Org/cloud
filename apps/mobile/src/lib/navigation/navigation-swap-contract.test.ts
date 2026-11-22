@@ -33,6 +33,13 @@ const ALLOWED: Record<string, string> = {
   // ((app) vs (auth)) rather than one screen for another. Pushing first would
   // mount the other group's tree beside the current one.
   'src/app/_layout.tsx': 'root group redirect over the Slot',
+  // These two routes render directly under that root `Slot`, which is a plain
+  // router navigator: it emits no transition start or end, so a push-then-retire
+  // could never retire the source, and Back from the destination would return to
+  // the dead route. `replace` leaves nothing beneath.
+  'src/app/+not-found.tsx': 'root Slot route; no transition event to retire on',
+  'src/app/security-agent-single-route-fixture.tsx':
+    'root Slot route; no transition event to retire on',
   // Reopens the route that was open before an RTL reload, from the app root,
   // outside any screen's stack.
   'src/lib/hooks/use-language-startup-preparation.ts': 'root-level RTL reload return',
@@ -47,11 +54,12 @@ const ALLOWED: Record<string, string> = {
   'src/lib/navigation/settled-replace.ts': 'the settle-then-swap hook itself',
 };
 
-/** The hooks a swapping file may use, matched by their import specifier. */
-const SAFE_HOOKS = [
-  "from '@/lib/navigation/stack-safe-replace'",
-  "from '@/lib/navigation/settled-replace'",
-];
+/**
+ * The bindings a swapping file may use. Matching the call, not the import, is
+ * what makes this a contract: a file that imports one of the hooks and then
+ * still calls `router.replace` fails.
+ */
+const SAFE_BINDINGS = ['= useStackSafeReplace(', '= useSettledReplace('];
 
 function sourceFiles(): string[] {
   return readdirSync(join(APP_ROOT, 'src'), { recursive: true, encoding: 'utf8' })
@@ -69,7 +77,7 @@ describe('navigation swap contract', () => {
         if (!source.includes('router.replace(')) {
           return false;
         }
-        return !SAFE_HOOKS.some(specifier => source.includes(specifier));
+        return !SAFE_BINDINGS.some(binding => source.includes(binding));
       });
     expect(offenders).toEqual([]);
   });

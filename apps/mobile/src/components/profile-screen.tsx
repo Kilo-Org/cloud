@@ -32,6 +32,7 @@ import {
   ContextControl,
   useContextPicker,
 } from '@/components/context-control';
+import { DeleteAccountCodeCard } from '@/components/delete-account-code-card';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -49,10 +50,8 @@ import {
 } from '@/components/settings-search/use-settings-search';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
-import { FormField } from '@/components/ui/form-field';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
@@ -411,7 +410,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
   const {
     phase: deletePhase,
     isPending: deletePending,
-    devCode,
+    code: deleteCode,
     canSubmitCode,
     beginDelete,
     submitCode,
@@ -828,32 +827,13 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
               </RowGroup>
 
               {(deletePhase === 'awaiting-code' || deletePhase === 'executing') && (
-                <Card className="gap-3">
-                  <FormField
-                    label={t('profile.confirmationCode')}
-                    placeholder={t('profile.confirmationCodePlaceholder')}
-                    keyboardType="number-pad"
-                    // Android only: keep the IME docked to the number-pad instead
-                    // of swapping to its full-screen extract editor, whose window
-                    // parks over the whole screen and buries the destructive submit
-                    // below it. The shared scroll view already reserves the docked
-                    // IME height and the reveal scrolls the block to its end, so
-                    // `TabScreenScrollView`'s occlusion reservation leaves the
-                    // submit above the keyboard without a dimensions change here.
-                    disableFullscreenUI
-                    defaultValue={devCode ?? undefined}
-                    onChangeText={setCode}
-                    editable={deletePhase !== 'executing'}
-                  />
-                  <Button
-                    variant="destructive"
-                    loading={deletePhase === 'executing'}
-                    disabled={deletePhase === 'executing' || !canSubmitCode}
-                    onPress={submitCode}
-                  >
-                    <Text>{t('profile.confirmDeletion')}</Text>
-                  </Button>
-                </Card>
+                <DeleteAccountCodeCard
+                  initialCode={deleteCode}
+                  canSubmitCode={canSubmitCode}
+                  executing={deletePhase === 'executing'}
+                  onChangeCode={setCode}
+                  onSubmit={submitCode}
+                />
               )}
 
               <Text variant="caption" className="text-center">

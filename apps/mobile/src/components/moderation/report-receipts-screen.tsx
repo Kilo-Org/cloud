@@ -18,12 +18,13 @@ import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-gr
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { SCREEN_GUTTER_DP } from '@/lib/layout';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
   hasRetentionBudget,
   reconcileFirstPage,
   withInfiniteRetention,
 } from '@/lib/query/infinite-retention';
-import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { reportReceiptRoute } from '@/lib/report-receipt-route';
 import {
@@ -51,11 +52,21 @@ const MAX_PAGES = 10;
 const SEPARATOR = ' · ';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
+/**
+ * The list body's top pad, in dp: the app's native rem is 14 pt, so this is the
+ * `pt-4` both branches have always carried. It stays one value for the skeleton
+ * and for the rows that replace it, so the card does not move when the load
+ * settles.
+ */
+const LIST_TOP_PAD = 14;
 // The page gutter and the top pad live on the content container; the cells are
 // one continuous grouped card, so no per-cell inset and no gap between them.
+// The inset is the shared page gutter — the same one the header and the receipt
+// this list opens use — and both the loading branch and the settled list take
+// this one style, so the skeleton and the rows share their geometry.
 const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingTop: 16,
+  paddingHorizontal: SCREEN_GUTTER_DP,
+  paddingTop: LIST_TOP_PAD,
 } satisfies ViewStyle;
 
 /**
@@ -157,7 +168,7 @@ export function ReportReceiptsScreen() {
       />
       <View className="flex-1">
         {loading ? (
-          <TabScreenScrollView className="flex-1" contentContainerClassName="px-4 pt-4">
+          <TabScreenScrollView className="flex-1" contentContainerStyle={listContentContainerStyle}>
             {/* The loaded rows are one grouped card, so the reserve is one. */}
             <RowGroup>
               <RowSkeleton subtitle />

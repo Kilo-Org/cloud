@@ -701,8 +701,10 @@ export class NativeSyncClient {
     /**
      * One ticket mint: the credential lookup, the grant exchange and the ticket POST, bounded
      * end to end. Each hop carries its own deadline, yet three slow hops would still hold a
-     * connect for their sum, so the whole chain races one mint deadline. The request carries the
-     * deadline's signal, so it cancels the hop in flight the moment the total bound fires.
+     * connect for their sum, so the whole chain races one mint deadline. The deadline's signal
+     * is the one the ticket POST carries, so that request is cancelled when the bound fires.
+     * The credential lookup and the grant exchange are shared with every other caller of this
+     * client, so they keep their own deadlines and are not cancelled with this mint.
      */
     const mint = ({ signal }: { signal?: AbortSignal } = {}) => {
       const controller = new AbortController();

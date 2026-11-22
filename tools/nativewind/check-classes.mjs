@@ -876,6 +876,12 @@ function anyPadding(token) {
  * `ScreenHeader`/`SheetHeader` owns its own gutter, so a screen writes no
  * padding on its `className`. Both move the page inset the contract fixed, and
  * the header's own gutter is what the next screen lines up against.
+ *
+ * The one carve-out is a margin of `auto` or `0` on a content container: an
+ * auto margin centres the container instead of moving the page column, and a
+ * zero margin writes no inset, which is why `wrongGutter` passes both. A
+ * padding of `0` is not carved out — a content container with no gutter is the
+ * gutterless column that policy exists for.
  */
 function detectScrollGutters({ program, chunks, text, lineOf }) {
   const problems = [];

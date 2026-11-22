@@ -422,6 +422,28 @@ describe('RepoBindingsScreen', () => {
     unmount();
   });
 
+  it('closes the Add flow when the read turns terminal under it', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressButton(renderer.root, 'Add default');
+    pressPressable(renderer.root, 'Select repository…');
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    // The same read now answers terminally: the screen shows the access state,
+    // so the sheet the removed form opened must close with it.
+    Object.assign(h.bindingsQuery, { isError: true, error: { data: { code: 'FORBIDDEN' } } });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+    expect(findOne(renderer.root, 'QueryError').props.variant).toBe('permission');
+
+    unmount();
+  });
+
   it('keeps the rows while a refetch is in flight', async () => {
     Object.assign(h.bindingsQuery, { bindings: [testBinding()], isLoading: false });
 

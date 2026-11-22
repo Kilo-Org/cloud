@@ -101,14 +101,17 @@ export function RepoBindingsScreen({
   const [repoPickerOpen, setRepoPickerOpen] = useState(false);
   const [profilePickerOpen, setProfilePickerOpen] = useState(false);
 
-  // The Add flow belongs to the permission it opened under, and the screen can
-  // learn a new permission while that flow is on screen: the sheets are native
-  // sheets over this route, so the route keeps focus and nothing else closes
-  // them. The flow therefore lasts only as long as the permission that allows
-  // it, and closing it here keeps every control it presents in step with the
-  // slot that decides whether Add is offered.
+  // The Add flow belongs to the permission and the read it opened under, and
+  // the screen can learn either while that flow is on screen: the sheets are
+  // native sheets over this route, so the route keeps focus and nothing else
+  // closes them. The flow therefore lasts only as long as the permission that
+  // allows it and a read that was not answered terminally, and closing it here
+  // keeps every control it presents in step with the slot that decides whether
+  // Add is offered. A terminal read failure removes the form and the header's
+  // create control, so an open sheet would sit over a state that no longer
+  // offers it.
   useEffect(() => {
-    if (canManage) {
+    if (canManage && !readErrorTerminal) {
       return;
     }
     setSelectedRepo(null);
@@ -116,7 +119,7 @@ export function RepoBindingsScreen({
     setIsAdding(false);
     setRepoPickerOpen(false);
     setProfilePickerOpen(false);
-  }, [canManage]);
+  }, [canManage, readErrorTerminal]);
 
   const repoOptions = useRepoOptions(organizationId, isAdding);
   const profileChoices =

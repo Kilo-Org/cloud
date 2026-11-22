@@ -12,7 +12,7 @@ export type ProfileOverviewErrorView = {
    * led here is stale. The list is refreshed so the dead row leaves it.
    */
   staleRow: boolean;
-  /** An added line under the variant's own description, or null. */
+  /** Replaces the variant's own description, or null. */
   descriptionKey: 'organization.boundary.accessDeniedDescription' | null;
 };
 

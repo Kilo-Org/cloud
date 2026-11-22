@@ -13,12 +13,13 @@
 //
 // The precedence is fixed, in this order:
 //
-// 1. A coded tRPC verdict wins. The server answered, so no retry can change the
-//    answer, and the answer is not a connectivity problem however the device
-//    reports its network. Only an error with no tRPC envelope is judged by
-//    connectivity.
+// 1. A terminal coded tRPC verdict wins. The server answered and no retry can
+//    change the answer, so the state and the absence of Retry follow the code
+//    however the device reports its network.
 // 2. A confirmed-offline device is then a connectivity failure, not a server
-//    one, and stays retryable.
+//    one, and stays retryable. A coded refusal that is not terminal (a server
+//    fault, a deadline) still yields to it here: the device cannot reach the
+//    server now, and the answer may differ once it can.
 // 3. Everything else is the variant the shared helpers report, retryable.
 //
 // The variant and retry decision reuse the shared tRPC helpers, so these reads
@@ -39,7 +40,7 @@ export type ProfileReadErrorView = {
   showRetry: boolean;
   /** The read's own load-failure title, or null to use the variant's copy. */
   titleKey: 'profiles.loadFailed' | null;
-  /** An added line under the variant's own description, or null. */
+  /** Replaces the variant's own description, or null. */
   descriptionKey: 'organization.boundary.accessDeniedDescription' | null;
 };
 

@@ -1,41 +1,44 @@
 import { type ReactNode, useState } from 'react';
-import { View } from 'react-native';
+
+import { isFormSheetRoute } from '@/lib/form-sheet-routes';
 
 /**
- * Keeps the PR-review subtree (`children`) mounted once it has mounted, and
- * draws a later gate arm above it instead of replacing it.
+ * Holds a PR-review gate arm back while a form sheet of the review stack is
+ * presented, and replaces the review subtree the rest of the time.
  *
  * The gate covers the route's `Stack`, and a `formSheet` route — the
  * conversation or inline comment composer, the submit-review and merge sheets —
- * is a scene of that stack. Replacing the stack while the reader has one of
- * those sheets open tears the sheet's content down and leaves its native
- * surface behind as a dimmed, empty panel (measured on Android: a uniform dim,
- * one empty full-screen group, no title, no body field, no footer). A status
- * change can arrive exactly then: the integration status is re-read after a
- * scope switch, a reconnect check, an organization selection restore, or a
- * failed read.
+ * is a scene of that stack, drawn inside the same native window. Replacing the
+ * stack while the reader has one of those sheets open tears the sheet's content
+ * down and leaves its native surface behind as a dimmed, empty panel (measured
+ * on Android: a uniform dim, one empty full-screen group, no title, no body
+ * field, no footer). An arm drawn above the stack instead covers the sheet the
+ * same way, so it is no better: a full-bleed surface in the layout's view paints
+ * over the sheet's own scene.
  *
- * So the first decision still replaces the subtree: a reader who is not
- * connected never mounts the authenticated review queries below, and a deep link
- * straight to a sheet route cannot present a sheet the gate would cover. After
- * that, an arm is an opaque overlay in this layout's own view. The covered
- * scene keeps its mounted state — the reader's tab, scroll position and any
- * presented sheet — while the arm explains the new state above it.
+ * A status change can arrive exactly while a sheet is open: the integration
+ * status is re-read after a scope switch, a reconnect check, an organization
+ * selection restore, or a failed read. So:
  *
- * The covered tree leaves touch and the accessibility tree while an arm is up,
- * the presentation `CoveredScreenA11yGate` gives a covered scene. A presented
- * route `formSheet` is its own native window on both platforms, so the arm
- * cannot paint over it and neither flag reaches into it: the reader keeps the
- * sheet they are typing in, and the arm takes the screen once they dismiss it.
- * `collapsable={false}` keeps the native view, because Android collapses a view
- * whose only props are styles and then drops its accessibility props.
+ *  - Before the subtree has mounted at all, the arm replaces it. A reader who is
+ *    not connected never mounts the authenticated review queries below, and a
+ *    deep link straight to a sheet route cannot present a sheet the gate would
+ *    cover.
+ *  - Once the subtree has mounted, an arm that arrives while one of the stack's
+ *    sheets is presented waits. The reader keeps the sheet they are typing in —
+ *    header, body field and submit stay mounted and live — and the arm takes the
+ *    screen on the first frame after the sheet is dismissed, when nothing is
+ *    presented to tear down.
  */
 export function PrReviewGateSurface({
   arm,
+  segments,
   children,
 }: Readonly<{
-  /** The gate arm to draw above the review subtree; `null` renders it alone. */
+  /** The gate arm to render when the review subtree may be replaced. */
   arm: ReactNode | null;
+  /** The current route segments, as `useSegments()` reports them. */
+  segments: readonly string[];
   children: ReactNode;
 }>) {
   // The subtree has mounted at least once. Adjusted during render, the
@@ -46,22 +49,8 @@ export function PrReviewGateSurface({
   if (arm === null && !mounted) {
     setMounted(true);
   }
-  if (!mounted) {
-    return <>{arm}</>;
+  if (arm === null || (mounted && isFormSheetRoute(segments))) {
+    return <>{children}</>;
   }
-  const covered = arm !== null;
-  return (
-    <View className="flex-1">
-      <View
-        className="flex-1"
-        collapsable={false}
-        pointerEvents={covered ? 'none' : 'auto'}
-        accessibilityElementsHidden={covered}
-        importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'}
-      >
-        {children}
-      </View>
-      {covered ? <View className="absolute inset-0">{arm}</View> : null}
-    </View>
-  );
+  return <>{arm}</>;
 }

@@ -1,9 +1,7 @@
-// Mounted coverage for the keeper that holds the PR-review subtree while a gate
-// arm draws above it. The subtree carries the route's Stack, and a comment
-// sheet is a scene of that Stack, so replacing it would tear a presented sheet
-// down. Before the subtree has ever mounted the arm must still be the only
-// thing on screen, and while an arm is up the covered scene must leave touch and
-// the accessibility tree.
+// Mounted coverage for the PR-review gate surface. The behaviour under test is
+// what keeps a presented comment sheet alive: an arm must not replace the Stack
+// below while one of the stack's sheets is presented, and before the subtree has
+// ever mounted the arm must still be the only thing on screen.
 
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,6 +11,9 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { PrReviewGateSurface } from './pr-review-gate-surface';
 
 vi.mock('react-native', () => ({ View: 'View' }));
+
+const BASE_SEGMENTS = ['(app)', 'pr-review', 'gitlab', 'acme', 'sample', '7'] as const;
+const SHEET_SEGMENTS = [...BASE_SEGMENTS, 'conversation-comment'] as const;
 
 function Arm({ name }: { name: string }) {
   return createElement('arm-mark', { name });
@@ -24,9 +25,9 @@ function ReviewStack() {
 
 let mounted: ReactTestRenderer | undefined = undefined;
 
-function update(arm: string | null): void {
+function update(arm: string | null, segments: readonly string[]): void {
   const tree = (
-    <PrReviewGateSurface arm={arm === null ? null : <Arm name={arm} />}>
+    <PrReviewGateSurface arm={arm === null ? null : <Arm name={arm} />} segments={segments}>
       <ReviewStack />
     </PrReviewGateSurface>
   );
@@ -39,19 +40,11 @@ function update(arm: string | null): void {
   });
 }
 
-/** The wrapper that holds the covered subtree, found by its a11y-hiding view. */
-function coveredScene() {
-  const scene = mounted?.root.findAllByType('View').find(view => view.props.collapsable === false);
-  if (!scene) {
-    throw new Error('missing the covered scene wrapper');
+function root(): ReactTestRenderer['root'] {
+  if (mounted === undefined) {
+    throw new Error('not mounted');
   }
-  return scene;
-}
-
-function overlay() {
-  return mounted?.root
-    .findAllByType('View')
-    .find(view => view.props.className === 'absolute inset-0');
+  return mounted.root;
 }
 
 beforeEach(() => {
@@ -60,52 +53,52 @@ beforeEach(() => {
 
 describe('PrReviewGateSurface', () => {
   it('draws only the arm before the review subtree has mounted', () => {
-    update('loading');
-    const root = mounted?.root;
-    expect(root?.findAllByType(ReviewStack)).toHaveLength(0);
-    expect(root?.findByType('arm-mark').props.name).toBe('loading');
-    // The arm replaces the subtree on entry, so it carries no overlay frame.
-    expect(root?.findAllByType('View')).toHaveLength(0);
+    update('loading', BASE_SEGMENTS);
+    expect(root().findAllByType(ReviewStack)).toHaveLength(0);
+    expect(root().findByType('arm-mark').props.name).toBe('loading');
   });
 
-  it('keeps the subtree mounted when a later arm arrives and draws the arm above it', () => {
-    update(null);
-    expect(mounted?.root.findAllByType(ReviewStack)).toHaveLength(1);
-
-    update('connect');
-    expect(mounted?.root.findAllByType(ReviewStack)).toHaveLength(1);
-    expect(mounted?.root.findByType('arm-mark').props.name).toBe('connect');
-    expect(overlay()?.findByType('arm-mark').props.name).toBe('connect');
+  it('draws only the arm on entry even when the link names a sheet route', () => {
+    // A deep link straight to a sheet still gets the gate: a disconnected
+    // reader must never mount the authenticated review queries.
+    update('loading', SHEET_SEGMENTS);
+    expect(root().findAllByType(ReviewStack)).toHaveLength(0);
+    expect(root().findByType('arm-mark').props.name).toBe('loading');
   });
 
-  it('takes the covered scene out of touch and the accessibility tree', () => {
-    update(null);
-    update('connect');
-    const scene = coveredScene();
-    expect(scene.props.pointerEvents).toBe('none');
-    expect(scene.props.accessibilityElementsHidden).toBe(true);
-    expect(scene.props.importantForAccessibility).toBe('no-hide-descendants');
-    // The sheet's own native window is outside this tree, so nothing here can
-    // reach it; only the covered scene is hidden.
-    expect(scene.findAllByType('review-stack')).toHaveLength(1);
+  it('replaces the subtree when a later arm arrives over its overview', () => {
+    update(null, BASE_SEGMENTS);
+    expect(root().findAllByType(ReviewStack)).toHaveLength(1);
+
+    update('connect', BASE_SEGMENTS);
+    expect(root().findAllByType(ReviewStack)).toHaveLength(0);
+    expect(root().findByType('arm-mark').props.name).toBe('connect');
   });
 
-  it('gives the covered scene back when the gate reaches its connected arm', () => {
-    update(null);
-    update('connect');
-    update(null);
-    const scene = coveredScene();
-    expect(scene.props.pointerEvents).toBe('auto');
-    expect(scene.props.accessibilityElementsHidden).toBe(false);
-    expect(scene.props.importantForAccessibility).toBe('auto');
-    expect(mounted?.root.findAllByType('arm-mark')).toHaveLength(0);
+  it('holds the arm back while one of the stack sheets is presented', () => {
+    // The presented sheet is a scene of the Stack below: replacing the subtree
+    // tears its content down, and an arm painted above the stack covers it.
+    update(null, BASE_SEGMENTS);
+    update(null, SHEET_SEGMENTS);
+    update('connect', SHEET_SEGMENTS);
+
+    expect(root().findAllByType(ReviewStack)).toHaveLength(1);
+    expect(root().findAllByType('arm-mark')).toHaveLength(0);
+  });
+
+  it('draws the held arm once the sheet is dismissed', () => {
+    update(null, SHEET_SEGMENTS);
+    update('connect', SHEET_SEGMENTS);
+    update('connect', BASE_SEGMENTS);
+    expect(root().findAllByType(ReviewStack)).toHaveLength(0);
+    expect(root().findByType('arm-mark').props.name).toBe('connect');
   });
 
   it('returns to the bare subtree when the gate reaches its connected arm again', () => {
-    update(null);
-    update('loading');
-    update(null);
-    expect(mounted?.root.findAllByType(ReviewStack)).toHaveLength(1);
-    expect(mounted?.root.findAllByType('arm-mark')).toHaveLength(0);
+    update(null, BASE_SEGMENTS);
+    update('loading', BASE_SEGMENTS);
+    update(null, BASE_SEGMENTS);
+    expect(root().findAllByType(ReviewStack)).toHaveLength(1);
+    expect(root().findAllByType('arm-mark')).toHaveLength(0);
   });
 });

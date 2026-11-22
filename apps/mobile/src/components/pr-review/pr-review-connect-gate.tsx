@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSegments } from 'expo-router';
 import { PlugZap, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -100,6 +101,9 @@ function GitHubConnectGate({
 }: Readonly<{ children: ReactNode; prRef?: ProviderPrRef }>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // The current route segments: an arm must not tear down a presented sheet
+  // (see `PrReviewGateSurface`).
+  const segments = useSegments();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
@@ -244,5 +248,9 @@ function GitHubConnectGate({
     return null;
   }
 
-  return <PrReviewGateSurface arm={renderArm()}>{children}</PrReviewGateSurface>;
+  return (
+    <PrReviewGateSurface arm={renderArm()} segments={segments}>
+      {children}
+    </PrReviewGateSurface>
+  );
 }

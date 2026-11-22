@@ -91,8 +91,8 @@ describe('authorizeGitLabProject', () => {
         threadRepository: 'other/thread',
       })
     ).resolves.toEqual({ allowed: true });
-    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', false);
-    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', false);
+    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', true);
+    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', true);
   });
 
   it('refuses a project the requester connection does not reach', async () => {

@@ -483,7 +483,7 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
           'bot-user-1',
           gitlabProject
         );
-        expect(fetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', false);
+        expect(fetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', true);
         expect(getGitLabTokenForOrganization).toHaveBeenCalledWith('org-1', 'bot-user-1');
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({

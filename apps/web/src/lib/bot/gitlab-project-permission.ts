@@ -73,10 +73,11 @@ export async function authorizeGitLabProject(params: {
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
   }
 
-  // The requester's own project list, not a single-row lookup: an account can
-  // hold more than one GitLab connection, and the one that answers must be the
-  // one that reaches this project on this instance.
-  const requesterRepositories = await fetchGitLabRepositoriesForUser(requesterUserId, false);
+  // The requester's own project list, read fresh: an account can hold more than
+  // one GitLab connection, and the one that answers must be the one that reaches
+  // this project on this instance. A stale snapshot would keep a membership that
+  // has since been removed, so the read is not served from the cache.
+  const requesterRepositories = await fetchGitLabRepositoriesForUser(requesterUserId, true);
   if (
     !requesterRepositories.integrationInstalled ||
     !requesterRepositories.repositories.some(repository =>

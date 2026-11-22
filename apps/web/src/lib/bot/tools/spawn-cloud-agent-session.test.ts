@@ -522,7 +522,7 @@ describe('spawnCloudAgentSession delegation', () => {
       'bot-user-1',
       'group/repo'
     );
-    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', false);
+    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', true);
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         gitUrl: 'https://gitlab.com/group/repo.git',
@@ -557,10 +557,10 @@ describe('spawnCloudAgentSession delegation', () => {
       'bot-user-1',
       'group/repo'
     );
-    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', false);
+    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', true);
     expect(mockGetGitLabTokenForOrganization).toHaveBeenCalledWith('organization-1', 'bot-user-1');
     expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
-    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', false);
+    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', true);
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         gitUrl: 'https://gitlab.com/group/repo.git',

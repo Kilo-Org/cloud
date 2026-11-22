@@ -134,6 +134,17 @@ describe('Telugu analytics copy', () => {
       'లెక్కించబడలేదు: 9 పూర్తయిన సమీక్షలలో 3 సమీక్షలకు ఫలితం క్యాప్చర్ చేయబడలేదు.'
     );
   });
+
+  it('inflects the counted noun for a single review', () => {
+    expect(
+      i18n.t('codeReviewer.analytics.trackedReviewsUncounted', {
+        count: 1,
+        displayCount: '1',
+        total: 9,
+        displayTotal: '9',
+      })
+    ).toBe('లెక్కించబడలేదు: 9 పూర్తయిన సమీక్షలలో 1 సమీక్షకు ఫలితం క్యాప్చర్ చేయబడలేదు.');
+  });
 });
 
 describe('Telugu council copy', () => {

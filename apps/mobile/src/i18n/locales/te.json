@@ -1574,7 +1574,7 @@
       "couldNotLoad": "విశ్లేషణలను లోడ్ చేయలేకపోయాము",
       "trackedReviewsCaption": "విశ్లేషణలు ఆన్‌లో ఉన్నప్పుడు ఈ వ్యవధిలో పూర్తయిన సమీక్షలు. కొనసాగుతున్న మరియు విఫలమైన సమీక్షలు ఎప్పుడూ లెక్కించబడవు.",
       "trackedReviewsUncounted": "లెక్కించబడలేదు: {{displayTotal}} పూర్తయిన సమీక్షలలో {{displayCount}} సమీక్షలకు ఫలితం క్యాప్చర్ చేయబడలేదు.",
-      "trackedReviewsUncounted_one": "లెక్కించబడలేదు: {{displayTotal}} పూర్తయిన సమీక్షలలో {{displayCount}} సమీక్షలకు ఫలితం క్యాప్చర్ చేయబడలేదు.",
+      "trackedReviewsUncounted_one": "లెక్కించబడలేదు: {{displayTotal}} పూర్తయిన సమీక్షలలో {{displayCount}} సమీక్షకు ఫలితం క్యాప్చర్ చేయబడలేదు.",
       "trackedReviewsUncounted_other": "లెక్కించబడలేదు: {{displayTotal}} పూర్తయిన సమీక్షలలో {{displayCount}} సమీక్షలకు ఫలితం క్యాప్చర్ చేయబడలేదు."
     },
     "council": {

@@ -24,9 +24,17 @@ import { SESSION_ATTENTION_KEY } from '@/lib/storage-keys';
  * existing navigation to the session detail.
  *
  * The encrypted KV is loaded lazily so the synchronous store API stays free
- * of the native SQLCipher chain (and importable in node tests). Until
- * hydration completes the store is empty, so badges render from server status
- * alone; a restored ack then suppresses its raise.
+ * of the native SQLCipher chain (and importable in node tests). Beside the
+ * entries the store publishes one hydration phase: `loading` from module init
+ * until the KV read settles, `ready` once the persisted entries (or a
+ * genuinely empty store) are readable, and `failed` when the KV is
+ * unavailable, the read rejects, or the blob does not parse. Consumers hold
+ * their needs-input affordance while the phase is `loading`: an unloaded store
+ * answers "not acked" for every raise, so drawing then would show a badge for
+ * a raise the person already dismissed and withdraw it a moment later. A
+ * `failed` phase is settled — it is never retried and never hangs — and fails
+ * open: the affordance derives from the server status alone, so a missing ack
+ * can add a badge but never suppress a genuine raise.
  *
  * No backend or tRPC imports: this is a mobile-local module so the web client
  * can keep its own copy. The one shared import is the pure timestamp reader,
@@ -131,10 +139,22 @@ type PersistedAttentionEntry = {
   expiresAt: number | null;
 };
 
+/**
+ * The one hydration phase the store publishes beside its entries.
+ *
+ * `loading` — module init until the KV read settles.
+ * `ready` — the read completed: persisted entries applied, or genuinely empty.
+ * `failed` — the KV is unavailable, the read rejected, or the blob does not
+ * parse. Settled: never retried, so consumers must not wait on it; they fail
+ * open instead.
+ */
+export type SessionAttentionHydration = 'loading' | 'ready' | 'failed';
+
 type AttentionStore = {
   listeners: Set<() => void>;
   entries: Map<string, AttentionEntry>;
   revision: number;
+  hydration: SessionAttentionHydration;
 };
 
 const STORE_KEY = '__kiloSessionAttentionStore__';
@@ -143,6 +163,7 @@ const store: AttentionStore = (globalScope[STORE_KEY] ??= {
   listeners: new Set<() => void>(),
   entries: new Map<string, AttentionEntry>(),
   revision: 0,
+  hydration: 'loading',
 });
 
 // ── Encrypted KV (lazy) ─────────────────────────────────────────────────────
@@ -237,10 +258,13 @@ function parseEntries(raw: string): PersistedAttentionEntry[] | null {
   }
 }
 
-function applyHydratedEntries(raw: string): boolean {
+/** What a stored blob did to the in-memory entries. */
+type HydrationApply = 'applied' | 'unchanged' | 'invalid';
+
+function applyHydratedEntries(raw: string): HydrationApply {
   const entries = parseEntries(raw);
   if (!entries) {
-    return false;
+    return 'invalid';
   }
   const now = Date.now();
   let applied = false;
@@ -257,7 +281,7 @@ function applyHydratedEntries(raw: string): boolean {
       applied = true;
     }
   }
-  return applied;
+  return applied ? 'applied' : 'unchanged';
 }
 
 /** The one entry a stored row describes: a cleared raise, or the answer it recorded. */
@@ -279,32 +303,93 @@ function hydratedEntry(entry: PersistedAttentionEntry, raiseId: string): Attenti
 
 let hydrationPromise: Promise<void> | null = null;
 
+// Dev-only: a bundle-time delay so the loading window is observable on a
+// device (`EXPO_PUBLIC_*` is inlined by Metro, so the value is baked into the
+// bundle and never read at runtime). Default 0 keeps the shipped timing; a
+// value that is not a positive finite number is ignored.
+const configuredHydrationDelayMs = __DEV__
+  ? Number(process.env.EXPO_PUBLIC_SESSION_ATTENTION_HYDRATION_DELAY_MS ?? 0)
+  : 0;
+const devHydrationDelayMs =
+  Number.isFinite(configuredHydrationDelayMs) && configuredHydrationDelayMs > 0
+    ? configuredHydrationDelayMs
+    : 0;
+
+/**
+ * Settle the hydration phase, bumping the revision when the phase changed — or
+ * when the same settle also changed the entries, so a restored ack still
+ * notifies subscribers exactly once.
+ */
+function settleHydration(next: SessionAttentionHydration, entriesChanged = false): void {
+  const changed = store.hydration !== next;
+  store.hydration = next;
+  if (!changed && !entriesChanged) {
+    return;
+  }
+  // Restored acks (and the settled phase itself) change badge decisions:
+  // notify subscribers so rows re-render and re-evaluate `isAttentionAcked`.
+  bumpRevision();
+}
+
+/** The one persisted read: the stored blob, the absence of one, or a failed read. */
+type PersistedRead =
+  | { readonly kind: 'read'; readonly raw: string | null }
+  | { readonly kind: 'error' };
+
+async function readPersistedEntries(kv: AttentionKv): Promise<PersistedRead> {
+  try {
+    return {
+      kind: 'read',
+      raw: await kv.getItem(SESSION_ATTENTION_KEY, SESSION_ATTENTION_ENTRY_KEY),
+    };
+  } catch {
+    return { kind: 'error' };
+  }
+}
+
 // eslint-disable-next-line require-await, @typescript-eslint/require-await -- single-flight must memoize hydration synchronously before any await; the awaits live inside the memoized hydration chain (same pattern as openDatabase in encrypted-kv.ts)
 async function hydrate(): Promise<void> {
   if (hydrationPromise) {
     return hydrationPromise;
   }
   hydrationPromise = (async () => {
+    if (devHydrationDelayMs > 0) {
+      const { promise, resolve } = Promise.withResolvers<undefined>();
+      setTimeout(resolve, devHydrationDelayMs);
+      await promise;
+    }
     const kv = await loadKv();
     if (!kv) {
+      // No encrypted KV on this build: settled and empty, and it never retries.
+      settleHydration('failed');
       return;
     }
-    try {
-      const raw = await kv.getItem(SESSION_ATTENTION_KEY, SESSION_ATTENTION_ENTRY_KEY);
-      if (raw !== null && applyHydratedEntries(raw)) {
-        // Restored acks change badge decisions: notify subscribers so rows
-        // re-render and re-evaluate `isAttentionAcked`.
-        bumpRevision();
-      }
-    } catch {
-      // Unreadable KV: start empty; badges re-derive from server status.
+    const read = await readPersistedEntries(kv);
+    if (read.kind === 'error') {
+      // Unreadable KV: settled, so consumers fail open on the server status.
+      settleHydration('failed');
+      return;
     }
+    if (read.raw === null) {
+      // No blob is a genuinely empty store, not a failure.
+      settleHydration('ready');
+      return;
+    }
+    // The single hydration bump: applying entries and settling to `ready` are
+    // the same transition, so an applied blob still notifies exactly once.
+    const applied = applyHydratedEntries(read.raw);
+    if (applied === 'invalid') {
+      settleHydration('failed');
+      return;
+    }
+    settleHydration('ready', applied === 'applied');
   })();
   return hydrationPromise;
 }
 
-// Hydrate at module init, before the first read. The store stays empty until
-// this completes, so badges render from server status in the meantime.
+// Hydrate at module init, before the first read. The store reports `loading`
+// until this settles, so consumers hold their badge instead of drawing one
+// from a store that may still answer "not acked" for a restored ack.
 void hydrate();
 
 // ── Store ───────────────────────────────────────────────────────────────────
@@ -338,12 +423,61 @@ export function getRevisionSnapshot(): number {
   return store.revision;
 }
 
+/** The settled/unsettled hydration phase. Stable primitive, safe as a store snapshot. */
+export function getHydrationSnapshot(): SessionAttentionHydration {
+  return store.hydration;
+}
+
 /**
  * Server snapshot for `useSyncExternalStore`. Stable across calls so the
  * hook is SSR / RN-safe; the real revision is read on the client.
  */
 function getServerSnapshot(): number {
   return 0;
+}
+
+/** Server snapshot for the hydration phase: nothing has hydrated on the server. */
+function getHydrationServerSnapshot(): SessionAttentionHydration {
+  return 'loading';
+}
+
+/**
+ * Enders for the settle waits a caller armed, so a test reset can end them
+ * instead of leaving a timer (or a latch nobody resolves) behind for the next
+ * case.
+ */
+const settledWaitReleases = new Set<() => void>();
+
+/**
+ * Resolves once hydration has settled (`ready` or `failed`), or after
+ * `deadlineMs`, whichever comes first. A background process that republishes
+ * the glanceable surfaces must not be withheld indefinitely by a store that
+ * has not settled, so the deadline is the caller's; the state is unchanged by
+ * the wait, so a caller that times out can still read `getHydrationSnapshot()`.
+ *
+ * Never rejects: `hydrationPromise` settles its own read failures into
+ * `failed` instead of throwing.
+ */
+export async function whenSessionAttentionHydrationSettled(deadlineMs: number): Promise<void> {
+  if (store.hydration !== 'loading') {
+    return;
+  }
+  const inFlight = hydrationPromise;
+  const { promise: deadline, resolve: deadlineReached } = Promise.withResolvers<undefined>();
+  const timer = setTimeout(deadlineReached, deadlineMs);
+  function release(): void {
+    clearTimeout(timer);
+    deadlineReached(undefined);
+  }
+  settledWaitReleases.add(release);
+  try {
+    // No read in flight (only a test reset leaves that): the phase has not
+    // settled and nothing will settle it, so only the deadline ends the wait.
+    await (inFlight === null ? deadline : Promise.race([inFlight, deadline]));
+  } finally {
+    settledWaitReleases.delete(release);
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -507,11 +641,19 @@ export function reconcileSessionAttention(
  * re-persist the blob afterwards, and hydration is re-armed so the next
  * signed-in account starts from an empty store.
  *
+ * The hydration phase settles to `ready`, never back to `loading`: the store is
+ * now authoritatively empty for the next account, and nothing re-runs hydrate
+ * for this run. Returning to `loading` would hold every badge until some read
+ * that never comes.
+ *
  * Best effort: a storage failure is swallowed so it can never abort sign-out.
  */
 export async function clearSessionAttentionForSignOut(): Promise<void> {
   store.entries.clear();
-  bumpRevision();
+  // One bump, through the settle helper: the phase moves to `ready` (or, when it
+  // already is, the cleared entries are the change). Nothing re-runs hydrate for
+  // this run, so the phase must never move back to `loading`.
+  settleHydration('ready', true);
   lastWrite = chainSave(SESSION_ATTENTION_KEY, async () => {
     const kv = await loadKv();
     if (!kv) {
@@ -576,16 +718,54 @@ export function isAttentionAcked(sessionId: string, raise: AttentionRaise): bool
   );
 }
 
-export function shouldShowNeedsInput({
+/** What a needs-input surface does with its affordance for one row. */
+export type NeedsInputVisibility = 'show' | 'hold' | 'hide';
+
+/**
+ * Decide one row's needs-input affordance from the server status, the store's
+ * hydration phase, and whether this raise is acked.
+ *
+ * - `loading` — the ack store has not settled, so it answers "not acked" for
+ *   every raise including one the person already dismissed: hold the
+ *   affordance rather than draw a badge that would disappear a moment later.
+ * - `failed` — settled and empty. Fail open: derive the badge from the server
+ *   status alone. A missing ack can add a badge the person dismissed, but it
+ *   can never suppress a genuine raise, and losing a raise is the worse error.
+ * - `ready` — hide only the raise the store knows was answered.
+ */
+export function needsInputVisibility({
   status,
-  raiseId: _raiseId,
+  hydration,
   isAcked,
 }: {
   status: string | null | undefined;
-  raiseId: string | null;
+  hydration: SessionAttentionHydration;
+  isAcked: boolean;
+}): NeedsInputVisibility {
+  if (hydration === 'loading') {
+    return 'hold';
+  }
+  if (!sessionNeedsInput(status)) {
+    return 'hide';
+  }
+  if (hydration === 'failed') {
+    return 'show';
+  }
+  return isAcked ? 'hide' : 'show';
+}
+
+/**
+ * The visibility reader for a non-React caller that already holds the
+ * hydration state (a widget, a notification planner, a background republish).
+ * A component reads `needsInputVisibility` with `useSessionAttentionHydration`
+ * so it re-renders when the phase settles.
+ */
+export function shouldShowNeedsInput(input: {
+  status: string | null | undefined;
+  hydration: SessionAttentionHydration;
   isAcked: boolean;
 }): boolean {
-  return sessionNeedsInput(status) && !isAcked;
+  return needsInputVisibility(input) === 'show';
 }
 
 /**
@@ -597,17 +777,34 @@ export function useSessionAttentionRevision(): number {
   return useSyncExternalStore(subscribe, getRevisionSnapshot, getServerSnapshot);
 }
 
+/**
+ * Subscribe a component to the hydration phase. Every transition bumps the
+ * revision, so this re-renders when the phase settles ('loading' → `ready` /
+ * `failed`); read it beside `isAttentionAcked` and pass both to
+ * `needsInputVisibility`.
+ */
+export function useSessionAttentionHydration(): SessionAttentionHydration {
+  return useSyncExternalStore(subscribe, getHydrationSnapshot, getHydrationServerSnapshot);
+}
+
 // ── Test-only helpers ───────────────────────────────────────────────────────
 
 /**
- * Test-only: clear all acks and reset the revision counter so each
- * test starts from a known state. Not for production use.
+ * Test-only: clear all acks, return the store to its pre-hydration phase, and
+ * reset the revision counter so each test starts from a known state. A settle
+ * wait an earlier case armed is released here, so no timer resolves into a
+ * later case. Not for production use.
  */
 export function __resetSessionAttentionForTests(): void {
   store.entries.clear();
   store.revision = 0;
+  store.hydration = 'loading';
   hydrationPromise = null;
   lastWrite = null;
+  for (const release of settledWaitReleases) {
+    release();
+  }
+  settledWaitReleases.clear();
 }
 
 /** Test-only: re-run hydration (a simulated restart) and return its promise. */

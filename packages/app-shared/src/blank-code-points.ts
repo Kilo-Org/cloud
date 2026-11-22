@@ -14,12 +14,14 @@
  * draws.
  *
  * The code points that are default-ignorable but neither a mark nor a format
- * character (U+2065, U+FFF0–FFF8, the U+E0000–E0FFF tag block) are deliberately
- * not covered. `hasVisibleText` keeps them visible and `hasVisibleGlyph` keeps
- * them blank, which is the answer each gate already gave: counting them blank
- * everywhere would start refusing organization names, directory-sync names and
- * composer text that carry them. Deciding that for those gates is its own
- * change, so the difference stays and is named here rather than left implicit.
+ * character — U+2065, U+FFF0–FFF8, and the unassigned code points of the
+ * U+E0000–E0FFF range, whose assigned members are format characters already
+ * covered — are deliberately not covered. `hasVisibleText` keeps them visible
+ * and `hasVisibleGlyph` keeps them blank, which is the answer each gate already
+ * gave: counting them blank everywhere would start refusing organization names,
+ * directory-sync names and composer text that carry them. Deciding that for
+ * those gates is its own change, so the difference stays and is named here
+ * rather than left implicit.
  */
 export const BLANK_FILLER_CODE_POINTS: ReadonlySet<number> = new Set([
   0x115f, 0x1160, 0x2800, 0x3164, 0xffa0,

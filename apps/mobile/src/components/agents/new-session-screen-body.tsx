@@ -159,7 +159,8 @@ function AndroidPendingPickerRecovery({
 }
 
 export function NewSessionScreenBody() {
-  const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
+  const { mode, setMode, model, setModel, variant, setVariant, modelSelectionFailure } =
+    useNewSessionModelState();
   const { t } = useTranslation();
   const router = useRouter();
   const pushOnce = useSinglePushRoute();
@@ -1491,6 +1492,7 @@ export function NewSessionScreenBody() {
         model={isRemoteTargetSelected ? modelView.selectedValue : displayModel}
         variant={isRemoteTargetSelected ? modelView.selectedVariant : displayVariant}
         modelOptions={isRemoteTargetSelected ? modelView.options : modelOptionsForToolbar}
+        modelSelectionFailure={modelSelectionFailure}
         customOptions={isRemoteTargetSelected ? remoteCustomOptions : customOptions}
         modelLocked={isRemoteTargetSelected ? false : Boolean(pinned.model)}
         modelLockLabel={isRemoteTargetSelected ? undefined : pinned.agentName}

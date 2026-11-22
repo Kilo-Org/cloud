@@ -1,13 +1,21 @@
-/* eslint-disable max-lines -- the collapsed-row, expand/collapse and view-on-provider suites share one fixture and mock harness in this file. */
+/* eslint-disable max-lines -- the collapsed-row, expand/collapse, view-on-provider and not-found suites share one fixture and mock harness in this file. */
 import { type ComponentProps, createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { QueryClientProvider } from '@tanstack/react-query';
+
 import { ExternalLink } from '@/components/ui/icons';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
-import { ProviderPrScopeProvider, ProviderPrWebUrlProvider } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrScope,
+  ProviderPrScopeProvider,
+  ProviderPrWebUrlProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 import { openExternalUrl } from '@/lib/external-link';
+import { createTestQueryClient } from '@/test/render-with-providers';
 import { PrReviewChecksSection } from './pr-review-checks-section';
+import { PrReviewUnavailableActions } from './pr-review-unavailable-actions';
 
 const query = vi.hoisted(() => ({
   data: {
@@ -53,6 +61,10 @@ vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
   Loader2: 'Loader2',
   MinusCircle: 'MinusCircle',
+  // The two glyphs the recovery actions carry; the suite below mounts that
+  // component for real.
+  PlugZap: 'PlugZap',
+  RotateCcw: 'RotateCcw',
   XCircle: 'XCircle',
 }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
@@ -71,13 +83,29 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     foreground: 'black',
     good: 'green',
     mutedForeground: 'gray',
+    // The recovery actions' shared `StateAction` reads the disabled ink.
+    primaryForeground: 'white',
     warn: 'orange',
   }),
+  useMutedDisabledInk: () => 'gray',
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+// The settled read carries no error in the row suites, so only the not-found
+// suite below reaches this: it answers the one arm that suite drives and the
+// generic retryable arm for anything else.
 vi.mock('@/lib/pr-review/classify-pr-review-query-state', () => ({
-  classifyPrReviewQueryState: () => ({ kind: 'retryable' }),
+  classifyPrReviewQueryState: (error: unknown) =>
+    (error as { data?: { code?: string } } | undefined)?.data?.code === 'NOT_FOUND'
+      ? { kind: 'not-found' }
+      : { kind: 'retryable' },
 }));
+// `PrReviewUnavailableActions` mounts for real on a provider scope; its retry
+// is the shared `StateAction`, whose own styling and busy face belong to its
+// suite, so here it is a host that carries the `onPress` this suite presses.
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
+// The recovery actions' own two glyphs; the rest of the icons stay the host
+// stubs the row suites query.
+vi.mock('sonner-native', () => ({ toast: vi.fn() }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     githubPrReview: { listChecks: { queryOptions: () => ({}) } },
@@ -381,4 +409,137 @@ describe('PrReviewChecksSection view-on-provider link', () => {
     });
     restore();
   });
+});
+
+describe('PrReviewChecksSection not-found arm', () => {
+  const gitlabScope: ProviderPrScope = {
+    ref: {
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+      instanceHint: 'https://gitlab.example.com',
+    },
+    organizationId: null,
+  };
+  const bitbucketScope: ProviderPrScope = {
+    ref: { platform: 'bitbucket', workspace: 'acme', repoSlug: 'repo', prId: 12 },
+    organizationId: 'org-1',
+  };
+
+  /**
+   * The settled read answered NOT_FOUND. GitLab and Bitbucket fold their
+   * connection failures into that same answer, so the section cannot treat it
+   * as terminal there; GitHub's own NOT_FOUND is genuinely terminal and mounts
+   * with no scope at all, which is the fallback the GitHub route gets.
+   *
+   * The real `PrReviewUnavailableActions` needs the query client its connection
+   * check reads and the scope that decides whether it renders, so every arm
+   * mounts under both.
+   */
+  function mountNotFound(scope?: ProviderPrScope) {
+    const previous = { isError: query.isError, error: query.error };
+    query.isError = true;
+    query.error = { data: { code: 'NOT_FOUND' } };
+    const client = createTestQueryClient();
+    const section = (
+      <PrReviewChecksSection owner="group/sub" repo="repo" number={12} checks={query} />
+    );
+    const renderer: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    act(() => {
+      renderer.current = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <ProviderPrWebUrlProvider value={null}>
+            {scope ? (
+              <ProviderPrScopeProvider value={scope}>{section}</ProviderPrScopeProvider>
+            ) : (
+              section
+            )}
+          </ProviderPrWebUrlProvider>
+        </QueryClientProvider>
+      );
+    });
+    const created = renderer.current;
+    if (!created) {
+      throw new Error('renderer was not created');
+    }
+    return {
+      renderer: created,
+      restore: () => {
+        query.isError = previous.isError;
+        query.error = previous.error;
+        client.clear();
+      },
+    };
+  }
+
+  function unavailableActions(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root.findAllByType(PrReviewUnavailableActions);
+  }
+
+  /** The recovery row's one primary, the shared state action that re-reads. */
+  function retryAction(renderer: TestRenderer.ReactTestRenderer) {
+    const [retry] = renderer.root.findAllByType('StateAction' as never);
+    if (!retry) {
+      throw new Error('the retry action did not render');
+    }
+    return retry;
+  }
+
+  it('keeps the terminal card on the GitHub arm, with no recovery row', () => {
+    const { renderer, restore } = mountNotFound();
+
+    expect(texts(renderer, 'prReview.checks.notAvailable')).toHaveLength(1);
+    expect(texts(renderer, 'prReview.terms.unavailableDescription')).toHaveLength(0);
+    expect(unavailableActions(renderer)).toHaveLength(0);
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+    restore();
+  });
+
+  it.each([
+    { platform: 'GitLab', scope: gitlabScope },
+    { platform: 'Bitbucket', scope: bitbucketScope },
+  ])(
+    'offers the real recovery rows on a $platform scope, retrying the checks read',
+    ({ scope }) => {
+      const { renderer, restore } = mountNotFound(scope);
+
+      // GitLab and Bitbucket fold their connection failures into the same
+      // NOT_FOUND a removed item produces, so the copy is the shared unavailable
+      // description and the state carries the read retry plus the connection
+      // check instead of the terminal card.
+      expect(texts(renderer, 'prReview.terms.unavailableDescription')).toHaveLength(1);
+      expect(texts(renderer, 'prReview.checks.notAvailable')).toHaveLength(0);
+      const actions = unavailableActions(renderer);
+      expect(actions).toHaveLength(1);
+      const retry = actions[0]?.props.onRetry as (() => void) | undefined;
+      if (!retry) {
+        throw new Error('the recovery rows did not render');
+      }
+      act(() => {
+        retry();
+      });
+      expect(query.refetch).toHaveBeenCalledTimes(1);
+
+      // The real component drew both of its controls: the outlined provider
+      // connection check under the retry, and the retry's own state action,
+      // which re-reads the checks when pressed.
+      const [connectionCheck] = renderer.root.findAllByType('Button' as never);
+      expect(connectionCheck?.props.accessibilityLabel).toBe('prReview.checkConnection');
+      act(() => {
+        (retryAction(renderer).props.onPress as () => void)();
+      });
+      expect(query.refetch).toHaveBeenCalledTimes(2);
+
+      act(() => {
+        renderer.unmount();
+      });
+      restore();
+    }
+  );
 });

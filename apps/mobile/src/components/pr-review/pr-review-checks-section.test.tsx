@@ -1,10 +1,15 @@
+/* eslint-disable max-lines -- the status-group, empty-state and error-arm suites share one mock harness and one fixture in this file, so the section's every state is asserted against one wiring. */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewChecksSection } from './pr-review-checks-section';
 
-import { ProviderPrWebUrlProvider } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrScope,
+  ProviderPrScopeProvider,
+  ProviderPrWebUrlProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 
 type Run = {
   name: string;
@@ -59,6 +64,14 @@ vi.mock('@/components/pr-review/pr-review-checks-status-row', () => ({
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
+// The recovery rows a provider scope gets instead of the terminal card: they
+// mount a query client and the provider's connection check, which this file's
+// harness has neither of, so they are a host here. The mounted suite
+// (`pr-review-checks-section.mounted.test.tsx`) mounts the real component and
+// asserts what it does.
+vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
+  PrReviewUnavailableActions: 'PrReviewUnavailableActions',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
@@ -103,16 +116,27 @@ let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
 /** The URL the review screen publishes for this PR (the GitHub arm's host). */
 const PR_WEB_URL = 'https://github.com/kilo/cloud/pull/7';
 
-function mount(serverWebUrl: string | null = PR_WEB_URL) {
+/**
+ * Mount the section. `PR_WEB_URL` is what the review screen publishes for the
+ * loaded change; `scope` is the provider route's scope, and leaving it out is
+ * exactly the GitHub route's tree — `useProviderPrScope` then falls back to
+ * the GitHub triple, so those cases exercise the GitHub arm.
+ */
+function mount(serverWebUrl: string | null = PR_WEB_URL, scope?: ProviderPrScope) {
+  const section = createElement(PrReviewChecksSection, {
+    owner: 'kilo',
+    repo: 'cloud',
+    number: 7,
+    checks: query,
+  });
   act(() => {
     mounted = TestRenderer.create(
       <ProviderPrWebUrlProvider value={serverWebUrl}>
-        {createElement(PrReviewChecksSection, {
-          owner: 'kilo',
-          repo: 'cloud',
-          number: 7,
-          checks: query,
-        })}
+        {scope ? (
+          <ProviderPrScopeProvider value={scope}>{section}</ProviderPrScopeProvider>
+        ) : (
+          section
+        )}
       </ProviderPrWebUrlProvider>
     );
   });
@@ -310,11 +334,60 @@ describe('PrReviewChecksSection error arms', () => {
     return mount();
   }
 
-  it('shows the terminal not-found message with no button', () => {
+  it('shows the terminal not-found message on the GitHub arm, with no button', () => {
+    // This harness publishes no provider scope, so the section reads the
+    // GitHub triple: GitHub's NOT_FOUND is a genuinely missing ref, so it
+    // stays terminal. The provider scopes' recovery rows are asserted here too
+    // (they are a host in this file) and mounted for real in
+    // `pr-review-checks-section.mounted.test.tsx`.
     const renderer = mountError('NOT_FOUND');
 
     expect(textNodes(renderer, 'prReview.checks.notAvailable')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'PrReviewUnavailableActions')
+    ).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      platform: 'GitLab',
+      scope: {
+        ref: { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+        organizationId: null,
+      } satisfies ProviderPrScope,
+    },
+    {
+      platform: 'Bitbucket',
+      scope: {
+        ref: { platform: 'bitbucket', workspace: 'acme', repoSlug: 'repo', prId: 12 },
+        organizationId: 'org-1',
+      } satisfies ProviderPrScope,
+    },
+  ])('swaps the terminal card for the recovery rows on a $platform scope', ({ scope }) => {
+    // GitLab and Bitbucket fold their connection failures into the same
+    // NOT_FOUND a removed item produces, so the copy is the shared unavailable
+    // description and the state carries the recovery rows, not the terminal
+    // card. The rows are a host here (see the mock above); the mounted suite
+    // mounts the real ones.
+    query.isError = true;
+    query.error = { data: { code: 'NOT_FOUND' } };
+    const renderer = mount(PR_WEB_URL, scope);
+
+    expect(textNodes(renderer, 'prReview.terms.unavailableDescription')).toHaveLength(1);
+    expect(textNodes(renderer, 'prReview.checks.notAvailable')).toHaveLength(0);
+    const actions = renderer.root.findAll(
+      node => String(node.type) === 'PrReviewUnavailableActions'
+    );
+    expect(actions).toHaveLength(1);
+    const retry = actions[0]?.props.onRetry as (() => void) | undefined;
+    if (!retry) {
+      throw new Error('the recovery rows did not render');
+    }
+    act(() => {
+      retry();
+    });
+    expect(query.refetch).toHaveBeenCalledTimes(1);
   });
 
   it('shows the terminal permission message with no button', () => {

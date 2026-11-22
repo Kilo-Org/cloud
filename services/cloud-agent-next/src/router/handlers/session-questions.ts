@@ -7,6 +7,7 @@ import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { answerWithAdmission } from '../../session/answer-admission.js';
+import type { ResolvedPayer } from '../../session/prompt-balance.js';
 import {
   pendingQueueFullAdmissionFailure,
   throwAdmissionError,
@@ -29,7 +30,7 @@ async function answerControlPlane(
   sessionId: SessionId,
   reply: ControlPlaneAnswerReply,
   /** The payer the mutation's own access gate already resolved. */
-  organizationId: string | null
+  resolvedPayer: ResolvedPayer
 ): Promise<{ success: boolean }> {
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
@@ -40,7 +41,7 @@ async function answerControlPlane(
     userId,
     ...(authToken === undefined ? {} : { authToken }),
     cloudAgentSessionId: sessionId,
-    organizationId,
+    resolvedPayer,
     reply,
   });
   switch (outcome.outcome) {
@@ -113,7 +114,7 @@ export function createSessionQuestionHandlers() {
                 questionId: input.questionId,
                 answers: input.answers,
               },
-              access.organizationId
+              { organizationId: access.organizationId }
             );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
@@ -159,7 +160,7 @@ export function createSessionQuestionHandlers() {
                 action: 'reject',
                 questionId: input.questionId,
               },
-              access.organizationId
+              { organizationId: access.organizationId }
             );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
@@ -208,7 +209,7 @@ export function createSessionQuestionHandlers() {
                 permissionId: input.permissionId,
                 response: input.response,
               },
-              access.organizationId
+              { organizationId: access.organizationId }
             );
             logger
               .withFields({ permissionId: input.permissionId, success: result.success })

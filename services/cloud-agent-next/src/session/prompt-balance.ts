@@ -11,6 +11,24 @@ import { requireCurrentSessionAccess } from '../session-access.js';
 import type { Env } from '../types.js';
 import { validateBalanceOnly, type BalanceOnlyResult } from '../balance-validation.js';
 
+/**
+ * The payer a caller's own access gate already resolved. `organizationId` is
+ * explicit rather than optional so "no organization" (the personal payer) can
+ * never be confused with "not resolved yet"; the distinction is a value, not
+ * the presence of a key.
+ */
+export type ResolvedPayer = { organizationId: string | null };
+
+/** The payer balance preflight request shared by every admission boundary. */
+export type PromptBalanceParams = {
+  env: Env;
+  authToken: string;
+  userId: string;
+  cloudAgentSessionId: string;
+  /** Present only when the caller's own access gate already resolved the payer. */
+  resolvedPayer?: ResolvedPayer;
+};
+
 function promptPayerScopeFailure(error: unknown): BalanceOnlyResult {
   if (error instanceof TRPCError && error.code === 'FORBIDDEN') {
     return { success: false, status: 404, message: 'Cloud Agent session was not found' };
@@ -83,18 +101,20 @@ function logPromptPayerScopeFailure(
  * one payer on every surface.
  *
  * A caller that already ran the session access gate passes the payer it
- * resolved as `organizationId`, which skips the read (and its retry) entirely.
- * A supplied `null` is the personal payer, exactly like a read that finds none.
+ * resolved as `resolvedPayer`, which skips the read (and its retry) entirely.
+ * A resolved personal payer is `{ organizationId: null }`, exactly like a read
+ * that finds none; an absent value means the caller resolved nothing, so the
+ * preflight reads it.
  */
-export async function defaultValidatePromptBalance(params: {
-  env: Env;
-  authToken: string;
-  userId: string;
-  cloudAgentSessionId: string;
-  organizationId?: string | null;
-}): Promise<BalanceOnlyResult> {
-  if ('organizationId' in params) {
-    return validateBalanceOnly(params.authToken, params.organizationId ?? undefined, params.env);
+export async function defaultValidatePromptBalance(
+  params: PromptBalanceParams
+): Promise<BalanceOnlyResult> {
+  if (params.resolvedPayer !== undefined) {
+    return validateBalanceOnly(
+      params.authToken,
+      params.resolvedPayer.organizationId ?? undefined,
+      params.env
+    );
   }
   let organizationId: string | null;
   try {

@@ -12,7 +12,11 @@
  * admission, where the DO rebuilds it and refuses if the session moved on.
  */
 import type { BalanceOnlyResult } from '../balance-validation.js';
-import { defaultValidatePromptBalance } from './prompt-balance.js';
+import {
+  defaultValidatePromptBalance,
+  type PromptBalanceParams,
+  type ResolvedPayer,
+} from './prompt-balance.js';
 import type { SandboxSessionV2 } from '../control-plane/session/session-do.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import type { Env } from '../types.js';
@@ -25,14 +29,7 @@ import type {
 import { preflightAndAdmitPromptMessage, type QueueMessageInput } from './queue-message.js';
 
 /** The payer balance preflight, injectable in tests exactly like the prompt route. */
-export type AnswerBalancePreflight = (params: {
-  env: Env;
-  authToken: string;
-  userId: string;
-  cloudAgentSessionId: string;
-  /** The payer the caller already resolved; absent means the preflight reads it. */
-  organizationId?: string | null;
-}) => Promise<BalanceOnlyResult>;
+export type AnswerBalancePreflight = (params: PromptBalanceParams) => Promise<BalanceOnlyResult>;
 
 export type AnswerAdmissionDeps = {
   validatePromptBalance?: AnswerBalancePreflight;
@@ -74,7 +71,7 @@ export async function answerWithAdmission(params: {
    * The payer the caller resolved at its own session access gate. Omitted when
    * the caller runs no gate, so the preflight reads the payer itself.
    */
-  organizationId?: string | null;
+  resolvedPayer?: ResolvedPayer;
   reply: ControlPlaneAnswerReply;
   deps?: AnswerAdmissionDeps;
 }): Promise<AnswerAdmissionOutcome> {
@@ -97,7 +94,7 @@ export async function answerWithAdmission(params: {
     authToken,
     userId: params.userId,
     cloudAgentSessionId: params.cloudAgentSessionId,
-    ...('organizationId' in params ? { organizationId: params.organizationId } : {}),
+    resolvedPayer: params.resolvedPayer,
   });
   if (!balance.success) {
     return { outcome: 'balance', status: balance.status, message: balance.message };

@@ -23,7 +23,10 @@ import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { answerWithAdmission, type AnswerAdmissionOutcome } from '../session/answer-admission.js';
-import { defaultValidatePromptBalance } from '../session/prompt-balance.js';
+import {
+  defaultValidatePromptBalance,
+  type PromptBalanceParams,
+} from '../session/prompt-balance.js';
 import {
   buildControlPlaneMessagePayload,
   ControlPlaneMessageInputError,
@@ -151,12 +154,7 @@ export type KiloFacadeRequestDeps = {
     cloudAgentSessionId: string;
     request: SubmittedSessionMessageRequest;
   }) => Promise<SessionMessageAdmissionResult>;
-  validatePromptBalance?: (params: {
-    env: Env;
-    authToken: string;
-    userId: string;
-    cloudAgentSessionId: string;
-  }) => Promise<BalanceOnlyResult>;
+  validatePromptBalance?: (params: PromptBalanceParams) => Promise<BalanceOnlyResult>;
   interruptPrompt?: (params: {
     env: Env;
     userId: string;

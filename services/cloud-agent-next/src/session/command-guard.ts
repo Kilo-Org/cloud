@@ -451,7 +451,7 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // name. The bound: a write performed by a program this policy does not allow
   // is not covered here, and neither is a path spelled some other way; the edit
   // tool's own map denies the same file.
-  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [`*${spelling}/con*`]),
+  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [`*${spelling}/co*`]),
   // A `cd` node is never evaluated, so a write whose target is the bare name
   // cannot be classified by its directory. These rules refuse that target by
   // name, at the cost of refusing a legitimate write to a file or directory
@@ -466,11 +466,18 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
     `${tool} * 'con'*`,
   ]),
   // The subcommand form compares a key without regard to case, so a rule names
-  // the upper-case spelling as well as the lower-case one.
-  ...['PUSH', 'FORCE', 'ALIAS', 'MIRROR'].flatMap(key => [
+  // the upper-case spelling as well as the lower-case one. The `include` key
+  // reads another file as configuration, so a write to it is refused as well.
+  ...['PUSH', 'FORCE', 'ALIAS', 'MIRROR', 'INCLUDE'].flatMap(key => [
     `git config *.${key}*`,
     `git -?* config *.${key}*`,
   ]),
+  'git config *include*',
+  'git -?* config *include*',
+  // A tab is one separator, so the inline-setting rules name it as the space
+  // rules do.
+  'git*-c\t?*.*',
+  'git*-c\t?*=*',
   // The redirect operator is written with or without a space before the target,
   // so one rule covers both spellings and either operator. A rule sees the
   // command text the runtime classifies, which for a compound line is one node

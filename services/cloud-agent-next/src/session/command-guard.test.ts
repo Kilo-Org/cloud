@@ -533,6 +533,11 @@ describe('security-remediation push command guard policy', () => {
       "cp /tmp/evil 'con'fig",
       'git config remote.origin.PUSH +main',
       'git -C . config alias.P "push --force"',
+      'git config remote.origin.MIRROR true',
+      'git config --global include.path /tmp/inc',
+      'cp /tmp/evil .git/co?fig',
+      'mv /tmp/evil .git/co*f',
+      'git -c\tremote.origin.mirror push',
       // The subcommand word split by a continuation.
       'git pu\\sh --force',
       // A shell hands a line continuation to git inside one command; the

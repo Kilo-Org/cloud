@@ -139,6 +139,21 @@ export function extendsPreviousRaw(
     if (LEADING_ROOT.test(appended) || INDENTED_LINE.test(appended) || !converted.endsWith('\n')) {
       return declined(value);
     }
+    const appendedConverted = convertHtmlToMarkdown(appended);
+    if (appendedConverted.startsWith('\n')) {
+      // The isolated conversion inserted a block separator because its own
+      // output was still empty, while in place the previous text already ends
+      // the block. Join the last line and the append and require the same
+      // conversion as that region in the value, so the composed string stays
+      // byte-identical to the whole conversion.
+      const anchor = previousLineStart(rawValue, rawValue.length);
+      if (
+        `${convertHtmlToMarkdown(rawValue.slice(anchor))}${appendedConverted}` !==
+        convertHtmlToMarkdown(value.slice(anchor))
+      ) {
+        return declined(value);
+      }
+    }
     // The appended text is the only region that can still change, so its own
     // open region — offset by where it begins — is the whole value's. Scanning
     // it keeps that region at the appended size: a later publish that extends a

@@ -910,6 +910,12 @@ const INCREMENTAL_CORPUS = [
   // paragraph and the first list. Completing the bullet merges `2. b ` back into
   // the paragraph, so the boundary must back up over the paragraph's whole run.
   '<b>x</b>\n2. b \n- i\n\n',
+  // A zero-output inline element closes a line whose conversion is already
+  // final, then a root block follows. The block separator is inserted by the
+  // conversion of the appended region alone, so composing that region after the
+  // previous conversion adds one newline the whole value does not have; the
+  // gate must decline instead of composing a different string.
+  'some <b>bold</b> text\n<b></b>\n<h1>Title</h1>\n\n',
   // A line holding only a tab does not end a paragraph in marked's GFM
   // paragraph tokenizer: `…\n\t\n` lexes as a paragraph plus a `space` token
   // while the next line does not interrupt the paragraph, but as one paragraph

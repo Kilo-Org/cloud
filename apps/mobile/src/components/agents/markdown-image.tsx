@@ -57,17 +57,26 @@ function FixedImageSlot({
 function BlockedImageChip({
   kind,
   uri,
+  alt,
   onShowLinkActions,
-}: Readonly<{ kind: 'http' | 'data'; uri: string; onShowLinkActions?: () => void }>) {
+}: Readonly<{
+  kind: 'http' | 'data';
+  uri: string;
+  alt: string;
+  onShowLinkActions?: () => void;
+}>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const host = kind === 'http' ? formatTrustedImageHost(uri) : null;
-  const label = host
+  const reason = host
     ? `${host} · ${t('agentChat.markdownImage.httpsOnly')}`
     : t('agentChat.markdownImage.httpsOnly');
+  const description = alt.trim();
+  const label = description ? `${description} · ${reason}` : reason;
   return (
-    <View
-      className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+    <Pressable
+      onLongPress={onShowLinkActions}
+      className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
       accessibilityRole="text"
       accessibilityLabel={label}
       accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
@@ -78,34 +87,49 @@ function BlockedImageChip({
       }}
     >
       <AlertCircle size={14} color={colors.mutedForeground} />
-      <Text className="shrink text-xs text-muted-foreground" numberOfLines={1}>
+      <Text className="shrink text-xs text-muted-foreground" numberOfLines={2}>
         {label}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
 /** HTTPS, not yet confirmed: source host plus a Load affordance. No Image mounts. */
 function UnconfirmedImageChip({
   uri,
+  alt,
   onLoad,
   onShowLinkActions,
-}: Readonly<{ uri: string; onLoad: () => void; onShowLinkActions?: () => void }>) {
+}: Readonly<{
+  uri: string;
+  alt: string;
+  onLoad: () => void;
+  onShowLinkActions?: () => void;
+}>) {
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const host = formatTrustedImageHost(uri);
+  const reason = host ?? t('agentChat.markdownImage.httpsOnly');
+  const description = alt.trim();
+  const label = description ? `${description} · ${reason}` : reason;
+  const loadLabel = host
+    ? t('agentChat.markdownImage.loadWithHost', { host })
+    : t('agentChat.markdownImage.load');
   return (
-    <View className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
-      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
-        {host ?? t('agentChat.markdownImage.httpsOnly')}
+    <Pressable
+      onLongPress={onShowLinkActions}
+      accessible={false}
+      className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+    >
+      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
+        {label}
       </Text>
       <Pressable
         onPress={onLoad}
+        onLongPress={onShowLinkActions}
         accessibilityRole="button"
         accessibilityLabel={
-          host
-            ? t('agentChat.markdownImage.loadWithHost', { host })
-            : t('agentChat.markdownImage.load')
+          description ? formatList([description, loadLabel], i18n.language) : loadLabel
         }
         accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
         onAccessibilityAction={event => {
@@ -120,7 +144,7 @@ function UnconfirmedImageChip({
           {t('agentChat.markdownImage.load')}
         </Text>
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
@@ -160,7 +184,7 @@ export function MarkdownImage({
     setMeasuredAspectRatio(undefined);
   }
 
-  const filename = markdownImageFilename(uri, alt);
+  const filename = markdownImageFilename(uri, alt, t('common.image'));
   const imageAccessibilityLabel = alt
     ? t('agentChat.filePart.viewImageWithAlt', { alt })
     : t('agentChat.filePart.viewImage');
@@ -174,7 +198,9 @@ export function MarkdownImage({
   );
 
   if (kind === 'http' || kind === 'data') {
-    return <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />;
+    return (
+      <BlockedImageChip kind={kind} uri={uri} alt={alt} onShowLinkActions={onShowLinkActions} />
+    );
   }
 
   if (kind === 'https' && !loadAllowed) {
@@ -182,6 +208,7 @@ export function MarkdownImage({
       <FixedImageSlot aspectRatio={aspectRatio}>
         <UnconfirmedImageChip
           uri={uri}
+          alt={alt}
           onShowLinkActions={onShowLinkActions}
           onLoad={() => {
             requestMarkdownImageTrust(uri);
@@ -194,10 +221,14 @@ export function MarkdownImage({
   // Other schemes never reach MarkdownImage from the renderer; keep the alt
   // text visible so a direct or fallback use never drops the description.
   if (kind === null) {
-    return <Text className="text-xs text-muted-foreground">{alt || 'image'}</Text>;
+    return <Text className="text-xs text-muted-foreground">{alt || t('common.image')}</Text>;
   }
 
   if (failed) {
+    const retryAlt = alt.trim();
+    const retryLabel = retryAlt
+      ? formatList([t('common.imageUnavailable'), retryAlt, t('common.retry')], i18n.language)
+      : t('agentChat.filePart.imageUnavailableRetry');
     return (
       <FixedImageSlot aspectRatio={aspectRatio ?? measuredAspectRatio}>
         <Pressable
@@ -209,7 +240,7 @@ export function MarkdownImage({
           onLongPress={onShowLinkActions}
           className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
           accessibilityRole="button"
-          accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
+          accessibilityLabel={retryLabel}
           accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
           onAccessibilityAction={event => {
             if (event.nativeEvent.actionName === 'showLinkActions') {

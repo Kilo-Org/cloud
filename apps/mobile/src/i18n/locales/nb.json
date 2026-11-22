@@ -91,6 +91,7 @@
     "draft": "Utkast",
     "enabled": "Aktivert",
     "github": "GitHub",
+    "image": "Bilde",
     "imageUnavailable": "Bildet er ikke tilgjengelig.",
     "loading": "Laster inn…",
     "loadMore": "Last inn flere",

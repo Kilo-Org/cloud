@@ -30,8 +30,7 @@ describe('kilo pass ended status', () => {
     expect(ended).toEqual(['canceled', 'unpaid', 'incomplete_expired']);
 
     // The ended union is closed, so a live status cannot be assigned to it.
-    // Removing either guard above makes this directive unused (TS2578) or the
-    // assignment legal, and the package typecheck reports it.
+    // This holds independently of the predicate: it guards the union itself.
     // @ts-expect-error 'active' is not an ended status.
     const notEnded: KiloPassEndedSubscriptionStatus = 'active';
     expect(isKiloPassSubscriptionEndedStatus(notEnded)).toBe(false);

@@ -589,13 +589,14 @@ export async function applyVercelSettings(
   userByok: BYOKResult[] | null,
   dataRegion: OrganizationDataRegion | null
 ) {
+  if (userByok?.length === 0) {
+    throw new Error('Invalid state: userByok should be null or not empty');
+  }
+
   const vercelModelId = await mapModelIdToVercel(requestedModel);
   requestToMutate.body.model = vercelModelId;
 
   if (userByok) {
-    if (userByok.length === 0) {
-      throw new Error('Invalid state: userByok should be null or not empty');
-    }
     // Only honor the caller's own `provider.ignore` here. `getProvider` has
     // already dropped keys outside the organization provider allow-list (see
     // `isVercelUserByokProviderAllowed`). Filtering by `provider.only` again

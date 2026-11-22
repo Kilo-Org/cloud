@@ -555,7 +555,10 @@
     "changelogFixesPolish": "ការជួសជុល និងការកែលម្អនៅទូទាំងកម្មវិធី។",
     "changelogAreas": {
       "signIn": "ការចូល",
-      "profileOrganizations": "ប្រវត្តិរូប និងស្ថាប័ន"
+      "profileOrganizations": "ប្រវត្តិរូប និងស្ថាប័ន",
+      "chat": "ជជែក",
+      "notifications": "ការជូនដំណឹង",
+      "integrations": "ការរួមបញ្ចូល"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "សហភាពអឺរ៉ុប",
       "au": "អូស្ត្រាលី",
       "jp": "ជប៉ុន"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ស្វែងរកចំណូលចិត្ត",
+    "noMatches": "មិនមានចំណូលចិត្តដែលត្រូវគ្នា",
+    "emptyDescription": "សាកល្បងឈ្មោះចំណូលចិត្ត ឬពាក្យគន្លឹះផ្សេង។",
+    "resultsStatus": "ចំណូលចិត្តដែលបានរកឃើញ៖ {{resultCount}}",
+    "keywords": {
+      "signOut": "ចាកចេញ|ចេញពីគណនី",
+      "appearance": "រចនាប័ទ្ម|ពណ៌",
+      "appUnlock": "ជីវមាត្រ|ផ្ទៃមុខ|ស្នាមម្រាមដៃ",
+      "language": "ភាសា|ការបកប្រែ",
+      "notifications": "ការជូនដំណឹង|ការដាស់តឿន",
+      "privacy": "ការវិភាគ|ការតាមដាន"
     }
   }
 }

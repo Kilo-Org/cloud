@@ -554,8 +554,11 @@
     "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
     "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
-      "signIn": "Innlogging",
-      "profileOrganizations": "Profil & organisasjoner"
+      "signIn": "innlogging",
+      "profileOrganizations": "profil & organisasjoner",
+      "chat": "samtale",
+      "notifications": "varsler",
+      "integrations": "integrasjoner"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Den europeiske union",
       "au": "Australia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Søk etter innstillinger…",
+    "noMatches": "Ingen treff i innstillingene",
+    "emptyDescription": "Prøv et annet innstillingsnavn eller søkeord.",
+    "resultsStatus": "Innstillinger funnet: {{resultCount}}",
+    "keywords": {
+      "signOut": "logg ut|utlogging",
+      "appearance": "tema|fargeskjema|farger",
+      "appUnlock": "biometri|ansiktsgjenkjenning|fingeravtrykk",
+      "language": "språk|oversettelse",
+      "notifications": "varsler|pushvarsler",
+      "privacy": "analyse|sporing"
     }
   }
 }

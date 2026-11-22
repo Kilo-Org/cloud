@@ -18,7 +18,11 @@ import {
   readKilo2FileReferences,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
-import { NATIVE_SYNC_RETAINED_WORK_BYTES, NATIVE_SYNC_RETAINED_WORK_FRAMES } from './limits';
+import {
+  NATIVE_SYNC_RETAINED_WORK_BYTES,
+  NATIVE_SYNC_RETAINED_WORK_FRAMES,
+  NATIVE_SYNC_TICKET_MINT_DEADLINE_MS,
+} from './limits';
 
 const tenantSchema = z.object({ type: z.enum(['user', 'organization']), id: z.string() });
 const envelopeSchema = z.object({
@@ -558,13 +562,14 @@ export class NativeSyncClient {
       socket.send(JSON.stringify(value));
       return true;
     };
-    const mint = async () =>
+    const mint = async ({ signal }: { signal?: AbortSignal } = {}) =>
       ticketSchema.parse(
         await this.request(
           ticketPath,
           {
             method: 'POST',
             body: JSON.stringify({ role: 'controller' }),
+            ...(signal ? { signal } : {}),
           },
           organizationID
         )
@@ -626,6 +631,9 @@ export class NativeSyncClient {
       let retainedBytes = 0;
       let retainedCount = 0;
       let draining = false;
+      // One `reauth_required` mint per connection; later frames join it instead of starting
+      // another POST or holding the queue.
+      let reauthMint: AbortController | undefined;
       const epoch: SocketEpoch = {
         signal: controller.signal,
         current: () => !stopped && current === generation && !controller.signal.aborted,
@@ -651,18 +659,61 @@ export class NativeSyncClient {
       retire = () => {
         for (const item of queue) epoch.release(item.bytes);
         queue.length = 0;
+        reauthMint?.abort();
         controller.abort();
       };
       greeted = false;
       onConnection('connecting');
       try {
-        const ticket = await mint();
+        const ticket = await mint({ signal: controller.signal });
         if (!epoch.current()) return;
         const url = new URL(path, this.options.baseUrl);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
         const next = new this.socketConstructor(url.href, [`kilo-session-ticket.${ticket.ticket}`]);
         socket = next;
         const sendCurrent = (value: unknown) => epoch.current() && send(value);
+        // Starts the one ticket mint this connection may have in flight and returns at once, so
+        // later queued frames keep draining. The mint races its own deadline because the fetcher
+        // may ignore the abort signal; `retire` cancels it together with the epoch.
+        const requestReauth = () => {
+          if (reauthMint) return;
+          const mintController = new AbortController();
+          reauthMint = mintController;
+          const failure = new NativeSyncError('live_ticket_timeout');
+          // ES2022/Hermes consumers do not provide Promise.withResolvers.
+          const ticket = new Promise<z.infer<typeof ticketSchema>>((resolve, reject) => {
+            const deadline = setTimeout(
+              () => mintController.abort(),
+              NATIVE_SYNC_TICKET_MINT_DEADLINE_MS
+            );
+            const abort = () => {
+              clearTimeout(deadline);
+              reject(failure);
+            };
+            mintController.signal.addEventListener('abort', abort, { once: true });
+            void mint({ signal: mintController.signal }).then(
+              value => {
+                clearTimeout(deadline);
+                mintController.signal.removeEventListener('abort', abort);
+                if (mintController.signal.aborted) reject(failure);
+                else resolve(value);
+              },
+              error => {
+                clearTimeout(deadline);
+                mintController.signal.removeEventListener('abort', abort);
+                reject(error);
+              }
+            );
+          }).finally(() => {
+            if (reauthMint === mintController) reauthMint = undefined;
+          });
+          void ticket.then(
+            value => sendCurrent({ type: 'reauth', ticket: value.ticket }),
+            (error: unknown) => {
+              if (epoch.current()) reconnect(error);
+            }
+          );
+        };
         const drain = async () => {
           if (draining) return;
           draining = true;
@@ -683,11 +734,7 @@ export class NativeSyncClient {
                   onConnection('connected');
                   scheduleRenewal(body);
                 }
-                if (frame.type === 'reauth_required') {
-                  const ticket = await mint();
-                  if (!epoch.current()) return;
-                  sendCurrent({ type: 'reauth', ticket: ticket.ticket });
-                }
+                if (frame.type === 'reauth_required') requestReauth();
                 if (frame.type === 'reauthorized') scheduleRenewal(body);
               }
               await onFrame(frame, sendCurrent, epoch, item.bytes);

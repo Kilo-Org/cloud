@@ -555,7 +555,10 @@
     "changelogFixesPolish": "સમગ્ર એપમાં ભૂલ સુધારા અને સુધારણાઓ.",
     "changelogAreas": {
       "signIn": "સાઇન-ઇન",
-      "profileOrganizations": "પ્રોફાઇલ તથા સંસ્થાઓ"
+      "profileOrganizations": "પ્રોફાઇલ તથા સંસ્થાઓ",
+      "chat": "ચેટ",
+      "notifications": "સૂચનાઓ",
+      "integrations": "ઇન્ટિગ્રેશન્સ"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "યુરોપિયન યુનિયન",
       "au": "ઓસ્ટ્રેલિયા",
       "jp": "જાપાન"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "પસંદગીઓ શોધો",
+    "noMatches": "મેળ ખાતી કોઈ પસંદગી નથી",
+    "emptyDescription": "પસંદગીનું બીજું નામ અથવા કીવર્ડ અજમાવો.",
+    "resultsStatus": "મળેલી પસંદગીઓ: {{resultCount}}",
+    "keywords": {
+      "signOut": "બહાર નીકળો|ખાતામાંથી બહાર નીકળો",
+      "appearance": "દેખાવ|રંગ યોજના",
+      "appUnlock": "ચહેરાની ઓળખ|આંગળીની છાપ",
+      "language": "ભાષા|અનુવાદ",
+      "notifications": "સૂચનાઓ|ચેતવણીઓ",
+      "privacy": "ગોપનીયતા|વિશ્લેષણ|પ્રવૃત્તિ પર નજર"
     }
   }
 }

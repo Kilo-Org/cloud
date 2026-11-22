@@ -559,7 +559,10 @@
     "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
     "changelogAreas": {
       "signIn": "تسجيل الدخول",
-      "profileOrganizations": "الملف الشخصي & المؤسسات"
+      "profileOrganizations": "الملف الشخصي & المؤسسات",
+      "chat": "الدردشة",
+      "notifications": "الإشعارات",
+      "integrations": "التكاملات"
     }
   },
   "preferences": {
@@ -5447,6 +5450,20 @@
       "eu": "الاتحاد الأوروبي",
       "au": "أستراليا",
       "jp": "اليابان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "البحث في الإعدادات",
+    "noMatches": "لا توجد إعدادات مطابقة",
+    "emptyDescription": "جرّب اسم إعداد آخر أو كلمة مفتاحية مختلفة.",
+    "resultsStatus": "عدد الإعدادات المطابقة: {{resultCount}}",
+    "keywords": {
+      "signOut": "تسجيل الخروج|خروج",
+      "appearance": "سمة|ألوان|الوضع الداكن",
+      "appUnlock": "قياسات حيوية|بصمة الوجه|بصمة الإصبع",
+      "language": "لغة|ترجمة",
+      "notifications": "تنبيهات|إشعارات",
+      "privacy": "تحليلات|تتبع"
     }
   }
 }

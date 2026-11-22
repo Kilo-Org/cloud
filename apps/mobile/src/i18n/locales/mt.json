@@ -557,8 +557,11 @@
     "changelogFixesIn": "Tiswijiet u titjib f'dawn l-oqsma: {{areas}}.",
     "changelogFixesPolish": "Tiswijiet u titjib fl-applikazzjoni kollha.",
     "changelogAreas": {
-      "signIn": "Dħul",
-      "profileOrganizations": "Profil & organizzazzjonijiet"
+      "signIn": "dħul",
+      "profileOrganizations": "profil & organizzazzjonijiet",
+      "chat": "taħdit",
+      "notifications": "notifiki",
+      "integrations": "integrazzjonijiet"
     }
   },
   "preferences": {
@@ -5360,6 +5363,20 @@
       "eu": "Unjoni Ewropea",
       "au": "Awstralja",
       "jp": "Ġappun"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Tfittxija tal-preferenzi",
+    "noMatches": "Ebda preferenza li taqbel",
+    "emptyDescription": "Ipprova isem ieħor ta’ preferenza jew kelma ewlenija oħra.",
+    "resultsStatus": "Preferenzi misjuba: {{resultCount}}",
+    "keywords": {
+      "signOut": "oħroġ|ittemm is-sessjoni",
+      "appearance": "tema|kuluri|dehra",
+      "appUnlock": "bijometrija|wiċċ|marka tas-swaba’",
+      "language": "lingwa|traduzzjoni",
+      "notifications": "twissijiet|notifiki",
+      "privacy": "analiżi|traċċar|privatezza"
     }
   }
 }

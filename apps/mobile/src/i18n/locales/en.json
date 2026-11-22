@@ -645,8 +645,11 @@
     "changelogFixesIn": "Fixes and improvements in {{areas}}.",
     "changelogFixesPolish": "Bug fixes and polish.",
     "changelogAreas": {
-      "signIn": "Sign-in",
-      "profileOrganizations": "Profile & organizations"
+      "signIn": "sign-in",
+      "profileOrganizations": "profile & organizations",
+      "chat": "chat",
+      "notifications": "notifications",
+      "integrations": "integrations"
     },
     "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
@@ -5099,6 +5102,20 @@
       "eu": "European Union",
       "au": "Australia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Search settings",
+    "noMatches": "No matching settings",
+    "emptyDescription": "Try a different setting name or keyword.",
+    "resultsStatus": "Settings found: {{resultCount}}",
+    "keywords": {
+      "signOut": "logout|log off",
+      "appearance": "theme|color scheme",
+      "appUnlock": "biometrics|face ID|fingerprint",
+      "language": "locale|translation",
+      "notifications": "alerts|push notifications",
+      "privacy": "analytics|tracking"
     }
   }
 }

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
     "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
-      "signIn": "Kirish",
-      "profileOrganizations": "Profil hamda tashkilotlar"
+      "signIn": "kirish",
+      "profileOrganizations": "profil hamda tashkilotlar",
+      "chat": "suhbat",
+      "notifications": "bildirishnomalar",
+      "integrations": "integratsiyalar"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Yevropa Ittifoqi",
       "au": "Avstraliya",
       "jp": "Yaponiya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Sozlamalarni qidirish",
+    "noMatches": "Mos sozlamalar topilmadi",
+    "emptyDescription": "Boshqa sozlama nomi yoki kalit so'z bilan qidiring.",
+    "resultsStatus": "Topilgan sozlamalar: {{resultCount}}",
+    "keywords": {
+      "signOut": "chiqish|seans",
+      "appearance": "mavzu|rang|uslub",
+      "appUnlock": "biometriya|yuz|barmoq",
+      "language": "til|tarjima",
+      "notifications": "bildirishnomalar|ogohlantirishlar",
+      "privacy": "tahlil|kuzatuv"
     }
   }
 }

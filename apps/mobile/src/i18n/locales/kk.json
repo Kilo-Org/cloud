@@ -554,8 +554,11 @@
     "changelogFixesIn": "Келесі бөлімдердегі түзетулер мен жақсартулар: {{areas}}.",
     "changelogFixesPolish": "Бүкіл қолданбадағы түзетулер мен жақсартулар.",
     "changelogAreas": {
-      "signIn": "Кіру",
-      "profileOrganizations": "Профиль мен ұйымдар"
+      "signIn": "кіру",
+      "profileOrganizations": "профиль мен ұйымдар",
+      "chat": "чат",
+      "notifications": "хабарландырулар",
+      "integrations": "интеграциялар"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Еуропалық Одақ",
       "au": "Австралия",
       "jp": "Жапония"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Параметрлерді іздеу",
+    "noMatches": "Сәйкес параметрлер табылмады",
+    "emptyDescription": "Басқа параметр атауын немесе кілт сөзді қолданып көріңіз.",
+    "resultsStatus": "Табылған параметрлер: {{resultCount}}",
+    "keywords": {
+      "signOut": "шығу|есептік жазбадан шығу",
+      "appearance": "тақырып|түс схемасы|қараңғы режим",
+      "appUnlock": "биометрия|бетті тану|саусақ ізі",
+      "language": "тіл|аударма",
+      "notifications": "ескертулер|хабарландырулар",
+      "privacy": "талдау|қадағалау"
     }
   }
 }

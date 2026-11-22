@@ -555,7 +555,10 @@
     "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
     "changelogAreas": {
       "signIn": "سائن ان",
-      "profileOrganizations": "پروفائل و تنظیمیں"
+      "profileOrganizations": "پروفائل و تنظیمیں",
+      "chat": "چیٹ",
+      "notifications": "اطلاعات",
+      "integrations": "انٹیگریشنز"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "یورپی یونین",
       "au": "آسٹریلیا",
       "jp": "جاپان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ترجیحات کی تلاش",
+    "noMatches": "مماثل ترجیحات نہیں ملیں",
+    "emptyDescription": "کسی اور ترجیح کے نام یا کلیدی لفظ سے تلاش کریں۔",
+    "resultsStatus": "ملنے والی ترجیحات: {{resultCount}}",
+    "keywords": {
+      "signOut": "سائن آؤٹ|لاگ آؤٹ",
+      "appearance": "تھیم|رنگ|ظاہری شکل",
+      "appUnlock": "بایومیٹرکس|چہرے کی شناخت|انگلی کا نشان",
+      "language": "زبان|ترجمہ",
+      "notifications": "اطلاعات|الرٹس|نوٹیفکیشن",
+      "privacy": "تجزیات|ٹریکنگ|رازداری"
     }
   }
 }

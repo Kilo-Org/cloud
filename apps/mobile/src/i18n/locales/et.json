@@ -554,8 +554,11 @@
     "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
     "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
     "changelogAreas": {
-      "signIn": "Sisselogimine",
-      "profileOrganizations": "Profiil ning organisatsioonid"
+      "signIn": "sisselogimine",
+      "profileOrganizations": "profiil ning organisatsioonid",
+      "chat": "vestlus",
+      "notifications": "teavitused",
+      "integrations": "integratsioonid"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Euroopa Liit",
       "au": "Austraalia",
       "jp": "Jaapan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Eelistuste otsing",
+    "noMatches": "Sobivaid eelistusi ei leitud",
+    "emptyDescription": "Proovi mõnda muud eelistuse nime või märksõna.",
+    "resultsStatus": "Leitud eelistusi: {{resultCount}}",
+    "keywords": {
+      "signOut": "logi välja|väljalogimine",
+      "appearance": "teema|värviskeem",
+      "appUnlock": "biomeetria|näotuvastus|sõrmejälg",
+      "language": "keel|tõlge",
+      "notifications": "märguanded|tõuketeavitused",
+      "privacy": "analüütika|jälgimine"
     }
   }
 }

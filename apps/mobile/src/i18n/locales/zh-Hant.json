@@ -555,7 +555,10 @@
     "changelogFixesPolish": "整個應用程式的修正與改進。",
     "changelogAreas": {
       "signIn": "登入",
-      "profileOrganizations": "個人資料與組織"
+      "profileOrganizations": "個人資料與組織",
+      "chat": "聊天",
+      "notifications": "通知",
+      "integrations": "整合"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "歐盟",
       "au": "澳洲",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "搜尋偏好設定",
+    "noMatches": "找不到符合的偏好設定",
+    "emptyDescription": "試試其他設定名稱或關鍵字。",
+    "resultsStatus": "已找到 {{resultCount}} 項偏好設定",
+    "keywords": {
+      "signOut": "登出|退出帳號",
+      "appearance": "主題|配色|深色模式",
+      "appUnlock": "生物辨識|臉部辨識|指紋",
+      "language": "語言|翻譯",
+      "notifications": "提醒|推播|通知",
+      "privacy": "分析|追蹤|隱私"
     }
   }
 }

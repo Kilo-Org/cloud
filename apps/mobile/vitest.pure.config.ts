@@ -91,6 +91,7 @@ export default defineProject({
       'modules/kilo-launcher-surfaces/*.test.ts',
       'src/lib/query/**/*.test.ts',
       'src/lib/settings/**/*.test.ts',
+      'src/lib/settings-search/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/lib/tool-summary-translation/**/*.test.ts',
       'src/lib/todos/**/*.test.ts',

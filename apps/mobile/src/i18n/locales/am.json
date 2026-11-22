@@ -555,7 +555,10 @@
     "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
     "changelogAreas": {
       "signIn": "መግቢያ",
-      "profileOrganizations": "መገለጫና ድርጅቶች"
+      "profileOrganizations": "መገለጫና ድርጅቶች",
+      "chat": "ውይይት",
+      "notifications": "ማሳወቂያዎች",
+      "integrations": "ውህደቶች"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "የአውሮፓ ህብረት",
       "au": "አውስትራሊያ",
       "jp": "ጃፓን"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "የምርጫዎች ፍለጋ",
+    "noMatches": "የሚዛመዱ ምርጫዎች የሉም",
+    "emptyDescription": "ሌላ የምርጫ ስም ወይም ቁልፍ ቃል ሞክር።",
+    "resultsStatus": "የተገኙ ምርጫዎች፦ {{resultCount}}",
+    "keywords": {
+      "signOut": "መውጣት|ዘግቶ መውጣት",
+      "appearance": "ገጽታ|ቀለም|ጨለማ",
+      "appUnlock": "ባዮሜትሪክስ|የፊት መለያ|የጣት አሻራ",
+      "language": "ቋንቋ|ትርጉም",
+      "notifications": "ማንቂያዎች|ማሳወቂያዎች",
+      "privacy": "ትንታኔ|ክትትል"
     }
   }
 }

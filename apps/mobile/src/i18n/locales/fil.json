@@ -554,8 +554,11 @@
     "changelogFixesIn": "Mga pag-aayos at pagpapahusay sa {{areas}}.",
     "changelogFixesPolish": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
     "changelogAreas": {
-      "signIn": "Pagpasok",
-      "profileOrganizations": "Propayl pati mga organisasyon"
+      "signIn": "pagpasok",
+      "profileOrganizations": "propayl pati mga organisasyon",
+      "chat": "usapan",
+      "notifications": "mga abiso",
+      "integrations": "mga integration"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "European Union",
       "au": "Australia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Maghanap sa mga kagustuhan",
+    "noMatches": "Walang tumutugmang kagustuhan",
+    "emptyDescription": "Subukan ang ibang pangalan ng kagustuhan o susing salita.",
+    "resultsStatus": "Mga nahanap na kagustuhan: {{resultCount}}",
+    "keywords": {
+      "signOut": "lumabas|tapusin ang sesyon",
+      "appearance": "tema|kulay",
+      "appUnlock": "biometriko|mukha|bakas ng daliri",
+      "language": "wika|pagsasalin",
+      "notifications": "abiso|paalala",
+      "privacy": "pagsusuri|pagsubaybay"
     }
   }
 }

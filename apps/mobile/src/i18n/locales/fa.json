@@ -555,7 +555,10 @@
     "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
       "signIn": "ورود",
-      "profileOrganizations": "نمایه & سازمان‌ها"
+      "profileOrganizations": "نمایه & سازمان‌ها",
+      "chat": "گفت‌وگو",
+      "notifications": "اعلان‌ها",
+      "integrations": "یکپارچه‌سازی‌ها"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "اتحادیه اروپا",
       "au": "استرالیا",
       "jp": "ژاپن"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "جست‌وجوی تنظیمات دلخواه",
+    "noMatches": "تنظیمات موردنظر پیدا نشد",
+    "emptyDescription": "نام تنظیم یا کلیدواژهٔ دیگری را امتحان کنید.",
+    "resultsStatus": "تنظیمات یافت‌شده: {{resultCount}}",
+    "keywords": {
+      "signOut": "خروج|خروج از حساب",
+      "appearance": "پوسته|رنگ‌بندی|حالت تاریک",
+      "appUnlock": "زیست‌سنجی|تشخیص چهره|اثر انگشت",
+      "language": "زبان|ترجمه",
+      "notifications": "اعلان|هشدار",
+      "privacy": "تحلیل داده‌ها|ردیابی"
     }
   }
 }

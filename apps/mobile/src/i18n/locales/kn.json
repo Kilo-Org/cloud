@@ -555,7 +555,10 @@
     "changelogFixesPolish": "ಆ್ಯಪ್‌ನಾದ್ಯಂತ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು.",
     "changelogAreas": {
       "signIn": "ಸೈನ್ ಇನ್",
-      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಹಾಗೂ ಸಂಸ್ಥೆಗಳು"
+      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಹಾಗೂ ಸಂಸ್ಥೆಗಳು",
+      "chat": "ಚಾಟ್",
+      "notifications": "ಅಧಿಸೂಚನೆಗಳು",
+      "integrations": "ಏಕೀಕರಣಗಳು"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "ಯುರೋಪಿಯನ್ ಒಕ್ಕೂಟ",
       "au": "ಆಸ್ಟ್ರೇಲಿಯಾ",
       "jp": "ಜಪಾನ್"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ಆದ್ಯತೆಗಳನ್ನು ಹುಡುಕಿ",
+    "noMatches": "ಹೊಂದಿಕೆಯಾಗುವ ಆದ್ಯತೆಗಳಿಲ್ಲ",
+    "emptyDescription": "ಬೇರೆ ಆದ್ಯತೆಯ ಹೆಸರು ಅಥವಾ ಹುಡುಕಾಟ ಪದ ಬಳಸಿ ಪ್ರಯತ್ನಿಸಿ.",
+    "resultsStatus": "ಕಂಡುಬಂದ ಆದ್ಯತೆಗಳು: {{resultCount}}",
+    "keywords": {
+      "signOut": "ನಿರ್ಗಮನ|ಹೊರಹೋಗು",
+      "appearance": "ನೋಟ|ಬಣ್ಣ|ವಿನ್ಯಾಸ",
+      "appUnlock": "ಮುಖ ಗುರುತು|ಬೆರಳಚ್ಚು",
+      "language": "ಭಾಷೆ|ಅನುವಾದ",
+      "notifications": "ಎಚ್ಚರಿಕೆಗಳು|ಅಧಿಸೂಚನೆಗಳು",
+      "privacy": "ಗೌಪ್ಯತೆ|ವಿಶ್ಲೇಷಣೆ|ಚಟುವಟಿಕೆಗಳ ನಿಗಾ"
     }
   }
 }

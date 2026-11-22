@@ -554,8 +554,11 @@
     "changelogFixesIn": "Lagfæringar og endurbætur á eftirfarandi sviðum: {{areas}}.",
     "changelogFixesPolish": "Lagfæringar og endurbætur í öllu forritinu.",
     "changelogAreas": {
-      "signIn": "Innskráning",
-      "profileOrganizations": "Prófíll & stofnanir"
+      "signIn": "innskráning",
+      "profileOrganizations": "prófíll & stofnanir",
+      "chat": "spjall",
+      "notifications": "tilkynningar",
+      "integrations": "samþættingar"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Evrópusambandið",
       "au": "Ástralía",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Leita að kjörstillingum",
+    "noMatches": "Engar kjörstillingar fundust",
+    "emptyDescription": "Prófaðu annað heiti eða leitarorð.",
+    "resultsStatus": "Kjörstillingar sem fundust: {{resultCount}}",
+    "keywords": {
+      "signOut": "skrá út|útskráning",
+      "appearance": "þema|litasamsetning",
+      "appUnlock": "lífkenni|andlitsgreining|fingrafar",
+      "language": "tungumál|þýðing",
+      "notifications": "viðvaranir|tilkynningar|ýtitilkynningar",
+      "privacy": "notkunargreining|rakning"
     }
   }
 }

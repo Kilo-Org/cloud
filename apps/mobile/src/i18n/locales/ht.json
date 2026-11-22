@@ -554,8 +554,11 @@
     "changelogFixesIn": "Koreksyon ak amelyorasyon nan {{areas}}.",
     "changelogFixesPolish": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
     "changelogAreas": {
-      "signIn": "Koneksyon",
-      "profileOrganizations": "Pwofil ak òganizasyon"
+      "signIn": "koneksyon",
+      "profileOrganizations": "pwofil ak òganizasyon",
+      "chat": "diskisyon",
+      "notifications": "notifikasyon",
+      "integrations": "entegrasyon"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Inyon Ewopeyen",
       "au": "Ostrali",
       "jp": "Japon"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Non preferans lan",
+    "noMatches": "Pa gen preferans ki koresponn",
+    "emptyDescription": "Eseye yon lòt non preferans oswa mo kle.",
+    "resultsStatus": "Preferans yo jwenn: {{resultCount}}",
+    "keywords": {
+      "signOut": "dekonekte|soti|fèmen sesyon",
+      "appearance": "tèm|koulè|mòd nwa",
+      "appUnlock": "byometri|figi|anprent",
+      "language": "lang|tradiksyon",
+      "notifications": "alèt|notifikasyon",
+      "privacy": "analiz|swivi|konfidansyalite"
     }
   }
 }

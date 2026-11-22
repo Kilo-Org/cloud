@@ -556,8 +556,11 @@
     "changelogFixesIn": "Popravki in izboljšave na področjih: {{areas}}.",
     "changelogFixesPolish": "Popravki in izboljšave v celotni aplikaciji.",
     "changelogAreas": {
-      "signIn": "Prijava",
-      "profileOrganizations": "Profil & organizacije"
+      "signIn": "prijava",
+      "profileOrganizations": "profil & organizacije",
+      "chat": "klepet",
+      "notifications": "obvestila",
+      "integrations": "integracije"
     }
   },
   "preferences": {
@@ -5273,6 +5276,20 @@
       "eu": "Evropska unija",
       "au": "Avstralija",
       "jp": "Japonska"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Iskanje nastavitev",
+    "noMatches": "Ni ustreznih nastavitev",
+    "emptyDescription": "Poskusi z drugim imenom nastavitve ali ključno besedo.",
+    "resultsStatus": "Najdene nastavitve: {{resultCount}}",
+    "keywords": {
+      "signOut": "odjava|odjavi se",
+      "appearance": "tema|barvna shema",
+      "appUnlock": "biometrija|prepoznavanje obraza|prstni odtis",
+      "language": "jezik|prevod",
+      "notifications": "opozorila|potisna obvestila",
+      "privacy": "analitika|sledenje"
     }
   }
 }

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
     "changelogFixesPolish": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
     "changelogAreas": {
-      "signIn": "Fidirana",
-      "profileOrganizations": "Mombamomba sy fikambanana"
+      "signIn": "fidirana",
+      "profileOrganizations": "mombamomba sy fikambanana",
+      "chat": "resaka",
+      "notifications": "fampandrenesana",
+      "integrations": "fampifandraisana"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Vondrona Eoropeana",
       "au": "Aostralia",
       "jp": "Japana"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Karohy ny safidy",
+    "noMatches": "Tsy misy safidy mifanaraka",
+    "emptyDescription": "Manandrama anaran-tsafidy na teny fikarohana hafa.",
+    "resultsStatus": "Safidy hita: {{resultCount}}",
+    "keywords": {
+      "signOut": "mivoaha|fivoahana",
+      "appearance": "bika|endrika|loko",
+      "appUnlock": "biometrika|tarehy|dian-tanana",
+      "language": "fiteny|fandikan-teny",
+      "notifications": "fampandrenesana|fanairana",
+      "privacy": "fanadihadiana|fanarahana"
     }
   }
 }

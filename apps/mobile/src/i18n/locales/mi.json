@@ -554,8 +554,11 @@
     "changelogFixesIn": "Ngā whakatika me ngā whakapainga i ēnei wāhanga: {{areas}}.",
     "changelogFixesPolish": "Ngā whakatika me ngā whakapainga puta noa i te taupānga.",
     "changelogAreas": {
-      "signIn": "Takiuru",
-      "profileOrganizations": "Kōtaha me ngā whakahaere"
+      "signIn": "takiuru",
+      "profileOrganizations": "kōtaha me ngā whakahaere",
+      "chat": "kōrerorero",
+      "notifications": "ngā whakamōhiotanga",
+      "integrations": "ngā tūhononga"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Te Kotahitanga o Ūropi",
       "au": "Ahitereiria",
       "jp": "Hapani"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Rapua ngā manakohanga",
+    "noMatches": "Kāore he manakohanga e ōrite ana",
+    "emptyDescription": "Whakamātauria tētahi atu ingoa manakohanga, kupu matua rānei.",
+    "resultsStatus": "Ngā manakohanga i kitea: {{resultCount}}",
+    "keywords": {
+      "signOut": "takiputa|puta atu",
+      "appearance": "āhua|kaupapa|huinga tae",
+      "appUnlock": "tautuhi koiora|kanohi|tā matimati",
+      "language": "reo|whakamāoritanga",
+      "notifications": "whakamōhiotanga|matohi",
+      "privacy": "tātaritanga|aroturuki|matatapu"
     }
   }
 }

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Gyare-gyare da ingantawa a {{areas}}.",
     "changelogFixesPolish": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
     "changelogAreas": {
-      "signIn": "Shiga",
-      "profileOrganizations": "Bayanan martaba & ƙungiyoyi"
+      "signIn": "shiga",
+      "profileOrganizations": "bayanan martaba & ƙungiyoyi",
+      "chat": "tattaunawa",
+      "notifications": "sanarwa",
+      "integrations": "haɗe-haɗe"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Ƙungiyar Tarayyar Turai",
       "au": "Ostiraliya",
       "jp": "Jafan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Nemo zaɓuɓɓuka",
+    "noMatches": "Babu zaɓuɓɓukan da suka dace",
+    "emptyDescription": "Gwada wani sunan zaɓi ko kalmar nema.",
+    "resultsStatus": "Zaɓuɓɓukan da aka samu: {{resultCount}}",
+    "keywords": {
+      "signOut": "fita|fita daga asusu",
+      "appearance": "jigo|launi|kamanni",
+      "appUnlock": "bayanan halitta|fuska|sawun yatsa",
+      "language": "harshe|fassara",
+      "notifications": "sanarwa|faɗakarwa",
+      "privacy": "nazari|bibiyar bayanai|sirri"
     }
   }
 }

@@ -555,7 +555,10 @@
     "changelogFixesPolish": "შესწორებები და გაუმჯობესებები მთელ აპში.",
     "changelogAreas": {
       "signIn": "შესვლა",
-      "profileOrganizations": "პროფილი & ორგანიზაციები"
+      "profileOrganizations": "პროფილი & ორგანიზაციები",
+      "chat": "ჩატი",
+      "notifications": "შეტყობინებები",
+      "integrations": "ინტეგრაციები"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "ევროკავშირი",
       "au": "ავსტრალია",
       "jp": "იაპონია"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "პარამეტრების ძებნა",
+    "noMatches": "შესაბამისი პარამეტრები ვერ მოიძებნა",
+    "emptyDescription": "სცადეთ პარამეტრის სხვა სახელი ან საკვანძო სიტყვა.",
+    "resultsStatus": "ნაპოვნი პარამეტრები: {{resultCount}}",
+    "keywords": {
+      "signOut": "გამოსვლა|ანგარიშიდან გამოსვლა",
+      "appearance": "თემა|ფერთა სქემა",
+      "appUnlock": "ბიომეტრია|სახის ამოცნობა|თითის ანაბეჭდი",
+      "language": "ენა|თარგმანი",
+      "notifications": "შეტყობინებები|გაფრთხილებები",
+      "privacy": "ანალიტიკა|თვალთვალი"
     }
   }
 }

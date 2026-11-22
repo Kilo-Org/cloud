@@ -37,12 +37,16 @@ const setOrganizationIdFn = vi.hoisted(() => vi.fn());
 const connectivityState = vi.hoisted(() => ({
   value: 'online' as 'online' | 'offline' | 'unknown',
 }));
+const confirmFn = vi.hoisted(() => vi.fn());
+const keyboardDismissFn = vi.hoisted(() => vi.fn());
 
 export {
   authState,
+  confirmFn,
   connectivityState,
   getProfileAgentScopeMock,
   idleState,
+  keyboardDismissFn,
   keys,
   organizationState,
   organizationsQueryFn,
@@ -55,6 +59,7 @@ export {
 vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   Alert: { alert: vi.fn() },
+  Keyboard: { dismiss: keyboardDismissFn },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -80,6 +85,7 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 vi.mock('expo-router', () => ({
+  useFocusEffect: vi.fn(),
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }));
 
@@ -176,8 +182,23 @@ vi.mock('@/components/use-feedback-prompt', () => ({
 }));
 
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+  useConfirmDialog: () => ({ confirm: confirmFn, dialog: null }),
 }));
+
+// The field and the results body belong to the settings-search surface; this
+// harness renders them as markers so its minimal react-native stub keeps
+// working, while the real index hook stays available to the coverage spec.
+vi.mock('@/components/settings-search/settings-search', () => ({
+  SettingsSearchField: 'SettingsSearchField',
+  SettingsSearchResults: 'SettingsSearchResults',
+}));
+
+// The integration index reads a cached tRPC setup-status query this harness
+// does not model; an empty source keeps each Profile spec on the root rows.
+vi.mock('@/lib/settings-search/integration-source', () => {
+  const source = { settings: [] };
+  return { useIntegrationSearchSource: () => source };
+});
 
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',

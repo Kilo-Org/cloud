@@ -555,7 +555,10 @@
     "changelogFixesPolish": "পুরো অ্যাপ জুড়ে সংশোধন ও উন্নতি।",
     "changelogAreas": {
       "signIn": "সাইন-ইন",
-      "profileOrganizations": "প্রোফাইল ও সংস্থা"
+      "profileOrganizations": "প্রোফাইল ও সংস্থা",
+      "chat": "চ্যাট",
+      "notifications": "বিজ্ঞপ্তি",
+      "integrations": "ইন্টিগ্রেশন"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "ইউরোপীয় ইউনিয়ন",
       "au": "অস্ট্রেলিয়া",
       "jp": "জাপান"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "পছন্দের সেটিংস খুঁজুন",
+    "noMatches": "কোনো সেটিংস মেলেনি",
+    "emptyDescription": "অন্য কোনো সেটিংসের নাম বা কীওয়ার্ড দিয়ে খুঁজুন।",
+    "resultsStatus": "সেটিংস পাওয়া গেছে: {{resultCount}}",
+    "keywords": {
+      "signOut": "সাইন আউট|লগআউট|বের হওয়া",
+      "appearance": "থিম|রঙের বিন্যাস",
+      "appUnlock": "বায়োমেট্রিক|মুখ শনাক্তকরণ|আঙুলের ছাপ",
+      "language": "ভাষা|অনুবাদ",
+      "notifications": "সতর্কতা|পুশ বিজ্ঞপ্তি",
+      "privacy": "বিশ্লেষণ|ট্র্যাকিং|গোপনীয়তা"
     }
   }
 }

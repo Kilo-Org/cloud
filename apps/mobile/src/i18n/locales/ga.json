@@ -557,8 +557,11 @@
     "changelogFixesIn": "Ceartúcháin agus feabhsuithe sna réimsí seo: {{areas}}.",
     "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
     "changelogAreas": {
-      "signIn": "Síniú isteach",
-      "profileOrganizations": "Próifíl & eagraíochtaí"
+      "signIn": "síniú isteach",
+      "profileOrganizations": "próifíl & eagraíochtaí",
+      "chat": "comhrá",
+      "notifications": "fógraí",
+      "integrations": "comhtháthuithe"
     }
   },
   "preferences": {
@@ -5360,6 +5363,20 @@
       "eu": "An tAontas Eorpach",
       "au": "An Astráil",
       "jp": "An tSeapáin"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cuardach roghanna",
+    "noMatches": "Níl aon roghanna ag teacht leis an gcuardach",
+    "emptyDescription": "Bain triail as ainm rogha eile nó eochairfhocal eile.",
+    "resultsStatus": "Roghanna aimsithe: {{resultCount}}",
+    "keywords": {
+      "signOut": "sínigh amach|logáil amach",
+      "appearance": "téama|scéim dathanna",
+      "appUnlock": "bithmhéadracht|aghaidh|méarlorg",
+      "language": "teanga|aistriúchán",
+      "notifications": "foláirimh|fógraí",
+      "privacy": "anailísíocht|rianú"
     }
   }
 }

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Поправки и подобрувања во следниве области: {{areas}}.",
     "changelogFixesPolish": "Поправки и подобрувања низ целата апликација.",
     "changelogAreas": {
-      "signIn": "Најава",
-      "profileOrganizations": "Профил & организации"
+      "signIn": "најава",
+      "profileOrganizations": "профил & организации",
+      "chat": "разговор",
+      "notifications": "известувања",
+      "integrations": "интеграции"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Европска Унија",
       "au": "Австралија",
       "jp": "Јапонија"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Пребарување поставки",
+    "noMatches": "Нема соодветни поставки",
+    "emptyDescription": "Обиди се со друго име на поставка или клучен збор.",
+    "resultsStatus": "Пронајдени поставки: {{resultCount}}",
+    "keywords": {
+      "signOut": "одјава|излез од сметката",
+      "appearance": "тема|шема на бои",
+      "appUnlock": "биометрија|лице|отпечаток од прст",
+      "language": "јазик|превод",
+      "notifications": "предупредувања|известувања",
+      "privacy": "аналитика|следење"
     }
   }
 }

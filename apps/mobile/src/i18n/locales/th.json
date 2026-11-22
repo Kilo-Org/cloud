@@ -555,7 +555,10 @@
     "changelogFixesPolish": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
     "changelogAreas": {
       "signIn": "การลงชื่อเข้าใช้",
-      "profileOrganizations": "โปรไฟล์กับองค์กร"
+      "profileOrganizations": "โปรไฟล์กับองค์กร",
+      "chat": "แชท",
+      "notifications": "การแจ้งเตือน",
+      "integrations": "การเชื่อมต่อ"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "สหภาพยุโรป",
       "au": "ออสเตรเลีย",
       "jp": "ญี่ปุ่น"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ค้นหาการตั้งค่า",
+    "noMatches": "ไม่พบการตั้งค่าที่ตรงกัน",
+    "emptyDescription": "ลองใช้ชื่อการตั้งค่าหรือคำค้นอื่น",
+    "resultsStatus": "พบการตั้งค่า: {{resultCount}}",
+    "keywords": {
+      "signOut": "ออกจากระบบ|ออกจากบัญชี",
+      "appearance": "ธีม|โทนสี",
+      "appUnlock": "ชีวมิติ|ใบหน้า|ลายนิ้วมือ",
+      "language": "ภาษา|การแปล",
+      "notifications": "แจ้งเตือน|การเตือน",
+      "privacy": "การวิเคราะห์|การติดตาม"
     }
   }
 }

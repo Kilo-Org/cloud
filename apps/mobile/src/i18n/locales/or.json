@@ -555,7 +555,10 @@
     "changelogFixesPolish": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
     "changelogAreas": {
       "signIn": "ସାଇନ୍ ଇନ୍",
-      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ"
+      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ",
+      "chat": "ଚାଟ୍",
+      "notifications": "ବିଜ୍ଞପ୍ତି",
+      "integrations": "ଇଣ୍ଟିଗ୍ରେସନ୍"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "ୟୁରୋପୀୟ ସଂଘ",
       "au": "ଅଷ୍ଟ୍ରେଲିଆ",
       "jp": "ଜାପାନ"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ପସନ୍ଦ ଖୋଜନ୍ତୁ",
+    "noMatches": "ମେଳ ଖାଉଥିବା ପସନ୍ଦ ନାହିଁ",
+    "emptyDescription": "ଅନ୍ୟ ଏକ ପସନ୍ଦର ନାମ କିମ୍ବା ଖୋଜ ଶବ୍ଦ ଦେଇ ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "resultsStatus": "ମିଳିଥିବା ପସନ୍ଦ: {{resultCount}}",
+    "keywords": {
+      "signOut": "ବାହାରିବା|ଖାତାରୁ ବାହାରିବା",
+      "appearance": "ରଙ୍ଗ|ଦେଖାଶୁଣା|ରଙ୍ଗ ଯୋଜନା",
+      "appUnlock": "ମୁହଁ|ଆଙ୍ଗୁଠି ଛାପ|ବାୟୋମେଟ୍ରିକ୍ସ",
+      "language": "ଭାଷା|ଅନୁବାଦ",
+      "notifications": "ସୂଚନା|ସତର୍କତା|ବିଜ୍ଞପ୍ତି",
+      "privacy": "ଗୋପନୀୟତା|ବିଶ୍ଳେଷଣ|ଅନୁସରଣ"
     }
   }
 }

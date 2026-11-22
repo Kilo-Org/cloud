@@ -555,7 +555,10 @@
     "changelogFixesPolish": "యాప్ అంతటా పరిష్కారాలు మరియు మెరుగుదలలు.",
     "changelogAreas": {
       "signIn": "సైన్ ఇన్",
-      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు"
+      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు",
+      "chat": "చాట్",
+      "notifications": "నోటిఫికేషన్లు",
+      "integrations": "ఇంటిగ్రేషన్‌లు"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "యూరోపియన్ యూనియన్",
       "au": "ఆస్ట్రేలియా",
       "jp": "జపాన్"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ప్రాధాన్యతల కోసం శోధన",
+    "noMatches": "సరిపోలే ప్రాధాన్యతలు లేవు",
+    "emptyDescription": "వేరే ప్రాధాన్యత పేరు లేదా శోధన పదంతో ప్రయత్నించండి.",
+    "resultsStatus": "కనుగొన్న ప్రాధాన్యతలు: {{resultCount}}",
+    "keywords": {
+      "signOut": "సైన్ అవుట్|నిష్క్రమణ",
+      "appearance": "థీమ్|రంగులు|రూపం",
+      "appUnlock": "బయోమెట్రిక్స్|ముఖ గుర్తింపు|వేలిముద్ర",
+      "language": "భాష|అనువాదం",
+      "notifications": "హెచ్చరికలు|నోటిఫికేషన్లు",
+      "privacy": "గోప్యత|విశ్లేషణలు|ట్రాకింగ్"
     }
   }
 }

@@ -558,8 +558,11 @@
     "changelogFixesIn": "Atgyweiriadau a gwelliannau i'r canlynol: {{areas}}.",
     "changelogFixesPolish": "Atgyweiriadau a gwelliannau ar draws yr ap.",
     "changelogAreas": {
-      "signIn": "Mewngofnodi",
-      "profileOrganizations": "Proffil a sefydliadau"
+      "signIn": "mewngofnodi",
+      "profileOrganizations": "proffil a sefydliadau",
+      "chat": "sgwrs",
+      "notifications": "hysbysiadau",
+      "integrations": "integreiddiadau"
     }
   },
   "preferences": {
@@ -5447,6 +5450,20 @@
       "eu": "Undeb Ewropeaidd",
       "au": "Awstralia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Chwilio am ddewisiadau",
+    "noMatches": "Dim dewisiadau cyfatebol",
+    "emptyDescription": "Rhowch gynnig ar enw dewis neu allweddair gwahanol.",
+    "resultsStatus": "Dewisiadau wedi'u canfod: {{resultCount}}",
+    "keywords": {
+      "signOut": "allgofnodi|gadael cyfrif",
+      "appearance": "thema|cynllun lliwiau",
+      "appUnlock": "biometreg|adnabod wyneb|ôl bys",
+      "language": "iaith|cyfieithu",
+      "notifications": "rhybuddion|hysbysiadau gwthio",
+      "privacy": "dadansoddeg|olrhain"
     }
   }
 }

@@ -555,7 +555,10 @@
     "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
     "changelogAreas": {
       "signIn": "ننوتل",
-      "profileOrganizations": "پروفایل و سازمانونه"
+      "profileOrganizations": "پروفایل و سازمانونه",
+      "chat": "خبرې اترې",
+      "notifications": "خبرتیاوې",
+      "integrations": "ادغامونه"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "اروپایي اتحادیه",
       "au": "آسټرالیا",
       "jp": "جاپان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "د غوره توبونو لټون",
+    "noMatches": "سمون لرونکي غوره توبونه ونه موندل شول",
+    "emptyDescription": "د غوره توب بل نوم یا بله کلیدي کلمه وازمویئ.",
+    "resultsStatus": "موندل شوي غوره توبونه: {{resultCount}}",
+    "keywords": {
+      "signOut": "وتل|له حسابه وتل",
+      "appearance": "بڼه|رنګونه|تیاره بڼه",
+      "appUnlock": "بایومیټریک|د مخ پېژندنه|د ګوتې نښه",
+      "language": "ژبه|ژباړه",
+      "notifications": "خبرتیاوې|فوري خبرتیاوې",
+      "privacy": "شننه|تعقیب|محرمیت"
     }
   }
 }

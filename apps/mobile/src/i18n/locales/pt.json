@@ -556,8 +556,11 @@
     "changelogFixesIn": "Correções e melhorias em {{areas}}.",
     "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
     "changelogAreas": {
-      "signIn": "Início de sessão",
-      "profileOrganizations": "Perfil & organizações"
+      "signIn": "início de sessão",
+      "profileOrganizations": "perfil & organizações",
+      "chat": "conversa",
+      "notifications": "notificações",
+      "integrations": "integrações"
     }
   },
   "preferences": {
@@ -5273,6 +5276,20 @@
       "eu": "União Europeia",
       "au": "Austrália",
       "jp": "Japão"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Pesquisar nas preferências",
+    "noMatches": "Nenhuma preferência encontrada",
+    "emptyDescription": "Experimente outro nome de preferência ou palavra-chave.",
+    "resultsStatus": "Preferências encontradas: {{resultCount}}",
+    "keywords": {
+      "signOut": "sair|terminar sessão",
+      "appearance": "tema|cores|modo escuro",
+      "appUnlock": "biometria|rosto|impressão digital",
+      "language": "idioma|língua|tradução",
+      "notifications": "alertas|avisos|notificações",
+      "privacy": "análise de dados|rastreio|privacidade"
     }
   }
 }

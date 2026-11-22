@@ -556,8 +556,11 @@
     "changelogFixesIn": "Выпраўленні і паляпшэнні ў раздзелах: {{areas}}.",
     "changelogFixesPolish": "Выпраўленні і паляпшэнні ва ўсёй праграме.",
     "changelogAreas": {
-      "signIn": "Уваход",
-      "profileOrganizations": "Профіль ды арганізацыі"
+      "signIn": "уваход",
+      "profileOrganizations": "профіль ды арганізацыі",
+      "chat": "чат",
+      "notifications": "апавяшчэнні",
+      "integrations": "інтэграцыі"
     }
   },
   "preferences": {
@@ -5273,6 +5276,20 @@
       "eu": "Еўрапейскі саюз",
       "au": "Аўстралія",
       "jp": "Японія"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Пошук налад",
+    "noMatches": "Адпаведных налад не знойдзена",
+    "emptyDescription": "Паспрабуйце іншую назву налады або ключавое слова.",
+    "resultsStatus": "Знойдзена налад: {{resultCount}}",
+    "keywords": {
+      "signOut": "выйсці|выхад",
+      "appearance": "тэма|колеравая схема",
+      "appUnlock": "біяметрыя|распазнаванне твару|адбітак пальца",
+      "language": "мова|пераклад",
+      "notifications": "абвесткі|апавяшчэнні|пуш-апавяшчэнні",
+      "privacy": "аналітыка|адсочванне"
     }
   }
 }

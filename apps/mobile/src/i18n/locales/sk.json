@@ -556,8 +556,11 @@
     "changelogFixesIn": "Opravy a vylepšenia v oblastiach: {{areas}}.",
     "changelogFixesPolish": "Opravy a vylepšenia v celej aplikácii.",
     "changelogAreas": {
-      "signIn": "Prihlásenie",
-      "profileOrganizations": "Profil i organizácie"
+      "signIn": "prihlásenie",
+      "profileOrganizations": "profil i organizácie",
+      "chat": "čet",
+      "notifications": "upozornenia",
+      "integrations": "integrácie"
     }
   },
   "preferences": {
@@ -5273,6 +5276,20 @@
       "eu": "Európska únia",
       "au": "Austrália",
       "jp": "Japonsko"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hľadať predvoľby",
+    "noMatches": "Žiadne zodpovedajúce predvoľby",
+    "emptyDescription": "Skúste iný názov predvoľby alebo kľúčové slovo.",
+    "resultsStatus": "Nájdené predvoľby: {{resultCount}}",
+    "keywords": {
+      "signOut": "odhlásiť sa|odhlásenie",
+      "appearance": "téma|farebná schéma",
+      "appUnlock": "biometria|tvár|odtlačok prsta",
+      "language": "jazyk|preklad",
+      "notifications": "upozornenia|oznámenia",
+      "privacy": "analytika|sledovanie"
     }
   }
 }

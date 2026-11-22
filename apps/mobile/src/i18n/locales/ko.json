@@ -555,7 +555,10 @@
     "changelogFixesPolish": "앱 전반의 수정 및 개선 사항.",
     "changelogAreas": {
       "signIn": "로그인",
-      "profileOrganizations": "프로필과 조직"
+      "profileOrganizations": "프로필과 조직",
+      "chat": "채팅",
+      "notifications": "알림",
+      "integrations": "연동"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "유럽 연합",
       "au": "호주",
       "jp": "일본"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "환경설정 검색",
+    "noMatches": "일치하는 설정 없음",
+    "emptyDescription": "다른 설정 이름이나 검색어로 검색해 보세요.",
+    "resultsStatus": "찾은 설정: {{resultCount}}개",
+    "keywords": {
+      "signOut": "로그아웃|접속 종료",
+      "appearance": "테마|색상|화면 스타일",
+      "appUnlock": "생체 인증|얼굴 인식|지문",
+      "language": "언어|번역",
+      "notifications": "알림|푸시 알림",
+      "privacy": "분석|추적|개인정보"
     }
   }
 }

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
     "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
-      "signIn": "Oturum açma",
-      "profileOrganizations": "Profil & kuruluşlar"
+      "signIn": "oturum açma",
+      "profileOrganizations": "profil & kuruluşlar",
+      "chat": "sohbet",
+      "notifications": "bildirimler",
+      "integrations": "entegrasyonlar"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Avrupa Birliği",
       "au": "Avustralya",
       "jp": "Japonya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Tercih ara",
+    "noMatches": "Eşleşen tercih bulunamadı",
+    "emptyDescription": "Farklı bir tercih adı veya anahtar kelime deneyin.",
+    "resultsStatus": "Bulunan tercihler: {{resultCount}}",
+    "keywords": {
+      "signOut": "çıkış|oturumu kapat|hesaptan çıkış",
+      "appearance": "tema|renk düzeni|koyu mod",
+      "appUnlock": "biyometri|yüz tanıma|parmak izi",
+      "language": "dil|çeviri",
+      "notifications": "uyarılar|anlık bildirimler",
+      "privacy": "analiz|takip|gizlilik"
     }
   }
 }

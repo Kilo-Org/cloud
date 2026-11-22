@@ -1678,16 +1678,24 @@ describe('ChatSidebar phase 4 drag ordering', () => {
   });
 
   it('keeps a stack visible when a child workspace has recent activity', () => {
-    const old = phase4Group(0, null, { createdAt: new Date(2026, 0, 1).toISOString() });
-    const child = phase4Group(1, null);
-    renderSidebar({
-      workspaceGroups: [{ ...old, stackLayers: [child] }],
-      workspaceOrder: 'activity',
-    });
-    expect(dom.container.querySelector('[data-worktree-id="worktree_drag_0"]')).not.toBeNull();
-    const ungrouped = dom.container.querySelector('[data-folder-drop="ungrouped"]');
-    expect(ungrouped?.textContent).toContain('Today');
-    expect(ungrouped?.textContent).not.toContain('Older');
+    // Pinned so the run cannot straddle local midnight: the child's own
+    // timestamps are derived from "now", and a boundary crossing moves it out
+    // of the Today group on its own.
+    jest.useFakeTimers({ now: new Date(2026, 10, 9, 12) });
+    try {
+      const old = phase4Group(0, null, { createdAt: new Date(2026, 0, 1).toISOString() });
+      const child = phase4Group(1, null);
+      renderSidebar({
+        workspaceGroups: [{ ...old, stackLayers: [child] }],
+        workspaceOrder: 'activity',
+      });
+      expect(dom.container.querySelector('[data-worktree-id="worktree_drag_0"]')).not.toBeNull();
+      const ungrouped = dom.container.querySelector('[data-folder-drop="ungrouped"]');
+      expect(ungrouped?.textContent).toContain('Today');
+      expect(ungrouped?.textContent).not.toContain('Older');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('preserves manual workspace positions and labels the separate sessions list', () => {

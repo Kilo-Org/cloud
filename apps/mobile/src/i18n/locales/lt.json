@@ -556,8 +556,11 @@
     "changelogFixesIn": "Pataisymai ir patobulinimai šiose srityse: {{areas}}.",
     "changelogFixesPolish": "Pataisymai ir patobulinimai visoje programėlėje.",
     "changelogAreas": {
-      "signIn": "Prisijungimas",
-      "profileOrganizations": "Profilis bei organizacijos"
+      "signIn": "prisijungimas",
+      "profileOrganizations": "profilis bei organizacijos",
+      "chat": "pokalbis",
+      "notifications": "pranešimai",
+      "integrations": "integracijos"
     }
   },
   "preferences": {
@@ -5273,6 +5276,20 @@
       "eu": "Europos Sąjunga",
       "au": "Australija",
       "jp": "Japonija"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Nuostatų paieška",
+    "noMatches": "Atitinkančių nuostatų nerasta",
+    "emptyDescription": "Pabandykite kitą nuostatos pavadinimą arba raktažodį.",
+    "resultsStatus": "Rasta nuostatų: {{resultCount}}",
+    "keywords": {
+      "signOut": "atsijungti|atsijungimas",
+      "appearance": "tema|spalvų schema",
+      "appUnlock": "biometriniai duomenys|veido atpažinimas|piršto atspaudas",
+      "language": "kalba|vertimas",
+      "notifications": "įspėjimai|tiesioginiai pranešimai",
+      "privacy": "analitika|sekimas"
     }
   }
 }

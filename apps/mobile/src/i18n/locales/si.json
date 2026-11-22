@@ -555,7 +555,10 @@
     "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogAreas": {
       "signIn": "පුරනය වීම",
-      "profileOrganizations": "පැතිකඩ හා සංවිධාන"
+      "profileOrganizations": "පැතිකඩ හා සංවිධාන",
+      "chat": "කතාබස්",
+      "notifications": "දැනුම්දීම්",
+      "integrations": "ඒකාබද්ධ කිරීම්"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "යුරෝපීය සංගමය",
       "au": "ඕස්ට්‍රේලියාව",
       "jp": "ජපානය"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "මනාප සොයන්න",
+    "noMatches": "ගැළපෙන මනාප නැත",
+    "emptyDescription": "වෙනත් මනාපයක නමක් හෝ මූලපදයක් යොදා බලන්න.",
+    "resultsStatus": "හමු වූ මනාප: {{resultCount}}",
+    "keywords": {
+      "signOut": "පිටවන්න|ගිණුමෙන් පිටවීම",
+      "appearance": "තේමාව|වර්ණ පටිපාටිය",
+      "appUnlock": "ජෛවමිතික|මුහුණ|ඇඟිලි සලකුණ",
+      "language": "භාෂාව|පරිවර්තනය",
+      "notifications": "ඇඟවීම්|දැනුම්දීම්",
+      "privacy": "විශ්ලේෂණ|ලුහුබැඳීම"
     }
   }
 }

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
     "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
     "changelogAreas": {
-      "signIn": "Hyrja",
-      "profileOrganizations": "Profili & organizatat"
+      "signIn": "hyrja",
+      "profileOrganizations": "profili & organizatat",
+      "chat": "biseda",
+      "notifications": "njoftimet",
+      "integrations": "integrimet"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Bashkimi Europian",
       "au": "Australi",
       "jp": "Japoni"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Kërkim preferencash",
+    "noMatches": "Asnjë preferencë që përputhet",
+    "emptyDescription": "Provoni një emër tjetër preference ose fjalë kyçe.",
+    "resultsStatus": "Preferenca të gjetura: {{resultCount}}",
+    "keywords": {
+      "signOut": "dil|dalje",
+      "appearance": "temë|skema e ngjyrave",
+      "appUnlock": "biometri|fytyrë|gjurmë gishti",
+      "language": "gjuhë|përkthim",
+      "notifications": "sinjalizime|njoftime",
+      "privacy": "analiza|gjurmim"
     }
   }
 }

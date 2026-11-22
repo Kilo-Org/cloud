@@ -555,7 +555,10 @@
     "changelogFixesPolish": "त्रुटि-सुधार और बेहतरी।",
     "changelogAreas": {
       "signIn": "साइन-इन",
-      "profileOrganizations": "प्रोफ़ाइल व संगठन"
+      "profileOrganizations": "प्रोफ़ाइल व संगठन",
+      "chat": "चैट",
+      "notifications": "सूचनाएँ",
+      "integrations": "इंटीग्रेशन"
     }
   },
   "preferences": {
@@ -5100,6 +5103,20 @@
       "eu": "यूरोपीय संघ",
       "au": "ऑस्ट्रेलिया",
       "jp": "जापान"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "पसंद में खोजें",
+    "noMatches": "मेल खाती कोई पसंद नहीं मिली",
+    "emptyDescription": "पसंद का कोई दूसरा नाम या कीवर्ड आज़माएँ।",
+    "resultsStatus": "पसंद मिलीं: {{resultCount}}",
+    "keywords": {
+      "signOut": "साइन आउट|लॉग आउट|बाहर निकलें",
+      "appearance": "थीम|रंग|डार्क मोड",
+      "appUnlock": "बायोमेट्रिक्स|चेहरा|फिंगरप्रिंट",
+      "language": "भाषा|अनुवाद",
+      "notifications": "सूचनाएँ|अलर्ट",
+      "privacy": "विश्लेषण|ट्रैकिंग"
     }
   }
 }

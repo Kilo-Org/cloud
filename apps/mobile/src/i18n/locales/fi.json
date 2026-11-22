@@ -554,8 +554,11 @@
     "changelogFixesIn": "Korjauksia ja parannuksia seuraaviin osioihin: {{areas}}.",
     "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
-      "signIn": "Kirjautuminen",
-      "profileOrganizations": "Profiili & organisaatiot"
+      "signIn": "kirjautuminen",
+      "profileOrganizations": "profiili & organisaatiot",
+      "chat": "keskustelu",
+      "notifications": "ilmoitukset",
+      "integrations": "integraatiot"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Euroopan unioni",
       "au": "Australia",
       "jp": "Japani"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hae asetuksia",
+    "noMatches": "Ei vastaavia asetuksia",
+    "emptyDescription": "Kokeile toista asetuksen nimeä tai hakusanaa.",
+    "resultsStatus": "Asetuksia löytyi: {{resultCount}}",
+    "keywords": {
+      "signOut": "kirjaudu ulos|uloskirjautuminen",
+      "appearance": "teema|värimaailma",
+      "appUnlock": "biometrinen tunnistus|kasvojentunnistus|sormenjälki",
+      "language": "kieli|käännös",
+      "notifications": "ilmoitukset|hälytykset|push-ilmoitukset",
+      "privacy": "analytiikka|seuranta"
     }
   }
 }

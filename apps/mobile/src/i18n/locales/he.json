@@ -556,7 +556,10 @@
     "changelogFixesPolish": "תיקונים ושיפורים בכל האפליקציה.",
     "changelogAreas": {
       "signIn": "התחברות",
-      "profileOrganizations": "פרופיל וארגונים"
+      "profileOrganizations": "פרופיל וארגונים",
+      "chat": "צ׳אט",
+      "notifications": "התראות",
+      "integrations": "אינטגרציות"
     }
   },
   "preferences": {
@@ -5186,6 +5189,20 @@
       "eu": "האיחוד האירופי",
       "au": "אוסטרליה",
       "jp": "יפן"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "חיפוש העדפות",
+    "noMatches": "אין העדפות תואמות",
+    "emptyDescription": "נסו שם אחר של העדפה או מילת מפתח אחרת.",
+    "resultsStatus": "העדפות שנמצאו: {{resultCount}}",
+    "keywords": {
+      "signOut": "התנתקות|יציאה מהחשבון",
+      "appearance": "ערכת נושא|צבעים|מצב כהה",
+      "appUnlock": "זיהוי ביומטרי|זיהוי פנים|טביעת אצבע",
+      "language": "שפה|תרגום",
+      "notifications": "התראות|הודעות דחיפה",
+      "privacy": "ניתוח נתונים|מעקב|פרטיות"
     }
   }
 }

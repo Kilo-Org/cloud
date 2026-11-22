@@ -554,8 +554,11 @@
     "changelogFixesIn": "Поправки и подобрения в {{areas}}.",
     "changelogFixesPolish": "Поправки и подобрения в цялото приложение.",
     "changelogAreas": {
-      "signIn": "Вход",
-      "profileOrganizations": "Профил & организации"
+      "signIn": "вход",
+      "profileOrganizations": "профил & организации",
+      "chat": "чат",
+      "notifications": "известия",
+      "integrations": "интеграции"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Европейски съюз",
       "au": "Австралия",
       "jp": "Япония"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Търсене в предпочитанията",
+    "noMatches": "Няма съвпадащи предпочитания",
+    "emptyDescription": "Опитайте да потърсите предпочитания по друго име или ключова дума.",
+    "resultsStatus": "Намерени предпочитания: {{resultCount}}",
+    "keywords": {
+      "signOut": "изход|излизане от профила",
+      "appearance": "тема|цветова схема",
+      "appUnlock": "биометрия|лицево разпознаване|пръстов отпечатък",
+      "language": "език|превод",
+      "notifications": "уведомления|сигнали|известия",
+      "privacy": "анализи|проследяване"
     }
   }
 }

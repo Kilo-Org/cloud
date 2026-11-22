@@ -555,7 +555,10 @@
     "changelogFixesPolish": "アプリ全体の修正と改善を行いました。",
     "changelogAreas": {
       "signIn": "サインイン",
-      "profileOrganizations": "プロフィールと組織"
+      "profileOrganizations": "プロフィールと組織",
+      "chat": "チャット",
+      "notifications": "通知",
+      "integrations": "連携"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "欧州連合",
       "au": "オーストラリア",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "設定を検索",
+    "noMatches": "該当する設定がありません",
+    "emptyDescription": "別の設定名やキーワードで検索してください。",
+    "resultsStatus": "見つかった設定：{{resultCount}}件",
+    "keywords": {
+      "signOut": "サインアウト|ログアウト",
+      "appearance": "テーマ|配色",
+      "appUnlock": "生体認証|顔認証|指紋認証",
+      "language": "言語|翻訳",
+      "notifications": "通知|プッシュ通知",
+      "privacy": "データ分析|トラッキング|プライバシー"
     }
   }
 }

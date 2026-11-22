@@ -554,8 +554,11 @@
     "changelogFixesIn": "Дараах хэсгүүдэд засвар, сайжруулалт хийгдсэн: {{areas}}.",
     "changelogFixesPolish": "Апп даяар засвар, сайжруулалт хийгдсэн.",
     "changelogAreas": {
-      "signIn": "Нэвтрэх",
-      "profileOrganizations": "Профайл ба байгууллагууд"
+      "signIn": "нэвтрэх",
+      "profileOrganizations": "профайл ба байгууллагууд",
+      "chat": "чат",
+      "notifications": "мэдэгдэл",
+      "integrations": "интеграцууд"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Европын Холбоо",
       "au": "Австрали",
       "jp": "Япон"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Тохиргоо хайх",
+    "noMatches": "Тохирох тохиргоо олдсонгүй",
+    "emptyDescription": "Өөр тохиргооны нэр эсвэл түлхүүр үгээр хайж үзнэ үү.",
+    "resultsStatus": "Олдсон тохиргоо: {{resultCount}}",
+    "keywords": {
+      "signOut": "гарах|бүртгэлээс гарах",
+      "appearance": "загвар|өнгөний схем|бараан горим",
+      "appUnlock": "биометр|царай таних|хурууны хээ",
+      "language": "хэл|орчуулга",
+      "notifications": "мэдэгдэл|сануулга",
+      "privacy": "дүн шинжилгээ|мөрдөх|нууцлал"
     }
   }
 }

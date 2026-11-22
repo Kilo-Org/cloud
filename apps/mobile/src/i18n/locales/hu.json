@@ -554,8 +554,11 @@
     "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
     "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
-      "signIn": "Bejelentkezés",
-      "profileOrganizations": "Profil & szervezetek"
+      "signIn": "bejelentkezés",
+      "profileOrganizations": "profil & szervezetek",
+      "chat": "csevegés",
+      "notifications": "értesítések",
+      "integrations": "integrációk"
     }
   },
   "preferences": {
@@ -5099,6 +5102,20 @@
       "eu": "Európai Unió",
       "au": "Ausztrália",
       "jp": "Japán"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Beállítások keresése",
+    "noMatches": "Nincs megfelelő beállítás",
+    "emptyDescription": "Próbálj másik beállításnévre vagy kulcsszóra keresni.",
+    "resultsStatus": "Talált beállítások: {{resultCount}}",
+    "keywords": {
+      "signOut": "kijelentkezés|kilépés",
+      "appearance": "téma|színséma",
+      "appUnlock": "biometria|arcfelismerés|ujjlenyomat",
+      "language": "nyelv|fordítás",
+      "notifications": "értesítések|riasztások",
+      "privacy": "analitika|követés|adatvédelem"
     }
   }
 }

@@ -810,12 +810,15 @@ export function ChatComposer({
       },
       withdrawRestoredSend: (text: string) => {
         const restored = restoredFailedSendRef.current;
-        if (restored === null || restored.text !== text) {
+        // Both sides compare as the prompt a send carries: a draft kept with
+        // surrounding whitespace restores raw, and the record names the text
+        // that was sent.
+        if (restored === null || composerPromptText(restored.text) !== composerPromptText(text)) {
           return;
         }
         // A draft the reader edited is their next message, not the send that
         // turned out to be delivered.
-        if (composerPromptText(textRef.current) !== text) {
+        if (composerPromptText(textRef.current) !== composerPromptText(restored.text)) {
           return;
         }
         restoredFailedSendRef.current = null;

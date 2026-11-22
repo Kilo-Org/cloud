@@ -95,6 +95,11 @@ export type KVPair = {
   updatedAt: number;
 };
 
+/** One scope entry with its stored value, for a read that classifies it. */
+export type KVPairWithValue = KVPair & {
+  v: string;
+};
+
 // The empty check is load-bearing, not a type duplicate: an empty scope
 // silently widens `clearScopePrefix` to every scope in the database.
 export function validateScope(scope: string): void {
@@ -812,4 +817,20 @@ export async function listValues(scope: string): Promise<string[]> {
     .orderBy(asc(kv.updatedAt))
     .all()
     .map(row => row.v);
+}
+
+/**
+ * Lists one scope's keys with their values oldest-first, in one statement: the
+ * eviction path that has to classify what it read (a tombstone, a live record)
+ * without one extra read per entry.
+ */
+export async function listEntriesWithValues(scope: string): Promise<KVPairWithValue[]> {
+  validateScope(scope);
+  const db = await openDatabase();
+  return db
+    .select({ k: kv.k, updatedAt: kv.updatedAt, v: kv.v })
+    .from(kv)
+    .where(eq(kv.scope, scope))
+    .orderBy(asc(kv.updatedAt))
+    .all();
 }

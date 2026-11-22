@@ -25,9 +25,9 @@ const kvMock = vi.hoisted(() => {
     removeItem: vi.fn(async (scope: string, k: string) => {
       scopes.get(scope)?.delete(k);
     }),
-    listEntries: vi.fn(async (scope: string) =>
+    listEntriesWithValues: vi.fn(async (scope: string) =>
       [...(scopes.get(scope)?.entries() ?? [])]
-        .map(([k, entry]) => ({ k, updatedAt: entry.updatedAt }))
+        .map(([k, entry]) => ({ k, updatedAt: entry.updatedAt, v: entry.v }))
         .sort((a, b) => a.updatedAt - b.updatedAt)
     ),
   };
@@ -37,7 +37,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
-  listEntries: kvMock.listEntries,
+  listEntriesWithValues: kvMock.listEntriesWithValues,
 }));
 
 // `readCacheScope` is imported from read-cache, which loads expo-secure-store.

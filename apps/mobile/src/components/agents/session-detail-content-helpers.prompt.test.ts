@@ -62,6 +62,22 @@ describe('hasConfirmedSentPrompt', () => {
     expect(hasConfirmedSentPrompt([userRow('m2', ['Something else'])], 'Retry me')).toBe(false);
   });
 
+  it('ignores an older turn that carried the same words', () => {
+    // Only the newest confirmed row can be the delivery which just landed; the
+    // reader may be repeating a short prompt like this on purpose.
+    const older = userRow('m-older', ['continue']);
+    const newest = userRow('m-newest', ['something else']);
+    expect(hasConfirmedSentPrompt([older, newest], 'continue')).toBe(false);
+  });
+
+  it('matches a draft kept with surrounding whitespace against the sent prompt', () => {
+    expect(hasConfirmedSentPrompt([userRow('m1', ['continue'])], '  continue  ')).toBe(true);
+  });
+
+  it('is false for a draft with nothing visible to send', () => {
+    expect(hasConfirmedSentPrompt([userRow('m1', ['continue'])], '   ')).toBe(false);
+  });
+
   it('compares the first human text part, as the composer restores it', () => {
     const row = userRow('m3', ['Retry me', 'and then this']);
     expect(hasConfirmedSentPrompt([row], 'Retry me')).toBe(true);

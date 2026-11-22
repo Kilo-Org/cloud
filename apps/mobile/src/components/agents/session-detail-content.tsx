@@ -217,6 +217,7 @@ import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-
 import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { composerPromptText } from '@/lib/composer-text';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { readPendingSendConfirmations } from '@/lib/persist/pending-send-confirmations';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
@@ -1605,11 +1606,11 @@ export function SessionDetailContent({
 
   // The record of unknown-outcome sends is the only thing that retires a
   // restored draft when its confirmation lands. When that record is truncated
-  // or unreadable, the confirmed transcript stands in: a restored draft whose
-  // text already sits in a delivered user row is a message the server took, so
-  // it is withdrawn instead of offered for a second send. The composer ignores
-  // a withdrawal of text that is not the unedited restored draft, so a repeated
-  // run costs nothing and a draft the reader typed or edited is never taken.
+  // or unreadable, the newest confirmed user row stands in: if it carries this
+  // draft's prompt, the server took that send, so the draft is withdrawn
+  // instead of offered for a second send. The composer ignores a withdrawal of
+  // text that is not the unedited restored draft, so a repeated run costs
+  // nothing and a draft the reader typed or edited is never taken.
   const restoredDraftValue = composerDraft.value;
   useEffect(() => {
     if (!pendingSendGuardIncomplete || !composerDraft.settled || !restoredDraftValue) {
@@ -1618,7 +1619,10 @@ export function SessionDetailContent({
     if (!hasConfirmedSentPrompt(messages, restoredDraftValue)) {
       return;
     }
-    composerControlRef.current?.withdrawRestoredSend(restoredDraftValue);
+    // The comparison uses the prompt the send carries, so the withdrawal gets
+    // that same value; the composer refuses a draft the reader edited away from
+    // it, which is the guard this depends on.
+    composerControlRef.current?.withdrawRestoredSend(composerPromptText(restoredDraftValue));
   }, [pendingSendGuardIncomplete, composerDraft.settled, restoredDraftValue, messages]);
 
   // Where the account settles a turn its balance refused. The action reads no

@@ -243,22 +243,26 @@ export async function tombstoneOldSessions({
   max,
   keepKey,
 }: TombstoneOldSessionsInput): Promise<void> {
-  const entries = await encryptedKv.listEntries(scope);
+  const entries = await encryptedKv.listEntriesWithValues(scope);
   const family = entries.filter(entry => entry.k.startsWith(prefix));
   if (family.length <= max) {
     return;
   }
 
-  // One read per entry, oldest-first, so both passes classify a value exactly
-  // once. A key that vanished while this walked it is not part of the family
-  // any more and is left out of the count.
-  const raws = await Promise.all(family.map(entry => encryptedKv.getItem(scope, entry.k)));
-  const present = family.flatMap((entry, index) => {
-    const raw = raws[index];
-    return raw === null || raw === undefined
-      ? []
-      : [{ k: entry.k, tombstone: isTombstone(raw), keep: entry.k === keepKey }];
-  });
+  // One read for the whole family, so both passes classify a value exactly
+  // once: the eviction path must not cost one SQLCipher read per entry.
+  const present = family.map(entry => ({
+    k: entry.k,
+    tombstone: isTombstone(entry.v),
+    keep: entry.k === keepKey,
+  }));
+  // The surplus is measured on what this pass actually read. A key that left
+  // the family between the listing and the write cannot make it negative: a
+  // negative surplus would make pass one delete tombstones that are still
+  // inside the window, and a deleted tombstone reads as "nothing recorded".
+  if (present.length <= max) {
+    return;
+  }
 
   // Pass one: delete the tombstones among the oldest records. Each deletion
   // shrinks the family, so the surplus it covers needs no retirement at all.

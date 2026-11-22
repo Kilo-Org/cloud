@@ -1,5 +1,7 @@
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { composerPromptText } from '@/lib/composer-text';
+
 import { type MessageFailure, selectMessageFailure } from './message-failure-state';
 import { firstHumanText } from './part-types';
 import { type SessionTranscriptItem, transcriptRendersMessage } from './session-transcript';
@@ -259,28 +261,34 @@ export function unansweredPromptMessageId(
 }
 
 /**
- * Whether the confirmed transcript already holds this prompt as a delivered
- * user row.
+ * Whether the confirmation that just landed is this prompt.
  *
  * The composer restores the text of a send whose outcome the transport could
  * not confirm, and the manager withdraws that restore when the server confirms
  * the row. The durable record of those sends can be truncated by its caps or
  * unreadable, and then nothing withdraws: the text is both delivered and sitting
  * in the composer, one Send away from being posted twice. This is how the
- * composer asks the transcript instead — a user row carrying this exact text is
- * that message, already delivered.
+ * composer asks the transcript instead.
  *
- * A `synthetic` user row is a client-materialised submission the server has not
- * confirmed, so it is the same unknown-outcome send rather than evidence of
- * delivery: it never makes this true. The compared text is
- * {@link firstHumanText}, the one the composer restores.
+ * Only the newest confirmed user row can answer: that is the delivery which
+ * just arrived, while an older row with the same words is a different turn the
+ * reader may well be repeating on purpose ("continue", "yes"). A `synthetic`
+ * row is a client-materialised submission the server has not confirmed, so it
+ * is the same unknown-outcome send rather than evidence of delivery and is
+ * skipped. Both sides compare as the prompt the composer sends, so a draft kept
+ * with surrounding whitespace still matches what the server stored.
  */
 export function hasConfirmedSentPrompt(messages: readonly StoredMessage[], text: string): boolean {
-  return messages.some(
-    message =>
-      message.info.role === 'user' &&
-      message.info.synthetic !== true &&
-      firstHumanText(message.parts) === text
+  const prompt = composerPromptText(text);
+  if (prompt === '') {
+    return false;
+  }
+  const newestConfirmedUserRow = messages.findLast(
+    message => message.info.role === 'user' && message.info.synthetic !== true
+  );
+  return (
+    newestConfirmedUserRow !== undefined &&
+    composerPromptText(firstHumanText(newestConfirmedUserRow.parts)) === prompt
   );
 }
 

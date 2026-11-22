@@ -25,9 +25,9 @@ const kvMock = vi.hoisted(() => {
     removeItem: vi.fn(async (scope: string, k: string) => {
       scopes.get(scope)?.delete(k);
     }),
-    listEntries: vi.fn(async (scope: string) =>
+    listEntriesWithValues: vi.fn(async (scope: string) =>
       [...(scopes.get(scope)?.entries() ?? [])]
-        .map(([k, entry]) => ({ k, updatedAt: entry.updatedAt }))
+        .map(([k, entry]) => ({ k, updatedAt: entry.updatedAt, v: entry.v }))
         .sort((a, b) => a.updatedAt - b.updatedAt)
     ),
   };
@@ -37,7 +37,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
-  listEntries: kvMock.listEntries,
+  listEntriesWithValues: kvMock.listEntriesWithValues,
 }));
 
 // `readCacheScope` is imported from cache-scope (via read-cache's re-export
@@ -312,6 +312,44 @@ describe('pending send confirmations', () => {
         (_, index) => `msg-${total - PENDING_SEND_MAX_IDS + index}`
       )
     );
+  });
+
+  it('keeps every record inside the window when a listed key vanished mid-walk', async () => {
+    // The surplus is measured on the records the eviction pass actually sees: a
+    // record that disappears between the listing and the write must not turn it
+    // negative, which would delete tombstones still inside the window.
+    for (let index = 0; index < PENDING_SEND_MAX_SESSIONS + 1; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- cap order depends on write order.
+      await persistPendingSendConfirmation({
+        owner: OWNER,
+        sessionId: `ses-vanish-${index}`,
+        messageId: 'msg-1',
+        text: 'hello',
+      });
+    }
+
+    const list = kvMock.listEntriesWithValues.getMockImplementation();
+    kvMock.listEntriesWithValues.mockImplementationOnce(async scope => {
+      const entries = (await list?.(scope)) ?? [];
+      // The oldest record left the family after the listing.
+      return entries.slice(1);
+    });
+
+    await persistPendingSendConfirmation({
+      owner: OWNER,
+      sessionId: 'ses-vanish-newest',
+      messageId: 'msg-1',
+      text: 'hello',
+    });
+
+    await expect(readPendingSendConfirmations(USER_ID, 'ses-vanish-newest')).resolves.toEqual({
+      items: [{ messageId: 'msg-1', text: 'hello' }],
+      complete: true,
+    });
+    await expect(readPendingSendConfirmations(USER_ID, 'ses-vanish-1')).resolves.toEqual({
+      items: [{ messageId: 'msg-1', text: 'hello' }],
+      complete: true,
+    });
   });
 
   it('retires the oldest session into a tombstone once the session cap is passed', async () => {

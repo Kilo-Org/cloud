@@ -1,4 +1,4 @@
-import { env, runInDurableObject } from 'cloudflare:test';
+import { env, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -4870,5 +4870,95 @@ describe('SessionIngestDO raw row export', () => {
     ).filter(line => line.t === 'row');
 
     expect(rows.map(row => storedBodyField(row, 'id'))).toEqual(['msg_a', 'msg_b', 'msg_c']);
+  });
+
+  it('resets an object that stores nothing when asked to clean an empty export', async () => {
+    const suffix = crypto.randomUUID().replaceAll('-', '');
+    const kiloUserId = `usr_raw_export_empty_${suffix}`;
+    const sessionId = `ses_${suffix.slice(0, 26)}`;
+    const stub = getStub(kiloUserId, sessionId);
+
+    const lines = parseNdjson(
+      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
+    );
+
+    expect(lines).toEqual([{ t: 'end', rows: 0, deleted_empty: true }]);
+
+    // The reset is applied by the alarm, so it cannot race this response. The
+    // abort that follows the reset surfaces to the alarm's caller.
+    await expect(runDurableObjectAlarm(stub)).rejects.toThrow(/abort/i);
+
+    // The object restarted with a fresh schema and no prior data.
+    const afterCleanup = parseNdjson(
+      await new Response(await getStub(kiloUserId, sessionId).exportSessionRowsStream()).text()
+    );
+
+    expect(afterCleanup).toEqual([{ t: 'end', rows: 0 }]);
+  });
+
+  it('keeps rows written between the cleanup request and the reset alarm', async () => {
+    const suffix = crypto.randomUUID().replaceAll('-', '');
+    const kiloUserId = `usr_raw_export_late_${suffix}`;
+    const sessionId = `ses_${suffix.slice(0, 26)}`;
+    const stub = getStub(kiloUserId, sessionId);
+
+    const lines = parseNdjson(
+      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
+    );
+    expect(lines).toEqual([{ t: 'end', rows: 0, deleted_empty: true }]);
+
+    // A row lands before the alarm runs: the reset must stand down. The alarm
+    // then continues into the metrics path, and the test worker has no O11Y
+    // service binding; the DO keeps its bindings on a plain property, so a test
+    // can replace them as the other alarm tests do.
+    await stub.ingest(
+      [{ type: 'message', data: { id: 'msg_late', role: 'user' } }],
+      kiloUserId,
+      sessionId,
+      1,
+      1000
+    );
+    await runInDurableObject(stub, instance => {
+      const doInstance = instance as unknown as { env: Record<string, unknown> };
+      Object.defineProperty(doInstance, 'env', {
+        value: { ...doInstance.env, O11Y: { ingestSessionMetrics: async () => {} } },
+        configurable: true,
+      });
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+
+    const after = parseNdjson(await new Response(await stub.exportSessionRowsStream()).text());
+    expect(after.filter(line => line.t === 'row').map(row => row.item_id)).toEqual([
+      'message/msg_late',
+    ]);
+  });
+
+  it('never resets an object that holds rows', async () => {
+    const suffix = crypto.randomUUID().replaceAll('-', '');
+    const kiloUserId = `usr_raw_export_keep_${suffix}`;
+    const sessionId = `ses_${suffix.slice(0, 26)}`;
+    const stub = getStub(kiloUserId, sessionId);
+
+    await stub.ingest(
+      [{ type: 'message', data: { id: 'msg_kept', role: 'user' } }],
+      kiloUserId,
+      sessionId,
+      1,
+      1000
+    );
+
+    const lines = parseNdjson(
+      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
+    );
+    expect(lines.filter(line => line.t === 'row').map(row => row.item_id)).toEqual([
+      'message/msg_kept',
+    ]);
+    expect(lines.at(-1)).toEqual({ t: 'end', rows: 1 });
+
+    // Nothing was deleted: an export without the flag still reads the row.
+    const again = parseNdjson(await new Response(await stub.exportSessionRowsStream()).text());
+    expect(again.filter(line => line.t === 'row').map(row => row.item_id)).toEqual([
+      'message/msg_kept',
+    ]);
   });
 });

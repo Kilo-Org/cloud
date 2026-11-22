@@ -48,3 +48,17 @@ export function raiseBlockedAccountFromRefusal(error: unknown): void {
   }
   setBlockedAccountExplanation(readAccountBlockedReason(error) ?? 'account_blocked');
 }
+
+/**
+ * Raises the blocked-account explanation from the refresh route's `USER_BLOCKED`
+ * refusal. That route's frozen body names only a block, never a domain reason,
+ * so this path must not overwrite a more specific reason an answered procedure
+ * already published: replacing `'email_domain_blocked'` with the generic account
+ * reason would offer a Retry that can never succeed for a domain refusal.
+ */
+export function raiseBlockedAccountExplanationFromRefresh(): void {
+  if (isBlockedAccountActive()) {
+    return;
+  }
+  setBlockedAccountExplanation('account_blocked');
+}

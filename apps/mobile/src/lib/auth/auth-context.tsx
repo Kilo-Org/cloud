@@ -84,6 +84,7 @@ import {
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
 import { setBlockedAccountExplanation } from '@/lib/auth/blocked-account-state';
+import { raiseBlockedAccountExplanationFromRefresh } from '@/lib/auth/blocked-account-raise';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
 import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
 import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
@@ -739,9 +740,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // clears the credential, not the reason, and the signed-out surface
           // must still say why once the token is gone. Only a successful
           // sign-in clears it. The refresh route's frozen body names only a
-          // block, so the copy falls back to the account explanation (that path
-          // has no session left, so it already offers no retry).
-          setBlockedAccountExplanation('account_blocked');
+          // block, so the raise falls back to the account explanation and never
+          // replaces a reason an answered procedure already published (that
+          // path has no session left, so it already offers no retry).
+          raiseBlockedAccountExplanationFromRefresh();
         }
         await signOut(true, 'session_ended');
       }
@@ -805,10 +807,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
               // Same refusal the unauthorized handler explains: the
               // explanation is raised before the teardown and outlives it, so
               // the signed-out surface says why instead of a bare session end.
-              // The frozen refresh body names only a block, so the copy falls
-              // back to the account explanation, and this path already has no
+              // The frozen refresh body names only a block, so the raise falls
+              // back to the account explanation without replacing a more
+              // specific reason already published, and this path already has no
               // session left to retry over.
-              setBlockedAccountExplanation('account_blocked');
+              raiseBlockedAccountExplanationFromRefresh();
             }
             await signOut(true, 'session_ended');
           }

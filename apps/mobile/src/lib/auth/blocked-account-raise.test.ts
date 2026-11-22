@@ -10,7 +10,10 @@ import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { setSignOutTeardownActive } from '@/lib/auth/auth-transition-state';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { tagDispatchSession, tagDispatchSessionAt } from '@/lib/auth/dispatch-epoch';
-import { raiseBlockedAccountFromRefusal } from '@/lib/auth/blocked-account-raise';
+import {
+  raiseBlockedAccountExplanationFromRefresh,
+  raiseBlockedAccountFromRefusal,
+} from '@/lib/auth/blocked-account-raise';
 
 const BLOCKED_REFUSAL = { data: { code: 'FORBIDDEN', accountBlocked: true } };
 const OTHER_FORBIDDEN = { data: { code: 'FORBIDDEN' } };
@@ -78,17 +81,18 @@ describe('raiseBlockedAccountFromRefusal', () => {
     expect(isBlockedAccountActive()).toBe(false);
   });
 
-  it('does not publish over an already-raised state', () => {
+  it('does not replace a more specific raised reason', () => {
     let calls = 0;
     const listener = (): void => {
       calls += 1;
     };
-    setBlockedAccountExplanation('account_blocked');
+    setBlockedAccountExplanation('email_domain_blocked');
     tagDispatchSession(BLOCKED_REFUSAL);
     const unsubscribe = subscribeBlockedAccount(listener);
 
     raiseBlockedAccountFromRefusal(BLOCKED_REFUSAL);
 
+    expect(getBlockedAccountExplanation()).toBe('email_domain_blocked');
     expect(calls).toBe(0);
     unsubscribe();
     setBlockedAccountExplanation(null);
@@ -135,5 +139,37 @@ describe('raiseBlockedAccountFromRefusal', () => {
     raiseBlockedAccountFromRefusal(refusal);
 
     expect(isBlockedAccountActive()).toBe(false);
+  });
+});
+
+describe('raiseBlockedAccountExplanationFromRefresh', () => {
+  beforeEach(() => {
+    setBlockedAccountExplanation(null);
+  });
+
+  it('raises the account explanation from the cleared state', () => {
+    raiseBlockedAccountExplanationFromRefresh();
+
+    expect(getBlockedAccountExplanation()).toBe('account_blocked');
+    setBlockedAccountExplanation(null);
+  });
+
+  // The refresh route's frozen body names only a block, so it must not
+  // downgrade the domain reason an answered procedure published: the surface
+  // would then offer a Retry no domain refusal can ever pass.
+  it('leaves a more specific raised reason untouched, without notifying', () => {
+    let calls = 0;
+    const listener = (): void => {
+      calls += 1;
+    };
+    setBlockedAccountExplanation('email_domain_blocked');
+    const unsubscribe = subscribeBlockedAccount(listener);
+
+    raiseBlockedAccountExplanationFromRefresh();
+
+    expect(getBlockedAccountExplanation()).toBe('email_domain_blocked');
+    expect(calls).toBe(0);
+    unsubscribe();
+    setBlockedAccountExplanation(null);
   });
 });

@@ -74,7 +74,12 @@ import {
 import { buildBlockedAccountSupportLink } from '@/lib/auth/blocked-account-support';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { openExternalUrl } from '@/lib/external-link';
-import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
+import {
+  resolveBootstrapDecision,
+  shouldAnnounceContentReady,
+  shouldShowBootstrapLoading,
+  shouldShowBootstrapLoadingSurface,
+} from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -966,38 +971,6 @@ function RootLayoutNav({
   // login screen is the deterministic entry context in both cases.
   const wrapperObscured = hidden || signingOutWindow;
 
-  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
-  // both accessibility trees. On the hidden → visible transition,
-  // `announceForA11y` is the deterministic entry context for screen-reader
-  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
-  // only when the wrapper has no node yet or the native call throws — no retry),
-  // deferred to the next frame so the revealed tree is measurable. Per-screen
-  // heading/first-control focus is owned by the screens themselves; the gate
-  // cannot know the active screen's heading.
-  //
-  // The transition is skipped while a bootstrap error is shown: the wrapper
-  // is unmounted then (the error screen replaces it), so "Content ready"
-  // would be a false announcement and the wrapper focus has no target. The
-  // cleanup cancels the pending frame, which React runs before any later
-  // render's frame can fire, so an interrupted reveal never focuses a stale
-  // wrapper.
-  const wrapperRef = useRef<ViewInstance>(null);
-  const wasHiddenRef = useRef(wrapperObscured);
-  useEffect(() => {
-    const wasHidden = wasHiddenRef.current;
-    wasHiddenRef.current = wrapperObscured;
-    if (!wasHidden || wrapperObscured || hasBootstrapError) {
-      return undefined;
-    }
-    announceForA11y(i18n.t('bootstrap.contentReady'));
-    const frame = requestAnimationFrame(() => {
-      requestA11yFocus(wrapperRef);
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [wrapperObscured, hasBootstrapError]);
-
   // The restore-error surface is settled, but a successful Retry does not
   // reveal the app immediately: the token publish, the user fetch, and the
   // consent check still run behind the loading gate, and the splash overlay
@@ -1058,6 +1031,47 @@ function RootLayoutNav({
   // it leaves both accessibility trees, stops taking touches, and paints
   // nothing that would show through the opaque surface above it.
   const obscureTree = wrapperObscured || showRestoreError || showBlockedAccountError;
+
+  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
+  // both accessibility trees. On the hidden → visible transition,
+  // `announceForA11y` is the deterministic entry context for screen-reader
+  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
+  // only when the wrapper has no node yet or the native call throws — no retry),
+  // deferred to the next frame so the revealed tree is measurable. Per-screen
+  // heading/first-control focus is owned by the screens themselves; the gate
+  // cannot know the active screen's heading.
+  //
+  // The transition is skipped while a bootstrap error is shown: the wrapper
+  // is unmounted then (the error screen replaces it), so "Content ready"
+  // would be a false announcement and the wrapper focus has no target. A
+  // full-screen overlay that owns the screen (the blocked explanation) also
+  // defers the entry announcement, because the wrapper it would focus stays
+  // hidden from both accessibility trees. The cleanup cancels the pending
+  // frame, which React runs before any later render's frame can fire, so an
+  // interrupted reveal never focuses a stale wrapper.
+  const wrapperRef = useRef<ViewInstance>(null);
+  const wasHiddenRef = useRef(wrapperObscured);
+  useEffect(() => {
+    const wasHidden = wasHiddenRef.current;
+    wasHiddenRef.current = wrapperObscured;
+    if (
+      !shouldAnnounceContentReady({
+        wasHidden,
+        wrapperObscured,
+        hasBootstrapError,
+        showBlockedAccountError,
+      })
+    ) {
+      return undefined;
+    }
+    announceForA11y(i18n.t('bootstrap.contentReady'));
+    const frame = requestAnimationFrame(() => {
+      requestA11yFocus(wrapperRef);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [wrapperObscured, hasBootstrapError, showBlockedAccountError]);
 
   // Both early returns below are guarded on `!showBlockedAccountError`: the
   // blocked overlay explains a "could not load your account" whose retry can
@@ -1169,7 +1183,13 @@ function RootLayoutNav({
       >
         <Slot />
       </View>
-      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
+      {shouldShowBootstrapLoadingSurface({
+        showBootstrapLoading,
+        showRestoreError,
+        showBlockedAccountError,
+      }) ? (
+        <BootstrapLoadingSurface />
+      ) : null}
       {showRestoreError ? (
         <View className="absolute inset-0">
           <BootstrapErrorScreen

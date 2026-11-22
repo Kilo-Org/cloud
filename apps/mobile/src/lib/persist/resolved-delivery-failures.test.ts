@@ -164,9 +164,10 @@ describe('resolved delivery failures', () => {
       items: [],
       complete: false,
     });
-    await expect(
-      readResolvedDeliveryFailures(USER_ID, `ses-${total - 1}`)
-    ).resolves.toEqual({ items: ['msg-1'], complete: true });
+    await expect(readResolvedDeliveryFailures(USER_ID, `ses-${total - 1}`)).resolves.toEqual({
+      items: ['msg-1'],
+      complete: true,
+    });
 
     const family = [...(deliveryBucket()?.keys() ?? [])].filter(key =>
       key.startsWith('resolved-delivery:')

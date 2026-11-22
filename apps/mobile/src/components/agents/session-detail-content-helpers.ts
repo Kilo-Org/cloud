@@ -275,10 +275,7 @@ export function unansweredPromptMessageId(
  * delivery: it never makes this true. The compared text is
  * {@link firstHumanText}, the one the composer restores.
  */
-export function hasConfirmedSentPrompt(
-  messages: readonly StoredMessage[],
-  text: string
-): boolean {
+export function hasConfirmedSentPrompt(messages: readonly StoredMessage[], text: string): boolean {
   return messages.some(
     message =>
       message.info.role === 'user' &&

@@ -155,7 +155,10 @@ const storedEnvelopeSchema = z.object({ items: z.array(z.unknown()), complete: z
 
 // A tombstone is recognized by content, not by a marker field: the envelope is
 // already the whole record, and the writers emit exactly this shape.
-const tombstoneSchema = z.object({ items: z.array(z.unknown()).max(0), complete: z.literal(false) });
+const tombstoneSchema = z.object({
+  items: z.array(z.unknown()).max(0),
+  complete: z.literal(false),
+});
 
 function isTombstone(raw: string): boolean {
   try {
@@ -276,9 +279,7 @@ export async function tombstoneOldSessions({
   const removalsSet = new Set(removals);
   await Promise.all(
     present
-      .filter(
-        record => !record.tombstone && !record.keep && !removalsSet.has(record.k)
-      )
+      .filter(record => !record.tombstone && !record.keep && !removalsSet.has(record.k))
       .slice(0, retired)
       .map(record => encryptedKv.setItem(scope, record.k, DELIVERY_TOMBSTONE_JSON))
   );

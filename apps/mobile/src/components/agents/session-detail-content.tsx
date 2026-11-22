@@ -642,9 +642,7 @@ export function SessionDetailContent({
     };
   }, [userId, sessionId, isIdentityLoading]);
   const pendingSendGuardIncomplete =
-    pendingSendGuard !== null && pendingSendGuard.sessionId === sessionId
-      ? pendingSendGuard.incomplete
-      : false;
+    pendingSendGuard?.sessionId === sessionId ? pendingSendGuard.incomplete : false;
 
   // Composer remount identity. An account CHANGE must remount the composer, so
   // one account's typed text never surfaces under another. Identity RESOLVING

@@ -12,6 +12,7 @@
  * UTF-8 byte budget in limits.ts.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
+import { sessionLiveCut } from '@kilocode/session-ingest-contracts';
 import type { ServiceEvent } from './normalizer';
 import type { SessionSnapshotFailure } from './snapshot-page';
 import { removePendingRequest, upsertByRequestId } from './pending-requests';
@@ -56,7 +57,8 @@ function utf8Tail(text: string, maxBytes: number): { text: string; truncated: bo
 }
 
 const SHORT_COMMIT_HASH_LENGTH = 7;
-const AUTOCOMMIT_SUBJECT_MAX_CHARS = 72;
+// UTF-16 code units, so the cut can share the workspace's grapheme reader.
+const AUTOCOMMIT_SUBJECT_MAX_LENGTH = 72;
 
 /** The first line of a commit message, trimmed, or undefined when it is blank. */
 function commitSubject(commitMessage: string): string | undefined {
@@ -65,41 +67,10 @@ function commitSubject(commitMessage: string): string | undefined {
   return subject.length === 0 ? undefined : subject;
 }
 
-/** A code point that joins the glyph before it, so a cut must never split or strand it. */
-function isJoinedCodePoint(codePoint: number): boolean {
-  return (
-    codePoint === 0x200d ||
-    codePoint === 0x20e3 ||
-    (codePoint >= 0xfe00 && codePoint <= 0xfe0f) ||
-    (codePoint >= 0x1f3fb && codePoint <= 0x1f3ff) ||
-    (codePoint >= 0xe0020 && codePoint <= 0xe007f)
-  );
-}
-
-/** A regional indicator; a flag is a pair of them, so one half alone renders as a letter. */
-function isRegionalIndicator(codePoint: number): boolean {
-  return codePoint >= 0x1f1e6 && codePoint <= 0x1f1ff;
-}
-
-/** Bound a subject to whole code points so no joined glyph or flag pair is split. */
+/** Bound a subject to whole graphemes so no joined glyph, flag pair, or mark is split. */
 function boundCommitSubject(subject: string): { subject: string; truncated: boolean } {
-  const codePoints = Array.from(subject).map(char => char.codePointAt(0) ?? 0);
-  const codePointCount = codePoints.length;
-  if (codePointCount <= AUTOCOMMIT_SUBJECT_MAX_CHARS) return { subject, truncated: false };
-  let end = AUTOCOMMIT_SUBJECT_MAX_CHARS;
-  // The first dropped code point joins the last kept one: keep neither.
-  while (end > 0 && isJoinedCodePoint(codePoints[end] ?? 0)) end -= 1;
-  // The last kept code point joins the first dropped one: drop it too.
-  while (end > 0 && isJoinedCodePoint(codePoints[end - 1] ?? 0)) end -= 1;
-  let regionalIndicators = 0;
-  while (
-    regionalIndicators < end &&
-    isRegionalIndicator(codePoints[end - regionalIndicators - 1] ?? 0)
-  ) {
-    regionalIndicators += 1;
-  }
-  if (regionalIndicators % 2 === 1) end -= 1;
-  return { subject: String.fromCodePoint(...codePoints.slice(0, end)), truncated: true };
+  if (subject.length <= AUTOCOMMIT_SUBJECT_MAX_LENGTH) return { subject, truncated: false };
+  return { subject: sessionLiveCut(subject, AUTOCOMMIT_SUBJECT_MAX_LENGTH), truncated: true };
 }
 
 /**

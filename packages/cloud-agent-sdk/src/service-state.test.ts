@@ -2639,7 +2639,7 @@ describe('createServiceState', () => {
       });
     });
 
-    it('bounds a long subject to 72 code points and marks the cut', () => {
+    it('bounds a long subject to 72 UTF-16 code units and marks the cut', () => {
       const state = createServiceState(makeConfig());
 
       state.process({
@@ -2668,10 +2668,12 @@ describe('createServiceState', () => {
       });
 
       const status = state.getStatus();
+      // A family sequence is 11 UTF-16 code units, so six whole sequences fit
+      // in the 72-unit cap and the seventh starts the dropped text.
       expect(status).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: `aaaaaaa · ${'👨‍👩‍👧‍👦'.repeat(10)}👨…`,
+        message: `aaaaaaa · ${'👨‍👩‍👧‍👦'.repeat(6)}…`,
         commitHash: localCommit.commitHash,
       });
       if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
@@ -2694,10 +2696,12 @@ describe('createServiceState', () => {
       });
 
       const status = state.getStatus();
+      // A flag is 4 UTF-16 code units, so `a` plus seventeen whole flags fit
+      // in the 72-unit cap.
       expect(status).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: `aaaaaaa · a${'🇵🇱'.repeat(35)}…`,
+        message: `aaaaaaa · a${'🇵🇱'.repeat(17)}…`,
         commitHash: localCommit.commitHash,
       });
       if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
@@ -2705,7 +2709,6 @@ describe('createServiceState', () => {
       expect(message.endsWith('…')).toBe(true);
       const kept = Array.from(message.slice(0, -1)).map(char => char.codePointAt(0) ?? 0);
       const lastKept = kept[kept.length - 1] ?? 0;
-      expect(lastKept >= 0x1f1e6 && lastKept <= 0x1f1ff).toBe(true);
       let regionalIndicators = 0;
       while (
         regionalIndicators < kept.length &&
@@ -2714,10 +2717,12 @@ describe('createServiceState', () => {
       ) {
         regionalIndicators += 1;
       }
+      // The run ends on a whole pair, so no lone regional indicator is kept.
+      expect(lastKept >= 0x1f1e6 && lastKept <= 0x1f1ff).toBe(true);
       expect(regionalIndicators % 2).toBe(0);
     });
 
-    it('drops a joiner that would strand the first dropped code point', () => {
+    it('drops a trailing joiner with the cluster it belongs to', () => {
       const state = createServiceState(makeConfig());
 
       state.process({
@@ -2728,6 +2733,9 @@ describe('createServiceState', () => {
       });
 
       const status = state.getStatus();
+      // The joiner makes the seventy-second `x` one cluster, and that cluster
+      // crosses the 72-unit cap, so the cut keeps seventy-one `x` and no
+      // trailing joiner reaches the message.
       expect(status).toEqual({
         type: 'autocommit',
         step: 'completed',
@@ -2737,6 +2745,38 @@ describe('createServiceState', () => {
       if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
       const kept = Array.from(status.message.slice(0, -1)).map(char => char.codePointAt(0) ?? 0);
       expect(kept[kept.length - 1] ?? 0).not.toBe(0x200d);
+    });
+
+    it('keeps the base of the last combining mark before the cut', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...localCommit,
+        commitMessage: 'e\u0301'.repeat(80),
+      });
+
+      const status = state.getStatus();
+      // Each `e` plus its combining acute is one 2-unit cluster, so the cap
+      // keeps 36 whole clusters and no mark is left without its base.
+      expect(status).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: `aaaaaaa · ${'e\u0301'.repeat(36)}…`,
+        commitHash: localCommit.commitHash,
+      });
+      if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
+      const message = status.message;
+      expect(message.endsWith('…')).toBe(true);
+      const kept = Array.from(message.slice(0, -1)).map(char => char.codePointAt(0) ?? 0);
+      const marks = kept.filter(code => code >= 0x0300 && code <= 0x036f).length;
+      const bases = kept.filter(code => code === 0x65).length;
+      // The last kept cluster is a whole `e` + acute: the mark is not stranded
+      // without its base, and no cluster is split across the cut.
+      expect([kept[kept.length - 2], kept[kept.length - 1]]).toEqual([0x65, 0x301]);
+      expect(bases).toBe(36);
+      expect(marks).toBe(bases);
     });
 
     it('shows the short hash alone when the message is empty', () => {

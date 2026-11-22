@@ -4726,6 +4726,9 @@
     "morningEnd": "Gabaasni hanga yeroo jiraatu",
     "timeHint": "Kaardiin Home yeroo yeroon gabaasaa xumuramu, toora ala illee, haala yeroo ammaa deebisa.",
     "invalidSchedule": "Zoonii yeroo sirrii fi yeroo gabaasaa duwwaa hin taane filadhu.",
+    "scheduleEmptyNight": "Yeroon gabaasaa duwwaadha. Yeroo gabaasni qophaa'u yeroo gabaasaa jalqabaa irra booda filadhu.",
+    "scheduleEmptyMorning": "Yeroon gabaasni qophaa'u fi yeroon hanga gabaasni jiraatu walqixa. Gabaasni yeroo hammam jiraatu filadhu.",
+    "scheduleFullDay": "Yeroowwan lamaan guyyaa guutuu uwwisu. Guyyaa keessaa kutaa tokko gabaasaa ala dhiisi.",
     "notificationsHint": "Gabaasa sagantaa tokkotti beeksisa waliigalaa tokko. Cuunfaa AI kaffaltii irraa walaba.",
     "notificationPermission": "Gabaasa kee argachuuf beeksisa push dandeessisi.",
     "defaultModel": "Moodeela durtii Kilo fayyadami",
@@ -4735,7 +4738,9 @@
     "estimate": "Tilmaama {{estimate}} · daangaa ol'aanaa {{maximum}}",
     "estimateUnavailable": "Cuunfaan kaffaltii qindaa'inoota kanaaf hin argamu. Moodelii ykn daangoota jijjiiri, ykn booda irra deebi'ii yaali.",
     "confirmPaid": "Cuunfaa kaffaltii {{context}}f dandeessisuu?",
+    "paidDisclosure_one": "Tilmaamaan {{estimate}}, hanga {{maximum}}, daangaa daqiiqaa {{minutes}} wajjin. Uumamni yoo kufe illee kaffaltiin ni jira.",
     "paidDisclosure": "Tilmaamaan {{estimate}}, hanga {{maximum}}, daangaa daqiiqaa {{minutes}} wajjin. Uumamni yoo kufe illee kaffaltiin ni jira.",
+    "paidDisclosure_other": "Tilmaamaan {{estimate}}, hanga {{maximum}}, daangaa daqiiqaa {{minutes}} wajjin. Uumamni yoo kufe illee kaffaltiin ni jira.",
     "enable": "Cuunfaa kaffaltii dandeessisi",
     "allContexts": "Gabaasonni dhuunfaa fi dhaabbataa adda adda ta'u.",
     "emptyHistory": "Gabaasonni olkaa'aman hin jiran",
@@ -4778,7 +4783,7 @@
     "sourceActivity": "Sochii maqaa hin qabne",
     "metadataFailureProvider": "dogoggora dhiyeessaa",
     "metadataFailureTool": "dogoggora meeshaa",
-    "metadataFailureCancelled": "Haqame",
+    "metadataStopped": "Deebiin dhumaa dhaabbate",
     "metadataFailureOther": "dogoggora hin ibsamne"
   },
   "systemSearch": {

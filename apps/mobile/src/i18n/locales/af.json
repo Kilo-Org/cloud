@@ -4726,6 +4726,9 @@
     "morningEnd": "Verslag beskikbaar tot",
     "timeHint": "Die Tuis-kaart herstel regstreekse status wanneer die verslagvenster eindig, selfs vanlyn.",
     "invalidSchedule": "Kies 'n geldige tydsone en 'n nie-leë verslagvenster.",
+    "scheduleEmptyNight": "Die verslagvenster is leeg. Kies 'n gereedheidstyd later as die begin van die venster.",
+    "scheduleEmptyMorning": "Die gereedheidstyd en die beskikbaar-tot-tyd stem ooreen. Kies hoe lank die verslag beskikbaar bly.",
+    "scheduleFullDay": "Die twee vensters dek 'n volle dag. Los 'n deel van die dag buite die verslag.",
     "notificationsHint": "Een algemene kennisgewing per geskeduleerde verslag. Onafhanklik van betaalde AI-opsommings.",
     "notificationPermission": "Skakel druk-kennisgewings aan om jou verslag te ontvang.",
     "defaultModel": "Gebruik Kilo se verstekmodel",
@@ -4735,6 +4738,8 @@
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie. Verander die model of die perke, of probeer later weer.",
     "confirmPaid": "Aktiveer betaalde opsommings vir {{context}}?",
+    "paidDisclosure_one": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
+    "paidDisclosure_other": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
     "paidDisclosure": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
     "enable": "Aktiveer betaalde opsommings",
     "allContexts": "Persoonlike en organisasieverslae bly apart.",
@@ -4778,7 +4783,7 @@
     "sourceActivity": "Aktiwiteit sonder titel",
     "metadataFailureProvider": "verskafferfout",
     "metadataFailureTool": "hulpmiddelfout",
-    "metadataFailureCancelled": "Gekanselleer",
+    "metadataStopped": "Laaste beurt is gestop",
     "metadataFailureOther": "ongespesifiseerde fout"
   },
   "systemSearch": {

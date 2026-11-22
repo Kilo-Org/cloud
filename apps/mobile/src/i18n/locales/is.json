@@ -4726,6 +4726,9 @@
     "morningEnd": "Yfirlit tiltækt til",
     "timeHint": "Heimaspjaldið sýnir aftur rauntímastöðu þegar yfirlitsglugganum lýkur, jafnvel án tengingar.",
     "invalidSchedule": "Veldu gilt tímabelti og yfirlitsglugga sem er ekki tómur.",
+    "scheduleEmptyNight": "Yfirlitsglugginn er tómur. Veldu tilbúinn tíma sem er síðar en upphaf gluggans.",
+    "scheduleEmptyMorning": "Tilbúinn tími og tíminn sem er í boði til stemma saman. Veldu hversu lengi yfirlitið helst í boði.",
+    "scheduleFullDay": "Gluggarnir tveir ná yfir heilan dag. Skildu eftir hluta dagsins utan yfirlitsins.",
     "notificationsHint": "Ein almenn tilkynning fyrir hvert áætlað yfirlit. Óháð greiddum AI samantektum.",
     "notificationPermission": "Kveiktu á push-tilkynningum til að fá yfirlitið þitt.",
     "defaultModel": "Nota sjálfgefið líkan Kilo",
@@ -4735,6 +4738,8 @@
     "estimate": "Áætlun {{estimate}} · hámark {{maximum}}",
     "estimateUnavailable": "Greidd samantekt er ekki tiltæk fyrir þessar stillingar. Breyttu líkaninu eða hámarkinu, eða reyndu aftur síðar.",
     "confirmPaid": "Virkja greiddar samantektir fyrir {{context}}?",
+    "paidDisclosure_one": "Áætlað {{estimate}}, allt að {{maximum}}, með {{minutes}} mín. hámarki. Kostnaður gildir þótt vinnsla mistakist.",
+    "paidDisclosure_other": "Áætlað {{estimate}}, allt að {{maximum}}, með {{minutes}} mín. hámarki. Kostnaður gildir þótt vinnsla mistakist.",
     "paidDisclosure": "Áætlað {{estimate}}, allt að {{maximum}}, með {{minutes}} mín. hámarki. Kostnaður gildir þótt vinnsla mistakist.",
     "enable": "Virkja greiddar samantektir",
     "allContexts": "Persónuleg yfirlit og yfirlit skipulagsheilda eru aðskilin.",
@@ -4778,7 +4783,7 @@
     "sourceActivity": "Ónefnd virkni",
     "metadataFailureProvider": "villa hjá þjónustuveitanda",
     "metadataFailureTool": "villa í verkfæri",
-    "metadataFailureCancelled": "Hætt við",
+    "metadataStopped": "Síðasta umferð var stöðvuð",
     "metadataFailureOther": "ótilgreind villa"
   },
   "systemSearch": {

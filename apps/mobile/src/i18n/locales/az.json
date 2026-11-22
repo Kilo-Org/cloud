@@ -4726,6 +4726,9 @@
     "morningEnd": "Hesabatın mövcud olduğu son vaxt",
     "timeHint": "Hesabat pəncərəsi bitəndə Əsas kart, hətta oflayn olsa belə, canlı statusu bərpa edir.",
     "invalidSchedule": "Etibarlı saat qurşağı və boş olmayan hesabat pəncərəsi seçin.",
+    "scheduleEmptyNight": "Hesabat pəncərəsi boşdur. Pəncərənin başlanğıcından sonra olan hazır vaxtı seçin.",
+    "scheduleEmptyMorning": "Hazır vaxt mövcudluğun son vaxtı ilə üst-üstə düşür. Hesabatın nə qədər mövcud qalacağını seçin.",
+    "scheduleFullDay": "İki pəncərə tam bir günü əhatə edir. Günün bir hissəsini hesabatdan kənarda buraxın.",
     "notificationsHint": "Hər planlaşdırılmış hesabat üçün bir ümumi bildiriş. Ödənişli AI xülasələrindən asılı deyil.",
     "notificationPermission": "Hesabatı almaq üçün push bildirişlərini aktiv edin.",
     "defaultModel": "Kilonun standart modelindən istifadə et",
@@ -4735,6 +4738,8 @@
     "estimate": "Təxmin {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu parametrlər üçün ödənişli xülasə mövcud deyil. Modeli və ya limitləri dəyişin, yaxud bir az sonra yenidən cəhd edin.",
     "confirmPaid": "{{context}} üçün ödənişli xülasələr aktiv edilsin?",
+    "paidDisclosure_one": "Təxminən {{estimate}}, maksimum {{maximum}}, {{minutes}} dəqiqəlik limitlə. Yaratma uğursuz olsa belə ödəniş tutulur.",
+    "paidDisclosure_other": "Təxminən {{estimate}}, maksimum {{maximum}}, {{minutes}} dəqiqəlik limitlə. Yaratma uğursuz olsa belə ödəniş tutulur.",
     "paidDisclosure": "Təxminən {{estimate}}, maksimum {{maximum}}, {{minutes}} dəqiqəlik limitlə. Yaratma uğursuz olsa belə ödəniş tutulur.",
     "enable": "Ödənişli xülasələri aktiv et",
     "allContexts": "Şəxsi və təşkilat hesabatları ayrı saxlanılır.",
@@ -4778,7 +4783,7 @@
     "sourceActivity": "Adsız fəaliyyət",
     "metadataFailureProvider": "provayder xətası",
     "metadataFailureTool": "alət xətası",
-    "metadataFailureCancelled": "Ləğv edildi",
+    "metadataStopped": "Son tur dayandırıldı",
     "metadataFailureOther": "müəyyən edilməmiş xəta"
   },
   "systemSearch": {

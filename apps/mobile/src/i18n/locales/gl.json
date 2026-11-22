@@ -4726,6 +4726,9 @@
     "morningEnd": "Informe dispoñible ata",
     "timeHint": "A tarxeta de Inicio volve ao estado en directo cando remata a xanela do informe, mesmo sen conexión.",
     "invalidSchedule": "Escolle un fuso horario válido e unha xanela do informe non baleira.",
+    "scheduleEmptyNight": "A xanela do informe está baleira. Escolle unha hora de preparación posterior ao inicio da xanela.",
+    "scheduleEmptyMorning": "A hora de preparación e a hora de fin de dispoñibilidade coinciden. Escolle canto tempo permanece dispoñible o informe.",
+    "scheduleFullDay": "As dúas xanelas cobren un día enteiro. Deixa parte do día fóra do informe.",
     "notificationsHint": "Unha notificación xenérica por cada informe programado. Independente dos resumos con IA de pago.",
     "notificationPermission": "Activa as notificacións push para recibir o teu informe.",
     "defaultModel": "Usar o modelo predeterminado de Kilo",
@@ -4735,6 +4738,8 @@
     "estimate": "Estimación {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Non hai dispoñible un resumo de pago para estes axustes. Cambia o modelo ou os límites, ou proba de novo máis tarde.",
     "confirmPaid": "Activar os resumos de pago para {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} min. Cóbrase aínda que a xeración falle.",
+    "paidDisclosure_other": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} min. Cóbrase aínda que a xeración falle.",
     "paidDisclosure": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} min. Cóbrase aínda que a xeración falle.",
     "enable": "Activar resumos de pago",
     "allContexts": "Os informes persoais e da organización mantéñense separados.",
@@ -4778,7 +4783,7 @@
     "sourceActivity": "Actividade sen título",
     "metadataFailureProvider": "erro do provedor",
     "metadataFailureTool": "erro da ferramenta",
-    "metadataFailureCancelled": "Cancelado",
+    "metadataStopped": "O último turno detívose",
     "metadataFailureOther": "erro non especificado"
   },
   "systemSearch": {

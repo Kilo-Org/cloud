@@ -4726,6 +4726,9 @@
     "morningEnd": "Raporun kullanılabileceği son saat",
     "timeHint": "Ana sayfa kartı, rapor aralığı bittiğinde çevrimdışı olsa bile canlı duruma döner.",
     "invalidSchedule": "Geçerli bir saat dilimi ve boş olmayan bir rapor aralığı seçin.",
+    "scheduleEmptyNight": "Rapor aralığı boş. Rapor aralığı başlangıcından daha geç bir rapor hazır olma saati seçin.",
+    "scheduleEmptyMorning": "Rapor hazır olma saati ile raporun kullanılabileceği son saat aynı. Raporun ne kadar süre kullanılabilir kalacağını seçin.",
+    "scheduleFullDay": "İki rapor aralığı tam bir günü kapsıyor. Günün bir kısmını rapor aralığı dışında bırakın.",
     "notificationsHint": "Planlanmış her rapor için tek bir genel bildirim. Ücretli AI özetlerinden bağımsızdır.",
     "notificationPermission": "Raporunuzu almak için anlık bildirimleri açın.",
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
@@ -4735,7 +4738,9 @@
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
     "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil. Modeli veya sınırları değiştirin ya da daha sonra tekrar deneyin.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
+    "paidDisclosure_one": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
     "paidDisclosure": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
+    "paidDisclosure_other": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
     "enable": "Ücretli özetleri etkinleştir",
     "allContexts": "Kişisel ve kuruluş raporları ayrı tutulur.",
     "emptyHistory": "Kayıtlı rapor yok",
@@ -4778,7 +4783,7 @@
     "sourceActivity": "Adsız etkinlik",
     "metadataFailureProvider": "sağlayıcı hatası",
     "metadataFailureTool": "araç hatası",
-    "metadataFailureCancelled": "İptal edildi",
+    "metadataStopped": "Son tur durduruldu",
     "metadataFailureOther": "belirtilmemiş hata"
   },
   "systemSearch": {

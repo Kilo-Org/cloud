@@ -4726,6 +4726,9 @@
     "morningEnd": "Brifing mavjud bo‘ladigan oxirgi vaqt",
     "timeHint": "Brifing davri tugaganda Bosh sahifa kartasi oflaynda ham jonli holatni tiklaydi.",
     "invalidSchedule": "To‘g‘ri vaqt mintaqasini va bo‘sh bo‘lmagan brifing davrini tanlang.",
+    "scheduleEmptyNight": "Brifing davri bo‘sh. Tayyor bo‘ladigan vaqtni brifing davri boshlanishidan keyinroq tanlang.",
+    "scheduleEmptyMorning": "Tayyor bo‘ladigan vaqt va mavjud bo‘ladigan oxirgi vaqt bir xil. Brifing qancha vaqt mavjud bo‘lishini tanlang.",
+    "scheduleFullDay": "Ikkala davr butun kunni qamrab oladi. Kunning bir qismini brifingdan tashqarida qoldiring.",
     "notificationsHint": "Har bir rejalashtirilgan brifing uchun bitta umumiy bildirishnoma. Pullik AI xulosalariga bog‘liq emas.",
     "notificationPermission": "Brifingni olish uchun push-bildirishnomalarni yoqing.",
     "defaultModel": "Kilo standart modelidan foydalanish",
@@ -4735,7 +4738,9 @@
     "estimate": "Taxminiy hisob {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu sozlamalar uchun pullik xulosa mavjud emas. Modelni yoki chegaralarni o‘zgartiring, yoki keyinroq qayta urinib ko‘ring.",
     "confirmPaid": "{{context}} uchun pullik xulosalar yoqilsinmi?",
+    "paidDisclosure_one": "Taxminan {{estimate}}, ko‘pi bilan {{maximum}}, {{minutes}} daqiqa cheklov bilan. Yaratish muvaffaqiyatsiz bo‘lsa ham to‘lov olinadi.",
     "paidDisclosure": "Taxminan {{estimate}}, ko‘pi bilan {{maximum}}, {{minutes}} daqiqa cheklov bilan. Yaratish muvaffaqiyatsiz bo‘lsa ham to‘lov olinadi.",
+    "paidDisclosure_other": "Taxminan {{estimate}}, ko‘pi bilan {{maximum}}, {{minutes}} daqiqa cheklov bilan. Yaratish muvaffaqiyatsiz bo‘lsa ham to‘lov olinadi.",
     "enable": "Pullik xulosalarni yoqish",
     "allContexts": "Shaxsiy va tashkilot brifinglari alohida saqlanadi.",
     "emptyHistory": "Saqlangan brifinglar yo‘q",
@@ -4778,7 +4783,7 @@
     "sourceActivity": "Nomsiz faoliyat",
     "metadataFailureProvider": "provayder xatosi",
     "metadataFailureTool": "vosita xatosi",
-    "metadataFailureCancelled": "Bekor qilindi",
+    "metadataStopped": "Oxirgi navbat to‘xtatildi",
     "metadataFailureOther": "aniqlanmagan xato"
   },
   "systemSearch": {

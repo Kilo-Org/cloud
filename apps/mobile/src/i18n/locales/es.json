@@ -4810,6 +4810,9 @@
     "morningEnd": "Informe disponible hasta",
     "timeHint": "La tarjeta de Inicio vuelve al estado en vivo cuando termina la ventana del informe, incluso sin conexión.",
     "invalidSchedule": "Elige una zona horaria válida y una ventana del informe no vacía.",
+    "scheduleEmptyNight": "La ventana del informe está vacía. Elige una hora de preparación posterior al inicio de la ventana.",
+    "scheduleEmptyMorning": "La hora de preparación y la hora de fin de disponibilidad coinciden. Elige cuánto tiempo permanece disponible el informe.",
+    "scheduleFullDay": "Las dos ventanas cubren un día completo. Deja parte del día fuera del informe.",
     "notificationsHint": "Una notificación genérica por cada informe programado. Independiente de los resúmenes de IA de pago.",
     "notificationPermission": "Activa las notificaciones push para recibir tu informe.",
     "defaultModel": "Usar el modelo predeterminado de Kilo",
@@ -4823,6 +4826,9 @@
     "estimateModelNotAllowed": "Este modelo no está permitido en este contexto. Elige otro modelo.",
     "estimateSpendLimitTooLow": "Sube el límite de gasto para permitir este resumen.",
     "confirmPaid": "¿Activar resúmenes de pago para {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimado, hasta {{maximum}}, con un límite de {{minutes}} min. Se cobra aunque la generación falle.",
+    "paidDisclosure_many": "{{estimate}} estimado, hasta {{maximum}}, con un límite de {{minutes}} min. Se cobra aunque la generación falle.",
+    "paidDisclosure_other": "{{estimate}} estimado, hasta {{maximum}}, con un límite de {{minutes}} min. Se cobra aunque la generación falle.",
     "paidDisclosure": "{{estimate}} estimado, hasta {{maximum}}, con un límite de {{minutes}} min. Se cobra aunque la generación falle.",
     "enable": "Activar resúmenes de pago",
     "allContexts": "Los informes personales y de organización se mantienen separados.",
@@ -4866,7 +4872,7 @@
     "sourceActivity": "Actividad sin título",
     "metadataFailureProvider": "error del proveedor",
     "metadataFailureTool": "error de la herramienta",
-    "metadataFailureCancelled": "Cancelado",
+    "metadataStopped": "El último turno se detuvo",
     "metadataFailureOther": "error no especificado"
   },
   "systemSearch": {

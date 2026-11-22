@@ -4726,6 +4726,9 @@
     "morningEnd": "Txostena eskuragarri egoteko azken ordua",
     "timeHint": "Hasierako txartelak zuzeneko egoera berrezartzen du txosten-tartea amaitzean, lineaz kanpo ere bai.",
     "invalidSchedule": "Aukeratu ordu-zona baliodun bat eta txosten-tarte ez-huts bat.",
+    "scheduleEmptyNight": "Txosten-tartea hutsik dago. Aukeratu prest egoteko ordu bat tartearen hasiera baino beranduago.",
+    "scheduleEmptyMorning": "Prest egoteko ordua eta erabilgarri egongo den azken ordua bat datoz. Aukeratu txostena zenbat denbora egongo den erabilgarri.",
+    "scheduleFullDay": "Bi tarteek egun osoa hartzen dute. Utzi egunaren zati bat txosten-tartetik kanpo.",
     "notificationsHint": "Programatutako txosten bakoitzeko jakinarazpen orokor bat. Ordainpeko AI laburpenetatik independentea.",
     "notificationPermission": "Gaitu push jakinarazpenak zure txostena jasotzeko.",
     "defaultModel": "Erabili Kiloren eredu lehenetsia",
@@ -4739,6 +4742,8 @@
     "estimateModelNotAllowed": "Eredu hau ez da onartzen testuinguru honetan. Aukeratu beste eredu bat.",
     "estimateSpendLimitTooLow": "Igo gastu-muga laburpen hau sortu ahal izateko.",
     "confirmPaid": "Gaitu ordainpeko laburpenak {{context}}-(e)rako?",
+    "paidDisclosure_one": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
+    "paidDisclosure_other": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
     "paidDisclosure": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
     "enable": "Gaitu ordainpeko laburpenak",
     "allContexts": "Txosten pertsonalak eta erakundekoak bereizita daude.",
@@ -4778,7 +4783,7 @@
     "sourceActivity": "Izenbururik gabeko jarduera",
     "metadataFailureProvider": "hornitzailearen errorea",
     "metadataFailureTool": "tresnaren errorea",
-    "metadataFailureCancelled": "Ezeztatuta",
+    "metadataStopped": "Azken txanda gelditu egin da",
     "metadataFailureOther": "zehaztu gabeko errorea"
   },
   "systemSearch": {

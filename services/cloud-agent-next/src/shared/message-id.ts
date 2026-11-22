@@ -1,4 +1,4 @@
-const MESSAGE_ID_PREFIX = 'msg_';
+export const MESSAGE_ID_PREFIX = 'msg_';
 const MESSAGE_ID_TIME_LENGTH = 12;
 const MESSAGE_ID_RANDOM_LENGTH = 14;
 

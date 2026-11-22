@@ -6,15 +6,17 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'ollama-cloud';
+
 export default {
-  id: 'ollama-cloud',
+  id,
   models_dev_id: 'ollama-cloud',
   ...apiKeyUpstream({
     apiUrl: 'https://ollama.com/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  models: cachedDirectByokModelList('ollama-cloud'),
+  models: cachedDirectByokModelList(id),
   provider_listing: {
     dataPolicy: {
       training: false,

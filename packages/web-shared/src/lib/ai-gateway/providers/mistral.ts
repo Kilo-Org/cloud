@@ -30,6 +30,9 @@ export function applyMistralModelSettings(requestToMutate: GatewayRequest) {
   dropToolStrictProperties(requestToMutate.body);
 }
 
+/** Message fields that carry the legacy reasoning string, in fallback order. */
+const LEGACY_REASONING_TEXT_FIELDS = ['reasoning_content', 'reasoning'] as const;
+
 function reasoningTextOf(message: Record<string, unknown>): string {
   const detailsText = Array.isArray(message.reasoning_details)
     ? message.reasoning_details
@@ -44,7 +47,7 @@ function reasoningTextOf(message: Record<string, unknown>): string {
     : '';
   if (detailsText) return detailsText;
   // Details without text, such as only summaries, fall back to the legacy reasoning strings.
-  for (const field of ['reasoning_content', 'reasoning']) {
+  for (const field of LEGACY_REASONING_TEXT_FIELDS) {
     const value = message[field];
     if (typeof value === 'string' && value) return value;
   }
@@ -59,7 +62,7 @@ function contentChunksOf(content: unknown): unknown[] {
 
 /** Message fields that carry reasoning. Mistral rejects them, so their text is replayed as a
  * `thinking` chunk instead. */
-const MESSAGE_REASONING_FIELDS = ['reasoning_details', 'reasoning_content', 'reasoning'];
+const MESSAGE_REASONING_FIELDS = ['reasoning_details', ...LEGACY_REASONING_TEXT_FIELDS];
 
 /** The effort the Mistral thinking transform sends when the request carries none. */
 const MISTRAL_DEFAULT_REASONING_EFFORT = 'high';

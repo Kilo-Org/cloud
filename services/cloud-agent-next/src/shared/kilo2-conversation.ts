@@ -2,6 +2,7 @@
 import { z } from 'zod';
 
 import { KILO_SESSION_ID_PREFIX } from './kilo-session-id';
+import { MESSAGE_ID_PREFIX } from './message-id';
 import { tokenUsageSchema } from './token-usage';
 
 const timestamp = z.number().finite();
@@ -64,7 +65,7 @@ const content = z
   .passthrough();
 export const kilo2MessageSchema = z
   .object({
-    id: z.string().startsWith('msg_'),
+    id: z.string().startsWith(MESSAGE_ID_PREFIX),
     type: z.string(),
     time: z.object({ created: timestamp, completed: timestamp.optional() }).passthrough(),
     text: z.string().optional(),
@@ -85,8 +86,10 @@ export type Kilo2Message = z.infer<typeof kilo2MessageSchema>;
 
 /**
  * The sibling import resolves in both copies: `scripts/sync-kilo2-contracts.mjs`
- * writes `token-usage`, `kilo-session-id` and `base62` beside this file for the
- * service whose Docker build context holds no workspace packages.
+ * writes `token-usage`, `kilo-session-id` and `base62` beside this file, and
+ * `message-id` there is the service's mirror module, kept equal by
+ * `message-id-mirror.test.ts`, for the service whose Docker build context holds
+ * no workspace packages.
  */
 export const kilo2SessionSchema = z.object({
   id: z.string().startsWith(KILO_SESSION_ID_PREFIX),

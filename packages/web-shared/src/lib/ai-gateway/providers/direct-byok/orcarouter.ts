@@ -6,15 +6,17 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'orcarouter';
+
 export default {
-  id: 'orcarouter',
+  id,
   models_dev_id: 'orcarouter',
   ...apiKeyUpstream({
     apiUrl: 'https://api.orcarouter.ai/v1',
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  models: cachedDirectByokModelList('orcarouter'),
+  models: cachedDirectByokModelList(id),
   provider_listing: {
     dataPolicy: {
       training: true,

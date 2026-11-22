@@ -228,6 +228,58 @@ describe('Claude billing grants', () => {
     expect(bobSharing.shareableLinks).toEqual([]);
   });
 
+  it('refuses a share authorized only by a grant that names both a person and an organization', async () => {
+    const alice = await insertTestUser();
+    const bob = await insertTestUser();
+    const organization = await createTestOrganization('Claude legacy member grant', alice.id, 0);
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: bob.id,
+      role: 'admin',
+    });
+    // The connection belongs to the organization and records Alice as its
+    // connector, so Bob must show a grant of his own to share it.
+    const [payer] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: null,
+        organization_id: organization.id,
+        user_profile_id: `uprof_${crypto.randomUUID()}`,
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: alice.id,
+      })
+      .returning();
+    if (!payer) throw new Error('Missing Alice organization payer');
+    await db.insert(claude_billing_connection_grants).values([
+      {
+        payer_connection_id: payer.id,
+        kilo_user_id: null,
+        organization_id: organization.id,
+        created_by: alice.id,
+      },
+      {
+        payer_connection_id: payer.id,
+        kilo_user_id: bob.id,
+        organization_id: organization.id,
+        created_by: alice.id,
+      },
+    ]);
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
+      organizationId: organization.id,
+    };
+    const bobPersonal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: bob.id };
+
+    await expect(
+      shareClaudeBillingConnection(organizationOwner, bobPersonal, bob.id)
+    ).rejects.toMatchObject({
+      reason: 'source_forbidden',
+    } satisfies Partial<ClaudeBillingShareError>);
+    await expect(getGrantedClaudeBillingConnection(bobPersonal)).resolves.toBeNull();
+  });
+
   it('refuses to replace a scope that uses another payer', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Claude occupied', user.id, 0);
@@ -280,6 +332,70 @@ describe('Claude billing grants', () => {
       userProfileId: payer.user_profile_id,
     });
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toBeNull();
+  });
+
+  it('retires a pending target row that holds only a grant naming both a person and an organization', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Claude pending legacy grant', user.id, 0);
+    const payer = await connectedPayer(user.id);
+    const [pendingTarget] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: null,
+        organization_id: organization.id,
+        user_profile_id: `uprof_pending_${crypto.randomUUID()}`,
+        // Synthetic: a Pending row that carries the retirement columns, so the
+        // retirement write must clear them and not only flip the status.
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        connected_at: new Date().toISOString(),
+        last_refusal_code: 'linked_organization_spend_limit_reached',
+        last_refusal_at: new Date().toISOString(),
+        status: 'pending',
+        created_by: user.id,
+      })
+      .returning();
+    if (!pendingTarget) throw new Error('Missing pending target fixture');
+    await db.insert(claude_billing_connection_grants).values([
+      // The organization's own grant, which the share moves to the payer it
+      // shares, so only the retired member grant is left on the pending row.
+      {
+        payer_connection_id: pendingTarget.id,
+        kilo_user_id: null,
+        organization_id: organization.id,
+        created_by: user.id,
+      },
+      {
+        payer_connection_id: pendingTarget.id,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        created_by: user.id,
+      },
+    ]);
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
+      organizationId: organization.id,
+    };
+
+    await shareClaudeBillingConnection(personal, organizationOwner, user.id);
+
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
+      id: payer.id,
+    });
+    await expect(
+      db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, pendingTarget.id))
+    ).resolves.toEqual([
+      expect.objectContaining({
+        status: 'removed',
+        connection_id: null,
+        connected_at: null,
+        last_refusal_code: null,
+        last_refusal_at: null,
+      }),
+    ]);
   });
 
   it('retires a pending target row with the full retirement column set when sharing over it', async () => {

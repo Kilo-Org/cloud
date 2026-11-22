@@ -273,4 +273,69 @@ describe('a sign-in attempt', () => {
     await expect(restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
     setTelemetrySink(null);
   });
+
+  it('leaves the stored draft untouched when the restore could not read it', async () => {
+    beginLoginEmail('typed@b.c');
+    await persistLoginDrafts();
+    const before = stored.values.get(LOGIN_DRAFT_RECORD_KEY) ?? '';
+
+    const reloaded = await reload();
+    stored.failingReads = 1;
+    /* The mount unmounts holding the blanks its failed read left it. */
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+    await reloaded.persistLoginDrafts();
+
+    expect(stored.values.get(LOGIN_DRAFT_RECORD_KEY)).toBe(before);
+
+    // A read that works finds the draft the failure could not see.
+    const again = await reload();
+    await expect(again.restoreLoginDrafts()).resolves.toEqual({
+      email: 'typed@b.c',
+      ssoRecovery: null,
+    });
+  });
+
+  it('leaves a retirement tombstone in place when a mount only reads it', async () => {
+    beginLoginEmail('a@b.c');
+    await persistLoginDrafts();
+    await retireLoginAttempt();
+
+    const reloaded = await reload();
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+    /* Its unmount writes what it holds: the blanks a tombstone restored. */
+    await reloaded.persistLoginDrafts();
+
+    expect(JSON.parse(stored.values.get(LOGIN_DRAFT_RECORD_KEY) ?? '{}')).toEqual({
+      version: 2,
+      state: 'retired',
+    });
+
+    const again = await reload();
+    await expect(again.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+  });
+
+  it('keeps a followed invite across a language reload', async () => {
+    const reloaded = await reload();
+    /* idle-auth.tsx:220-229 seeds the invite's address before its banner effect. */
+    reloaded.holdLoginEmail('invited@b.c');
+    reloaded.holdSsoRecovery({ email: 'invited@b.c', ssoOrganizationId: 'org-1' });
+    await reloaded.persistLoginDrafts();
+
+    const again = await reload();
+    await expect(again.restoreLoginDrafts()).resolves.toEqual({
+      email: 'invited@b.c',
+      ssoRecovery: { email: 'invited@b.c', ssoOrganizationId: 'org-1' },
+    });
+  });
+
+  it('does not write a blank draft over an unreadable record', async () => {
+    stored.values.set(LOGIN_DRAFT_RECORD_KEY, '{not json');
+
+    const reloaded = await reload();
+    /* A value this build cannot parse is not evidence that nothing is stored. */
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+    await reloaded.persistLoginDrafts();
+
+    expect(stored.values.get(LOGIN_DRAFT_RECORD_KEY)).toBe('{not json');
+  });
 });

@@ -55,15 +55,19 @@ describe('Telugu tool-card labels name the tool', () => {
   it('fits the permission sentence that interpolates the same labels', () => {
     // permission-tool-label.ts maps the skill and question ids onto these keys,
     // and the card reads "{{permission}} అనుమతించాలా?", so each value must be a
-    // noun or gerund phrase rather than a finite clause.
-    for (const key of ['agentChat.toolCard.toolSkill', 'agentChat.toolCard.toolQuestion']) {
-      const sentence = i18n.t('agentChat.permissionCard.allowQuestion', {
-        permission: i18n.t(key),
-      });
-      expect(sentence).toBe(`${i18n.t(key)} అనుమతించాలా?`);
-    }
-    expect(i18n.t('agentChat.toolCard.toolSkill')).toBe('నైపుణ్యం లోడ్ చేయడం');
-    expect(i18n.t('agentChat.toolCard.toolQuestion')).toBe('మీకు ప్రశ్నలు అడగడం');
+    // noun or gerund phrase rather than a finite clause. The assembled
+    // sentences are pinned literally, so a label that stops being a noun or
+    // gerund phrase fails here even though the template still interpolates.
+    expect(
+      i18n.t('agentChat.permissionCard.allowQuestion', {
+        permission: i18n.t('agentChat.toolCard.toolSkill'),
+      })
+    ).toBe('నైపుణ్యం లోడ్ చేయడం అనుమతించాలా?');
+    expect(
+      i18n.t('agentChat.permissionCard.allowQuestion', {
+        permission: i18n.t('agentChat.toolCard.toolQuestion'),
+      })
+    ).toBe('మీకు ప్రశ్నలు అడగడం అనుమతించాలా?');
   });
 });
 

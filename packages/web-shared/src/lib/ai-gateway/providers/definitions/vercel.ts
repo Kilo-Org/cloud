@@ -1,6 +1,9 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { defineGatewayProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/gateway-provider';
+import {
+  defineGatewayProvider,
+  withApiKey,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/gateway-provider';
 
 export const VERCEL_AI_GATEWAY = defineGatewayProvider({
   type: 'vercel',
@@ -9,5 +12,5 @@ export const VERCEL_AI_GATEWAY = defineGatewayProvider({
 });
 
 export function createUserVercelAiGatewayProvider(apiKey: string): Provider {
-  return { ...VERCEL_AI_GATEWAY, apiKey };
+  return withApiKey(VERCEL_AI_GATEWAY, apiKey);
 }

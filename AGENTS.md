@@ -60,7 +60,7 @@ prepare test dependencies.
 
 Use `---`, `:---`, `---:`, or `:---:` in separator cells without spaces.
 Use at most one space on each side of a content cell.
-To fix padding in one file, run `bun run script/check-md-table-padding.ts --fix path/to/file.md`.
+To fix padding in one file, run `pnpm check:md-table-padding --fix path/to/file.md`.
 
 ## Guidance Map
 

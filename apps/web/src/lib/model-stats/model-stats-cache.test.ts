@@ -35,12 +35,15 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   },
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({ warnExceptInTest: jest.fn() }));
+const mockWarn = jest.fn();
 const mockRequireCustomLlmsById = jest.fn(async () => new Map([['acme/custom', {}]]));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   requireCustomLlmsById: () => mockRequireCustomLlmsById(),
 }));
 
 const TTL = 5 * 60 * 1000;
+const FAILURE_RETRY_MS = 15 * 1000;
 const benchmark = {
   model_name: 'Model',
   provider: 'Provider',
@@ -87,6 +90,11 @@ beforeEach(async () => {
   jest.useFakeTimers();
   jest.setSystemTime(Date.parse(checkedAt));
   jest.spyOn(console, 'error').mockImplementation(() => {});
+  const utils = jest.requireMock<{ warnExceptInTest: jest.Mock }>(
+    '@kilocode/web-shared/lib/utils.server'
+  );
+  mockWarn.mockReset();
+  utils.warnExceptInTest.mockImplementation(mockWarn);
   [cache, enkrypt, listRoute, detailRoute] = await Promise.all([
     import('@kilocode/web-shared/lib/model-stats/model-stats-cache'),
     import('@kilocode/web-shared/lib/model-stats/enkrypt'),
@@ -168,6 +176,67 @@ describe('model stats snapshot cache', () => {
     expect(await cache.getModelStatsSnapshot({ fromDb: readDb })).not.toBe(replica);
     expect(mockReplicaSelect).toHaveBeenCalledTimes(2);
     expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves the last known-good snapshot, reports once, then retries after the cooldown', async () => {
+    // The case the derived views cannot see: the cache swallows the failure and returns its cached
+    // snapshot, so the report has to happen here and the caller never learns of the outage.
+    const outage = new Error('unavailable');
+    const first = await cache.getModelStatsSnapshot();
+    jest.advanceTimersByTime(TTL);
+    mockOrderBy.mockRejectedValueOnce(outage);
+
+    expect(await cache.getModelStatsSnapshot()).toBe(first);
+    expect(mockWarn).toHaveBeenCalledTimes(1);
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[model-stats] snapshot unavailable: unavailable; serving the last known-good snapshot'
+    );
+
+    // Inside the failure window the cache serves itself: no new query, and no second report.
+    expect(await cache.getModelStatsSnapshot()).toBe(first);
+    expect(mockSelect).toHaveBeenCalledTimes(2);
+    expect(mockWarn).toHaveBeenCalledTimes(1);
+
+    // Once the cooldown passes it really retries, which is what the title claims.
+    jest.advanceTimersByTime(FAILURE_RETRY_MS);
+    const recovered = await cache.getModelStatsSnapshot();
+    expect(recovered).not.toBe(first);
+    expect(mockSelect).toHaveBeenCalledTimes(3);
+    expect(mockWarn).toHaveBeenCalledTimes(1);
+
+    // A successful load cleared the marker, so the next outage reports again even though it rejects
+    // with the very same error object the first outage used.
+    jest.advanceTimersByTime(TTL);
+    mockOrderBy.mockRejectedValueOnce(outage);
+    expect(await cache.getModelStatsSnapshot()).toBe(recovered);
+    expect(mockWarn).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a cold failure as serving no model stats', async () => {
+    // Nothing cached and nothing served: the message must not claim a fallback.
+    mockOrderBy.mockRejectedValue(new Error('unavailable'));
+
+    await expect(cache.getModelStatsSnapshot()).rejects.toThrow('unavailable');
+
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[model-stats] snapshot unavailable: unavailable; serving no model stats'
+    );
+  });
+
+  it('keeps the report per read client when two clients reject with the same error', async () => {
+    // The only shape that tells a per-client marker from a module-wide one: two clients rejecting
+    // with the *same* error object. Per client, the second client has no marker yet, so it reports;
+    // with one shared marker it would stay silent and the count would be 1. Both calls are cold, so
+    // the cooldown cannot return a cache before the catch runs.
+    const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
+    const outage = new Error('unavailable');
+    mockReplicaOrderBy.mockRejectedValue(outage);
+    mockOrderBy.mockRejectedValue(outage);
+
+    await expect(cache.getModelStatsSnapshot({ fromDb: readDb })).rejects.toThrow('unavailable');
+    await expect(cache.getModelStatsSnapshot()).rejects.toThrow('unavailable');
+
+    expect(mockWarn).toHaveBeenCalledTimes(2);
   });
 
   it('selects only each row verification alongside nested stats in one ordered left join', async () => {

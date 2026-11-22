@@ -1,3 +1,4 @@
+import { GitHubIdentityConflictError } from '@kilocode/db/github-identity';
 import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
@@ -713,6 +714,29 @@ describe('fetch disconnect endpoint', () => {
 
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({ error: 'disconnect_failed' });
+  });
+
+  it('reports a precondition mismatch as a conflict', async () => {
+    serviceMocks.disconnectUserAuthorization.mockRejectedValueOnce(
+      new GitHubIdentityConflictError()
+    );
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
+        {
+          method: 'POST',
+          body: JSON.stringify(disconnectExpected),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: await authorizationHeader('user_1'),
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: 'connection_conflict' });
   });
 });
 

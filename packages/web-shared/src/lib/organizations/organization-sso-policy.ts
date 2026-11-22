@@ -15,6 +15,7 @@ export type SsoPolicyMisconfigurationReason =
   | 'conflicting_child_policy'
   | 'unsupported_nested_parent'
   | 'invalid_domain'
+  | 'domain_unclaimed'
   | 'ambiguous_domain';
 
 export type EffectiveOrganizationSsoPolicy =
@@ -226,7 +227,12 @@ async function loadOrganizationSsoInput(
   };
 }
 
-/** The policy that applies when the organization's own domain or its parent's is authoritative. */
+/**
+ * The policy that applies when the organization's own domain or its parent's is the source.
+ * A domain counts as authoritative only when exactly one live organization claims it; a domain
+ * that no live organization claims has no authority row, which is not a conflict between
+ * organizations, so it gets its own `domain_unclaimed` reason.
+ */
 function resolveSourcePolicy(
   authoritiesByDomain: Map<string, SsoAuthorityRow[]>,
   organizationId: string,
@@ -244,7 +250,10 @@ function resolveSourcePolicy(
   switch (match.status) {
     case 'conflicting_child_policy':
       return { status: 'misconfigured', organizationId, reason: 'conflicting_child_policy' };
+    // An unmatched domain has no live organization row that claims it, so no other organization
+    // conflicts with this one; the stored domain is simply unclaimed.
     case 'unmatched':
+      return { status: 'misconfigured', organizationId, reason: 'domain_unclaimed' };
     case 'ambiguous':
       return { status: 'misconfigured', organizationId, reason: 'ambiguous_domain' };
     case 'authoritative':

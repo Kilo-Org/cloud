@@ -289,3 +289,77 @@ describe('Telugu preparation fallbacks and failure', () => {
     expect(i18n.t('agentChat.preparation.errorAgentUnavailable')).toBe('ఏజెంట్ అందుబాటులో లేకుండా పోయింది');
   });
 });
+
+describe('Telugu share, spend-alert and voice copy', () => {
+  it('names the share sheet as unavailable rather than as a finished share', () => {
+    expect(i18n.t('share.staleTitle')).toBe('పంచుకోవడం అందుబాటులో లేదు');
+  });
+
+  it('keeps both host kinds in the trusted-host empty state', () => {
+    expect(i18n.t('trustedHosts.emptyDescription')).toBe(
+      'లింక్ హోస్ట్‌ను లేదా చిత్ర హోస్ట్‌ను విశ్వసిస్తే, అది మళ్లీ అనుమతి అడగకుండా తెరుచుకుంటుంది.'
+    );
+  });
+
+  it('scopes the missing voice input to the selected language', () => {
+    expect(i18n.t('voiceInput.unavailableLanguage')).toBe(
+      'ఈ పరికరంలో ఎంచుకున్న భాషకు వాయిస్ ఇన్‌పుట్ అందుబాటులో లేదు. దాని ఆఫ్‌లైన్ స్పీచ్ ఫైల్‌లను ఇన్‌స్టాల్ చేయండి లేదా యాప్‌లో మరొక భాషను ఉపయోగించండి.'
+    );
+  });
+
+  it('asks for a gateway sign-in before transcription', () => {
+    expect(i18n.t('voiceInput.gatewaySignInRequired')).toBe(
+      'Kilo Gateway వచనంగా మార్చే సదుపాయాన్ని ఉపయోగించడానికి సైన్ ఇన్ చేయండి.'
+    );
+  });
+
+  it('describes the spend threshold and the hourly spike in one sentence', () => {
+    expect(i18n.t('spendAlerts.subtitle')).toBe(
+      'ఈ పరిధి స్వంత ఖర్చు ఒక పరిమితిని దాటినప్పుడు లేదా దాని సాధారణ గంటవారీ రేటు కంటే హఠాత్తుగా పెరిగినప్పుడు బిల్లింగ్ పరిచయాలకు ఇమెయిల్ లేదా పుష్ ద్వారా హెచ్చరిక పంపండి.'
+    );
+  });
+
+  it('names the hourly spike as a heading rather than a finished event', () => {
+    expect(i18n.t('spendAlerts.anomalyTitle')).toBe('గంటవారీ హఠాత్తు పెరుగుదల');
+  });
+});
+
+describe('Telugu session share durations and expiry sentence', () => {
+  it('keeps each duration a standalone label', () => {
+    expect(i18n.t('sessionShare.duration1d')).toBe('1 రోజు');
+    expect(i18n.t('sessionShare.duration7d')).toBe('7 రోజులు');
+    expect(i18n.t('sessionShare.duration30d')).toBe('30 రోజులు');
+  });
+
+  it('keeps the duration a bare label inside the expiry line', () => {
+    const duration = i18n.t('sessionShare.duration7d');
+    expect(i18n.t('sessionShare.expiresIn', { duration })).toBe(`గడువు: ${duration}`);
+  });
+});
+
+describe('Telugu link revoke copy', () => {
+  it('keeps the button, title and failure line on one revoke verb', () => {
+    expect(i18n.t('sessionShare.revoke')).toBe('లింక్‌ను ఉపసంహరించండి');
+    expect(i18n.t('sessionShare.revokeTitle')).toBe('లింక్‌ను ఉపసంహరించాలా?');
+    expect(i18n.t('sessionShare.revokeFailed')).toBe('లింక్‌ను ఉపసంహరించలేకపోయాము.');
+  });
+});
+
+describe('Telugu to-do counts', () => {
+  it('keeps the singular wording for one open item', () => {
+    expect(i18n.t('todos.lists.openCount', { count: 1 })).toBe('1 తెరిచి ఉన్నది');
+  });
+
+  it('uses the plural wording for an empty list, which CLDR routes into the other category', () => {
+    expect(i18n.t('todos.lists.openCount', { count: 0 })).toBe('0 తెరిచి ఉన్నవి');
+  });
+
+  it('uses the plural wording above one', () => {
+    expect(i18n.t('todos.lists.openCount', { count: 2 })).toBe('2 తెరిచి ఉన్నవి');
+  });
+
+  it('keeps the run count singular for one run and plural for two', () => {
+    expect(i18n.t('todos.item.runCount', { count: 1 })).toBe('1 అమలు');
+    expect(i18n.t('todos.item.runCount', { count: 2 })).toBe('2 అమలులు');
+  });
+});

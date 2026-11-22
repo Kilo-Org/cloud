@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import {
   applyVariableEdit,
@@ -33,6 +34,7 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_VARS: readonly ProfileVarSource[] = [];
@@ -73,6 +75,11 @@ export function ProfileVariablesScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const varsQuery = useAgentProfileVars(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: varsQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
   const canManage = permission === 'allowed';
@@ -199,10 +206,11 @@ export function ProfileVariablesScreen({
   if (varsQuery.isError) {
     content = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void varsQuery.refetch()}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+        onRetry={readError.showRetry ? () => void varsQuery.refetch() : undefined}
         isRetrying={varsQuery.isRefetching}
       />
     );

@@ -27,12 +27,17 @@ import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
   permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+  connectivity: 'online' as string,
   query: {
     data: undefined as TestVars | undefined,
+    error: undefined as unknown,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -54,6 +59,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
@@ -100,8 +108,10 @@ describe('ProfileVariablesScreen', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     h.permission = 'allowed';
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
+      error: undefined,
       isError: false,
       isPending: true,
       isRefetching: false,
@@ -120,13 +130,57 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('error: renders QueryError and Retry refetches', async () => {
-    Object.assign(h.query, { isError: true, isPending: false });
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
 
     const { renderer, unmount } = await mountScreen();
 
     const queryError = findOne(renderer.root, 'QueryError');
     act(() => {
       (queryError.props as { onRetry: () => void }).onRetry();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('permission');
+    expect(queryError.title).toBeUndefined();
+    expect(queryError.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(typeof queryError.onRetry).toBe('function');
+    act(() => {
+      queryError.onRetry?.();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
@@ -792,7 +846,9 @@ describe('ProfileVariablesScreen delete confirmation', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     h.permission = 'allowed';
+    h.connectivity = 'online';
     h.query.data = testVars([{ key: VARIABLE_KEY, value: '1', isSecret: false }]);
+    h.query.error = undefined;
     h.query.isError = false;
     h.query.isPending = false;
     h.query.isRefetching = false;

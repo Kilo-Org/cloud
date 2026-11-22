@@ -394,6 +394,8 @@ describe('listChangedFiles — pagination', () => {
       // The diffstat endpoint never carries a patch, whatever the file holds.
       patch: null,
       patchMissingCause: 'provider_omitted',
+      // The pre-cause field an older client bundle reads agrees with the cause.
+      patchMissing: true,
     });
     expect(result.files[1]).toMatchObject({ path: 'src/fingerprint.ts', status: 'added' });
     expect(result.nextCursor).not.toBeNull();

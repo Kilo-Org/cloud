@@ -193,6 +193,18 @@ function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
           ? 'renamed'
           : 'modified'
   );
+  // GitLab sends a blank diff for a change with no content and a one-line
+  // placeholder for a binary file. The placeholder is tested FIRST: a file that
+  // is both renamed and binary-with-changes carries it, and treating its rename
+  // flag as "no content change" would say the opposite of the placeholder. Only
+  // a blank diff on a rename-only entry is unchanged.
+  const patchMissingCause = isBinaryPlaceholderDiff(diff.diff)
+    ? 'binary'
+    : diff.diff
+      ? null
+      : diff.renamed_file && !diff.new_file && !diff.deleted_file
+        ? 'content_unchanged'
+        : 'binary';
   return {
     path: diff.new_path,
     previousPath: diff.old_path !== diff.new_path ? diff.old_path : null,
@@ -200,18 +212,9 @@ function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
     additions,
     deletions,
     patch: diff.diff || null,
-    // GitLab sends a blank diff for a change with no content and a one-line
-    // placeholder for a binary file. The placeholder is tested FIRST: a file
-    // that is both renamed and binary-with-changes carries it, and treating its
-    // rename flag as "no content change" would say the opposite of the
-    // placeholder. Only a blank diff on a rename-only entry is unchanged.
-    patchMissingCause: isBinaryPlaceholderDiff(diff.diff)
-      ? 'binary'
-      : diff.diff
-        ? null
-        : diff.renamed_file && !diff.new_file && !diff.deleted_file
-          ? 'content_unchanged'
-          : 'binary',
+    patchMissingCause,
+    // The pre-cause field a client bundle without the cause still reads.
+    patchMissing: patchMissingCause !== null,
   };
 }
 

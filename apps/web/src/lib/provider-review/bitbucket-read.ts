@@ -550,6 +550,8 @@ function mapDiffstatEntry(entry: z.infer<typeof BitbucketDiffstatEntrySchema>): 
     // any file, so the reason is the endpoint itself, not the file's content.
     patch: null,
     patchMissingCause: 'provider_omitted',
+    // The pre-cause field a client bundle without the cause still reads.
+    patchMissing: true,
   };
 }
 

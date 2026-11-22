@@ -225,6 +225,15 @@ export type ProviderPrFile = {
   deletions: number;
   patch: string | null;
   patchMissingCause: ProviderPrFilePatchMissingCause | null;
+  /**
+   * The pre-cause flag, kept only for a client bundle that predates
+   * `patchMissingCause`: it reads this boolean and has no cause to show, so
+   * dropping the field would silently flip every patch-less file to "has a
+   * diff" on an installed app that has not taken an update. It is the cause's
+   * own truth (`patchMissingCause !== null`), never an independent signal;
+   * remove it once no released client reads the file read.
+   */
+  patchMissing: boolean;
 };
 
 /**

@@ -551,6 +551,7 @@ describe('listChangedFiles', () => {
       status: 'removed',
       deletions: 2,
       patchMissingCause: null,
+      patchMissing: false,
     });
   });
 

@@ -262,7 +262,11 @@ function fixtureFilesPage(url: string, surface: string | undefined) {
   const offset = pageInput.cursor === 100 ? 100 : 0;
   const surfaceFiles = filesForSurface(surface);
   return {
-    files: surfaceFiles.slice(offset, offset + 100),
+    // The fixture answers both route shapes, and the wire DTO carries the
+    // pre-cause flag beside the cause, so a page built here has to carry it too.
+    files: surfaceFiles
+      .slice(offset, offset + 100)
+      .map(file => ({ ...file, patchMissing: file.patchMissingCause !== null })),
     nextCursor: offset + 100 < surfaceFiles.length ? offset + 100 : null,
   };
 }

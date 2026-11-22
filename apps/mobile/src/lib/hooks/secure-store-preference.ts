@@ -269,10 +269,12 @@ export function createSecureStorePreference<T>(options: {
       }
       retryArmed = false;
       release();
-      // A write that landed while the device was locked (`setAsync`, or a
-      // `set()` whose write reached the disk) already said what the disk holds,
-      // so the value is no longer unknown and a read here would only spend a
-      // keychain call and repaint it.
+      // A `setAsync` write that landed while the device was locked already said
+      // what the disk holds and settled `hasLoaded`, so the value is no longer
+      // unknown and a read here would only spend a keychain call and repaint
+      // it. A plain `set()` does not settle the store (`applyPersisted` leaves
+      // `hasLoaded` to the read, because a write says what the disk now holds,
+      // not that the value it was merged into was read), so it still re-reads.
       if (hasLoaded) {
         return;
       }

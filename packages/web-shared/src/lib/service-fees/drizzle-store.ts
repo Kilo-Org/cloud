@@ -151,7 +151,7 @@ export function createOrganizationServiceFeeExemptionStore(
     async lockOrganization(organizationId) {
       await acquireOrganizationServiceFeeExemptionLock(
         {
-          execute: query => dbOrTx.execute(query as Parameters<ServiceFeeDbOrTx['execute']>[0]),
+          execute: query => dbOrTx.execute(query),
         },
         organizationId
       );

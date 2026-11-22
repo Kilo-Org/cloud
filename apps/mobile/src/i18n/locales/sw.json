@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Hali \"{{name}}\" (kitambulisho: {{slug}})",
-        "modeUpdate": "Hali \"{{name}}\" (kitambulisho: {{slug}}): {{changes}}",
+        "modeUpdate": "Hali \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

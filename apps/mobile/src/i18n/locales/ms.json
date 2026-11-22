@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "mod \"{{name}}\" (pengecam: {{slug}})",
-        "modeUpdate": "mod \"{{name}}\" (pengecam: {{slug}}): {{changes}}",
+        "modeUpdate": "mod \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

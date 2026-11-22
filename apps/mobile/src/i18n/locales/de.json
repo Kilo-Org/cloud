@@ -3429,7 +3429,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Modus \"{{name}}\" (Bezeichner: {{slug}})",
-        "modeUpdate": "Modus \"{{name}}\" (Bezeichner: {{slug}}): {{changes}}",
+        "modeUpdate": "Modus \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

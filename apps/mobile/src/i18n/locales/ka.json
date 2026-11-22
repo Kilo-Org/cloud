@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "რეჟიმი \"{{name}}\" (იდენტიფიკატორი: {{slug}})",
-        "modeUpdate": "რეჟიმი \"{{name}}\" (იდენტიფიკატორი: {{slug}}): {{changes}}",
+        "modeUpdate": "რეჟიმი \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

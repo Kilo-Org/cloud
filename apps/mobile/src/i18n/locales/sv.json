@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Läge \"{{name}}\" (identifierare: {{slug}})",
-        "modeUpdate": "Läge \"{{name}}\" (identifierare: {{slug}}): {{changes}}",
+        "modeUpdate": "Läge \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

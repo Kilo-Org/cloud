@@ -3561,7 +3561,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Režim \"{{name}}\" (identifikátor: {{slug}})",
-        "modeUpdate": "Režim \"{{name}}\" (identifikátor: {{slug}}): {{changes}}",
+        "modeUpdate": "Režim \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

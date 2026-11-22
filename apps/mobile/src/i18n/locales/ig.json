@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Ọnọdụ \"{{name}}\" (njirimara: {{slug}})",
-        "modeUpdate": "Ọnọdụ \"{{name}}\" (njirimara: {{slug}}): {{changes}}",
+        "modeUpdate": "Ọnọdụ \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

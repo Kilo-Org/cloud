@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "முறை \"{{name}}\" (அடையாளங்காட்டி: {{slug}})",
-        "modeUpdate": "முறை \"{{name}}\" (அடையாளங்காட்டி: {{slug}}): {{changes}}",
+        "modeUpdate": "முறை \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

@@ -3429,7 +3429,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Chế độ \"{{name}}\" (mã định danh: {{slug}})",
-        "modeUpdate": "Chế độ \"{{name}}\" (mã định danh: {{slug}}): {{changes}}",
+        "modeUpdate": "Chế độ \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

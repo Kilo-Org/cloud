@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "ሁነታ \"{{name}}\" (መለያ: {{slug}})",
-        "modeUpdate": "ሁነታ \"{{name}}\" (መለያ: {{slug}}): {{changes}}",
+        "modeUpdate": "ሁነታ \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

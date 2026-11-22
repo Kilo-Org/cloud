@@ -3499,7 +3499,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Način rada \"{{name}}\" (identifikator: {{slug}})",
-        "modeUpdate": "Način rada \"{{name}}\" (identifikator: {{slug}}): {{changes}}",
+        "modeUpdate": "Način rada \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

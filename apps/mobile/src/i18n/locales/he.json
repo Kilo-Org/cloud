@@ -3491,7 +3491,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "מצב \"{{name}}\" (מזהה: {{slug}})",
-        "modeUpdate": "מצב \"{{name}}\" (מזהה: {{slug}}): {{changes}}",
+        "modeUpdate": "מצב \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

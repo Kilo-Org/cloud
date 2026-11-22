@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Mënyra \"{{name}}\" (identifikuesi: {{slug}})",
-        "modeUpdate": "Mënyra \"{{name}}\" (identifikuesi: {{slug}}): {{changes}}",
+        "modeUpdate": "Mënyra \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

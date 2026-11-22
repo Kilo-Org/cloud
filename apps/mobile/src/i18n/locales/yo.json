@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Ipò \"{{name}}\" (ìdánimọ̀: {{slug}})",
-        "modeUpdate": "Ipò \"{{name}}\" (ìdánimọ̀: {{slug}}): {{changes}}",
+        "modeUpdate": "Ipò \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

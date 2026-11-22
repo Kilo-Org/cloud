@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "ໂໝດ \"{{name}}\" (ຕົວລະບຸ: {{slug}})",
-        "modeUpdate": "ໂໝດ \"{{name}}\" (ຕົວລະບຸ: {{slug}}): {{changes}}",
+        "modeUpdate": "ໂໝດ \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

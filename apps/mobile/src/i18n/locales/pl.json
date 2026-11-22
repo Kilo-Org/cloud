@@ -3553,7 +3553,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Tryb \"{{name}}\" (identyfikator: {{slug}})",
-        "modeUpdate": "Tryb \"{{name}}\" (identyfikator: {{slug}}): {{changes}}",
+        "modeUpdate": "Tryb \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

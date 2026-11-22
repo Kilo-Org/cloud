@@ -3429,7 +3429,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Mod \"{{name}}\" (tanımlayıcı: {{slug}})",
-        "modeUpdate": "Mod \"{{name}}\" (tanımlayıcı: {{slug}}): {{changes}}",
+        "modeUpdate": "Mod \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

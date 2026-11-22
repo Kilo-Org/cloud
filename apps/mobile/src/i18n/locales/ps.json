@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "حالت \"{{name}}\" (پېژندونکی: {{slug}})",
-        "modeUpdate": "حالت \"{{name}}\" (پېژندونکی: {{slug}}): {{changes}}",
+        "modeUpdate": "حالت \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

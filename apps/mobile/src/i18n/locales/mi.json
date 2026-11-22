@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Aratau \"{{name}}\" (tohu tautuhi: {{slug}})",
-        "modeUpdate": "Aratau \"{{name}}\" (tohu tautuhi: {{slug}}): {{changes}}",
+        "modeUpdate": "Aratau \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

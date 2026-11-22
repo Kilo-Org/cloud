@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "မုဒ် \"{{name}}\" (အမှတ်အသား: {{slug}})",
-        "modeUpdate": "မုဒ် \"{{name}}\" (အမှတ်အသား: {{slug}}): {{changes}}",
+        "modeUpdate": "မုဒ် \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

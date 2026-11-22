@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Režiim \"{{name}}\" (identifikaator: {{slug}})",
-        "modeUpdate": "Režiim \"{{name}}\" (identifikaator: {{slug}}): {{changes}}",
+        "modeUpdate": "Režiim \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

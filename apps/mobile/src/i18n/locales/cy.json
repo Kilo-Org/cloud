@@ -3685,7 +3685,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Modd \"{{name}}\" (dynodydd: {{slug}})",
-        "modeUpdate": "Modd \"{{name}}\" (dynodydd: {{slug}}): {{changes}}",
+        "modeUpdate": "Modd \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

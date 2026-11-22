@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Imodi \"{{name}}\" (isihlonzi: {{slug}})",
-        "modeUpdate": "Imodi \"{{name}}\" (isihlonzi: {{slug}}): {{changes}}",
+        "modeUpdate": "Imodi \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

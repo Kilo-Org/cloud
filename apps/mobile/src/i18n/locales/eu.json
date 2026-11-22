@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Modua \"{{name}}\" (identifikatzailea: {{slug}})",
-        "modeUpdate": "Modua \"{{name}}\" (identifikatzailea: {{slug}}): {{changes}}",
+        "modeUpdate": "Modua \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

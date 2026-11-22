@@ -3553,7 +3553,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Режим «{{name}}» (ідентифікатор: {{slug}})",
-        "modeUpdate": "Режим «{{name}}» (ідентифікатор: {{slug}}): {{changes}}",
+        "modeUpdate": "Режим «{{name}}»: {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

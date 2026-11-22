@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "മോഡ് \"{{name}}\" (ഐഡന്റിഫയർ: {{slug}})",
-        "modeUpdate": "മോഡ് \"{{name}}\" (ഐഡന്റിഫയർ: {{slug}}): {{changes}}",
+        "modeUpdate": "മോഡ് \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

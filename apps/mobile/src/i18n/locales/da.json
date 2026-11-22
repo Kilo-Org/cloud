@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Tilstand \"{{name}}\" (identifikator: {{slug}})",
-        "modeUpdate": "Tilstand \"{{name}}\" (identifikator: {{slug}}): {{changes}}",
+        "modeUpdate": "Tilstand \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

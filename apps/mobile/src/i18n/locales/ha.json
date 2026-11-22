@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Yanayi \"{{name}}\" (alama: {{slug}})",
-        "modeUpdate": "Yanayi \"{{name}}\" (alama: {{slug}}): {{changes}}",
+        "modeUpdate": "Yanayi \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

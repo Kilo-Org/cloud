@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Hamur \"{{name}}\" (auðkenni: {{slug}})",
-        "modeUpdate": "Hamur \"{{name}}\" (auðkenni: {{slug}}): {{changes}}",
+        "modeUpdate": "Hamur \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

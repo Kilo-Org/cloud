@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Qaabka \"{{name}}\" (aqoonsiga: {{slug}})",
-        "modeUpdate": "Qaabka \"{{name}}\" (aqoonsiga: {{slug}}): {{changes}}",
+        "modeUpdate": "Qaabka \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

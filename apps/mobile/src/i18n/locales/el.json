@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Λειτουργία \"{{name}}\" (αναγνωριστικό: {{slug}})",
-        "modeUpdate": "Λειτουργία \"{{name}}\" (αναγνωριστικό: {{slug}}): {{changes}}",
+        "modeUpdate": "Λειτουργία \"{{name}}\": {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

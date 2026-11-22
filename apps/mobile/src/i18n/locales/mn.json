@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Горим «{{name}}» (танигч: {{slug}})",
-        "modeUpdate": "Горим «{{name}}» (танигч: {{slug}}): {{changes}}",
+        "modeUpdate": "Горим «{{name}}»: {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

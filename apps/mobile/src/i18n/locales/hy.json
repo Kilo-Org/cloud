@@ -3437,7 +3437,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "Ռեժիմ \"{{name}}\" (նույնացուցիչ՝ {{slug}})",
-        "modeUpdate": "Ռեժիմ \"{{name}}\" (նույնացուցիչ՝ {{slug}})՝ {{changes}}",
+        "modeUpdate": "Ռեժիմ \"{{name}}\"՝ {{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

@@ -3429,7 +3429,7 @@
       "detail": {
         "fieldChange": "{{field}}: {{previous}} → {{next}}",
         "modeIdentity": "モード「{{name}}」（識別子：{{slug}}）",
-        "modeUpdate": "モード「{{name}}」（識別子：{{slug}}）：{{changes}}",
+        "modeUpdate": "モード「{{name}}」：{{changes}}",
         "field": {
           "name": "$t(organization.modes.nameLabel)",
           "slug": "$t(organization.modes.identifierLabel)",

@@ -5,7 +5,8 @@
 //
 // The Kilo user token is passed in the request body and injected only as a
 // child-process env var (KILO_AUTH_CONTENT). It is never written to disk and
-// never logged.
+// never logged. Every captured child stream this server returns or delivers has
+// each occurrence of the token replaced with '[redacted]'.
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -257,6 +258,14 @@ function runCase({
   });
 }
 
+// Nothing the child writes reaches a caller unread: each captured stream is scrubbed
+// with the one credential this server injects before it is returned or delivered.
+function redactToken(text, kiloToken) {
+  return typeof kiloToken === 'string' && kiloToken.length > 0
+    ? text.split(kiloToken).join('[redacted]')
+    : text;
+}
+
 async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) {
   const startedAt = Date.now();
   const result = await new Promise(resolve => {
@@ -299,11 +308,11 @@ async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) 
       clearTimeout(finishTimer);
       resolve({
         exitCode,
-        stdoutLines: stdout.split('\n').filter(line => line.length > 0),
-        stderrTail:
-          typeof kiloToken === 'string' && kiloToken.length > 0
-            ? stderrTail.split(kiloToken).join('[redacted]')
-            : stderrTail,
+        stdoutLines: stdout
+          .split('\n')
+          .filter(line => line.length > 0)
+          .map(line => redactToken(line, kiloToken)),
+        stderrTail: redactToken(stderrTail, kiloToken),
         timedOut,
       });
     };

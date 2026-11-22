@@ -92,6 +92,7 @@ type ContainerResponse = {
     exitCode?: number;
     durationMs?: number;
     stderrTail?: string;
+    stdoutLines?: string[];
     timedOut?: boolean;
     error?: string;
   };
@@ -374,6 +375,33 @@ it('settles an asynchronous spawn error once and redacts case authentication', a
   });
   expect(pending.res.end).toHaveBeenCalledOnce();
   expect(mocks.rm).toHaveBeenCalledOnce();
+});
+
+it('replaces the case credential in every captured stream it returns', async () => {
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const eventLine = JSON.stringify({
+    type: 'text',
+    part: { text: `auth ${runBody.kiloToken}`, time: { end: 1 } },
+  });
+  const diagnosticLine = `diagnostic: ${runBody.kiloToken}`;
+  const stderrText = `warning: ${runBody.kiloToken} rejected`;
+  mocks.children[0].stdout.emit('data', Buffer.from(`${eventLine}\n${diagnosticLine}\n`));
+  mocks.children[0].stderr.emit('data', Buffer.from(stderrText));
+  mocks.children[0].emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body).toMatchObject({
+    exitCode: 0,
+    timedOut: false,
+    stdoutLines: [
+      eventLine.replace(runBody.kiloToken, '[redacted]'),
+      diagnosticLine.replace(runBody.kiloToken, '[redacted]'),
+    ],
+    stderrTail: stderrText.replace(runBody.kiloToken, '[redacted]'),
+  });
+  expect(JSON.stringify(response.body)).not.toContain(runBody.kiloToken);
 });
 
 it('keeps local warmup and real cases in the same serialized CLI lane', async () => {

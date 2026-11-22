@@ -125,6 +125,32 @@ describe('organization SSO policy', () => {
     });
   });
 
+  test('reports an unclaimed domain as its own reason', async () => {
+    // The authority lookup compares the stored value with the trimmed domain, so an
+    // organization that stored its domain with surrounding whitespace owns no authority row.
+    const whitespaceClaim = await createOrganization({
+      name: 'Whitespace Claim Organization',
+      sso_domain: ' whitespace-claim.example.com ',
+    });
+    const claimant = await createOrganization({
+      name: 'Claimant Organization',
+      sso_domain: 'claimant-organization.example.com',
+    });
+
+    await expect(resolveEffectiveOrganizationSsoPolicy(claimant.id)).resolves.toEqual({
+      status: 'required',
+      organizationId: claimant.id,
+      source: 'self',
+      sourceOrganizationId: claimant.id,
+      domain: 'claimant-organization.example.com',
+    });
+    await expect(resolveEffectiveOrganizationSsoPolicy(whitespaceClaim.id)).resolves.toEqual({
+      status: 'misconfigured',
+      organizationId: whitespaceClaim.id,
+      reason: 'domain_unclaimed',
+    });
+  });
+
   test('fails closed when the direct parent was soft deleted', async () => {
     const parent = await createOrganization({
       name: 'Deleted Parent',

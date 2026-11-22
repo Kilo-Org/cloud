@@ -189,8 +189,7 @@ export async function findOrganizationMemberBalanceRow(
     )
     .where(
       and(
-        eq(organizations.id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId),
+        directOrganizationMembershipCondition({ organizationId, kiloUserId: userId }),
         isNull(organizations.deleted_at),
         not(eq(organization_memberships.role, 'billing_manager'))
       )

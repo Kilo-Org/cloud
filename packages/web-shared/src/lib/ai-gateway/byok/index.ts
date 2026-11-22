@@ -92,9 +92,10 @@ async function getVercelModelMetadata(caller: string): Promise<GatewayModelMap |
 
 /** The inference providers for `modelId`, or null when the Vercel metadata is unavailable. */
 async function lookupInferenceUserByokProviders(
-  modelId: string
+  modelId: string,
+  caller: string
 ): Promise<UserByokProviderId[] | null> {
-  const vercelModelMetadata = await getVercelModelMetadata('getModelInferenceUserByokProviders');
+  const vercelModelMetadata = await getVercelModelMetadata(caller);
   return vercelModelMetadata
     ? deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)
     : null;
@@ -108,14 +109,27 @@ async function lookupInferenceUserByokProviders(
 export async function getModelInferenceUserByokProviders(
   modelId: string
 ): Promise<UserByokProviderId[]> {
-  const providers = await lookupInferenceUserByokProviders(modelId);
+  const providers = await lookupInferenceUserByokProviders(
+    modelId,
+    'getModelInferenceUserByokProviders'
+  );
   if (!providers) {
     return [];
   }
   if (providers.length === 0) {
-    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
+    console.debug(`[getModelInferenceUserByokProviders] no user byok providers for ${modelId}`);
   }
   return providers;
+}
+
+/** Whether any key in `providerIds` is an inference provider key rather than a gateway key. */
+function hasInferenceProviderKey(providerIds: readonly UserByokProviderId[]): boolean {
+  return providerIds.some(providerId => !isGatewayUserByokProviderId(providerId));
+}
+
+/** Whether `providerIds` holds a gateway key, which serves the catalog under its own ids. */
+function hasGatewayKey(providerIds: readonly UserByokProviderId[]): boolean {
+  return providerIds.some(isGatewayUserByokProviderId);
 }
 
 /**
@@ -130,12 +144,8 @@ export async function getModelUserByokProviders(
 ): Promise<UserByokProviderId[]> {
   const enabled = enabledProviderIds ? [...enabledProviderIds] : undefined;
   const [inferenceProviders, gatewayProviders] = await Promise.all([
-    !enabled || enabled.some(id => !isGatewayUserByokProviderId(id))
-      ? getModelInferenceUserByokProviders(modelId)
-      : [],
-    !enabled || enabled.some(isGatewayUserByokProviderId)
-      ? getModelGatewayUserByokProviders(modelId)
-      : [],
+    !enabled || hasInferenceProviderKey(enabled) ? getModelInferenceUserByokProviders(modelId) : [],
+    !enabled || hasGatewayKey(enabled) ? getModelGatewayUserByokProviders(modelId) : [],
   ]);
   return [...inferenceProviders, ...gatewayProviders];
 }
@@ -251,7 +261,8 @@ export async function getEnabledByokProviders(
 
 /**
  * Every key the owner stored, enabled or not, in the order `getByokCredentials` returns them. Reads
- * no key material, so it suits previews that must not decrypt keys.
+ * no key material, so it suits previews that must not decrypt keys. A stored row whose provider id
+ * is not a known `UserByokProviderId` is omitted.
  */
 export async function getByokKeyStates(
   fromDb: ByokSourceDb,
@@ -261,7 +272,10 @@ export async function getByokKeyStates(
 }
 
 export type StoredByokKeys = {
-  /** Every key the owner stored, enabled or not, in `getByokKeyStates` order. */
+  /**
+   * Every key the owner stored, enabled or not, in `getByokKeyStates` order; a row with an unknown
+   * provider id is omitted.
+   */
   keys: ByokKeyState[];
   /** Decrypts the enabled stored key of a provider in `keys`, from the same read. */
   decrypt(providerId: UserByokProviderId): Promise<BYOKResult>;
@@ -329,10 +343,10 @@ export async function addUserByokAvailability(
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
   const enabled = [...enabledProviders];
-  const vercelModelMetadata = enabled.some(id => !isGatewayUserByokProviderId(id))
+  const vercelModelMetadata = hasInferenceProviderKey(enabled)
     ? await getVercelModelMetadata('addUserByokAvailability')
     : null;
-  const hasGatewayKey = enabled.some(isGatewayUserByokProviderId);
+  const gatewayKeyEnabled = hasGatewayKey(enabled);
   const derived = { examined: 0, withoutInferenceProviders: 0 };
   const modelsWithAvailability = await Promise.all(
     models.map(async model => {
@@ -350,7 +364,7 @@ export async function addUserByokAvailability(
       }
       const modelProviders = [
         ...inferenceProviders,
-        ...(hasGatewayKey ? await getModelGatewayUserByokProviders(model.id) : []),
+        ...(gatewayKeyEnabled ? await getModelGatewayUserByokProviders(model.id) : []),
       ];
       const hasUserByokAvailable = await hasEnabledUserByokForModel({
         modelId: model.id,
@@ -369,7 +383,7 @@ export async function addUserByokAvailability(
   // per-model record would grow with the catalog rather than with the request.
   if (derived.withoutInferenceProviders > 0) {
     console.debug(
-      `[getModelUserByokProviders] no user byok providers for ${derived.withoutInferenceProviders} of ${derived.examined} models`
+      `[addUserByokAvailability] no user byok providers for ${derived.withoutInferenceProviders} of ${derived.examined} models`
     );
   }
   return modelsWithAvailability;
@@ -384,17 +398,19 @@ const NO_ALLOWED_PROVIDERS: ReadonlySet<string> = new Set();
  * Gateway keys leave the choice of provider to the gateway, so they do not count, and neither does
  * any key for an id a custom LLM owns, which `getProvider` serves first. Catalog-mode direct BYOK
  * keys are decided per provider instead (see `getAllowedDirectByokCatalogModelIds`).
- * Catalog passes call this once per model, so it reads the lookup without writing a record.
+ * Catalog passes call this once per model, so it writes no per-model record of its own; the shared
+ * metadata lookup still reports a missing Vercel metadata.
  */
 export async function hasInferenceProviderUserByokForModel(
   modelId: string,
   enabledProviderIds: readonly UserByokProviderId[]
 ): Promise<boolean> {
   if (await isCustomLlm(modelId)) return false;
-  if (isAutoSmallFreeModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
+  if (isAutoSmallFreeModel(modelId) || !hasInferenceProviderKey(enabledProviderIds)) {
     return false;
   }
-  const modelProviders = (await lookupInferenceUserByokProviders(modelId)) ?? [];
+  const modelProviders =
+    (await lookupInferenceUserByokProviders(modelId, 'hasInferenceProviderUserByokForModel')) ?? [];
   return modelProviders.some(
     providerId =>
       enabledProviderIds.includes(providerId) &&
@@ -407,7 +423,7 @@ export function isInferenceProviderUserByok(userByok: readonly BYOKResult[] | nu
   return (
     userByok !== null &&
     userByok.length > 0 &&
-    !userByok.some(byok => isGatewayUserByokProviderId(byok.providerId))
+    !hasGatewayKey(userByok.map(byok => byok.providerId))
   );
 }
 

@@ -2,6 +2,8 @@ import {
   type ComponentProps,
   createContext,
   type ReactNode,
+  type Ref,
+  type RefObject,
   useCallback,
   useContext,
   useEffect,
@@ -9,13 +11,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import {
-  type Ref,
-  type RefObject,
-  type ScrollViewInstance,
-  View,
-  type ViewInstance,
-} from 'react-native';
+import { type ScrollViewInstance, View, type ViewInstance } from 'react-native';
 
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type SettingDefinition } from '@/lib/settings-search/definitions';
@@ -169,10 +165,9 @@ type SettingsTargetProps = {
 export function SettingsTarget({ item, targetIds, children }: Readonly<SettingsTargetProps>) {
   const context = useContext(SettingsTargetContext);
   const nodeRef = useRef<ViewInstance | null>(null);
+  const target = context?.target;
   const active =
-    context !== null &&
-    context.target !== undefined &&
-    (context.target === item.id || targetIds?.includes(context.target) === true);
+    target !== undefined && (target === item.id || targetIds?.includes(target) === true);
 
   // The row's layout is the reveal trigger: the frame is known by then, so the
   // measurement never lands on a zero-sized first pass.

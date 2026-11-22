@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { type Href } from 'expo-router';
 import { useMemo } from 'react';
 
 import { type IntegrationSetupStatus } from '@/lib/integrations/integration-rows';
@@ -12,6 +11,7 @@ import {
 import {
   defineSetting,
   type SettingDefinition,
+  type SettingsPath,
   type SettingsSearchSource,
 } from '@/lib/settings-search/definitions';
 import { useTRPC } from '@/lib/trpc';
@@ -31,7 +31,7 @@ import { useTRPC } from '@/lib/trpc';
  */
 
 /** The personal integrations hub in the Profile tab. */
-const INTEGRATION_SETTINGS_PATH: Extract<Href, string> = '/(app)/(tabs)/(3_profile)/integrations';
+const INTEGRATION_SETTINGS_PATH: SettingsPath = '/(app)/(tabs)/(3_profile)/integrations';
 
 /** The hub's own name as the breadcrumb of every result below it. */
 const INTEGRATION_SETTINGS_CONTEXT = 'integrations.title';

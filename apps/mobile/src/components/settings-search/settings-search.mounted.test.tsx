@@ -1,15 +1,21 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, TestRenderer, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
+import {
+  act,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+  TestRenderer,
+} from '@/test/renderer';
 
 import { defineSetting, type SettingsSearchSource } from '@/lib/settings-search/definitions';
-import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from './settings-search';
+import { SettingsSearchField, SettingsSearchResults } from './settings-search';
+import { useSettingsSearch } from './use-settings-search';
 
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
-const lookups = vi.hoisted(() => ({ keyword: {} as Record<string, number> }));
-const copy = vi.hoisted(() => ({
-  values: {
+const lookups = vi.hoisted((): { keyword: Record<string, number> } => ({ keyword: {} }));
+const copy = vi.hoisted(() => {
+  const values: Record<string, string> = {
     'settingsSearch.placeholder': 'Search settings',
     'settingsSearch.noMatches': 'No matching settings',
     'settingsSearch.emptyDescription': 'Try a different setting name or keyword.',
@@ -22,8 +28,9 @@ const copy = vi.hoisted(() => ({
     'common.language': 'Language',
     'consent.helpImprove': 'Help improve Kilo',
     'preferences.hideThinking': 'Hide thinking details',
-  } as Record<string, string>,
-}));
+  };
+  return { values };
+});
 const announce = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
@@ -49,35 +56,12 @@ vi.mock('react-i18next', () => {
     useTranslation: () => ({ t, i18n: { resolvedLanguage: 'en', language: 'en' } }),
   };
 });
-// The real matcher is owned by another slice; this double keeps the hook's
-// index contract (label/context/keyword lookup, label-only ranges).
-vi.mock('@/lib/settings-search/match', () => ({
-  searchSettings: (
-    entries: readonly {
-      label: string;
-      context?: string;
-      keywords?: readonly string[];
-    }[],
-    query: string
-  ) => {
-    const needle = query.trim().toLocaleLowerCase('en');
-    if (needle === '') {
-      return [];
-    }
-    const found = [];
-    for (const entry of entries) {
-      const fields = [entry.label, entry.context, ...(entry.keywords ?? [])];
-      const matches = fields.some(
-        field => typeof field === 'string' && field.toLocaleLowerCase('en').includes(needle)
-      );
-      if (!matches) {
-        continue;
-      }
-      const at = entry.label.toLocaleLowerCase('en').indexOf(needle);
-      found.push({ entry, ranges: at < 0 ? [] : [{ start: at, end: at + needle.length }] });
-    }
-    return found;
-  },
+// The real matcher is used here: it is pure, and this suite must prove the
+// index contract (label/context/keyword lookup, label-only ranges) against it.
+// `cn` only joins class names; importing the real utilities module would pull
+// the app's i18n instance and every catalog into this suite.
+vi.mock('@/lib/utils', () => ({
+  cn: (...classes: string[]) => classes.join(' '),
 }));
 vi.mock('@/components/ui/search-field', () => ({
   SearchField: (props: Record<string, unknown>) => createElement('SearchField', props),
@@ -286,7 +270,7 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     typeQuery(root, 'tracking');
     const [row] = rows(root);
     act(() => {
-      (row?.props.onPress as () => void)();
+      (row?.props.onPress as (() => void) | undefined)?.();
     });
 
     expect(selected).toHaveLength(1);

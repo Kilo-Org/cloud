@@ -30,6 +30,8 @@ type MemberRowProps = {
   canManageLimit: boolean;
   /** Caller's own organization role; it decides which roles the menu offers. */
   callerRole: OrgRole | undefined;
+  /** Whether the caller may change the plan; it picks the refusal's sentence. */
+  canManageBilling: boolean;
   enableUsageLimits: boolean;
   /** Organization is a sales demo, so spend may be paired with its limit. */
   isSalesDemo: boolean;
@@ -58,6 +60,7 @@ export function MemberRow({
   canManage,
   canManageLimit,
   callerRole,
+  canManageBilling,
   enableUsageLimits,
   isSalesDemo,
   organizationId,
@@ -80,7 +83,7 @@ export function MemberRow({
   // with it. Both name the cause and the owner's next step; the copy comes from
   // the same server mapping the hook's toast used.
   const roleChangeFailure = mutations.updateMember.isError
-    ? organizationErrorMessage(mutations.updateMember.error)
+    ? organizationErrorMessage(mutations.updateMember.error, canManageBilling, 'absent')
     : null;
   const refusalMessage = roleChangeFailure ?? removalFailure?.message ?? null;
   const [menu, setMenu] = useState<'actions' | 'role' | null>(null);
@@ -177,7 +180,10 @@ export function MemberRow({
           try {
             await mutations.removeMember.mutateAsync({ memberId: member.id });
           } catch (error) {
-            attempt.fail({ kind: 'removal-refused', message: removalRefusalMessage(error) });
+            attempt.fail({
+              kind: 'removal-refused',
+              message: removalRefusalMessage(error, canManageBilling),
+            });
             return;
           }
           // The row leaving the list is the success outcome itself: the row is
@@ -283,12 +289,15 @@ export function MemberRow({
         accessibilityRole="button"
         // Names can repeat; the email is the row's unique fact, so a reader
         // hears it too instead of two identical rows. A member with no name
-        // already reads by the email, so nothing is appended then.
-        accessibilityLabel={
-          displayName === member.email
-            ? t('organization.members.manageA11y', { name: displayName })
-            : [t('organization.members.manageA11y', { name: displayName }), member.email].join(', ')
-        }
+        // already reads by the email, so nothing is appended then. The limit
+        // line is the other fact the row shows that a reader cannot otherwise
+        // hear, because it sits in a caption beside the role chip, so it joins
+        // the name after the email.
+        accessibilityLabel={[
+          t('organization.members.manageA11y', { name: displayName }),
+          ...(displayName === member.email ? [] : [member.email]),
+          ...(spendLine === null ? [] : [spendLine]),
+        ].join(', ')}
         className="active:opacity-70"
       >
         {inner}

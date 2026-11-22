@@ -20,14 +20,13 @@ import {
   organization_invitations,
   organization_membership_removals,
   organization_memberships,
-  organization_seats_purchases,
   organization_user_limits,
   organization_user_usage,
   organizations,
   provider_oauth_attempts,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, desc, eq, inArray, isNull, gt, or } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
@@ -39,7 +38,11 @@ import {
 } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
-import { classifyOrganizationEntitlement } from './trial-utils';
+import {
+  classifyOrganizationEntitlement,
+  getOrganizationTrialEndDate,
+  isRunningTrialStage,
+} from './trial-utils';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -50,20 +53,7 @@ import {
   lockOrganizationGroupPolicy,
 } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
-
-// `organization_seats_purchases` is append-only, so the most recently created
-// row is the organization's current subscription state — the same input the
-// subscription gate classifies with. Lazily built: suites that mock the
-// drizzle module must not see this evaluated at import time.
-function latestSeatPurchaseStatusSql() {
-  return sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-    SELECT ${organization_seats_purchases.subscription_status}
-    FROM ${organization_seats_purchases}
-    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-    ORDER BY ${organization_seats_purchases.created_at} DESC
-    LIMIT 1
-  )`;
-}
+import { latestSeatPurchaseStatusSql } from './organization-seat-purchases';
 
 /** An invitation is live while it is unaccepted and unexpired. */
 function liveInvitationCondition(organizationId: string) {
@@ -72,6 +62,11 @@ function liveInvitationCondition(organizationId: string) {
     isNull(organization_invitations.accepted_at),
     gt(organization_invitations.expires_at, sql`NOW()`)
   );
+}
+
+/** A user's membership in an organization that is not soft-deleted. */
+function userMembershipInLiveOrganization(userId: User['id']) {
+  return and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at));
 }
 
 export async function getOrganizationById(
@@ -139,23 +134,13 @@ export async function getUserOrganizationsWithSeats(
       organization_memberships,
       eq(organization_memberships.organization_id, organizations.id)
     )
-    .where(
-      and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
-    );
+    .where(userMembershipInLiveOrganization(userId));
 
   const now = new Date();
-  return results.map(result => ({
-    organizationName: result.organizationName,
-    organizationId: result.organizationId,
-    parentOrganizationId: result.parentOrganizationId,
-    role: result.role,
-    memberCount: result.total_member_count,
-    balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,
-    requireSeats: result.requireSeats,
-    plan: result.plan,
-    created_at: result.createdAt,
-    isSalesDemo: result.isSalesDemo,
-    isTrialExpiredForEnforcement: classifyOrganizationEntitlement({
+  return results.map(result => {
+    // One classification feeds both the gate verdict and the trial readout, so
+    // the two can never disagree about which state the organization is in.
+    const entitlement = classifyOrganizationEntitlement({
       organization: {
         created_at: result.createdAt,
         free_trial_end_at: result.freeTrialEndAt,
@@ -164,12 +149,42 @@ export async function getUserOrganizationsWithSeats(
       },
       latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
       now,
-    }).isTrialExpiredForEnforcement,
-    seatCount: {
-      used: result.total_member_count,
-      total: result.seatCountTotal,
-    },
-  }));
+    });
+    // A bypass (`displayStatus === 'subscribed'`) means the trial is not what
+    // governs the organization, and the expired stages are the trial's past, so
+    // only the four running stages are published. The guard reads the published
+    // value itself — `trialStatus` stays a running stage through a bypass, so
+    // the bypass check names `bypassReason` alongside it, and the narrowed type
+    // is the set the wire actually carries. The date rides along with them: a
+    // client renders "trial ends on <date>" from the payload instead of
+    // re-deriving `free_trial_end_at ?? created_at + 14d` on the device.
+    const trialStatus =
+      entitlement.bypassReason == null && isRunningTrialStage(entitlement.trialStatus)
+        ? entitlement.trialStatus
+        : null;
+    return {
+      organizationName: result.organizationName,
+      organizationId: result.organizationId,
+      parentOrganizationId: result.parentOrganizationId,
+      role: result.role,
+      memberCount: result.total_member_count,
+      balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,
+      requireSeats: result.requireSeats,
+      plan: result.plan,
+      created_at: result.createdAt,
+      isSalesDemo: result.isSalesDemo,
+      isTrialExpiredForEnforcement: entitlement.isTrialExpiredForEnforcement,
+      trialStatus,
+      trialEndsAt:
+        trialStatus == null
+          ? null
+          : getOrganizationTrialEndDate(result.freeTrialEndAt, result.createdAt).toISOString(),
+      seatCount: {
+        used: result.total_member_count,
+        total: result.seatCountTotal,
+      },
+    };
+  });
 }
 
 /**
@@ -188,9 +203,7 @@ export async function getUserOrgMemberships(
     })
     .from(organization_memberships)
     .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
-    .where(
-      and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
-    );
+    .where(userMembershipInLiveOrganization(userId));
   return rows;
 }
 
@@ -199,7 +212,7 @@ export async function userHasOrganizations(userId: User['id']): Promise<boolean>
     .select({ id: organization_memberships.id })
     .from(organization_memberships)
     .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
-    .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
+    .where(userMembershipInLiveOrganization(userId))
     .limit(1);
   return result.length > 0;
 }
@@ -209,7 +222,7 @@ export async function getSingleUserOrganization(userId: User['id']): Promise<Org
     .select({ organization: organizations })
     .from(organization_memberships)
     .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
-    .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
+    .where(userMembershipInLiveOrganization(userId))
     .limit(2);
   return result.length === 1 ? result[0].organization : null;
 }
@@ -240,11 +253,9 @@ export async function getProfileOrganizations(
 ): Promise<ProfileOrganization[]> {
   const { excludeAccessBlocked = false } = options;
 
-  // Only pull in each org's current subscription status when the caller needs
-  // to hide "Access Blocked" orgs. organization_seats_purchases is append-only,
-  // so the most recently created row reflects the current state. This keeps
-  // getProfileOrganizations a single query and adds no seat-purchase lookup for
-  // callers that don't opt in.
+  // Only add the subquery when the caller opts in to hiding "Access Blocked"
+  // orgs, so getProfileOrganizations stays a single query for callers that do
+  // not need it.
   const latestSeatPurchaseStatus = excludeAccessBlocked
     ? latestSeatPurchaseStatusSql()
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
@@ -260,7 +271,7 @@ export async function getProfileOrganizations(
       organization_memberships,
       eq(organization_memberships.organization_id, organizations.id)
     )
-    .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
+    .where(userMembershipInLiveOrganization(userId))
     // Deterministic order so callers can treat the first element as a stable
     // default selection (e.g. profile `selectedOrganizationId`). Old form was
     // created_at, id; sales-demo orgs win so profile selectedOrganizationId is
@@ -463,8 +474,10 @@ export async function addSsoUserToOrganization(
         .limit(1);
       if (
         invitation &&
-        normalizeEmail(invitation.email) ===
-          (invitation.normalizedUserEmail ?? normalizeEmail(invitation.userEmail))
+        invitationAddressesAccount(invitation.email, {
+          email: invitation.userEmail,
+          normalizedEmail: invitation.normalizedUserEmail,
+        })
       ) {
         return false;
       }
@@ -501,10 +514,16 @@ export async function updateUserRoleInOrganization(
   userId: User['id'],
   role: OrganizationRole,
   txn?: DrizzleTransaction
-): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> {
+): Promise<{
+  success: boolean;
+  updated: 'membership' | 'invitation' | 'none';
+}> {
   const run = async (
     tx: DrizzleTransaction
-  ): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> => {
+  ): Promise<{
+    success: boolean;
+    updated: 'membership' | 'invitation' | 'none';
+  }> => {
     const membershipUpdateResult = await tx
       .update(organization_memberships)
       .set({ role })
@@ -533,7 +552,10 @@ export async function updateUserRoleInOrganization(
     }
 
     const pendingInvitations = await tx
-      .select({ id: organization_invitations.id, email: organization_invitations.email })
+      .select({
+        id: organization_invitations.id,
+        email: organization_invitations.email,
+      })
       .from(organization_invitations)
       .where(liveInvitationCondition(organizationId));
 
@@ -567,10 +589,13 @@ export async function updateUserRoleInOrganization(
 
 /**
  * Raised when the target organization row is deleted or never existed. Distinct
- * from the SSO-misconfiguration sentence below, which applies only where the
+ * from `ORGANIZATION_SSO_MISCONFIGURED_MESSAGE`, which applies only where the
  * policy status is `misconfigured`.
  */
 export const ORGANIZATION_MISSING_MESSAGE = 'This organization is no longer available';
+
+/** Raised when the organization's SSO policy cannot decide a membership join. */
+export const ORGANIZATION_SSO_MISCONFIGURED_MESSAGE = 'Organization SSO policy is misconfigured';
 
 export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
   'Child organizations can only invite people who are already members of the parent organization.';
@@ -806,7 +831,7 @@ export async function inviteUserToOrganization(
 
     const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
     if (policy.status === 'misconfigured') {
-      throw new Error('Organization SSO policy is misconfigured');
+      throw new Error(ORGANIZATION_SSO_MISCONFIGURED_MESSAGE);
     }
 
     let authenticationRequirement: 'default' | 'workos' = 'default';
@@ -841,11 +866,15 @@ export async function inviteUserToOrganization(
   return txn ? run(txn) : db.transaction(run);
 }
 
+/**
+ * @param fromDb - Database instance to use (defaults to primary db, pass a replica connection for reads that tolerate lag)
+ */
 export async function getOrganizationMembers(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  fromDb: DrizzleConnection = db
 ): Promise<OrganizationMember[]> {
   const [activeMembers, pendingInvitations] = await Promise.all([
-    db
+    fromDb
       .select({
         id: organization_memberships.kilo_user_id,
         name: kilocode_users.google_user_name,
@@ -881,7 +910,7 @@ export async function getOrganizationMembers(
           eq(kilocode_users.is_bot, false)
         )
       ),
-    db
+    fromDb
       .select({
         id: organization_invitations.id,
         email: organization_invitations.email,
@@ -1082,7 +1111,7 @@ export async function acceptOrganizationInvite(
 
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organization.id, tx);
       if (ssoPolicy.status === 'misconfigured') {
-        return failureResult('Organization SSO policy is misconfigured');
+        return failureResult(ORGANIZATION_SSO_MISCONFIGURED_MESSAGE);
       }
 
       const acceptingUserDomain = getLowerDomainFromEmail(acceptingUser.email);
@@ -1321,22 +1350,4 @@ export async function markOrganizationAsDeleted(
   };
   if (txn) return execute(txn);
   return db.transaction(execute);
-}
-
-export async function getOrganizationMemberByEmail(
-  organizationId: Organization['id'],
-  email: string
-) {
-  const result = await db
-    .select()
-    .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-    .where(
-      and(
-        eq(organization_memberships.organization_id, organizationId),
-        eq(kilocode_users.google_user_email, email)
-      )
-    )
-    .limit(1);
-  return result.length > 0 ? result[0] : null;
 }

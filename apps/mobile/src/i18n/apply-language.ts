@@ -56,10 +56,10 @@ function refreshLocalizedNotifications(): void {
  * Persist what the running screens hold before a relaunch they did not ask
  * for. The login screen registers its own flush only on the globe press, so a
  * device change it never asked for has to persist its typed state directly;
- * `persistLoginDrafts` refuses an uninitialized or retired attempt on its own,
- * so calling it unasked is safe. A bridge registered by another screen is
- * flushed too, because the reload discards the JS context without running
- * React cleanup.
+ * `persistLoginDrafts` refuses a retired attempt and one whose restore learned
+ * no draft of its own, so calling it unasked is safe. A bridge registered by
+ * another screen is flushed too, because the reload discards the JS context
+ * without running React cleanup.
  */
 async function flushBeforeReload(): Promise<void> {
   try {
@@ -108,6 +108,18 @@ async function restartForDirection(
   // write skips the relaunch instead of risking that loop.
   if (!(await writeDirectionAttemptAsync(language))) {
     return { kind: 'restart-skipped' };
+  }
+  try {
+    // A form's typed text lives in the durable draft store behind a 500 ms
+    // debounce. The reload below discards the JS context without running React
+    // cleanup, so a draft still inside that window would be lost; forcing every
+    // pending write here is its save point. Loaded here, not at module scope: a
+    // static import would pull the native SQLCipher store into the language
+    // picker's suites.
+    const { flushAllDrafts } = await import('@/lib/persist/drafts');
+    await flushAllDrafts();
+  } catch {
+    // A failed convenience flush must not block the relaunch.
   }
   syncRtl(language);
   try {

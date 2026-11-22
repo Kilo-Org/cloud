@@ -47,13 +47,26 @@ function operatorTokenProvider(): AccessTokenProvider {
   });
 }
 
+let provider: AccessTokenProvider | null = null;
+
+/** One federation provider for the module, shared by the token cache and the client. */
+function claudeOperatorProvider(): AccessTokenProvider {
+  provider ??= operatorTokenProvider();
+  return provider;
+}
+
 let tokenCache: TokenCache | null = null;
 
 export async function getClaudeOperatorToken(): Promise<string> {
-  tokenCache ??= new TokenCache(operatorTokenProvider());
+  tokenCache ??= new TokenCache(claudeOperatorProvider());
   return await tokenCache.getToken();
 }
 
+/**
+ * Clears the module token cache that `getClaudeOperatorToken()` reads, so its
+ * next call mints a fresh token. The Anthropic client keeps its own cache and
+ * clears that one itself after a 401; this call does not affect the client.
+ */
 export function invalidateClaudeOperatorToken(): void {
   tokenCache?.invalidate();
 }
@@ -65,7 +78,7 @@ export function getClaudeOperatorClient(): Anthropic {
     baseURL: CLAUDE_API_BASE_URL,
     apiKey: null,
     authToken: null,
-    credentials: operatorTokenProvider(),
+    credentials: claudeOperatorProvider(),
     timeout: 15_000,
     // Profile creation is not idempotent: a lost reply must not create a second profile automatically.
     maxRetries: 0,

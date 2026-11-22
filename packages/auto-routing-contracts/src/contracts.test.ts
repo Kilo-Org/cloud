@@ -19,8 +19,11 @@ import {
   BenchmarkConfigSchema,
   BenchmarkConfigAdminLegacyFieldsSchema,
   BenchmarkRunAdminLegacyFieldsSchema,
+  BenchmarkRunSummariesResponseSchema,
+  BenchmarkRunsResponseSchema,
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
+  BenchmarkModelTotalsSchema,
   BenchmarkProfileStatusesRequestSchema,
   BenchmarkSchedulerConfigResponseSchema,
   BenchmarkSchedulerOverridesSchema,
@@ -722,6 +725,32 @@ describe('AutoRoutingDecisionSchema variant compatibility', () => {
       false
     );
   });
+
+  it('reports each omitted field at its own path', () => {
+    const missingTableVersion = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      tableVersion: null,
+    });
+    expect(missingTableVersion.error?.issues.map(issue => issue.path)).toEqual([['tableVersion']]);
+
+    const missingSubtaskType = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      subtaskType: null,
+    });
+    expect(missingSubtaskType.error?.issues.map(issue => issue.path)).toEqual([['subtaskType']]);
+
+    const allMissing = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      taskType: null,
+      subtaskType: null,
+      tableVersion: null,
+    });
+    expect(allMissing.error?.issues.map(issue => issue.path)).toEqual([
+      ['taskType'],
+      ['subtaskType'],
+      ['tableVersion'],
+    ]);
+  });
 });
 
 describe('benchmark profile request entry bounds', () => {
@@ -903,5 +932,76 @@ describe('RefreshBenchmarkProfilesRequestSchema duplicate pairs', () => {
         ])
       ).success
     ).toBe(true);
+  });
+});
+
+describe('admin run cost contracts', () => {
+  const run = {
+    id: 'run-1',
+    router: 'efficient' as const,
+    kind: 'decider' as const,
+    purpose: 'platform' as const,
+    status: 'completed' as const,
+    startedAt: '2026-11-01T00:00:00.000Z',
+    completedAt: '2026-11-01T01:00:00.000Z',
+    error: null,
+  };
+
+  it('keeps a run whose cases reported no cost null, not zero', () => {
+    const parsed = BenchmarkRunsResponseSchema.parse({
+      runs: [{ ...run, totals: { totalCostUsd: null, measuredCases: 12, erroredCases: 0 } }],
+    });
+    expect(parsed.runs[0].totals).toEqual({
+      totalCostUsd: null,
+      measuredCases: 12,
+      erroredCases: 0,
+    });
+  });
+
+  it('parses a list from a worker that predates the totals and models fields', () => {
+    const parsed = BenchmarkRunsResponseSchema.parse({ runs: [run] });
+    expect(parsed.runs[0].totals).toBeUndefined();
+    expect(parsed.runs[0].models).toBeUndefined();
+  });
+
+  it('rejects a negative measured case count', () => {
+    const result = BenchmarkRunsResponseSchema.safeParse({
+      runs: [{ ...run, totals: { totalCostUsd: 0.1, measuredCases: -1, erroredCases: 0 } }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('parses per-pair totals and accepts a route summary response without them', () => {
+    const totals = {
+      model: 'vendor/alpha',
+      variant: 'high',
+      accuracy: 0.9,
+      routeAccuracy: null,
+      costPerCaseUsd: 0.002,
+      totalCostUsd: 0.4,
+      cases: 200,
+      errors: 2,
+      timeouts: 0,
+    };
+    expect(BenchmarkModelTotalsSchema.parse(totals)).toEqual({ ...totals, uncostedCases: 0 });
+    expect(
+      BenchmarkModelTotalsSchema.parse({ ...totals, costPerCaseUsd: null }).costPerCaseUsd
+    ).toBeNull();
+
+    expect(
+      BenchmarkRunSummariesResponseSchema.parse({
+        summaries: [],
+        modelTotals: [totals],
+      }).modelTotals
+    ).toEqual([{ ...totals, uncostedCases: 0 }]);
+    // A worker that predates the field still parses; every case is assumed
+    // priced, which is what its own mean already asserted.
+    expect(
+      BenchmarkModelTotalsSchema.parse({ ...totals, uncostedCases: undefined }).uncostedCases
+    ).toBe(0);
+    // An older worker serves route rows only.
+    expect(
+      BenchmarkRunSummariesResponseSchema.parse({ summaries: [] }).modelTotals
+    ).toBeUndefined();
   });
 });

@@ -1716,41 +1716,32 @@ export type OrganizationGroupModelAccessPolicy = {
 type OrganizationPermissionAction = 'allow' | 'ask' | 'deny';
 type OrganizationPermissionRule = { pattern: string; action: OrganizationPermissionAction };
 
-type AgentPermissionSet = {
-  unrestricted_mode?: 'allow' | 'deny';
-  auto_approve?: 'deny';
-  tools?: Record<
-    string,
-    | OrganizationPermissionAction
-    | { rules: OrganizationPermissionRule[]; fallback?: OrganizationPermissionAction }
-  >;
-  shell?: Partial<
-    Record<'bash' | 'powershell', { fallback: 'ask' | 'deny'; rules: OrganizationPermissionRule[] }>
-  >;
-};
-
 export type OrganizationGroupAgentPermissionsPolicy = {
   type: 'agent_permissions';
-  data: AgentPermissionSet & {
-    schema_version: 1;
-    by_os?: Partial<Record<'linux' | 'macos' | 'windows', AgentPermissionSet>>;
-  };
-};
-
-export type OrganizationGroupClientConfigurationPolicy = {
-  type: 'client_configuration';
   data: {
     schema_version: 1;
-    show_session_dollar_values: boolean;
+    unrestricted_mode?: 'allow' | 'deny';
+    tools?: Record<
+      string,
+      | OrganizationPermissionAction
+      | { rules: OrganizationPermissionRule[]; fallback?: OrganizationPermissionAction }
+    >;
+    shell?: Partial<
+      Record<
+        'bash' | 'powershell',
+        { fallback: 'ask' | 'deny'; rules: OrganizationPermissionRule[] }
+      >
+    >;
   };
 };
 
 export type OrganizationGroupPolicy =
   | OrganizationGroupModelAccessPolicy
-  | OrganizationGroupAgentPermissionsPolicy
-  | OrganizationGroupClientConfigurationPolicy;
+  | OrganizationGroupAgentPermissionsPolicy;
 export type OrganizationGroupPolicyType = OrganizationGroupPolicy['type'];
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
+
+export type NamedOrganizationPolicyKind = 'agent_permissions' | 'client_configuration';
 
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);
 
@@ -1923,6 +1914,7 @@ export const AuditLogAction = z.enum([
   'organization.group.default_policy.remove',
   'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
   'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
+  'organization.named_policy.change',
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
@@ -3063,6 +3055,18 @@ const CustomLlmRemoveFromBodyPathSchema = z.string().superRefine((path, ctx) => 
   }
 });
 
+/**
+ * Replaces each reasoning effort a request names with the effort the upstream receives, for
+ * example `{ "xhigh": "high", "max": "high" }`. It rewrites only effort fields, so a disable sent
+ * another way, such as `reasoning.enabled: false`, is unaffected.
+ */
+export const ReasoningEffortMapSchema = z.partialRecord(
+  ReasoningEffortSchema,
+  ReasoningEffortSchema
+);
+
+export type ReasoningEffortMap = z.infer<typeof ReasoningEffortMapSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
   /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
@@ -3076,6 +3080,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(CustomLlmRemoveFromBodyPathSchema).optional(),
   reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
+  reasoning_effort_map: ReasoningEffortMapSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -3200,7 +3205,7 @@ export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
  * partner first and fall back to the regular route when it answers with an
  * unsuccessful status. User BYOK keys and other user-paid routes are unaffected. When the
  * definition declares `opencode_settings.reasoning_options`, a request for a reasoning effort
- * outside them skips the partner up front.
+ * outside them, after `reasoning_effort_map` applies, skips the partner up front.
  */
 export const CustomLlmPartnerSchema = z.object({
   /** The provider slug the partner serves the model as. Organization provider allow

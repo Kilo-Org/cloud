@@ -22,18 +22,31 @@ const config = vi.hoisted(() => ({
   data: null as Record<string, unknown> | null,
   isLoading: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  error: null as unknown,
   refetch: vi.fn(),
 }));
+const platformError = vi.hoisted(() => ({ props: null as Record<string, unknown> | null }));
 const repositories = vi.hoisted(() => ({
   data: undefined as readonly RepoRow[] | undefined,
   isLoading: false,
   isError: false,
   isFetching: false,
   fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  error: null as unknown,
   refetch: vi.fn(),
 }));
 const connectivity = vi.hoisted(() => ({ known: true }));
-const capability = vi.hoisted(() => ({ canManage: true }));
+const configRetry = vi.hoisted(() => ({ retry: vi.fn(), isRetrying: false }));
+const repositoriesRetry = vi.hoisted(() => ({ retry: vi.fn(), isRetrying: false }));
+const capability = vi.hoisted(() => ({
+  canManage: true,
+  status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+}));
+const settingsRecovery = vi.hoisted(() => ({ retry: vi.fn(), isRetrying: false }));
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
@@ -92,6 +105,9 @@ vi.mock('@shopify/flash-list', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
+  useRetrySecurityAgentConfig: () => configRetry,
+  useRetrySecurityAgentRepositories: () => repositoriesRetry,
+  useRetrySecurityAgentSettings: () => settingsRecovery,
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
   useSecurityAgentRepositories: () => repositories,
@@ -124,13 +140,21 @@ vi.mock('@/components/security-agent/orphaned-findings-card', () => ({
   OrphanedFindingsCard: 'OrphanedFindingsCard',
 }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: 'PlatformErrorScreen',
+  PlatformErrorScreen: (props: Record<string, unknown>) => {
+    platformError.props = props;
+    return null;
+  },
 }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/security-agent/settings-recovery-status', () => ({
+  // A host string, so the suite can both count the status and read the props
+  // its Retry is wired through.
+  SettingsRecoveryStatus: 'SettingsRecoveryStatus',
+}));
 // `headerRight` is a prop, not a child: the stub renders it so the Save button
 // (the screen's only save path) actually mounts.
 vi.mock('@/components/screen-header', () => ({
@@ -246,6 +270,38 @@ async function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   });
 }
 
+// The permission-recovery row the screen renders, found as the host element its
+// stub draws, so a case can tell one from none and read the props its Retry is
+// wired through.
+function recoveryStatuses(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => String(node.type) === 'SettingsRecoveryStatus');
+}
+
+// The orphaned-findings card's Clear is irreversible, so the grant its stub
+// receives is part of the role read's contract; a missing or doubled card
+// fails loudly instead of reading undefined.
+function orphanedCardCanManage(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const cards = renderer.root.findAll(node => String(node.type) === 'OrphanedFindingsCard');
+  const card = cards[0];
+  if (cards.length !== 1 || !card) {
+    throw new Error(`expected one orphaned-findings card, found ${cards.length}`);
+  }
+  const props: { canManage?: unknown } = card.props;
+  return props.canManage;
+}
+
+// The banner's Retry is the screen's own handler; reading it through a guard
+// makes a missing or non-callable handler fail loudly.
+function queryErrorRetry(renderer: TestRenderer.ReactTestRenderer): () => void {
+  const props: { onRetry?: unknown } = renderer.root.find(
+    node => String(node.type) === 'QueryError'
+  ).props;
+  if (typeof props.onRetry !== 'function') {
+    throw new TypeError('QueryError onRetry is not callable');
+  }
+  return props.onRetry as () => void;
+}
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   sideInsets.left = 0;
@@ -253,13 +309,28 @@ beforeEach(() => {
   config.data = configData('selected');
   config.isLoading = false;
   config.isError = false;
+  config.isPending = false;
+  config.fetchStatus = 'idle';
+  config.error = null;
+  platformError.props = null;
   repositories.data = THREE_REPOS;
   repositories.isLoading = false;
   repositories.isError = false;
   repositories.isFetching = false;
   repositories.fetchStatus = 'idle';
+  repositories.error = null;
   connectivity.known = true;
+  configRetry.retry.mockReset();
+  configRetry.retry.mockResolvedValue(undefined);
+  repositoriesRetry.retry.mockReset();
+  repositoriesRetry.retry.mockResolvedValue(undefined);
   capability.canManage = true;
+  capability.status = 'allowed';
+  capability.isPending = false;
+  capability.fetchStatus = 'idle';
+  settingsRecovery.retry.mockReset();
+  settingsRecovery.retry.mockResolvedValue(undefined);
+  settingsRecovery.isRetrying = false;
   save.isPending = false;
   save.mutateAsync.mockReset();
   save.mutateAsync.mockResolvedValue({});
@@ -353,7 +424,10 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
   });
 
-  it('keeps the retryable QueryError in the header without mounting rows', async () => {
+  it('keeps the retryable QueryError in the header when nothing was delivered', async () => {
+    // A failed read that delivered no rows is a body failure: the error owns
+    // the section and no rows mount under it.
+    repositories.data = undefined;
     repositories.isError = true;
     const { renderer } = await mount();
 
@@ -361,6 +435,67 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect((error.props as { placement: string }).placement).toBe('top');
     expect(typeof (error.props as { onRetry: unknown }).onRetry).toBe('function');
     expect(repoRows(renderer)).toHaveLength(0);
+  });
+
+  it('keeps the delivered rows under a failed refetch with the banner above them', async () => {
+    // A failed refetch that still holds the delivered row set must not blank
+    // the picker: a tRPC answer proves the server was reachable, so the banner
+    // keeps the system wording while the rows stay selectable.
+    repositories.data = THREE_REPOS;
+    repositories.isError = true;
+    repositories.isFetching = false;
+    repositories.error = Object.assign(new Error('boom'), {
+      data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+    });
+    const { renderer } = await mount();
+
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect((error.props as { variant: string }).variant).toBe('server');
+    expect(repoRows(renderer)).toHaveLength(3);
+    expect((listOf(renderer).props as { data: RepoRow[] }).data).toHaveLength(3);
+    // The validation line belongs to the rows it is about, so it rides with
+    // them instead of disappearing with the failure.
+    expect(textContents(renderer)).toContain(i18n.t('securityAgent.repositories.selectAtLeastOne'));
+  });
+
+  it('keeps the failure banner above a stale empty grant', async () => {
+    // A refetch that failed over a delivered `[]` must not pass the cached
+    // empty grant off as current: the banner names the failure above the
+    // EmptyState, whose grant action stays the way out.
+    repositories.data = [];
+    repositories.isError = true;
+    repositories.error = Object.assign(new Error('boom'), {
+      data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+    });
+    const { renderer } = await mount();
+
+    const errors = renderer.root.findAll(node => String(node.type) === 'QueryError');
+    expect(errors).toHaveLength(1);
+    const banner = errors[0];
+    if (!banner) {
+      throw new Error('stale empty grant rendered no failure banner');
+    }
+    const props: { variant?: unknown } = banner.props;
+    expect(props.variant).toBe('server');
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
+    expect(emptyStateActionLabel(renderer)).toBe(i18n.t('securityAgent.repositories.manageAccess'));
+
+    act(queryErrorRetry(renderer));
+    expect(repositoriesRetry.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the connection on a failed refetch that never reached the server', async () => {
+    // A transport rejection carries no server answer, so the banner names the
+    // connection — and the delivered rows still mount under it.
+    repositories.data = THREE_REPOS;
+    repositories.isError = true;
+    repositories.isFetching = false;
+    repositories.error = new TypeError('Network request failed');
+    const { renderer } = await mount();
+
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect((error.props as { variant: string }).variant).toBe('offline');
+    expect(repoRows(renderer)).toHaveLength(3);
   });
 
   it('keeps the EmptyState with Manage access in the header', async () => {
@@ -409,9 +544,11 @@ describe('RepositorySettingsScreen repository picker', () => {
       0
     );
 
-    // A `[]` still cached under a failed refetch is not the settled empty grant:
-    // the section must not render a label with no state and no control under it.
-    repositories.data = [];
+    // A read that delivered nothing under a failed refetch is not the settled
+    // empty grant: the section must not render a label with no state and no
+    // control under it. (`[]` is delivered data, so it renders the EmptyState
+    // with Manage access — a control — which is not what this case asserts.)
+    repositories.data = undefined;
     repositories.isLoading = false;
     repositories.isError = true;
     const failed = await mount();
@@ -480,6 +617,32 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(placeholderRows(renderer)).toHaveLength(0);
   });
 
+  it('retries a paused repository read through one deliberate attempt', async () => {
+    // A read with no data reuses its paused promise on `refetch()`, so the
+    // banner's Retry must run the deliberate attempt instead.
+    repositories.data = undefined;
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.fetchStatus = 'paused';
+    const { renderer } = await mount();
+
+    act(queryErrorRetry(renderer));
+
+    expect(repositoriesRetry.retry).toHaveBeenCalledTimes(1);
+    expect(repositories.refetch).not.toHaveBeenCalled();
+  });
+
+  it('retries a failed refetch over delivered rows through one deliberate attempt', async () => {
+    repositories.data = THREE_REPOS;
+    repositories.isError = true;
+    const { renderer } = await mount();
+
+    act(queryErrorRetry(renderer));
+
+    expect(repositoriesRetry.retry).toHaveBeenCalledTimes(1);
+    expect(repositories.refetch).not.toHaveBeenCalled();
+  });
+
   it('keeps the skeleton for a paused read whose connectivity is unsettled', async () => {
     connectivity.known = false;
     repositories.data = undefined;
@@ -526,5 +689,141 @@ describe('RepositorySettingsScreen repository picker', () => {
     );
     // The mode choice itself still renders.
     expect(renderer.root.findAll(node => String(node.type) === 'ChoiceRow')).toHaveLength(2);
+  });
+});
+
+describe('config load failure', () => {
+  it('names the connection for a paused config read instead of holding the skeleton', async () => {
+    // A paused read is pending without loading and has no data, so the
+    // skeleton gate would hold it until connectivity returns.
+    config.data = null;
+    config.isLoading = false;
+    config.isPending = true;
+    config.fetchStatus = 'paused';
+
+    await mount();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('paused first read did not render the failure screen');
+    }
+    expect(error.variant).toBe('offline');
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.repositories.couldNotLoad'));
+    const onRetry: unknown = error.onRetry;
+    if (typeof onRetry !== 'function') {
+      throw new TypeError('paused first read has no retry');
+    }
+    act(onRetry as () => void);
+    expect(configRetry.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('titles the failure with the screen and leaves the description to the variant', async () => {
+    config.data = null;
+    config.isError = true;
+    config.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+
+    await mount();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('failed first read did not render the failure screen');
+    }
+    // The failed read is named once, in the error's own title. A message here
+    // would repeat the same words above the variant's cause.
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.repositories.couldNotLoad'));
+    expect(error.message).toBeUndefined();
+    expect(error.variant).toBe('server');
+  });
+});
+
+describe('role read states', () => {
+  // A non-personal scope is the only one whose capability comes from the role
+  // read: the personal scope short-circuits to `allowed`, so these states do
+  // not exist there.
+  const ORG_SCOPE = 'org_role_fixture';
+
+  it('offers Retry and keeps the controls usable when the role read fails', async () => {
+    // A failed role read is not a refusal: it must name its cause with a Retry
+    // instead of claiming the viewer may not change these settings.
+    capability.canManage = false;
+    capability.status = 'error';
+    const { renderer } = await mount(ORG_SCOPE);
+
+    const statuses = recoveryStatuses(renderer);
+    expect(statuses).toHaveLength(1);
+    const onRetry: unknown = statuses[0]?.props.onRetry;
+    if (typeof onRetry !== 'function') {
+      throw new TypeError('recovery status onRetry is not callable');
+    }
+    act(onRetry as () => void);
+    expect(settingsRecovery.retry).toHaveBeenCalledTimes(1);
+
+    expect(textContents(renderer)).not.toContain(i18n.t('securityAgent.sla.permissionNote'));
+    // The header keeps its save path and the rows keep their controls: the
+    // server enforces the permission, so an unanswered question must not lock
+    // the screen.
+    expect(typeof saveButton.onSave).toBe('function');
+    expect(repoRows(renderer).map(row => (row.props as { disabled: boolean }).disabled)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    const modeRows = renderer.root.findAll(node => String(node.type) === 'ChoiceRow');
+    expect(modeRows.map(row => row.props.disabled)).toEqual([false, false]);
+  });
+
+  it('keeps the controls usable while a paused first role read names the connection', async () => {
+    // A first role read the online manager paused can never finish: it names the
+    // connection with Retry rather than reading as a refusal.
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    connectivity.known = true;
+    const { renderer } = await mount(ORG_SCOPE);
+
+    expect(recoveryStatuses(renderer)).toHaveLength(1);
+    expect(textContents(renderer)).not.toContain(i18n.t('securityAgent.sla.permissionNote'));
+  });
+
+  it('offers the Clear action only on a settled grant', async () => {
+    // The card's Clear is irreversible, so the controls staying usable on an
+    // unanswered role read does not extend to it: only a settled grant opens it.
+    capability.canManage = false;
+    capability.status = 'error';
+    const failed = await mount(ORG_SCOPE);
+    expect(orphanedCardCanManage(failed.renderer)).toBe(false);
+
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    const paused = await mount(ORG_SCOPE);
+    expect(orphanedCardCanManage(paused.renderer)).toBe(false);
+
+    capability.status = 'allowed';
+    capability.canManage = true;
+    capability.isPending = false;
+    capability.fetchStatus = 'idle';
+    const allowed = await mount(ORG_SCOPE);
+    expect(orphanedCardCanManage(allowed.renderer)).toBe(true);
+
+    capability.status = 'denied';
+    capability.canManage = false;
+    const denied = await mount(ORG_SCOPE);
+    expect(orphanedCardCanManage(denied.renderer)).toBe(false);
+  });
+
+  it('locks the controls and names the rule only on a settled denial', async () => {
+    capability.canManage = false;
+    capability.status = 'denied';
+    const { renderer } = await mount(ORG_SCOPE);
+
+    expect(recoveryStatuses(renderer)).toHaveLength(0);
+    expect(textContents(renderer)).toContain(i18n.t('securityAgent.sla.permissionNote'));
+    expect(saveButton.onSave).toBeNull();
+    expect(repoRows(renderer).map(row => (row.props as { disabled: boolean }).disabled)).toEqual([
+      true,
+      true,
+      true,
+    ]);
   });
 });

@@ -6,18 +6,27 @@ import en from './locales/en.json';
  * Catalog copy reaches the screen through `InlineCodeText`, which draws a
  * backticked run in the mono style and leaves everything else as body copy. A
  * value that is not rendered through it would show the marker itself, so only
- * the two keys that name the `kilo remote` command carry backticks in English,
- * and they mark the command once.
+ * the keys listed here carry backticks in English, and each one marks a literal
+ * once: the `kilo remote` command, and the regular expression a mode's file
+ * restriction accepts.
  */
 const COMMAND_COPY = [
   {
     key: 'agentChat.instancePicker.noCliInstancesDescription',
     value:
       'Run `kilo remote` in a project on your computer, or update Kilo CLI if one is already running.',
+    marked: '`kilo remote`',
   },
   {
     key: 'tour.remoteOptionBody',
     value: 'Run Kilo on your own machine through the `kilo remote` CLI.',
+    marked: '`kilo remote`',
+  },
+  {
+    key: 'organization.modes.restrictionHint',
+    value:
+      'A regular expression selects the files this mode may edit, for example `\\.md$` for markdown files only. Leave it empty to allow every file.',
+    marked: '`\\.md$`',
   },
 ] as const;
 
@@ -40,9 +49,9 @@ function lookup(path: string): unknown {
 }
 
 describe('plain-text copy', () => {
-  it.each(COMMAND_COPY)('marks the command once in $key', ({ key, value }) => {
+  it.each(COMMAND_COPY)('marks the literal once in $key', ({ key, value, marked }) => {
     expect(lookup(key)).toBe(value);
-    expect(value.match(/`[^`]*`/g)).toStrictEqual(['`kilo remote`']);
+    expect(value.match(/`[^`]*`/g)).toStrictEqual([marked]);
   });
 
   it('keeps the computer hint free of command markers', () => {

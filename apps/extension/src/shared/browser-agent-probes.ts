@@ -3,6 +3,11 @@ import { z } from 'zod';
 import { SENSITIVE_REASON, sensitiveReasonForField } from './browser-agent-checks';
 import type { BrowserSensitiveField } from './browser-agent-checks';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
+import {
+  readIsolatedFocusProbe,
+  readIsolatedSensitivePresence,
+  readIsolatedTargetProbe,
+} from './browser-agent-isolated-probe';
 
 /**
  * Page probes an agent call runs at action time: what the page hides, which
@@ -14,7 +19,7 @@ import type { BrowserToolPageSession } from './browser-tool-snapshot';
  * page's own DOM, evaluated through the tab's debugger attachment.
  */
 
-type ProbeSession = Pick<BrowserToolPageSession, 'send' | 'resolveTarget'>;
+type ProbeSession = Pick<BrowserToolPageSession, 'isolatedProbe' | 'send' | 'resolveTarget'>;
 
 const ISOLATED_WORLD_NAME = 'kilo-agent-probe';
 
@@ -366,6 +371,8 @@ export type SensitiveVerdict =
       readonly kind: 'sensitive';
       /** Set when the sensitive element is a frame the page cannot read. */
       readonly frameBackendNodeId?: number | undefined;
+      /** The same frame by its id, where the probe ran without a debugger protocol (Firefox). */
+      readonly frameId?: string | undefined;
       readonly reason: string;
     }
   | { readonly kind: 'unknown'; readonly cause: string };
@@ -375,22 +382,8 @@ const classifyField = (kind: SensitiveFieldKind): SensitiveVerdict => ({
   reason: sensitiveReasonForField(kind),
 });
 
-/** Classifies one probe payload; anything not fully understood is unknown. */
-export const classifyProbeValue = (value: unknown): SensitiveVerdict => {
-  const raw = probeJsonSchema.safeParse(value);
-
-  if (!raw.success) {
-    return { cause: 'the probe returned no text', kind: 'unknown' };
-  }
-
-  let parsed: unknown = undefined;
-
-  try {
-    parsed = JSON.parse(raw.data);
-  } catch {
-    return { cause: 'the probe returned malformed JSON', kind: 'unknown' };
-  }
-
+/** Classifies a decoded probe payload; anything not fully understood is unknown. */
+const classifyProbePayload = (parsed: unknown): SensitiveVerdict => {
   const payload = sensitiveProbePayloadSchema.safeParse(parsed);
 
   if (!payload.success) {
@@ -408,6 +401,25 @@ export const classifyProbeValue = (value: unknown): SensitiveVerdict => {
   }
 
   return classifyField(field.kind);
+};
+
+/** Classifies one probe payload; anything not fully understood is unknown. */
+export const classifyProbeValue = (value: unknown): SensitiveVerdict => {
+  const raw = probeJsonSchema.safeParse(value);
+
+  if (!raw.success) {
+    return { cause: 'the probe returned no text', kind: 'unknown' };
+  }
+
+  let parsed: unknown = undefined;
+
+  try {
+    parsed = JSON.parse(raw.data);
+  } catch {
+    return { cause: 'the probe returned malformed JSON', kind: 'unknown' };
+  }
+
+  return classifyProbePayload(parsed);
 };
 
 /** Classifies an element held as a remote object; a failed call is unknown. */
@@ -446,6 +458,26 @@ const focusedDescriptionSchema = z.object({ node: focusedNodeSchema.optional() }
  * shape is unknown (sensitive), never plain.
  */
 export const classifyFocusedElement = async (session: ProbeSession): Promise<SensitiveVerdict> => {
+  if (session.isolatedProbe !== undefined) {
+    const focus = await readIsolatedFocusProbe(session.isolatedProbe);
+
+    if (focus === undefined) {
+      return { cause: 'the focused element could not be read', kind: 'unknown' };
+    }
+
+    if (focus.probe === undefined) {
+      return focus.frameId === undefined
+        ? { cause: 'the focused frame could not be identified', kind: 'unknown' }
+        : {
+            frameId: focus.frameId,
+            kind: 'sensitive',
+            reason: 'typing into a field inside a frame the page cannot read',
+          };
+    }
+
+    return classifyProbePayload(focus.probe);
+  }
+
   try {
     const frameId = await mainFrameId(session);
     const contextId =
@@ -523,6 +555,19 @@ export const classifyTargetElement = async (
 
     if (resolved.kind === 'ambiguous') {
       return { cause: 'the selector matches several elements', kind: 'unknown' };
+    }
+
+    if (session.isolatedProbe !== undefined) {
+      // The scripting backend resolves every target to its unique selector in the frame that holds it.
+      return resolved.kind === 'selector'
+        ? classifyProbePayload(
+            await readIsolatedTargetProbe(
+              session.isolatedProbe,
+              resolved.selector,
+              resolved.frameId
+            )
+          )
+        : { cause: 'the target has no selector to probe', kind: 'unknown' };
     }
 
     const frameId = await mainFrameId(session);
@@ -670,9 +715,13 @@ export const SENSITIVE_FIELD_PRESENCE_PROBE_EXPRESSION = `(() => {
  * the gate treats as sensitive.
  */
 export const readFrameSensitiveFields = async (
-  session: Pick<BrowserToolPageSession, 'send'>,
+  session: Pick<BrowserToolPageSession, 'isolatedProbe' | 'send'>,
   frameId: string
 ): Promise<'absent' | 'present' | 'unknown'> => {
+  if (session.isolatedProbe !== undefined) {
+    return readIsolatedSensitivePresence(session.isolatedProbe, frameId);
+  }
+
   const payload = await readProbePayload({
     expression: SENSITIVE_FIELD_PRESENCE_PROBE_EXPRESSION,
     frameId,

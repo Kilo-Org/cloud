@@ -139,13 +139,12 @@ describe('model preferences client', () => {
     });
   });
 
-  it('posts add favorite with raw model JSON and no batch or org header', async () => {
+  it('posts add favorite with raw model JSON and no scope', async () => {
     const { fetch, seen } = captureFetch(() => mutationEnvelope());
     await addModelFavorite({
       ...clientOpts(fetch),
       apiBaseUrl: 'https://app.kilo.ai/',
       model: 'anthropic/claude-sonnet-4',
-      organizationId: 'org-1',
     });
     const request = firstRequest(seen);
     expect({
@@ -163,10 +162,9 @@ describe('model preferences client', () => {
       input: 'https://app.kilo.ai/api/trpc/modelPreferences.addFavorite',
       method: 'POST',
     });
-    expect(request.input).not.toContain('batch');
   });
 
-  it('posts remove favorite with raw model JSON and no batch param', async () => {
+  it('posts remove favorite with raw model JSON and no scope', async () => {
     const { fetch, seen } = captureFetch(() => mutationEnvelope());
     await removeModelFavorite({
       ...clientOpts(fetch),
@@ -175,17 +173,20 @@ describe('model preferences client', () => {
     });
     const request = firstRequest(seen);
     expect({
+      authorization: request.headers.get('authorization'),
       body: request.body,
       contentType: request.headers.get('content-type'),
+      hasOrgHeader: request.headers.has('x-kilocode-organizationid'),
       input: request.input,
       method: request.method,
     }).toStrictEqual({
+      authorization: 'Bearer token-1',
       body: '{"model":"anthropic/claude-sonnet-4"}',
       contentType: 'application/json',
+      hasOrgHeader: false,
       input: 'https://app.kilo.ai/api/trpc/modelPreferences.removeFavorite',
       method: 'POST',
     });
-    expect(request.input).not.toContain('batch');
   });
 
   it('classifies HTTP and tRPC auth failures as terminal', () => {
@@ -270,18 +271,6 @@ describe('model preferences client', () => {
   it('never adds a batch query parameter on get', async () => {
     const { fetch, seen } = captureFetch(() => favoritesEnvelope());
     await fetchModelPreferences({ ...clientOpts(fetch), organizationId: 'org-2' });
-    expect(firstRequest(seen).input).not.toMatch(/[?&]batch=/);
-  });
-
-  it('never adds a batch query parameter on add favorite', async () => {
-    const { fetch, seen } = captureFetch(() => mutationEnvelope());
-    await addModelFavorite({ ...clientOpts(fetch), model: 'model-a' });
-    expect(firstRequest(seen).input).not.toMatch(/[?&]batch=/);
-  });
-
-  it('never adds a batch query parameter on remove favorite', async () => {
-    const { fetch, seen } = captureFetch(() => mutationEnvelope());
-    await removeModelFavorite({ ...clientOpts(fetch), model: 'model-a' });
     expect(firstRequest(seen).input).not.toMatch(/[?&]batch=/);
   });
 });

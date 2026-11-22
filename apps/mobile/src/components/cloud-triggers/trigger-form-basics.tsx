@@ -26,6 +26,7 @@ import {
 } from '@/lib/cloud-triggers/trigger-draft';
 import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 import { useTriggerRepositories } from '@/lib/cloud-triggers/use-trigger-options';
+import { connectedServicesHref } from '@/lib/profile-navigation';
 import { ltrValueTextStyle } from '@/lib/rtl-text';
 
 const ACTIVATION_OPTIONS = [
@@ -182,6 +183,7 @@ export function TriggerFormBasics({
           repositories={repositories.repositories}
           isLoading={repositories.isLoading}
           isError={repositories.isError}
+          error={repositories.error}
           onRetry={() => {
             repositories.refetch();
           }}
@@ -197,6 +199,7 @@ export function TriggerFormBasics({
           onClose={() => {
             onRepositoryPickerOpenChange(false);
           }}
+          connectedServicesHref={connectedServicesHref(organizationId)}
         />
       ) : null}
     </View>

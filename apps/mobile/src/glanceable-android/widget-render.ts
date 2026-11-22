@@ -7,27 +7,24 @@
  */
 
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type TOptions } from 'i18next';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
-import { i18n } from '@/i18n';
+import { formatGlanceableCount } from '@/lib/glanceable/count-format';
 import {
   getHomeWidgetDataForSnapshot,
   getLastHomeWidgetData,
 } from '@/lib/glanceable/home-widget-data';
+import { glanceableTranslate } from '@/lib/glanceable/translate';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import {
-  formatGlanceableAgo,
-  formatGlanceableClock,
-  formatGlanceableCount,
-  isWidgetRtl,
-} from './count-format';
+import { formatGlanceableAgo, formatGlanceableClock, isWidgetRtl } from './count-format';
 import { getStoredWidgetSnapshot } from './live-update';
 import { type AndroidWidgetProps, buildCurrentWidgetProps } from './widget-props';
 
 /** Translated copy for the widget and the card's terminal line. */
-export function translate(key: string): string {
-  return i18n.t(key);
+export function translate(key: string, options?: TOptions): string {
+  return glanceableTranslate(key, options);
 }
 
 let lastPublishedSnapshot: GlanceableAgentsSnapshot | null = null;

@@ -1,4 +1,15 @@
-const parseFloatOrNull = (value: string | null) => (value === null ? null : parseFloat(value));
+/**
+ * A decimal header value, or `null` when the header is absent or holds no complete finite
+ * number. `Number` rejects trailing text, which `parseFloat` silently drops, so a malformed
+ * coordinate becomes `null` like an absent one instead of `NaN` in a field typed `number | null`.
+ */
+const parseFloatOrNull = (value: string | null): number | null => {
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 export const EmptyFraudDetectionHeaders = getFraudDetectionHeaders(new Headers());
 export type FraudDetectionHeaders = ReturnType<typeof getFraudDetectionHeaders>;
 export function getFraudDetectionHeaders(headers: Headers) {

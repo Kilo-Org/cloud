@@ -1,4 +1,5 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -17,8 +18,13 @@ import {
   useOrgAvailableModels,
   useOrgGatewaySettings,
   useOrgModelCatalog,
+  useProviderDisplayNames,
 } from '@/lib/hooks/use-org-settings-queries';
-import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import {
+  isMoneyRole,
+  useOrgBoundary,
+  useOrgWithMembers,
+} from '@/lib/hooks/use-organization-queries';
 
 const TITLE_KEY = 'organization.settingsOnWeb.providersAndModels';
 
@@ -58,6 +64,13 @@ export function OrganizationProvidersAndModelsScreen() {
   const models = useOrgAvailableModels(organizationId, enterprise);
   const catalog = useOrgModelCatalog(enterprise);
   const gateway = useOrgGatewaySettings(organizationId, enterprise);
+  const providerNameRows = useProviderDisplayNames(enterprise);
+  // The Providers tab titles each row with the gateway's display name, so the
+  // rows look their name up by the slug they store.
+  const providerNames = useMemo(
+    () => Object.fromEntries((providerNameRows.data ?? []).map(row => [row.slug, row.displayName])),
+    [providerNameRows.data]
+  );
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t(TITLE_KEY)} />;
@@ -95,7 +108,10 @@ export function OrganizationProvidersAndModelsScreen() {
     );
   }
 
-  if (models.isPending || catalog.isPending) {
+  // The names query is part of the guard so the Providers tab never paints slug
+  // titles and then swaps them for display names. An error is not: the form
+  // renders the slugs it already holds.
+  if (models.isPending || catalog.isPending || providerNameRows.isPending) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} />
@@ -109,6 +125,7 @@ export function OrganizationProvidersAndModelsScreen() {
     void models.refetch();
     void catalog.refetch();
     void gateway.refetch();
+    void providerNameRows.refetch();
   };
 
   if (models.isError && models.data == null) {
@@ -135,6 +152,7 @@ export function OrganizationProvidersAndModelsScreen() {
       <ModelAccessForm
         organizationId={organizationId}
         canEdit={canManageOrganization(role)}
+        canManageBilling={isMoneyRole(role)}
         models={models.data.data}
         catalog={catalog.data ?? []}
         catalogUnavailable={catalog.data == null && catalog.isError}
@@ -142,6 +160,7 @@ export function OrganizationProvidersAndModelsScreen() {
         onRetryCatalog={() => void catalog.refetch()}
         providerAllowList={membership.data.settings.provider_allow_list}
         modelDenyList={membership.data.settings.model_deny_list}
+        providerNames={providerNames}
         gateway={gateway.data}
         gatewayIsError={gateway.isError}
         gatewayIsFetching={gateway.isFetching}

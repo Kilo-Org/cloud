@@ -36,6 +36,7 @@ import {
 } from '../../session/validate-repository-access.js';
 import type { TRPCContext } from '../../types.js';
 import { isBuiltinMode } from '../schemas.js';
+import { resolveHostedWorkspaceRepositories } from './hosted-workspace-repositories.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 import { assertRequestedRepositories } from './requested-environment-repositories.js';
 import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub.js';
@@ -45,6 +46,7 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { logger } from '../../logger.js';
+import { NETWORK_SECRET_LIMITS } from '@kilocode/worker-utils/network-secrets';
 
 const WEB_ORIGIN = 'cloud-agent-web';
 
@@ -246,6 +248,7 @@ function applyProfileResolution(
           ? {}
           : { environmentSetupCommandCount: resolved.environmentSetupCommandCount }),
         encryptedSecrets: resolved.encryptedSecrets,
+        ...(resolved.networkSecrets ? { networkSecrets: resolved.networkSecrets } : {}),
         mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
         runtimeSkills: resolved.skills,
         runtimeAgents: resolved.agents,
@@ -262,12 +265,19 @@ function applyProfileResolution(
 function assertResolvedConfigurationWithinSessionLimits(
   resolved: SessionProfileBundle | undefined
 ): void {
+  if (Object.keys(resolved?.networkSecrets ?? {}).length > NETWORK_SECRET_LIMITS.MAX_SECRETS) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Maximum ${NETWORK_SECRET_LIMITS.MAX_SECRETS} network secrets per workspace after merging environments and profiles`,
+    });
+  }
   // An older wrapper receives the start commands appended to setup, so the
   // combined list must fit one setup list.
   const setupAndStart = [...(resolved?.setupCommands ?? []), ...(resolved?.startCommands ?? [])];
   const parsed = SessionProfileBundleSchema.safeParse({
     envVars: resolved?.envVars,
     encryptedSecrets: resolved?.encryptedSecrets,
+    networkSecrets: resolved?.networkSecrets,
     setupCommands: setupAndStart,
   });
   if (!parsed.success) {
@@ -442,11 +452,12 @@ export function resolveContinuationMode(
  * continuation first session), instead of widening the global origin allowlist.
  * `continuationModeResolution` replaces an unavailable local mode with `code`
  * after resolution, so the following `assertModeAvailableForProfile` passes.
- * Only the continuation handler sets these.
+ * The two profile flags are only used by the continuation handler.
  */
 export type SessionCreationPolicyOptions = {
   includeWebDefaults?: boolean;
   continuationModeResolution?: boolean;
+  hostedAdditionalRepositoryIds?: number[] | undefined;
 };
 
 type SessionCreationContext = Pick<
@@ -529,13 +540,21 @@ export async function preflightSessionCreation(
     await assertOrganizationMembership(db, ctx.userId, organizationId);
   }
 
-  await assertRepositoryAccessBeforeSessionCreation({
-    env: ctx.env,
-    userId: ctx.userId,
-    orgId: organizationId,
-    createdOnPlatform: request.options?.createdOnPlatform,
-    repository: request.repository,
-  });
+  if (policyOptions?.hostedAdditionalRepositoryIds?.length) {
+    request = await resolveHostedWorkspaceRepositories(
+      ctx,
+      request,
+      policyOptions.hostedAdditionalRepositoryIds
+    );
+  } else {
+    await assertRepositoryAccessBeforeSessionCreation({
+      env: ctx.env,
+      userId: ctx.userId,
+      orgId: organizationId,
+      createdOnPlatform: request.options?.createdOnPlatform,
+      repository: request.repository,
+    });
+  }
 
   const policy: ProfileResolutionPolicy = policyOptions?.includeWebDefaults
     ? { defaultProfileResolution: 'include-web-defaults' }

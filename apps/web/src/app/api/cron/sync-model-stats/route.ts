@@ -17,7 +17,7 @@ import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
 import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getMonitoredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 
 /**
@@ -58,13 +58,14 @@ export async function GET(request: NextRequest) {
 
     // Merge pricing from enhanced models into raw models
     // This ensures Kilo free models have their $0 pricing applied
-    const allModels: OpenRouterModel[] = openRouterResponse.data.map(model => {
+    const allModels: OpenRouterCatalogModel[] = openRouterResponse.data.map(model => {
       const enhancedModel = enhancedModelsMap.get(model.id);
       if (enhancedModel) {
         return {
           ...model,
           pricing: enhancedModel.pricing,
           name: enhancedModel.name,
+          retires_on: enhancedModel.retires_on,
         };
       }
       return model;

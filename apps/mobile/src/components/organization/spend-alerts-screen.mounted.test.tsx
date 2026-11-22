@@ -5,14 +5,23 @@
 // save errors (retryable, draft kept), permission denial, the off state, and
 // the push channel's agreement with the Notifications screen.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode, useState } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
+import {
+  type SpendAlertsFormDraft,
+  SpendAlertsScreen,
+} from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
 import { formatList } from '@/lib/format';
+import {
+  NOTIFICATION_SETTINGS_SOURCES,
+  SPEND_ALERT_ANOMALY_SETTINGS,
+  SPEND_ALERT_MASTER_SETTING,
+  SPEND_ALERT_THRESHOLD_SETTINGS,
+} from '@/lib/settings-search/notification-sources';
 import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { compiledLengthDp } from '@/test/native-dimensions';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -28,6 +37,35 @@ const boundary = vi.hoisted(() => ({
   org: null as { organizationId: string } | null,
   isResolving: false,
 }));
+
+// The durable draft, controllable per case: a form's restore path needs the
+// draft to land after the stored row painted, and an edit to beat it. Both
+// states carry `save`/`clear`, because the real hook writes through while it
+// still reports `loading`.
+const formDraft = vi.hoisted(() => {
+  const save = vi.fn<(value: unknown) => void>();
+  const clear = vi.fn<() => void>();
+  const current: {
+    kind: 'loading' | 'ready';
+    value: SpendAlertsFormDraft | null;
+  } = { kind: 'ready', value: null };
+  const useFormDraft = vi.fn(
+    (_input: { userId?: string; isIdentityLoading: boolean; entityKey: string }) =>
+      current.kind === 'loading'
+        ? { kind: 'loading' as const, save, clear }
+        : { kind: 'ready' as const, value: current.value, save, clear }
+  );
+  return { save, clear, current, useFormDraft };
+});
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+vi.mock('@/lib/persist/drafts', () => ({
+  spendAlertsFormDraftKey: (organizationId: string | undefined) =>
+    `spend-alerts-form:${organizationId ?? 'personal'}`,
+}));
+vi.mock('@/lib/persist/use-form-draft', () => ({ useFormDraft: formDraft.useFormDraft }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -74,7 +112,20 @@ vi.mock('@/components/organization/permission-denied', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+// The settings-search wrappers read the route's target from the scroll context.
+// The mock keeps each target addressable so the suite can assert which controls
+// the index can reach, and renders the rows exactly as the real one does.
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: ({
+    settingsTarget,
+    children,
+  }: {
+    settingsTarget?: string;
+    children?: ReactNode;
+  }) => createElement('SettingsSearchScrollView', { settingsTarget }, children),
+  SettingsTarget: ({ item, children }: { item: { id: string }; children?: ReactNode }) =>
+    createElement('SettingsTarget', { item }, children),
+}));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/directional-icons', () => ({
@@ -296,11 +347,59 @@ async function mountLoaded(overrides: Record<string, unknown> = {}) {
   return view;
 }
 
+/** A stored draft matching the default fixture, with the named fields changed. */
+function restoredDraft(overrides: Partial<SpendAlertsFormDraft> = {}): SpendAlertsFormDraft {
+  return {
+    threshold: '25',
+    multiplier: '2',
+    enabled: true,
+    thresholdEnabled: true,
+    thresholdEmail: true,
+    thresholdPush: false,
+    windowOption: '24',
+    anomalyEnabled: true,
+    anomalyEmail: true,
+    anomalyPush: false,
+    ...overrides,
+  };
+}
+
+/**
+ * Mount the screen inside a harness that can re-render it in place.
+ *
+ * `renderWithProviders` returns no update path, so re-rendering the screen
+ * directly would drop the Query provider the mount established (`No QueryClient
+ * set`). The harness owns the state instead: a stored draft "lands" by bumping
+ * `version`, which re-renders the same `SpendAlertsScreen` under the same
+ * providers, and the mocked draft hook is read again on that render.
+ */
+async function mountScreenWithDraftLanding(organizationId?: string) {
+  const box: { land: () => void } = { land: () => undefined };
+  function Harness() {
+    // The counter is never read: incrementing it is what re-renders the screen
+    // under the same providers, one render after the draft lands.
+    const [, setVersion] = useState(0);
+    box.land = () => {
+      act(() => {
+        setVersion(current => current + 1);
+      });
+    };
+    // No key: the same screen instance re-renders, so state the person already
+    // built (typed text, touched flags) survives the landing. A remount would
+    // silently reset it and make the untouched-edit rule untested.
+    return createElement(SpendAlertsScreen, organizationId == null ? {} : { organizationId });
+  }
+  const view = await renderWithProviders(createElement(Harness));
+  return { ...view, land: box.land };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   boundary.organizationId = undefined;
   boundary.org = null;
   boundary.isResolving = false;
+  formDraft.current.kind = 'ready';
+  formDraft.current.value = null;
   saveMutationFn.mockResolvedValue(settingsFixture());
 });
 
@@ -776,5 +875,263 @@ describe('SpendAlertsScreen push agreement', () => {
       expect(frames[index]).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
       expect(frames[index]).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
+  });
+});
+
+describe('SpendAlertsScreen restored draft', () => {
+  /** Mount through the landing harness and wait for the stored row to paint. */
+  async function mountLoadedWithLanding() {
+    getQueryFn.mockResolvedValue(settingsFixture());
+    const view = await mountScreenWithDraftLanding();
+    await waitFor(() => texts(view.renderer).includes(i18n.t('spendAlerts.subtitle')));
+    return view;
+  }
+
+  it('seeds the fields and switches from a draft that lands after the stored row', async () => {
+    const { renderer, land } = await mountLoadedWithLanding();
+
+    // The stored row paints first: the draft has not answered yet.
+    expect(formDraft.useFormDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', entityKey: 'spend-alerts-form:personal' })
+    );
+    expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('25');
+    expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
+
+    formDraft.current.value = restoredDraft({
+      threshold: '99',
+      multiplier: '3.5',
+      windowOption: '168',
+      thresholdEmail: false,
+    });
+    land();
+
+    // The uncontrolled fields re-read `defaultValue` because the field block
+    // remounted, and the state-driven controls carry the restored values.
+    expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('99');
+    expect(fieldByLabel(renderer, MULTIPLIER).props.defaultValue).toBe('3.5');
+    expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('168');
+    expect(channelSwitches(renderer, i18n.t('common.email'))[0]?.props.value).toBe(false);
+  });
+
+  it('keeps a value the person typed before the draft landed', async () => {
+    const { renderer, land } = await mountLoadedWithLanding();
+
+    type(renderer, LIMIT, '40');
+    expect(formDraft.save).toHaveBeenLastCalledWith(expect.objectContaining({ threshold: '40' }));
+
+    formDraft.current.value = restoredDraft({
+      threshold: '99',
+      windowOption: '720',
+      thresholdEmail: false,
+    });
+    land();
+
+    // The person's own edit wins, and no restored value reaches the rest of
+    // the form either: the draft is applied only while the form is untouched.
+    expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('40');
+    expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
+    expect(channelSwitches(renderer, i18n.t('common.email'))[0]?.props.value).toBe(true);
+  });
+
+  it('writes an edit made before the stored draft settles', async () => {
+    // The load window: the store has not answered, so the form shows the stored
+    // row. An edit there still reaches the store — the hook writes through
+    // instead of dropping the write until the draft answers.
+    formDraft.current.kind = 'loading';
+    const { renderer } = await mountLoaded();
+
+    type(renderer, LIMIT, '40');
+
+    expect(formDraft.save).toHaveBeenLastCalledWith(expect.objectContaining({ threshold: '40' }));
+  });
+
+  it('clears the stored draft when a save settles before the draft answers', async () => {
+    formDraft.current.kind = 'loading';
+    const { renderer } = await mountLoaded();
+
+    type(renderer, LIMIT, '30');
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => formDraft.clear.mock.calls.length === 1);
+    expect(formDraft.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves the whole draft on an edit and clears it when the save lands', async () => {
+    const { renderer } = await mountLoaded();
+
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), false);
+    expect(formDraft.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        enabled: false,
+        threshold: '25',
+        multiplier: '2',
+        windowOption: '24',
+      })
+    );
+
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => formDraft.clear.mock.calls.length === 1);
+    expect(formDraft.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an edit typed while the save was in flight', async () => {
+    // The save answers late, so the person types again before it lands. The
+    // request only holds the earlier values, and dropping the draft on its
+    // success would throw the newer text away. The saved confirmation proves
+    // the request settled, so the assertion below is not a race with it.
+    const pendingSave = Promise.withResolvers<unknown>();
+    saveMutationFn.mockReturnValueOnce(pendingSave.promise);
+    const { renderer } = await mountLoaded();
+
+    type(renderer, LIMIT, '40');
+    press(buttonByVariant(renderer));
+    type(renderer, LIMIT, '55');
+
+    pendingSave.resolve(undefined);
+    // Let the mutation settle and flush its own success path before asserting:
+    // the request itself is the proof, not a paint.
+    await act(async () => {
+      await pendingSave.promise;
+    });
+    await waitFor(() => saveMutationFn.mock.calls.length === 1);
+
+    expect(formDraft.clear).not.toHaveBeenCalled();
+  });
+});
+
+describe('SpendAlertsScreen settings search', () => {
+  const SPEND_SOURCES = NOTIFICATION_SETTINGS_SOURCES.filter(
+    source => source.path === '/(app)/(tabs)/(3_profile)/spend-alerts'
+  );
+  const INDEXED_IDS = SPEND_SOURCES.flatMap(source => source.settings.map(item => item.id));
+  const INDEXED_LABELS = new Set<string>(
+    SPEND_SOURCES.flatMap(source => source.settings.map(item => i18n.t(item.label)))
+  );
+
+  // The test renderer types host props as `unknown`; these name the props the
+  // mocked settings-search wrappers receive.
+  type MockSettingsTargetProps = { item: { id: string } };
+  type MockSettingsScrollProps = { settingsTarget?: string };
+
+  function targetIds(renderer: ReactTestRenderer): string[] {
+    return byType(renderer, 'SettingsTarget').map(target => {
+      const props = target.props as MockSettingsTargetProps;
+      return props.item.id;
+    });
+  }
+
+  /** The target the scroll surface hands to the real `SettingsTarget` context. */
+  function scrollTarget(renderer: ReactTestRenderer): string | undefined {
+    const surface = byType(renderer, 'SettingsSearchScrollView')[0];
+    return (surface?.props as MockSettingsScrollProps | undefined)?.settingsTarget;
+  }
+
+  it('indexes the personal spend screen and only it', () => {
+    expect(SPEND_SOURCES.length).toBeGreaterThan(0);
+    for (const source of SPEND_SOURCES) {
+      expect(source.path).toBe('/(app)/(tabs)/(3_profile)/spend-alerts');
+      expect(source.settings.length).toBeGreaterThan(0);
+    }
+    expect(new Set(INDEXED_IDS).size).toBe(INDEXED_IDS.length);
+  });
+
+  it('registers a target for every indexed spend setting', async () => {
+    const { renderer } = await mountLoaded();
+
+    const rendered = new Set(targetIds(renderer));
+    expect(INDEXED_IDS.filter(id => !rendered.has(id))).toEqual([]);
+  });
+
+  it('targets the push row in both of its presentations', async () => {
+    // With push deliverable the row is a switch.
+    const { renderer } = await mountLoaded();
+    expect(targetIds(renderer)).toContain(SPEND_ALERT_THRESHOLD_SETTINGS.push.id);
+    expect(targetIds(renderer)).toContain(SPEND_ALERT_ANOMALY_SETTINGS.push.id);
+
+    // While the category or device cannot deliver, the row is the link to
+    // Notifications; the result must still land on it.
+    const off = await mountLoaded({ pushCategoryEnabled: false });
+    expect(pushOffRow(off.renderer)).toBeDefined();
+    expect(targetIds(off.renderer)).toContain(SPEND_ALERT_THRESHOLD_SETTINGS.push.id);
+    expect(targetIds(off.renderer)).toContain(SPEND_ALERT_ANOMALY_SETTINGS.push.id);
+  });
+
+  it('names the rule rows and the editable fields with the index labels', async () => {
+    const { renderer } = await mountLoaded();
+    const rendered = texts(renderer);
+
+    // The card titles and the window choice list carry the definitions' labels.
+    expect(rendered).toContain(i18n.t(SPEND_ALERT_THRESHOLD_SETTINGS.enabled.label));
+    expect(rendered).toContain(i18n.t(SPEND_ALERT_THRESHOLD_SETTINGS.window.label));
+    // Both rules carry the channel definitions' label, so one definition per
+    // channel names every row and its search result.
+    expect(
+      rendered.filter(value => value === i18n.t(SPEND_ALERT_THRESHOLD_SETTINGS.email.label))
+    ).toHaveLength(2);
+    expect(
+      rendered.filter(value => value === i18n.t(SPEND_ALERT_ANOMALY_SETTINGS.email.label))
+    ).toHaveLength(2);
+
+    // Both editable fields read their label from the index, so a result and the
+    // field it reveals say the same thing.
+    const fieldLabels = byType(renderer, 'FormField').map(node => String(node.props.label));
+    expect(fieldLabels).toHaveLength(2);
+    expect(fieldLabels).toEqual(expect.arrayContaining([LIMIT, MULTIPLIER]));
+    for (const label of fieldLabels) {
+      expect(INDEXED_LABELS.has(label)).toBe(true);
+    }
+  });
+
+  it.each([SPEND_ALERT_THRESHOLD_SETTINGS.limit, SPEND_ALERT_ANOMALY_SETTINGS.multiplier])(
+    'keeps the $id rule target exact while its card is on screen',
+    async setting => {
+      getQueryFn.mockResolvedValue(settingsFixture());
+      const view = await renderWithProviders(
+        createElement(SpendAlertsScreen, { settingsTarget: setting.id })
+      );
+      await waitFor(() => texts(view.renderer).includes(i18n.t('spendAlerts.subtitle')));
+
+      expect(scrollTarget(view.renderer)).toBe(setting.id);
+      expect(targetIds(view.renderer)).toContain(setting.id);
+    }
+  );
+
+  it('reveals the master switch for a hidden rule target, without switching it on', async () => {
+    getQueryFn.mockResolvedValue(settingsFixture({ enabled: false }));
+    const target = SPEND_ALERT_THRESHOLD_SETTINGS.limit.id;
+    const view = await renderWithProviders(
+      createElement(SpendAlertsScreen, { settingsTarget: target })
+    );
+    await waitFor(() => texts(view.renderer).includes(i18n.t('spendAlerts.subtitle')));
+
+    // The rule cards — and the field the result names — are not on screen, so
+    // the reveal names the switch that brings them back instead of nothing.
+    expect(byType(view.renderer, 'FormField')).toHaveLength(0);
+    expect(scrollTarget(view.renderer)).toBe(SPEND_ALERT_MASTER_SETTING.id);
+
+    // The switch is only revealed: the screen must not turn alerts on for the
+    // person, and nothing is saved behind their back.
+    const master = switchByLabel(view.renderer, i18n.t(SPEND_ALERT_MASTER_SETTING.label));
+    expect(master?.props.value).toBe(false);
+    expect(saveMutationFn).not.toHaveBeenCalled();
+
+    // Once the person turns it on, the routed target lands on the field exactly.
+    toggle(master, true);
+    expect(scrollTarget(view.renderer)).toBe(target);
+    expect(targetIds(view.renderer)).toContain(target);
+  });
+
+  it('forwards the route target to the scroll surface', async () => {
+    getQueryFn.mockResolvedValue(settingsFixture());
+    const view = await renderWithProviders(
+      createElement(SpendAlertsScreen, {
+        settingsTarget: SPEND_ALERT_THRESHOLD_SETTINGS.window.id,
+      })
+    );
+    await waitFor(() => texts(view.renderer).includes(i18n.t('spendAlerts.subtitle')));
+
+    expect(scrollTarget(view.renderer)).toBe(SPEND_ALERT_THRESHOLD_SETTINGS.window.id);
+    expect(targetIds(view.renderer)).toContain(SPEND_ALERT_THRESHOLD_SETTINGS.window.id);
   });
 });

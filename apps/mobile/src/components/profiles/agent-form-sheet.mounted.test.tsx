@@ -327,6 +327,42 @@ describe('AgentFormSheet parity fields', () => {
     unmount();
   });
 
+  it('names the stored rules a switch cannot show, on the row and on the switch', async () => {
+    const base = agentSource();
+    const { renderer, unmount } = await mountSheet({
+      ...base,
+      config: {
+        ...base.config,
+        permission: { bash: { 'git *': 'allow', '*': 'ask' }, read: 'ask' },
+      },
+    });
+
+    const notePrefix = i18n.t('profiles.agents.toolRule', { rule: '' });
+    const notes = findAll(renderer.root, 'Text')
+      .map(node => node.props.children)
+      .filter(
+        (child): child is string => typeof child === 'string' && child.startsWith(notePrefix)
+      );
+
+    expect(notes).toEqual([
+      i18n.t('profiles.agents.toolRule', { rule: 'ask' }),
+      i18n.t('profiles.agents.toolRule', { rule: 'git *: allow · *: ask' }),
+    ]);
+
+    for (const node of toolSwitches(renderer.root)) {
+      expect(node.props.disabled).toBe(false);
+    }
+    const switchFor = (label: string): ReactTestInstance | undefined =>
+      toolSwitches(renderer.root).find(node => node.props.accessibilityLabel === label);
+    expect(switchFor('bash')?.props.accessibilityHint).toBe(
+      i18n.t('profiles.agents.toolRule', { rule: 'git *: allow · *: ask' })
+    );
+    // `edit` stores no rule, so neither its row nor its switch carries a note.
+    expect(switchFor('edit')?.props.accessibilityHint).toBeUndefined();
+
+    unmount();
+  });
+
   it('happy: lists the model variants and saves the picked effort', async () => {
     h.useAvailableModels.mockReturnValue({
       models: [modelOption('anthropic/claude', ['low', 'high'])],

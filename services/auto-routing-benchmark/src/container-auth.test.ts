@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   serverOptions: undefined as undefined | ServerOptions,
   spawn: vi.fn(),
   mkdtemp: vi.fn(),
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
   rm: vi.fn(),
   close: vi.fn(),
   exit: vi.fn<typeof process.exit>(),
@@ -36,6 +38,8 @@ vi.mock('node:http', () => ({
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
 vi.mock('node:fs/promises', () => ({
   mkdtemp: mocks.mkdtemp,
+  mkdir: mocks.mkdir,
+  writeFile: mocks.writeFile,
   rm: mocks.rm,
 }));
 
@@ -88,6 +92,7 @@ type ContainerResponse = {
     exitCode?: number;
     durationMs?: number;
     stderrTail?: string;
+    stdoutLines?: string[];
     timedOut?: boolean;
     error?: string;
   };
@@ -137,6 +142,15 @@ function stopServer() {
   mocks.sigterm();
 }
 
+// Checks every four-character window of the case key across the returned text.
+function expectNoKeyWindow(body: unknown) {
+  const payload = JSON.stringify(body);
+  const { kiloToken } = runBody;
+  for (let index = 0; index + 4 <= kiloToken.length; index += 1) {
+    expect(payload).not.toContain(kiloToken.slice(index, index + 4));
+  }
+}
+
 beforeEach(() => {
   vi.resetModules();
   mocks.handler = undefined;
@@ -145,6 +159,8 @@ beforeEach(() => {
   mocks.children = [];
   mocks.spawn.mockReset().mockImplementation(createChild);
   mocks.mkdtemp.mockReset().mockResolvedValue('/tmp/benchmark-auth-test');
+  mocks.mkdir.mockReset().mockResolvedValue(undefined);
+  mocks.writeFile.mockReset().mockResolvedValue(undefined);
   mocks.rm.mockReset().mockResolvedValue(undefined);
   mocks.close.mockReset();
   mocks.exit.mockReset();
@@ -201,6 +217,30 @@ it('/run sends the prompt on stdin and disables automatic ingest while preservin
   });
   mocks.children[0].emit('close', 0);
   expect((await pending.done).status).toBe(200);
+});
+
+it.each([
+  ['an ordinary case keeps the inherited working directory', {}, '/app'],
+  ['an isolated case runs in its own workspace', { isolated: true }, '/tmp/benchmark-auth-test'],
+])('/run: %s', async (_kind, isolation, pwd) => {
+  vi.stubEnv('PWD', '/app');
+  await loadServer();
+  const pending = request('/run', { ...runBody, ...isolation });
+  await flushServer();
+  const options = mocks.spawn.mock.calls[0][2];
+  expect(options.cwd).toBe('/tmp/benchmark-auth-test');
+  expect(options.env.PWD).toBe(pwd);
+  mocks.children[0].emit('close', 0);
+  expect((await pending.done).status).toBe(200);
+});
+
+it('/run rejects a non-boolean isolation flag', async () => {
+  await loadServer();
+  expect(await request('/run', { ...runBody, isolated: 'yes' }).done).toEqual({
+    status: 400,
+    body: { error: 'isolated must be a boolean when provided' },
+  });
+  expect(mocks.spawn).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -344,6 +384,153 @@ it('settles an asynchronous spawn error once and redacts case authentication', a
   });
   expect(pending.res.end).toHaveBeenCalledOnce();
   expect(mocks.rm).toHaveBeenCalledOnce();
+});
+
+it('replaces the case credential in every captured stream it returns', async () => {
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const eventLine = JSON.stringify({
+    type: 'text',
+    part: { text: `auth ${runBody.kiloToken}`, time: { end: 1 } },
+  });
+  const diagnosticLine = `diagnostic: ${runBody.kiloToken}`;
+  const stderrText = `warning: ${runBody.kiloToken} rejected`;
+  mocks.children[0].stdout.emit('data', Buffer.from(`${eventLine}\n${diagnosticLine}\n`));
+  mocks.children[0].stderr.emit('data', Buffer.from(stderrText));
+  mocks.children[0].emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body).toMatchObject({
+    exitCode: 0,
+    timedOut: false,
+    stdoutLines: [
+      eventLine.replace(runBody.kiloToken, '[redacted]'),
+      diagnosticLine.replace(runBody.kiloToken, '[redacted]'),
+    ],
+    stderrTail: stderrText.replace(runBody.kiloToken, '[redacted]'),
+  });
+  expect(JSON.stringify(response.body)).not.toContain(runBody.kiloToken);
+});
+
+it('keeps whole stdout lines at the 2 MB capture cap', async () => {
+  // The container server keeps at most 2 MB of stdout; the retained text ends inside a line.
+  const stdoutCap = 2 * 1024 * 1024;
+  const { kiloToken } = runBody;
+  const completeLines = 2045;
+  const line = `${'x'.repeat(1024)}\n`;
+  const retainedTailBytes = stdoutCap - completeLines * line.length;
+  const tailLine = `${'x'.repeat(retainedTailBytes - 6)}${kiloToken.slice(0, 6)}${'y'.repeat(10)}`;
+  // The cap keeps this line's first bytes only.
+  expect(tailLine.slice(0, retainedTailBytes).endsWith(kiloToken.slice(0, 6))).toBe(true);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stdout.emit('data', Buffer.from(`${line.repeat(completeLines)}${tailLine}`));
+  child.stderr.emit('data', Buffer.from('warning: truncated case\n'));
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  const stdoutLines = response.body.stdoutLines ?? [];
+  expect(stdoutLines).toHaveLength(completeLines);
+  for (const value of stdoutLines) expect(value).toMatch(/^x+$/u);
+  expectNoKeyWindow(response.body);
+});
+
+it('keeps only whole lines before the stdout cap', async () => {
+  // The key spans the whole tail line, which the cap cuts.
+  const stdoutCap = 2 * 1024 * 1024;
+  const { kiloToken } = runBody;
+  const completeLines = 2045;
+  const line = `${'x'.repeat(1024)}\n`;
+  const retainedTailBytes = stdoutCap - completeLines * line.length;
+  const prefixBytes = retainedTailBytes - kiloToken.length - 9;
+  const tailLine = `${'x'.repeat(prefixBytes)}${kiloToken}${'x'.repeat(10)}`;
+  expect(completeLines * line.length + tailLine.length).toBe(stdoutCap + 1);
+  // The tail line that holds the key is the line the cap cuts.
+  expect(tailLine.slice(0, retainedTailBytes - 9).endsWith(kiloToken)).toBe(true);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stdout.emit('data', Buffer.from(`${line.repeat(completeLines)}${tailLine}`));
+  child.stderr.emit('data', Buffer.from('warning: truncated case\n'));
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  const stdoutLines = response.body.stdoutLines ?? [];
+  expect(stdoutLines).toHaveLength(completeLines);
+  for (const value of stdoutLines) expect(value).toMatch(/^x+$/u);
+  expect(stdoutLines.join('\n')).not.toContain(kiloToken);
+  expectNoKeyWindow(response.body);
+});
+
+it('keeps only whole lines at the start of the stderr tail', async () => {
+  // The stderr cap keeps the last 4 KB, whose first line is partial.
+  const stderrCap = 4 * 1024;
+  const { kiloToken } = runBody;
+  const suffix = kiloToken.slice(10);
+  const retainedTail = `${suffix}\n${'z'.repeat(stderrCap - suffix.length - 1)}`;
+  expect(retainedTail).toHaveLength(stderrCap);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stderr.emit(
+    'data',
+    Buffer.from(`${'q'.repeat(10)}${kiloToken}${retainedTail.slice(suffix.length)}`)
+  );
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body.stderrTail).toBe('z'.repeat(stderrCap - suffix.length - 1));
+  expect(response.body.stderrTail).not.toContain('q');
+  expectNoKeyWindow(response.body);
+});
+
+it('keeps only whole lines after the stderr tail start', async () => {
+  // The retained tail starts 9 characters before a whole line that must not survive.
+  const stderrCap = 4 * 1024;
+  const { kiloToken } = runBody;
+  const padding = 9;
+  const retainedTail = `${'q'.repeat(padding)}${kiloToken}\n${'z'.repeat(
+    stderrCap - padding - kiloToken.length - 1
+  )}`;
+  expect(retainedTail).toHaveLength(stderrCap);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stderr.emit('data', Buffer.from(`w${retainedTail}`));
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body.stderrTail).toBe('z'.repeat(stderrCap - padding - kiloToken.length - 1));
+  expect(response.body.stderrTail).not.toContain('q');
+  expect(response.body.stderrTail).not.toContain(kiloToken);
+  expectNoKeyWindow(response.body);
+});
+
+it('returns no captured text when a truncated stream holds no whole line', async () => {
+  // A stream with no newline is one partial line, so both capped edges keep nothing.
+  const { kiloToken } = runBody;
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stdout.emit('data', Buffer.from(`${'x'.repeat(2 * 1024 * 1024)}${kiloToken}`));
+  child.stderr.emit('data', Buffer.from(`${kiloToken}${'y'.repeat(4 * 1024)}`));
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body).toMatchObject({ stdoutLines: [], stderrTail: '' });
+  expectNoKeyWindow(response.body);
 });
 
 it('keeps local warmup and real cases in the same serialized CLI lane', async () => {

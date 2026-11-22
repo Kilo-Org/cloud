@@ -154,6 +154,7 @@ export async function sendUpstreamAttemptWithByokFailover(
       stopReason = 'client-disconnected';
       break;
     }
+    providerContext.onUpstreamFailure?.();
     // All attempts share one upstream budget, so the invocation still ends within the route's
     // maxDuration with time left for usage accounting.
     if (remainingBudgetMs(startedAt) < MIN_FAILOVER_BUDGET_MS) {

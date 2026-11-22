@@ -131,4 +131,14 @@ export const SESSION_CARD_FIXTURES = {
     rows: () => [{ status: 'idle', ago: 0, title: 'Write the release notes' }],
     follow: { index: 0, finish: true },
   },
+  'session-card-android-pair': {
+    description:
+      'Android session notification: two Working sessions followed at once, one card each.',
+    rows: () => [
+      { status: 'busy', ago: 12, title: 'Migrate the billing webhooks' },
+      { status: 'busy', ago: 31, title: 'Refactor the settle path' },
+    ],
+    sessionIds: ['ses_01JQ8ZK4M2XW3T7YB6NCV0000', 'ses_01JQ8ZK4M2XW3T7YB6NCV2662'],
+    follow: { index: [0, 1] },
+  },
 } satisfies Record<string, GlanceableFixture>;

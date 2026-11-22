@@ -7,25 +7,65 @@ describe('selectProfileOverviewErrorView', () => {
   it('treats NOT_FOUND as a stale list row: no retry, list refresh, not-found copy', () => {
     expect(
       selectProfileOverviewErrorView({ data: { code: 'NOT_FOUND', httpStatus: 404 } }, 'online')
-    ).toEqual({ variant: 'not-found', showRetry: false, staleRow: true });
+    ).toEqual({
+      variant: 'not-found',
+      showRetry: false,
+      staleRow: true,
+      descriptionKey: null,
+    });
   });
 
   it('keeps the not-found state when the device reports offline: the server answered', () => {
     expect(
       selectProfileOverviewErrorView({ data: { code: 'NOT_FOUND', httpStatus: 404 } }, 'offline')
-    ).toEqual({ variant: 'not-found', showRetry: false, staleRow: true });
+    ).toEqual({
+      variant: 'not-found',
+      showRetry: false,
+      staleRow: true,
+      descriptionKey: null,
+    });
   });
 
   it('treats a refused permission as terminal without refreshing the list', () => {
     expect(
       selectProfileOverviewErrorView({ data: { code: 'FORBIDDEN', httpStatus: 403 } }, 'online')
-    ).toEqual({ variant: 'permission', showRetry: false, staleRow: false });
+    ).toEqual({
+      variant: 'permission',
+      showRetry: false,
+      staleRow: false,
+      descriptionKey: 'organization.boundary.accessDeniedDescription',
+    });
+  });
+
+  it('keeps the refusal when the device reports offline: the server answered', () => {
+    expect(
+      selectProfileOverviewErrorView({ data: { code: 'FORBIDDEN', httpStatus: 403 } }, 'offline')
+    ).toEqual({
+      variant: 'permission',
+      showRetry: false,
+      staleRow: false,
+      descriptionKey: 'organization.boundary.accessDeniedDescription',
+    });
   });
 
   it('keeps other terminal codes out of the retry loop without claiming a stale row', () => {
     expect(
       selectProfileOverviewErrorView({ data: { code: 'BAD_REQUEST', httpStatus: 400 } }, 'online')
-    ).toEqual({ variant: 'not-found', showRetry: false, staleRow: false });
+    ).toEqual({
+      variant: 'not-found',
+      showRetry: false,
+      staleRow: false,
+      descriptionKey: null,
+    });
+  });
+
+  it('does not claim a stale row for a bare NOT_FOUND code without an envelope', () => {
+    expect(selectProfileOverviewErrorView({ code: 'NOT_FOUND' }, 'online')).toEqual({
+      variant: 'server',
+      showRetry: true,
+      staleRow: false,
+      descriptionKey: null,
+    });
   });
 
   it('offers retry for an error without a code while the device is confirmed offline', () => {
@@ -33,6 +73,7 @@ describe('selectProfileOverviewErrorView', () => {
       variant: 'offline',
       showRetry: true,
       staleRow: false,
+      descriptionKey: null,
     });
   });
 
@@ -41,17 +82,24 @@ describe('selectProfileOverviewErrorView', () => {
       variant: 'timeout',
       showRetry: true,
       staleRow: false,
+      descriptionKey: null,
     });
   });
 
   it('offers retry with the server variant for an unclassified failure', () => {
     expect(
       selectProfileOverviewErrorView({ data: { code: 'INTERNAL_SERVER_ERROR' } }, 'online')
-    ).toEqual({ variant: 'server', showRetry: true, staleRow: false });
+    ).toEqual({
+      variant: 'server',
+      showRetry: true,
+      staleRow: false,
+      descriptionKey: null,
+    });
     expect(selectProfileOverviewErrorView(undefined, 'unknown')).toEqual({
       variant: 'server',
       showRetry: true,
       staleRow: false,
+      descriptionKey: null,
     });
   });
 });

@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { and, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { alias, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
   kilocode_users,
   organizations,
@@ -41,6 +41,29 @@ type GrantLookup = {
 const targetOrganization = alias(organizations, 'target_organization');
 const grantOrganization = alias(organizations, 'grant_organization');
 const parentOrganization = alias(organizations, 'parent_organization');
+/** The organization with this id is present and not soft-deleted. */
+function liveTarget(organizationId: string): SQL | undefined {
+  return and(eq(targetOrganization.id, organizationId), isNull(targetOrganization.deleted_at));
+}
+
+/** The target's still-linked direct parent is present and not soft-deleted. */
+function liveParentOfTarget(): SQL | undefined {
+  return and(
+    eq(parentOrganization.id, targetOrganization.parent_organization_id),
+    isNull(parentOrganization.deleted_at)
+  );
+}
+
+/** A grant column names the target organization or its live direct parent. */
+function grantOnTargetOrLiveParent(
+  organizationColumn: AnyPgColumn,
+  targetOrganizationId: string
+): SQL | undefined {
+  return or(
+    eq(organizationColumn, targetOrganizationId),
+    eq(organizationColumn, parentOrganization.id)
+  );
+}
 
 /**
  * An active grant on the target organization, or on its live direct parent,
@@ -67,10 +90,7 @@ async function findUsableGrant(params: {
     })
     .from(support_access_grants)
     .innerJoin(kilocode_users, eq(kilocode_users.id, support_access_grants.actor_kilo_user_id))
-    .innerJoin(
-      targetOrganization,
-      and(eq(targetOrganization.id, params.organizationId), isNull(targetOrganization.deleted_at))
-    )
+    .innerJoin(targetOrganization, liveTarget(params.organizationId))
     .innerJoin(
       grantOrganization,
       and(
@@ -78,13 +98,7 @@ async function findUsableGrant(params: {
         isNull(grantOrganization.deleted_at)
       )
     )
-    .leftJoin(
-      parentOrganization,
-      and(
-        eq(parentOrganization.id, targetOrganization.parent_organization_id),
-        isNull(parentOrganization.deleted_at)
-      )
-    )
+    .leftJoin(parentOrganization, liveParentOfTarget())
     .where(
       and(
         eq(support_access_grants.actor_kilo_user_id, params.actorKiloUserId),
@@ -93,10 +107,7 @@ async function findUsableGrant(params: {
         eq(kilocode_users.is_admin, true),
         isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason),
-        or(
-          eq(grantOrganization.id, targetOrganization.id),
-          eq(grantOrganization.id, parentOrganization.id)
-        )
+        grantOnTargetOrLiveParent(grantOrganization.id, params.organizationId)
       )
     )
     .orderBy(
@@ -119,40 +130,27 @@ async function findUsableGrant(params: {
 
 /**
  * Distinguishes an expired or revoked grant from "never requested" so the
- * caller can return a specific cause code, per the Failure UX rule. A grant on
- * the target's still-linked, live direct parent counts, so a lapsed inherited
- * grant reports the same reason as a lapsed direct one; a deleted parent's
- * lapsed grant does not.
+ * caller can return a specific cause code, per the Failure UX rule. The grant
+ * read mirrors {@link findUsableGrant}'s placement rule: the target's own
+ * lapsed grant reports even when the target is deleted, while only a still
+ * linked, live direct parent's lapsed grant does — a lapsed inherited grant
+ * reports the same reason as a lapsed direct one, and a deleted parent's does
+ * not report at all.
  */
 export async function latestSupportGrantStatus(params: {
   actorKiloUserId: string;
   organizationId: string;
 }): Promise<'expired' | 'revoked' | null> {
-  const [target] = await db
-    .select({ parentOrganizationId: organizations.parent_organization_id })
-    .from(organizations)
-    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
-    .limit(1);
-  const organizationIds = [params.organizationId];
-  if (target?.parentOrganizationId) {
-    const [parent] = await db
-      .select({ id: organizations.id })
-      .from(organizations)
-      .where(
-        and(eq(organizations.id, target.parentOrganizationId), isNull(organizations.deleted_at))
-      )
-      .limit(1);
-    if (parent) organizationIds.push(target.parentOrganizationId);
-  }
-
   const [row] = await db
     .select({ status: support_access_grants.status })
     .from(support_access_grants)
+    .leftJoin(targetOrganization, liveTarget(params.organizationId))
+    .leftJoin(parentOrganization, liveParentOfTarget())
     .where(
       and(
         eq(support_access_grants.actor_kilo_user_id, params.actorKiloUserId),
-        inArray(support_access_grants.organization_id, organizationIds),
-        inArray(support_access_grants.status, ['expired', 'revoked'])
+        inArray(support_access_grants.status, ['expired', 'revoked']),
+        grantOnTargetOrLiveParent(support_access_grants.organization_id, params.organizationId)
       )
     )
     .orderBy(desc(support_access_grants.requested_at))
@@ -231,7 +229,9 @@ export async function evaluateSupportAccess(params: {
   if (!supportEntrySatisfiesRoles(entry, params.roles)) {
     return {
       access: null,
-      decision: 'deny_action_class',
+      // The grant exists and its class fits; the allowlisted entry's stand-in
+      // role is simply more than the grant's actor may stand in for.
+      decision: 'deny_actor_permission',
       grantId: grant.id,
       inheritedFromOrganizationId,
     };

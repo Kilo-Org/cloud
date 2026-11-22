@@ -1,16 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
 import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
+import {
+  SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+  SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+} from '@kilocode/app-shared/integrations-errors';
 import { i18n } from '@/i18n';
 import {
   isTrialExpiredRefusal,
+  knownServerErrorCopyKey,
   knownServerErrorMessage,
   ORGANIZATION_MEMBER_EXISTS_MESSAGE,
   ORGANIZATION_PENDING_INVITATION_MESSAGE,
   ORGANIZATION_TRIAL_EXPIRED_MESSAGE,
   organizationErrorMessage,
 } from '@/lib/server-error-copy';
-import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
+import {
+  TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY,
+  TRIAL_ENDED_BILLING_COPY_KEY,
+  TRIAL_ENDED_COPY_KEY,
+} from '@/lib/trial-refusal-copy';
 
 function makeError(code: string, message: string): Error {
   return Object.assign(new Error(message), { data: { code, message } });
@@ -90,6 +99,22 @@ describe('knownServerErrorMessage', () => {
     }
   );
 
+  // Slack did not answer, so the integration stays connected and the person can
+  // press Disconnect again; the copy must say the retry is possible.
+  it('explains an unconfirmed Slack disconnect as a retry', () => {
+    const unconfirmed = makeError('SERVICE_UNAVAILABLE', SLACK_DISCONNECT_UNCONFIRMED_MESSAGE);
+    expect(knownServerErrorCopyKey(unconfirmed)).toBe('integrations.disconnectRetry');
+    expect(knownServerErrorMessage(unconfirmed)).toBe(i18n.t('integrations.disconnectRetry'));
+  });
+
+  // The saved access for the connection cannot be read, so a retry cannot work
+  // and the copy has to name the support step instead.
+  it('explains an unreadable Slack connection as a support step', () => {
+    const unreadable = makeError('SERVICE_UNAVAILABLE', SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE);
+    expect(knownServerErrorCopyKey(unreadable)).toBe('integrations.disconnectNeedsSupport');
+    expect(knownServerErrorMessage(unreadable)).toBe(i18n.t('integrations.disconnectNeedsSupport'));
+  });
+
   // `assertEnabled` refuses save, reject and approve with this one sentence, so
   // its copy must describe the gate and never one action's outcome.
   it('describes only the gate for the shared disabled rejection', () => {
@@ -130,10 +155,27 @@ describe('the trial refusal, read by role', () => {
     );
   });
 
+  it('names the destination for a billing role the surface cannot arm', () => {
+    expect(knownServerErrorMessage(trialRefusal(), true, 'absent')).toBe(
+      i18n.t(TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY)
+    );
+    expect(organizationErrorMessage(trialRefusal(), true, 'absent')).toBe(
+      i18n.t(TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY)
+    );
+    expect(knownServerErrorCopyKey(trialRefusal(), true, 'absent')).toBe(
+      TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY
+    );
+  });
+
   it('keeps the owner-naming copy for a reader who cannot change the plan', () => {
     expect(knownServerErrorMessage(trialRefusal(), false)).toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
     expect(knownServerErrorMessage(trialRefusal())).toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
     expect(organizationErrorMessage(trialRefusal())).toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
+    // The step cannot upgrade a member's copy: the destination sentence would
+    // hand a reader the server refuses an instruction it refuses anyway.
+    expect(knownServerErrorMessage(trialRefusal(), false, 'absent')).toBe(
+      i18n.t(TRIAL_ENDED_COPY_KEY)
+    );
   });
 
   it('carries the role into no other sentence', () => {
@@ -142,6 +184,14 @@ describe('the trial refusal, read by role', () => {
       i18n.t('organization.inviteMember.alreadyMember')
     );
     expect(organizationErrorMessage(inviteConflict, true)).toBe(
+      i18n.t('organization.inviteMember.alreadyMember')
+    );
+    // The surface's own answer rides with the role, so it must not reach a
+    // sentence whose explanation has nothing to do with the plan either.
+    expect(knownServerErrorMessage(inviteConflict, true, 'absent')).toBe(
+      i18n.t('organization.inviteMember.alreadyMember')
+    );
+    expect(knownServerErrorMessage(inviteConflict, false, 'absent')).toBe(
       i18n.t('organization.inviteMember.alreadyMember')
     );
   });

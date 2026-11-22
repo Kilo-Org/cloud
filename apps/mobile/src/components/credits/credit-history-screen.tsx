@@ -7,7 +7,11 @@ import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
-import { LedgerHistoryRow, PurchaseHistoryRow } from '@/components/credits/credit-history-rows';
+import {
+  GrantHistoryRow,
+  LedgerHistoryRow,
+  PurchaseHistoryRow,
+} from '@/components/credits/credit-history-rows';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -19,6 +23,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { buildCreditHistoryItems, type CreditHistoryItem } from '@/lib/credits/credit-history';
 import { openExternalUrl } from '@/lib/external-link';
 import {
+  useCreditGrantHistory,
   useCreditPurchaseHistory,
   usePersonalCreditBlocks,
 } from '@/lib/hooks/use-personal-credits';
@@ -41,8 +46,9 @@ function HistoryRowSkeleton({ last }: Readonly<{ last: boolean }>) {
  * channel allows, and the ledger the web `/credits` page lists — grants,
  * bonuses, expiries, deductions, and adjustments — as one chronological list.
  *
- * Purchases are paged and the ledger is not, so the two are merged by date; the
- * ledger names the grant an expiry closed, which is why both land together.
+ * Purchases are paged while the ledger and the grants are single reads, so all
+ * three are merged by date; the ledger names the grant an expiry closed, which
+ * is why both land together.
  */
 export function PersonalCreditHistoryScreen() {
   const { t } = useTranslation();
@@ -51,6 +57,7 @@ export function PersonalCreditHistoryScreen() {
 
   const purchases = useCreditPurchaseHistory(true);
   const blocks = usePersonalCreditBlocks(true);
+  const grantHistory = useCreditGrantHistory(true);
   const receiptMutation = useMutation(
     trpc.user.getCreditPurchaseReceipt.mutationOptions({
       onSuccess: result => {
@@ -67,9 +74,10 @@ export function PersonalCreditHistoryScreen() {
   );
 
   const deductions = blocks.data?.deductions;
+  const grants = grantHistory.data?.grants;
   const items = useMemo<CreditHistoryItem[]>(
-    () => buildCreditHistoryItems(purchases.entries, deductions ?? []),
-    [purchases.entries, deductions]
+    () => buildCreditHistoryItems(purchases.entries, deductions ?? [], grants ?? []),
+    [purchases.entries, deductions, grants]
   );
 
   const openReceipt = useCallback(
@@ -83,30 +91,37 @@ export function PersonalCreditHistoryScreen() {
     : null;
 
   const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<CreditHistoryItem>) =>
-      item.kind === 'purchase' ? (
-        <PurchaseHistoryRow
-          entry={item.entry}
-          isOpeningReceipt={openingReceiptId === item.entry.id}
-          onOpenReceipt={openReceipt}
-          last={index === items.length - 1}
-        />
-      ) : (
-        <LedgerHistoryRow
-          deduction={item.deduction}
-          grantListed={item.grantListed}
-          last={index === items.length - 1}
-        />
-      ),
+    ({ item, index }: ListRenderItemInfo<CreditHistoryItem>) => {
+      const last = index === items.length - 1;
+      if (item.kind === 'purchase') {
+        return (
+          <PurchaseHistoryRow
+            entry={item.entry}
+            isOpeningReceipt={openingReceiptId === item.entry.id}
+            onOpenReceipt={openReceipt}
+            last={last}
+          />
+        );
+      }
+      if (item.kind === 'grant') {
+        return <GrantHistoryRow grant={item.grant} last={last} />;
+      }
+      return (
+        <LedgerHistoryRow deduction={item.deduction} grantListed={item.grantListed} last={last} />
+      );
+    },
     [openReceipt, openingReceiptId, items.length]
   );
 
   const purchasesFirstPageError = purchases.query.isError && purchases.entries.length === 0;
-  const isFirstPageError = purchasesFirstPageError || (blocks.isError && items.length === 0);
+  const isFirstPageError =
+    purchasesFirstPageError || ((blocks.isError || grantHistory.isError) && items.length === 0);
 
   // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
   // permission state, and anything else keeps the retryable neutral copy.
-  const classifiedError = trpcErrorVariant(purchases.query.error ?? blocks.error);
+  const classifiedError = trpcErrorVariant(
+    purchases.query.error ?? blocks.error ?? grantHistory.error
+  );
   const errorVariant: QueryErrorVariant =
     classifiedError === 'not-found' ||
     classifiedError === 'permission' ||
@@ -117,16 +132,23 @@ export function PersonalCreditHistoryScreen() {
   // by retrying; every other failure keeps its Retry.
   const isPermanentError = errorVariant === 'not-found' || errorVariant === 'permission';
 
-  const isLoading = purchases.query.status === 'pending' || blocks.isPending;
+  const isLoading =
+    purchases.query.status === 'pending' || blocks.isPending || grantHistory.isPending;
   const isLaterPageError = purchases.query.isFetchNextPageError;
-  // The ledger is a second read feeding this list. When it fails on its own the
-  // purchases that already loaded stay on screen, and the footer names the part
-  // that is missing instead of dropping it without a word.
-  const ledgerFailed = blocks.isError && items.length > 0;
+  // The ledger and the grants are two more reads feeding this list. When one
+  // fails on its own the purchases that already loaded stay on screen, and the
+  // footer names the part that is missing instead of dropping it silently.
+  const ledgerFailed = (blocks.isError || grantHistory.isError) && items.length > 0;
+  // Both reads are bounded, and the caption names the bound once for the merged
+  // list, so a truncated grant history cannot print a second copy of it. The
+  // grants have no next page, so their bound holds even while purchases load on.
+  const isRetentionLimited =
+    grantHistory.data?.hasMore === true || (purchases.isRetentionLimited && !purchases.hasMore);
 
   const retryAll = () => {
     void purchases.query.refetch();
     void blocks.refetch();
+    void grantHistory.refetch();
   };
 
   let body: ReactNode = null;
@@ -144,7 +166,7 @@ export function PersonalCreditHistoryScreen() {
         <QueryError
           variant={errorVariant}
           onRetry={isPermanentError ? undefined : retryAll}
-          isRetrying={purchases.query.isFetching || blocks.isFetching}
+          isRetrying={purchases.query.isFetching || blocks.isFetching || grantHistory.isFetching}
         />
       </Animated.View>
     );
@@ -159,7 +181,7 @@ export function PersonalCreditHistoryScreen() {
   } else {
     const footer = (
       <View className="pt-3">
-        {purchases.isRetentionLimited && !isLaterPageError && !purchases.hasMore && (
+        {isRetentionLimited && !isLaterPageError && (
           <View className="items-center gap-3 px-4 py-4">
             <Text variant="caption" className="text-center">
               {t('credits.history.retentionLimit')}
@@ -210,8 +232,9 @@ export function PersonalCreditHistoryScreen() {
               className={STATE_ACTION_CLASS}
               onPress={() => {
                 void blocks.refetch();
+                void grantHistory.refetch();
               }}
-              loading={blocks.isFetching}
+              loading={blocks.isFetching || grantHistory.isFetching}
               accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>

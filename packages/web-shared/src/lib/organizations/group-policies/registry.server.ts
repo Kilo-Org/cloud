@@ -23,10 +23,6 @@ export const organizationGroupPolicyServerRegistry = {
     type: 'agent_permissions',
     normalize: policy => policy,
   },
-  client_configuration: {
-    type: 'client_configuration',
-    normalize: policy => policy,
-  },
 } satisfies PolicyServerRegistry;
 
 export function normalizeRegisteredOrganizationGroupPolicy(
@@ -37,7 +33,5 @@ export function normalizeRegisteredOrganizationGroupPolicy(
       return organizationGroupPolicyServerRegistry.model_access.normalize(policy);
     case 'agent_permissions':
       return organizationGroupPolicyServerRegistry.agent_permissions.normalize(policy);
-    case 'client_configuration':
-      return organizationGroupPolicyServerRegistry.client_configuration.normalize(policy);
   }
 }

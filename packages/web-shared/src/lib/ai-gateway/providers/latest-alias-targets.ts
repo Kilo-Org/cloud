@@ -67,8 +67,9 @@ export function applyLatestAliasTargets(
  * target is `LATEST_ALIAS_TARGET_MIN_AGE_MS` old, counted from its `created` time or, when that is
  * unknown, from when the switch was first seen; until then the switch is kept as `pending`. An
  * alias whose stored target left the catalog switches at once. An alias the refresh reports
- * without a live target keeps its stored entry, including any pending switch. Aliases that left
- * the catalog are dropped.
+ * without a live target, and one the refresh omits entirely, keeps its stored entry — including
+ * any pending switch — so a transient upstream omission cannot drop the pin and switch the alias
+ * back the moment it reappears.
  */
 export function updateLatestAliasTargets(params: {
   previous: LatestAliasTargets;
@@ -80,15 +81,15 @@ export function updateLatestAliasTargets(params: {
 }): LatestAliasTarget[] {
   const { previous, models, createdAtMs, nowMs } = params;
   const entries: LatestAliasTarget[] = [];
-  for (const [alias, model] of Object.entries(models)) {
-    if (!isLatestAliasId(alias)) continue;
+  const aliases = new Set([
+    ...Object.keys(models).filter(isLatestAliasId),
+    ...[...previous.keys()].filter(isLatestAliasId),
+  ]);
+  for (const alias of aliases) {
     const stored = previous.get(alias);
-    const liveTarget = model.alias_target?.slug;
-    if (liveTarget === undefined) {
-      if (stored) entries.push(stored);
-      continue;
-    }
-    if (!Object.hasOwn(models, liveTarget)) {
+    const model = Object.hasOwn(models, alias) ? models[alias] : undefined;
+    const liveTarget = model?.alias_target?.slug;
+    if (liveTarget === undefined || !Object.hasOwn(models, liveTarget)) {
       if (stored) entries.push(stored);
       continue;
     }

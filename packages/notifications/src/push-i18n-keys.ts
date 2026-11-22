@@ -9,6 +9,12 @@ const SESSION_TITLE_KEY = 'session.title';
 /** The payload key the security-lifecycle producer sends. */
 export const SECURITY_LIFECYCLE_I18N_KEY = 'internal.securityLifecycle';
 
+/** The payload key the agent-session notification producer sends. */
+export const AGENT_SESSION_NOTIFICATION_I18N_KEY = 'agentSession.notification';
+
+/** The payload key the session-ready producer sends. */
+export const SESSION_READY_I18N_KEY = 'sessionReady';
+
 /** The leaf of the generic body the security-lifecycle notice reads. */
 export const SECURITY_LIFECYCLE_BODY_LEAF = 'securityUpdate';
 
@@ -42,8 +48,8 @@ export const SECURITY_FINDING_PUSH_BODY_KEY = 'internal.securityFinding.body';
  */
 const SHARED_TITLE_KEYS: ReadonlyMap<string, string> = new Map([
   [SECURITY_LIFECYCLE_I18N_KEY, GENERIC_PUSH_TITLE_KEY],
-  ['agentSession.notification', SESSION_TITLE_KEY],
-  ['sessionReady', SESSION_TITLE_KEY],
+  [AGENT_SESSION_NOTIFICATION_I18N_KEY, SESSION_TITLE_KEY],
+  [SESSION_READY_I18N_KEY, SESSION_TITLE_KEY],
 ]);
 
 /**

@@ -14,11 +14,7 @@ import type {
 import { OrganizationDataRegionSchema, type Endpoint } from '@kilocode/db/schema-types';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import {
-  findVercelOnlyModels,
-  getVendorNamesByModelPrefix,
-  getVercelOnlyModelName,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
+import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import {
   getModelDisplayPricing,
   maxEndpointPricing,
@@ -264,18 +260,17 @@ function getVercelOnlyOfferings(
   vercelModelIdOverrides: VercelModelIdOverrides,
   updatedAt: string
 ): VercelOffering[] {
-  const vendorNames = getVendorNamesByModelPrefix(openRouterCatalogModels);
   return findVercelOnlyModels({
     openRouterModelIds,
     openRouterModels: openRouterCatalogModels,
     vercelMetadata: vercelModels,
     overrides: vercelModelIdOverrides,
   }).map(vercelOnlyModel => {
-    const { id, storedModel, contextWindow, modalities, pricing } = vercelOnlyModel;
+    const { id, name, storedModel, contextWindow, modalities, pricing } = vercelOnlyModel;
     return {
       model: {
         slug: id,
-        name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
+        name,
         author: id.includes('/') ? id.slice(0, id.indexOf('/')) : 'Other',
         description: storedModel.description ?? '',
         context_length: contextWindow,

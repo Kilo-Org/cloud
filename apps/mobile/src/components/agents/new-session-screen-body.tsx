@@ -63,6 +63,7 @@ import { useSessionEnvironment } from '@/lib/cloud-environments/use-session-envi
 import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
@@ -291,10 +292,8 @@ export function NewSessionScreenBody() {
   // the personal account or one of the reader's organizations, and its sheet is
   // titled "Select account" (`profile.selectAccount`).
   const accountSection = (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('preferences.account')}
-      </Text>
+    <View className="mt-5 gap-2">
+      <FormFieldLabel label={t('preferences.account')} />
       {isCloneEntry ? (
         <ContextControl
           scope={{ organizationId: organizationId ?? null, isResolved: true }}

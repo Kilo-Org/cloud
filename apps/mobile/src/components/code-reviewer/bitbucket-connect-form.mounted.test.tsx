@@ -1,13 +1,16 @@
 // The Bitbucket token form's two outcomes: a connect that lands closes the
-// sheet it sits in, and a refusal the server will repeat forever (a lost role)
-// leaves the field disabled with the sentence that explains it. Everything else
-// the form renders is static copy.
+// sheet it sits in, and a failed connect leaves a sentence beside a submit whose
+// state says whether another press can help. A refused token is judged, so only
+// a different one unblocks submit; a transport fault is not, so the same token
+// may go again. Everything else the form renders is static copy.
 
 import { createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { textActionTargetClass, textActionTargetDp } from '@/lib/a11y/tap-target';
 import { act, type ReactTestRenderer } from '@/test/renderer';
+import { compiledDimensions } from '@/test/native-dimensions';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { BitbucketConnectForm } from './bitbucket-connect-form';
@@ -17,7 +20,13 @@ const mutations = vi.hoisted(() => ({
   replace: vi.fn<(vars: { integrationId: string; accessToken: string }) => Promise<unknown>>(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+// The form asks the shared tap-target helpers for the platform's target, so the
+// mock carries the platform the helpers read.
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  View: 'View',
+}));
 vi.mock('@/lib/hooks/use-bitbucket', () => ({
   useConnectBitbucket: () => ({ mutateAsync: mutations.connect }),
   useReplaceBitbucketToken: () => ({ mutateAsync: mutations.replace }),
@@ -41,6 +50,15 @@ function submitButton(root: ReactTestRenderer['root']) {
   const button = found.at(-1);
   if (!button) {
     throw new Error('missing submit button');
+  }
+  return button;
+}
+
+/** The token-minting link above the field: the form's other button. */
+function openInBrowserButton(root: ReactTestRenderer['root']) {
+  const button = root.findAll(node => Object.is(node.type, BUTTON)).at(0);
+  if (!button) {
+    throw new Error('missing open-in-browser button');
   }
   return button;
 }
@@ -123,6 +141,25 @@ describe('BitbucketConnectForm', () => {
     expect(rendersText(root, firstConnectDescription)).toBe(false);
   });
 
+  it('gives the token-minting link the platform touch target', async () => {
+    // The compact outline button renders its `sm` 36pt frame, which the audit
+    // reads on the control's own node; the link carries the platform target
+    // instead, so a tap on the sentence beside it does not miss the control.
+    const { root } = await mount(null);
+    const link = openInBrowserButton(root);
+
+    expect(link.props.className).toBe(textActionTargetClass());
+    // It sits in the form's `gap-5` column, not in a row whose content band its
+    // height would blow out, so it takes no overhang cancel.
+    expect(link.props.style).toBeUndefined();
+
+    const declarations = (await compiledDimensions(link.props.className as string)) as {
+      minHeight?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { minHeight: number };
+    expect(box.minHeight).toBe(textActionTargetDp());
+  });
+
   it('connects the pasted token and hands the sheet its dismissal', async () => {
     mutations.connect.mockResolvedValue({ integrationId: 'bitbucket-1' });
     const { root, onConnected } = await mount(null);
@@ -156,18 +193,23 @@ describe('BitbucketConnectForm', () => {
       },
     });
     const { root, onConnected } = await mount(null);
+    // The role sentence names the organization whose rule refused, so a person
+    // in several of them reads which one this is.
+    const roleDenial = i18n.t('codeReviewer.bitbucketConnect.deniedConnectRole', {
+      organization: 'Acme',
+    });
 
     await submit(root, 'workspace-token');
 
     expect(onConnected).not.toHaveBeenCalled();
-    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.adminOnlyConnectDescription'));
+    expect(statusMessage(root)).toBe(roleDenial);
     expect(submitButton(root).props.disabled).toBe(true);
 
     // A lost role is not a token problem, so a new token neither clears the
     // sentence nor re-enables the submit that would be refused again.
     await edit(root, 'another-token');
 
-    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.adminOnlyConnectDescription'));
+    expect(statusMessage(root)).toBe(roleDenial);
     expect(submitButton(root).props.disabled).toBe(true);
   });
 
@@ -195,7 +237,7 @@ describe('BitbucketConnectForm', () => {
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(controls);
   });
 
-  it('keeps submit available for a refused token, which a different one can fix', async () => {
+  it('disables submit for a refused token until the field holds a different one', async () => {
     mutations.connect.mockRejectedValue({
       data: { code: 'UNAUTHORIZED', message: 'Bitbucket rejected the Workspace Access Token' },
     });
@@ -204,15 +246,35 @@ describe('BitbucketConnectForm', () => {
     await submit(root, 'workspace-token');
 
     // A first connect pasted the token that never worked, so the sentence
-    // names the token rather than an expired connection.
+    // names the token rather than an expired connection. Bitbucket judged this
+    // token, so the same one cannot go again.
     expect(statusMessage(root)).toBe(i18n.t('codeReviewer.bitbucketConnect.tokenRefused'));
-    expect(submitButton(root).props.disabled).toBe(false);
+    expect(submitButton(root).props.disabled).toBe(true);
 
-    // The next token is the repair, so typing retires the sentence.
+    // The next token is the repair, so typing retires the sentence and the
+    // block with it.
     await edit(root, 'another-token');
 
     expect(statusMessage(root)).toBeNull();
+    expect(submitButton(root).props.disabled).toBe(false);
     expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
+  });
+
+  it('keeps submit enabled for a failure that never judged the token', async () => {
+    mutations.connect.mockRejectedValue({ data: { code: 'INTERNAL_SERVER_ERROR' } });
+    const { root } = await mount(null);
+
+    await submit(root, 'workspace-token');
+
+    // A server fault judged no token, so the same one may go again without an
+    // edit: the sentence points at the connection, not at the token.
+    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.providerCheckFailedMessage'));
+    expect(submitButton(root).props.disabled).toBe(false);
+
+    await edit(root, 'another-token');
+
+    expect(statusMessage(root)).toBeNull();
+    expect(submitButton(root).props.disabled).toBe(false);
   });
 
   it('announces an expired connection when replacing a stored token', async () => {
@@ -232,6 +294,13 @@ describe('BitbucketConnectForm', () => {
     });
     expect(mutations.connect).not.toHaveBeenCalled();
     expect(statusMessage(root)).toBe(i18n.t('prReview.reconnectNotice.bitbucketTitle'));
+    // The refused token is the connection's, so a replacement is what unblocks
+    // submit: the same one cannot go again.
+    expect(submitButton(root).props.disabled).toBe(true);
+
+    await edit(root, 'another-token');
+
+    expect(statusMessage(root)).toBeNull();
     expect(submitButton(root).props.disabled).toBe(false);
   });
 

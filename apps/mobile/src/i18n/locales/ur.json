@@ -140,10 +140,12 @@
     "keepRunning": "جاری رہنے دیں",
     "newSession": "نیا سیشن",
     "noModelsAvailable": "کوئی ماڈل دستیاب نہیں",
+    "modelRetires": "{{date}} کو ریٹائر ہوگا",
     "notFound": "نہیں ملا۔",
     "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
+    "viewOnGitHub": "GitHub پر PR دیکھیں",
     "completed": "مکمل",
     "pending": "زیر التوا",
     "running": "چل رہا ہے",
@@ -183,7 +185,31 @@
     "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔",
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
-    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
+    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "فہرست نقطہ",
+        "nestedBulletPoint": "نیسٹڈ فہرست نقطہ",
+        "orderedItem": "فہرست آئٹم {n}",
+        "nestedOrderedItem": "نیسٹڈ فہرست آئٹم {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "نیسٹڈ اقتباس"
+      },
+      "table": {
+        "row": "قطار {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "سرخیاں",
+        "links": "لنک",
+        "images": "تصاویر"
+      }
+    }
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -277,9 +303,13 @@
     "credits": "کریڈٹس",
     "failedToLoadBalance": "بیلنس لوڈ نہیں ہو سکا۔ دوبارہ کوشش کرنے کے لیے ٹیپ کریں۔",
     "balanceLoadFailed": "بیلنس لوڈ نہیں ہو سکا",
+    "balanceUnreachable": "سرور تک رسائی نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+    "balanceAccessDenied": "آپ کو یہ بیلنس دیکھنے کی اجازت نہیں ہے۔",
+    "balanceUnavailable": "بیلنس لوڈ نہیں ہو سکا۔",
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
+    "availableToSpendInOrganization": "اس تنظیم میں خرچ کرنے کے لیے دستیاب",
     "signOutTitle": "سائن آؤٹ کریں؟",
     "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔",
     "deleteAccountTitle": "اکاؤنٹ حذف کریں؟",
@@ -421,6 +451,17 @@
       "location": "Vertex مقام",
       "clientEmail": "سروس اکاؤنٹ ای میل",
       "privateKey": "سروس اکاؤنٹ کی نجی کلید",
+      "privateKeyBlockRequired": "پورا کلید بلاک پیسٹ کریں، BEGIN لائن سے END لائن تک۔",
+      "privateKeyEncrypted": "یہ کلید بلاک پاس فریز سے محفوظ ہے۔ ایسی سروس اکاؤنٹ کلید پیسٹ کریں جس میں کوئی پاس فریز نہ ہو۔",
+      "names": {
+        "codestral": "صرف پرانا Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT سے سائن ان کریں)",
+        "xiaomi": "Xiaomi (استعمال کے مطابق ادائیگی)",
+        "zai": "Z.ai (استعمال کے مطابق ادائیگی)",
+        "bedrockByok": "Amazon Bedrock (براہ راست)",
+        "vertexByok": "Google Vertex AI (براہ راست)"
+      },
       "modelMappings": "ماڈل میپنگز",
       "modelMappingsDescription": "گیٹ وے ماڈل کو حسب ضرورت ڈیپلائمنٹ نام پر بھیجیں۔",
       "mappingTitle": "میپنگ {{number}}",
@@ -481,6 +522,7 @@
       "receiptLabel": "رسید",
       "copyReceiptId": "رسید کی آئی ڈی کاپی کریں",
       "appealLabel": "اپیل",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "موصول ہو گئی",
       "triageOpen": "زیرِ جائزہ",
       "triageActioned": "برقرار رکھی گئی",
@@ -498,7 +540,25 @@
       "nextStepInReview": "نتیجہ اس اسکرین پر نظر آئے گا، اور فیصلے کے بعد آپ اپیل کر سکتے ہیں۔",
       "nextStepAppeal": "اپیل کا نتیجہ اس اسکرین پر نظر آئے گا۔",
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
-      "viewReceipt": "رسید دیکھیں"
+      "viewReceipt": "رسید دیکھیں",
+      "targetLabel": "رپورٹ شدہ چیز",
+      "reasonLabel": "رپورٹ کی وجہ",
+      "targetMessage": "اے آئی جواب",
+      "targetComment": "پل ریکویسٹ تبصرہ",
+      "targetUser": "شخص",
+      "reasonHarmful": "نقصان دہ مواد",
+      "reasonIllegal": "غیر قانونی مواد",
+      "reasonHarassment": "ہراسانی",
+      "reasonSpam": "ناخواستہ اشتہارات",
+      "reasonOther": "کوئی اور وجہ"
+    },
+    "reportReceipts": {
+      "title": "رپورٹس",
+      "rowSubtitle": "آپ کی جمع کرائی گئی رپورٹس اور ان کے نتائج",
+      "emptyTitle": "ابھی کوئی رپورٹ نہیں",
+      "emptyDescription": "پل ریکویسٹ مباحثے میں کسی تبصرے سے یا ایجنٹ سیشن میں اے آئی جواب سے جمع کرائی گئی رپورٹس اپنے نتیجے کے ساتھ یہاں نظر آئیں گی۔",
+      "couldNotLoad": "آپ کی رپورٹس لوڈ نہیں ہو سکیں",
+      "capped": "آپ کی حالیہ ترین رپورٹس دکھائی جا رہی ہیں۔"
     },
     "changelog": "نیا کیا ہے",
     "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
@@ -507,7 +567,10 @@
     "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
     "changelogAreas": {
       "signIn": "سائن ان",
-      "profileOrganizations": "پروفائل اور تنظیمیں"
+      "profileOrganizations": "پروفائل و تنظیمیں",
+      "chat": "چیٹ",
+      "notifications": "اطلاعات",
+      "integrations": "انٹیگریشنز"
     }
   },
   "preferences": {
@@ -752,6 +815,9 @@
       "couldNotLoadMore": "مزید تبصرے لوڈ نہیں ہو سکے۔",
       "retryLoadingMore": "مزید تبصرے لوڈ کرنے کی دوبارہ کوشش کریں",
       "loadMoreComments": "مزید تبصرے لوڈ کریں",
+      "conversationTruncated": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
+      "conversationTruncated_one": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
+      "conversationTruncated_other": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
       "addReaction": "ردعمل شامل کریں",
       "reactionPill": "{{emoji}} ردعمل، {{displayCount}} {{countLabel}}",
       "reaction_one": "ردعمل",
@@ -881,7 +947,6 @@
       "noAccess": "اس ریپوزٹری کی جانچوں تک آپ کی رسائی نہیں ہے۔",
       "couldNotLoad": "جانچیں لوڈ نہیں ہو سکیں۔",
       "retryChecks": "جانچیں لوڈ کرنے کی دوبارہ کوشش کریں",
-      "viewOnGitHub": "GitHub پر PR دیکھیں",
       "noChecksReported": "کوئی جانچ رپورٹ نہیں ہوئی",
       "passed": "{{displayCount}} کامیاب",
       "passed_one": "{{displayCount}} کامیاب",
@@ -936,9 +1001,9 @@
       "checkFailedTitleGitLab": "GitLab کنکشن چیک نہیں ہو سکا۔",
       "checkFailedTitleBitbucket": "Bitbucket کنکشن چیک نہیں ہو سکا۔",
       "providerCheckFailedMessage": "پرووائیڈر تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-      "reconnectTitle": "GitHub سے دوبارہ رابطہ",
-      "reconnectTitleGitLab": "GitLab سے دوبارہ رابطہ",
-      "reconnectTitleBitbucket": "Bitbucket سے دوبارہ رابطہ",
+      "reconnectTitle": "GitHub کو دوبارہ منسلک کریں",
+      "reconnectTitleGitLab": "GitLab کو دوبارہ منسلک کریں",
+      "reconnectTitleBitbucket": "Bitbucket کو دوبارہ منسلک کریں",
       "reconnectDescription": "آپ کا GitHub کنکشن منسوخ کر دیا گیا ہے۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لیں",
       "gitlabInstanceMismatchTitle": "GitLab کنکشن کسی دوسرے انسٹینس کے لیے ہے",
@@ -946,8 +1011,9 @@
       "checkActiveConnection": "کنکشن فعال ہے، لیکن یہ آئٹم ابھی بھی لوڈ نہیں ہو سکتا۔",
       "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
       "bitbucketOrgOnlyNoOrganizationDescription": "اس اکاؤنٹ کی ابھی تک کوئی تنظیم نہیں ہے۔ ایک تنظیم بنانے یا اس میں شامل ہونے پر آپ Bitbucket پل ریکویسٹس کا جائزہ لے سکتے ہیں۔",
-      "gitlabReconnectAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
+      "reconnectAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
       "bitbucketNotConnectedTitle": "Bitbucket منسلک نہیں ہے",
+      "bitbucketAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے منسلک کرنے کی درخواست کریں۔",
       "adminOnlyConnectDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
       "contextLine": "{{organization}} کے لیے",
       "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
@@ -1160,6 +1226,8 @@
       "emptyTitle": "ابھی تک کوئی اطلاعات نہیں",
       "emptyCategoryTitle": "اس زمرے میں کوئی اطلاعات نہیں",
       "emptyBody": "اس اکاؤنٹ کو موصول ہونے والی اطلاعات یہاں نظر آتی ہیں۔ یہ {{days}} دنوں تک محفوظ رکھی جاتی ہیں۔",
+      "emptyBody_one": "اس اکاؤنٹ کو موصول ہونے والی اطلاعات یہاں نظر آتی ہیں۔ یہ {{days}} دنوں تک محفوظ رکھی جاتی ہیں۔",
+      "emptyBody_other": "اس اکاؤنٹ کو موصول ہونے والی اطلاعات یہاں نظر آتی ہیں۔ یہ {{days}} دنوں تک محفوظ رکھی جاتی ہیں۔",
       "capped": "حالیہ ترین اطلاعات دکھائی جا رہی ہیں۔",
       "loadError": "اطلاعات کی سرگزشت لوڈ نہیں ہو سکی۔",
       "openFailed": "یہ اطلاع اب کہیں نہیں کھلتی۔"
@@ -1240,6 +1308,7 @@
       "manageAccess": "رسائی کا انتظام کریں",
       "bitbucketNoRepositoriesDescription": "اس Bitbucket ورک اسپیس میں کوئی ریپوزٹری دستیاب نہیں ہے۔",
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
+      "githubNoRepositoriesDescription": "چیک کریں کہ Kilo کی GitHub ایپ کو ریپوزٹریوں تک رسائی حاصل ہے، پھر فہرست تازہ کریں۔",
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo کی GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ کروانا چاہتے ہیں۔",
       "repositoryAccess": "ریپوزٹری تک رسائی",
@@ -1269,11 +1338,11 @@
       "couldNotGetLatest": "تازہ ترین معلومات حاصل نہیں ہو سکیں۔",
       "byline": "#{{number}}، مصنف: {{author}}",
       "noFindings": "کوئی مسئلہ نہیں ملا۔",
-      "findingsUnavailable": "اس جائزے کی ناکامی کی وجہ سے نتائج دستیاب نہیں ہیں۔",
+      "findingsUnavailable": "نتائج دستیاب نہیں ہیں۔",
       "findingsInProgress": "یہ جائزہ ابھی جاری ہے۔ مکمل ہونے پر مسائل یہاں نظر آئیں گے۔",
       "findingsEndedWithoutResults": "یہ جائزہ کوئی مسئلہ سامنے لانے سے پہلے ہی ختم ہو گیا۔",
       "serviceUnavailable": "کوڈ کے جائزے کی سروس سے رابطہ نہیں ہو سکا۔ سروس دستیاب ہونے پر جائزے کی دوبارہ کوشش کریں۔",
-      "reviewFailed": "جائزہ ناکام ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
+      "reviewFailed": "جائزہ ناکام ہو گیا۔",
       "showMore": "مزید دکھائیں",
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
@@ -1391,16 +1460,19 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔"
+      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے، اس لیے مالک کو ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کرنی ہوگی۔"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
+      "deniedManagedByOwner": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے {{organization}} کے کسی مالک سے کہیں۔",
+      "deniedConnectRole": "صرف {{organization}} کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+      "deniedReconnectRole": "{{organization}} کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
       "managedOnWebTitle": "ویب پر منظم کیا جاتا ہے",
       "managedOnWebShort": "یہ کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
       "managedOnWebRepositories": "{{organization}} کے لیے ریپوزٹریز کمپیوٹر سے ویب پر منتخب کریں۔",
       "description": "{{organization}} کے لیے ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
       "descriptionReconnect": "{{organization}} کے لیے ورک اسپیس تک رسائی کا نیا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
-      "descriptionOverview": "{{organization}} کے لیے ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے اگلی اسکرین پر چسپاں کریں۔",
+      "descriptionOverview": "ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے اگلی اسکرین پر چسپاں کریں۔",
       "scopes": "اکاؤنٹ: پڑھنے کی اجازت · ریپوزٹریز: پڑھنے اور لکھنے کی اجازت · پل ریکویسٹس: پڑھنے کی اجازت · ویب ہکس: پڑھنے اور لکھنے کی اجازت",
       "tokenPlaceholder": "ورک اسپیس تک رسائی کا ٹوکن",
       "tokenRefused": "Bitbucket نے یہ ورک اسپیس تک رسائی کا ٹوکن قبول نہیں کیا۔ چیک کریں کہ اس میں اوپر دی گئی اجازتیں موجود ہیں، پھر دوبارہ کوشش کریں۔"
@@ -1532,7 +1604,9 @@
       "unavailablePersonallySwitchAction": "تنظیم تبدیل کریں",
       "unavailableOrganizationTitle": "جائزہ کمیٹی کا جائزہ فی الوقت دستیاب نہیں ہے",
       "unavailableForOrganization": "جائزہ کمیٹی کے جائزے کے لیے فعال سبسکرپشن یا آزمائشی دور کے ساتھ انٹرپرائز پلان درکار ہے۔ اس تنظیم کے پاس یہ فی الوقت موجود نہیں ہے۔",
-      "unavailableForOrganizationNeutral": "اس تنظیم کے لیے جائزہ کمیٹی کا جائزہ فی الوقت دستیاب نہیں ہے۔ بعد میں دوبارہ کوشش کریں۔",
+      "unavailablePlanCheck": "جائزہ کمیٹی کا جائزہ اس تنظیم کا پلان چیک نہیں کر سکا۔ دوبارہ کوشش کریں تاکہ دوبارہ چیک کیا جا سکے۔",
+      "unavailableFlagRollout": "اس تنظیم کے لیے جائزہ کمیٹی کا جائزہ ابھی تک دستیاب نہیں ہے۔ اسے حاصل کرنے کے لیے ایپ کو تازہ ترین ورژن میں اپ ڈیٹ کریں۔",
+      "unavailableForOrganizationMember": "جائزہ کمیٹی کے جائزے کے لیے فعال سبسکرپشن یا آزمائشی دور کے ساتھ انٹرپرائز پلان درکار ہے۔ تنظیم کا مالک پلان تبدیل کر سکتا ہے۔",
       "unavailableOnBitbucket": "جائزہ کمیٹی کا جائزہ Bitbucket ریپوزٹریز کے لیے دستیاب نہیں۔",
       "noRepositories": "ابھی کوئی ریپوزٹری منتخب نہیں۔ پہلے ریپوزٹری کی ترتیبات میں ریپوزٹریز منتخب کریں۔",
       "specialists": "ماہرین",
@@ -1843,7 +1917,7 @@
       "couldNotLoadMore": "مزید مسائل لوڈ نہیں ہو سکے۔",
       "noMatchesTitle": "منتخب فلٹرز کے مطابق کوئی مسئلہ نہیں ملا",
       "noMatchesDescription": "منتخب فلٹرز تبدیل کر کے یا ہٹا کر دیکھیں۔",
-      "emptyTitle": "کوئی غیر حل شدہ مسئلہ نہیں",
+      "emptyTitle": "کوئی کھلا مسئلہ نہیں",
       "emptyDescription": "اس وقت کوئی غیر حل شدہ مسئلہ توجہ طلب نہیں ہے۔"
     },
     "findingRow": {
@@ -2034,7 +2108,7 @@
     "remediationUnavailable": {
       "findingNotFound": "سکیورٹی مسئلہ اب موجود نہیں ہے۔",
       "approvalRequired": "خودکار اصلاح کے لیے منظوری درکار ہے۔ منظوری دینے کے لیے اصلاح دستی طور پر شروع کریں۔",
-      "findingNotOpen": "مسئلہ اب غیر حل شدہ حالت میں نہیں ہے۔",
+      "findingNotOpen": "مسئلہ اب کھلا نہیں ہے۔",
       "repoNotInScope": "ریپوزٹری سیکیورٹی ایجنٹ کے لیے منتخب نہیں ہے۔",
       "analysisRequired": "اصلاح شروع کرنے سے پہلے کوڈ بیس کا تجزیہ کریں۔",
       "staleAnalysis": "تجزیے کے بعد مسئلہ تبدیل ہو گیا۔ اصلاح شروع کرنے سے پہلے دوبارہ تجزیہ کریں۔",
@@ -2507,8 +2581,7 @@
       "searchPlaceholder": "ریپوزٹریز کی تلاش",
       "noMatches": "کوئی نتیجہ نہیں ملا",
       "noRepositories": "کوئی ریپوزٹری دستیاب نہیں",
-      "noRepositoriesDescription": "آپ کے اکاؤنٹ سے کوئی ریپوزٹری منسلک نہیں ہے۔",
-      "loading": "لوڈ ہو رہا ہے…",
+      "noRepositoriesDescription": "ریپوزٹریز لوڈ کرنے کے لیے GitHub یا GitLab کو منسلک کریں۔",
       "accessibility": "ریپوزٹری: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3401,7 +3474,7 @@
       "manageOnWeb": "ویب پر بلنگ سیٹنگز",
       "changePlan": "پلان تبدیل کریں",
       "buySeats": "سیٹیں خریدیں",
-      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ ویب پر منظم کیے جاتے ہیں۔",
+      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ kilo.ai پر منظم کیے جاتے ہیں۔",
       "setupAutoTopUp": "خودکار ٹاپ اپ سیٹ اپ کریں",
       "manageAutoTopUp": "خودکار ٹاپ اپ کا انتظام کریں",
       "opensOnWeb": "ویب پر کھلتا ہے"
@@ -3583,13 +3656,14 @@
       "identifierLabel": "شناخت کنندہ",
       "identifierRequired": "شناخت کنندہ درج کریں۔",
       "identifierTaken": "ایک اور موڈ پہلے ہی یہ شناخت کنندہ استعمال کرتا ہے۔",
+      "identifierTooLong": "شناخت کنندہ کو {{max}} حروف یا اس سے کم تک رکھیں۔",
       "nameLabel": "موڈ کا نام",
       "nameRequired": "موڈ کا نام درج کریں۔",
       "notFound": "یہ موڈ اب موجود نہیں ہے۔",
-      "restrictionHint": "صرف وہ فائلیں ترمیم کی جا سکتی ہیں جو اس پیٹرن سے مطابقت رکھتی ہوں۔ ہر فائل کی اجازت کے لیے اسے خالی چھوڑیں۔",
-      "restrictionInvalid": "درست پیٹرن درج کریں۔",
+      "restrictionHint": "ریگولر ایکسپریشن منتخب کرتا ہے کہ یہ موڈ کن فائلوں میں ترمیم کر سکتا ہے، مثلاً صرف markdown فائلوں کے لیے `\\.md$`۔ ہر فائل کی اجازت کے لیے اسے خالی چھوڑیں۔",
+      "restrictionInvalid": "درست ریگولر ایکسپریشن درج کریں۔",
       "restrictionLabel": "پابندی کا لیبل",
-      "restrictionPattern": "فائل پیٹرن",
+      "restrictionPattern": "فائل کی پابندی",
       "roleLabel": "کردار کی تعریف",
       "roleRequired": "بیان کریں کہ یہ موڈ کیا کرتا ہے۔",
       "tool": {
@@ -3673,7 +3747,7 @@
     "emailDeliveryFailed": "ای میل کی ترسیل فی الحال دستیاب نہیں ہے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "admissionRequired": "آپ کی ڈیوائس کی تصدیق نہیں ہو سکتی۔ کسی دوسری ڈیوائس پر یا ویب کے ذریعے سائن ان کرنے کے لیے '$t(login.moreSignInOptions)' استعمال کریں۔",
     "default": "کوئی خرابی پیش آ گئی۔ دوبارہ کوشش کریں۔",
-    "retryableAdmission": "ہم اس ڈیوائس کی تصدیق نہیں کر سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+    "retryableAdmission": "اس ڈیوائس کی تصدیق نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
     "startSignInFailed": "سائن ان شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "couldNotOpenBrowser": "براؤزر نہیں کھل سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "signInTimedOut": "سائن ان کا وقت ختم ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -3745,6 +3819,34 @@
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
     "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "countNoun": {
+      "needsInput_one": "ان پٹ درکار",
+      "needsInput_other": "ان پٹ درکار",
+      "running_one": "کام جاری ہے",
+      "running_other": "کام جاری ہے",
+      "scheduled_one": "شیڈول شدہ",
+      "scheduled_other": "شیڈول شدہ",
+      "idle_one": "فارغ",
+      "idle_other": "فارغ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ان پٹ درکار",
+      "needsInput_other": "{{displayCount}} ان پٹ درکار",
+      "running_one": "{{displayCount}} کام جاری ہے",
+      "running_other": "{{displayCount}} کام جاری ہے",
+      "scheduled_one": "{{displayCount}} شیڈول شدہ",
+      "scheduled_other": "{{displayCount}} شیڈول شدہ",
+      "idle_one": "{{displayCount}} فارغ",
+      "idle_other": "{{displayCount}} فارغ"
+    },
+    "footer": {
+      "checked": "آخری تصدیق {{time}}",
+      "lastKnown": "آخری معلوم حالت · {{time}}"
+    },
+    "wake": {
+      "nextRun": "اگلا اجرا {{time}}",
+      "wasDue": "متوقع تھا {{time}}"
+    },
     "step": {
       "editing": "ترمیم",
       "reading": "پڑھ رہا ہے",
@@ -3990,7 +4092,8 @@
         "space": "اس ماڈل کے لیے کافی خالی اسٹوریج نہیں ہے۔ جگہ خالی کریں اور دوبارہ کوشش کریں۔",
         "network": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
         "invalidFile": "ڈاؤن لوڈ شدہ فائل ایسا ماڈل نہیں ہے جو یہ ایپ چلا سکے، اس لیے اسے ہٹا دیا گیا۔",
-        "checksum": "ڈاؤن لوڈ شدہ فائل اپنے شائع شدہ چیک سم سے مطابقت نہیں رکھتی، اس لیے اسے ہٹا دیا گیا۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔"
+        "checksum": "ڈاؤن لوڈ شدہ فائل اپنے شائع شدہ چیک سم سے مطابقت نہیں رکھتی، اس لیے اسے ہٹا دیا گیا۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔",
+        "writeFailed": "یہ ڈیوائس ماڈل محفوظ نہیں کر سکی۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔"
       }
     },
     "catalog": {
@@ -4168,7 +4271,7 @@
     "personalDefaultDescription": "جب کسی ریپوزٹری میں پن شدہ پروفائل نہ ہو تو خودکار طور پر لوڈ ہوتا ہے۔",
     "organizationDefaultDescription": "ان اراکین کے لیے خودکار طور پر لوڈ کیا گیا جن کا کوئی ذاتی ڈیفالٹ نہیں ہے۔",
     "setAsDefault": "بطور ڈیفالٹ سیٹ کریں۔",
-    "saveFailed": "پروفائل محفوظ نہیں ہو سکا",
+    "saveFailed": "پروفائل کو محفوظ نہیں کیا جا سکا۔ دوبارہ کوشش کریں۔",
     "organizationRoleRequired": "صرف تنظیم کے مالک اور منتظم تنظیم کی پروفائل بدل سکتے ہیں۔",
     "deleteTitle": "پروفائل حذف کریں۔",
     "deleteMessage": "یہ پروفائل اور اس کی ترتیبات کو مستقل طور پر ہٹا دیتا ہے۔ اسے کالعدم نہیں کیا جا سکتا۔",
@@ -4317,6 +4420,7 @@
       "promptPlaceholder": "آپ ایک…",
       "tools": "اوزار",
       "wholeToolRule": "یہ ایجنٹ بیک وقت ہر اوزار پر ایک اصول لاگو کرتا ہے: {{rule}}۔ یہ سوئچز صرف پڑھنے کے لیے ہیں۔",
+      "toolRule": "محفوظ اصول: {{rule}}",
       "visibility": "مرئیت",
       "visibilityPrimary": "پرائمری — چننے والے میں دکھایا گیا ہے۔",
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
@@ -4426,19 +4530,34 @@
       "deductionFallback": "کریڈٹ کی کٹوتی",
       "emptyDescription": "کریڈٹ کی خریداریاں، رسیدیں اور استعمال یہاں نظر آئیں گے۔",
       "emptyTitle": "کریڈٹ کی کوئی تاریخچہ نہیں",
+      "expiredGrant": "میعاد ختم ہو گئی: {{description}}",
       "googlePlayReceipt": "Google Play کی رسید",
       "kind": {
         "adjustment": "ترمیم",
         "balanceNeutral": "بیلنس پر اثر نہیں",
         "deduction": "کٹوتی",
         "grant": "مفت کریڈٹ",
+        "promotionalCredits": "پروموشنل کریڈٹس",
+        "welcomeCredits": "خوش آمدید کریڈٹ",
         "purchase": "خریداری"
+      },
+      "program": {
+        "adminBulkGrant": "منتظم کا کریڈٹ عطیہ",
+        "contributorChampion": "شراکت دار چیمپئن کریڈٹ",
+        "feedback": "رائے کا کریڈٹ",
+        "influencer": "انفلوئنسر کریڈٹ",
+        "ossMonthlyReset": "اوپن سورس کریڈٹس کا ماہانہ ری سیٹ",
+        "ossSponsorship": "اوپن سورس کفالت کا کریڈٹ",
+        "pullRequest": "پل ریکویسٹ کریڈٹ",
+        "usageIssue": "استعمال کے مسئلے کا کریڈٹ",
+        "vibeDay": "Vibe Day کریڈٹ"
       },
       "purchaseFallback": "کریڈٹ کی خریداری",
       "receipt": "رسید",
       "receiptA11y": "{{description}}، {{amount}}، {{date}} کی رسید کھولیں",
       "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔",
-      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔"
+      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔",
+      "voidedGrant": "منسوخ: {{description}}"
     },
     "title": "کریڈٹس خریدیں",
     "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",
@@ -4687,6 +4806,8 @@
     "connectedTo": "{{account}} سے منسلک",
     "disconnected": "{{provider}} منقطع ہو گیا",
     "disconnectFailed": "{{provider}} کو منقطع نہیں کیا جا سکا",
+    "disconnectRetry": "Slack منقطع ہونے کی تصدیق نہیں کر سکا۔ دوبارہ کوشش کریں۔",
+    "disconnectNeedsSupport": "Kilo اس کنکشن کے لیے محفوظ Slack رسائی نہیں پڑھ سکا۔ منقطع کرنے کا عمل مکمل کرنے کے لیے معاونت کی ٹیم سے رابطہ کریں۔",
     "couldNotLoad": "انٹیگریشنز لوڈ نہیں ہو سکیں",
     "permissionDenied": "آپ کو ان انٹیگریشنز کا انتظام کرنے کی اجازت نہیں ہے۔",
     "managedByOwner": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے تنظیم کے کسی مالک سے کہیں۔",
@@ -4772,6 +4893,9 @@
       "runAsCreator": "میرے طور پر چلائیں",
       "runAsCreatorDescription": "ہر رن آپ کے اکاؤنٹ سے ہوتا ہے، اس لیے سیکرٹ ہیڈر لازمی ہے۔",
       "saveFailedTitle": "ٹرگر محفوظ نہیں ہو سکا",
+      "nameTaken": "“{{name}}” نام کا ٹرگر پہلے سے موجود ہے۔",
+      "saveFailedRetry": "سرور سے رابطہ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "saveFailedCheck": "فارم میں درج ویلیوز چیک کریں اور دوبارہ کوشش کریں۔",
       "deleteTitle": "یہ ٹرگر حذف کریں؟",
       "deleteMessage": "{{name}} کو کی جانے والی کالیں ناکام ہوں گی۔ اسے واپس نہیں کیا جا سکتا۔",
       "deleteMessageScheduled": "{{name}} ٹرگر کے شیڈول شدہ رنز رک جائیں گے۔ اسے واپس نہیں کیا جا سکتا۔",
@@ -4853,12 +4977,15 @@
     "inputDescription": "Enkrypt AI کے ساتھ ہر ان پٹ اسکین کرتا ہے، بشمول ٹول کے نتائج۔ جب Enkrypt دستیاب نہ ہو تو درخواستیں مسترد کیے جانے کے بجائے اسکین کیے بغیر بھیج دی جاتی ہیں۔",
     "outputTitle": "آؤٹ پٹ گارڈ ریلز",
     "outputDescription": "اراکین کو ملنے سے پہلے Enkrypt AI کے ساتھ جوابات اسکین کرتا ہے۔ جب تک آپ اسے آن نہ کریں یہ بند رہتا ہے۔",
+    "outputUnavailable": "Kilo نے اس تنظیم کے لیے آؤٹ پٹ اسکیننگ فعال نہیں کی، اس لیے جوابات کی جانچ نہیں ہوتی اور یہاں مقرر کرنے کے لیے کچھ نہیں ہے۔ اس کی درخواست کے لیے {{supportEmail}} سے رابطہ کریں۔",
     "detectorsHint": "بلاک نشان زدہ درخواست مسترد کرتا ہے۔ صرف لاگ کرنا درخواست میں تاخیر کیے بغیر اسے ریکارڈ کرتا ہے۔",
     "detectorsHintOutput": "بلاک نشان زدہ جواب کو ناکام کرتا ہے۔ صرف لاگ کرنا جواب میں تاخیر کیے بغیر اسے ریکارڈ کرتا ہے۔",
     "choiceLog": "صرف لاگ",
     "applyTo": "کس پر لاگو کریں",
     "applyToAllMembers": "تمام اراکین",
     "applyKiloDefault": "Kilo ڈیفالٹ لاگو کریں",
+    "applyKiloDefaultEnglishNote": "Kilo کی ڈیفالٹ پالیسی کا متن انگریزی میں ہے، کیونکہ Kilo Gateway اسے بالکل ویسے ہی لاگو کرتا ہے جیسے لکھا گیا ہے۔",
+    "applyKiloDefaultReplaceMessage": "Kilo کی ڈیفالٹ پالیسی انگریزی میں لکھی گئی ہے اور پالیسی کی خلاف ورزی میں آپ کا مقرر کردہ بدل دیتی ہے۔ پالیسی متن والے خانے میں آپ کا درج کردہ متن واپس نہیں لایا جا سکتا۔",
     "invalidSavedTitle": "محفوظ شدہ ان پٹ ڈیٹیکٹر کی ترتیبات پڑھی نہیں جا سکتیں",
     "invalidSavedBody": "جب تک ان پٹ ڈیٹیکٹرز دوبارہ محفوظ نہ ہوں درخواستیں بلاک رہتی ہیں۔ نیچے دیے گئے ڈیٹیکٹرز Kilo ڈیفالٹ سے شروع ہوتے ہیں۔",
     "invalidSavedOutputTitle": "محفوظ شدہ آؤٹ پٹ ڈیٹیکٹر کی ترتیبات پڑھی نہیں جا سکتیں",
@@ -4994,6 +5121,7 @@
     "providersNeedCatalog": "مکمل ماڈل کیٹلاگ لوڈ ہونے تک پرووائیڈر سوئچز صرف پڑھنے کے لیے رہیں گے۔ انہیں تبدیل کرنے کے لیے اوپر دوبارہ کوشش کریں پر ٹیپ کریں۔",
     "providersEmpty": "اس تلاش سے کوئی پرووائیڈر مطابقت نہیں رکھتا۔",
     "providersNone": "اس تنظیم کے لیے کوئی پرووائیڈر دستیاب نہیں ہے۔",
+    "providersUnavailable": "پرووائیڈر کی فہرست لوڈ نہیں ہو سکی۔",
     "allowAllShown": "دکھائے گئے سب کی اجازت دیں",
     "denyAllShown": "دکھائے گئے سب کو مسترد کریں",
     "gatewaysDescription": "Kilo ماڈل کی درخواستیں Vercel AI Gateway یا OpenRouter کے ذریعے روٹ کرتا ہے۔ غیر فعال گیٹ وے ان درخواستوں کو ناکام کر دیتا ہے۔",
@@ -5012,6 +5140,20 @@
       "eu": "یورپی یونین",
       "au": "آسٹریلیا",
       "jp": "جاپان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ترجیحات کی تلاش",
+    "noMatches": "مماثل ترجیحات نہیں ملیں",
+    "emptyDescription": "کسی اور ترجیح کے نام یا کلیدی لفظ سے تلاش کریں۔",
+    "resultsStatus": "ملنے والی ترجیحات: {{resultCount}}",
+    "keywords": {
+      "signOut": "سائن آؤٹ|لاگ آؤٹ",
+      "appearance": "تھیم|رنگ|ظاہری شکل",
+      "appUnlock": "بایومیٹرکس|چہرے کی شناخت|انگلی کا نشان",
+      "language": "زبان|ترجمہ",
+      "notifications": "اطلاعات|الرٹس|نوٹیفکیشن",
+      "privacy": "تجزیات|ٹریکنگ|رازداری"
     }
   }
 }

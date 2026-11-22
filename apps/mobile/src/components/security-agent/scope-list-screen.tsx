@@ -1,5 +1,4 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
-import { useQuery } from '@tanstack/react-query';
 import { Building2, User } from '@/components/ui/icons';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -10,27 +9,25 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import { classifyReadFailureKind, readFailureKindVariant } from '@/lib/query/read-failure-variant';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { useTRPC } from '@/lib/trpc';
 
 // Diverges from the Code Reviewer scope list: current server policy allows
 // org members to operate Security Agent, so members are not labeled "View only".
 export function ScopeListScreen() {
   const pushOnce = useSinglePushRoute();
-  const trpc = useTRPC();
   const { t } = useTranslation();
-  const {
-    data: orgs,
-    isError,
-    isFetching,
-    fetchStatus,
-    refetch,
-  } = useQuery(trpc.organizations.list.queryOptions());
-  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  // The membership read comes through the hook that owns the shared entry's
+  // options. A second observer with defaulted options would replace those
+  // options while this screen is mounted and leave every other consumer's read
+  // paused with no data.
+  const { data: orgs, error, isError, isFetching, fetchStatus, refetch } = useOrganizationsList();
+  const connectivity = useCommittedConnectivityStatus();
 
   const openScope = (scope: string) => {
     pushOnce(getSecurityAgentPath(scope));
@@ -38,17 +35,27 @@ export function ScopeListScreen() {
 
   // An org-list failure only degrades the organization section — the
   // Personal scope doesn't depend on it and must stay reachable. Only a
-  // delivered read may say which organizations exist: a failed read, or one
-  // paused by lost connectivity, delivered nothing and names its cause with
-  // Retry instead of silently dropping the section.
+  // delivered read may say which organizations exist, so a failed read names
+  // its cause with Retry instead of silently dropping the section.
   const orgsBody = classifyListBody({
     rowCount: orgs?.length ?? 0,
     hasDeliveredData: orgs !== undefined,
     isError: isError && orgs === undefined,
     isFetching,
     fetchStatus,
-    connectivityKnown,
+    connectivityKnown: connectivity !== 'unknown',
   });
+  // The read settles instead of pausing, so `classifyListBody` can no longer
+  // reach its paused cause here: the failure's own cause decides the copy. The
+  // kind orders a control-plane deadline first, then the connection, so a
+  // slow-but-reachable server never reads as an unreachable one.
+  const failureVariant = readFailureKindVariant(
+    classifyReadFailureKind({
+      errors: error ? [error] : [],
+      isPaused: false,
+      connectivity,
+    })
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -88,7 +95,7 @@ export function ScopeListScreen() {
         {orgsBody.status === 'error' ? (
           <QueryError
             placement="top"
-            variant={orgsBody.cause === 'offline' ? 'offline' : 'server'}
+            variant={failureVariant}
             title={t('common.couldNotLoadOrganizations')}
             onRetry={() => void refetch()}
             isRetrying={orgsBody.isRetrying}

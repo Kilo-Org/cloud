@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nytt sikkerhetsfunn ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritisk",
+      "high": "Høy",
+      "medium": "Middels",
+      "low": "Lav"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA-advarsel"
     },

@@ -131,6 +131,7 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
     getOnDraftChange: () => getOnDraftChangeRef.current,
     getOwner: () => owner,
     getUserId: () => getUserIdRef.current,
+    isOwnerAlive: () => ownerAliveRef.current,
     openTranscriptionModelPicker,
   });
   const actions = actionsRef.current;

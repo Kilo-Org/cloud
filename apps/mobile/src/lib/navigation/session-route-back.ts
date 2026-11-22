@@ -2,7 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { BackHandler } from 'react-native';
 
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { useBackToAgentsSessions } from '@/lib/navigation/back-to-agents-sessions';
 
 /**
  * System Back on the agent-chat session route.
@@ -15,22 +15,24 @@ import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
  * stack's only screen — the navigator has nothing to pop, and Android's default
  * Back leaves the app. The header's own back control already falls back to the
  * sessions list for that case (`backFallback`), and system Back must answer the
- * same way, so it navigates there and consumes the press.
+ * same way, so it navigates there through the same exit rule the failed
+ * session's own cards use, and consumes the press.
  */
 export function useSessionRouteBack(): void {
   const router = useRouter();
+  const backToSessions = useBackToAgentsSessions();
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
         if (router.canGoBack()) {
           return false;
         }
-        router.dismissTo(AGENTS_SESSIONS_HREF);
+        backToSessions();
         return true;
       });
       return () => {
         subscription.remove();
       };
-    }, [router])
+    }, [backToSessions, router])
   );
 }

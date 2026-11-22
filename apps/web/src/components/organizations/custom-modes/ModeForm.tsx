@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import type { OrganizationMode } from '@/lib/organizations/organization-modes';
 import type { EditGroupConfig } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { Save, FileText } from 'lucide-react';
 import { useModeTemplates } from './useModeTemplates';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
@@ -24,7 +25,7 @@ import {
   isOrganizationAutoTargetModel,
   isOrganizationCustomRouterTarget,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
-import { modeSlugFromName } from '@kilocode/app-shared/organizations';
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },
@@ -40,11 +41,11 @@ const modeFormSchema = z.object({
   name: z
     .string()
     .min(1, 'Mode name is required')
-    .max(100, 'Mode name must be less than 100 characters'),
+    .max(100, 'Mode name must be 100 characters or fewer'),
   slug: z
     .string()
     .min(1, 'Mode slug is required')
-    .max(50, 'Mode slug must be less than 50 characters')
+    .max(MODE_SLUG_MAX_LENGTH, `Mode slug must be ${MODE_SLUG_MAX_LENGTH} characters or fewer`)
     .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens'),
   roleDefinition: z.string().min(1, 'Role definition is required'),
   description: z.string().optional(),
@@ -559,8 +560,10 @@ export function ModeForm({
                       <SelectItem key={model.id} value={model.id}>
                         <div className="flex flex-col">
                           <span className="font-mono text-sm">{model.id}</span>
-                          {model.name !== model.id && (
-                            <span className="text-muted-foreground text-xs">{model.name}</span>
+                          {modelNameWithRetirement(model) !== model.id && (
+                            <span className="text-muted-foreground text-xs">
+                              {modelNameWithRetirement(model)}
+                            </span>
                           )}
                         </div>
                       </SelectItem>

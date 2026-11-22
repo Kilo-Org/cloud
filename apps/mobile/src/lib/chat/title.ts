@@ -17,6 +17,40 @@ import { segmenter } from '@/lib/intl-cache';
  */
 export const DERIVED_CHAT_TEXT_MAX_LENGTH = 80;
 
+/**
+ * How many code units of a stored message a derived label is read from.
+ *
+ * A label is at most {@link DERIVED_CHAT_TEXT_MAX_LENGTH} characters, so the
+ * derivation reads at most this much of the message and costs the label rather
+ * than a long body. A message no longer than the window is read whole; a
+ * longer one is labelled from its start, at most one code unit past this many
+ * when the cut falls inside a surrogate pair (see {@link windowStart}).
+ */
+export const DERIVED_CHAT_TEXT_SOURCE_WINDOW = 4096;
+
+/**
+ * The start of `text`, cut at the window.
+ *
+ * The cut is widened by one code unit when it would land between the two halves
+ * of a surrogate pair, so the lexer never receives an unpaired half. Cutting
+ * through one would turn a digit outside the BMP at the window edge into the
+ * replacement character, which the 80-character cut guards against in the
+ * label itself.
+ */
+function windowStart(text: string): string {
+  if (text.length <= DERIVED_CHAT_TEXT_SOURCE_WINDOW) {
+    return text;
+  }
+  const cut = text.slice(0, DERIVED_CHAT_TEXT_SOURCE_WINDOW);
+  // A lone high surrogate at the end of the cut is the first half of a pair the
+  // cut split; take the second half with it. With the `u` flag the class matches
+  // only a half with no partner, never a complete pair.
+  if (/[\uD800-\uDBFF]$/u.test(cut)) {
+    return text.slice(0, DERIVED_CHAT_TEXT_SOURCE_WINDOW + 1);
+  }
+  return cut;
+}
+
 const ELLIPSIS = '…';
 
 /**
@@ -29,7 +63,9 @@ const ELLIPSIS = '…';
  * quote contributes the text of its children, never its own `#`, `-`, or `>`.
  *
  * The lexer is the transcript renderer's memoized one, so deriving a title for
- * a message already on screen reuses the tokens that draw it.
+ * a message already on screen reuses the tokens that draw it. This function
+ * lexes whatever it is given: the caller bounds the source first, so the lexer
+ * never sees more of a long message than the caller's window.
  */
 function chatPlainText(text: string): string {
   return markedTokensText(lexMarkdown(text), ' ');
@@ -112,15 +148,22 @@ function markedTokenText(token: MarkedToken): string {
 }
 
 /**
- * A message reduced to one short line: inline markdown is reduced to the text
+ * A message reduced to one short line derived from its start, at most
+ * {@link DERIVED_CHAT_TEXT_SOURCE_WINDOW} code units of it (one more when the
+ * window ends inside a surrogate pair): inline markdown is reduced to the text
  * it wraps, whitespace runs (line breaks included) collapse to single spaces,
  * the ends are trimmed, and a line longer than
  * {@link DERIVED_CHAT_TEXT_MAX_LENGTH} characters is cut short at that cap with
  * a trailing ellipsis. A line that fits keeps its characters: the ellipsis
  * means a cut happened, never that the cap was counted in a different unit.
+ *
+ * The source is bounded before it is read, so the cost of a label is the label
+ * rather than the length of the stored message; a message longer than the
+ * window is labelled from the start of its body, and the rest is never read.
  */
 export function derivedChatText(text: string): string {
-  const oneLine = chatPlainText(text).replaceAll(/\s+/gu, ' ').trim();
+  const source = windowStart(text);
+  const oneLine = chatPlainText(source).replaceAll(/\s+/gu, ' ').trim();
   // A string no longer than the cap in code units holds no more characters
   // than that, so the common short message never reaches the segmenter.
   if (oneLine.length <= DERIVED_CHAT_TEXT_MAX_LENGTH) {

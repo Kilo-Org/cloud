@@ -1,5 +1,7 @@
 import {
   canReuseDownloadCodeChallenge,
+  findActiveExport,
+  findReadyExport,
   getDisplayStatus,
   getRefetchInterval,
   hasActiveExports,
@@ -126,5 +128,71 @@ describe('active export detection and polling', () => {
       })
     ).toBe(false);
     expect(getRefetchInterval(undefined)).toBe(false);
+  });
+});
+
+describe('per-subject export lookup', () => {
+  const now = new Date('2026-08-05T12:00:00.000Z');
+
+  const personal = (overrides: Partial<UserExport> = {}) =>
+    makeUserExport({ id: 'personal', subjectType: 'user', organizationId: null, ...overrides });
+  const organization = (organizationId: string, overrides: Partial<UserExport> = {}) =>
+    makeUserExport({
+      id: `org-${organizationId}`,
+      subjectType: 'organization',
+      organizationId,
+      ...overrides,
+    });
+
+  // One subject rule decides both lookups, so an active export of one subject
+  // must never disable or hide the other.
+  it('matches an active export only for its own subject', () => {
+    const records = [
+      organization('org-a', { status: 'processing' }),
+      personal({ status: 'queued' }),
+    ];
+
+    expect(findActiveExport(records, null)?.id).toBe('personal');
+    expect(findActiveExport(records, 'org-a')?.id).toBe('org-org-a');
+    expect(findActiveExport(records, 'org-b')).toBeUndefined();
+  });
+
+  it('matches a ready export only for its own subject', () => {
+    const records = [
+      organization('org-a', { status: 'ready', expiresAt: '2026-09-01T00:00:00.000Z' }),
+      personal({ status: 'ready', expiresAt: '2026-09-01T00:00:00.000Z' }),
+    ];
+
+    expect(findReadyExport(records, null, now)?.id).toBe('personal');
+    expect(findReadyExport(records, 'org-a', now)?.id).toBe('org-org-a');
+    expect(findReadyExport(records, 'org-b', now)).toBeUndefined();
+  });
+
+  it('does not treat a personal export as an organization export', () => {
+    const records = [personal({ status: 'processing' })];
+
+    expect(findActiveExport(records, 'org-a')).toBeUndefined();
+    expect(findReadyExport(records, 'org-a', now)).toBeUndefined();
+  });
+
+  it('applies its own status test for each subject', () => {
+    const records = [
+      organization('org-a', { status: 'ready', expiresAt: '2026-09-01T00:00:00.000Z' }),
+      personal({ status: 'processing' }),
+    ];
+
+    // The organization export is ready but not active; the personal one is
+    // active but not ready. Neither finder may borrow the other's status.
+    expect(findActiveExport(records, 'org-a')).toBeUndefined();
+    expect(findReadyExport(records, null, now)).toBeUndefined();
+    expect(findActiveExport(records, null)?.id).toBe('personal');
+    expect(findReadyExport(records, 'org-a', now)?.id).toBe('org-org-a');
+  });
+
+  it('returns undefined for an empty or missing list', () => {
+    expect(findActiveExport([], null)).toBeUndefined();
+    expect(findReadyExport([], null, now)).toBeUndefined();
+    expect(findActiveExport(null, 'org-a')).toBeUndefined();
+    expect(findReadyExport(undefined, null, now)).toBeUndefined();
   });
 });

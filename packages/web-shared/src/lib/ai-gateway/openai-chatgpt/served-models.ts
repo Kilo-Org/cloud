@@ -1,11 +1,11 @@
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
+  fetchMetadata,
   readStoredMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import { FAILURE_BACKOFF_MS } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
+import { OPENAI_CHATGPT_API_URL, readOpenAiChatGptPartnerKey } from './upstream';
 
 /**
  * Which models the partner project can actually serve.
@@ -83,35 +83,38 @@ function parseServedModelIds(body: unknown): Set<string> {
   return ids;
 }
 
+/**
+ * The metadata-cache cron refreshes this source and `isOpenAiModelServed` reads
+ * its stored row and refetches it on the request path. The descriptor is shared,
+ * so it keeps `fetchMetadata`'s own batch timeout; the request path passes its
+ * shorter `REQUEST_TIMEOUT_MS` deadline per call, and `AbortSignal.any` keeps
+ * whichever bound is tighter.
+ */
 export const openAiServedModelsMetadataSource: MetadataSource<Set<string>> = {
   url: MODELS_URL,
-  headers: () => ({ authorization: `Bearer ${getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV)}` }),
+  // The same trimmed read the gate uses, so a whitespace-padded value cannot
+  // pass the gate and then be sent as a broken bearer credential.
+  headers: () => ({ authorization: `Bearer ${readOpenAiChatGptPartnerKey() ?? ''}` }),
   parse: parseServedModelIds,
 };
 
-async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
+async function fetchServedModelIds(): Promise<Set<string> | null> {
   const stored = await readStoredMetadata(openAiServedModelsMetadataSource, readDb);
   if (stored) return stored;
 
   try {
-    const response = await fetch(MODELS_URL, {
-      // Bypass Next's data cache: it would otherwise keep answering with the body
-      // it already stored for `CACHE_TTL_SECONDS`, so the short failure window
-      // could only repeat an unusable answer instead of asking the project again.
-      cache: 'no-store',
-      headers: { authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
-
-    return readServedModelIds(await response.json());
+    return (
+      await fetchMetadata(openAiServedModelsMetadataSource, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+    ).data;
   } catch {
     return null;
   }
 }
 
 /**
- * True when the project behind `apiKey` can serve `modelId`.
+ * True when the partner project can serve `modelId`.
  *
  * A missing key, a failed request, a 200 without a usable list, or an unreadable
  * body returns true: a transient problem must not hide the route, and the
@@ -119,17 +122,19 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
  * `FAILURE_BACKOFF_MS` so a burst of eligible requests does not each pay the lookup
  * and its timeout, so a bad answer costs the short window and never the hour a
  * good list is reused for. Each lookup reads the list the metadata cache refresh
- * stored, and asks the project directly only when no usable row exists.
+ * stored, and refetches the same descriptor through `fetchMetadata` under
+ * `REQUEST_TIMEOUT_MS` only when no usable row exists; the metadata cache is the
+ * only request path.
  */
-export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
-  if (apiKey.trim().length === 0) return true;
+export async function isOpenAiModelServed(modelId: string): Promise<boolean> {
+  if (readOpenAiChatGptPartnerKey() === null) return true;
 
   if (!cachedModelIds || Date.now() >= cacheExpiresAt) {
     // A recent failure already answered "unknown": fail open without another
     // request until its short TTL passes.
     if (Date.now() < failureExpiresAt) return true;
 
-    inFlight ??= fetchServedModelIds(apiKey)
+    inFlight ??= fetchServedModelIds()
       .then(ids => {
         if (ids) {
           cachedModelIds = ids;

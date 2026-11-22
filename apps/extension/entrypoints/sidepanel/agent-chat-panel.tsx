@@ -1023,9 +1023,15 @@ export const AgentChatPanel = ({
       selectedTabId: conversation?.selectedTabId,
     });
 
+    /*
+     * A retry is a gateway path like a first send, so it uses the same catalog
+     * admission: the conversation's stored model must be in the loaded catalog
+     * for the current identity before a turn starts.
+     */
     if (
       conversation === undefined ||
       runSelectedTabId === undefined ||
+      !isModelInCatalog(conversation.model ?? '') ||
       store.get(runningConversationIdsAtom).includes(conversationId) ||
       store.get(compactingConversationIdsAtom).includes(conversationId)
     ) {

@@ -515,16 +515,47 @@ describe('local agent browser bridge', () => {
     expect(fake.run[1]).toMatchObject({
       agent: { sensitive: [token] },
       arguments: { action: 'new', url: 'https://app.example.com/report.txt' },
+      // The repeat is the model's own call: the step names it, so the runtime keeps driving the tab it opened.
+      step: {
+        arguments: { action: 'new', url: 'https://app.example.com/report.txt' },
+        toolName: 'browser_tabs',
+      },
       tabId: 77,
       toolName: 'browser_tabs',
     });
-    expect(fake.run[1]?.step).toBeUndefined();
     expect(approved).toStrictEqual({
       content: [{ text: 'report.txt: The file was downloaded.', type: 'text' }],
     });
     // The token was redeemed by the repeat: the same token cannot approve a second call.
     expect(tokens.consume(token, binding)).toBe(false);
     expect(tokens.size()).toBe(0);
+  });
+
+  it('binds the model’s own step for browser_tabs new on a session that already has a tab', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    const url = 'https://app.example.com/report.txt';
+
+    await bridge.callTool(CONTROLLER, {
+      arguments: { action: 'new', url },
+      authorized: [{ class: 'navigate', origin: 'https://app.example.com' }],
+      name: 'browser_tabs',
+      sessionHandle: HANDLE,
+    });
+
+    // The runtime runs this as the navigate on the tab it opens; the step is still the call the model made, so a
+    // Refusal names `browser_tabs` and binds the arguments the model can send again.
+    expect(fake.run[0]).toMatchObject({
+      arguments: { action: 'new', url },
+      step: { arguments: { action: 'new', url }, toolName: 'browser_tabs' },
+      tabId: 5,
+      toolName: 'browser_tabs',
+    });
+    // The runtime opens the tab it needs; the bridge never opens one behind its back.
+    expect(fake.ownTabs).toStrictEqual([]);
   });
 
   it('reports the navigation that failed instead of a tab that never loaded', async () => {
@@ -798,6 +829,22 @@ describe('local agent browser bridge', () => {
     await expect(bridge.callTool(CONTROLLER, snapshotParams())).resolves.toStrictEqual({
       content: [{ text: 'No element matches e99.', type: 'text' }],
       isError: true,
+    });
+  });
+
+  it('maps a tool this browser cannot run onto unsupported_in_browser', async () => {
+    const error =
+      'browser_drag is not available in Firefox: this browser exposes no debugger protocol.';
+    const fake = createFakeRuntime({
+      outcome: () => ({ kind: 'unsupported', result: { error, ok: false } }),
+    });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+      message: error,
     });
   });
 

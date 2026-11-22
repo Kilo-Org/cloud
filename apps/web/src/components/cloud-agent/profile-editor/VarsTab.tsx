@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import { cn } from '@/lib/utils';
 import { profileVarKeyError } from '@/lib/profile-var-key';
+import { ProfileNetworkSecrets } from './ProfileNetworkSecrets';
 import type {
   useProfileMutations,
   useCombinedProfileMutations,
@@ -46,7 +47,7 @@ const cleanKey = (raw: string) => {
 export function VarsTab({
   profileId,
   organizationId,
-  vars,
+  vars: allVars,
   mutations,
   readOnly = false,
 }: VarsTabProps) {
@@ -57,6 +58,7 @@ export function VarsTab({
   const [showEditValue, setShowEditValue] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const vars = allVars.filter(row => row.delivery !== 'network');
 
   const startAdding = () => {
     setIsAdding(true);
@@ -198,6 +200,9 @@ export function VarsTab({
         <span className="text-xs font-medium">Environment Variables</span>
       </div>
 
+      <p className="text-muted-foreground text-xs leading-5">
+        Commands can read these values. For an API key or token, use Network secrets.
+      </p>
       {vars.map(varItem => (
         <div
           key={varItem.key}
@@ -211,7 +216,7 @@ export function VarsTab({
                   type={showEditValue ? 'text' : 'password'}
                   value={editingValue}
                   onChange={e => setEditingValue(e.target.value)}
-                  placeholder={varItem.isSecret ? 'Enter new secret value' : 'Value'}
+                  placeholder={varItem.isSecret ? 'Enter new hidden value' : 'Value'}
                   className="pr-10 text-sm"
                   autoComplete="new-password"
                   data-1p-ignore="true"
@@ -331,7 +336,7 @@ export function VarsTab({
                         e.preventDefault();
                       }
                     }}
-                    placeholder={draft.isSecret ? 'Secret value (encrypted)' : 'Value'}
+                    placeholder={draft.isSecret ? 'Hidden value' : 'Value'}
                     className="h-8 pr-8 text-sm pointer-coarse:h-11"
                     autoComplete="new-password"
                     data-1p-ignore="true"
@@ -362,7 +367,12 @@ export function VarsTab({
                       ? 'border-primary/40 text-primary'
                       : 'text-muted-foreground border-input'
                   )}
-                  title={draft.isSecret ? 'Encrypted secret' : 'Plain value — click to encrypt'}
+                  aria-label={draft.isSecret ? 'Hidden value' : 'Visible value — click to hide'}
+                  title={
+                    draft.isSecret
+                      ? 'Hidden after you save it. Commands can still read it.'
+                      : 'Visible value — click to hide'
+                  }
                   disabled={savingKey === '__new__'}
                 >
                   <Lock className="h-3.5 w-3.5" />
@@ -414,6 +424,13 @@ export function VarsTab({
       {vars.length === 0 && !isAdding && (
         <p className="text-muted-foreground py-2 text-center text-sm">No environment variables.</p>
       )}
+      <ProfileNetworkSecrets
+        profileId={profileId}
+        organizationId={organizationId}
+        vars={allVars}
+        mutations={mutations}
+        readOnly={readOnly}
+      />
     </div>
   );
 }

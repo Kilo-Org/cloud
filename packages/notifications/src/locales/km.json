@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "ការរកឃើញសុវត្ថិភាពថ្មី ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "ធ្ងន់ធ្ងរ",
+      "high": "ខ្ពស់",
+      "medium": "មធ្យម",
+      "low": "ទាប"
+    },
     "securityFindingSlaWarning": {
       "title": "ការព្រមាន SLA"
     },

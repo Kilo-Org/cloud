@@ -74,6 +74,7 @@ const emptyOptions = () => ({
   profiles: [],
   isLoading: false,
   isError: false,
+  error: undefined,
   refetch: vi.fn(),
 });
 

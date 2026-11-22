@@ -610,12 +610,17 @@ const snapshotRootFrameId = async (
   }
 };
 
+/**
+ * `mergeRefs` keeps the refs earlier snapshots registered: a find reads the same
+ * tree, and like Playwright MCP a ref stays valid until the next snapshot.
+ */
 const captureScopedSnapshot = async (
   deps: BrowserReadActionDeps,
-  options: BrowserSnapshotCaptureOptions
+  options: BrowserSnapshotCaptureOptions,
+  mergeRefs = false
 ): Promise<BrowserAriaSnapshotCapture> => {
   if (deps.agentScope === undefined) {
-    return captureBrowserAriaSnapshot(deps.session, options);
+    return captureBrowserAriaSnapshot(deps.session, options, { mergeRefs });
   }
 
   const target = options.target ?? '';
@@ -625,7 +630,7 @@ const captureScopedSnapshot = async (
   return captureAgentSnapshotView(deps.session, deps.agentScope, {
     ...(options.depth === undefined ? {} : { depth: options.depth }),
     ...(options.maxLines === undefined ? {} : { maxLines: options.maxLines }),
-    mergeRefs: target !== '',
+    mergeRefs: mergeRefs || target !== '',
     ...(rootFrameId === undefined ? {} : { rootFrameId }),
   });
 };
@@ -842,8 +847,12 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     );
   }
 
-  // A search reads far more of the tree than one snapshot prints: a match past those lines still needs its ref.
-  const capture = await captureScopedSnapshot(deps, { maxLines: MAX_BROWSER_TOOL_FIND_LINES });
+  // A search reads far more of the tree than one snapshot prints: a match past those lines still needs its ref, and its refs merge into the registry whatever the target.
+  const capture = await captureScopedSnapshot(
+    deps,
+    { maxLines: MAX_BROWSER_TOOL_FIND_LINES },
+    true
+  );
   const matches: number[] = [];
 
   for (const [index, line] of capture.lines.entries()) {

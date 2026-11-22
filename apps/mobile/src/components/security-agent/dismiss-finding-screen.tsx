@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the sheet draws the whole-body load, permission, paused and terminal failure states beside the form from one draft */
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
@@ -26,10 +27,7 @@ import {
   isDismissFailureRetryable,
   resolveDismissFailure,
 } from '@/components/security-agent/dismiss-finding-failure';
-import {
-  useRetrySecurityAgentCapability,
-  useSecurityAgentCapability,
-} from '@/lib/hooks/use-security-agent';
+import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import {
   isSecurityTrialRefusal,
@@ -44,7 +42,12 @@ import {
 } from '@/lib/hooks/use-security-findings';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
+import {
+  classifyReadFailureKind,
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 
@@ -63,7 +66,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const findingRetry = useRetrySecurityFinding(scope, findingId);
-  const capabilityRetry = useRetrySecurityAgentCapability(scope);
   const [reason, setReason] = useState<DismissReason | null>(null);
   const commentRef = useRef('');
   const dismissFinding = useDismissSecurityFinding(scope);
@@ -161,10 +163,16 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   if (findingQuery.isError && !findingQuery.data) {
+    // The title names what failed; the variant supplies the cause and next step.
     return (
       <DismissSheetFrame>
         <QueryError
-          message={t('securityAgent.dismiss.couldNotLoad')}
+          variant={classifyReadFailureVariant({
+            errors: [findingQuery.error],
+            isPaused: findingQuery.fetchStatus === 'paused',
+            connectivity,
+          })}
+          title={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
       </DismissSheetFrame>
@@ -172,44 +180,48 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   // A paused first read never reaches the loading gate: name the connection
-  // and offer Retry for whichever read the form waits on. A deliberate retry
-  // above retires the paused promise a plain `refetch` would only join.
+  // and offer Retry. A deliberate retry retires the paused promise a plain
+  // `refetch` would only join. The capability read comes through the hook that
+  // owns the shared organizations options, so it never pauses: it settles into
+  // the failure branch below instead.
   const findingPaused = isReadPausedBeforeData({ ...findingQuery, connectivity });
-  if (findingPaused || isReadPausedBeforeData({ ...capability, connectivity })) {
+  if (findingPaused) {
     return (
       <DismissSheetFrame>
         <QueryError
           variant="offline"
-          message={t(
-            findingPaused
-              ? 'securityAgent.dismiss.couldNotLoad'
-              : 'securityAgent.dismiss.couldNotCheckPermissions'
-          )}
+          message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => {
-            void (findingPaused ? findingRetry.retry() : capabilityRetry.retry());
+            void findingRetry.retry();
           }}
-          isRetrying={findingPaused ? findingRetry.isRetrying : capabilityRetry.isRetrying}
+          isRetrying={findingRetry.isRetrying}
         />
       </DismissSheetFrame>
     );
   }
 
   if (capability.status === 'error') {
+    // The capability read settles instead of pausing, so its own error names
+    // the cause: a failure that never reached the server is the connection's,
+    // and the deadline keeps its own wording.
+    const kind = classifyReadFailureKind({
+      errors: capability.error ? [capability.error] : [],
+      isPaused: false,
+      connectivity,
+    });
     return (
       <DismissSheetFrame>
         <QueryError
+          variant={readFailureKindVariant(kind)}
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
         />
       </DismissSheetFrame>
     );
   }
-  // `capability.isLoading` is `isPending && isFetching`, which stays false for
-  // a read paused with no data — a paused capability read in the unsettled
-  // window would fall through to the cannot-dismiss empty state with no
-  // Retry. `status === 'loading'` is the state the hook models for exactly
-  // that case (settings-overview-screen.tsx gates on it), and it makes the
-  // paused branch above true for both reads.
+  // `capability.isLoading` is `isPending && isFetching`, so the gate reads
+  // `status` instead: the hook reports 'loading' for every capability read
+  // without data, whether it is still in flight or has not started.
   if (
     findingQuery.isLoading ||
     !findingQuery.data ||

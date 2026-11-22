@@ -90,6 +90,7 @@ vi.mock('@/lib/chat/use-chat', async () => {
         chats: state.chats,
         isLoading: false,
         isError: false,
+        isSuccess: true,
         refetch: () => undefined,
         remove: async () => {
           await Promise.resolve();
@@ -107,8 +108,12 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
     models: [{ id: 'm1', name: 'One', isPreferred: true }],
     isLoading: false,
     isError: false,
+    isFetched: true,
     refetch: () => undefined,
   }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#fff', mutedForeground: '#6F6A61' }),

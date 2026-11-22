@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the picker draws its rows, the mode choice, and every read state (loading, paused, failed, empty) from one screen; splitting would re-encode the same hooks */
 import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
@@ -9,13 +10,17 @@ import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useStyleSideInsets } from '@/lib/screen-insets';
 
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
-import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
+import {
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+} from '@/lib/query/read-failure-variant';
 import { OrphanedFindingsCard } from '@/components/security-agent/orphaned-findings-card';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
@@ -34,6 +39,9 @@ import {
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import {
+  useRetrySecurityAgentConfig,
+  useRetrySecurityAgentRepositories,
+  useRetrySecurityAgentSettings,
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -73,12 +81,25 @@ function RepositorySettingsSkeleton() {
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  // Only a settled denial disables the controls: a failed or still-unanswered role
+  // read is not evidence that the viewer cannot manage the settings.
+  const readOnly = capability.status === 'denied';
+  // The card's Clear is irreversible, so it opens only on a settled grant: a
+  // role read that is still pending or has failed is not one.
+  const canManageOrphanedFindings = capability.status === 'allowed';
+  const settingsRecovery = useRetrySecurityAgentSettings(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
+  // Both reads can be paused by the online manager, and a refetch on a read
+  // with no data reuses the paused promise. The deliberate attempts reach the
+  // server, so the paused branches below use them and not `refetch()`.
+  const configPausedRetry = useRetrySecurityAgentConfig(scope);
+  const repositoriesPausedRetry = useRetrySecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
   const feedback = useSettingsSaveFeedback();
   const connectivity = useCommittedConnectivityStatus();
+  const capabilityPaused = isReadPausedBeforeData({ ...capability, connectivity });
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -171,27 +192,45 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         <RepoToggleRow
           repo={item}
           selected={selectedIdSet.has(item.id)}
-          disabled={!canManage}
+          disabled={readOnly}
           onPress={() => {
             toggleRepo(item.id);
           }}
         />
       </RowGroupItem>
     ),
-    [selectedIdSet, canManage, repositoryCount, toggleRepo]
+    [selectedIdSet, readOnly, repositoryCount, toggleRepo]
   );
 
   if (config.isError && !config.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <PlatformErrorScreen
         title={t('common.repositories')}
+        errorTitle={t('securityAgent.repositories.couldNotLoad')}
         variant={classifyReadFailureVariant({
           errors: [config.error],
           isPaused: config.fetchStatus === 'paused',
           connectivity,
         })}
-        message={t('securityAgent.repositories.couldNotLoad')}
         onRetry={() => void config.refetch()}
+      />
+    );
+  }
+  // A first config read the online manager paused (connectivity known) can
+  // never finish: the skeleton gate would hold it until connectivity returns.
+  // Name the connection and offer the deliberate retry instead.
+  if (isReadPausedBeforeData({ ...config, connectivity })) {
+    return (
+      <PlatformErrorScreen
+        title={t('common.repositories')}
+        errorTitle={t('securityAgent.repositories.couldNotLoad')}
+        variant="offline"
+        onRetry={() => {
+          void configPausedRetry.retry();
+        }}
+        isRetrying={configPausedRetry.isRetrying}
       />
     );
   }
@@ -208,14 +247,19 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const repositoriesBody = classifyListBody({
     rowCount: repositoryCount,
     hasDeliveredData: repositories.data !== undefined,
-    isError: repositories.isError,
+    // Only a failed read with nothing delivered is a body failure: a delivered
+    // row set keeps the rows and the banner above them.
+    isError: repositories.isError && repositories.data === undefined,
     isFetching: repositories.isFetching,
     fetchStatus: repositories.fetchStatus,
     connectivityKnown: connectivity !== 'unknown',
   });
   const repositoriesFailed =
     repositoriesBody.status === 'error' ||
-    (repositoriesBody.status === 'rows' && repositories.isError);
+    (repositoriesBody.status === 'rows' && repositories.isError) ||
+    // A refetch that failed over a delivered `[]` still has to say so: the
+    // cached empty grant is not evidence that the access is still empty.
+    (repositoriesBody.status === 'empty' && repositories.isError);
   // A settled empty grant leaves nothing to choose between: both modes select
   // from the same empty list, so the pair stays visible (it says what the
   // setting is) but no longer claims a choice the reader cannot make.
@@ -225,9 +269,10 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // nothing accessible there is nothing to select and nothing to sync whichever
   // mode is stored, and widening the app's access is the only way out. Naming it
   // only in `selected` mode left the disabled agent's "Select repositories" row
-  // landing on a screen whose only controls were the two mode choices. Only the
-  // classifier's delivered-empty answer reaches the section in `all` mode, so a
-  // cached `[]` under a failed read cannot render a label with no control.
+  // landing on a screen whose only controls were the two mode choices. Only a
+  // delivered empty answer reaches the section in `all` mode — a cached `[]`
+  // counts as delivered and renders the state with its Manage access control —
+  // so a read that delivered nothing still cannot draw a label with no control.
   const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
 
   // The GitHub settings page is where installation access is widened on the
@@ -252,12 +297,21 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // the rendered order and paddings are unchanged from the ScrollView version.
   const listHeader: ReactNode = (
     <View className="gap-6 px-4 pt-3">
-      {!canManage && (
+      {capability.status === 'error' || capabilityPaused ? (
+        <SettingsRecoveryStatus
+          message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
+          isRetrying={settingsRecovery.isRetrying}
+          onRetry={() => {
+            void settingsRecovery.retry();
+          }}
+        />
+      ) : null}
+      {readOnly && (
         <Text className="text-center text-xs text-muted-foreground">
           {t('securityAgent.sla.permissionNote')}
         </Text>
       )}
-      <OrphanedFindingsCard scope={scope} canManage={canManage} />
+      <OrphanedFindingsCard scope={scope} canManage={canManageOrphanedFindings} />
       <RadioGroup label={t('common.repositories')}>
         <RowGroup>
           {(['all', 'selected'] as const).map(option => (
@@ -267,7 +321,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                 option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
               }
               selected={mode === option}
-              disabled={!canManage || noRepositoriesAvailable}
+              disabled={readOnly || noRepositoriesAvailable}
               onPress={() => {
                 setMode(option);
               }}
@@ -288,15 +342,19 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           )}
           {repositoriesFailed && (
             <QueryError
-              variant={
-                repositoriesBody.status === 'error' && repositoriesBody.cause === 'offline'
-                  ? 'offline'
-                  : 'server'
-              }
+              variant={classifyReadFailureVariant({
+                errors: repositories.error ? [repositories.error] : [],
+                isPaused: repositories.fetchStatus === 'paused',
+                connectivity,
+              })}
               placement="top"
               title={t('common.couldNotLoadRepositories')}
-              onRetry={() => void repositories.refetch()}
-              isRetrying={repositories.isFetching}
+              // `refetch()` reuses a paused read's promise, so only the
+              // deliberate attempt reaches the server.
+              onRetry={() => {
+                void repositoriesPausedRetry.retry();
+              }}
+              isRetrying={repositoriesPausedRetry.isRetrying}
             />
           )}
           {repositoriesBody.status === 'empty' ? (
@@ -323,8 +381,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const listFooter: ReactNode =
     showRepositoryStates &&
-    !repositories.isLoading &&
-    !repositories.isError &&
+    // Keyed on the rows the body shows, so a delivered row set under a failed
+    // refetch keeps the "select at least one" line beside them.
+    repositoriesBody.status === 'rows' &&
     hasRepositories &&
     selectedIds.length === 0 ? (
       <Text className="px-4 pt-3 text-xs text-destructive">
@@ -334,10 +393,12 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   // The ScrollView cannot hold a virtualized list, so the picker's rows live in
   // this FlashList and stop mounting every repository in one commit. Its data
-  // is empty outside selected mode (or while loading / errored), leaving only
-  // the header's states visible.
+  // is the delivered row set whenever the body has one to show — including
+  // under a failed refetch, where the banner rides above the rows — and is
+  // empty only outside selected mode or before a read delivered.
   const listData =
-    showRepositoryStates && !repositories.isLoading && !repositories.isError
+    showRepositoryStates &&
+    (repositoriesBody.status === 'rows' || repositoriesBody.status === 'empty')
       ? (repositories.data ?? [])
       : [];
 
@@ -347,7 +408,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         title={t('common.repositories')}
         onBack={onBack}
         headerRight={
-          canManage ? (
+          readOnly ? undefined : (
             <SettingsSaveButton
               dirty={dirty}
               valid={valid}
@@ -355,7 +416,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               onSave={handleSave}
               skipNextGuardRef={skipNextGuardRef}
             />
-          ) : undefined
+          )
         }
       />
       {feedback.node}

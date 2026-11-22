@@ -60,6 +60,20 @@ vi.mock('@/lib/cloud-triggers/use-cloud-triggers', () => ({
     refetch: vi.fn(),
   }),
 }));
+vi.mock('@/lib/hooks/use-available-models', () => ({
+  // The screen reads the model catalogue for the read-only rows; a mount here
+  // needs no catalogue, so the list stays empty.
+  useAvailableModels: () => ({
+    models: [],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    isFetched: true,
+    hasDeliveredData: true,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));

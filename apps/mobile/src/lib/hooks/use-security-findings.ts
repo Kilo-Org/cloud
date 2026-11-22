@@ -17,6 +17,7 @@ import { useHoistedOperationKey } from '@/lib/operation-key';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { usePausedReadRetry } from '@/lib/query/retry-paused-read';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -96,6 +97,15 @@ export function useRetrySecurityFinding(scope: string, id: string) {
   return usePausedReadRetry(queryKey);
 }
 
+/** Deliberate retry for the one paused analysis read, keyed exactly as below. */
+export function useRetrySecurityAnalysis(scope: string, findingId: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getAnalysis.queryKey({ findingId })
+    : trpc.organizations.securityAgent.getAnalysis.queryKey({ organizationId: scope, findingId });
+  return usePausedReadRetry(queryKey);
+}
+
 const ANALYSIS_POLL_INTERVAL_MS = 3000;
 
 // Poll only while there's something in flight: analysis still running, or a
@@ -163,6 +173,7 @@ export function useDismissSecurityFinding(scope: string) {
   // dismissal's copy follows this reader's role in the organization it acts on.
   const canManageBilling = useCanManageBilling(scope);
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]
     ) => {
@@ -203,6 +214,7 @@ export function useStartSecurityAnalysis(scope: string) {
   const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.startAnalysis.mutate>[0]) =>
       isPersonalSecurityScope(scope)

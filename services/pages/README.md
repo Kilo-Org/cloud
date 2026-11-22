@@ -256,6 +256,7 @@ Plain variables, set in `vars` in `wrangler.jsonc`.
 | `PAGES_KILO_AUDIENCE` | The name the web app holds this deployment under. Sign-in fails unless it is an audience in the web app's `pages-auth-clients.ts` |
 | `PAGES_DEFAULT_PAGE_QUOTA` | How many active Pages one account may hold |
 | `PAGES_CATALOG_INDEX` | Epoch label of the D1 catalog index |
+| `PAGES_SOCIAL_CARD` | Key of the link-preview card in the `pages-dev-assets` bucket, `brand/social-card-<12 hex>.png`. Pages serves it at `/social-card.png?v=<12 hex>` in the tags of `/`, `/connect`, every app route and Page links with no published preview. Without it, Pages serves the card in its package |
 | `NOTEBOOK_CLOUD_OIDC_FLOW` | `server`. Structural: the package names it, and the build checks it |
 | `PAGES_OAUTH_METADATA_EGRESS` | `public-https`. Structural: the package names it, and the build checks it. Tells Pages the Worker fetches client metadata as public Internet traffic, which the `global_fetch_strictly_public` compatibility flag provides. Without it, new metadata authorizations get a 503 |
 | `NOTEBOOK_CLOUD_ANACONDA_API_KEY_*` | Not read while `PAGES_KILO_APP_URL` is set |

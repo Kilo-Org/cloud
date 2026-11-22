@@ -52,6 +52,11 @@ async function readTaggedBody(
   }
 }
 
+/**
+ * Sends once, to the dedicated tagged queue when the cutover switch is exactly `true`, otherwise
+ * to the shared source queue. Tagged usage is never hedged, and a failed send, including a missing
+ * dedicated binding, never falls back to the other queue or a direct write.
+ */
 async function enqueueTaggedUsage(
   env: Env,
   message: TaggedUsageQueueMessage,
@@ -70,7 +75,11 @@ async function enqueueTaggedUsage(
   const sendStartedAt = performance.now();
   let response: unknown;
   try {
-    response = await env.USAGE_INGEST_QUEUE.send(message, { contentType: 'json' });
+    const queue =
+      env.USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED === 'true'
+        ? env.USAGE_INGEST_ENKRYPT_QUEUE
+        : env.USAGE_INGEST_QUEUE;
+    response = await queue.send(message, { contentType: 'json' });
   } catch (error) {
     // The send may still have enqueued. The 503 lets the producer resend the same usage id,
     // which the writer for that kind deduplicates.

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Wiwa aabo tuntun ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Líle jù lọ",
+      "high": "Gíga",
+      "medium": "Alábọ̀ọ́dé",
+      "low": "Kékeré"
+    },
     "securityFindingSlaWarning": {
       "title": "Ikilọ SLA"
     },

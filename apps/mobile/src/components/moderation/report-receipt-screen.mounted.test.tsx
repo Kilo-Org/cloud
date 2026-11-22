@@ -26,12 +26,35 @@ type MutationOptions = {
 
 type AlertButton = { text?: string; onPress?: () => void };
 
-type Receipt = { receiptId: string; triageStatus: string; appealStatus: string };
+type Receipt = {
+  receiptId: string;
+  targetKind: string;
+  reason: string;
+  triageStatus: string;
+  appealStatus: string;
+};
+
+/**
+ * A receipt as `getReportReceipt` answers it: the fields a case does not name
+ * keep what the report server reports for a plain report of an AI response.
+ */
+function receiptState(overrides: Partial<Receipt> = {}): Receipt {
+  return {
+    receiptId: RECEIPT_ID,
+    targetKind: 'message',
+    reason: 'harmful',
+    triageStatus: 'received',
+    appealStatus: 'none',
+    ...overrides,
+  };
+}
 
 type ScreenState = {
   params: Record<string, string>;
   receipt: Receipt;
   error: { data?: { code: string }; message?: string } | undefined;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  connectivity: 'online' | 'offline' | 'unknown';
   mutations: MutationOptions[];
   mutate: Mock;
   alert: Mock;
@@ -43,10 +66,14 @@ const state = vi.hoisted((): ScreenState => ({
   params: { 'receipt-id': '11111111-1111-4111-8111-111111111111' },
   receipt: {
     receiptId: '11111111-1111-4111-8111-111111111111',
+    targetKind: 'message',
+    reason: 'harmful',
     triageStatus: 'received',
     appealStatus: 'none',
   },
   error: undefined as { data?: { code: string }; message?: string } | undefined,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
   alert: vi.fn(),
@@ -75,6 +102,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
       isPending: false,
       isError: state.error !== undefined,
       isFetching: false,
+      fetchStatus: state.fetchStatus,
       error: state.error,
       refetch: vi.fn(),
     }),
@@ -111,8 +139,14 @@ vi.mock('@/components/agents/use-message-copy', () => ({ performCopy: state.perf
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),
 }));
+// The failure face names the connection from the committed connectivity the
+// offline banner paints, so the cases set it instead of a NetInfo subscription.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => state.connectivity,
+}));
 
 const BUTTON = 'Button' as ElementType;
+const QUERY_ERROR = 'QueryError' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -150,8 +184,10 @@ function appealButton(root: ReactTestRenderer['root']) {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.params = { 'receipt-id': RECEIPT_ID };
-  state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'received', appealStatus: 'none' };
+  state.receipt = receiptState({ triageStatus: 'received', appealStatus: 'none' });
   state.error = undefined;
+  state.fetchStatus = 'idle';
+  state.connectivity = 'online';
   state.mutations = [];
   state.mutate.mockClear();
   state.alert.mockClear();
@@ -165,9 +201,14 @@ afterEach(() => {
 });
 
 describe('ReportReceiptScreen', () => {
-  it('shows the receipt id, its triage state and the appeal state', async () => {
+  it('shows the receipt id, what was reported and why, and the outcomes', async () => {
+    state.receipt = receiptState({ targetKind: 'comment', reason: 'harassment' });
     const root = await mount();
 
+    // The report itself comes before the answer to it, right under the id.
+    expect(texts(root)).toEqual(
+      expect.arrayContaining(['Reported item', 'PR comment', 'Reason for report', 'Harassment'])
+    );
     expect(texts(root)).toEqual(expect.arrayContaining([RECEIPT_ID, 'Received', 'None submitted']));
   });
 
@@ -207,7 +248,7 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('asks before appealing, then submits the appeal once', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'none' };
+    state.receipt = receiptState({ triageStatus: 'actioned', appealStatus: 'none' });
     const root = await mount();
 
     const appeal = appealButton(root);
@@ -233,7 +274,7 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('keeps the appeal button hidden once an appeal is in review', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'rejected', appealStatus: 'submitted' };
+    state.receipt = receiptState({ triageStatus: 'rejected', appealStatus: 'submitted' });
     const root = await mount();
 
     expect(texts(root)).toContain('Under review');
@@ -248,14 +289,14 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('states where the outcome of a report under review appears', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'open', appealStatus: 'none' };
+    state.receipt = receiptState({ triageStatus: 'open', appealStatus: 'none' });
     const root = await mount();
 
     expect(texts(root)).toContain(NEXT_STEP_SENTENCES[1]);
   });
 
   it('states where the outcome of a submitted appeal appears', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'rejected', appealStatus: 'submitted' };
+    state.receipt = receiptState({ triageStatus: 'rejected', appealStatus: 'submitted' });
     const root = await mount();
 
     expect(texts(root)).toContain(NEXT_STEP_SENTENCES[2]);
@@ -263,7 +304,7 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('states that an appeal decision is final', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'accepted' };
+    state.receipt = receiptState({ triageStatus: 'actioned', appealStatus: 'accepted' });
     const root = await mount();
 
     expect(texts(root)).toContain(NEXT_STEP_SENTENCES[3]);
@@ -271,7 +312,7 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('states that a declined appeal decision is final', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'rejected' };
+    state.receipt = receiptState({ triageStatus: 'actioned', appealStatus: 'rejected' });
     const root = await mount();
 
     expect(texts(root)).toContain(NEXT_STEP_SENTENCES[3]);
@@ -279,7 +320,7 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('says nothing beyond the appeal button when the appeal is the next step', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'none' };
+    state.receipt = receiptState({ triageStatus: 'actioned', appealStatus: 'none' });
     const root = await mount();
 
     for (const sentence of NEXT_STEP_SENTENCES) {
@@ -289,7 +330,7 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('says nothing about a next step for a status it does not know', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'escalated', appealStatus: 'none' };
+    state.receipt = receiptState({ triageStatus: 'escalated', appealStatus: 'none' });
     const root = await mount();
 
     // The unknown status still renders through the row's fallback, so the silence
@@ -308,14 +349,17 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('keeps a retry for a failure that could pass', async () => {
-    state.error = { message: 'Service unavailable' };
+    state.error = { data: { code: 'INTERNAL_SERVER_ERROR' }, message: 'Service unavailable' };
     const root = await mount();
 
-    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+    const [failure] = root.findAll(node => Object.is(node.type, QUERY_ERROR));
+    expect(failure).toBeDefined();
+    expect(failure?.props.variant).toBe('server');
+    expect(failure?.props.onRetry).toBeTypeOf('function');
   });
 
   it('reports a refused appeal', async () => {
-    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'none' };
+    state.receipt = receiptState({ triageStatus: 'actioned', appealStatus: 'none' });
     await mount();
 
     act(() => {

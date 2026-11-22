@@ -417,6 +417,7 @@
   ],
   "hi": [
     "analysis failed",
+    "block",
     "cancelled",
     "deleted",
     "dismissed",
@@ -1100,6 +1101,7 @@
   ],
   "ta": ["dismissed", "open", "open pull request", "pr opened", "superseded"],
   "te": [
+    "block",
     "cancelled",
     "commit",
     "deleted",
@@ -1107,9 +1109,8 @@
     "open",
     "open pull request",
     "pr opened",
-    "remediation blocked",
+    "search repositories",
     "sign out",
-    "superseded",
     "unknown"
   ],
   "th": ["completed", "no kiloclaw instances", "plan", "receipt"],

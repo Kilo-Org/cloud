@@ -140,10 +140,12 @@
     "keepRunning": "Çalıştırmaya devam et",
     "newSession": "Yeni oturum",
     "noModelsAvailable": "Kullanılabilir model yok",
+    "modelRetires": "Kullanımdan kalkıyor: {{date}}",
     "notFound": "Bulunamadı.",
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "viewOnGitHub": "PR'ı GitHub'da görüntüle",
     "completed": "Tamamlandı",
     "pending": "Bekliyor",
     "running": "Çalışıyor",
@@ -183,7 +185,31 @@
     "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
     "privateRepositoryA11y": "{{name}}, özel depo",
     "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur.",
-    "organizationTrialEndedBilling": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Faturalandırmayı güncelleyip ardından tekrar deneyebilirsin."
+    "organizationTrialEndedBilling": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
+    "organizationTrialEndedBillingAtKiloAi": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Madde işareti",
+        "nestedBulletPoint": "İç içe madde işareti",
+        "orderedItem": "Liste öğesi {n}",
+        "nestedOrderedItem": "İç içe liste öğesi {n}"
+      },
+      "blockquote": {
+        "quote": "Alıntı",
+        "nestedQuote": "İç içe alıntı"
+      },
+      "table": {
+        "row": "Satır {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Başlıklar",
+        "links": "Bağlantılar",
+        "images": "Görseller"
+      }
+    }
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -277,9 +303,13 @@
     "credits": "Krediler",
     "failedToLoadBalance": "Bakiye yüklenemedi. Tekrar denemek için dokun.",
     "balanceLoadFailed": "Bakiye yüklenemedi",
+    "balanceUnreachable": "Sunucuya ulaşılamadı. Tekrar deneyin.",
+    "balanceAccessDenied": "Bu bakiyeyi görüntüleme izniniz yok.",
+    "balanceUnavailable": "Bakiye yüklenemedi.",
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
+    "availableToSpendInOrganization": "Bu kuruluşta harcanabilir",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",
@@ -421,6 +451,17 @@
       "location": "Vertex konumu",
       "clientEmail": "Hizmet hesabı e-postası",
       "privateKey": "Hizmet hesabı özel anahtarı",
+      "privateKeyBlockRequired": "Anahtar bloğunun tamamını BEGIN satırından END satırına kadar yapıştır.",
+      "privateKeyEncrypted": "Bu anahtar bloğu parola korumalı. Parolası olmayan bir hizmet hesabı anahtarı yapıştır.",
+      "names": {
+        "codestral": "Yalnızca eski Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ile oturum aç)",
+        "xiaomi": "Xiaomi (kullandıkça öde)",
+        "zai": "Z.ai (kullandıkça öde)",
+        "bedrockByok": "Amazon Bedrock (doğrudan)",
+        "vertexByok": "Google Vertex AI (doğrudan)"
+      },
       "modelMappings": "Model eşlemeleri",
       "modelMappingsDescription": "Bir gateway modelini özel bir dağıtım adına yönlendir.",
       "mappingTitle": "Eşleme {{number}}",
@@ -481,12 +522,13 @@
       "receiptLabel": "Alındı",
       "copyReceiptId": "Alındı kimliğini kopyala",
       "appealLabel": "İtiraz",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Alındı",
       "triageOpen": "İnceleniyor",
       "triageActioned": "Haklı bulundu",
       "triageRejected": "Haklı bulunmadı",
       "appealNone": "Gönderilmedi",
-      "appealSubmitted": "İnceleniyor",
+      "appealSubmitted": "İtiraz inceleniyor",
       "appealAccepted": "Kabul edildi",
       "appealRejected": "Reddedildi",
       "appeal": "Bu karara itiraz et",
@@ -498,7 +540,25 @@
       "nextStepInReview": "Sonuç bu ekranda görünecek ve karar verildikten sonra itiraz edebilirsiniz.",
       "nextStepAppeal": "İtiraz sonucu bu ekranda görünecek.",
       "nextStepFinal": "İtiraz kararı kesindir. Başka itiraz gönderilemez.",
-      "viewReceipt": "Alındıyı görüntüle"
+      "viewReceipt": "Alındıyı görüntüle",
+      "targetLabel": "Bildirilen öğe",
+      "reasonLabel": "Bildirim nedeni",
+      "targetMessage": "Yapay zeka yanıtı",
+      "targetComment": "Çekme isteği yorumu",
+      "targetUser": "Kullanıcı",
+      "reasonHarmful": "Zararlı içerik",
+      "reasonIllegal": "Yasa dışı içerik",
+      "reasonHarassment": "Taciz",
+      "reasonSpam": "İstenmeyen içerik",
+      "reasonOther": "Diğer neden"
+    },
+    "reportReceipts": {
+      "title": "Raporlar",
+      "rowSubtitle": "Gönderdiğiniz raporlar ve sonuçları",
+      "emptyTitle": "Henüz rapor yok",
+      "emptyDescription": "Bir pull request tartışmasındaki yorumdan veya bir ajan oturumundaki yapay zeka yanıtından gönderdiğiniz raporlar, sonuçlarıyla birlikte burada görünür.",
+      "couldNotLoad": "Raporlarınız yüklenemedi",
+      "capped": "En son raporlarınız gösteriliyor."
     },
     "changelog": "Yenilikler",
     "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
@@ -506,8 +566,11 @@
     "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
     "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
-      "signIn": "Oturum açma",
-      "profileOrganizations": "Profil ve kuruluşlar"
+      "signIn": "oturum açma",
+      "profileOrganizations": "profil & kuruluşlar",
+      "chat": "sohbet",
+      "notifications": "bildirimler",
+      "integrations": "entegrasyonlar"
     }
   },
   "preferences": {
@@ -601,6 +664,8 @@
       "emptyTitle": "Henüz bildirim yok",
       "emptyCategoryTitle": "Bu kategoride bildirim yok",
       "emptyBody": "Bu hesabın aldığı bildirimler burada görünür. {{days}} gün boyunca saklanır.",
+      "emptyBody_one": "Bu hesabın aldığı bildirimler burada görünür. {{days}} gün boyunca saklanır.",
+      "emptyBody_other": "Bu hesabın aldığı bildirimler burada görünür. {{days}} gün boyunca saklanır.",
       "capped": "En son bildirimler gösteriliyor.",
       "loadError": "Bildirim geçmişi yüklenemedi.",
       "openFailed": "Bu bildirim artık hiçbir yerde açılmıyor."
@@ -681,6 +746,7 @@
       "manageAccess": "Erişimi yönet",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket çalışma alanında kullanılabilir depo yok.",
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
+      "githubNoRepositoriesDescription": "Kilo GitHub uygulamasının depo erişim izinlerini kontrol et, ardından listeyi yenile.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
       "repositoryAccess": "depo erişimi",
@@ -697,16 +763,19 @@
     },
     "autoReviews": "Otomatik incelemeler",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
+      "notConnectedReadOnlyPlan": "Kuruluşun deneme süresi sona erdi, bu yüzden sahibin kilo.ai adresinden faturalandırmayı güncellemesi gerekiyor."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
+      "deniedManagedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir {{organization}} sahibine başvurun.",
+      "deniedConnectRole": "Yalnızca {{organization}} sahipleri, yöneticileri ve faturalandırma yöneticileri bağlayabilir.",
+      "deniedReconnectRole": "Yeniden bağlaması için bir {{organization}} sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "managedOnWebTitle": "Web üzerinden yönetilir",
       "managedOnWebShort": "Bu bağlantı bir bilgisayardan web üzerinden yönetilir.",
       "managedOnWebRepositories": "{{organization}} için depoları bir bilgisayardan web üzerinden seç.",
       "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
-      "descriptionOverview": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve sonraki ekranda yapıştır.",
+      "descriptionOverview": "Bir çalışma alanı erişim belirteci oluştur ve sonraki ekranda yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
       "tokenPlaceholder": "Çalışma alanı erişim belirteci",
       "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
@@ -768,11 +837,11 @@
       "gateHidden": "Gizli",
       "gateNone": "Yok",
       "noFindings": "Bulgu yok.",
-      "findingsUnavailable": "Bu inceleme başarısız olduğu için sonuçlar kullanılamıyor.",
+      "findingsUnavailable": "Sonuçlar kullanılamıyor.",
       "findingsInProgress": "Bu inceleme hâlâ sürüyor. İnceleme tamamlandığında bulgular burada görünür.",
       "findingsEndedWithoutResults": "Bu inceleme, herhangi bir bulgu üretmeden sona erdi.",
       "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",
-      "reviewFailed": "İnceleme başarısız oldu. Lütfen tekrar dene.",
+      "reviewFailed": "İnceleme başarısız oldu.",
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",
       "retryReview": "İncelemeyi tekrar dene",
       "retryNeedsSettings": "Kod inceleyici kapalı veya ayarlarının ilgilenilmesi gerekiyor. Ayarları düzeltin, ardından bu incelemeyi tekrar deneyin.",
@@ -973,7 +1042,9 @@
       "unavailablePersonallySwitchAction": "Kuruluş değiştir",
       "unavailableOrganizationTitle": "Konsey incelemesi şu anda mevcut değil",
       "unavailableForOrganization": "Konsey incelemesi, etkin bir abonelik veya deneme süresi olan Enterprise planını gerektirir. Bu kuruluşta şu anda mevcut değil.",
-      "unavailableForOrganizationNeutral": "Konsey incelemesi şu anda bu kuruluş için mevcut değil. Daha sonra tekrar deneyin.",
+      "unavailablePlanCheck": "Konsey incelemesi bu kuruluşun planını kontrol edemedi. Kontrol etmek için tekrar deneyin.",
+      "unavailableFlagRollout": "Konsey incelemesi bu kuruluş için henüz kullanılamıyor. Edinmek için uygulamayı en son sürüme güncelleyin.",
+      "unavailableForOrganizationMember": "Konsey incelemesi, etkin bir abonelik veya deneme süresi olan Enterprise planını gerektirir. Planı bir kuruluş sahibi değiştirebilir.",
       "unavailableOnBitbucket": "Konsey incelemesi Bitbucket depoları için kullanılamıyor.",
       "noRepositories": "Henüz depo seçilmedi. Önce depo ayarlarından depo seç.",
       "specialists": "Uzmanlar",
@@ -1948,8 +2019,7 @@
       "searchPlaceholder": "Depo ara",
       "noMatches": "Eşleşme yok",
       "noRepositories": "Kullanılabilir depo yok",
-      "noRepositoriesDescription": "Hesabına bağlı depo yok.",
-      "loading": "Yükleniyor…",
+      "noRepositoriesDescription": "Depoları yüklemek için GitHub veya GitLab hesabını bağla.",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2783,7 +2853,6 @@
       "skipped_one": "{{displayCount}} atlandı",
       "skipped_other": "{{displayCount}} atlandı",
       "title": "Kontroller",
-      "viewOnGitHub": "PR'ı GitHub'da görüntüle",
       "checkDetails": "kontrol ayrıntıları"
     },
     "composer": {
@@ -2822,8 +2891,9 @@
       "checkActiveConnection": "Bağlantı aktif, ancak bu öğe hâlâ yüklenemiyor.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
-      "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
+      "reconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
+      "bitbucketAdminOnlyDescription": "Bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "adminOnlyConnectDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
@@ -2847,6 +2917,9 @@
       "couldNotLoad": "Tartışma yüklenemedi.",
       "couldNotLoadMore": "Daha fazla yorum yüklenemedi.",
       "loadMoreComments": "Daha fazla yorum yükle",
+      "conversationTruncated": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_one": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_other": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
       "loading": "Tartışma yükleniyor",
       "moderation": {
         "block": {
@@ -3393,7 +3466,7 @@
       "manageOnWeb": "Web'deki faturalandırma ayarları",
       "changePlan": "Planı değiştir",
       "buySeats": "Lisans satın al",
-      "managedOnWeb": "Plan, lisanslar ve otomatik yükleme web'de yönetilir.",
+      "managedOnWeb": "Plan, lisanslar ve otomatik yükleme kilo.ai adresinden yönetilir.",
       "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
       "manageAutoTopUp": "Otomatik yüklemeyi yönet",
       "opensOnWeb": "Web'de açılır"
@@ -3587,13 +3660,14 @@
       "identifierLabel": "Tanımlayıcı",
       "identifierRequired": "Bir tanımlayıcı girin.",
       "identifierTaken": "Bu tanımlayıcıyı başka bir mod zaten kullanıyor.",
+      "identifierTooLong": "Tanımlayıcıyı {{max}} karakter veya daha az tutun.",
       "nameLabel": "Mod adı",
       "nameRequired": "Bir mod adı girin.",
       "notFound": "Bu mod artık mevcut değil.",
-      "restrictionHint": "Yalnızca bu desenle eşleşen dosyalar düzenlenebilir. Tüm dosyalara izin vermek için boş bırakın.",
-      "restrictionInvalid": "Geçerli bir desen girin.",
+      "restrictionHint": "Düzenli ifade, bu modun düzenleyebileceği dosyaları seçer; örneğin yalnızca markdown dosyaları için `\\.md$`. Tüm dosyalara izin vermek için boş bırakın.",
+      "restrictionInvalid": "Geçerli bir düzenli ifade girin.",
       "restrictionLabel": "Kısıtlama etiketi",
-      "restrictionPattern": "Dosya deseni",
+      "restrictionPattern": "Dosya kısıtlaması",
       "roleLabel": "Rol tanımı",
       "roleRequired": "Bu modun ne yaptığını açıklayın.",
       "tool": {
@@ -3673,7 +3747,7 @@
     "emailDeliveryFailed": "E-posta gönderimi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar dene.",
     "admissionRequired": "Cihazın doğrulanamıyor. Başka bir cihazdan veya web üzerinden oturum açmak için '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "default": "Bir sorun oluştu. Lütfen tekrar dene.",
-    "retryableAdmission": "Bu cihaz doğrulanamadı. Bağlantını kontrol et ve tekrar dene.",
+    "retryableAdmission": "Bu cihaz doğrulanamadı. Tekrar dene.",
     "startSignInFailed": "Oturum açma işlemi başlatılamadı. Lütfen tekrar dene.",
     "couldNotOpenBrowser": "Tarayıcı açılamadı. Lütfen tekrar dene.",
     "signInTimedOut": "Oturum açma işlemi zaman aşımına uğradı. Lütfen tekrar dene.",
@@ -3745,6 +3819,34 @@
     "nextScheduled": "Sıradaki zamanlananlar",
     "answerNeeded": "Yanıt bekliyor",
     "waitingToRetry": "Yeniden deneme bekleniyor",
+    "countNoun": {
+      "needsInput_one": "Yanıt bekliyor",
+      "needsInput_other": "Yanıt bekliyor",
+      "running_one": "Çalışıyor",
+      "running_other": "Çalışıyor",
+      "scheduled_one": "Zamanlandı",
+      "scheduled_other": "Zamanlandı",
+      "idle_one": "Boşta",
+      "idle_other": "Boşta"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Yanıt bekliyor",
+      "needsInput_other": "{{displayCount}} Yanıt bekliyor",
+      "running_one": "{{displayCount}} Çalışıyor",
+      "running_other": "{{displayCount}} Çalışıyor",
+      "scheduled_one": "{{displayCount}} Zamanlandı",
+      "scheduled_other": "{{displayCount}} Zamanlandı",
+      "idle_one": "{{displayCount}} Boşta",
+      "idle_other": "{{displayCount}} Boşta"
+    },
+    "footer": {
+      "checked": "Kontrol edildi {{time}}",
+      "lastKnown": "Son bilinen · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Sonraki çalışma {{time}}",
+      "wasDue": "Bekleniyordu {{time}}"
+    },
     "step": {
       "editing": "Düzenleniyor",
       "reading": "Okunuyor",
@@ -3990,7 +4092,8 @@
         "space": "Bu model için yeterli boş depolama alanı yok. Yer açıp yeniden deneyin.",
         "network": "İndirme tamamlanamadı. Bağlantınızı denetleyip yeniden deneyin.",
         "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı.",
-        "checksum": "İndirilen dosya yayımlanan sağlama toplamıyla eşleşmiyor, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin."
+        "checksum": "İndirilen dosya yayımlanan sağlama toplamıyla eşleşmiyor, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin.",
+        "writeFailed": "Bu cihaz modeli kaydedemedi. İndirmeyi yeniden deneyin."
       }
     },
     "catalog": {
@@ -4168,7 +4271,7 @@
     "personalDefaultDescription": "Hiçbir deponun sabitlenmiş profili olmadığında otomatik olarak yüklenir.",
     "organizationDefaultDescription": "Kişisel varsayılanı olmayan üyeler için otomatik olarak yüklenir.",
     "setAsDefault": "Varsayılan olarak ayarla",
-    "saveFailed": "Profil kaydedilemedi",
+    "saveFailed": "Profil kaydedilemedi. Tekrar deneyin.",
     "organizationRoleRequired": "Kuruluş profillerini yalnızca kuruluş sahipleri ve yöneticiler değiştirebilir.",
     "deleteTitle": "Profili sil",
     "deleteMessage": "Bu, profili ve ayarlarını kalıcı olarak kaldırır. Bu geri alınamaz.",
@@ -4317,6 +4420,7 @@
       "promptPlaceholder": "Sen bir…",
       "tools": "Aletler",
       "wholeToolRule": "Bu ajan tüm aletlere aynı anda tek bir kural uygular: {{rule}}. Bu anahtarlar salt okunur.",
+      "toolRule": "Kayıtlı kural: {{rule}}",
       "visibility": "Görünürlük",
       "visibilityPrimary": "Birincil — seçicide gösterilir",
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
@@ -4426,19 +4530,34 @@
       "deductionFallback": "Kredi düşümü",
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
       "emptyTitle": "Kredi geçmişi yok",
+      "expiredGrant": "Süresi doldu: {{description}}",
       "googlePlayReceipt": "Makbuz Google Play'de",
       "kind": {
         "adjustment": "Düzeltme",
         "balanceNeutral": "Bakiyeyi etkilemez",
         "deduction": "Düşüm",
         "grant": "Kredi hediyesi",
+        "promotionalCredits": "Promosyon kredileri",
+        "welcomeCredits": "Hoş geldin kredisi",
         "purchase": "Satın alım"
+      },
+      "program": {
+        "adminBulkGrant": "Yönetici tarafından verilen kredi",
+        "contributorChampion": "Katkı şampiyonu kredisi",
+        "feedback": "Geri bildirim kredisi",
+        "influencer": "Etkileyici kredisi",
+        "ossMonthlyReset": "Açık kaynak sponsorluğu aylık sıfırlaması",
+        "ossSponsorship": "Açık kaynak sponsorluk kredisi",
+        "pullRequest": "Çekme isteği kredisi",
+        "usageIssue": "Kullanım sorunu kredisi",
+        "vibeDay": "Vibe day kredisi"
       },
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
       "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
-      "retentionLimit": "En son kredi geçmişi gösteriliyor."
+      "retentionLimit": "En son kredi geçmişi gösteriliyor.",
+      "voidedGrant": "İptal edildi: {{description}}"
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
@@ -4687,6 +4806,8 @@
     "connectedTo": "Bağlı hesap: {{account}}",
     "disconnected": "{{provider}} bağlantısı kesildi",
     "disconnectFailed": "{{provider}} bağlantısı kesilemedi",
+    "disconnectRetry": "Slack bağlantı kesme işlemini doğrulayamadı. Tekrar dene.",
+    "disconnectNeedsSupport": "Kilo bu bağlantı için kaydedilen Slack erişimini okuyamadı. Bağlantı kesmeyi tamamlamak için destekle iletişime geç.",
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
     "managedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibine başvurun.",
@@ -4772,6 +4893,9 @@
       "runAsCreator": "Benim adıma çalıştır",
       "runAsCreatorDescription": "Her çalıştırma hesabınızı kullanır, bu nedenle gizli başlık gerekir.",
       "saveFailedTitle": "Tetikleyici kaydedilemedi",
+      "nameTaken": "“{{name}}” adlı bir tetikleyici zaten var.",
+      "saveFailedRetry": "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+      "saveFailedCheck": "Formdaki değerleri kontrol edip tekrar deneyin.",
       "deleteTitle": "Bu tetikleyici silinsin mi?",
       "deleteMessage": "{{name}} adresine yapılan çağrılar başarısız olur. Bu işlem geri alınamaz.",
       "deleteMessageScheduled": "{{name}} tetikleyicisinin zamanlanmış çalıştırmaları durur. Bu işlem geri alınamaz.",
@@ -4853,12 +4977,15 @@
     "inputDescription": "Araç sonuçları dahil her girdiyi Enkrypt AI ile tarar. Enkrypt kullanılamadığında istekler reddedilmek yerine taranmadan gönderilir.",
     "outputTitle": "Çıktı korkulukları",
     "outputDescription": "Yanıtları, üyeler almadan önce Enkrypt AI ile tarar. Siz açmadıkça kapalıdır.",
+    "outputUnavailable": "Kilo bu kuruluş için çıktı taramasını etkinleştirmedi, bu yüzden yanıtlar denetlenmiyor ve burada ayarlanacak bir şey yok. Bunu talep etmek için {{supportEmail}} ile iletişime geçin.",
     "detectorsHint": "Engelle, işaretlenen isteği reddeder. Yalnızca günlüğe kaydet seçeneği ise isteği geciktirmeden kaydeder.",
     "detectorsHintOutput": "Engelle, işaretlenen yanıtı başarısız kılar. Yalnızca günlüğe kaydet seçeneği ise yanıtı geciktirmeden kaydeder.",
     "choiceLog": "Yalnızca günlüğe kaydet",
     "applyTo": "Şunlara uygula",
     "applyToAllMembers": "Tüm üyeler",
     "applyKiloDefault": "Kilo Varsayılanını Uygula",
+    "applyKiloDefaultEnglishNote": "Kilo varsayılan ilke metni İngilizcedir, çünkü Kilo Gateway onu yazıldığı gibi aynen uygular.",
+    "applyKiloDefaultReplaceMessage": "Kilo varsayılan ilkesi İngilizce yazılmıştır ve İlke ihlali altında ayarladığınızı değiştirir. İlke metni alanına girdiğiniz metin geri getirilemez.",
     "invalidSavedTitle": "Kaydedilen girdi algılayıcı ayarları okunamıyor",
     "invalidSavedBody": "Girdi algılayıcıları yeniden kaydedilene kadar istekler engellenir. Aşağıdaki algılayıcılar Kilo Varsayılanından başlar.",
     "invalidSavedOutputTitle": "Kaydedilen çıktı algılayıcı ayarları okunamıyor",
@@ -4994,6 +5121,7 @@
     "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
     "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",
     "providersNone": "Bu kuruluş için kullanılabilir sağlayıcı yok.",
+    "providersUnavailable": "Sağlayıcı listesi yüklenemedi.",
     "allowAllShown": "Gösterilenlerin tümüne izin ver",
     "denyAllShown": "Gösterilenlerin tümünü reddet",
     "gatewaysDescription": "Kilo, model isteklerini Vercel AI Gateway veya OpenRouter üzerinden yönlendirir. Devre dışı bırakılan bir ağ geçidi bu istekleri başarısız kılar.",
@@ -5012,6 +5140,20 @@
       "eu": "Avrupa Birliği",
       "au": "Avustralya",
       "jp": "Japonya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Tercih ara",
+    "noMatches": "Eşleşen tercih bulunamadı",
+    "emptyDescription": "Farklı bir tercih adı veya anahtar kelime deneyin.",
+    "resultsStatus": "Bulunan tercihler: {{resultCount}}",
+    "keywords": {
+      "signOut": "çıkış|oturumu kapat|hesaptan çıkış",
+      "appearance": "tema|renk düzeni|koyu mod",
+      "appUnlock": "biyometri|yüz tanıma|parmak izi",
+      "language": "dil|çeviri",
+      "notifications": "uyarılar|anlık bildirimler",
+      "privacy": "analiz|takip|gizlilik"
     }
   }
 }

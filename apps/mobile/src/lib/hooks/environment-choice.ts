@@ -73,11 +73,6 @@ const store = createSecureStorePreference<StoredEnvironmentChoice>({
   mergeOnLoad: (disk, pending) => ({ ...disk, ...pending }),
 });
 
-// Warm the disk read at module scope: the first render of the new-session form
-// must already hold the stored choice, or the picker would reopen on "choose"
-// and then replace it a frame later.
-store.preload();
-
 export function clearEnvironmentChoices() {
   store.clear();
 }

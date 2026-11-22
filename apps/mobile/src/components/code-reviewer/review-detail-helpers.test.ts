@@ -7,8 +7,8 @@ import {
   findingsEmptyCopyKey,
   flattenCouncilFindings,
   gateThresholdLabel,
-  reviewCancellationLabel,
-  reviewFailureLabel,
+  reviewCancellationCopy,
+  reviewFailureCopy,
   selectRetryAction,
   severityLabelKey,
 } from './review-detail-helpers';
@@ -72,7 +72,7 @@ describe('councilVoteLabel', () => {
   });
 });
 
-describe('reviewFailureLabel', () => {
+describe('reviewFailureCopy', () => {
   it.each([
     ['github_installation_required', 'githubInstallationRequired'],
     ['github_ip_allow_list', 'githubIpAllowList'],
@@ -81,29 +81,45 @@ describe('reviewFailureLabel', () => {
     ['selected_model_unavailable', 'selectedModelUnavailable'],
     ['repeated_repository_clone_timeout', 'repeatedRepositoryCloneTimeout'],
   ] as const)('uses localized action-required copy for %s', (reason, copyKey) => {
-    expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
-      i18n.t(`codeReviewer.actionRequired.${copyKey}.description`)
-    );
+    // The action-required description ends with its own instruction, so the
+    // caller must not print a second one under it.
+    expect(reviewFailureCopy(i18n.t, 'Internal diagnostic', reason)).toEqual({
+      message: i18n.t(`codeReviewer.actionRequired.${copyKey}.description`),
+      namesRecovery: true,
+    });
   });
 
   it.each([null, 'upstream_error', 'future-reason'])(
     'does not expose unknown diagnostics for %s',
     reason => {
-      expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
-        i18n.t('codeReviewer.reviewDetail.reviewFailed')
-      );
+      // The generic failure statement promises nothing, so the caller owns the
+      // recovery control and this copy never asks for a retry.
+      expect(reviewFailureCopy(i18n.t, 'Internal diagnostic', reason)).toEqual({
+        message: i18n.t('codeReviewer.reviewDetail.reviewFailed'),
+        namesRecovery: false,
+      });
     }
   );
 
+  it('reports the generic failure copy for a review with no persisted message', () => {
+    expect(reviewFailureCopy(i18n.t, null, null)).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.reviewFailed'),
+      namesRecovery: false,
+    });
+  });
+
   it('localizes the known service-unreachable dispatch message', () => {
     expect(
-      reviewFailureLabel(
+      reviewFailureCopy(
         i18n.t,
         'Dispatch failed: could not reach the code review service. ' +
           'It may be offline — retry the review once it is running.',
         'upstream_error'
       )
-    ).toBe(i18n.t('codeReviewer.reviewDetail.serviceUnavailable'));
+    ).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.serviceUnavailable'),
+      namesRecovery: true,
+    });
   });
 });
 
@@ -184,80 +200,102 @@ describe('selectRetryAction', () => {
   });
 });
 
-describe('reviewCancellationLabel', () => {
-  const label = (over: {
+describe('reviewCancellationCopy', () => {
+  const copy = (over: {
     status: string;
     errorMessage: string | null;
     terminalReason?: string | null;
     platformLabel?: string;
   }) =>
-    reviewCancellationLabel(i18n.t, {
+    reviewCancellationCopy(i18n.t, {
       platformLabel: 'GitHub',
       ...over,
     });
 
   it('leaves reviews that did not end cancelled or interrupted alone', () => {
     expect(
-      label({ status: 'completed', errorMessage: 'Superseded by new push', terminalReason: null })
+      copy({ status: 'completed', errorMessage: 'Superseded by new push', terminalReason: null })
     ).toBeNull();
   });
 
   it('shows nothing when there is no stored message to explain', () => {
-    expect(label({ status: 'cancelled', errorMessage: null })).toBeNull();
+    expect(copy({ status: 'cancelled', errorMessage: null })).toBeNull();
   });
 
   it('explains a review replaced by a newer commit, by reason or by message', () => {
-    const expected = i18n.t('codeReviewer.reviewDetail.cancelReasonSuperseded');
-    expect(label({ status: 'cancelled', errorMessage: 'Superseded by new push' })).toBe(expected);
+    const expected = {
+      message: i18n.t('codeReviewer.reviewDetail.cancelReasonSuperseded'),
+      // A replacement states the outcome and no way forward of its own, so the
+      // caller still owns the sentence that explains the recovery control.
+      namesRecovery: false,
+    };
+    expect(copy({ status: 'cancelled', errorMessage: 'Superseded by new push' })).toEqual(expected);
     expect(
-      label({
+      copy({
         status: 'cancelled',
         errorMessage: 'Superseded by duplicate merge-commit continuation',
       })
-    ).toBe(expected);
+    ).toEqual(expected);
     expect(
-      label({ status: 'cancelled', errorMessage: 'worker stopped', terminalReason: 'superseded' })
-    ).toBe(expected);
+      copy({ status: 'cancelled', errorMessage: 'worker stopped', terminalReason: 'superseded' })
+    ).toEqual(expected);
   });
 
   it('names the disconnected platform in the recovery step', () => {
     const message = 'Platform integration disconnected';
-    expect(label({ status: 'cancelled', errorMessage: message, platformLabel: 'GitLab' })).toBe(
-      i18n.t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
+    expect(copy({ status: 'cancelled', errorMessage: message, platformLabel: 'GitLab' })).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
         platform: 'GitLab',
-      })
-    );
+      }),
+      // The sentence ends by saying to reconnect and re-run, so the card must not
+      // print a second instruction under it.
+      namesRecovery: true,
+    });
   });
 
   it('explains both Bitbucket cancellation causes', () => {
-    expect(label({ status: 'cancelled', errorMessage: 'Bitbucket Code Reviewer disabled' })).toBe(
-      i18n.t('codeReviewer.reviewDetail.cancelReasonBitbucketReviewerDisabled')
+    expect(copy({ status: 'cancelled', errorMessage: 'Bitbucket Code Reviewer disabled' })).toEqual(
+      {
+        message: i18n.t('codeReviewer.reviewDetail.cancelReasonBitbucketReviewerDisabled'),
+        // Ending with "Enable it again, then re-run the review." makes this the
+        // second sentence that carries its own instruction.
+        namesRecovery: true,
+      }
     );
     expect(
-      label({
+      copy({
         status: 'cancelled',
         errorMessage: 'Bitbucket pull request state superseded this review',
       })
-    ).toBe(i18n.t('codeReviewer.reviewDetail.cancelReasonBitbucketPullRequestChanged'));
+    ).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.cancelReasonBitbucketPullRequestChanged'),
+      namesRecovery: false,
+    });
   });
 
   it('falls back to the outcome for a cause the row cannot tell apart', () => {
-    expect(label({ status: 'cancelled', errorMessage: 'Cancelled by user' })).toBe(
-      i18n.t('codeReviewer.reviewDetail.cancelReasonCancelled')
-    );
-    expect(label({ status: 'interrupted', errorMessage: 'container restarted' })).toBe(
-      i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted')
-    );
+    expect(copy({ status: 'cancelled', errorMessage: 'Cancelled by user' })).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.cancelReasonCancelled'),
+      // "This review was cancelled." names no next step either.
+      namesRecovery: false,
+    });
+    expect(copy({ status: 'interrupted', errorMessage: 'container restarted' })).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted'),
+      namesRecovery: false,
+    });
   });
 
   it('reads an interrupt persisted as cancelled by its reason', () => {
     expect(
-      label({
+      copy({
         status: 'cancelled',
         errorMessage: 'container restarted',
         terminalReason: 'interrupted',
       })
-    ).toBe(i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted'));
+    ).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted'),
+      namesRecovery: false,
+    });
   });
 });
 
@@ -277,8 +315,16 @@ describe('findingsEmptyCopyKey', () => {
     );
   });
 
-  it('keeps the failure copy for a failed review', () => {
+  it('says the results are unavailable without repeating the failure', () => {
     expect(findingsEmptyCopyKey('failed')).toBe('codeReviewer.reviewDetail.findingsUnavailable');
+    const line = i18n.t('codeReviewer.reviewDetail.findingsUnavailable');
+    // The badge and the reason card state the failure, so this line only says
+    // that the section has nothing to show and its results are unavailable.
+    expect(line).not.toBe(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(line).not.toMatch(/fail/i);
+    // "No findings" is the result of a review that finished clean, so a failed
+    // review may never read as one.
+    expect(line).not.toBe(i18n.t('codeReviewer.reviewDetail.noFindings'));
   });
 
   it('reports an ended review with no findings as a result', () => {

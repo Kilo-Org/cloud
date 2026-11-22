@@ -7,6 +7,7 @@ import {
   genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
+  localizedPushParams,
   pushBodyCatalogKey,
   pushTitleCatalogKey,
   resolvePushLocale,
@@ -297,17 +298,24 @@ export class NotificationChannelDO extends DurableObject<Env> {
         // arrive as i18nParams and pass through the catalog templates. Both
         // keys come from the mapping because sibling kinds can share one
         // entry: the security-finding kinds read one body, both session kinds
-        // read one title, and each kind keeps its own entry otherwise.
+        // read one title, and each kind keeps its own entry otherwise. A
+        // finding's severity is the one param translated rather than passed
+        // through, because it is a fixed set of words and not the user's text.
+        const params = localizedPushParams(
+          resolvedLocale,
+          input.push.i18nKey,
+          input.push.i18nParams
+        );
         title = translatePush(
           resolvedLocale,
           pushTitleCatalogKey(input.push.i18nKey),
-          input.push.i18nParams,
+          params,
           input.push.title
         );
         body = translatePush(
           resolvedLocale,
           pushBodyCatalogKey(input.push.i18nKey),
-          input.push.i18nParams,
+          params,
           input.push.body
         );
       } else {

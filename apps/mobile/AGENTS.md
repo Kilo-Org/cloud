@@ -25,7 +25,8 @@ pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused && pnpm assert:c
 git diff --check
 ```
 
-- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `pnpm test` runs it too.
+- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `--config <path>` reads an already-evaluated config instead, resolved from `apps/mobile`. `--profile <name>` selects the contract set, and falls back to `EAS_BUILD_PROFILE`, which the release supplies as `production`. The success line names the resolved profile. Exit 1 is contract drift. Exit 2 is a config it could not evaluate or read. `--profile` selects the contract set only, so a local release-set run needs the production environment. `pnpm test` runs the four guards `assert:colors`, `assert:names`, `assert:resolution` and `assert:config` before Vitest: the chain runs the live config guard, and Vitest runs its fixture cases for both profiles.
+- `pnpm lint` covers `src` and `modules` only: `scripts/` holds Node build guards chained by `pnpm test`, and the app's type-aware React Native rules do not apply there. `pnpm format`, `format:check` and the repo-wide format check still cover them.
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
@@ -99,6 +100,15 @@ above another native sheet, and a dialog rendered through `@rn-primitives/portal
 tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a portal card. A `DialogCard`
 is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
 needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
+
+A toast raised while a native sheet is open must be visible over it, and must not cover the sheet's actions.
+On iOS the root Toaster's `FullWindowOverlay` already draws above every presented sheet. On Android the
+app's one Toaster (`AppToaster`) renders into the top open sheet's toast host instead of the main tree the
+sheet covers: `Sheet` and every focused presented route (a `formSheet` or `modal` scene, through the shared
+scene layout) wrap their content in `SheetToastScope` (`@/components/sheet-toast-host`). Inside a sheet the
+toast is compact (its text capped at 1.4x the font scale) and starts below the sheet's `SheetHeader` and the
+status bar, read from both views' window rects, so the header's actions stay above it and the bottom actions
+of a short sheet stay clear below it; call sites keep calling `toast.error`.
 
 Markdown images reach `react-native-enriched-markdown` only from HTTPS hosts the reader trusted or confirmed;
 `markdown-image-gate` rewrites every other image into a "Load" link before the native view can fetch it.
@@ -203,7 +213,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 
 ## React Native Rules
 
-- Default exports only where Expo Router requires them, in `src/app/`.
+- Default exports only where Expo Router requires them, in `src/app/`, or where a build resolution needs one: `src/lib/chat/remote-mcp-pkce.ts` default-exports because `metro.config.js` resolves `pkce-challenge` to it and the MCP SDK default-imports that package.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
 - Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
@@ -224,6 +234,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - A single-line caller can change horizontal padding, text size, and minimum height.
 - All inputs use physical `pl-*`/`pr-*` for horizontal padding, including caller overrides and zero-inset search fields; Android `TextInput` does not apply logical `paddingInline` from `px-*`.
 - A multiline caller keeps its alignment and line breaks; its physical padding classes override the shared `pl-3 pr-3 pt-2.5 pb-2.5` inset.
+- A text area's accessible name is its label alone. `patches/react-native@0.88.1.patch` keeps `Libraries/Text/TextInput/Multiline/RCTUITextView.mm` from appending the placeholder to an explicit `accessibilityLabel`, and only a text area with no name of its own takes the placeholder as its name; do not re-create a placeholder in JavaScript to work around it.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules
@@ -248,7 +259,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 
 ### Layout contract
 
-One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
+One contract, enforced by `pnpm --filter kilo-app run check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
 
 | Concern | Contract | Use |
 |---|---|---|
@@ -261,7 +272,7 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line (two at a large font scale); up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
 | Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`, which owns that geometry; callers add no padding of their own. Rows own no card and no grouped divider |
 | Card | Non-row block (balance, metric, info, a field block on a non-form screen): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. For full-bleed layered content the surface alone, with each layer owning its inset. | `Card` from `@/components/ui/card`; `padding="none"` for the bare surface |
-| Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box |
+| Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. A form field's visible label renders through FormFieldLabel, and the field block owns the gap between that label and its control. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box; FormFieldLabel for the label |
 | Forms | A form — a screen or sheet whose job is to fill in and submit fields (New profile, Edit profile, Profile detail's name and description, New mode, Create organization) — lays its fields flat in the body at the section gap, never in a `Card`. A `Card` holds fields only as one block among other content: an item the person adds or removes (a model mapping, a variable), a one-time entry under the status that asked for it (a confirmation code), or a settings group whose fields belong to the control beside them. | `FormField` directly in the `SCREEN_BODY_CLASS` body |
 | Search field | One shape for every search: the bordered field surface (`rounded-md`, the input border and fill), an 18pt leading magnifier, the single-line `Input`'s 44pt box with the frame's 10.5pt inset, `text-sm` for the query and the one-line hint (the `FormField` size, so a search inside a form matches the fields beside it), and an in-field clear on both platforms. A running search names its spinner. The caller sets only its placement (gutter and vertical margin). | `SearchField` from `@/components/ui/search-field` |
 | Segmented control | The track and its loaded height are the control's own; a skeleton reserves that frame instead of a hand-sized box. Options may carry a badge, a disabled state, their own test handle, and a spoken name and hint when the visible label is a short form; a badge that carries information (a count) goes into the spoken name too. A strip whose options switch the body below it passes `semantics="tabs"` (a `tablist` of tabs); a value choice keeps the default radio group. | `SegmentedControl` from `@/components/ui/segmented-control`; `SEGMENTED_FRAME_CLASS` / `SEGMENTED_FRAME_HEIGHT_CLASS` for a skeleton |
@@ -271,26 +282,18 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | Screen intro | One muted body line under the header, above the first section, on every screen that carries intro text; never a caption size and never a hand-sized `text-xs`. | `Text` `variant="muted"` |
 | Screen header | First child of the screen root; `size="large"` on tab roots; never override its gutter, title typography or bottom padding. A badge on the title line goes through `titleAccessory`; a header a screen must measure (a pin under it) passes `titleRef`. | `ScreenHeader` |
 | Sheet header | Every formSheet route and imperative `Sheet`. The body uses the same body class. An eyebrow names the reference being edited; `doneBusy` marks a commit in flight; `variant="close"` is the header a surface with nothing to commit uses. | `SheetHeader` |
-| States | Loading, empty, error and happy states for every data screen. Every loading placeholder owns the loaded geometry — a row reserves through `RowSkeleton`, a section label through `SectionHeaderSkeleton`, a control through its own frame constant — so the swap to real content cannot move the screen. One placement rule: `center` when the state is the whole surface, `top` only when it sits under intro text or controls. A state's way out is the one action slot, filled with `StateAction` (primary, compact, label-sized, leading icon) at the slot's fixed gap. A state owns the 14pt gutter only when it is its surface's full-bleed content (a `center` state; a `top`/`static` one in a list's empty slot passes `inset="gutter"`); one laid out inside a body or card that already insets draws none, and no caller spells the inset itself. A state never repeats the screen's own way out: a header already draws the back chevron, so a denial under one carries no Back action (`PermissionDenied`'s `showBack`). | `RowSkeleton` (`variant="session"` for a flat list; `lines`, `tile`, `trailingControl`, `trailing="switch"`, `stack`), `SectionHeaderSkeleton`, `Skeleton`, `EmptyState` (`inset`, `action`), `StateAction`, `QueryError`, `CenteredState` |
+| States | Loading, empty, error and happy states for every data screen. Every loading placeholder owns the loaded geometry — a row reserves through `RowSkeleton`, a section label through `SectionHeaderSkeleton`, a control through its own frame constant — so the swap to real content cannot move the screen. One placement rule: `center` when the state is the whole surface, `top` only when it sits under intro text or controls. A state's way out is the one action slot, filled with `StateAction` (compact, label-sized, leading icon — brand-filled by default, `emphasis="quiet"` for an outlined face on a screen whose primary action lives elsewhere) at the slot's fixed gap. A state owns the 14pt gutter only when it is its surface's full-bleed content (a `center` state; a `top`/`static` one in a list's empty slot passes `inset="gutter"`); one laid out inside a body or card that already insets draws none, and no caller spells the inset itself. A state never repeats the screen's own way out: a header already draws the back chevron, so a denial under one carries no Back action (`PermissionDenied`'s `showBack`). | `RowSkeleton` (`variant="session"` for a flat list; `lines`, `tile`, `trailingControl`, `trailing="switch"`, `stack`), `SectionHeaderSkeleton`, `Skeleton`, `EmptyState` (`inset`, `action`), `StateAction`, `QueryError`, `CenteredState` |
 | Primary action | One per screen. A pinned footer is the shared bar, outside the scroll body; an inline action ends its section. | `ScreenFooter` from `@/components/ui/screen-footer` (`clearance` for the bottom band, `keyboard` for who lifts it) |
 | Create control | One per list screen: the header `+` creates, and the empty state carries the title and description only. | `ScreenHeader` `headerRight` with `IconButton` |
 | FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
-| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans L1–L13 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans `LAYOUT_RULES` names, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm --filter kilo-app run check:classes` enforces it |
 
-`pnpm check:classes` reads every class string (and every `style`/`*Style` object) against `LAYOUT_RULES` in
-`tools/nativewind/check-classes.mjs`, which is the only description of the rules: **L1** an arbitrary spacing,
-type-size, line-height, tracking or radius value; **L2** a page inset written on a scroll body or a `CenteredState`
-content container, or any padding on a `ScreenHeader`/`SheetHeader`; **L3** `uppercase` or `tracking-*` outside a
-section label; **L4** a card surface built by hand (a card fill plus a card radius, even when the two sit in
-different branches of one className); **L5** `text-xl` or larger; **L6** a layout number in a `style` or `*Style`
-object (an inset or a measurement passes); **L7** a chevron imported straight from the icon modules instead of
-`RowChevron`; **L8** an arbitrary height, width or size that pins one box; **L9** a row divider drawn as
-`border-b`/`border-t` in `border-border` instead of `border-hair-soft`; **L10** `ScreenHeader` `titleContent`
-outside the three screens that own a title line; **L11** a `Sheet` without a `SheetHeader`; **L12** a horizontal
-padding or margin wider than the 14pt gutter (`px-`/`ps-`/`pe-`/`pl-`/`pr-`/`mx-`/`ms-`/`me-` at 5 and up); **L13** a
-`Button` inside an `EmptyState`/`QueryError` `action` slot instead of `StateAction`. A
-violation the migration has not reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call
-site and lower its line, never regenerate the baseline over a new violation.
+`pnpm --filter kilo-app run check:classes` reads every class string (and every `style`/`*Style` object)
+against `LAYOUT_RULES` in `tools/nativewind/check-classes.mjs`, which is the only description of the rules:
+read the L1–L13 ids and their bans there instead of restating them here. A violation the migration has not
+reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call site and
+lower its line, never regenerate the baseline over a new violation, and the rewrite refuses while the theme
+or any walked file could not be read or parsed.
 
 After you change anything in `components/ui`, run the design gate on
 `kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.

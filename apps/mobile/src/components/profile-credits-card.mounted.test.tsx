@@ -13,8 +13,12 @@ import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { CreditsCard } from './profile-credits-card';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { CreditsCard, type CreditsCardOrgList } from './profile-credits-card';
+import {
+  ICON_TARGET_BOX_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -25,6 +29,9 @@ import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/rend
 // the marker itself is asserted only where the wrapping behavior is under test.
 const readable = (text: string) =>
   text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
+
+/** One `caption` line at font scale 1, as the card reserves it (gate-measured). */
+const CAPTION_LINE_DP = 14.1;
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -38,6 +45,8 @@ const currentUser = vi.hoisted(() => ({
 }));
 /** Window the card lays out in; a narrow one must stack the credits header. */
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
+/** The safe-area side insets the scroller takes off the card's settled width. */
+const insets = vi.hoisted(() => ({ left: 0, right: 0 }));
 
 // The provider now announces the lost-membership recovery through the
 // toast adapter, whose module graph reaches react-native's Flow source
@@ -134,7 +143,7 @@ vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) 
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ bottom: 0, left: insets.left, right: insets.right, top: 0 }),
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -230,6 +239,20 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function trpcError(code: string): Error {
+  return Object.assign(new Error(code), { data: { code, message: code } });
+}
+
+/**
+ * A read that never reached the server: a fetch rejection carries no tRPC code
+ * and no HTTP status, which is what names the connection rather than the
+ * server.
+ */
+function getConnectionBalanceFailure(): void {
+  getContextBalanceQueryFn.mockRejectedValue(new TypeError('Network request failed'));
+}
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
 
@@ -240,17 +263,22 @@ const organizationSwitch: { set: (id: string | null) => void } = { set: () => un
  * drives on screen. A test that switches accounts calls it directly, so the
  * card's balance behavior is observed without the picker owning the card.
  */
-function CardHarness({ orgs }: Readonly<{ orgs?: OrgListEntry[] }>) {
+function CardHarness({ orgList }: Readonly<{ orgList: CreditsCardOrgList }>) {
   const organization = useOrganization();
   organizationSwitch.set = organization.setOrganizationId;
-  return createElement(CreditsCard, { enabled: true, orgs });
+  return createElement(CreditsCard, { enabled: true, orgList });
 }
 
 async function mountCard(
   queryClient: QueryClient = createTestQueryClient(),
-  orgs?: OrgListEntry[]
+  orgs?: OrgListEntry[],
+  orgList?: CreditsCardOrgList
 ) {
-  const ui = await renderWithProviders(createElement(CardHarness, { orgs }), {
+  // Most suites pass a plain membership list; the union's own states are given
+  // only by the tests that drive the pending and failed windows.
+  const resolvedOrgList: CreditsCardOrgList =
+    orgList ?? (orgs !== undefined ? { status: 'ready', orgs } : { status: 'loading' });
+  const ui = await renderWithProviders(createElement(CardHarness, { orgList: resolvedOrgList }), {
     queryClient,
     wrapper: OrganizationProvider,
   });
@@ -348,10 +376,32 @@ function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
   );
 }
 
+/** The note's fixed box: the one View the card tags as the expiry slot. */
+function noteSlot(renderer: ReactTestRenderer): ReactTestInstance {
+  const [slot] = renderer.root.findAll(node => node.props.testID === 'credits-expiry-slot');
+  if (slot === undefined) {
+    throw new Error('The card painted no expiry slot');
+  }
+  return slot;
+}
+
+/** The height the slot reserves, in dp, at the test's font scale of 1. */
+function slotHeight(slot: ReactTestInstance): number {
+  const style: unknown = slot.props.style;
+  if (style === null || typeof style !== 'object' || !('minHeight' in style)) {
+    return 0;
+  }
+  const { minHeight } = style;
+  return typeof minHeight === 'number' ? minHeight : 0;
+}
+
 beforeEach(() => {
   Platform.OS = 'ios';
   balancePreference.loaded = true;
   windowDims.width = 390;
+  windowDims.fontScale = 1;
+  insets.left = 0;
+  insets.right = 0;
   // A test that simulates the app reporting offline must not leak that state.
   onlineManager.setOnline(true);
   savedMetadata.clear();
@@ -468,9 +518,11 @@ describe('CreditsCard balance state', () => {
   it('shows the skeleton instead of the previous account balance while a switch settles', async () => {
     currentUser.userId = 'user-a';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    // Member roles keep the amount on the member read, whose switch window this
+    // test observes; a money role's amount comes from the list with no read.
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
-      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'member' },
+      { organizationId: 'org-b', organizationName: 'Beta', role: 'member' },
     ] as OrgListEntry[];
     listState.payload = orgs;
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
@@ -565,7 +617,7 @@ describe('CreditsCard balance state', () => {
       currentUser.userId = 'user-a';
       getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
       const orgs = [
-        { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+        { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
       ] as OrgListEntry[];
       if (context === 'organization') {
         listState.payload = orgs;
@@ -587,8 +639,8 @@ describe('CreditsCard balance state', () => {
     currentUser.userId = 'user-a';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
-      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 10_000_000 },
+      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner', balance: 10_000_000 },
     ] as OrgListEntry[];
     listState.payload = orgs;
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
@@ -673,7 +725,7 @@ describe('CreditsCard balance state', () => {
       ],
     });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     listState.payload = orgs;
     try {
@@ -701,7 +753,7 @@ describe('CreditsCard balance state', () => {
     getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
     orgCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     listState.payload = orgs;
     const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
@@ -963,6 +1015,396 @@ describe('CreditsCard balance state', () => {
   });
 });
 
+describe('CreditsCard organization balance source', () => {
+  // 36_120_000 microdollars is $36.12: a member's `$0.00` read under the same
+  // organization name is visibly wrong beside it.
+  const organizationBalance = 36_120_000;
+  const billingManagerOrgs = [
+    {
+      organizationId: 'org-a',
+      organizationName: 'Acme',
+      role: 'billing_manager',
+      balance: organizationBalance,
+    },
+  ] as OrgListEntry[];
+
+  // Every money role manages the organization's money, so every one of them
+  // paints the organization's own balance. The member read answers zero for
+  // them — the defect was painting that figure under the organization's name.
+  it.each(['owner', 'admin', 'billing_manager'])(
+    'paints the organization balance for a %s instead of the member read',
+    async role => {
+      currentUser.userId = 'user-1';
+      savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+      const moneyRoleOrgs = [{ ...billingManagerOrgs[0], role }] as OrgListEntry[];
+      getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+      listState.payload = moneyRoleOrgs;
+
+      const { texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
+        status: 'ready',
+        orgs: moneyRoleOrgs,
+      });
+      try {
+        await waitFor(() => texts().includes('$36.12'));
+        expect(texts()).not.toContain('$0.00');
+        // The amount is the organization's own balance, so no member-scope copy.
+        expect(texts()).not.toContain('Available to spend in this organization');
+      } finally {
+        unmount();
+      }
+    }
+  );
+
+  it("paints a plain member's spend balance with its scope caption", async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 4.2 });
+    const orgs = [
+      {
+        organizationId: 'org-a',
+        organizationName: 'Acme',
+        role: 'member',
+        balance: organizationBalance,
+      },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    try {
+      // The allowance the server caps at the organization balance, not the
+      // organization balance itself; the caption marks the member branch, so
+      // the wait cannot pass on the personal frame before the context restores.
+      await waitFor(
+        () =>
+          texts().includes('$4.20') && texts().includes('Available to spend in this organization')
+      );
+      expect(texts()).not.toContain('$36.12');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('hides the member scope caption while the balance block paints its failure', async () => {
+    // The caption describes the amount under it, so the failure window keeps
+    // its row and takes it out of sight and out of the reading order: the card
+    // must not explain an amount that is not on screen.
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
+    const orgs = [
+      {
+        organizationId: 'org-a',
+        organizationName: 'Acme',
+        role: 'member',
+        balance: organizationBalance,
+      },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    try {
+      await waitFor(() => texts().includes("Couldn't load balance"));
+
+      const captions = renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Text') &&
+          node.children.some(
+            child =>
+              typeof child === 'string' && child === 'Available to spend in this organization'
+          )
+      );
+      // The row stays in the tree, so the block keeps the height the amount
+      // paints at; no other copy of the caption can be visible beside it.
+      expect(captions).toHaveLength(1);
+      const caption = renderer.root.find(
+        node =>
+          Object.is(node.type, 'Text') &&
+          node.children.some(
+            child =>
+              typeof child === 'string' && child === 'Available to spend in this organization'
+          )
+      );
+      expect(hasClasses(caption, ['text-xs', 'opacity-0'])).toBe(true);
+      expect(caption.props.accessibilityElementsHidden).toBe(true);
+      expect(caption.props.importantForAccessibility).toBe('no');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('turns a failed membership list into the balance retry surface', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    const retryOrganizations = vi.fn<() => void>();
+    // The provider still needs the memberships to restore the selection.
+    listState.payload = billingManagerOrgs;
+
+    const { renderer, labels, texts, unmount } = await mountCard(
+      createTestQueryClient(),
+      undefined,
+      { status: 'error', error: trpcError('INTERNAL_SERVER_ERROR'), retry: retryOrganizations }
+    );
+    try {
+      await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+      expect(texts()).toContain("Couldn't load balance");
+      expect(texts()).not.toContain('$36.12');
+
+      const reads = getContextBalanceQueryFn.mock.calls.length;
+      const retry = renderer.root.find(
+        node =>
+          node.type === Pressable &&
+          node.props.accessibilityRole === 'button' &&
+          node.props.accessibilityLabel === 'Failed to load balance. Tap to retry.'
+      );
+      await act(async () => {
+        (retry.props.onPress as () => void)();
+        await Promise.resolve();
+      });
+
+      expect(retryOrganizations).toHaveBeenCalledTimes(1);
+      expect(refetchUserId).toHaveBeenCalledTimes(1);
+      // The balance read runs again too: the retry re-fetches every source the
+      // failure surface stands for.
+      await waitFor(() => getContextBalanceQueryFn.mock.calls.length > reads);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps a Personal balance failure out of the membership list error', async () => {
+    // A Personal balance comes from `getContextBalance` alone; the membership
+    // read stands for an organization context only. A failed list must not
+    // rename the personal failure's kind or drop its Retry. The empty settled
+    // membership list is what leaves the provider on Personal.
+    currentUser.userId = 'user-1';
+    savedMetadata.delete(ORGANIZATION_STORAGE_KEY);
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
+    listState.payload = [];
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
+      status: 'error',
+      error: trpcError('FORBIDDEN'),
+      retry: vi.fn<() => void>(),
+    });
+    try {
+      await waitFor(() => texts().includes("Couldn't load balance"));
+      expect(texts()).not.toContain("You don't have permission to view this balance.");
+
+      const retry = renderer.root.findAll(
+        node =>
+          node.type === Pressable &&
+          node.props.accessibilityLabel === 'Failed to load balance. Tap to retry.'
+      );
+      expect(retry).toHaveLength(1);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('names a refused membership list instead of offering a retry', async () => {
+    // The list is where this context's balance comes from, so its refusal is
+    // the balance's own refusal: the retryable line beside a Retry could never
+    // succeed on a permission error.
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    listState.payload = billingManagerOrgs;
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
+      status: 'error',
+      error: trpcError('FORBIDDEN'),
+      retry: vi.fn<() => void>(),
+    });
+    try {
+      const REFUSAL_COPY = "You don't have permission to view this balance.";
+      await waitFor(() => texts().includes(REFUSAL_COPY));
+      expect(texts()).toContain(REFUSAL_COPY);
+      expect(texts()).not.toContain('Failed to load balance. Tap to retry.');
+
+      const retryLines = renderer.root.findAll(
+        node =>
+          node.type === Pressable &&
+          node.props.accessibilityLabel === 'Failed to load balance. Tap to retry.'
+      );
+      expect(retryLines).toHaveLength(0);
+      // The refusal is a statement, so no control carries it either.
+      const refusalControls = renderer.root.findAll(
+        node => node.type === Pressable && node.props.accessibilityLabel === REFUSAL_COPY
+      );
+      expect(refusalControls).toHaveLength(0);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the member scope caption out of sight while the amount is a skeleton', async () => {
+    // A member's cold start answers the role from the list before the member
+    // balance lands, and the caption would name a figure that is not on screen.
+    // It stays in the tree for the row's height, hidden from eye and reader.
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    const pendingBalance = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(pendingBalance.promise);
+    const orgs = [
+      {
+        organizationId: 'org-a',
+        organizationName: 'Acme',
+        role: 'member',
+        balance: organizationBalance,
+      },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    try {
+      await waitFor(
+        () =>
+          texts().includes('SKELETON') &&
+          texts().includes('Available to spend in this organization')
+      );
+
+      const captions = renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Text') &&
+          node.children.some(
+            child =>
+              typeof child === 'string' && child === 'Available to spend in this organization'
+          )
+      );
+      // One caption, kept for the row's height, and never painted over the bar.
+      expect(captions).toHaveLength(1);
+      const caption = renderer.root.find(
+        node =>
+          Object.is(node.type, 'Text') &&
+          node.children.some(
+            child =>
+              typeof child === 'string' && child === 'Available to spend in this organization'
+          )
+      );
+      expect(hasClasses(caption, ['text-xs', 'opacity-0'])).toBe(true);
+      expect(caption.props.accessibilityElementsHidden).toBe(true);
+      expect(caption.props.importantForAccessibility).toBe('no');
+    } finally {
+      unmount();
+      pendingBalance.resolve({ balance: 4.2 });
+    }
+  });
+
+  it('holds the skeleton while the membership list has not named the role', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    // The member read answers `$0.00` for this billing manager, and the list
+    // that decides the amount's source has not answered: neither figure paints.
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    listState.payload = billingManagerOrgs;
+
+    const { texts, unmount } = await mountCard(createTestQueryClient());
+    try {
+      await waitFor(() => texts().includes('SKELETON'));
+      expect(texts()).not.toContain('$0.00');
+      expect(texts()).not.toContain('$36.12');
+      expect(texts()).not.toContain('Available to spend in this organization');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps painting the membership row when the member read fails', async () => {
+    // React Query keeps `data` through a failed background refetch, so the
+    // screen hands the card a settled list even while its read is in error. The
+    // retained rows decide the amount, so the failed member read paints nothing.
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+    listState.payload = billingManagerOrgs;
+
+    const { labels, texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
+      status: 'ready',
+      orgs: billingManagerOrgs,
+    });
+    try {
+      await waitFor(() => texts().includes('$36.12'));
+      expect(texts()).not.toContain("Couldn't load balance");
+      expect(labels()).not.toContain('Failed to load balance. Tap to retry.');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('never paints the member scope caption for a money role', async () => {
+    // The caption waits for the settled role: a money role's amount is the
+    // organization's own balance whatever window the card is in.
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    const stalled = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(stalled.promise);
+    listState.payload = billingManagerOrgs;
+
+    const { texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
+      status: 'ready',
+      orgs: billingManagerOrgs,
+    });
+    try {
+      await waitFor(() => texts().includes('$36.12'));
+      expect(texts()).not.toContain('Available to spend in this organization');
+    } finally {
+      unmount();
+      stalled.resolve({ balance: 0 });
+    }
+  });
+
+  it('keeps the organization amount and offers a retry when the identity read fails', async () => {
+    // The credit reads are gated on the resolved owner, so they can never answer
+    // here. The amount still paints from the membership row, and the note slot
+    // carries the exit instead of an unreachable skeleton.
+    currentUser.userId = undefined;
+    currentUser.isError = true;
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    listState.payload = billingManagerOrgs;
+
+    const { renderer, labels, texts, unmount } = await mountCard(
+      createTestQueryClient(),
+      undefined,
+      { status: 'ready', orgs: billingManagerOrgs }
+    );
+    try {
+      await waitFor(() => texts().includes('$36.12'));
+      expect(texts()).not.toContain('SKELETON');
+      expect(labels()).not.toContain('Failed to load balance. Tap to retry.');
+      expect(labels()).toContain('Retry');
+      // The retryable branch is one `text-sm` line in the slot's
+      // two-caption-line reserve: the failure status is capped to a single
+      // line and the action's 28 dp box cancels its own overflow, so the card
+      // keeps its height when the exit paints.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(CAPTION_LINE_DP * 2, 5);
+      const [failureLine] = renderer.root.findAll(
+        node => Object.is(node.type, 'Text') && node.props.children === 'Credit expiry unavailable.'
+      );
+      expect(failureLine?.props.numberOfLines).toBe(1);
+      expect(texts()).toContain('Credit expiry unavailable.');
+
+      const retry = renderer.root.find(
+        node =>
+          node.type === Pressable &&
+          node.props.accessibilityRole === 'button' &&
+          node.props.accessibilityLabel === 'Retry'
+      );
+      expect(hasClasses(retry, LINE_ACTION_BOX_CLASS.split(' '))).toBe(true);
+      expect(classesOf(retry)).not.toContain(STATE_ACTION_CLASS);
+
+      await act(async () => {
+        (retry.props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      expect(refetchUserId).toHaveBeenCalledTimes(1);
+      expect(texts()).toContain('$36.12');
+    } finally {
+      unmount();
+    }
+  });
+});
+
 describe('CreditsCard add-credits entry point', () => {
   it.each([
     ['ios', 0],
@@ -1007,15 +1449,18 @@ describe('CreditsCard add-credits entry point', () => {
     onlineManager.setOnline(true);
   });
 
-  it('settles an unreachable balance read to the retry surface while offline', async () => {
+  it('settles an unreachable balance read to the connection state while offline', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
+    getConnectionBalanceFailure();
     onlineManager.setOnline(false);
 
     const { labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    // A read that never reached the server names the connection, not a
+    // server-side failure, and keeps the Retry that a restored network makes
+    // useful.
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
-    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Could not reach the server. Try again.');
     expect(texts()).toContain('Retry');
     expect(texts()).not.toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
@@ -1025,10 +1470,10 @@ describe('CreditsCard add-credits entry point', () => {
 
   it('keeps personal Buy credits actionable when the balance request fails', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+    getConnectionBalanceFailure();
 
     const { renderer, labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
     expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
     expect(texts()).not.toContain('$0.00');
@@ -1037,6 +1482,52 @@ describe('CreditsCard add-credits entry point', () => {
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
 
+    unmount();
+  });
+
+  it('names a permission refusal without offering Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('FORBIDDEN'));
+
+    const { renderer, labels, texts, unmount } = await mountCard();
+    const PERMISSION_COPY = "You don't have permission to view this balance.";
+    await waitFor(() => labels().includes(PERMISSION_COPY));
+
+    expect(texts()).toContain(PERMISSION_COPY);
+    // A refusal cannot be fixed by asking again, so the card offers no action.
+    expect(texts()).not.toContain('Retry');
+    const retrySurface = renderer.root.findAll(
+      node => node.type === Pressable && node.props.accessibilityRole === 'button'
+    );
+    expect(
+      retrySurface.some(node =>
+        String(node.props.accessibilityLabel ?? '').includes('Tap to retry')
+      )
+    ).toBe(false);
+    unmount();
+  });
+
+  it('describes a terminal balance failure as an explanation with no Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('NOT_FOUND'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes("Balance couldn't be loaded."));
+
+    expect(texts()).toContain("Balance couldn't be loaded.");
+    expect(texts()).not.toContain('Retry');
+    unmount();
+  });
+
+  it('keeps the retry line for a transient balance failure', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+
+    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Retry');
     unmount();
   });
 
@@ -1063,7 +1554,7 @@ describe('CreditsCard add-credits entry point', () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     // The stored selection must stay in the fetched list, or the provider's
     // lost-membership recovery switches it to Personal before the card reads it.
@@ -1097,7 +1588,7 @@ describe('CreditsCard add-credits entry point', () => {
     const balance = Promise.withResolvers<{ balance: number }>();
     getContextBalanceQueryFn.mockReturnValue(balance.promise);
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     listState.payload = orgs;
 
@@ -1140,7 +1631,7 @@ describe('CreditsCard add-credits entry point', () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     listState.payload = orgs;
 
@@ -1179,13 +1670,38 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
+  /**
+   * The one-row arm's control slot: the row's last child, beside the value column.
+   * The row is reanimated's `Animated.View` (it animates its own layout), which is
+   * not a host `View` in the rendered tree, so it is matched by its classes alone.
+   */
+  function controlSlot(renderer: ReactTestRenderer): ReactTestInstance {
+    const rows = renderer.root.findAll(node =>
+      hasClasses(node, ['min-w-0', 'flex-1', 'flex-row', 'items-center', 'gap-1'])
+    );
+    const row = rows[0];
+    if (rows.length !== 1 || row === undefined) {
+      throw new Error(`Expected one one-row arm, received ${rows.length}`);
+    }
+    const slot = row.children.at(-1);
+    if (slot === undefined || typeof slot === 'string') {
+      throw new Error('The one-row arm has no control slot');
+    }
+    return slot;
+  }
+
   /** The nearest host View above the note: the column the note shares with the amount. */
   function noteColumn(renderer: ReactTestRenderer): ReactTestInstance {
     const [note] = renderer.root.findAll(
       node => typeof node.type === 'string' && node.props.children === 'No expiring credits.'
     );
     let current = note?.parent ?? null;
-    while (current !== null && !Object.is(current.type, 'View')) {
+    // The note sits in its own fixed two-line slot; the column it shares with
+    // the amount is the first `View` above that slot.
+    while (
+      current !== null &&
+      (!Object.is(current.type, 'View') || current.props.testID === 'credits-expiry-slot')
+    ) {
       current = current.parent;
     }
     if (current === null) {
@@ -1202,6 +1718,131 @@ describe('CreditsCard balance row', () => {
     expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
     expect(renders(balanceBlock(renderer), 'ADD_CREDITS_BUTTON')).toBe(false);
     unmount();
+  });
+
+  it('holds the toggle box while the balance loads, so the wide card is the same height after', async () => {
+    currentUser.userId = 'user-a';
+    const pending = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(pending.promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, texts, unmount } = await mountCard();
+    try {
+      const box = cardBox(renderer);
+      await act(() => {
+        (box.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+          nativeEvent: { layout: { width: 383 } },
+        });
+      });
+      // The one-row arm gives the control the row's height: a placeholder that
+      // is not the control's own 48pt box shrinks the card while the read runs
+      // and grows it when the amount lands, moving every row below the card.
+      const loadingControl = controlSlot(renderer);
+      expect(classesOf(loadingControl)).toEqual(
+        expect.arrayContaining(ICON_TARGET_BOX_CLASS.split(' '))
+      );
+
+      await act(async () => {
+        pending.resolve({ balance: 1 });
+        await pending.promise;
+      });
+      await waitFor(() => texts().includes('$1.00'));
+      expect(String(controlSlot(renderer).props.className)).toContain(ICON_TARGET_BOX_CLASS);
+    } finally {
+      unmount();
+      pending.resolve({ balance: 1 });
+    }
+  });
+
+  it('reserves the funded note’s two lines while the credits load', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    const pending = Promise.withResolvers<{
+      creditBlocks: { balance_mUsd: number; expiry_date: string | null }[];
+    }>();
+    personalCreditBlocksQueryFn.mockReturnValue(pending.promise);
+    const { renderer, texts, unmount } = await mountCard();
+    try {
+      // A funded note is a sentence that wraps to two `caption` lines at this
+      // card's width (14.1 dp each: the gate device measured the funded
+      // sentence at 28.19 dp), while the bar stands in for one. A slot that only
+      // held the bar grew the card by a line when funded credits landed and
+      // moved every row below it.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(28.2, 5);
+
+      await act(async () => {
+        pending.resolve({
+          creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+        });
+        await pending.promise;
+      });
+      await waitFor(() => texts().some(text => text.includes('in credits expires')));
+      expect(renders(noteSlot(renderer), 'in credits expires')).toBe(true);
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(28.2, 5);
+    } finally {
+      unmount();
+      pending.resolve({ creditBlocks: [] });
+    }
+  });
+
+  it('reserves the wrapped note at a large font scale, not just a scaled two-line box', async () => {
+    // Android's largest scale (2.0) is the gate's `font-max` cell: the column
+    // keeps its dp width while every glyph widens, so the funded sentence takes
+    // about twice as many lines as at scale 1 and the box has to reserve them.
+    windowDims.fontScale = 2;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, renderer, unmount } = await mountCard();
+    try {
+      await waitFor(() => texts().some(text => text.includes('in credits expires')));
+      // Four lines at 28.2 dp each, not the two a scale-multiplied box holds.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(CAPTION_LINE_DP * 2 * 4, 5);
+      expect(slotHeight(noteSlot(renderer))).toBeGreaterThan(CAPTION_LINE_DP * 2 * 2);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the stacked arm on the first frame where the scroller takes landscape insets', async () => {
+    // The review's own case: the landscape insets (47/59) at font scale 2. The
+    // settled width is 800 - 28 - 47 - 59 = 666 card dp, and 666 / 2 = 333
+    // stacks; the window alone (800 - 28 = 772, 386 scaled) would pick the
+    // one-row arm and `onLayout` would flip it.
+    windowDims.width = 800;
+    windowDims.fontScale = 2;
+    insets.left = 47;
+    insets.right = 59;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockReturnValue(Promise.withResolvers<{ balance: number }>().promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, unmount } = await mountCard();
+    try {
+      // No layout event: this is the arm the first frame paints.
+      const shell = balanceBlock(renderer);
+      expect(classesOf(shell)).not.toContain('flex-row');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the one-row arm on the first frame where the insets leave room for it', async () => {
+    // The same window and scale without the cutout: 772 / 2 = 386 scaled dp
+    // keeps the note beside the amount, so the first frame must agree.
+    windowDims.width = 800;
+    windowDims.fontScale = 2;
+    insets.left = 0;
+    insets.right = 0;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockReturnValue(Promise.withResolvers<{ balance: number }>().promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, unmount } = await mountCard();
+    try {
+      expect(classesOf(balanceBlock(renderer))).toContain('flex-row');
+    } finally {
+      unmount();
+    }
   });
 
   it.each<[string, number]>([

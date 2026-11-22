@@ -19,10 +19,18 @@ import {
 import { briefingAccessDenied, selectBriefingSettingsPhase } from '@/lib/agent-briefing-state';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 export function BriefingSettingsScreen() {
   const { t } = useTranslation();
+  // Landscape clears the notch/sensor housing with a side safe area. The ready
+  // body is the scroller, whose content container carries the page gutter, so
+  // the inset goes on the scroller's own style as a margin; the loading body is
+  // a plain padded View, so it takes the inset as padding on a wrapper outside
+  // that gutter. Both collapse to `undefined` at the zero portrait insets.
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
+  const sideInsetStyle = useSideInsetStyle();
   const access = useBriefingAccess();
   const preferences = useBriefingPreferences();
   const offline = useOfflineBannerState();
@@ -46,6 +54,7 @@ export function BriefingSettingsScreen() {
       />
       {readyPreferences !== undefined && (
         <ScrollView
+          style={sideInsetMarginStyle}
           automaticallyAdjustKeyboardInsets
           contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-12')}
         >
@@ -79,8 +88,10 @@ export function BriefingSettingsScreen() {
         </ScrollView>
       )}
       {phase === 'loading' && (
-        <View className={SCREEN_BODY_CLASS}>
-          <Skeleton className="h-96 rounded-xl" />
+        <View style={sideInsetStyle}>
+          <View className={SCREEN_BODY_CLASS}>
+            <Skeleton className="h-96 rounded-xl" />
+          </View>
         </View>
       )}
       {/* Connectivity pauses the first fetch instead of failing it, so the screen

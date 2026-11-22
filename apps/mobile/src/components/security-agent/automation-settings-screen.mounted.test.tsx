@@ -5,14 +5,19 @@
 // The helper import is first: its vi.mock registrations must be in place
 // before any other import evaluates.
 import {
+  approvalRow,
   capability,
   config,
   connectivity,
+  enabledConfig,
   pillGroups,
   platformError,
+  recoveryStatuses,
   retryConfig,
   save,
   saveButton,
+  settingsRecovery,
+  textContents,
   toastSuccess,
   toggleRows,
   trackInteraction,
@@ -24,24 +29,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AutomationSettingsScreen } from './automation-settings-screen';
-
-const APPROVAL_ROW_TITLE = 'Require approval before auto-remediation';
-
-function enabledConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    isEnabled: true,
-    autoAnalysisEnabled: false,
-    autoAnalysisMinSeverity: 'high',
-    autoAnalysisIncludeExisting: false,
-    autoRemediationEnabled: true,
-    autoRemediationMinSeverity: 'high',
-    autoRemediationIncludeExisting: false,
-    autoRemediationRequireApproval: true,
-    autoDismissEnabled: false,
-    autoDismissConfidenceThreshold: 'high',
-    ...overrides,
-  };
-}
 
 function renderScreen(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -57,27 +44,20 @@ function renderScreen(): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
-function approvalRow(): {
-  title: string;
-  value: boolean;
-  disabled: boolean;
-  onValueChange: (value: boolean) => void;
-} {
-  const row = toggleRows.rows.find(r => r.title === APPROVAL_ROW_TITLE);
-  if (!row) {
-    throw new Error('approval toggle row not found');
-  }
-  return row;
-}
-
 describe('AutomationSettingsScreen approval gate', () => {
   beforeEach(() => {
     config.data = null;
     config.isLoading = false;
     config.isError = false;
+    config.error = null;
     config.isPending = false;
     config.fetchStatus = 'idle';
     capability.canManage = true;
+    capability.status = 'allowed';
+    capability.isPending = false;
+    capability.fetchStatus = 'idle';
+    settingsRecovery.retry.mockClear();
+    settingsRecovery.isRetrying = false;
     retryConfig.retry.mockClear();
     retryConfig.isRetrying = false;
     save.isPending = false;
@@ -137,11 +117,65 @@ describe('AutomationSettingsScreen approval gate', () => {
   });
 
   it('renders the approval toggle disabled for read-only viewers', () => {
+    // Only a settled denial disables the draft: `canManage` alone is what a
+    // failed or still-unanswered role read also reports.
     capability.canManage = false;
+    capability.status = 'denied';
     config.data = enabledConfig();
     renderScreen();
 
     expect(approvalRow().disabled).toBe(true);
+  });
+
+  it('offers Retry and keeps the rows editable when the role read failed', () => {
+    capability.status = 'error';
+    config.data = enabledConfig();
+    const renderer = renderScreen();
+
+    expect(recoveryStatuses(renderer)).toHaveLength(1);
+    expect(recoveryStatuses(renderer)[0]?.props).toMatchObject({
+      message: i18n.t('securityAgent.settingsOverview.couldNotLoadPermissions'),
+      isRetrying: false,
+    });
+    // A failed role read is not evidence of a denial: the draft stays editable.
+    expect(approvalRow().disabled).toBe(false);
+  });
+
+  it('keeps the permission note and disables the rows for a settled denial', () => {
+    capability.canManage = false;
+    capability.status = 'denied';
+    config.data = enabledConfig();
+    const renderer = renderScreen();
+
+    // A denial is settled, so the recovery row has nothing to retry and the
+    // permission note is the one explanation.
+    expect(recoveryStatuses(renderer)).toHaveLength(0);
+    expect(textContents(renderer)).toContain(i18n.t('securityAgent.sla.permissionNote'));
+    expect(approvalRow().disabled).toBe(true);
+  });
+
+  it('offers Retry for a role read paused by a confirmed-offline device', () => {
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    config.data = enabledConfig();
+    const renderer = renderScreen();
+
+    // A paused read can never finish on its own, so it names the action instead
+    // of holding the screen as if the role were still being read.
+    expect(recoveryStatuses(renderer)).toHaveLength(1);
+  });
+
+  it('keeps the recovery row off a role read still in flight', () => {
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.fetchStatus = 'fetching';
+    config.data = enabledConfig();
+    const renderer = renderScreen();
+
+    expect(recoveryStatuses(renderer)).toHaveLength(0);
+    expect(approvalRow().disabled).toBe(false);
   });
 
   it('names the connection and offers Retry for a first read paused offline', () => {
@@ -159,7 +193,8 @@ describe('AutomationSettingsScreen approval gate', () => {
       throw new Error('paused first read did not render the failure screen');
     }
     expect(error.variant).toBe('offline');
-    expect(error.message).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(error.message).toBeUndefined();
     expect(error.title).toBe(i18n.t('securityAgent.automation.title'));
     // The retry routes through the deliberate paused-read hook, not the plain
     // query refetch, and the branch forwards the hook's busy state.
@@ -303,5 +338,21 @@ describe('AutomationSettingsScreen approval gate', () => {
       // Label in name: the switch is named by the text the row shows.
       expect(row.accessibilityLabel).toBeUndefined();
     }
+  });
+  it('titles a failed first read with the screen and leaves the description to the variant', () => {
+    config.data = null;
+    config.isError = true;
+    config.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    renderScreen();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('failed first read did not render the failure screen');
+    }
+    // The failed read is named once, in the error's own title. A message here
+    // would repeat the same words above the variant's cause.
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(error.message).toBeUndefined();
+    expect(error.variant).toBe('server');
   });
 });

@@ -32,6 +32,7 @@ import {
   listHostedWorkspaces,
 } from './router/handlers/hosted-workspace-list.js';
 import { getHostedWorkspaceStatus } from './router/handlers/hosted-workspace-status.js';
+import { listHostedWorkspaceRepositories } from './router/handlers/hosted-workspace-repositories.js';
 import { refreshHostedWorkspacePullRequest } from './router/handlers/hosted-workspace-pull-request-refresh.js';
 import {
   getHostedWorkspaceChangeFile,
@@ -66,6 +67,7 @@ export const appRouter = router({
   listHostedSessions,
   listChildSessions,
   listHostedWorkspaces,
+  listHostedWorkspaceRepositories,
   getHostedWorkspace,
   getHostedWorkspaceStatus,
   refreshHostedWorkspacePullRequest,

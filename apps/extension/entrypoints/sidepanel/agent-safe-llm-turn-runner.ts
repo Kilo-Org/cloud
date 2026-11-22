@@ -110,7 +110,12 @@ export const runSafeLlmTurn = ({
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
       if (isKiloBrowserToolCallEvent(toolCall)) {
-        return executeKiloBrowserToolCall(toolCall, browserCaller, options.signal);
+        // Safe mode exposes only the read-only tools, so a dialog answer it cannot call is not offered.
+        return executeKiloBrowserToolCall(
+          toolCall,
+          { caller: browserCaller, safeMode: true },
+          options.signal
+        );
       }
 
       if (isWebMcpToolCallEvent(toolCall)) {

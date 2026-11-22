@@ -309,6 +309,97 @@ test('gutter: content a native sheet hosts is measured from the sheet root', () 
   assert.equal(run(presentedContent(21), LANDSCAPE)[0]?.measured, 21);
 });
 
+/**
+ * A landscape empty state: the page box starts at the 47 dp inset, and the
+ * state's block is centred in the *window*, so its own edge lands 1 dp outside
+ * the page box while both sides stay symmetric (63 dp of window edge, 63 dp of
+ * page edge on the 900 pt phone below).
+ */
+function landscapeCenteredState(): ProbeNode[] {
+  return [
+    { parent: 0, tag: 'RNSScreen', rect: [0, 0, 900, 400] },
+    { parent: 1, tag: 'View', rect: [0, 0, 900, 400], style: { backgroundColor: '#ffffff' } },
+    { parent: 2, tag: 'ScrollView', rect: [0, 66, 900, 334], style: { overflow: 'scroll' } },
+    {
+      parent: 3,
+      tag: 'View',
+      rect: [0, 66, 900, 334],
+      owners: ['View', 'ScrollView', 'CenteredState', 'EmptyState'],
+    },
+    {
+      parent: 4,
+      tag: 'View',
+      rect: [48, 172, 804, 46],
+      owners: ['View', 'EmptyStateBody', 'View', 'ScrollView'],
+    },
+    {
+      parent: 5,
+      tag: 'Paragraph',
+      rect: [48, 172, 700, 24],
+      owners: ['Text', 'View', 'EmptyStateBody'],
+      text: 'AI Guardrails is not enabled',
+    },
+    {
+      parent: 5,
+      tag: 'Paragraph',
+      rect: [48, 200, 804, 18],
+      owners: ['Text', 'View', 'EmptyStateBody'],
+      text: 'Kilo enables AI Guardrails for an organization on request.',
+    },
+  ];
+}
+
+test('gutter: a centred block inside a landscape inset is not inside the gutter', () => {
+  // The block spans the window minus symmetric margins: its start edge is 1 dp
+  // outside the page box, which the inside-gutter test read as content painted
+  // in the gutter. The centred block's placement is its own, so nothing here is
+  // an error.
+  assert.deepEqual(run(landscapeCenteredState(), LANDSCAPE), []);
+
+  // The exemption is the centred placement, not the inset: a block pinned to
+  // the page box's own start edge, with no centred ancestor above it, is still
+  // content painted in the gutter.
+  const pinned: ProbeNode[] = [
+    { parent: 0, tag: 'RNSScreen', rect: [0, 0, 900, 400] },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 0, 900, 400],
+      style: { backgroundColor: '#ffffff' },
+    },
+    { parent: 2, tag: 'View', rect: [47, 172, 700, 46] },
+    { parent: 3, tag: 'Paragraph', rect: [47, 172, 700, 24], text: 'Body line' },
+  ];
+  const findings = run(pinned, LANDSCAPE);
+  assert.ok(findings.length > 0);
+  assert.ok(findings.every(finding => finding.measured === 0));
+});
+
+test('gutter: a centred block does not excuse a child that leaves its column', () => {
+  // The exemption covers the block's own column: the text a centred empty state
+  // stacks inside it. A card painted flush to the page edge below that block is
+  // its own column, and the centred ancestor must not accept it — before the
+  // exemption moved ahead of the inside-gutter test, the rule reported this at
+  // 0 dp.
+  assert.deepEqual(
+    run(
+      [
+        { parent: 0, tag: 'RNSScreen', rect: [0, 0, 900, 400] },
+        {
+          parent: 1,
+          tag: 'View',
+          rect: [0, 0, 900, 400],
+          style: { backgroundColor: '#ffffff' },
+        },
+        { parent: 2, tag: 'View', rect: [48, 120, 804, 200] },
+        { parent: 3, tag: 'Paragraph', rect: [47, 140, 700, 40], text: 'Flush child' },
+      ],
+      LANDSCAPE
+    ).map(finding => [finding.element.path, finding.measured]),
+    [['Paragraph', 0]]
+  );
+});
+
 test('gutter: chips in a horizontal scroller keep their scroll offset', () => {
   assert.deepEqual(
     run([

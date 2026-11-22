@@ -142,10 +142,12 @@
     "keepRunning": "Continuar em execução",
     "newSession": "Nova sessão",
     "noModelsAvailable": "Sem modelos disponíveis",
+    "modelRetires": "Descontinuado em {{date}}",
     "notFound": "Conteúdo não encontrado.",
     "online": "Em linha",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
+    "viewOnGitHub": "Ver PR no GitHub",
     "completed": "Concluída",
     "pending": "Pendente",
     "running": "Em execução",
@@ -185,7 +187,31 @@
     "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
     "privateRepositoryA11y": "{{name}}, repositório privado",
     "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês.",
-    "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente."
+    "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente.",
+    "organizationTrialEndedBillingAtKiloAi": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Marcador",
+        "nestedBulletPoint": "Marcador aninhado",
+        "orderedItem": "Item da lista {n}",
+        "nestedOrderedItem": "Item da lista aninhado {n}"
+      },
+      "blockquote": {
+        "quote": "Citação",
+        "nestedQuote": "Citação aninhada"
+      },
+      "table": {
+        "row": "Linha {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemática: {latex}"
+      },
+      "rotor": {
+        "headings": "Títulos",
+        "links": "Ligações",
+        "images": "Imagens"
+      }
+    }
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -279,9 +305,13 @@
     "credits": "Créditos",
     "failedToLoadBalance": "Não foi possível carregar o saldo. Toque para tentar novamente.",
     "balanceLoadFailed": "Não foi possível carregar o saldo",
+    "balanceUnreachable": "Não foi possível contactar o servidor. Tente novamente.",
+    "balanceAccessDenied": "Não tem permissão para ver este saldo.",
+    "balanceUnavailable": "Não foi possível carregar o saldo.",
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
+    "availableToSpendInOrganization": "Disponível para gastar nesta organização",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -423,6 +453,17 @@
       "location": "Localização Vertex",
       "clientEmail": "Email da conta de serviço",
       "privateKey": "Chave privada da conta de serviço",
+      "privateKeyBlockRequired": "Cola o bloco completo da chave, desde a linha BEGIN até à linha END.",
+      "privateKeyEncrypted": "Este bloco da chave está protegido por uma frase-passe. Cola uma chave de conta de serviço que não tenha frase-passe.",
+      "names": {
+        "codestral": "Apenas Codestral antigo",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Iniciar sessão com ChatGPT)",
+        "xiaomi": "Xiaomi (pagamento conforme a utilização)",
+        "zai": "Z.ai (pagamento conforme a utilização)",
+        "bedrockByok": "Amazon Bedrock (direto)",
+        "vertexByok": "Google Vertex AI (direto)"
+      },
       "modelMappings": "Mapeamentos de modelos",
       "modelMappingsDescription": "Envia um modelo do gateway para um nome de implementação personalizado.",
       "mappingTitle": "Mapeamento {{number}}",
@@ -483,12 +524,13 @@
       "receiptLabel": "Comprovativo",
       "copyReceiptId": "Copiar ID do comprovativo",
       "appealLabel": "Recurso",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Recebida",
       "triageOpen": "Em análise",
       "triageActioned": "Procedente",
       "triageRejected": "Não procedente",
       "appealNone": "Nenhum enviado",
-      "appealSubmitted": "Em análise",
+      "appealSubmitted": "Recurso em análise",
       "appealAccepted": "Aceite",
       "appealRejected": "Recusado",
       "appeal": "Recorrer desta decisão",
@@ -500,7 +542,25 @@
       "nextStepInReview": "O resultado aparecerá neste ecrã e pode recorrer após a decisão.",
       "nextStepAppeal": "O resultado do recurso aparecerá neste ecrã.",
       "nextStepFinal": "A decisão do recurso é final. Não é possível apresentar novo recurso.",
-      "viewReceipt": "Ver comprovativo"
+      "viewReceipt": "Ver comprovativo",
+      "targetLabel": "Item denunciado",
+      "reasonLabel": "Motivo da denúncia",
+      "targetMessage": "Resposta da IA",
+      "targetComment": "Comentário do PR",
+      "targetUser": "Utilizador",
+      "reasonHarmful": "Conteúdo nocivo",
+      "reasonIllegal": "Conteúdo ilegal",
+      "reasonHarassment": "Assédio",
+      "reasonSpam": "Publicidade não solicitada",
+      "reasonOther": "Outro motivo"
+    },
+    "reportReceipts": {
+      "title": "Denúncias",
+      "rowSubtitle": "As denúncias que fizeste e os respetivos resultados",
+      "emptyTitle": "Ainda não há denúncias",
+      "emptyDescription": "As denúncias que fizeres a partir de um comentário numa discussão de pull request ou de uma resposta da IA numa sessão de agente aparecem aqui com o respetivo resultado.",
+      "couldNotLoad": "Não foi possível carregar as tuas denúncias",
+      "capped": "A mostrar as tuas denúncias mais recentes."
     },
     "changelog": "Novidades",
     "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização da app.",
@@ -508,8 +568,11 @@
     "changelogFixesIn": "Correções e melhorias em {{areas}}.",
     "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
     "changelogAreas": {
-      "signIn": "Início de sessão",
-      "profileOrganizations": "Perfil e organizações"
+      "signIn": "início de sessão",
+      "profileOrganizations": "perfil & organizações",
+      "chat": "conversa",
+      "notifications": "notificações",
+      "integrations": "integrações"
     }
   },
   "preferences": {
@@ -775,6 +838,11 @@
       "couldNotLoadMore": "Não foi possível carregar mais comentários.",
       "retryLoadingMore": "Tentar carregar mais comentários novamente",
       "loadMoreComments": "Carregar mais comentários",
+      "conversationTruncated": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_zero": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_one": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_other": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_many": "São apresentados apenas os primeiros {{displayCount}} comentários.",
       "addReaction": "Adicionar reação",
       "reactionPill": "reação {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reação",
@@ -909,7 +977,6 @@
       "noAccess": "Não tens acesso às verificações deste repositório.",
       "couldNotLoad": "Não foi possível carregar as verificações.",
       "retryChecks": "Tentar carregar as verificações novamente",
-      "viewOnGitHub": "Ver PR no GitHub",
       "noChecksReported": "Nenhuma verificação comunicada",
       "passed": "{{displayCount}} com êxito",
       "passed_one": "{{displayCount}} com êxito",
@@ -982,8 +1049,9 @@
       "checkActiveConnection": "A ligação está ativa, mas este item ainda não pode ser carregado.",
       "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
-      "gitlabReconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
+      "reconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
       "bitbucketNotConnectedTitle": "O Bitbucket não está ligado",
+      "bitbucketAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que o ligue.",
       "adminOnlyConnectDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a sua conta pessoal"
@@ -1212,6 +1280,10 @@
       "emptyTitle": "Ainda não há notificações",
       "emptyCategoryTitle": "Ainda não há notificações nesta categoria",
       "emptyBody": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_zero": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_one": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_many": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_other": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
       "capped": "A mostrar as notificações mais recentes.",
       "loadError": "Não foi possível carregar o histórico de notificações.",
       "openFailed": "Esta notificação já não abre em lado nenhum."
@@ -1292,6 +1364,7 @@
       "manageAccess": "Gerir acesso",
       "bitbucketNoRepositoriesDescription": "Não há repositórios disponíveis neste espaço de trabalho do Bitbucket.",
       "gitlabNoRepositoriesDescription": "Podes precisar de conceder acesso a mais grupos ou projetos no GitLab.",
+      "githubNoRepositoriesDescription": "Verifique as permissões de acesso da aplicação Kilo para GitHub e atualize a lista.",
       "installGithubApp": "Instalar a aplicação do GitHub nos repositórios",
       "installGithubAppDescription": "Dá à aplicação do Kilo no GitHub acesso aos repositórios que queres rever.",
       "repositoryAccess": "acesso ao repositório",
@@ -1321,11 +1394,11 @@
       "couldNotGetLatest": "Não foi possível obter os dados mais recentes.",
       "byline": "#{{number}} por {{author}}",
       "noFindings": "Não foram detetadas ocorrências.",
-      "findingsUnavailable": "Os resultados não estão disponíveis porque esta revisão falhou.",
+      "findingsUnavailable": "Os resultados não estão disponíveis.",
       "findingsInProgress": "Esta revisão ainda está em curso. As ocorrências aparecem aqui quando terminar.",
       "findingsEndedWithoutResults": "Esta revisão terminou antes de produzir ocorrências.",
       "serviceUnavailable": "Não foi possível estabelecer ligação ao serviço de revisão de código. Repita a revisão quando o serviço estiver disponível.",
-      "reviewFailed": "A revisão falhou. Tente novamente.",
+      "reviewFailed": "A revisão falhou.",
       "showMore": "Mostrar mais",
       "created": "Criada",
       "started": "Iniciada",
@@ -1443,16 +1516,19 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar."
+      "notConnectedReadOnlyPlan": "O período de teste da organização terminou, por isso um proprietário tem de atualizar a faturação em kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
+      "deniedManagedByOwner": "Peça a um proprietário de {{organization}} para alterar a conexão que não consegue alterar.",
+      "deniedConnectRole": "Apenas os proprietários, os administradores e os gestores de faturação de {{organization}} o podem ligar.",
+      "deniedReconnectRole": "Peça a um proprietário, administrador ou gestor de faturação de {{organization}} que a volte a ligar.",
       "managedOnWebTitle": "Gerida na Web",
       "managedOnWebShort": "Esta ligação é gerida na Web, a partir de um computador.",
       "managedOnWebRepositories": "Escolhe os repositórios de {{organization}} na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
       "descriptionReconnect": "Cria um novo token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
-      "descriptionOverview": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o no ecrã seguinte.",
+      "descriptionOverview": "Cria um token de acesso ao espaço de trabalho e cola-o no ecrã seguinte.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
       "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
       "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
@@ -1478,9 +1554,9 @@
       "activity": "Atividade"
     },
     "providerConnect": {
-      "githubApp": "Aplicação do GitHub",
+      "githubApp": "aplicação do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tenta novamente.",
-      "gitlabAccount": "Conta do GitLab",
+      "gitlabAccount": "conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tenta novamente.",
       "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente."
     },
@@ -1588,7 +1664,9 @@
       "unavailablePersonallySwitchAction": "Trocar de organização",
       "unavailableOrganizationTitle": "Revisão do conselho não está disponível",
       "unavailableForOrganization": "A revisão do conselho precisa do plano Enterprise com uma subscrição ou um período de teste ativos. Esta organização não o tem neste momento.",
-      "unavailableForOrganizationNeutral": "A revisão do conselho não está disponível para esta organização neste momento. Tente novamente mais tarde.",
+      "unavailablePlanCheck": "A revisão do conselho não conseguiu verificar o plano desta organização. Tente novamente para verificar outra vez.",
+      "unavailableFlagRollout": "A revisão do conselho ainda não está disponível para esta organização. Atualize a aplicação para a versão mais recente para a obter.",
+      "unavailableForOrganizationMember": "A revisão do conselho precisa do plano Enterprise com uma subscrição ou um período de teste ativos. O proprietário da organização pode alterar o plano.",
       "unavailableOnBitbucket": "A revisão do conselho não está disponível para repositórios Bitbucket.",
       "noRepositories": "Ainda não há repositórios selecionados. Escolhe primeiro repositórios nas definições de repositórios.",
       "specialists": "Especialistas",
@@ -2609,8 +2687,7 @@
       "searchPlaceholder": "Pesquisar repositórios",
       "noMatches": "Sem resultados",
       "noRepositories": "Nenhum repositório disponível",
-      "noRepositoriesDescription": "Nenhum repositório está ligado à sua conta.",
-      "loading": "A carregar…",
+      "noRepositoriesDescription": "Para carregar repositórios, ligue uma conta do GitHub ou do GitLab.",
       "accessibility": "Repositório: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3523,7 +3600,7 @@
       "manageOnWeb": "Definições de faturação na Web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar lugares",
-      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos na Web.",
+      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos em kilo.ai.",
       "setupAutoTopUp": "Configurar carregamento automático",
       "manageAutoTopUp": "Gerir carregamento automático",
       "opensOnWeb": "Abre na web"
@@ -3705,13 +3782,14 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Introduza um identificador.",
       "identifierTaken": "Outro modo já utiliza este identificador.",
+      "identifierTooLong": "Mantenha o identificador com {{max}} caracteres ou menos.",
       "nameLabel": "Nome do modo",
       "nameRequired": "Introduza um nome de modo.",
       "notFound": "Este modo já não existe.",
-      "restrictionHint": "Só os ficheiros que correspondem a este padrão podem ser editados. Deixe vazio para permitir todos os ficheiros.",
-      "restrictionInvalid": "Introduza um padrão válido.",
+      "restrictionHint": "Uma expressão regular seleciona os ficheiros que este modo pode editar, por exemplo `\\.md$` para apenas ficheiros markdown. Deixe vazio para permitir todos os ficheiros.",
+      "restrictionInvalid": "Introduza uma expressão regular válida.",
       "restrictionLabel": "Etiqueta de restrição",
-      "restrictionPattern": "Padrão de ficheiro",
+      "restrictionPattern": "Restrição de ficheiro",
       "roleLabel": "Definição da função",
       "roleRequired": "Descreva o que este modo faz.",
       "tool": {
@@ -3799,7 +3877,7 @@
     "emailDeliveryFailed": "O envio de emails está temporariamente indisponível. Tenta novamente mais tarde.",
     "admissionRequired": "Não é possível verificar o teu dispositivo. Usa '$t(login.moreSignInOptions)' para iniciar sessão noutro dispositivo ou no site.",
     "default": "Algo correu mal. Tenta novamente.",
-    "retryableAdmission": "Não foi possível verificar este dispositivo. Verifica a tua ligação e tenta novamente.",
+    "retryableAdmission": "Não foi possível verificar este dispositivo. Tenta novamente.",
     "startSignInFailed": "Não foi possível iniciar o processo de início de sessão. Tenta novamente.",
     "couldNotOpenBrowser": "Não foi possível abrir o navegador. Tenta novamente.",
     "signInTimedOut": "O tempo para iniciar sessão esgotou-se. Tenta novamente.",
@@ -3871,6 +3949,50 @@
     "nextScheduled": "Próximos agendamentos",
     "answerNeeded": "Resposta necessária",
     "waitingToRetry": "À espera de nova tentativa",
+    "countNoun": {
+      "needsInput_one": "À espera de resposta",
+      "needsInput_zero": "À espera de resposta",
+      "needsInput_many": "À espera de resposta",
+      "needsInput_other": "À espera de resposta",
+      "running_one": "A trabalhar",
+      "running_zero": "A trabalhar",
+      "running_many": "A trabalhar",
+      "running_other": "A trabalhar",
+      "scheduled_one": "Agendada",
+      "scheduled_zero": "Agendadas",
+      "scheduled_many": "Agendadas",
+      "scheduled_other": "Agendadas",
+      "idle_one": "Em espera",
+      "idle_zero": "Em espera",
+      "idle_many": "Em espera",
+      "idle_other": "Em espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} À espera de resposta",
+      "needsInput_zero": "{{displayCount}} À espera de resposta",
+      "needsInput_many": "{{displayCount}} À espera de resposta",
+      "needsInput_other": "{{displayCount}} À espera de resposta",
+      "running_one": "{{displayCount}} A trabalhar",
+      "running_zero": "{{displayCount}} A trabalhar",
+      "running_many": "{{displayCount}} A trabalhar",
+      "running_other": "{{displayCount}} A trabalhar",
+      "scheduled_one": "{{displayCount}} Agendada",
+      "scheduled_zero": "{{displayCount}} Agendadas",
+      "scheduled_many": "{{displayCount}} Agendadas",
+      "scheduled_other": "{{displayCount}} Agendadas",
+      "idle_one": "{{displayCount}} Em espera",
+      "idle_zero": "{{displayCount}} Em espera",
+      "idle_many": "{{displayCount}} Em espera",
+      "idle_other": "{{displayCount}} Em espera"
+    },
+    "footer": {
+      "checked": "Verificado {{time}}",
+      "lastKnown": "Último estado conhecido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima execução {{time}}",
+      "wasDue": "Estava previsto {{time}}"
+    },
     "step": {
       "editing": "A editar",
       "reading": "A ler",
@@ -4118,7 +4240,8 @@
         "space": "Não há espaço de armazenamento livre suficiente para este modelo. Liberte espaço e tente novamente.",
         "network": "A transferência não terminou. Verifique a sua ligação e tente novamente.",
         "invalidFile": "O ficheiro transferido não é um modelo que esta aplicação possa executar, por isso foi removido.",
-        "checksum": "O ficheiro transferido não corresponde à soma de verificação publicada, por isso foi removido. Tente transferir novamente."
+        "checksum": "O ficheiro transferido não corresponde à soma de verificação publicada, por isso foi removido. Tente transferir novamente.",
+        "writeFailed": "Este dispositivo não conseguiu guardar o modelo. Tente transferir novamente."
       }
     },
     "catalog": {
@@ -4306,7 +4429,7 @@
     "personalDefaultDescription": "Carregado automaticamente quando nenhum repositório tem um perfil fixado.",
     "organizationDefaultDescription": "Carregado automaticamente para membros que não têm predefinição pessoal.",
     "setAsDefault": "Definir como predefinido",
-    "saveFailed": "Não foi possível guardar o perfil",
+    "saveFailed": "Não foi possível guardar o perfil. Tenta novamente.",
     "organizationRoleRequired": "Apenas os proprietários da organização e os administradores podem alterar os perfis da organização.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Elimina permanentemente o perfil e as respetivas definições. Esta ação não pode ser anulada.",
@@ -4457,6 +4580,7 @@
       "promptPlaceholder": "És um…",
       "tools": "Ferramentas",
       "wholeToolRule": "Este agente aplica uma regra a todas as ferramentas de uma só vez: {{rule}}. Esses interruptores são somente leitura.",
+      "toolRule": "Regra armazenada: {{rule}}",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primário — mostrado no seletor",
       "visibilitySubagent": "Subagente — só pode ser invocado por outros",
@@ -4566,19 +4690,34 @@
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras, recibos e uso de créditos aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
+      "expiredGrant": "Expirado: {{description}}",
       "googlePlayReceipt": "Recibo do Google Play",
       "kind": {
         "adjustment": "Ajuste",
         "balanceNeutral": "Sem efeito no saldo",
         "deduction": "Dedução",
         "grant": "Concessão de créditos",
+        "promotionalCredits": "Créditos promocionais",
+        "welcomeCredits": "Créditos de boas-vindas",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessão de créditos pelo administrador",
+        "contributorChampion": "Crédito de campeão contribuidor",
+        "feedback": "Crédito por comentários",
+        "influencer": "Crédito de influencer",
+        "ossMonthlyReset": "Renovação do patrocínio de código aberto",
+        "ossSponsorship": "Crédito de patrocínio de código aberto",
+        "pullRequest": "Crédito por PR",
+        "usageIssue": "Crédito por problema de utilização",
+        "vibeDay": "Crédito por Vibe Day"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
-      "retentionLimit": "A mostrar o histórico de créditos mais recente."
+      "retentionLimit": "A mostrar o histórico de créditos mais recente.",
+      "voidedGrant": "Anulado: {{description}}"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
@@ -4843,6 +4982,8 @@
     "connectedTo": "Conectado a {{account}}",
     "disconnected": "{{provider}} desconectado",
     "disconnectFailed": "Não foi possível desconectar {{provider}}",
+    "disconnectRetry": "Não foi possível confirmar a desconexão do Slack. Tente novamente.",
+    "disconnectNeedsSupport": "O Kilo não conseguiu ler o acesso ao Slack guardado para esta ligação. Contacte o suporte para concluir a desconexão.",
     "couldNotLoad": "Não foi possível carregar as integrações",
     "permissionDenied": "Você não tem permissão para gerenciar estas integrações.",
     "managedByOwner": "Peça a um proprietário da organização para alterar uma conexão que não consegue alterar.",
@@ -4928,6 +5069,9 @@
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Todas as execuções usam a sua conta, por isso o cabeçalho secreto é obrigatório.",
       "saveFailedTitle": "Não foi possível guardar o acionador",
+      "nameTaken": "Já existe um acionador chamado «{{name}}».",
+      "saveFailedRetry": "Não foi possível contactar o servidor. Verifique a ligação e tente novamente.",
+      "saveFailedCheck": "Verifique os valores do formulário e tente novamente.",
       "deleteTitle": "Eliminar este acionador?",
       "deleteMessage": "As chamadas para {{name}} vão falhar. Esta ação não pode ser anulada.",
       "deleteMessageScheduled": "As execuções agendadas de {{name}} param. Esta ação não pode ser anulada.",
@@ -5009,12 +5153,15 @@
     "inputDescription": "Analisa cada entrada com a Enkrypt AI, incluindo os resultados das ferramentas. Quando a Enkrypt AI não está disponível, os pedidos são enviados sem análise em vez de rejeitados.",
     "outputTitle": "Proteções de saída",
     "outputDescription": "Analisa as respostas com a Enkrypt AI antes de os membros as receberem. Desativadas, a menos que as ative.",
+    "outputUnavailable": "O Kilo não ativou a análise de saída para esta organização, por isso as respostas não são verificadas e não há nada para configurar aqui. Contacte {{supportEmail}} para o pedir.",
     "detectorsHint": "Bloquear rejeita um pedido sinalizado. A opção Registar apenas regista-o sem atrasar o pedido.",
     "detectorsHintOutput": "Bloquear faz falhar uma resposta sinalizada. A opção Registar apenas regista-a sem atrasar a resposta.",
     "choiceLog": "Registar apenas",
     "applyTo": "Aplicar a",
     "applyToAllMembers": "Todos os membros",
     "applyKiloDefault": "Aplicar predefinição do Kilo",
+    "applyKiloDefaultEnglishNote": "O texto da política predefinida do Kilo está em inglês, porque o Kilo Gateway aplica-o exatamente como está escrito.",
+    "applyKiloDefaultReplaceMessage": "A política predefinida do Kilo está escrita em inglês e substitui o que definiu em Violação da política. O texto que introduziu no campo de texto da política não pode ser recuperado.",
     "invalidSavedTitle": "Não é possível ler as definições guardadas dos detetores de entrada",
     "invalidSavedBody": "Os pedidos são bloqueados até que os detetores de entrada sejam guardados novamente. Os detetores abaixo partem da predefinição do Kilo.",
     "invalidSavedOutputTitle": "Não é possível ler as definições guardadas dos detetores de saída",
@@ -5150,6 +5297,7 @@
     "providersNeedCatalog": "Os interruptores dos fornecedores ficam só de leitura até o catálogo completo de modelos ser carregado. Toque em Tentar novamente acima para os editar.",
     "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",
     "providersNone": "Nenhum fornecedor está disponível para esta organização.",
+    "providersUnavailable": "Não foi possível carregar a lista de fornecedores.",
     "allowAllShown": "Permitir todos os apresentados",
     "denyAllShown": "Negar todos os apresentados",
     "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",
@@ -5168,6 +5316,20 @@
       "eu": "União Europeia",
       "au": "Austrália",
       "jp": "Japão"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Pesquisar nas preferências",
+    "noMatches": "Nenhuma preferência encontrada",
+    "emptyDescription": "Experimente outro nome de preferência ou palavra-chave.",
+    "resultsStatus": "Preferências encontradas: {{resultCount}}",
+    "keywords": {
+      "signOut": "sair|terminar sessão",
+      "appearance": "tema|cores|modo escuro",
+      "appUnlock": "biometria|rosto|impressão digital",
+      "language": "idioma|língua|tradução",
+      "notifications": "alertas|avisos|notificações",
+      "privacy": "análise de dados|rastreio|privacidade"
     }
   }
 }

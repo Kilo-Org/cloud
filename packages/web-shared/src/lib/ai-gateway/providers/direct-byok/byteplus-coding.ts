@@ -1,5 +1,5 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { applyThinkingToggleAndReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { applyThinkingToggleAndReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import {
   apiKeyUpstream,
   type DirectByokModel,
@@ -9,6 +9,7 @@ import {
   effortOptions,
   REASONING_TOGGLE,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
+import { formatModelId } from './model-id';
 
 export const BYTEPLUS_CODING_PROVIDER_ID = 'byteplus-coding';
 
@@ -78,6 +79,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 131072,
     max_completion_tokens: 65536,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'dola-seed-2.0-code',
@@ -110,8 +112,8 @@ export const BYTEPLUS_CODING_MODELS = [
   },
 ] as const satisfies ReadonlyArray<DirectByokModel>;
 
-export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
-  model => `${BYTEPLUS_CODING_PROVIDER_ID}/${model.id}`
+export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(model =>
+  formatModelId(BYTEPLUS_CODING_PROVIDER_ID, model.id)
 );
 
 export default {

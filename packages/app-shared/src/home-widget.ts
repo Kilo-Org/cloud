@@ -21,13 +21,14 @@ import {
   isApprovableGlanceableStatus,
   isTerminalGlanceableStatus,
   type BuildGlanceableSnapshotInput,
+  type GlanceableAgentsSnapshotStatus,
   type GlanceableNeedsInputKind,
   type GlanceableSessionRow,
   type GlanceableStatusKind,
   type GlanceableTerminalStatus,
   compareSessionInstant,
 } from './glanceable-agents-snapshot';
-import { timestampMs, timestampToIso } from './utils';
+import { epochMsToIso, timestampMs, timestampToIso } from './utils';
 
 export const HOME_WIDGET_DETAIL_LIMIT = 3;
 const titleSchema = z.string().max(GLANCEABLE_TITLE_LIMIT);
@@ -155,12 +156,26 @@ const QUIET_REFRESH_MS = 2 * 60 * 60 * 1000;
 const WAKE_RETRY_MS = 15 * 60 * 1000;
 
 /**
- * The one cadence rule: every caller that needs a snapshot's refresh interval
- * reads this function. A terminal snapshot is quiet regardless of the counts
- * that survive beside it, so auth/privacy termination cannot keep polling.
+ * The one terminal narrowing: the status when it ends the surface, else null.
+ * Callers read this value instead of testing the predicate and keeping a
+ * boolean beside a status a later branch can contradict.
  */
-function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
-  if (isTerminalGlanceableStatus(snapshot.status)) return QUIET_REFRESH_MS;
+function terminalStatusOf(status: GlanceableAgentsSnapshotStatus): GlanceableTerminalStatus | null {
+  return isTerminalGlanceableStatus(status) ? status : null;
+}
+
+/**
+ * The one cadence rule: every caller that needs a snapshot's refresh interval
+ * reads this function. It takes the caller's already-narrowed terminal status
+ * rather than testing the predicate again, and a terminal snapshot is quiet
+ * regardless of the counts that survive beside it, so auth/privacy termination
+ * cannot keep polling.
+ */
+function refreshInterval(
+  snapshot: GlanceableAgentsSnapshot,
+  terminal: GlanceableTerminalStatus | null
+): number {
+  if (terminal !== null) return QUIET_REFRESH_MS;
   return snapshot.status === 'waiting' ||
     snapshot.status === 'stale' ||
     snapshot.status === 'expired' ||
@@ -262,18 +277,18 @@ export function buildHomeWidgetData(
   }
 ): HomeWidgetData {
   const snapshot = buildGlanceableSnapshot(input);
+  const terminal = terminalStatusOf(snapshot.status);
   return {
     snapshot,
-    details: isTerminalGlanceableStatus(snapshot.status)
-      ? emptyHomeWidgetDetails()
-      : buildHomeWidgetDetails(input.sessions),
+    details: terminal === null ? buildHomeWidgetDetails(input.sessions) : emptyHomeWidgetDetails(),
   };
 }
 
 /**
- * Decide four linked presentation facts once: terminal, primaryKind,
- * checkedAt, and staleAt. The presentation's `stale` flag and the timeline
- * boundary both read `staleAt`, so native aging cannot disagree with the flag.
+ * Decide the linked presentation facts once: terminal, primaryKind, checkedAt,
+ * staleAt, and the cadence they age by. The presentation's `stale` flag and the
+ * timeline boundary both read `staleAt`, so native aging cannot disagree with
+ * the flag.
  */
 function staleness(data: HomeWidgetData): {
   /**
@@ -285,44 +300,50 @@ function staleness(data: HomeWidgetData): {
   primaryKind: GlanceableStatusKind | null;
   checkedAt: string | null;
   staleAt: number | null;
+  /** The cadence the snapshot ages by, so a caller needs no second `refreshInterval` read. */
+  refreshMs: number;
 } {
   const { snapshot } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
+  const terminal = terminalStatusOf(snapshot.status);
   const primaryKind = terminal === null ? primaryKindOf(snapshot) : null;
   const checkedAt =
     terminal !== null || (primaryKind === null && snapshot.status !== 'empty')
       ? null
       : snapshot.updatedAt;
   const confirmedAt = timestampMs(checkedAt);
+  const refreshMs = refreshInterval(snapshot, terminal);
   return {
     terminal,
     primaryKind,
     checkedAt,
-    staleAt: confirmedAt === null ? null : confirmedAt + refreshInterval(snapshot),
+    staleAt: confirmedAt === null ? null : confirmedAt + refreshMs,
+    refreshMs,
   };
 }
 
 /**
  * The one wake rule: a snapshot has a wake time only when it is not terminal
- * and counts a scheduled session. The ms form and the ISO form come from one
- * guard, so presentation, refresh cadence and the timeline cannot disagree
- * about whether a wake exists or which instant it names.
+ * and counts a scheduled session. The ms form, the ISO form and the derived
+ * retry come from one guard, so presentation, refresh cadence and the timeline
+ * cannot disagree about whether a wake exists or which instants it names.
+ *
+ * The union carries the invariant: `WAKE_RETRY_MS` is a positive floor, so a
+ * retry exists exactly when its wake does and is always strictly later. No
+ * caller compares the two instants, because no state exists where they meet.
  */
+type ScheduledWake =
+  | { at: null; iso: null; retryAt: null }
+  | { at: number; iso: string; retryAt: number };
+
 function scheduledWake(
   snapshot: GlanceableAgentsSnapshot,
   terminal: GlanceableTerminalStatus | null
-): { at: number | null; iso: string | null } {
-  if (terminal !== null || snapshot.scheduled <= 0) return { at: null, iso: null };
-  return { at: timestampMs(snapshot.scheduledAt), iso: timestampToIso(snapshot.scheduledAt) };
-}
-
-/** One retry after the wake's own schedule; a snapshot with no wake has no retry. */
-function wakeRetryAt(
-  snapshot: GlanceableAgentsSnapshot,
-  terminal: GlanceableTerminalStatus | null
-): number | null {
-  const wake = scheduledWake(snapshot, terminal).at;
-  return wake === null ? null : wake + WAKE_RETRY_MS;
+): ScheduledWake {
+  if (terminal !== null || snapshot.scheduled <= 0) return { at: null, iso: null, retryAt: null };
+  const at = timestampMs(snapshot.scheduledAt);
+  if (at === null) return { at: null, iso: null, retryAt: null };
+  // `at` parsed, so the ISO form of the same value parses too.
+  return { at, iso: epochMsToIso(at), retryAt: at + WAKE_RETRY_MS };
 }
 
 /**
@@ -353,7 +374,6 @@ export function buildHomeWidgetPresentation(
   const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
-  const retry = wakeRetryAt(snapshot, terminal);
   const status = presentationStatus(terminal, snapshot, primaryKind);
   // One approval availability: the same value decides the key the native action
   // submits and whether Approve is offered, so the card cannot advertise Approve
@@ -381,7 +401,7 @@ export function buildHomeWidgetPresentation(
     scheduledAt: wake.iso,
     approvalKey: approvalAvailable ? details.approvalKey : null,
     // The card never advertises an update past the retry deadline.
-    awaitingUpdate: wake.at !== null && now >= wake.at && (retry === null || now < retry),
+    awaitingUpdate: wake.at !== null && now >= wake.at && now < wake.retryAt,
     primaryTitle:
       terminal !== null || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
         ? null
@@ -399,17 +419,27 @@ export function buildHomeWidgetPresentation(
  */
 export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
-  const next = now + refreshInterval(snapshot);
-  const wake = scheduledWake(snapshot, terminal).at;
-  const retry = wakeRetryAt(snapshot, terminal);
+  const { terminal, refreshMs } = staleness(data);
+  const next = now + refreshMs;
+  const wake = scheduledWake(snapshot, terminal);
   // Both instants come from the snapshot, so a passed wake cannot create a busy refresh loop.
   const requested =
-    wake !== null && wake > now ? wake : retry !== null && retry > now ? retry : null;
+    wake.at !== null && wake.at > now
+      ? wake.at
+      : wake.retryAt !== null && wake.retryAt > now
+        ? wake.retryAt
+        : null;
   return requested !== null ? Math.min(next, requested) : next;
 }
 
-/** Native offline aging uses these server/shared-derived boundaries, not a second policy. */
+/**
+ * Native offline aging uses these server/shared-derived boundaries, not a second policy.
+ *
+ * One `scheduledWake` reads both instants. Its retry is strictly later than its
+ * wake, so the two are never equal and neither needs to be compared with the
+ * other. `staleAt` is a separate interval, though, so it can coincide with
+ * either instant and both keep their own comparison against it.
+ */
 export function buildHomeWidgetPresentationTimeline(
   data: HomeWidgetData,
   now: number
@@ -419,10 +449,11 @@ export function buildHomeWidgetPresentationTimeline(
   const { terminal, staleAt } = staleness(data);
   if (terminal === null) {
     if (staleAt !== null && staleAt > now) times.push(staleAt);
-    const wake = scheduledWake(snapshot, terminal).at;
-    if (wake !== null && wake > now && wake !== staleAt) times.push(wake);
-    const retry = wakeRetryAt(snapshot, terminal);
-    if (retry !== null && retry > now && retry !== staleAt && retry !== wake) times.push(retry);
+    const wake = scheduledWake(snapshot, terminal);
+    if (wake.at !== null && wake.at > now && wake.at !== staleAt) times.push(wake.at);
+    if (wake.retryAt !== null && wake.retryAt > now && wake.retryAt !== staleAt) {
+      times.push(wake.retryAt);
+    }
   }
   return times
     .sort((a, b) => a - b)

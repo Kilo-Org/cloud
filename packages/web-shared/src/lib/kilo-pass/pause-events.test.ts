@@ -315,4 +315,23 @@ describe('getPausedMonthSet', () => {
 
     expect(result.size).toBe(0);
   });
+
+  test('rejects an unparseable fromIssueMonth', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const subId = await insertTestSubscription({ kiloUserId: user.id });
+
+    await openPauseEvent(db, {
+      kiloPassSubscriptionId: subId,
+      pausedAt: '2026-01-15T00:00:00.000Z',
+      resumesAt: null,
+    });
+
+    await expect(
+      getPausedMonthSet(db, {
+        kiloPassSubscriptionId: subId,
+        fromIssueMonth: 'not-a-month',
+        maxMonthsBack: 3,
+      })
+    ).rejects.toThrow('Invalid issueMonth: not-a-month');
+  });
 });

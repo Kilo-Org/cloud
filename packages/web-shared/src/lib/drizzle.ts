@@ -1,20 +1,44 @@
 import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
+import {
+  KNOWN_READ_REPLICA_NAMES,
+  readReplicaInventory,
+} from '@kilocode/web-shared/lib/read-replicas';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
-import { computeDatabaseUrl } from '@kilocode/db';
+import {
+  computeDatabaseUrl,
+  getDatabaseClientConfig,
+  postgresConnectionTarget,
+} from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { attachDatabasePool } from '@vercel/functions';
+import { parseIPv6 } from '@kilocode/web-shared/lib/cloudflare-ip';
+import { firstForwardedHop } from '@kilocode/web-shared/lib/http/forwarded-hop';
 export const { Client, Pool } = pg;
-const { DEBUG_QUERY_LOGGING, VERCEL_REGION, NODE_ENV } = process.env;
+const { VERCEL_REGION, NODE_ENV } = process.env;
 
-// Environment validation. A missing variable fails at module load through requireEnv, so every
-// required-variable failure in this module has one throw type and one message shape.
-const POSTGRES_CONNECT_TIMEOUT = requireEnv(
+// Environment validation. A missing required variable fails at module load through
+// `requireEnv`, and a malformed one fails through `requireIntegerEnv`, so every
+// required-variable failure in this module happens at load with one `Error` and an
+// explicit message naming the variable.
+const POSTGRES_CONNECT_TIMEOUT = requireIntegerEnv(
   'POSTGRES_CONNECT_TIMEOUT',
   process.env.POSTGRES_CONNECT_TIMEOUT
 );
-// Not read by this module: the data export pool sizes its own timeout. The check stays because
-// it is part of the deployment's startup contract.
-requireEnv('POSTGRES_MAX_QUERY_TIME', process.env.POSTGRES_MAX_QUERY_TIME);
+
+// Query logging is opt-in: only the literal `true` enables it, so an unset variable and any
+// other value, including the string `false`, leave it off.
+const DEBUG_QUERY_LOGGING = process.env.DEBUG_QUERY_LOGGING === 'true';
+
+/** A required environment variable parsed once into the integer the module uses. */
+export function requireIntegerEnv(name: string, value: string | undefined): number {
+  const trimmed = requireEnv(name, value).trim();
+  if (!/^[0-9]+$/.test(trimmed) || !Number.isSafeInteger(Number(trimmed))) {
+    throw new Error(
+      `Invalid required environment variable ${name}: expected a non-negative integer number of milliseconds, received ${JSON.stringify(value)}`
+    );
+  }
+  return Number(trimmed);
+}
 
 // Base url + test worker suffix (shared). It selects POSTGRES_URL_PRODUCTION or
 // POSTGRES_URL for the current mode and throws when that variable is unset, so
@@ -31,6 +55,16 @@ if (IS_SCRIPT) {
 const appName = IS_SCRIPT ? 'kilocode-script' : 'kilocode-web';
 
 /**
+ * The host the pools below connect to: the `POSTGRES_SCRIPT_URL` host when `IS_SCRIPT` is set,
+ * the app's host otherwise. This is the same parse the pool uses, so the host is lowercase, and a
+ * caller that names the target without handling the URL or its credentials cannot disagree with
+ * the connection that is actually used.
+ */
+export function primaryDatabaseHost(): string {
+  return postgresConnectionTarget(postgresUrl).host;
+}
+
+/**
  * Whether a region is on the US side. The root AGENTS.md section "Vercel Function Regions" is
  * the source of truth: functions run only in `fra1` and `sfo1`, and any other observed region is
  * a proxy or edge hop rather than the function, so only the SFO prefix can match.
@@ -40,44 +74,145 @@ export function isUSRegion(region = VERCEL_REGION): boolean {
   return region.startsWith('sfo');
 }
 
-export function selectReplicaUrl({
+/**
+ * The replica URLs `readDb` may read from, never empty. `readDb` picks one per request with
+ * `selectReplicaIndex`; a single entry needs no choice.
+ */
+export function selectReplicaUrls({
   primaryUrl,
   nodeEnv,
   vercelRegion,
   usReplicaUrl,
   euReplicaUrls,
-  random = Math.random,
 }: {
   primaryUrl: string;
   nodeEnv: string | undefined;
   vercelRegion: string | undefined;
   usReplicaUrl: string | undefined;
   euReplicaUrls: string[];
-  random?: () => number;
-}): string {
-  if (nodeEnv === 'development') return primaryUrl;
-  if (isUSRegion(vercelRegion)) return usReplicaUrl || primaryUrl;
-  if (euReplicaUrls.length === 0) return primaryUrl;
-  return euReplicaUrls.at(Math.floor(random() * euReplicaUrls.length)) ?? primaryUrl;
+}): string[] {
+  if (nodeEnv === 'development') return [primaryUrl];
+  if (isUSRegion(vercelRegion)) return [usReplicaUrl || primaryUrl];
+  if (euReplicaUrls.length === 0) return [primaryUrl];
+  return euReplicaUrls;
 }
 
 /**
- * Get the read replica URL based on deployment region.
- * - US deployments use the US replica (POSTGRES_REPLICA_US_URL) for lower latency
- * - EU deployments randomly select one of two EU replicas to split read traffic
- *   across ~2,200 concurrent Vercel instances (~50/50 statistical distribution)
- * - Falls back to primary if no replica URL is configured for the region
+ * The part of a client address that picks its replica: the /64 prefix of an IPv6 address,
+ * which privacy extensions keep while rotating the rest, otherwise the address itself. An
+ * IPv4-mapped address keys as its IPv4 address in every spelling; its /64 prefix is 0 for every
+ * client.
  */
-function getReplicaUrl(): string {
-  return selectReplicaUrl({
+export function replicaAffinityKey(ip: string): string {
+  if (!ip.includes(':')) return ip;
+  const parsed = parseIPv6(dottedTailToHex(ip));
+  if (parsed === null) return ip;
+  if (parsed >> BigInt(32) === BigInt(0xffff)) {
+    const v4 = Number(parsed & BigInt(0xffffffff));
+    return [v4 >>> 24, (v4 >>> 16) & 255, (v4 >>> 8) & 255, v4 & 255].join('.');
+  }
+  return (parsed >> BigInt(64)).toString(16);
+}
+
+/** Rewrites an IPv6 address's dotted IPv4 tail as two hex groups, which `parseIPv6` accepts. */
+function dottedTailToHex(ip: string): string {
+  const tail = /:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (!tail) return ip;
+  const octets = tail.slice(1).map(Number);
+  if (octets.some(octet => octet > 255)) return ip;
+  const [a = 0, b = 0, c = 0, d = 0] = octets;
+  const groups = `${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  return `${ip.slice(0, tail.index)}:${groups}`;
+}
+
+/**
+ * Which of `count` replicas serves a request. Replicas lag independently, so a user whose reads
+ * alternate between them can see a row appear and then vanish. Hashing the client address sends
+ * one address to the same replica from every instance; without an address, `fallbackIndex` (the
+ * instance's own random pick) keeps at least each instance consistent.
+ */
+export function selectReplicaIndex(
+  ip: string | null,
+  count: number,
+  fallbackIndex: number
+): number {
+  if (count <= 1) return 0;
+  if (ip === null) return fallbackIndex;
+  // FNV-1a: deterministic across instances, unlike Math.random.
+  let hash = 0x811c9dc5;
+  for (const char of replicaAffinityKey(ip)) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  // FNV-1a's odd multiplier never changes the low bit, so `% 2` alone would only see the
+  // parity of odd characters. The murmur3 finalizer mixes the high bits down.
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 0xc2b2ae35);
+  hash ^= hash >>> 16;
+  return (hash >>> 0) % count;
+}
+
+const SYMBOL_FOR_REQ_CONTEXT = Symbol.for('@vercel/request-context');
+
+/**
+ * The current request's headers from the Vercel request context, or undefined outside a request
+ * and outside Vercel. `readDb` picks a replica synchronously and Next's `headers()` is async.
+ * `@vercel/functions` reads the same symbol in `getContext`, which it does not export, as do
+ * Vercel's firewall and flags packages.
+ */
+function vercelRequestHeaders(): Record<string, string> | undefined {
+  const fromSymbol: typeof globalThis & {
+    [SYMBOL_FOR_REQ_CONTEXT]?: { get?: () => { headers?: Record<string, string> } | undefined };
+  } = globalThis;
+  return fromSymbol[SYMBOL_FOR_REQ_CONTEXT]?.get?.()?.headers;
+}
+
+/**
+ * The client address in request headers. Same headers, in the same order, as
+ * `callerAddressOrNull` in `apps/web`.
+ */
+function requestIp(headers: Record<string, string>): string | null {
+  return (
+    firstForwardedHop(headers['x-vercel-forwarded-for']) ?? firstForwardedHop(headers['x-real-ip'])
+  );
+}
+
+/**
+ * Get the read replica URLs based on deployment region.
+ * - US deployments use the US replica (POSTGRES_REPLICA_US_URL) for lower latency
+ * - EU deployments use every enabled EU replica to split read traffic, picking one per request
+ *   by client address
+ * - Replicas listed in POSTGRES_REPLICAS_DISABLED are skipped (see read-replicas.ts)
+ * - Replicas whose URL does not parse are skipped, so one bad optional URL cannot stop the
+ *   module from loading now that every EU replica gets a pool
+ * - Falls back to primary if no enabled replica is configured for the region
+ */
+function getReplicaUrls(): string[] {
+  const inventory = readReplicaInventory();
+  if (inventory.unknownDisabled.length > 0) {
+    console.warn(
+      `POSTGRES_REPLICAS_DISABLED names unknown replicas: ${JSON.stringify(inventory.unknownDisabled)}; ` +
+        `valid names: ${KNOWN_READ_REPLICA_NAMES.join(', ')}`
+    );
+  }
+  const enabled = inventory.enabled.filter(replica => {
+    try {
+      getDatabaseClientConfig(replica.url);
+      return true;
+    } catch {
+      // The URL and the parse error can both contain credentials, so only the name is logged.
+      console.warn(`Skipping read replica ${replica.name}: its URL is invalid`);
+      return false;
+    }
+  });
+  return selectReplicaUrls({
     primaryUrl: postgresUrl,
     nodeEnv: NODE_ENV,
     vercelRegion: VERCEL_REGION,
-    usReplicaUrl: getEnvVariable('POSTGRES_REPLICA_US_URL'),
-    euReplicaUrls: [
-      getEnvVariable('POSTGRES_REPLICA_EU_URL'),
-      getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
-    ].filter(Boolean),
+    usReplicaUrl: enabled.find(replica => replica.side === 'us')?.url,
+    euReplicaUrls: enabled.filter(replica => replica.side === 'eu').map(replica => replica.url),
   });
 }
 
@@ -91,7 +226,7 @@ const idleTimeoutMillis = 5_000;
 
 const sharedPoolConfig: Partial<pg.PoolConfig> = {
   max,
-  connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT),
+  connectionTimeoutMillis: POSTGRES_CONNECT_TIMEOUT,
   idleTimeoutMillis,
 };
 
@@ -99,36 +234,56 @@ const sharedPoolConfig: Partial<pg.PoolConfig> = {
 const primary = createDrizzleClient({
   connectionString: postgresUrl,
   poolConfig: { ...sharedPoolConfig, application_name: appName },
-  logger: !!DEBUG_QUERY_LOGGING,
+  logger: DEBUG_QUERY_LOGGING,
 });
 export const pool = primary.pool;
 
-// Replica pool - US replica in US regions; in EU regions the configured EU
-// replica, with the primary only as fallback
-const replicaUrl = getReplicaUrl();
-export const usesSeparateReplica = replicaUrl !== postgresUrl;
+// pg pools open connections on demand. Queued Enkrypt and Exa share two dedicated
+// connections per runtime, preserving their existing combined two-write ceiling.
+// Co-location raises the primary connection envelope from 10 to 12 (plus replicas);
+// N runtimes may add up to 2N connections. This does not isolate PostgreSQL row locks.
+const taggedWriter = createDrizzleClient({
+  connectionString: postgresUrl,
+  poolConfig: { ...sharedPoolConfig, max: 2, application_name: `${appName}-tagged-writer` },
+  logger: DEBUG_QUERY_LOGGING,
+});
+export const taggedWriterPool = taggedWriter.pool;
+export const taggedWriterDb = taggedWriter.db;
+taggedWriterPool.on('error', (error: Error) => {
+  console.error('Unexpected error on idle client (tagged writer)', { error_name: error.name });
+});
 
-const replica = usesSeparateReplica
-  ? createDrizzleClient({
-      connectionString: replicaUrl,
-      poolConfig: { ...sharedPoolConfig, application_name: `${appName}-replica` },
-      logger: !!DEBUG_QUERY_LOGGING,
-    })
-  : primary;
-const replicaPool = replica.pool;
+// Replica pools - US replica in US regions; in EU regions one pool per configured
+// EU replica, with the primary only as fallback. Each pool keeps the full `max`,
+// because a request reads from one replica only and needs the capacity it had
+// before.
+const replicaUrls = getReplicaUrls();
+export const usesSeparateReplica = replicaUrls[0] !== postgresUrl;
+
+const replicas = usesSeparateReplica
+  ? replicaUrls.map(connectionString =>
+      createDrizzleClient({
+        connectionString,
+        poolConfig: { ...sharedPoolConfig, application_name: `${appName}-replica` },
+        logger: DEBUG_QUERY_LOGGING,
+      })
+    )
+  : [primary];
+const replicaPools = usesSeparateReplica ? replicas.map(replica => replica.pool) : [];
 
 // Attach pools to ensure idle connections close before suspension
 // Skip in test environment as it interferes with Jest's cleanup
 if (process.env.NODE_ENV !== 'test') {
   attachDatabasePool(pool);
-  if (usesSeparateReplica) {
+  attachDatabasePool(taggedWriterPool);
+  for (const replicaPool of replicaPools) {
     attachDatabasePool(replicaPool);
   }
 }
 
 /**
  * Whether an idle-client pool error should terminate the process. Pure and
- * exported so it can be unit-tested without a database, like `selectReplicaUrl`
+ * exported so it can be unit-tested without a database, like `selectReplicaUrls`
  * above and `classifyReplicaRow` in replication-health.ts.
  *
  * A dead *primary* pool means the process cannot serve traffic, so it exits and
@@ -136,7 +291,7 @@ if (process.env.NODE_ENV !== 'test') {
  *
  * A dead *replica* pool does not, so its listener only logs and then calls this
  * predicate, which answers false. The replica is a read-path optimisation and
- * `selectReplicaUrl` already treats a missing replica as "use the primary".
+ * `selectReplicaUrls` already treats a missing replica as "use the primary".
  * Exiting here escalated a replica-only outage into whole-instance
  * termination: when both EU replicas refused connections on 2026-08-12 this
  * handler fired 107 times in under an hour, killing instances whose primary was
@@ -162,7 +317,7 @@ pool.on('error', (err: Error) => {
   }
 });
 
-if (usesSeparateReplica) {
+for (const replicaPool of replicaPools) {
   replicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
     if (shouldExitOnPoolError('replica')) {
@@ -188,10 +343,41 @@ const primaryDb = primary.db;
  * tolerate slight replication lag (typically <100ms).
  *
  * In US regions, this connects to the US replica for lower latency.
- * In EU regions, this connects to the EU replica to split read traffic off the primary.
+ * In EU regions, this splits read traffic off the primary across the EU replicas. Each query
+ * builder, relational query, or transaction is bound when it is created to the replica
+ * `selectReplicaIndex` picks for the current request.
  * Falls back to the primary if no replica URL is configured for the region.
  */
-export const readDb = replica.db;
+export const readDb = createReadDb(replicas.map(replica => replica.db));
+
+export function createReadDb(dbs: DrizzleDatabase[]): DrizzleDatabase {
+  const [first] = dbs;
+  if (!first) throw new Error('readDb needs at least one database');
+  if (dbs.length === 1) return first;
+  const fallbackIndex = Math.floor(Math.random() * dbs.length);
+  // Vercel keeps one headers object per request, so each request hashes its address once.
+  const indexByHeaders = new WeakMap<object, number>();
+  const currentDb = () => {
+    const headers = vercelRequestHeaders();
+    if (!headers) return dbs[fallbackIndex] ?? first;
+    let index = indexByHeaders.get(headers);
+    if (index === undefined) {
+      index = selectReplicaIndex(requestIp(headers), dbs.length, fallbackIndex);
+      indexByHeaders.set(headers, index);
+    }
+    return dbs[index] ?? first;
+  };
+  // One stable object, so callers that key on `readDb` (the model-stats cache) still see one client.
+  return new Proxy(first, {
+    get(_target, property) {
+      const target = currentDb();
+      const value: unknown = Reflect.get(target, property, target);
+      if (typeof value !== 'function') return value;
+      const method = value as (...args: unknown[]) => unknown;
+      return method.bind(target);
+    },
+  });
+}
 
 /**
  * Default database instance - connects to the primary database.
@@ -233,7 +419,8 @@ export const auto_deleted_at = { deleted_at: drizzleSql`now()` };
  */
 export async function closeAllDrizzleConnections(): Promise<void> {
   await pool.end();
-  if (usesSeparateReplica) {
+  await taggedWriterPool.end();
+  for (const replicaPool of replicaPools) {
     await replicaPool.end();
   }
 }

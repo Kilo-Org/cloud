@@ -9,6 +9,7 @@ import {
   type ViewInstance,
 } from 'react-native';
 
+import { useSheetToastHeader } from '@/components/sheet-toast-host';
 import { Share, X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
@@ -16,6 +17,7 @@ import {
   useSettledSheetHeaderTopClearance,
   useSheetHeaderTopClearance,
 } from '@/lib/form-sheet';
+import { usePresentedSheetTopClearance } from '@/lib/hooks/use-presented-sheet-top-inset';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { useSideInsetStyle } from '@/lib/screen-insets';
@@ -63,6 +65,7 @@ export function SheetHeader({
   variant = 'default',
   topInset = 'always',
   underHandle = false,
+  padTopToBody = false,
   surfaceClassName = 'bg-background',
 }: {
   title: string;
@@ -127,6 +130,18 @@ export function SheetHeader({
    */
   underHandle?: boolean;
   /**
+   * The header sits on the sheet's own top edge, with nothing above it: no
+   * native handle and no platform chrome. Its own padding is then the whole
+   * band over the title, and the default `pt-4` leaves the title more room
+   * above it than the divider leaves below it. The header takes the body's
+   * `pt-3` instead, so the space either side of the title matches.
+   *
+   * The content-sized confirm card passes it. A page sheet or a full-window
+   * surface keeps the default: there the extra 4dp reads as the gap under the
+   * sheet's edge, not as a band over the title.
+   */
+  padTopToBody?: boolean;
+  /**
    * The surface the sheet paints behind the header. A sheet that sits on the
    * raised dark surface passes `bg-card` so its top edge separates from the
    * near-black window behind it; the app canvas colour is the default.
@@ -150,13 +165,34 @@ export function SheetHeader({
   const clearance = useSheetHeaderTopClearance(topInset);
   const { clearance: topInsetHeight, onLayout: handleSurfaceLayout } =
     useSettledSheetHeaderTopClearance({ topInset, clearance, surfaceRef });
+  // iOS sizes a `formSheet` by its own maximum height, so on a short enough
+  // phone the maximum is the window and the sheet presents at the window top
+  // with its header inside the status bar. Nothing read inside the sheet can
+  // see that (the presentation offset lives outside the React tree), so the
+  // header asks the native side where the surface's origin sits and covers
+  // only the part of the status-bar band above it. A phone whose sheet presents
+  // below the inset answers nothing extra and keeps the clearance above.
+  const { clearance: presentedClearance, onLayout: handlePresentedLayout } =
+    usePresentedSheetTopClearance({ topInset, clearance: topInsetHeight, surfaceRef });
+  // The sheet's toast sits below this header, so it never covers its actions.
+  const reportToastHeaderLayout = useSheetToastHeader(surfaceRef);
   // Resolved at render so each platform reads its own pair, through the same
   // helper the sheets that draw their own title row use.
   const underHandlePadding = sheetUnderHandlePaddingClass('header');
+  // What the header's own box spends above and below the title. `underHandle`
+  // hands the gap below the title when a native handle already leaves one
+  // above it; `padTopToBody` does the same for a card that draws its own top
+  // edge, where the header's padding is the only room over the title.
+  let verticalPadding = 'pb-3 pt-4';
+  if (underHandle) {
+    verticalPadding = underHandlePadding;
+  } else if (padTopToBody) {
+    verticalPadding = 'pb-3 pt-3';
+  }
   const safeAreaStyle =
-    topInsetHeight > 0 || sideInsetStyle !== undefined
+    presentedClearance > 0 || sideInsetStyle !== undefined
       ? {
-          ...(topInsetHeight > 0 ? { paddingTop: topInsetHeight } : undefined),
+          ...(presentedClearance > 0 ? { paddingTop: presentedClearance } : undefined),
           ...sideInsetStyle,
         }
       : undefined;
@@ -196,20 +232,26 @@ export function SheetHeader({
     // flattened header breaks that native pass and the list paints over it.
     <View
       ref={surfaceRef}
-      onLayout={handleSurfaceLayout}
+      onLayout={() => {
+        handleSurfaceLayout();
+        handlePresentedLayout();
+        reportToastHeaderLayout?.();
+      }}
       collapsable={false}
       className={cn(
         'border-b border-border px-4',
         // The centred 48dp action row leaves ~10dp of leading above the title's
         // line box and the same below it; `pb-3` puts the divider ~21dp under
-        // the title. A native handle already leaves room above the content, so
-        // `pt-4` made the gap over the title about twice the gap below it.
-        // The handle's own gap differs by platform (Material3 ~22dp, iOS 16pt),
-        // so each platform gets its own split: measured 33.9dp above and
-        // 35.9dp below on the Android emulator, and 26.3pt above and 33.7pt
-        // below on iOS with `pb-5 pt-1`. `pb-4 pt-1.5` predicts 28.3pt and
-        // 29.7pt, so the gap over the title is no larger than the gap below it.
-        underHandle ? underHandlePadding : 'pb-3 pt-4',
+        // the title, so a larger `pt-4` over it is a band the reader measures
+        // against that divider. The pair resolved above says which case
+        // applies: a native handle already leaves room over the content, and a
+        // card with no handle above it takes the body's own inset. The handle's
+        // own gap differs by platform (Material3 ~22dp, iOS 16pt), so each
+        // platform gets its own split: measured 33.9dp above and 35.9dp below
+        // on the Android emulator, and 26.3pt above and 33.7pt below on iOS
+        // with `pb-5 pt-1`. `pb-4 pt-1.5` predicts 28.3pt and 29.7pt, so the
+        // gap over the title is no larger than the gap below it.
+        verticalPadding,
         surfaceClassName
       )}
     >

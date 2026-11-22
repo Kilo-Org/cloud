@@ -73,6 +73,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   openaichatgpt: 'OpenAI (ChatGPT)',
   opencodego: 'OpenCode Go',
   openinference: 'OpenInference',
+  openrouter: 'OpenRouter',
   orcarouter: 'OrcaRouter',
   other: 'Other',
   particle: 'Particle AI',

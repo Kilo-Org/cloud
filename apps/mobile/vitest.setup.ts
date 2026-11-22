@@ -183,6 +183,25 @@ vi.mock('expo', () => ({
   },
 }));
 
+// `expo-application` answers from the native binary; a test project has none,
+// so its expo module lookup throws. The values are what a dev build reports and
+// no suite asserts on them: a suite that does mocks this module itself and wins.
+vi.mock('expo-application', () => ({
+  applicationId: 'com.kilocode.kiloapp',
+  nativeApplicationVersion: '1.0.0',
+  nativeBuildVersion: '1',
+}));
+
+// The same shape for `expo-device`, which the analytics module reads for the
+// event's form factor and total memory. A test project has no native module to
+// answer it, and no suite asserts on the values: a suite that does mocks this
+// module itself and wins.
+vi.mock('expo-device', () => ({
+  deviceType: null,
+  totalMemory: 0,
+  DeviceType: { UNKNOWN: 0, PHONE: 1, TABLET: 2, DESKTOP: 3, TV: 4 },
+}));
+
 // Haptics are decoration, and the app's wrapper already settles a rejected
 // call; the stub resolves like a device with a haptic engine. The enums keep
 // the library's values so a caller's argument is the same one it sends on a
@@ -556,4 +575,72 @@ vi.mock('@rn-primitives/dialog', async () => {
     Trigger,
     useRootContext: useRoot,
   };
+});
+
+// `@rn-primitives/portal` ships untranspiled JSX in `dist/*.mjs` too, so the
+// real module cannot be imported here either. This stub keeps its contract:
+// `Portal` renders nothing and hands its children to the `PortalHost` of the
+// same `hostName` from an effect, so they render at the host's place in the
+// tree (a sheet's toast host draws the app's Toaster inside the sheet). A
+// suite that needs another placement mocks this module itself and wins.
+vi.mock('@rn-primitives/portal', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+
+  const DEFAULT_HOST = 'default';
+  const hosts = new Map<string, Map<string, ReactNode>>();
+  const listeners = new Set<() => void>();
+  let version = 0;
+
+  function emit(): void {
+    version += 1;
+    for (const listener of listeners) {
+      listener();
+    }
+  }
+
+  function subscribe(listener: () => void): () => void {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }
+
+  function Portal({
+    name,
+    hostName = DEFAULT_HOST,
+    children,
+  }: {
+    name: string;
+    hostName?: string;
+    children?: ReactNode;
+  }) {
+    React.useEffect(() => {
+      const entries = hosts.get(hostName) ?? new Map<string, ReactNode>();
+      entries.set(name, children);
+      hosts.set(hostName, entries);
+      emit();
+    }, [hostName, name, children]);
+    React.useEffect(
+      () => () => {
+        hosts.get(hostName)?.delete(name);
+        emit();
+      },
+      [hostName, name]
+    );
+    return null;
+  }
+
+  function PortalHost({ name = DEFAULT_HOST }: { name?: string }) {
+    React.useSyncExternalStore(
+      subscribe,
+      () => version,
+      () => version
+    );
+    const entries = [...(hosts.get(name)?.values() ?? [])];
+    return entries.length === 0 ? null : React.createElement(React.Fragment, null, ...entries);
+  }
+
+  return { Portal, PortalHost };
 });

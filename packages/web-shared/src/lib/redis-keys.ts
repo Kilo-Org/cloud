@@ -37,14 +37,32 @@ export const codingPlanUsageRedisKey = (input: {
 /** `digest` is a hex SHA-256 over the envelope and its KMS context; see `data-key-cache.ts`. */
 export const byokDataKeyRedisKey = (digest: string) => redisKey(`byok-data-key:v1:${digest}`);
 
+/** `digest` is a hex SHA-256 over the caller, partner and prompt cache key; see `partner-upstream-error-cache.ts`. */
+export const partnerUpstreamErrorRedisKey = (digest: string) =>
+  redisKey(`partner-upstream-error:v1:${digest}`);
+
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'
 );
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
+/** Enkrypt guardrail calls started in one minute; `minute` counts minutes since the Unix epoch. */
+export const enkryptCallsMinuteRedisKey = (minute: number) =>
+  redisKey(`enkrypt:calls:v1:${minute}`);
+
 export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
   redisKey(`organization:non-trial-enterprise:${organizationId}`);
+
+/** Anonymized AI-adoption aggregates for an organization over one rounded date range. */
+export const organizationAIAdoptionRedisKey = (input: {
+  organizationId: string;
+  startDate: string;
+  endDate: string;
+}) =>
+  redisKey(
+    `organization:ai-adoption:v1:${input.organizationId}:${input.startDate}:${input.endDate}`
+  );
 
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);

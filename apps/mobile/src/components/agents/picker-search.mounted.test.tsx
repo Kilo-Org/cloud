@@ -54,6 +54,8 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   BackHandler: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },
@@ -76,6 +78,7 @@ vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   Info: 'Info',
   Lock: 'Lock',
+  Plug: 'Plug',
   Search: 'Search',
   SearchX: 'SearchX',
   Unlock: 'Unlock',

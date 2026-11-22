@@ -23,7 +23,10 @@ function deleteSegments(target: unknown, segments: readonly string[]) {
  * Deletes the field a dotted path names, for example `usage`, `tools.*.function.strict` or
  * `messages.*.content.*.cache_control`. `*` stands for every element of an array or every value
  * of an object; a plain segment never reaches into array elements. Where an intermediate value is
- * missing or is not an object or array, nothing is deleted. Only own properties are visited.
+ * missing or is not an object or array, nothing is deleted. Only own properties are visited. A path
+ * with an empty segment, a path with a segment listed in `REMOVE_FROM_BODY_BLOCKED_SEGMENTS`, and a
+ * path whose last segment is `*` delete nothing, and each one looks the same as a field that was
+ * already absent.
  */
 export function deleteAtPath(root: unknown, path: string) {
   const segments = path.split('.');

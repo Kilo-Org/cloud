@@ -131,43 +131,114 @@ describe('submitManualAnalysisStart', () => {
   });
 
   it('keeps a 4xx Worker rejection definitive', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: () => Promise.resolve({ error: 'Invalid manual analysis command' }),
-    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'Invalid manual analysis command' }),
+      });
 
-    await expect(submitManualAnalysisStart(startParams())).rejects.toThrow(
-      'Invalid manual analysis command'
-    );
+      const error = await submitManualAnalysisStart(startParams()).catch(
+        (caught: unknown) => caught
+      );
+
+      expect(error).toBeInstanceOf(TRPCError);
+      expect((error as TRPCError).code).toBe('PRECONDITION_FAILED');
+      expect((error as TRPCError).message).toBe('Security analysis service request was rejected');
+      expect((error as TRPCError).message).not.toContain('Invalid manual analysis command');
+      expect(errorSpy).toHaveBeenCalledWith('Security analysis Worker rejected the request', {
+        route: 'analysis/manual-analysis-start',
+        status: 400,
+        notes: 'Invalid manual analysis command',
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('keeps the known disabled-routing 503 definitive', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: () => Promise.resolve({ error: 'Manual analysis Worker routing is disabled' }),
-    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({ error: 'Manual analysis Worker routing is disabled' }),
+      });
 
-    await expect(submitManualAnalysisStart(startParams())).rejects.toThrow(
-      'Manual analysis Worker routing is disabled'
-    );
+      const error = await submitManualAnalysisStart(startParams()).catch(
+        (caught: unknown) => caught
+      );
+
+      expect((error as TRPCError).code).toBe('PRECONDITION_FAILED');
+      expect((error as Error).message).toBe('Security analysis service request was rejected');
+      expect((error as Error).message).not.toContain('Manual analysis Worker routing is disabled');
+      expect(errorSpy).toHaveBeenCalledWith('Security analysis Worker rejected the request', {
+        route: 'analysis/manual-analysis-start',
+        status: 503,
+        notes: 'Manual analysis Worker routing is disabled',
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('keeps the known disabled-routing 503 definitive even with success true (no success requirement)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: () =>
-        Promise.resolve({
-          error: 'Manual analysis Worker routing is disabled',
-          success: true,
-        }),
-    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: () =>
+          Promise.resolve({
+            error: 'Manual analysis Worker routing is disabled',
+            success: true,
+          }),
+      });
 
-    await expect(submitManualAnalysisStart(startParams())).rejects.toThrow(
-      'Manual analysis Worker routing is disabled'
-    );
+      const error = await submitManualAnalysisStart(startParams()).catch(
+        (caught: unknown) => caught
+      );
+
+      expect((error as TRPCError).code).toBe('PRECONDITION_FAILED');
+      expect((error as Error).message).toBe('Security analysis service request was rejected');
+      expect(errorSpy).toHaveBeenCalledWith('Security analysis Worker rejected the request', {
+        route: 'analysis/manual-analysis-start',
+        status: 503,
+        notes: 'Manual analysis Worker routing is disabled',
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('classifies a 401 Worker rejection as not-configured and caps the logged body note', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const workerBody = `${'internal secret mismatch '.repeat(20)}end`;
+    try {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: workerBody }),
+      });
+
+      const error = await submitManualAnalysisStart(startParams()).catch(
+        (caught: unknown) => caught
+      );
+
+      expect(error).toBeInstanceOf(TRPCError);
+      expect((error as TRPCError).code).toBe('PRECONDITION_FAILED');
+      expect((error as TRPCError).message).toBe('Security service is not configured');
+      expect((error as TRPCError).message).not.toContain('internal secret mismatch');
+      expect(workerBody.length).toBeGreaterThan(200);
+      expect(errorSpy).toHaveBeenCalledWith('Security analysis Worker rejected the request', {
+        route: 'analysis/manual-analysis-start',
+        status: 401,
+        notes: workerBody.slice(0, 200),
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
 

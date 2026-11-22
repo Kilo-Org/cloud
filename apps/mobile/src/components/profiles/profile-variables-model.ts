@@ -19,6 +19,8 @@ export type ProfileVarSource = Readonly<{
   key: string;
   value: string;
   isSecret: boolean;
+  /** `network` marks a network secret. It is not an environment variable, so it has no row. */
+  delivery?: 'env' | 'network';
 }>;
 
 /** One environment-variable row as the screen renders it. */
@@ -38,14 +40,18 @@ export const SECRET_MASK = '••••••';
  * Render rows from the profile's variables. A secret is masked by default: the
  * server only ever sends `***` for one, so a row the user just saved — whose
  * value is still local — is the only place a secret value can be revealed.
+ * Network secrets are left out: commands never read their value, and saving one
+ * as an environment variable is refused by the server.
  */
 export function variableRows(vars: readonly ProfileVarSource[]): VariableRow[] {
-  return vars.map(v => ({
-    key: v.key,
-    value: v.value,
-    isSecret: v.isSecret,
-    maskedValue: v.isSecret ? SECRET_MASK : v.value,
-  }));
+  return vars
+    .filter(v => v.delivery !== 'network')
+    .map(v => ({
+      key: v.key,
+      value: v.value,
+      isSecret: v.isSecret,
+      maskedValue: v.isSecret ? SECRET_MASK : v.value,
+    }));
 }
 
 export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'reserved' | 'value-required';

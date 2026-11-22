@@ -43,6 +43,8 @@ const focusEffect = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
@@ -96,6 +98,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => ({ retry: vi.fn(), isRetrying: false }),
   useSecurityAnalysis: () => analysis,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({

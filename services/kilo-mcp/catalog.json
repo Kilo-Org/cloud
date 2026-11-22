@@ -563,7 +563,7 @@
   "agentProfiles.create": {
     "path": "agentProfiles.create",
     "kind": "mutation",
-    "summary": "Create a new agent profile with a name and optional description, owned by the current user or an organization.",
+    "summary": "Create a new agent profile with a name and optional description, owned by the current user or an organization. The same call can store the profile's environment variables, with secret values encrypted, its setup commands, and whether it becomes the owner's default.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -581,6 +581,73 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "vars": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "value": {
+                "type": "string",
+                "maxLength": 10000
+              },
+              "isSecret": {
+                "type": "boolean"
+              },
+              "networkSecret": {
+                "type": "object",
+                "properties": {
+                  "allowedHosts": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 254,
+                      "pattern": "^[A-Za-z0-9.-]+$"
+                    }
+                  },
+                  "locations": {
+                    "default": [
+                      "header"
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "const": "header"
+                    }
+                  }
+                },
+                "required": [
+                  "allowedHosts"
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "value",
+              "isSecret"
+            ]
+          }
+        },
+        "commands": {
+          "maxItems": 21,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "setAsDefault": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -592,9 +659,12 @@
       "create",
       "name",
       "description",
-      "organizationid"
+      "organizationid",
+      "vars",
+      "commands",
+      "setasdefault"
     ],
-    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. agentprofiles create name description organizationid name description organizationId"
+    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. The same call can store the profile's environment variables, with secret values encrypted, its setup commands, and whether it becomes the owner's default. agentprofiles create name description organizationid vars commands setasdefault name description organizationId vars commands setAsDefault"
   },
   "agentProfiles.createAgent": {
     "path": "agentProfiles.createAgent",
@@ -2284,7 +2354,7 @@
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "commands": {
-          "maxItems": 20,
+          "maxItems": 21,
           "type": "array",
           "items": {
             "type": "string",
@@ -2507,6 +2577,36 @@
         },
         "isSecret": {
           "type": "boolean"
+        },
+        "networkSecret": {
+          "type": "object",
+          "properties": {
+            "allowedHosts": {
+              "minItems": 1,
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 254,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              }
+            },
+            "locations": {
+              "default": [
+                "header"
+              ],
+              "minItems": 1,
+              "maxItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "const": "header"
+              }
+            }
+          },
+          "required": [
+            "allowedHosts"
+          ]
         }
       },
       "required": [
@@ -2523,9 +2623,10 @@
       "organizationid",
       "key",
       "value",
-      "issecret"
+      "issecret",
+      "networksecret"
     ],
-    "searchBlob": "agentProfiles.setVar Set or update an environment variable on an agent profile. Mark a value as secret to have it stored encrypted. agentprofiles setvar profileid organizationid key value issecret profileId organizationId key value isSecret"
+    "searchBlob": "agentProfiles.setVar Set or update an environment variable on an agent profile. Mark a value as secret to have it stored encrypted. agentprofiles setvar profileid organizationid key value issecret networksecret profileId organizationId key value isSecret networkSecret"
   },
   "agentProfiles.skills": {
     "path": "agentProfiles.skills",
@@ -10106,6 +10207,53 @@
             "maxLength": 8192
           }
         },
+        "networkSecrets": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "allowedHosts": {
+                "minItems": 1,
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 254,
+                  "pattern": "^[A-Za-z0-9.-]+$"
+                }
+              },
+              "locations": {
+                "default": [
+                  "header"
+                ],
+                "minItems": 1,
+                "maxItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "const": "header"
+                }
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8192
+              }
+            },
+            "required": [
+              "allowedHosts",
+              "key",
+              "value"
+            ]
+          }
+        },
         "commands": {
           "maxItems": 1,
           "type": "array",
@@ -10175,6 +10323,7 @@
       "repositories",
       "plainvars",
       "secrets",
+      "networksecrets",
       "commands",
       "startcommands",
       "sandboxallocation",
@@ -10182,7 +10331,7 @@
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets networksecrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets networkSecrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "cloudEnvironments.delete": {
     "path": "cloudEnvironments.delete",
@@ -10512,6 +10661,75 @@
             ]
           }
         },
+        "networkSecrets": {
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "allowedHosts": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 254,
+                      "pattern": "^[A-Za-z0-9.-]+$"
+                    }
+                  },
+                  "locations": {
+                    "default": [
+                      "header"
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "const": "header"
+                    }
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "allowedHosts",
+                  "key",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "delete": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "key",
+                  "delete"
+                ]
+              }
+            ]
+          }
+        },
         "commands": {
           "maxItems": 1,
           "type": "array",
@@ -10581,6 +10799,7 @@
       "repositories",
       "plainvars",
       "secrets",
+      "networksecrets",
       "commands",
       "startcommands",
       "sandboxallocation",
@@ -10588,7 +10807,7 @@
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets networksecrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets networkSecrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -16972,6 +17191,17 @@
     ],
     "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
   },
+  "models.providerNames": {
+    "path": "models.providerNames",
+    "kind": "query",
+    "summary": "List all AI model providers available in Kilo, returning each provider's slug and human-readable display name. Useful for populating provider pickers, filters, or labels when selecting a model.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "providernames"
+    ],
+    "searchBlob": "models.providerNames List all AI model providers available in Kilo, returning each provider's slug and human-readable display name. Useful for populating provider pickers, filters, or labels when selecting a model. models providernames"
+  },
   "models.selectorList": {
     "path": "models.selectorList",
     "kind": "query",
@@ -17127,6 +17357,34 @@
       "listhiddenusers"
     ],
     "searchBlob": "moderation.listHiddenUsers List the GitHub logins of all users the current user has blocked and muted. moderation listhiddenusers"
+  },
+  "moderation.listReportReceipts": {
+    "path": "moderation.listReportReceipts",
+    "kind": "query",
+    "summary": "List your own content moderation report receipts and their statuses, newest first, with cursor-based pagination. Use it to review reports you filed, check triage and appeal status, or page through your report history.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      }
+    },
+    "tags": [
+      "moderation",
+      "listreportreceipts",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "moderation.listReportReceipts List your own content moderation report receipts and their statuses, newest first, with cursor-based pagination. Use it to review reports you filed, check triage and appeal status, or page through your report history. moderation listreportreceipts cursor limit cursor limit"
   },
   "moderation.muteUser": {
     "path": "moderation.muteUser",
@@ -17506,6 +17764,7 @@
               "organization.group.default_policy.remove",
               "organization.group.policy_type.enable",
               "organization.group.policy_type.disable",
+              "organization.named_policy.change",
               "organization.created",
               "organization.token.generate",
               "organization.funds.distribute_to_children",
@@ -22136,7 +22395,8 @@
                                 "type": "array",
                                 "items": {
                                   "type": "string",
-                                  "minLength": 1
+                                  "minLength": 1,
+                                  "maxLength": 200
                                 }
                               },
                               "provider_allow_list": {
@@ -22144,7 +22404,8 @@
                                 "type": "array",
                                 "items": {
                                   "type": "string",
-                                  "minLength": 1
+                                  "minLength": 1,
+                                  "maxLength": 64
                                 }
                               }
                             },
@@ -22153,7 +22414,8 @@
                               "model_allow_list",
                               "provider_allow_list"
                             ],
-                            "additionalProperties": false
+                            "additionalProperties": false,
+                            "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                           }
                         ]
                       }
@@ -22581,7 +22843,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 200
                               }
                             },
                             "provider_allow_list": {
@@ -22589,7 +22852,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 64
                               }
                             }
                           },
@@ -22598,7 +22862,8 @@
                             "model_allow_list",
                             "provider_allow_list"
                           ],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                         }
                       ]
                     }
@@ -22833,7 +23098,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 200
                               }
                             },
                             "provider_allow_list": {
@@ -22841,7 +23107,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 64
                               }
                             }
                           },
@@ -22850,7 +23117,8 @@
                             "model_allow_list",
                             "provider_allow_list"
                           ],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                         }
                       ]
                     }
@@ -37705,6 +37973,21 @@
       "getcreditblocks"
     ],
     "searchBlob": "user.getCreditBlocks Get the current user's credit balance breakdown, including credit blocks, deductions enriched with instance names, and auto top-up status. user getcreditblocks"
+  },
+  "user.getCreditGrantHistory": {
+    "path": "user.getCreditGrantHistory",
+    "kind": "query",
+    "summary": "List the free bonus credits and promotional credit grants added to the current user's account, newest first, with each grant's date, amount, and reason plus a flag for whether older grants exist beyond the returned page.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {}
+    },
+    "tags": [
+      "user",
+      "getcreditgranthistory"
+    ],
+    "searchBlob": "user.getCreditGrantHistory List the free bonus credits and promotional credit grants added to the current user's account, newest first, with each grant's date, amount, and reason plus a flag for whether older grants exist beyond the returned page. user getcreditgranthistory"
   },
   "user.getCreditPurchaseConfirmation": {
     "path": "user.getCreditPurchaseConfirmation",

@@ -58,6 +58,7 @@ import {
   getCreditTransactionsForOrganizationPage,
 } from '@kilocode/web-shared/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { ORGANIZATION_CREDIT_ACTOR } from '@kilocode/db/credit-expiration';
 import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { credit_transactions } from '@kilocode/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
@@ -617,8 +618,6 @@ export const organizationsRouter = createTRPCRouter({
       where: eq(credit_transactions.organization_id, organizationId),
     });
 
-    const kilo_user_id = 'system';
-
     return getCreditBlocks(
       transactions,
       now,
@@ -627,7 +626,7 @@ export const organizationsRouter = createTRPCRouter({
         microdollars_used: org.microdollars_used,
         total_microdollars_acquired: org.total_microdollars_acquired,
       },
-      kilo_user_id
+      ORGANIZATION_CREDIT_ACTOR
     );
   }),
 

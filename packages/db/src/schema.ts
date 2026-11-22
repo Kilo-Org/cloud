@@ -150,6 +150,7 @@ import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-p
 import type {
   OrganizationModeConfig,
   OrganizationGroupPolicies,
+  NamedOrganizationPolicyKind,
   OrganizationGuardrailConfig,
   OrganizationGuardrailSource,
   OrganizationMcpConnectDecision,
@@ -4216,6 +4217,121 @@ export const organization_group_policy_settings = pgTable(
 
 export type OrganizationGroupPolicySettings =
   typeof organization_group_policy_settings.$inferSelect;
+
+export const organization_named_policies = pgTable(
+  'organization_named_policies',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    name: text().notNull(),
+    schema_version: integer().notNull(),
+    document: jsonb().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_organization_named_policies_organization',
+    }).onDelete('cascade'),
+    unique('UQ_organization_named_policies_organization_kind_id').on(
+      table.organization_id,
+      table.kind,
+      table.id
+    ),
+    uniqueIndex('UQ_organization_named_policies_organization_id_canonical_name').on(
+      table.organization_id,
+      sql`lower(btrim(${table.name}))`
+    ),
+    check(
+      'organization_named_policies_kind_check',
+      sql`${table.kind} IN ('agent_permissions', 'client_configuration')`
+    ),
+    check(
+      'organization_named_policies_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 80`
+    ),
+    check('organization_named_policies_schema_version_check', sql`${table.schema_version} >= 1`),
+    check(
+      'organization_named_policies_document_check',
+      sql`jsonb_typeof(${table.document}) = 'object'`
+    ),
+  ]
+);
+
+export const organization_default_policy_links = pgTable(
+  'organization_default_policy_links',
+  {
+    organization_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    policy_id: uuid().notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.organization_id, table.kind],
+      name: 'PK_organization_default_policy_links',
+    }),
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_organization_default_policy_links_organization',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organization_id, table.kind, table.policy_id],
+      foreignColumns: [
+        organization_named_policies.organization_id,
+        organization_named_policies.kind,
+        organization_named_policies.id,
+      ],
+      name: 'FK_organization_default_policy_links_policy',
+    }).onDelete('no action'),
+    index('IDX_organization_default_policy_links_policy').on(
+      table.organization_id,
+      table.policy_id,
+      table.kind
+    ),
+  ]
+);
+
+export const organization_group_policy_links = pgTable(
+  'organization_group_policy_links',
+  {
+    organization_id: uuid().notNull(),
+    group_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    policy_id: uuid().notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.organization_id, table.group_id, table.kind],
+      name: 'PK_organization_group_policy_links',
+    }),
+    foreignKey({
+      columns: [table.organization_id, table.group_id],
+      foreignColumns: [organization_groups.organization_id, organization_groups.id],
+      name: 'FK_organization_group_policy_links_group',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organization_id, table.kind, table.policy_id],
+      foreignColumns: [
+        organization_named_policies.organization_id,
+        organization_named_policies.kind,
+        organization_named_policies.id,
+      ],
+      name: 'FK_organization_group_policy_links_policy',
+    }).onDelete('no action'),
+    index('IDX_organization_group_policy_links_policy').on(
+      table.organization_id,
+      table.policy_id,
+      table.kind
+    ),
+  ]
+);
 
 export const organization_membership_removals = pgTable(
   'organization_membership_removals',
@@ -9005,6 +9121,11 @@ export const agent_environment_profile_vars = pgTable(
     key: text().notNull(),
     value: text().notNull(), // Plaintext if is_secret=false, encrypted if is_secret=true
     is_secret: boolean().notNull().default(false),
+    delivery: text({ enum: ['env', 'network'] })
+      .notNull()
+      .default('env'),
+    allowed_hosts: text().array(),
+    injection_locations: text().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -9208,6 +9329,11 @@ export const cloud_agent_environment_vars = pgTable(
     key: text().notNull(),
     value: text().notNull(), // Plaintext if is_secret=false, RSA+AES envelope JSON if is_secret=true
     is_secret: boolean().notNull().default(false),
+    delivery: text({ enum: ['env', 'network'] })
+      .notNull()
+      .default('env'),
+    allowed_hosts: text().array(),
+    injection_locations: text().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

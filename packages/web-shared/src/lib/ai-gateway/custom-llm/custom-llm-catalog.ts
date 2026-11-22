@@ -70,13 +70,19 @@ function parseAllCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   });
 }
 
-/** The custom LLMs that own their id, without partners. */
+/** Reads and parses every custom_llm2 row, partners included. */
+async function readAllCustomLlmRows(): Promise<CustomLlm[]> {
+  return parseAllCustomLlmRows(await readDb.select().from(custom_llm2));
+}
+
+/** The custom LLMs that own their id, without partners, parsed from raw rows. */
 export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return parseAllCustomLlmRows(rows).filter(customLlm => !isPartnerCustomLlm(customLlm));
 }
 
 export async function fetchCustomLlmsFromDatabase(): Promise<CustomLlm[]> {
-  return parseCustomLlmRows(await readDb.select().from(custom_llm2));
+  const customLlms = await readAllCustomLlmRows();
+  return customLlms.filter(customLlm => !isPartnerCustomLlm(customLlm));
 }
 
 /** Admin edits take effect when this expires: every serverless instance keeps
@@ -111,7 +117,7 @@ async function loadCustomLlmsById(): Promise<CustomLlmMaps> {
   try {
     const byId = new Map<string, CustomLlm>();
     const partnersById = new Map<string, PartnerCustomLlm>();
-    for (const customLlm of parseAllCustomLlmRows(await readDb.select().from(custom_llm2))) {
+    for (const customLlm of await readAllCustomLlmRows()) {
       const key = customLlm.public_id.toLowerCase();
       if (isPartnerCustomLlm(customLlm)) partnersById.set(key, customLlm);
       else byId.set(key, customLlm);

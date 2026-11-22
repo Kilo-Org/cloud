@@ -1,14 +1,16 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
-  faviconIcon,
+  providerListing,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'edenai';
+
 export default {
-  id: 'edenai',
+  id,
   models_dev_id: 'edenai',
   ...apiKeyUpstream({
     apiUrl: 'https://api.edenai.run/v3',
@@ -19,15 +21,12 @@ export default {
   transformRequest(context) {
     replaceReasoningObjectWithReasoningEffort(context.request, { disableWithNoneEffort: true });
   },
-  models: cachedDirectByokModelList('edenai'),
-  provider_listing: {
-    dataPolicy: {
-      training: true,
-      retainsPrompts: true,
-      canPublish: false,
-      termsOfServiceURL: 'https://www.edenai.co/terms',
-      privacyPolicyURL: 'https://www.edenai.co/privacy',
-    },
-    icon: faviconIcon('https://www.edenai.co/'),
-  },
+  models: cachedDirectByokModelList(id),
+  provider_listing: providerListing({
+    siteUrl: 'https://www.edenai.co/',
+    training: true,
+    retainsPrompts: true,
+    termsOfServiceURL: 'https://www.edenai.co/terms',
+    privacyPolicyURL: 'https://www.edenai.co/privacy',
+  }),
 } satisfies DirectByokProvider;

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import '@/i18n';
-import { type DeleteAccountPhase, useDeleteAccount } from './use-delete-account';
+import { type DeleteAccountState, useDeleteAccount } from './use-delete-account';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -133,28 +133,18 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-type DeleteAccountResult = {
-  phase: DeleteAccountPhase;
-  isPending: boolean;
-  devCode: string | null;
-  canSubmitCode: boolean;
-  beginDelete: () => void;
-  submitCode: () => void;
-  setCode: (code: string) => void;
-};
-
-function Probe({ holder }: { holder: { current: DeleteAccountResult | null } }) {
+function Probe({ holder }: { holder: { current: DeleteAccountState | null } }) {
   holder.current = useDeleteAccount();
   return null;
 }
 
-async function mountProbe(): Promise<{ current: DeleteAccountResult | null }> {
-  const holder: { current: DeleteAccountResult | null } = { current: null };
+async function mountProbe(): Promise<{ current: DeleteAccountState | null }> {
+  const holder: { current: DeleteAccountState | null } = { current: null };
   await renderWithProviders(createElement(Probe, { holder }));
   return holder;
 }
 
-function current(holder: { current: DeleteAccountResult | null }): DeleteAccountResult {
+function current(holder: { current: DeleteAccountState | null }): DeleteAccountState {
   const result = holder.current;
   if (!result) {
     throw new Error('probe did not render');
@@ -163,7 +153,7 @@ function current(holder: { current: DeleteAccountResult | null }): DeleteAccount
 }
 
 /** Types the code, then submits after the rerender that holds it. */
-function enterCode(holder: { current: DeleteAccountResult | null }, code: string) {
+function enterCode(holder: { current: DeleteAccountState | null }, code: string) {
   act(() => {
     current(holder).setCode(code);
   });

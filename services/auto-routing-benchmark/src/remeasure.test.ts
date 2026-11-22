@@ -4,6 +4,7 @@ import type { AutoRouter } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { deciderCliPrompt } from './cli-runner';
 import { DECIDER_CASES, FRONTIER_CASES, type DeciderCase } from './datasets/decider-cases';
+import { PROBE_CASES } from './datasets/probe-cases';
 import {
   copyRemeasureBaselines,
   countCurrentProfilesByStatus,
@@ -16,6 +17,12 @@ import {
   settleRemeasuresForRun,
 } from './db';
 import {
+  ACTIVE_MEASUREMENT_REVISION,
+  deciderCasesForRouter,
+  MEASUREMENT_REVISION,
+  minimumCaseRevisions,
+} from './measurement-revision';
+import {
   argvAffectedCases,
   PROMPT_TRANSPORT_REVISION,
   snapshotPromptTokens,
@@ -27,6 +34,7 @@ const ENGINE = 'efficient:v1:test';
 const FRONTIER_ENGINE = 'frontier:v1:test';
 const MODEL = 'vendor/model';
 const current = { router: 'efficient' as const, engineIdentity: ENGINE, repetitions: 1 };
+const newest = { ...current, revision: MEASUREMENT_REVISION };
 const entry = { model: MODEL, variant: null };
 
 const quoted = (c: DeciderCase) => !c.longContext && deciderCliPrompt(c).includes('"');
@@ -203,8 +211,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
       runId: 'dest',
       ...current,
       entries: [entry],
-      skipOldCaseIds: affectedIds('efficient'),
-      promptRevision: PROMPT_TRANSPORT_REVISION,
+      minimumRevisions: minimumCaseRevisions('efficient', PROMPT_TRANSPORT_REVISION),
     });
 
     expect(caseIds('dest')).toEqual([plainCase.id, quotedExact.id, quotedStructured.id].sort());
@@ -226,7 +233,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     seedMeasuredPair();
     const before = tableDump();
     const report = await planPromptTransportRemeasure(db, {
-      ...current,
+      ...newest,
       action: 'dry-run',
       prices: new Map([
         [
@@ -235,11 +242,13 @@ describe('prompt transport re-measure (real SQLite)', () => {
         ],
       ]),
     });
-    const affected = argvAffectedCases('efficient');
+    const minimums = minimumCaseRevisions('efficient', MEASUREMENT_REVISION);
+    const affected = DECIDER_CASES.filter(c => c.id in minimums);
     const snapshotTokens = affected.reduce((total, c) => total + snapshotPromptTokens(c), 0);
     expect(report).toMatchObject({
       pairs: 1,
       affectedResults: affected.length,
+      unmeasuredResults: PROBE_CASES.length,
       unknownCostResults: 0,
       changed: 0,
       pairDetails: [{ model: MODEL, queues: ['platform'], state: null }],
@@ -249,12 +258,12 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect(tableDump()).toEqual(before);
   });
 
-  it('re-measures only affected cases while the pair keeps serving its previous run', async () => {
+  it('re-measures only affected and added cases while the pair keeps serving', async () => {
     if (!plainCase) throw new Error('dataset needs a plain case');
     insertRun('old');
     seedMeasuredPair();
     const request = () =>
-      planPromptTransportRemeasure(db, { ...current, action: 'request', prices: new Map() });
+      planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
     expect((await request()).changed).toBe(1);
     expect((await request()).changed).toBe(0);
     expect(await listQueuedRemeasures(db, current, 'platform')).toHaveLength(1);
@@ -278,21 +287,21 @@ describe('prompt transport re-measure (real SQLite)', () => {
     });
 
     insertRun('remeasure', { status: 'running', startedAt: '2026-10-05T00:00:00.000Z' });
-    const skipOldCaseIds = affectedIds('efficient');
-    await copyRemeasureBaselines(db, {
-      runId: 'remeasure',
-      skipOldCaseIds,
-      promptRevision: PROMPT_TRANSPORT_REVISION,
-    });
+    const minimumRevisions = minimumCaseRevisions('efficient', MEASUREMENT_REVISION);
+    await copyRemeasureBaselines(db, { runId: 'remeasure', minimumRevisions });
     await reuseDeciderCaseResults(db, {
       runId: 'remeasure',
       ...current,
       entries: [entry],
-      skipOldCaseIds,
-      promptRevision: PROMPT_TRANSPORT_REVISION,
+      minimumRevisions,
     });
-    const unaffected = DECIDER_CASES.filter(c => !skipOldCaseIds.includes(c.id)).map(c => c.id);
-    expect(caseIds('remeasure')).toEqual([...unaffected].sort());
+    const cases = deciderCasesForRouter('efficient', MEASUREMENT_REVISION);
+    const rerun = cases.filter(c => c.id in minimumRevisions).map(c => c.id);
+    expect(caseIds('remeasure')).toEqual(
+      DECIDER_CASES.filter(c => !rerun.includes(c.id))
+        .map(c => c.id)
+        .sort()
+    );
     expect(
       sqlite
         .prepare('SELECT error FROM case_results WHERE run_id = ? AND case_id = ?')
@@ -303,17 +312,17 @@ describe('prompt transport re-measure (real SQLite)', () => {
       runId: 'remeasure',
       entries: [entry],
       repetitions: 1,
-      caseIds: DECIDER_CASES.map(c => c.id),
+      caseIds: cases.map(c => c.id),
       chunkSize: 1,
     });
     const scheduled = sqlite
       .prepare("SELECT case_ids FROM scheduler_chunks WHERE run_id = ? AND status = 'pending'")
       .all('remeasure')
       .flatMap(row => JSON.parse(String(row.case_ids)) as string[]);
-    expect(scheduled.sort()).toEqual([...skipOldCaseIds].sort());
+    expect(scheduled.sort()).toEqual([...rerun].sort());
 
-    for (const caseId of skipOldCaseIds) {
-      insertResult('remeasure', caseId, { revision: PROMPT_TRANSPORT_REVISION });
+    for (const caseId of rerun) {
+      insertResult('remeasure', caseId, { revision: MEASUREMENT_REVISION });
     }
     await settleRemeasuresForRun(db, 'remeasure', []);
     expect(profileRunId()).toEqual({ run_id: 'remeasure', status: 'ready' });
@@ -321,10 +330,73 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect((await request()).pairs).toBe(0);
   });
 
+  it('schedules only the tool-evidence cases for a pool pair measured under revision 2', async () => {
+    insertRun('old');
+    for (const benchCase of DECIDER_CASES) {
+      insertResult('old', benchCase.id, { revision: PROMPT_TRANSPORT_REVISION });
+    }
+    insertProfile('old');
+    insertRun('next', { status: 'running', startedAt: '2026-10-05T00:00:00.000Z' });
+
+    await reuseDeciderCaseResults(db, {
+      runId: 'next',
+      ...current,
+      entries: [entry],
+      minimumRevisions: minimumCaseRevisions('efficient', MEASUREMENT_REVISION),
+    });
+    await scheduleRunChunks(db, {
+      runId: 'next',
+      entries: [entry],
+      repetitions: 1,
+      caseIds: deciderCasesForRouter('efficient', MEASUREMENT_REVISION).map(c => c.id),
+      chunkSize: 1,
+    });
+
+    const scheduled = sqlite
+      .prepare("SELECT case_ids FROM scheduler_chunks WHERE run_id = ? AND status = 'pending'")
+      .all('next')
+      .flatMap(row => JSON.parse(String(row.case_ids)) as string[]);
+    // Revision 3 re-measures only the probe cases plus the single re-answered terminal case;
+    // the 90 agentic base cases keep their revision-2 results (tool evidence is recorded free).
+    expect(scheduled.sort()).toEqual(
+      [...PROBE_CASES.map(c => c.id), 'supp-agent-term-pwd-base'].sort()
+    );
+    expect(DECIDER_CASES.filter(c => c.taskType === 'agentic_execution')).toHaveLength(90);
+    expect(scheduled.length).toBeLessThan(DECIDER_CASES.length / 5);
+  });
+
+  it('finds nothing to re-measure for pairs fully measured at the active revision', async () => {
+    insertRun('old');
+    for (const benchCase of deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION)) {
+      insertResult('old', benchCase.id, { revision: ACTIVE_MEASUREMENT_REVISION });
+    }
+    insertProfile('old');
+    const before = tableDump();
+
+    const report = await planPromptTransportRemeasure(db, {
+      ...current,
+      revision: ACTIVE_MEASUREMENT_REVISION,
+      action: 'request',
+      prices: new Map(),
+    });
+
+    expect(report).toMatchObject({
+      promptRevision: ACTIVE_MEASUREMENT_REVISION,
+      pairs: 0,
+      affectedResults: 0,
+      unmeasuredResults: 0,
+      projectedCostUsd: 0,
+      changed: 0,
+    });
+    const probeIds = new Set(PROBE_CASES.map(c => c.id));
+    expect([...probeIds].every(id => report.affectedCaseIds.includes(id))).toBe(true);
+    expect(tableDump()).toEqual(before);
+  });
+
   it('queues owner-only pairs for the owner queue', async () => {
     insertRun('old');
     seedMeasuredPair(MODEL, { platform: false, user: true });
-    await planPromptTransportRemeasure(db, { ...current, action: 'request', prices: new Map() });
+    await planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
     expect(await listQueuedRemeasures(db, current, 'user')).toEqual([
       expect.objectContaining({ model: MODEL, variant: '' }),
     ]);
@@ -336,7 +408,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     seedMeasuredPair('vendor/dead');
     seedMeasuredPair('vendor/failed');
     seedMeasuredPair('vendor/released');
-    await planPromptTransportRemeasure(db, { ...current, action: 'request', prices: new Map() });
+    await planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
     const pair = (model: string) => ({ model, variant: null });
 
     await markProfilesRunningForRun(db, 'dead-lane', [pair('vendor/dead')], current);
@@ -344,7 +416,10 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect(profileRunId('vendor/dead')).toEqual({ run_id: 'old', status: 'ready' });
 
     await markProfilesRunningForRun(db, 'failed-run', [pair('vendor/failed')], current);
-    await markProfilesFailedForRun(db, 'failed-run', 'scheduler initialization failed');
+    await markProfilesFailedForRun(db, 'failed-run', {
+      failureClass: 'run_init_failed',
+      reason: 'scheduler initialization failed',
+    });
     expect(profileRunId('vendor/failed')).toEqual({ run_id: 'old', status: 'ready' });
 
     await markProfilesRunningForRun(db, 'unwritten', [pair('vendor/released')], current);
@@ -358,16 +433,33 @@ describe('prompt transport re-measure (real SQLite)', () => {
     insertRun('old');
     seedMeasuredPair('vendor/a');
     seedMeasuredPair('vendor/b');
-    await planPromptTransportRemeasure(db, { ...current, action: 'request', prices: new Map() });
+    await planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
     await markProfilesRunningForRun(db, 'running', [{ model: 'vendor/a', variant: null }], current);
     const report = await planPromptTransportRemeasure(db, {
-      ...current,
+      ...newest,
       action: 'cancel',
       prices: new Map(),
     });
     expect(report.changed).toBe(1);
     expect(sqlite.prepare('SELECT model, run_id FROM profile_remeasures').all()).toEqual([
       { model: 'vendor/a', run_id: 'running' },
+    ]);
+  });
+
+  it('cancels only the pairs a pair-scoped cancel names', async () => {
+    insertRun('old');
+    seedMeasuredPair('vendor/a');
+    seedMeasuredPair('vendor/b');
+    await planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
+    const report = await planPromptTransportRemeasure(db, {
+      ...newest,
+      action: 'cancel',
+      prices: new Map(),
+      pairs: [{ model: 'vendor/a', variant: null }],
+    });
+    expect(report.changed).toBe(1);
+    expect(sqlite.prepare('SELECT model FROM profile_remeasures').all()).toEqual([
+      { model: 'vendor/b' },
     ]);
   });
 
@@ -381,6 +473,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
         router: 'frontier',
         engineIdentity: FRONTIER_ENGINE,
         repetitions: 1,
+        revision: MEASUREMENT_REVISION,
         action: 'dry-run',
         prices: new Map(),
         frontierInnerQuotes,

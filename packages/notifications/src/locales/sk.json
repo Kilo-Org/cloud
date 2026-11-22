@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nový bezpečnostný problém ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritická",
+      "high": "Vysoká",
+      "medium": "Stredná",
+      "low": "Nízka"
+    },
     "securityFindingSlaWarning": {
       "title": "Upozornenie na SLA"
     },

@@ -27,8 +27,9 @@ export const usage = '<email>';
  *   with a body that runs past three lines.
  * - provider keys: an Anthropic key and an OpenAI key, both wrapped by the
  *   local `byok-kms` service with a placeholder secret upstream rejects.
- * - credit history: two paid purchases, a grant, that grant's expiry, and one
- *   usage deduction, so the purchase list and the ledger both have rows.
+ * - credit history: two paid purchases, an expiring grant with its expiry row,
+ *   a welcome grant that still expires and an open-ended referral grant, and
+ *   one usage deduction, so the purchase list and the ledger both have rows.
  *
  * Two screens need no seed for their empty state, and two cannot be seeded: a
  * fresh account already shows the empty blocked-people list and the empty
@@ -38,10 +39,17 @@ export const usage = '<email>';
  * Trusted hosts live in the device's own SQLCipher store, so there is no backend
  * row to write.
  *
- * The credit ledger renders purchases and negative rows only
- * (`buildCreditHistoryItems`), so a positive grant appears through the expiry
- * row that closes it: the grant is seeded with a past expiry date and an
- * expiry row that names it, which is the shape `computeExpiration` writes.
+ * The credit history lists purchases, the free grants no expiry row prints, and
+ * negative rows (`buildCreditHistoryItems` merges the three sources). An expired
+ * grant appears through the expiry row that closes it: that grant is seeded with
+ * a past expiry date and an expiry row that names it, which is the shape
+ * `computeExpiration` writes. The welcome grant carries a live expiry date, as
+ * the category's own 30-day term writes it, so its row prints when it runs out;
+ * the referral grant has no term, so its row prints the date alone. Neither
+ * unspent grant has an expiry row closing it, so both are rows of their own. The
+ * ledger-cache reconciliation row is seeded too, with the shape
+ * `recompute-balances` writes, so the list shows the one positive free row the
+ * history labels as an adjustment instead of a grant.
  *
  * The passkey rows carry generated credential ids and a placeholder COSE key:
  * they render in the list, and the device cannot sign in with them, because
@@ -57,7 +65,7 @@ export const usage = '<email>';
  *
  * A rerun deletes the rows this topic owns — the two derived passkey credential
  * ids, the four moderation logins, the five idempotency keys, the two derived
- * provider ids and the five credit transaction ids — then inserts them again.
+ * provider ids and the eight credit transaction ids — then inserts them again.
  */
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -75,7 +83,20 @@ const NOTIFICATION_KEYS = [
 
 const BYOK_PROVIDERS = ['anthropic', 'openai'] as const;
 
-const CREDIT_KEYS = ['purchase-1', 'purchase-2', 'grant', 'grant-expiry', 'usage'] as const;
+const CREDIT_KEYS = [
+  'purchase-1',
+  'purchase-2',
+  'grant',
+  'grant-expiry',
+  'usage',
+  'welcome-grant',
+  'referral-grant',
+  'accounting-adjustment',
+  'program-grant',
+  'program-grant-expiry',
+  'voided-grant',
+  'voided-grant-row',
+] as const;
 
 /** Stable UUID for one account's fixture key: a rerun replaces the same rows. */
 function seedUuid(userId: string, key: string): string {
@@ -381,6 +402,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       amount_microdollars: 5_000_000,
       is_free: true,
       description: 'Promotional credit',
+      credit_category: 'github-promo-2025-07-03',
       credit_source: 'promotion',
       expiry_date: iso(-10 * DAY_MS),
       created_at: iso(-90 * DAY_MS),
@@ -404,11 +426,91 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       description: 'Usage',
       created_at: iso(-6 * DAY_MS),
     },
+    {
+      id: creditIds[5],
+      kilo_user_id: userId,
+      amount_microdollars: 4_000_000,
+      is_free: true,
+      description: 'Welcome credits',
+      credit_category: 'automatic-welcome-credits',
+      credit_source: 'promotion',
+      // The category's own term (`WELCOME_CREDIT_EXPIRY_HRS`, 30 days, in
+      // `promoCreditCategoriesOld.ts`) runs from when the grant was written, so
+      // this unspent grant still prints the date it runs out. The referral
+      // grant below has no term and stays without one.
+      created_at: iso(-5 * DAY_MS),
+      expiry_date: iso(25 * DAY_MS),
+    },
+    {
+      id: creditIds[6],
+      kilo_user_id: userId,
+      amount_microdollars: 2_000_000,
+      is_free: true,
+      description: 'Referral bonus',
+      credit_category: 'referral-referring-bonus',
+      credit_source: 'promotion',
+      created_at: iso(-60 * DAY_MS),
+    },
+    {
+      id: creditIds[7],
+      kilo_user_id: userId,
+      amount_microdollars: 500_000,
+      is_free: true,
+      description: 'Correction to match cached balance during recomputation',
+      credit_category: 'accounting_adjustment',
+      created_at: iso(-150 * DAY_MS),
+    },
+    {
+      id: creditIds[8],
+      kilo_user_id: userId,
+      amount_microdollars: 2_000_000,
+      is_free: true,
+      description: 'Promotional credit for influencer',
+      credit_category: 'influencer',
+      credit_source: 'promotion',
+      expiry_date: iso(-20 * DAY_MS),
+      created_at: iso(-100 * DAY_MS),
+    },
+    {
+      id: creditIds[9],
+      kilo_user_id: userId,
+      amount_microdollars: -2_000_000,
+      is_free: true,
+      description: 'Expired: Promotional credit for influencer',
+      credit_category: 'credits_expired',
+      original_transaction_id: creditIds[8],
+      credit_source: 'promotion',
+      created_at: iso(-20 * DAY_MS),
+    },
+    {
+      id: creditIds[10],
+      kilo_user_id: userId,
+      amount_microdollars: 1_000_000,
+      is_free: true,
+      description: 'OSS Sponsorship Program initial credits',
+      credit_category: 'oss-sponsorship',
+      credit_source: 'promotion',
+      expiry_date: iso(-30 * DAY_MS),
+      created_at: iso(-120 * DAY_MS),
+    },
+    {
+      id: creditIds[11],
+      kilo_user_id: userId,
+      amount_microdollars: -1_000_000,
+      is_free: true,
+      description: 'Credit voided from Orb system',
+      credit_category: 'orb_credit_voided',
+      original_transaction_id: creditIds[10],
+      credit_source: 'promotion',
+      created_at: iso(-30 * DAY_MS),
+    },
   ]);
 
   console.log('This fixture represents:');
   console.log('  Passkeys, blocked and muted people, recorded notifications, two provider keys');
-  console.log('  and a credit ledger with purchases, an expired grant and a deduction.');
+  console.log('  and a credit ledger with purchases, an expired campaign grant, a program');
+  console.log('  grant with its own expiry, a voided program grant, an unspent grant that');
+  console.log('  still expires, and a deduction.');
   console.log('  The passkey rows list but cannot sign in: no device holds their private key.');
   console.log('The empty states of the blocked-people and passkey lists need no seed: a fresh');
   console.log('account already shows them. Data export needs the cloud-data-export-ui release');

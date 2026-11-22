@@ -5,7 +5,9 @@
 //
 // The Kilo user token is passed in the request body and injected only as a
 // child-process env var (KILO_AUTH_CONTENT). It is never written to disk and
-// never logged.
+// never logged. Every captured child stream this server returns or delivers
+// keeps whole lines only: a cap drops the line it cut, and every remaining value
+// is returned with the placeholder.
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -179,7 +181,9 @@ function warmUpOnce() {
     delete env.KILO_API_URL;
     delete env.KILO_ORG_ID;
     warmup = serializeCli(() =>
-      runCli({ args: ['db', 'path'], env, timeoutMs: DEFAULT_TIMEOUT_MS })
+      withWorkspace(cwd =>
+        runCli({ args: ['db', 'path'], cwd, env, timeoutMs: DEFAULT_TIMEOUT_MS })
+      )
     ).then(
       result => {
         if (result.exitCode !== 0) warmup = null;
@@ -194,38 +198,7 @@ function warmUpOnce() {
   return warmup;
 }
 
-// The prompt goes to the CLI on stdin, never argv: Linux caps one argv string at
-// 128 KiB (MAX_ARG_STRLEN), which a long-context case exceeds, and `kilo run` re-quotes
-// argv messages that contain spaces. With no positional message it reads stdin to EOF
-// and sends that text verbatim as the user message.
-function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, variant, context }) {
-  const resolvedOrgId = typeof orgId === 'string' && orgId.length > 0 ? orgId : null;
-  const args = ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`];
-  if (typeof variant === 'string' && variant.length > 0) args.push('--variant', variant);
-  return runCli({
-    args,
-    stdin: prompt,
-    env: {
-      ...process.env,
-      KILO_AUTH_CONTENT: JSON.stringify({
-        kilo: {
-          type: 'api',
-          key: kiloToken,
-          ...(resolvedOrgId ? { organizationId: resolvedOrgId } : {}),
-        },
-      }),
-      KILO_API_URL: kiloApiUrl,
-      KILO_DISABLE_SESSION_INGEST: '1',
-      ...(resolvedOrgId ? { KILO_ORG_ID: resolvedOrgId } : {}),
-      NO_COLOR: '1',
-    },
-    timeoutMs,
-    kiloToken,
-    context,
-  });
-}
-
-async function runCli({ args, stdin, env, timeoutMs, kiloToken, context }) {
+async function withWorkspace(run) {
   let dir;
   try {
     dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
@@ -235,100 +208,170 @@ async function runCli({ args, stdin, env, timeoutMs, kiloToken, context }) {
       'workspace_error'
     );
   }
-  const startedAt = Date.now();
-  let result;
   try {
-    result = await new Promise(resolve => {
-      let timedOut = false;
-      let stdout = '';
-      let stdoutTruncated = false;
-      let stderrTail = '';
-      // The kilo wrapper spawns a grandchild; timeout must kill its whole group.
-      let child;
-      try {
-        child = spawn('kilo', args, {
-          cwd: dir,
-          env,
-          stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
-          detached: true,
-        });
-      } catch (error) {
-        throw new NotStartedError(
-          error instanceof Error ? error.message : 'case process failed',
-          'spawn_error'
-        );
-      }
-      if (context && typeof child.pid === 'number') {
-        logCaseEvent('benchmark_container_case_started', context, {
-          outcome: 'running',
-          category: 'spawned',
-        });
-      }
-      if (stdin !== undefined) {
-        // A CLI that exits before reading everything closes the pipe; its exit code reports it.
-        child.stdin.on('error', () => {});
-        child.stdin.end(stdin);
-      }
-      let finished = false;
-      let finishTimer;
-      const finish = exitCode => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(killTimer);
-        clearTimeout(finishTimer);
-        resolve({
-          exitCode,
-          stdoutLines: stdout.split('\n').filter(line => line.length > 0),
-          stderrTail:
-            typeof kiloToken === 'string' && kiloToken.length > 0
-              ? stderrTail.split(kiloToken).join('[redacted]')
-              : stderrTail,
-          timedOut,
-        });
-      };
-      // A surviving grandchild can keep the pipes open after the CLI exits.
-      const finishAfterExit = exitCode => {
-        if (finished || finishTimer) return;
-        finishTimer = setTimeout(() => finish(exitCode), 5_000);
-        finishTimer.unref();
-      };
-      const killTimer = setTimeout(() => {
-        timedOut = true;
-        finishAfterExit(-1);
-        try {
-          process.kill(-child.pid, 'SIGKILL');
-        } catch {
-          try {
-            child.kill('SIGKILL');
-          } catch {
-            return;
-          }
-        }
-      }, timeoutMs);
-
-      child.stdout.on('data', chunk => {
-        if (stdoutTruncated) return;
-        const text = chunk.toString('utf8');
-        if (stdout.length + text.length > STDOUT_CAP_BYTES) {
-          stdout += text.slice(0, STDOUT_CAP_BYTES - stdout.length);
-          stdoutTruncated = true;
-        } else {
-          stdout += text;
-        }
-      });
-      child.stderr.on('data', chunk => {
-        stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_CAP_BYTES);
-      });
-      child.on('error', error => {
-        stderrTail = (stderrTail + `\nspawn error: ${error.message}`).slice(-STDERR_CAP_BYTES);
-        finish(-1);
-      });
-      child.on('close', code => finish(code ?? -1));
-      child.on('exit', code => finishAfterExit(code ?? -1));
-    });
+    return await run(dir);
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+// The prompt goes to the CLI on stdin, never argv: Linux caps one argv string at
+// 128 KiB (MAX_ARG_STRLEN), which a long-context case exceeds, and `kilo run` re-quotes
+// argv messages that contain spaces. With no positional message it reads stdin to EOF
+// and sends that text verbatim as the user message.
+//
+// The CLI takes its working directory from PWD before the process cwd, and the inherited
+// PWD is the image's WORKDIR (/app), which every case of the instance shares. An isolated
+// case runs in its own workspace instead; ordinary cases keep /app so their prompts and
+// tool results stay identical to the results already measured.
+//
+function runCase({
+  model,
+  prompt,
+  isolated,
+  kiloToken,
+  kiloApiUrl,
+  orgId,
+  timeoutMs,
+  variant,
+  context,
+}) {
+  const resolvedOrgId = typeof orgId === 'string' && orgId.length > 0 ? orgId : null;
+  const args = ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`];
+  if (typeof variant === 'string' && variant.length > 0) args.push('--variant', variant);
+  const runEnv = {
+    ...process.env,
+    KILO_AUTH_CONTENT: JSON.stringify({
+      kilo: {
+        type: 'api',
+        key: kiloToken,
+        ...(resolvedOrgId ? { organizationId: resolvedOrgId } : {}),
+      },
+    }),
+    KILO_API_URL: kiloApiUrl,
+    KILO_DISABLE_SESSION_INGEST: '1',
+    ...(resolvedOrgId ? { KILO_ORG_ID: resolvedOrgId } : {}),
+    NO_COLOR: '1',
+  };
+  return withWorkspace(async cwd => {
+    const env = isolated ? { ...runEnv, PWD: cwd } : runEnv;
+    return runCli({ args, cwd, stdin: prompt, env, timeoutMs, kiloToken, context });
+  });
+}
+
+// Nothing the child writes reaches a caller unread: each captured stream is scrubbed
+// with the one credential this server injects before it is returned or delivered.
+function redactToken(text, kiloToken) {
+  return typeof kiloToken === 'string' && kiloToken.length > 0
+    ? text.split(kiloToken).join('[redacted]')
+    : text;
+}
+
+// A cap ends inside a line, so a capped edge keeps whole lines only and drops the line
+// the cap cut.
+function dropCutLine(text, edge) {
+  const cut = edge === 'end' ? text.lastIndexOf('\n') : text.indexOf('\n');
+  if (cut === -1) return '';
+  return edge === 'end' ? text.slice(0, cut + 1) : text.slice(cut + 1);
+}
+
+async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) {
+  const startedAt = Date.now();
+  const result = await new Promise(resolve => {
+    let timedOut = false;
+    let stdout = '';
+    let stdoutTruncated = false;
+    let stderrTail = '';
+    let stderrTruncated = false;
+    // The kilo wrapper spawns a grandchild; timeout must kill its whole group.
+    let child;
+    try {
+      child = spawn('kilo', args, {
+        cwd,
+        env,
+        stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+        detached: true,
+      });
+    } catch (error) {
+      throw new NotStartedError(
+        error instanceof Error ? error.message : 'case process failed',
+        'spawn_error'
+      );
+    }
+    if (context && typeof child.pid === 'number') {
+      logCaseEvent('benchmark_container_case_started', context, {
+        outcome: 'running',
+        category: 'spawned',
+      });
+    }
+    if (stdin !== undefined) {
+      // A CLI that exits before reading everything closes the pipe; its exit code reports it.
+      child.stdin.on('error', () => {});
+      child.stdin.end(stdin);
+    }
+    let finished = false;
+    let finishTimer;
+    const finish = exitCode => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(killTimer);
+      clearTimeout(finishTimer);
+      const retainedStdout = stdoutTruncated ? dropCutLine(stdout, 'end') : stdout;
+      const retainedStderr = stderrTruncated ? dropCutLine(stderrTail, 'start') : stderrTail;
+      resolve({
+        exitCode,
+        stdoutLines: retainedStdout
+          .split('\n')
+          .filter(line => line.length > 0)
+          .map(line => redactToken(line, kiloToken)),
+        stderrTail: redactToken(retainedStderr, kiloToken),
+        timedOut,
+      });
+    };
+    // A surviving grandchild can keep the pipes open after the CLI exits.
+    const finishAfterExit = exitCode => {
+      if (finished || finishTimer) return;
+      finishTimer = setTimeout(() => finish(exitCode), 5_000);
+      finishTimer.unref();
+    };
+    const killTimer = setTimeout(() => {
+      timedOut = true;
+      finishAfterExit(-1);
+      try {
+        process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          return;
+        }
+      }
+    }, timeoutMs);
+
+    child.stdout.on('data', chunk => {
+      if (stdoutTruncated) return;
+      const text = chunk.toString('utf8');
+      if (stdout.length + text.length > STDOUT_CAP_BYTES) {
+        stdout += text.slice(0, STDOUT_CAP_BYTES - stdout.length);
+        stdoutTruncated = true;
+      } else {
+        stdout += text;
+      }
+    });
+    child.stderr.on('data', chunk => {
+      const text = chunk.toString('utf8');
+      if (stderrTail.length + text.length > STDERR_CAP_BYTES) stderrTruncated = true;
+      stderrTail = (stderrTail + text).slice(-STDERR_CAP_BYTES);
+    });
+    child.on('error', error => {
+      const text = `\nspawn error: ${error.message}`;
+      if (stderrTail.length + text.length > STDERR_CAP_BYTES) stderrTruncated = true;
+      stderrTail = (stderrTail + text).slice(-STDERR_CAP_BYTES);
+      finish(-1);
+    });
+    child.on('close', code => finish(code ?? -1));
+    child.on('exit', code => finishAfterExit(code ?? -1));
+  });
   result.durationMs = Date.now() - startedAt;
   return result;
 }
@@ -382,7 +425,7 @@ const server = createServer(
           return;
         }
 
-        const { model, prompt, kiloToken, kiloApiUrl, orgId, variant, resultCallback } =
+        const { model, prompt, kiloToken, kiloApiUrl, orgId, variant, resultCallback, isolated } =
           parsed ?? {};
         const timeoutMs =
           typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
@@ -409,6 +452,10 @@ const server = createServer(
           sendResponse(400, { error: 'variant must be a string when provided' });
           return;
         }
+        if (isolated !== undefined && isolated !== null && typeof isolated !== 'boolean') {
+          sendResponse(400, { error: 'isolated must be a boolean when provided' });
+          return;
+        }
         const callback = isResultCallback(resultCallback) ? resultCallback : null;
         const context = executionContext(callback, model, variant);
         logCaseEvent('benchmark_container_case_accepted', context, {
@@ -427,6 +474,7 @@ const server = createServer(
               response: await runCaseSerialized({
                 model,
                 prompt,
+                isolated: isolated === true,
                 kiloToken,
                 kiloApiUrl,
                 orgId,
@@ -442,6 +490,8 @@ const server = createServer(
                 : 'cli_error';
           } catch (err) {
             // A case may only be reported as never started when no child was spawned.
+            // `failure` holds a parent-side message about workspace or process setup, not text
+            // captured from the child's streams, so the placeholder substitution does not apply.
             if (err instanceof NotStartedError) {
               outcome = { kind: 'not_started' };
               category = err.category;

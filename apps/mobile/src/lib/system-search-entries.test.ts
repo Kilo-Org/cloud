@@ -69,6 +69,19 @@ describe('session documents', () => {
     expect(document?.route).toBe('kiloapp://agent-chat/sess-2');
   });
 
+  it('decodes a stored percent-encoded branch into the description', () => {
+    // The row stores the branch encoded (`fix/請求書`), while the result's
+    // description reads the way the session row's subtitle does.
+    const document = storedSessionSearchDocument({
+      session_id: 'sess-encoded',
+      title: 'Reissue the invoice export',
+      organization_id: null,
+      git_branch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+    });
+
+    expect(document?.description).toBe('fix/請求書');
+  });
+
   it('skips a session with an empty or whitespace title', () => {
     expect(storedSessionSearchDocument({ session_id: 'a', title: '' })).toBeNull();
     expect(storedSessionSearchDocument({ session_id: 'b', title: '   ' })).toBeNull();

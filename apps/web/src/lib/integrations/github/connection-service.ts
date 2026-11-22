@@ -6,7 +6,10 @@ import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { github_connection_attempts } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
-import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import {
+  connectVerifiedGitHubInstallation,
+  logGitHubWorkflowRoleTransfers,
+} from '@/lib/integrations/db/github-installations';
 import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositoriesForMaintenance,
@@ -22,6 +25,29 @@ const candidatesSchema: z.ZodType<GitHubInstallationCandidate[]> = z.array(
     accountType: z.enum(['Organization', 'User']),
   })
 );
+
+/**
+ * Returns the stored candidate that is identical to the submitted one in all
+ * four fields, and only when its installation id is canonical. Both the
+ * pre-provider check and the locked in-transaction check use this helper so
+ * they cannot drift apart.
+ */
+function matchStoredCandidate(
+  stored: unknown,
+  submitted: GitHubInstallationCandidate
+): GitHubInstallationCandidate | null {
+  const parsed = candidatesSchema.safeParse(stored);
+  if (!parsed.success) return null;
+  const matched = parsed.data.find(
+    candidate =>
+      candidate.installationId === submitted.installationId &&
+      candidate.accountId === submitted.accountId &&
+      candidate.accountLogin === submitted.accountLogin &&
+      candidate.accountType === submitted.accountType
+  );
+  if (!matched || !/^[1-9][0-9]*$/.test(matched.installationId)) return null;
+  return matched;
+}
 
 export async function createGitHubConnectionAttempt(input: {
   kiloUserId: string;
@@ -135,27 +161,48 @@ export async function completeGitHubConnectionAttempt(input: {
   candidate: GitHubInstallationCandidate;
   authorizeOwner: (owner: Owner) => Promise<void>;
 }) {
+  // Read scoped to this caller's own attempt, but deliberately without the
+  // consumed/expiry predicates used by the picker reads: the documented
+  // idempotent replay below runs against an already-consumed row that carries
+  // `completed_integration_id`, and Postgres must not hide it from us.
   const [initialAttempt] = await db
     .select()
     .from(github_connection_attempts)
-    .where(eq(github_connection_attempts.id, input.attemptId))
+    .where(
+      and(
+        eq(github_connection_attempts.id, input.attemptId),
+        eq(github_connection_attempts.kilo_user_id, input.userId),
+        eq(github_connection_attempts.github_user_id, input.githubUserId)
+      )
+    )
     .limit(1);
   if (!initialAttempt) return { ok: false as const, reason: 'installation_unavailable' as const };
   if (
     initialAttempt.completed_integration_id &&
-    initialAttempt.kilo_user_id === input.userId &&
-    initialAttempt.github_user_id === input.githubUserId &&
     initialAttempt.selected_installation_id === input.candidate.installationId
   ) {
     return { ok: true as const, integrationId: initialAttempt.completed_integration_id };
   }
+  // The recorded eligible-installation entry supplies the installation id,
+  // account id, login and account type that the provider reads and the connect
+  // below use. A candidate this attempt did not record returns
+  // `installation_unavailable` before the first provider read runs.
+  if (initialAttempt.consumed_at || new Date(initialAttempt.expires_at) <= new Date())
+    return { ok: false as const, reason: 'installation_unavailable' as const };
+  if (initialAttempt.selected_installation_id !== input.candidate.installationId)
+    return { ok: false as const, reason: 'installation_unavailable' as const };
+  const storedCandidate = matchStoredCandidate(
+    initialAttempt.eligible_installations,
+    input.candidate
+  );
+  if (!storedCandidate) return { ok: false as const, reason: 'installation_unavailable' as const };
   const details = await fetchGitHubInstallationDetails(
-    input.candidate.installationId,
+    storedCandidate.installationId,
     initialAttempt.github_app_type
   );
   if (
-    details.account.id.toString() !== input.candidate.accountId ||
-    details.account.login !== input.candidate.accountLogin
+    details.account.id.toString() !== storedCandidate.accountId ||
+    details.account.login !== storedCandidate.accountLogin
   )
     return { ok: false as const, reason: 'installation_unavailable' as const };
   // Cache the repository inventory for both selections, not only
@@ -171,7 +218,7 @@ export async function completeGitHubConnectionAttempt(input: {
   // because that listing is the user's own selection.
   const fetchInventory = () =>
     fetchGitHubRepositoriesForMaintenance(
-      input.candidate.installationId,
+      storedCandidate.installationId,
       initialAttempt.github_app_type
     );
   const repositories =
@@ -183,7 +230,7 @@ export async function completeGitHubConnectionAttempt(input: {
           });
           return null;
         });
-  return db.transaction(async tx => {
+  const completed = await db.transaction(async tx => {
     const [attempt] = await tx
       .select()
       .from(github_connection_attempts)
@@ -201,20 +248,17 @@ export async function completeGitHubConnectionAttempt(input: {
     )
       return { ok: false as const, reason: 'installation_unavailable' as const };
     if (attempt.completed_integration_id)
-      return { ok: true as const, integrationId: attempt.completed_integration_id };
+      return {
+        ok: true as const,
+        integrationId: attempt.completed_integration_id,
+        roleTransfers: [],
+      };
     if (attempt.consumed_at || new Date(attempt.expires_at) <= new Date())
       return { ok: false as const, reason: 'installation_unavailable' as const };
-    const storedCandidates = candidatesSchema.safeParse(attempt.eligible_installations);
-    if (
-      !storedCandidates.success ||
-      !storedCandidates.data.some(
-        candidate =>
-          candidate.installationId === input.candidate.installationId &&
-          candidate.accountId === input.candidate.accountId &&
-          candidate.accountLogin === input.candidate.accountLogin &&
-          candidate.accountType === input.candidate.accountType
-      )
-    ) {
+    // Same helper as the pre-provider check above, so the two checks cannot
+    // drift apart.
+    const storedCandidate = matchStoredCandidate(attempt.eligible_installations, input.candidate);
+    if (!storedCandidate) {
       return { ok: false as const, reason: 'installation_unavailable' as const };
     }
     const owner = { type: attempt.owner_type, id: attempt.owner_id } as const;
@@ -222,9 +266,9 @@ export async function completeGitHubConnectionAttempt(input: {
     const result = await connectVerifiedGitHubInstallation(
       owner,
       {
-        platformInstallationId: input.candidate.installationId,
-        platformAccountId: input.candidate.accountId,
-        platformAccountLogin: input.candidate.accountLogin,
+        platformInstallationId: storedCandidate.installationId,
+        platformAccountId: storedCandidate.accountId,
+        platformAccountLogin: storedCandidate.accountLogin,
         permissions: details.permissions,
         scopes: details.events,
         repositoryAccess: details.repository_selection,
@@ -233,7 +277,7 @@ export async function completeGitHubConnectionAttempt(input: {
         githubAppType: attempt.github_app_type,
         kiloUserId: input.userId,
         githubUserId: input.githubUserId,
-        accountType: input.candidate.accountType,
+        accountType: storedCandidate.accountType,
       },
       tx
     );
@@ -247,4 +291,10 @@ export async function completeGitHubConnectionAttempt(input: {
       .where(eq(github_connection_attempts.id, attempt.id));
     return result;
   });
+  // Log the workflow-role transfers only after this transaction has committed —
+  // see the ConnectVerifiedGitHubInstallationInTransactionResult doc comment.
+  if (completed.ok) logGitHubWorkflowRoleTransfers(completed.roleTransfers);
+  return completed.ok
+    ? { ok: true as const, integrationId: completed.integrationId }
+    : { ok: false as const, reason: completed.reason };
 }

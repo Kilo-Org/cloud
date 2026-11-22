@@ -68,7 +68,7 @@ export function hashStepUpBinding(
   return createHash('sha256').update(stepUpBindingValue(actionClass, operation)).digest('hex');
 }
 
-async function countPasskeys(userId: string, fromDb: typeof db): Promise<number> {
+async function countPasskeys(userId: string, fromDb: DrizzleConnection): Promise<number> {
   const [row] = await fromDb
     .select({ count: sql<number>`count(*)::int` })
     .from(passkey_credentials)
@@ -88,7 +88,7 @@ async function countPasskeys(userId: string, fromDb: typeof db): Promise<number>
  */
 export async function evaluateStepUp(
   params: StepUpEvaluationParams,
-  fromDb: typeof db = db
+  fromDb: DrizzleConnection = db
 ): Promise<StepUpEvaluation> {
   if (!params.webSessionId) {
     return { state: { status: 'session_unbound' }, proof: null, passkeyCount: 0 };

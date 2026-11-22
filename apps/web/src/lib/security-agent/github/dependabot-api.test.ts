@@ -211,4 +211,114 @@ describe('dependabot-api', () => {
       expect(mockListAlertsForRepo).toHaveBeenCalledTimes(30);
     });
   });
+
+  describe('unknown outcome cache', () => {
+    const probedRepositoryName = (args: unknown[]): string | undefined => {
+      const request = args[0];
+      if (!request || typeof request !== 'object' || !('repo' in request)) return undefined;
+      return typeof request.repo === 'string' ? request.repo : undefined;
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('does not probe again inside the retry TTL', async () => {
+      const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
+      mockListAlertsForRepo.mockRejectedValue({ status: 403, message: 'Forbidden' });
+      const repositories = [{ id: 1, fullName: 'unknown-cache/widgets' }];
+
+      await expect(
+        checkDependabotAlertsAvailability('unknown-cache-installation', 'standard', repositories)
+      ).resolves.toEqual([{ id: 1, status: 'unknown' }]);
+      await expect(
+        checkDependabotAlertsAvailability('unknown-cache-installation', 'standard', repositories)
+      ).resolves.toEqual([{ id: 1, status: 'unknown' }]);
+
+      expect(mockListAlertsForRepo).toHaveBeenCalledTimes(1);
+    });
+
+    it('probes again after the retry TTL', async () => {
+      const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
+      mockListAlertsForRepo.mockRejectedValue({ status: 403, message: 'Forbidden' });
+      const repositories = [{ id: 1, fullName: 'unknown-retry/widgets' }];
+
+      await checkDependabotAlertsAvailability(
+        'unknown-retry-installation',
+        'standard',
+        repositories
+      );
+      expect(mockListAlertsForRepo).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(180_000);
+      await expect(
+        checkDependabotAlertsAvailability('unknown-retry-installation', 'standard', repositories)
+      ).resolves.toEqual([{ id: 1, status: 'unknown' }]);
+
+      expect(mockListAlertsForRepo).toHaveBeenCalledTimes(2);
+    });
+
+    it('reports a cached non-definitive outcome as unknown, never disabled', async () => {
+      const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
+      mockListAlertsForRepo.mockRejectedValue({ status: 403, message: 'Forbidden' });
+      const repositories = [{ id: 1, fullName: 'unknown-not-disabled/widgets' }];
+
+      const first = await checkDependabotAlertsAvailability(
+        'unknown-not-disabled-installation',
+        'standard',
+        repositories
+      );
+      const second = await checkDependabotAlertsAvailability(
+        'unknown-not-disabled-installation',
+        'standard',
+        repositories
+      );
+
+      expect(first).toEqual([{ id: 1, status: 'unknown' }]);
+      expect(second).toEqual([{ id: 1, status: 'unknown' }]);
+      expect([...first, ...second].map(result => result.status)).not.toContain('disabled');
+    });
+
+    it('keeps a definitive outcome cached while a non-definitive one expires', async () => {
+      const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
+      mockListAlertsForRepo.mockImplementation((...args: unknown[]) => {
+        return probedRepositoryName(args) === 'enabled'
+          ? Promise.resolve({ data: [] })
+          : Promise.reject({ status: 403, message: 'Forbidden' });
+      });
+      const repositories = [
+        { id: 1, fullName: 'ttl-separation/enabled' },
+        { id: 2, fullName: 'ttl-separation/unknown' },
+      ];
+      const probedRepositoryCounts = () => {
+        const probed = mockListAlertsForRepo.mock.calls.map(probedRepositoryName);
+        return {
+          enabled: probed.filter(repo => repo === 'enabled').length,
+          unknown: probed.filter(repo => repo === 'unknown').length,
+        };
+      };
+
+      await expect(
+        checkDependabotAlertsAvailability('ttl-separation-installation', 'standard', repositories)
+      ).resolves.toEqual([
+        { id: 1, status: 'enabled' },
+        { id: 2, status: 'unknown' },
+      ]);
+      expect(probedRepositoryCounts()).toEqual({ enabled: 1, unknown: 1 });
+
+      await jest.advanceTimersByTimeAsync(180_000);
+      await expect(
+        checkDependabotAlertsAvailability('ttl-separation-installation', 'standard', repositories)
+      ).resolves.toEqual([
+        { id: 1, status: 'enabled' },
+        { id: 2, status: 'unknown' },
+      ]);
+
+      expect(probedRepositoryCounts()).toEqual({ enabled: 1, unknown: 2 });
+    });
+  });
 });

@@ -837,4 +837,3 @@ export async function listValues(scope: string): Promise<string[]> {
     .all()
     .map(row => row.v);
 }
-

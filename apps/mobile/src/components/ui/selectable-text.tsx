@@ -44,6 +44,14 @@ type SelectableTextProps = {
  * text field, which a value is not; the static branch therefore sets no role,
  * because a text node is already text to an assistive reader.
  *
+ * The static branch names the value's own base direction (`direction="auto"`),
+ * because a read-only value is copy the app did not write. A right-to-left
+ * interface therefore adds no U+200F mark to the text a reader selects and
+ * copies, and the copied string matches the iOS branch, which copies the raw
+ * string. A caller that pins its own direction through `style`
+ * (`codeFieldTextStyle`) still wins, because that style lands after the
+ * computed direction in the array `Text` builds.
+ *
  * The text flows through `value`, not `defaultValue`, because the sheet
  * re-resolves a streaming part from the live `messages` prop on every render.
  * The repo rule that bans `value` plus state for editable iOS inputs does not
@@ -89,6 +97,7 @@ export function SelectableText({
     <Text
       className={classes}
       style={style}
+      direction="auto"
       selectable
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}

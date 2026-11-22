@@ -143,6 +143,9 @@ describe('SelectableText on Android', () => {
     expect(text?.props.style).toEqual(style);
     expect(text?.props.accessibilityLabel).toBe('Selected command');
     expect(text?.props.accessibilityHint).toBe('Copies the value');
+    // The Android copy must match the iOS copy of the same value, so the value
+    // names its own base direction and no RTL base mark joins the selection.
+    expect(text?.props.direction).toBe('auto');
     // Static text stays text: no role may make TalkBack announce a field or a
     // button, and no EditText is rendered at all.
     expect(text?.props.accessibilityRole).toBeUndefined();

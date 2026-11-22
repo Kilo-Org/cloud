@@ -46,7 +46,7 @@ import {
 } from '@/lib/navigation/login-redirect-latch';
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewInstance } from 'react-native';
+import { AppState, View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
@@ -63,6 +63,7 @@ import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { isAppLandingSegments } from '@/lib/agent-attachments/picker-launch-restore';
+import { setUploadForegroundSource } from '@/lib/agent-attachments/upload-task';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
@@ -192,6 +193,12 @@ captureLaunchDeepLink();
 captureSystemSearchLaunch();
 prefetchCurrentUser();
 preloadStartupFonts();
+// The attachment upload's inactivity window only counts foreground time. iOS
+// runs the transfer in a background URLSession, so the window must not judge a
+// suspended app for time it could not observe; `uploadOne` stays free of
+// `react-native` imports so its contract is testable, and the app supplies the
+// one real source here.
+setUploadForegroundSource(AppState);
 
 function RootLayoutNav({
   languageReady,

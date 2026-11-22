@@ -43,16 +43,44 @@ type UploadOutcome = { key: string };
 export const AGENT_ATTACHMENT_UPLOAD_STALL_MS = 20_000;
 
 /**
+ * The app's foreground signal, as one subscription. `uploadOne` stays free of
+ * `react-native` imports so its contract runs in the node test project; the
+ * caller that owns the app shell supplies the real source.
+ */
+export type ForegroundSource = {
+  addEventListener(type: 'change', handler: (state: string) => void): { remove(): void };
+};
+
+let foregroundSource: ForegroundSource | undefined = undefined;
+
+/**
+ * Registers the app's `AppState`-shaped source for the stall window. The app
+ * root calls this once; without it the window measures wall-clock inactivity,
+ * which is correct on Android and for a foreground iOS transfer.
+ */
+export function setUploadForegroundSource(source: ForegroundSource): void {
+  foregroundSource = source;
+}
+
+/**
  * One inactivity window for one native transfer. `touch()` arms it at the
  * start and re-arms it from every progress event; `run()` disarms it however
  * the transfer settles, so a window never outlives the upload it bounds.
+ *
+ * The window only counts foreground time. An iOS upload runs in a background
+ * URLSession and keeps moving while the app is suspended, but JavaScript timers
+ * do not fire there: an expired timer would then fire the moment the app
+ * returns, before the progress events the transfer queued are delivered, and
+ * cancel an upload that was never stuck. Leaving the foreground therefore
+ * suspends the window and returning re-arms it.
  */
 function uploadStallWindow() {
   let timer: ReturnType<typeof setTimeout> | undefined = undefined;
   let running = false;
+  let suspended = false;
   let stall = (): void => undefined;
 
-  const disarm = () => {
+  const disarm = (): void => {
     if (timer !== undefined) {
       clearTimeout(timer);
       timer = undefined;
@@ -60,8 +88,8 @@ function uploadStallWindow() {
   };
 
   /** Arms the window; a progress event after the transfer settled is ignored. */
-  const touch = () => {
-    if (!running) {
+  const touch = (): void => {
+    if (!running || suspended) {
       return;
     }
     disarm();
@@ -70,6 +98,19 @@ function uploadStallWindow() {
       stall();
     }, AGENT_ATTACHMENT_UPLOAD_STALL_MS);
   };
+
+  const subscription = foregroundSource?.addEventListener('change', next => {
+    if (!running) {
+      return;
+    }
+    if (next === 'active') {
+      suspended = false;
+      touch();
+      return;
+    }
+    suspended = true;
+    disarm();
+  });
 
   /**
    * Runs `task.uploadAsync()` under the window. A stall settles the awaited
@@ -87,13 +128,16 @@ function uploadStallWindow() {
       task.cancel();
     };
     running = true;
+    suspended = false;
     try {
       const transfer = task.uploadAsync();
       touch();
       return await Promise.race([transfer, stalled.promise]);
     } finally {
       running = false;
+      stall = (): void => undefined;
       disarm();
+      subscription?.remove();
     }
   };
 

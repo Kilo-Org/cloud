@@ -1,9 +1,14 @@
 /* eslint-disable class-methods-use-this -- the File mock mirrors the instance-only native File surface. */
+/* eslint-disable max-lines -- one owned suite covers the upload contract: the presign, the cancelled branch, and the inactivity window that bounds the transfer. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { trpcClient } from '@/lib/trpc';
 import { classifyUploadFailure } from './agent-attachment-types';
-import { AGENT_ATTACHMENT_UPLOAD_STALL_MS, uploadOne } from './upload-task';
+import {
+  AGENT_ATTACHMENT_UPLOAD_STALL_MS,
+  setUploadForegroundSource,
+  uploadOne,
+} from './upload-task';
 import { classifyAttachment } from './validate';
 
 vi.mock('@/lib/trpc', () => ({
@@ -308,5 +313,66 @@ describe('uploadOne', () => {
 
     expect(await outcome).toEqual(new Error('Upload stalled'));
     expect(createdTask().cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not judge an upload for time the app spent in the background', async () => {
+    // An iOS transfer keeps moving in a background URLSession while the app is
+    // suspended, and JavaScript timers do not run there. The window must not
+    // spend the suspended time against the transfer, or a returning app cancels
+    // an upload that never stalled.
+    vi.useFakeTimers();
+    const listeners = new Set<(state: string) => void>();
+    setUploadForegroundSource({
+      addEventListener: (_type, handler) => {
+        listeners.add(handler);
+        return {
+          remove: () => {
+            listeners.delete(handler);
+          },
+        };
+      },
+    });
+    const sendState = (state: string) => {
+      for (const handler of listeners) {
+        handler(state);
+      }
+    };
+    uploadAsyncImpl = () => new Promise(() => undefined);
+
+    const pending = uploadOne({
+      attachmentId: 'att-10',
+      path: 'path-10',
+      extension: 'pdf',
+      contentType: 'application/pdf',
+      contentLength: 100,
+      localUri: 'file:///cache/backgrounded.pdf',
+      onProgress: () => undefined,
+    });
+    let settled = false;
+    const outcome = (async () => {
+      const error = await rejectionOf(pending);
+      settled = true;
+      return error;
+    })();
+
+    // The window is built after the presign resolves, so let that land first,
+    // otherwise the state change reaches no listener.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listeners.size).toBe(1);
+    sendState('background');
+    await vi.advanceTimersByTimeAsync(AGENT_ATTACHMENT_UPLOAD_STALL_MS * 3);
+
+    // Three windows of suspended time must not be held against the transfer.
+    expect(settled).toBe(false);
+    expect(createdTask().cancel).not.toHaveBeenCalled();
+
+    // Back in front, it gets a whole fresh window before it counts as stalled.
+    sendState('active');
+    await vi.advanceTimersByTimeAsync(AGENT_ATTACHMENT_UPLOAD_STALL_MS - 1);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await outcome).toEqual(new Error('Upload stalled'));
+    setUploadForegroundSource({ addEventListener: () => ({ remove: () => undefined }) });
   });
 });

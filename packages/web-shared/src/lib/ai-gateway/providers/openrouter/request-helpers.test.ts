@@ -1,10 +1,28 @@
 import type { GatewayRequest } from './types';
-import { enableReasoningSummaries } from './request-helpers';
+import { addCacheBreakpoints, enableReasoningSummaries } from './request-helpers';
 
 function responsesRequest(
   body: Partial<Extract<GatewayRequest, { kind: 'responses' }>['body']>
 ): Extract<GatewayRequest, { kind: 'responses' }> {
   return { kind: 'responses', body: { model: 'meta/muse-spark-1.3', input: 'hello', ...body } };
+}
+
+function messagesRequest(
+  content: Extract<GatewayRequest, { kind: 'messages' }>['body']['messages'][number]['content']
+): Extract<GatewayRequest, { kind: 'messages' }> {
+  return {
+    kind: 'messages',
+    body: {
+      model: 'anthropic/claude-sonnet-5.5',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content }],
+    },
+  };
+}
+
+function lastMessageContent(request: Extract<GatewayRequest, { kind: 'messages' }>) {
+  const lastMessage = request.body.messages.at(-1);
+  return Array.isArray(lastMessage?.content) ? lastMessage.content : [];
 }
 
 describe('enableReasoningSummaries', () => {
@@ -60,5 +78,66 @@ describe('enableReasoningSummaries', () => {
     enableReasoningSummaries(request);
 
     expect(request.body).not.toHaveProperty('thinking');
+  });
+});
+
+describe('addCacheBreakpoints', () => {
+  test('breaks last on a Messages text block, never on a thinking block', () => {
+    const request = messagesRequest([
+      { type: 'thinking', thinking: 'reasoning', signature: 'sig' },
+      { type: 'text', text: 'hello <environment_details>x</environment_details>' },
+      { type: 'text', text: 'after' },
+    ]);
+
+    addCacheBreakpoints(request);
+
+    const blocks = lastMessageContent(request);
+    expect(blocks[2]).toHaveProperty('cache_control');
+    expect(blocks[0]).not.toHaveProperty('cache_control');
+    expect(blocks[1]).not.toHaveProperty('cache_control');
+  });
+
+  test('breaks on the block before environment details when it is cacheable', () => {
+    const request = messagesRequest([
+      { type: 'text', text: 'hello' },
+      { type: 'text', text: '<environment_details>x</environment_details>' },
+      { type: 'text', text: 'after' },
+    ]);
+
+    addCacheBreakpoints(request);
+
+    const blocks = lastMessageContent(request);
+    expect(blocks[0]).toHaveProperty('cache_control');
+    expect(blocks[1]).not.toHaveProperty('cache_control');
+    expect(blocks[2]).not.toHaveProperty('cache_control');
+  });
+
+  test('skips a thinking block that sits before environment details', () => {
+    const request = messagesRequest([
+      { type: 'text', text: 'hello' },
+      { type: 'thinking', thinking: 'reasoning', signature: 'sig' },
+      { type: 'text', text: '<environment_details>x</environment_details>' },
+    ]);
+
+    addCacheBreakpoints(request);
+
+    const blocks = lastMessageContent(request);
+    expect(blocks[2]).toHaveProperty('cache_control');
+    expect(blocks[0]).not.toHaveProperty('cache_control');
+    expect(blocks[1]).not.toHaveProperty('cache_control');
+  });
+
+  test('skips a redacted_thinking block that sits before environment details', () => {
+    const request = messagesRequest([
+      { type: 'redacted_thinking', data: 'opaque' },
+      { type: 'text', text: '<environment_details>x</environment_details>' },
+      { type: 'text', text: 'after' },
+    ]);
+
+    addCacheBreakpoints(request);
+
+    const blocks = lastMessageContent(request);
+    expect(blocks[2]).toHaveProperty('cache_control');
+    expect(blocks[0]).not.toHaveProperty('cache_control');
   });
 });

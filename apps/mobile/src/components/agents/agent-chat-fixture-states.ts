@@ -34,7 +34,7 @@ export type AgentChatFixtureState =
  * point is the notice carries one; every other state carries none, so a cell
  * shows the notice exactly when its target asks for it.
  */
-export const FIXTURE_UNREADABLE_QUESTIONS = {
+const FIXTURE_UNREADABLE_QUESTIONS = {
   idle: [],
   'pending-permission': [],
   'permission-failed': [],

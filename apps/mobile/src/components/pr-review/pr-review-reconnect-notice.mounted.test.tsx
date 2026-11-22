@@ -1,5 +1,5 @@
 import { QueryObserver } from '@tanstack/react-query';
-import { act, createElement } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,7 +58,9 @@ afterEach(() => {
   client.clear();
 });
 
-async function mountNotice() {
+async function mountNotice(
+  props: ComponentProps<typeof PrReviewReconnectNotice> = {}
+): Promise<void> {
   const observer = new QueryObserver(client, {
     queryKey: reviewKey,
     queryFn: mocks.review,
@@ -66,7 +68,9 @@ async function mountNotice() {
     initialData: 'cached',
   });
   unsubscribe = observer.subscribe(vi.fn<() => void>());
-  view = await renderWithProviders(createElement(PrReviewReconnectNotice), { queryClient: client });
+  view = await renderWithProviders(<PrReviewReconnectNotice {...props} />, {
+    queryClient: client,
+  });
 }
 
 function button() {
@@ -129,5 +133,36 @@ describe('PrReviewReconnectNotice', () => {
     });
     await waitFor(() => !button().loading);
     expect(mocks.review).toHaveBeenCalledOnce();
+  });
+
+  it('reports a check that settled on a usable connection', async () => {
+    const onConnectionRestored = vi.fn<() => void>();
+    await mountNotice({ onConnectionRestored });
+    await checkConnection();
+
+    // The answer is what a surface clears its own latch with, so it is
+    // reported exactly once, after the check settled.
+    expect(onConnectionRestored).toHaveBeenCalledOnce();
+  });
+
+  it('reports nothing when the check answers a revoked connection', async () => {
+    mocks.authorization.mockResolvedValue({ connected: false, revoked: true });
+    const onConnectionRestored = vi.fn<() => void>();
+    await mountNotice({ onConnectionRestored });
+    await checkConnection();
+
+    expect(onConnectionRestored).not.toHaveBeenCalled();
+  });
+
+  it('reports nothing when the check rejects', async () => {
+    mocks.authorization.mockRejectedValue(new Error('Connection check failed'));
+    const onConnectionRestored = vi.fn<() => void>();
+    await mountNotice({ onConnectionRestored });
+    await checkConnection();
+
+    // The hook's toast owns the failure; a surface must not read a failed
+    // check as a resolved connection.
+    expect(mocks.toastError).toHaveBeenCalledWith('Connection check failed');
+    expect(onConnectionRestored).not.toHaveBeenCalled();
   });
 });

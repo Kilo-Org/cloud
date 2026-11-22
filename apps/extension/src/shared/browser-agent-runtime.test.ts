@@ -3165,28 +3165,19 @@ describe('agent browser calls', () => {
       [71],
     ]);
 
-    // The repeat runs on a later instant than the file the guarded call created, so that file is never inside this
-    // Call's own download window: only the clock keeps the two apart, and a search's window is millisecond-granular.
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(Date.now() + 1000);
+    const approved = await openTab([expectStepToken(guarded)]);
 
-    try {
-      const approved = await openTab([expectStepToken(guarded)]);
-
-      // The tab never left the origin the call was approved for, so the answer is the browser's download refusal with
-      // The step token a repeat needs, not a navigation result that would hide it.
-      expect(approved.kind).toBe('needs_permission');
-      expect(approved.kind === 'needs_permission' && !approved.result.ok).toBe(true);
-      expect(
-        approved.kind === 'needs_permission' && !approved.result.ok ? approved.result.error : ''
-      ).toContain(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
-      expect(approved.kind === 'needs_permission' ? approved.stepToken !== undefined : false).toBe(
-        true
-      );
-      expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
-    } finally {
-      vi.useRealTimers();
-    }
+    // The tab never left the origin the call was approved for, so the answer is the browser's download refusal with
+    // The step token a repeat needs, not a navigation result that would hide it.
+    expect(approved.kind).toBe('needs_permission');
+    expect(approved.kind === 'needs_permission' && !approved.result.ok).toBe(true);
+    expect(
+      approved.kind === 'needs_permission' && !approved.result.ok ? approved.result.error : ''
+    ).toContain(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+    expect(approved.kind === 'needs_permission' ? approved.stepToken !== undefined : false).toBe(
+      true
+    );
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
   });
 
   it('leaves a later download of the same url alone when the record for it is stale', async () => {

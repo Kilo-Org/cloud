@@ -4,7 +4,6 @@ import { captureMessage } from '@sentry/nextjs';
 import {
   GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME,
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS,
-  GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER,
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
 } from '@kilocode/web-shared/lib/config.server';
 import { countAdmissionCondition } from './native-admission-counters';
@@ -236,11 +235,7 @@ function getPlayIntegrityConfig(): PlayIntegrityConfig | null {
 
 /** True when a credential input the verifier cannot work without is absent. */
 function isCredentialConfigMissing(): boolean {
-  return (
-    !GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER ||
-    !GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY ||
-    !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME
-  );
+  return !GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY || !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME;
 }
 
 /** The configured signing-certificate digests, or an empty list when unset. */

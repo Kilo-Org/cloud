@@ -16,6 +16,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { isModelAllowedForProviderKey } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { validateOrganizationAutoTarget } from './organization-auto-model';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -110,18 +111,24 @@ describe('validateOrganizationAutoTarget catalog load client', () => {
     (options: { countryCode: string | null; fromDb?: object }) => Promise<unknown>
   >;
 
-  test('forwards the model-stats load client to the catalog read', async () => {
+  test('reads the catalog through the replica client the seam names', async () => {
     const replica = { select: jest.fn() } as unknown as ModelStatsLoadClient;
 
     await expect(
-      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6', { fromDb: replica })
+      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6', {
+        read: { fromDb: replica as typeof readDb },
+      })
     ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
     expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: replica });
   });
 
-  test('keeps the primary default when no client is passed', async () => {
+  test('keeps the primary default inside a transaction', async () => {
+    const tx = { select: jest.fn() } as never;
+
     await expect(
-      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6')
+      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6', {
+        read: { tx },
+      })
     ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
     expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: undefined });
   });
@@ -133,7 +140,7 @@ describe('validateOrganizationAutoTarget catalog load client', () => {
 
     await expect(
       validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6', {
-        fromDb: replica,
+        read: { fromDb: replica as typeof readDb },
       })
     ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
     expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: replica });

@@ -198,8 +198,8 @@ async function resolveOrganizationAutoModel(
 
   let validation: OrganizationAutoTargetValidationResult;
   try {
-    // The gateway runs in `sfo1`, so validation reads the US replica; web routers keep the primary
-    // default because they validate right after a write.
+    // The gateway runs in `sfo1`, so validation reads the US replica; web routers validate inside
+    // their transaction and keep the primary they just wrote to.
     validation = await validateOrganizationAutoTarget(
       {
         id: organizationContext.organizationId,
@@ -207,7 +207,7 @@ async function resolveOrganizationAutoModel(
         settings: organizationContext.settings,
       },
       targetModelId,
-      { apiKind: params.apiKind ?? undefined, fromDb: readDb }
+      { apiKind: params.apiKind ?? undefined, read: { fromDb: readDb } }
     );
   } catch {
     return {

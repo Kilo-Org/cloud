@@ -198,6 +198,22 @@ const IDLE_CHILD_SESSION_HYDRATION_STATE = {
   status: 'idle',
 } satisfies ChildSessionHydrationState;
 
+/**
+ * Where the active session's first history page stands, as one state:
+ *
+ * - `pending` — no first page has settled yet, so the transcript surface must
+ *   keep its skeleton and must not claim the session is empty.
+ * - `settled` — a first page settled with something the reader can judge: rows
+ *   were stored, or the session genuinely has no admitted turn to show.
+ * - `unreadable` — the page settled with no row to show although the session
+ *   had history: rows existed and were dropped (`omittedItemCount > 0`), or
+ *   the run admitted an initial turn that the page matched no rows for.
+ */
+type TranscriptHistoryState =
+  | { kind: 'pending' }
+  | { kind: 'settled' }
+  | { kind: 'unreadable' };
+
 const EMPTY_REMOTE_MODEL_STATE = {
   ownerConnectionId: null,
   protocol: 'unknown',
@@ -660,6 +676,8 @@ type SessionManagerAtoms = {
    * (pre-clear messages may reappear — accepted tradeoff).
    */
   transcriptCleared: W<boolean>;
+  /** Where the active session's first history page stands, as one state. */
+  transcriptHistory: Atom<TranscriptHistoryState>;
   /**
    * Ids the user resolved by retrying, for the active session: a failed
    * delivery entry, or every row an accepted retry replaced (the delivered
@@ -1341,6 +1359,48 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
   const transcriptClearedAtom = atom(false);
+  /**
+   * The first applied page's own evidence, kept as facts: whether it stored any
+   * row and how many items the reader omitted. It is a dependency of
+   * `transcriptHistoryAtom`, not a verdict: whether the facts mean `settled` or
+   * `unreadable` also needs the session's admitted turn, which usually resolves
+   * AFTER this page (the eager page read starts before the metadata await), so
+   * the verdict is derived on read.
+   */
+  const firstPageEvidenceAtom = atom<{
+    storedRowCount: number;
+    omittedItemCount: number;
+  } | null>(null);
+  /**
+   * First-page lifecycle for the active session: `pending` until a first page
+   * settles, then `settled` or `unreadable`. The transcript view reads it so a
+   * session whose history was never read cannot render as an action-less empty
+   * transcript, and a page that settled with nothing readable gets a retryable
+   * failure instead of the empty state.
+   *
+   * Derived from the evidence and the metadata rather than latched at the page
+   * apply, because the metadata's `initialMessageId` is what separates a
+   * genuinely empty session from a page that matched no row of an admitted
+   * turn, and the metadata lands after the page: a derived read flips when it
+   * arrives, with no extra wiring.
+   */
+  const transcriptHistoryAtom = atom<TranscriptHistoryState>(get => {
+    // `/clear` empties the view on purpose: that is an empty session, not a
+    // history that could not be read, whatever the stored evidence says.
+    if (get(transcriptClearedAtom)) return { kind: 'settled' };
+    const evidence = get(firstPageEvidenceAtom);
+    if (evidence === null) return { kind: 'pending' };
+    if (evidence.storedRowCount > 0) return { kind: 'settled' };
+    if (evidence.omittedItemCount > 0) return { kind: 'unreadable' };
+    const metadata = get(fetchedSessionDataAtom);
+    // No rows and nothing omitted is only judgeable once the session's own
+    // metadata is known: `initialMessageId` separates a session that never
+    // admitted a turn (the normal empty state) from a page that matched no row
+    // of an admitted one. Until then the answer is still pending, and the
+    // metadata usually lands after this page.
+    if (metadata === null) return { kind: 'pending' };
+    return metadata.initialMessageId != null ? { kind: 'unreadable' } : { kind: 'settled' };
+  });
 
   // Bumped whenever the active session or its resolved-delivery record changes,
   // so the read-only projection below re-derives on a switch, on a recorded
@@ -2622,6 +2682,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     );
     if (initialPage) {
       initialPageOmittedItemCount = outcome.omittedItemCount;
+      // The first applied page owns the evidence. A later re-apply of the same
+      // page (the live read after the cached replay) must not overwrite it, and
+      // the `settled`/`unreadable` verdict is derived from it plus the
+      // metadata, which may still be landing.
+      if (store.get(firstPageEvidenceAtom) === null) {
+        store.set(firstPageEvidenceAtom, {
+          storedRowCount: storedMessageIds.length,
+          omittedItemCount: outcome.omittedItemCount,
+        });
+      }
     }
     store.set(olderMessagesErrorAtom, null);
     return storedMessageIds;
@@ -3301,6 +3371,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(failedPromptAtom, failedPromptBySession.get(kiloSessionId)?.text ?? null);
     store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
+    // Nothing has read this session's history yet: until its first page
+    // settles the transcript surface keeps the skeleton instead of an
+    // action-less empty state. `clearAllAtoms` leaves the evidence alone
+    // because a `destroy` must not claim a page is still pending.
+    store.set(firstPageEvidenceAtom, null);
     // A retry that keeps the transcript mounted must also keep advertising that
     // the visible rows are being refetched: the rows stay, the refresh is the
     // wait the user is in.
@@ -4459,6 +4534,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     olderMessagesInFlight = null;
     loadOlderGeneration += 1;
     store.set(transcriptClearedAtom, true);
+    // The user asked for an empty view: it is deliberately empty, not a
+    // history that could not be read, so it settles with no rows and nothing
+    // omitted.
+    store.set(firstPageEvidenceAtom, { storedRowCount: 0, omittedItemCount: 0 });
     // Nothing stale is on screen any more: the user asked for an empty view.
     store.set(isRefreshingCachedTranscriptAtom, false);
     store.set(chatUIAtom, { shouldAutoScroll: true });
@@ -4801,6 +4880,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       olderMessagesError: olderMessagesErrorAtom,
       olderMessagesOmittedItemCount: olderMessagesOmittedItemCountAtom,
       transcriptCleared: transcriptClearedAtom,
+      transcriptHistory: transcriptHistoryAtom,
       resolvedDeliveryFailures: resolvedDeliveryFailuresAtom,
       supersededInFlightMessageIds: supersededInFlightMessageIdsAtom,
     },
@@ -4822,6 +4902,7 @@ export type {
   StandaloneQuestion,
   StandaloneSuggestion,
   ChildSessionHydrationState,
+  TranscriptHistoryState,
   StoredMessage,
   DeliveredFailedPrompt,
   PendingSendConfirmation,

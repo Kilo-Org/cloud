@@ -7,6 +7,7 @@ import {
   type SessionManagerConfig,
   type StoredMessage,
   type SnapshotHistoryFailure,
+  type TranscriptHistoryState,
 } from './session-manager';
 import type { FetchedSessionData, AssociatedPrData } from './types';
 import {
@@ -43,6 +44,7 @@ import type {
   CloudStatus,
   FilePart,
   CachedSessionSnapshotPage,
+  CloudSessionMetadata,
   KiloSessionId,
   MessageDeliveryState,
   PreparationAttempt,
@@ -11587,6 +11589,267 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     expect(
       atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
     ).toEqual(['msg-current']);
+  });
+
+  describe('transcriptHistory', () => {
+    // The first page arrives through the transport's `onInitialPageLoaded`, so a
+    // switch resolves before its page lands: one microtask flush delivers it.
+    const settlePage = async (): Promise<void> =>
+      new Promise<void>(resolve => setImmediate(resolve));
+
+    it('is pending after switchSession until the first page settles, then settled with its rows', async () => {
+      // The page read stays open, so the assertion cannot race the transport's
+      // own delivery of it.
+      const pageRead = deferred<SessionSnapshotPageOutcome>();
+      const fetchSnapshotPage = createPageFetchMock(() => pageRead.promise);
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'pending' }
+      );
+
+      pageRead.resolve(
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: [makePageMessage('msg-first', 'ses-1', 'first')],
+        })
+      );
+      await settlePage();
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'settled' }
+      );
+    });
+
+    it('stays pending until the metadata can judge a zero-row page, then is unreadable', async () => {
+      // The reported defect: the run admitted a prompt, the reader matched no
+      // row, and nothing was omitted. The page read resolves first (the eager
+      // cloud read starts before the metadata await), so the verdict can only
+      // be derived once the metadata lands.
+      const workspaceSessionId = cloudAgentId('workspace_11111111-1111-4111-8111-111111111111');
+      const metadataRead = deferred<CloudSessionMetadata>();
+      const config = createMockConfig({
+        resolveSession: jest.fn().mockResolvedValue({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: workspaceSessionId,
+        }),
+        fetchCloudSnapshotPage: jest.fn().mockResolvedValue({
+          kind: 'success',
+          info: { id: 'ses-1' },
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+          updateCursor: 1,
+        }),
+        fetchCloudSession: jest.fn(() => metadataRead.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      const opening = mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+
+      // The page produced no row and nothing was omitted: not judgeable yet.
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'pending' }
+      );
+
+      metadataRead.resolve({
+        sessionId: workspaceSessionId,
+        kiloSessionId: kiloId('ses-1'),
+        initialMessageId: 'msg_0123456789abcdefghijklmnop',
+      });
+      await opening;
+
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'unreadable' }
+      );
+    });
+
+    it('settles as empty only once the metadata says no turn was admitted', async () => {
+      // Same ordering as the test above, with the other discriminator: the
+      // page cannot claim the session is empty until the metadata rules out an
+      // admitted turn.
+      const workspaceSessionId = cloudAgentId('workspace_22222222-2222-4222-8222-222222222222');
+      const metadataRead = deferred<CloudSessionMetadata>();
+      const config = createMockConfig({
+        resolveSession: jest.fn().mockResolvedValue({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: workspaceSessionId,
+        }),
+        fetchCloudSnapshotPage: jest.fn().mockResolvedValue({
+          kind: 'success',
+          info: { id: 'ses-1' },
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+          updateCursor: 1,
+        }),
+        fetchCloudSession: jest.fn(() => metadataRead.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      const opening = mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'pending' }
+      );
+
+      metadataRead.resolve({
+        sessionId: workspaceSessionId,
+        kiloSessionId: kiloId('ses-1'),
+      });
+      await opening;
+
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'settled' }
+      );
+    });
+
+    it('settles as empty for a session with no admitted turn', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [] })
+      );
+      const config = createMockConfig({
+        fetchSnapshotPage,
+        fetchSession: jest
+          .fn()
+          .mockResolvedValue({ ...defaultFetchedSession, initialMessageId: null }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'settled' }
+      );
+    });
+
+    it('is unreadable when the page omitted every row it carried', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [], omittedItemCount: 3 })
+      );
+      const config = createMockConfig({
+        fetchSnapshotPage,
+        fetchSession: jest
+          .fn()
+          .mockResolvedValue({ ...defaultFetchedSession, initialMessageId: null }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'unreadable' }
+      );
+    });
+
+    it('is unreadable when an admitted turn matched no rows', async () => {
+      // The reported defect: the run had a prompt, the reader matched no row,
+      // and nothing was omitted, so `omittedItemCount` says nothing.
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [] })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+
+      expect(
+        atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)
+      ).toEqual({ kind: 'unreadable' });
+    });
+
+    it('settles on stored rows regardless of omissions', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: [makePageMessage('msg-kept', 'ses-1', 'kept')],
+          omittedItemCount: 2,
+        })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'settled' }
+      );
+    });
+
+    it('is unchanged by an older page', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+        if (!options.cursor) {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: [],
+            nextCursor: 'cursor-A',
+            omittedItemCount: 4,
+          });
+        }
+        return makePage({
+          kiloSessionId: 'ses-1',
+          messages: [makePageMessage('msg-older', 'ses-1', 'older')],
+          nextCursor: null,
+        });
+      });
+      const config = createMockConfig({
+        fetchSnapshotPage,
+        fetchSession: jest
+          .fn()
+          .mockResolvedValue({ ...defaultFetchedSession, initialMessageId: null }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'unreadable' }
+      );
+
+      await mgr.loadOlderMessages();
+
+      // Older pages never decide the first page's outcome, even with rows.
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'unreadable' }
+      );
+    });
+
+    it('settles on /clear: a deliberately cleared view is empty, not unreadable', async () => {
+      // The strongest `unreadable` inputs: the session DID admit a turn and the
+      // page dropped every row it carried. Without the cleared check a `/clear`
+      // would show the history failure over a transcript the person emptied on
+      // purpose.
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: [],
+          omittedItemCount: 3,
+        })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'unreadable' }
+      );
+
+      mgr.clearTranscript();
+
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
+        { kind: 'settled' }
+      );
+    });
   });
 
   describe('page replay tool lifecycle ordering', () => {

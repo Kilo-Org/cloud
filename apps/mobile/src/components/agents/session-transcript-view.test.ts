@@ -10,6 +10,7 @@ describe('resolveSessionTranscriptView', () => {
         hasStatusIndicator: true,
         hasOlderMessages: true,
         olderMessagesError: null,
+        historyState: { kind: 'pending' },
       })
     ).toBe('list');
   });
@@ -21,6 +22,7 @@ describe('resolveSessionTranscriptView', () => {
         hasStatusIndicator: true,
         hasOlderMessages: false,
         olderMessagesError: null,
+        historyState: { kind: 'pending' },
       })
     ).toBe('status');
   });
@@ -32,6 +34,7 @@ describe('resolveSessionTranscriptView', () => {
         hasStatusIndicator: false,
         hasOlderMessages: true,
         olderMessagesError: null,
+        historyState: { kind: 'pending' },
       })
     ).toBe('older-loading');
   });
@@ -43,6 +46,7 @@ describe('resolveSessionTranscriptView', () => {
         hasStatusIndicator: false,
         hasOlderMessages: true,
         olderMessagesError: { kind: 'retryable' },
+        historyState: { kind: 'pending' },
       })
     ).toBe('older-error');
   });
@@ -56,19 +60,60 @@ describe('resolveSessionTranscriptView', () => {
           hasStatusIndicator: false,
           hasOlderMessages: true,
           olderMessagesError,
+          historyState: { kind: 'settled' },
         })
       ).toBe('empty');
     }
   );
 
-  it('shows the empty state for a zero-item transcript with no cursor', () => {
+  it('shows the empty state for a zero-item settled transcript with no cursor', () => {
     expect(
       resolveSessionTranscriptView({
         transcriptItemCount: 0,
         hasStatusIndicator: false,
         hasOlderMessages: false,
         olderMessagesError: null,
+        historyState: { kind: 'settled' },
       })
     ).toBe('empty');
   });
+
+  it('keeps the skeleton while no first page has settled', () => {
+    expect(
+      resolveSessionTranscriptView({
+        transcriptItemCount: 0,
+        hasStatusIndicator: false,
+        hasOlderMessages: false,
+        olderMessagesError: null,
+        historyState: { kind: 'pending' },
+      })
+    ).toBe('history-pending');
+  });
+
+  it('gives a first page that settled unreadable its own failure, not the empty state', () => {
+    expect(
+      resolveSessionTranscriptView({
+        transcriptItemCount: 0,
+        hasStatusIndicator: false,
+        hasOlderMessages: false,
+        olderMessagesError: null,
+        historyState: { kind: 'unreadable' },
+      })
+    ).toBe('history-error');
+  });
+
+  it.each([{ kind: 'pending' }, { kind: 'unreadable' }] as const)(
+    'keeps an older-page error above the first-page state ($kind)',
+    historyState => {
+      expect(
+        resolveSessionTranscriptView({
+          transcriptItemCount: 0,
+          hasStatusIndicator: false,
+          hasOlderMessages: true,
+          olderMessagesError: { kind: 'retryable' },
+          historyState,
+        })
+      ).toBe('older-error');
+    }
+  );
 });

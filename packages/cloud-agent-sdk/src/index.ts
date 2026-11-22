@@ -53,6 +53,7 @@ export type {
   StandaloneQuestion,
   StandaloneSuggestion,
   ChildSessionHydrationState,
+  TranscriptHistoryState,
   StoredMessage,
   DeliveredFailedPrompt,
   PendingSendConfirmation,

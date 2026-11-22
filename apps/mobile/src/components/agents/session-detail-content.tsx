@@ -489,6 +489,7 @@ export function SessionDetailContent({
   const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
   const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
   const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
+  const transcriptHistory = useAtomValue(manager.atoms.transcriptHistory);
   const [openContextSheetIdentity, setOpenContextSheetIdentity] =
     useState<ContextSheetIdentity | null>(null);
   const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null);
@@ -1394,6 +1395,7 @@ export function SessionDetailContent({
     hasStatusIndicator: statusIndicator !== null,
     hasOlderMessages,
     olderMessagesError,
+    historyState: transcriptHistory,
   });
 
   // A zero-item transcript with a live older-page cursor is transient: page
@@ -2031,7 +2033,10 @@ export function SessionDetailContent({
   // The threshold is anchored to the route's open, so a slow metadata round
   // trip before this screen mounts does not restart the clock.
   const sessionLoadPhase = useSessionSlowLoadPhase({
-    isLoading: shouldShowLoading,
+    // A first page that has not settled is a load in progress as well: without
+    // it a stalled open whose `isLoading` the transport already cleared would
+    // sit on the skeleton with no message and no Retry.
+    isLoading: shouldShowLoading || transcriptHistory.kind === 'pending',
     hasContent: messages.length > 0,
     hasError: error !== null,
     hasStatusIndicator: statusIndicator !== null,
@@ -2170,10 +2175,25 @@ export function SessionDetailContent({
   // A Retry tapped while the rows were still missing must release once the
   // failed preparation rows arrive: they are the run's own failure statement,
   // so the stale page-load failure has nothing left to say.
+  //
+  // A first page that settled with nothing readable is the same failure a
+  // terminal load failure states, and reuses that card, its single Retry latch
+  // and its release on a settled reopen. One card, one latch.
+  const historyFailure = useMemo<SessionTerminalError>(
+    () => ({
+      variant: 'server',
+      title: t('agentChat.session.couldNotLoadThisSession'),
+      message: t('agentChat.session.historyUnavailable'),
+      retryable: true,
+      retryWith: 'session',
+      detail: '',
+    }),
+    [t]
+  );
   const shownTerminalError =
     terminalRetryPending && messages.length === 0 && !hasFailedPreparation
       ? (terminalError ?? terminalRetry.error)
-      : terminalError;
+      : (terminalError ?? (transcriptView === 'history-error' ? historyFailure : null));
   const handleTerminalRetry = (failure: SessionTerminalError): void => {
     if (terminalRetryPending) {
       return;
@@ -2339,7 +2359,12 @@ export function SessionDetailContent({
   // session speaking, and each keeps the chrome it already has.
   const transcriptRowsHidden = transcriptView === 'list' && !transcriptOpenSettled;
   const isSessionChromePending =
-    (shouldShowLoading || transcriptView === 'older-loading' || transcriptRowsHidden) &&
+    (shouldShowLoading ||
+      transcriptView === 'older-loading' ||
+      // The body is still the skeleton because no first page has settled, so
+      // the chrome keeps its loading shape with it.
+      transcriptView === 'history-pending' ||
+      transcriptRowsHidden) &&
     terminalError === null &&
     activeQuestion === null &&
     activePermission === null;
@@ -3509,7 +3534,14 @@ export function SessionDetailContent({
         </CenteredState>
       );
     }
-    if (shouldBlockMessages || transcriptView === 'older-loading') {
+    if (
+      shouldBlockMessages ||
+      transcriptView === 'older-loading' ||
+      transcriptView === 'history-pending'
+    ) {
+      // A first page that has not settled keeps the skeleton: the empty state
+      // below would claim the session has nothing to show before its history
+      // was read.
       return <SessionSkeletonMessages sessionId={sessionId} />;
     }
     if (transcriptView !== 'list') {
@@ -3554,6 +3586,9 @@ export function SessionDetailContent({
           />
         );
       }
+      // `history-error` never reaches here: `shownTerminalError` resolves its
+      // failure before this function's first branch, so the card that owns it
+      // renders instead of this empty state.
       return (
         <EmptyState
           icon={MessageSquare}

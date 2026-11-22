@@ -674,6 +674,7 @@ function makeManager() {
       isLoadingOlderMessages: { value: false },
       olderMessagesError: { value: null },
       olderMessagesOmittedItemCount: { value: 0 },
+      transcriptHistory: { value: { kind: 'settled' } },
       resolvedDeliveryFailures: { value: new Set<string>() },
       supersededInFlightMessageIds: { value: new Set<string>() },
       deliveredFailedPrompt: { value: null },

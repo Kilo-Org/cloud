@@ -345,7 +345,7 @@ export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
 type SameUnion<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type AssertTrue<T extends true> = T;
-export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
+type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
   SameUnion<
     DispatchPushOutcome['kind'],
     | 'delivered'

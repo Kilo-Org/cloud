@@ -16,6 +16,7 @@ import {
   useSaveOrgModelAccess,
 } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import {
   type AvailableModel,
@@ -98,6 +99,10 @@ export function ModelAccessForm({
   onRetryGateway: () => void;
 }>) {
   const { t } = useTranslation();
+  // The lists below take the tab-screen frame, which also carries the window's
+  // side insets. The header block above them takes the same insets so the
+  // controls and the rows stay in one column on a landscape display cutout.
+  const sideInsetStyle = useSideInsetStyle();
   // The screen resolves the reader's role once and hands it down: this form
   // renders no billing step beside the failure line, so a money role reads the
   // sentence that names the destination instead of one that claims an owner
@@ -275,67 +280,71 @@ export function ModelAccessForm({
 
   return (
     <View className="flex-1">
-      <View className="gap-3 px-4 pt-3">
-        {/* The warning tile marks missing data; the message takes the body
+      {/* The inset rides on this wrapper, not on the padded block: inline
+          padding there would replace the page gutter the class draws. */}
+      <View style={sideInsetStyle}>
+        <View className="gap-3 px-4 pt-3">
+          {/* The warning tile marks missing data; the message takes the body
             ink, because the muted neutral fails body-text contrast on it. */}
-        {notice === null ? null : (
-          <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
-            <Text className="flex-1 text-foreground">{notice}</Text>
+          {notice === null ? null : (
+            <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
+              <Text className="flex-1 text-foreground">{notice}</Text>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={catalogIsFetching}
+                onPress={onRetryCatalog}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            </View>
+          )}
+          <SegmentedControl
+            options={[
+              { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
+              { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
+              { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
+            ]}
+            value={tab}
+            onChange={nextTab => {
+              // A tab change is the person looking elsewhere: a draft that lands
+              // after it must not move the lists under the tab they chose.
+              touchedRef.current = true;
+              setTab(nextTab);
+            }}
+            accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
+          />
+          {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
+          {/* The buttons keep their place while the draft is clean, so a save
+            that settles never moves the list below them. */}
+          <View className="flex-row items-center gap-2">
+            <View className="min-h-5 flex-1 justify-center">
+              <AccessibleStatus
+                message={statusMessage}
+                tone={feedback.status === 'failed' ? 'error' : 'status'}
+                className="text-sm"
+              />
+            </View>
             <Button
               variant="outline"
               size="sm"
-              loading={catalogIsFetching}
-              onPress={onRetryCatalog}
+              disabled={!dirty || saving}
+              onPress={() => {
+                clearWhere(() => true);
+                // Cancel is a deliberate discard: the stored copy goes with the
+                // screen's, or a language-direction reload would restore exactly
+                // the edits the person just threw away.
+                touchedRef.current = true;
+                formDraft.clear();
+                setForm(previous => ({ ...previous, draft: previous.baseline }));
+              }}
             >
-              <Text>{t('common.retry')}</Text>
+              <Text>{t('common.cancel')}</Text>
+            </Button>
+            <Button size="sm" loading={saving} disabled={cannotSave} onPress={() => void onSave()}>
+              <Text>{t('common.save')}</Text>
             </Button>
           </View>
-        )}
-        <SegmentedControl
-          options={[
-            { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
-            { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
-            { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
-          ]}
-          value={tab}
-          onChange={nextTab => {
-            // A tab change is the person looking elsewhere: a draft that lands
-            // after it must not move the lists under the tab they chose.
-            touchedRef.current = true;
-            setTab(nextTab);
-          }}
-          accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
-        />
-        {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
-        {/* The buttons keep their place while the draft is clean, so a save
-            that settles never moves the list below them. */}
-        <View className="flex-row items-center gap-2">
-          <View className="min-h-5 flex-1 justify-center">
-            <AccessibleStatus
-              message={statusMessage}
-              tone={feedback.status === 'failed' ? 'error' : 'status'}
-              className="text-sm"
-            />
-          </View>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!dirty || saving}
-            onPress={() => {
-              clearWhere(() => true);
-              // Cancel is a deliberate discard: the stored copy goes with the
-              // screen's, or a language-direction reload would restore exactly
-              // the edits the person just threw away.
-              touchedRef.current = true;
-              formDraft.clear();
-              setForm(previous => ({ ...previous, draft: previous.baseline }));
-            }}
-          >
-            <Text>{t('common.cancel')}</Text>
-          </Button>
-          <Button size="sm" loading={saving} disabled={cannotSave} onPress={() => void onSave()}>
-            <Text>{t('common.save')}</Text>
-          </Button>
         </View>
       </View>
 
@@ -356,7 +365,7 @@ export function ModelAccessForm({
               caption stays to keep the read-only explanation on screen. */}
           {providerRowsIncomplete &&
           !(savePayload.kind === 'provider-catalog-unavailable' && feedback.status !== 'failed') ? (
-            <Text variant="caption" className="px-4 pb-2">
+            <Text variant="caption" className="px-4 pb-2" style={sideInsetStyle}>
               {t('organizationModelAccess.providersNeedCatalog')}
             </Text>
           ) : null}

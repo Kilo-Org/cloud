@@ -434,6 +434,8 @@
       }
     },
     {
+      // `metro.config.js` resolves the MCP SDK's `pkce-challenge` specifier to this
+      // module, and the SDK default-imports that package, so the module needs a default.
       "files": ["src/lib/chat/remote-mcp-pkce.ts"],
       "rules": {
         "import/no-default-export": "off"

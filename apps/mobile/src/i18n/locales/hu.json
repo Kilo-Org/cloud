@@ -2565,7 +2565,7 @@
       "searchPlaceholder": "Adattárak keresése",
       "noMatches": "Nincs találat",
       "noRepositories": "Nincs elérhető adattár",
-      "noRepositoriesDescription": "Egyetlen adattár sincs a fiókodhoz kapcsolva.",
+      "noRepositoriesDescription": "Az adattárak betöltéséhez csatlakoztass GitHubot vagy GitLabot.",
       "loading": "Betöltés…",
       "accessibility": "Adattár: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Ön egy…",
       "tools": "Eszközök",
       "wholeToolRule": "Ez az ügynök egyszerre egy szabályt alkalmaz minden eszközre: {{rule}}. Ezek a kapcsolók csak olvashatók.",
+      "toolRule": "Tárolt szabály: {{rule}}",
       "visibility": "Láthatóság",
       "visibilityPrimary": "Elsődleges — a választóban látható",
       "visibilitySubagent": "Alügynök — csak másoktól hívható",

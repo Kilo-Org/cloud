@@ -114,7 +114,11 @@ export async function getAvailableModelsForOrganization(
 
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
   availableModels.push(
-    ...(await listAvailableCustomLlms(organizationId, context.groupIds, countryCode))
+    ...(await listAvailableCustomLlms(
+      organizationId,
+      context.groups.map(group => group.id),
+      countryCode
+    ))
   );
 
   const chatGptOwner = chatGptByokOwner(organizationId, subject, audience);

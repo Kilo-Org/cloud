@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Fikarohana tahirin-kaody",
       "noMatches": "Tsy misy mifanaraka",
       "noRepositories": "Tsy misy tahirin-kaody azo ampiasaina",
-      "noRepositoriesDescription": "Tsy misy tahirin-kaody mifandray amin'ny kaontinao.",
+      "noRepositoriesDescription": "Mba hahazoana tahirin-kaody, ampifandraiso amin'ny GitHub na GitLab.",
       "loading": "Maka angona…",
       "accessibility": "Tahirin-kaody: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Ianao dia…",
       "tools": "Fitaovana",
       "wholeToolRule": "Ity agent ity dia mampihatra fitsipika iray amin'ny fitaovana rehetra indray mandeha: {{rule}}. Vakiana fotsiny ireo mpifamadihana ireo.",
+      "toolRule": "Fitsipika voatahiry: {{rule}}",
       "visibility": "Fahitana",
       "visibilityPrimary": "Kilonga — aseho ao amin'ny mpanangona",
       "visibilitySubagent": "Subagent — azo antsoina amin'ny hafa ihany",

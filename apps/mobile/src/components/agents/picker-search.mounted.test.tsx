@@ -78,6 +78,7 @@ vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   Info: 'Info',
   Lock: 'Lock',
+  Plug: 'Plug',
   Search: 'Search',
   SearchX: 'SearchX',
   Unlock: 'Unlock',

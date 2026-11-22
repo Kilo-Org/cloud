@@ -2721,7 +2721,7 @@
       "searchPlaceholder": "Cuardach stór",
       "noMatches": "Níl aon toradh ann",
       "noRepositories": "Níl aon stór ar fáil",
-      "noRepositoriesDescription": "Níl aon stór ceangailte le do chuntas.",
+      "noRepositoriesDescription": "Ceangail le GitHub nó le GitLab chun stór a lódáil.",
       "loading": "Ag lódáil…",
       "accessibility": "Stór: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4638,6 +4638,7 @@
       "promptPlaceholder": "Is duine thú…",
       "tools": "Uirlisí",
       "wholeToolRule": "Cuireann an gníomhaire seo riail amháin i bhfeidhm ar gach uirlis ag an am céanna: {{rule}}. Tá na lasca seo inléite amháin.",
+      "toolRule": "Riail stóráilte: {{rule}}",
       "visibility": "Infheictheacht",
       "visibilityPrimary": "Bunscoile — a thaispeántar sa roghnóir",
       "visibilitySubagent": "Fo-ghníomhaire — inghlaoite ó dhaoine eile amháin",

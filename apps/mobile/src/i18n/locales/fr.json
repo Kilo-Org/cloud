@@ -1906,7 +1906,7 @@
       "searchPlaceholder": "Rechercher des dépôts",
       "noMatches": "Aucun résultat",
       "noRepositories": "Aucun dépôt disponible",
-      "noRepositoriesDescription": "Aucun dépôt n'est lié à votre compte.",
+      "noRepositoriesDescription": "Connectez GitHub ou GitLab pour charger des dépôts.",
       "loading": "Chargement…",
       "accessibility": "Dépôt : {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4480,6 +4480,7 @@
       "promptPlaceholder": "Vous êtes un…",
       "tools": "Outils",
       "wholeToolRule": "Cet agent applique une règle à tous les outils à la fois : {{rule}}. Ces interrupteurs sont en lecture seule.",
+      "toolRule": "Règle enregistrée : {{rule}}",
       "visibility": "Visibilité",
       "visibilityPrimary": "Primaire — affiché dans le sélecteur",
       "visibilitySubagent": "Sous-agent — appelable uniquement par d'autres",

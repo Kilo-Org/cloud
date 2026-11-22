@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Barbaacha kuusaalee koodii",
       "noMatches": "Wanti walsimu hin jiru",
       "noRepositories": "Kuusaan koodii hin argamu",
-      "noRepositoriesDescription": "Kuusaawwan koodii herrega keetti walqabatan hin jiran.",
+      "noRepositoriesDescription": "Kuusaa koodii fe'uuf, herrega GitHub yookaan GitLab walitti hidhi.",
       "loading": "Fe'aa jira…",
       "accessibility": "Kuusaa koodii: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Ati nama …",
       "tools": "Meeshaalee",
       "wholeToolRule": "Maajentiin kun seera tokko meeshaalee hunda irratti yeroo tokkotti hojiirra oolcha: {{rule}}. Qalqalloonni kunneen dubbisuu qofa danda'u.",
+      "toolRule": "Seera kuusame: {{rule}}",
       "visibility": "Mul’achuu",
       "visibilityPrimary": "Primary — kan agarsiifame picker keessatti",
       "visibilitySubagent": "Subagent — kanneen biroo irraa qofa kan waamamu",

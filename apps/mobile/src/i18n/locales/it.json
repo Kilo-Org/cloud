@@ -1993,7 +1993,7 @@
       "searchPlaceholder": "Cerca repository",
       "noMatches": "Nessun risultato",
       "noRepositories": "Nessun repository disponibile",
-      "noRepositoriesDescription": "Nessun repository è collegato al tuo account.",
+      "noRepositoriesDescription": "Collega GitHub o GitLab per caricare i repository.",
       "loading": "Caricamento…",
       "accessibility": "Repository selezionato: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4480,6 +4480,7 @@
       "promptPlaceholder": "Tu sei un…",
       "tools": "Utensili",
       "wholeToolRule": "Questo agente applica una regola a ogni utensile contemporaneamente: {{rule}}. Questi interruttori sono di sola lettura.",
+      "toolRule": "Regola salvata: {{rule}}",
       "visibility": "Visibilità",
       "visibilityPrimary": "Principale — mostrato nel selettore",
       "visibilitySubagent": "Subagente — richiamabile solo da altri",

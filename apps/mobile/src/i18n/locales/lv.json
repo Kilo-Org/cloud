@@ -2613,7 +2613,7 @@
       "searchPlaceholder": "Meklēt repozitorijus",
       "noMatches": "Nav atbilstību",
       "noRepositories": "Nav pieejamu repozitoriju",
-      "noRepositoriesDescription": "Tavam kontam nav pievienotu repozitoriju.",
+      "noRepositoriesDescription": "Lai ielādētu repozitorijus, pievieno GitHub vai GitLab kontu.",
       "loading": "Ielādē…",
       "accessibility": "Repozitorijs: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4480,6 +4480,7 @@
       "promptPlaceholder": "Tu esi…",
       "tools": "Rīki",
       "wholeToolRule": "Šis aģents vienlaikus piemēro vienu noteikumu visiem rīkiem: {{rule}}. Šie slēdži ir tikai lasāmi.",
+      "toolRule": "Saglabātais noteikums: {{rule}}",
       "visibility": "Redzamība",
       "visibilityPrimary": "Primārais — parādīts atlasītājā",
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",

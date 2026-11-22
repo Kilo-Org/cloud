@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Tafuta hazina",
       "noMatches": "Hakuna matokeo yanayolingana",
       "noRepositories": "Hakuna hazina zinazopatikana",
-      "noRepositoriesDescription": "Hakuna hazina zilizounganishwa kwenye akaunti yako.",
+      "noRepositoriesDescription": "Ili kupakia hazina, unganisha GitHub au GitLab.",
       "loading": "Inapakia…",
       "accessibility": "Hazina: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Wewe ni…",
       "tools": "Zana",
       "wholeToolRule": "Wakala huyu hutumia kanuni moja kwa kila zana kwa wakati mmoja: {{rule}}. Swichi hizi ni za kusoma tu.",
+      "toolRule": "Kanuni iliyohifadhiwa: {{rule}}",
       "visibility": "Mwonekano",
       "visibilityPrimary": "Msingi — imeonyeshwa kwenye kiteua",
       "visibilitySubagent": "Subagent — inaitwa tu kutoka kwa wengine",

@@ -2665,7 +2665,7 @@
       "searchPlaceholder": "Hledat repozitáře",
       "noMatches": "Žádné shody",
       "noRepositories": "Žádné repozitáře nejsou k dispozici",
-      "noRepositoriesDescription": "K vašemu účtu nejsou připojeny žádné repozitáře.",
+      "noRepositoriesDescription": "Chcete-li načíst repozitáře, připojte GitHub nebo GitLab.",
       "loading": "Načítání…",
       "accessibility": "Repozitář: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4559,6 +4559,7 @@
       "promptPlaceholder": "ty jsi…",
       "tools": "Nástroje",
       "wholeToolRule": "Tento agent aplikuje jedno pravidlo na všechny nástroje najednou: {{rule}}. Tyto přepínače jsou pouze pro čtení.",
+      "toolRule": "Uložené pravidlo: {{rule}}",
       "visibility": "Viditelnost",
       "visibilityPrimary": "Primární — zobrazí se ve výběru",
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",

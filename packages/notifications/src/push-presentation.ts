@@ -49,12 +49,18 @@ export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
 export const LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID = 'active-agents';
 
 /**
- * The channel `androidChannelIdForPushDataToAppVersion` keeps an agent briefing
- * on for a token that predates the split. The id itself is current — every
- * split build creates `agent-progress` (see `AGENT_CHANNEL_SPLIT_APP_VERSION`)
- * — so this is not legacy vocabulary: it names the fallback role the resolver
- * gives the channel, the one place a briefing goes to a channel the version
- * gate, not the payload, chose.
+ * The channel `androidChannelIdForPushDataToAppVersion` falls back to for an
+ * agent briefing when the token's client predates `agent-briefing`. The id
+ * itself is current — every split build creates `agent-progress` (see
+ * `AGENT_CHANNEL_SPLIT_APP_VERSION`) — so this is not legacy vocabulary: it
+ * names the fallback role the resolver gives the channel, the one place a
+ * briefing goes to a channel the version gate, not the payload, chose.
+ *
+ * The fallback is version-gated like any other channel, so it reaches only the
+ * tokens that already create it: `1.0.12` through `1.0.15`. A token older than
+ * the split gets no channel id at all — `agent-progress` does not exist on that
+ * build either — and the caller omits `channelId`, so Android posts to the
+ * app's default channel.
  */
 export const BRIEFING_FALLBACK_CHANNEL_ID: AndroidNotificationChannelId = 'agent-progress';
 
@@ -69,8 +75,12 @@ export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
 
 /**
  * The first mobile version whose every build creates `agent-briefing`. Builds of
- * `1.0.15` shipped without it, so a lower version keeps the brief on
- * `agent-progress` (see `androidChannelIdForPushDataToAppVersion`).
+ * `1.0.15` shipped without it, so a version from `1.0.12` through `1.0.15`
+ * keeps the brief on `agent-progress` (see
+ * `androidChannelIdForPushDataToAppVersion`). The split channels start at
+ * `AGENT_CHANNEL_SPLIT_APP_VERSION`, so a pre-split token is below both gates:
+ * it also has no `agent-progress`, gets no channel id, and the push lands on the
+ * app's default channel.
  */
 export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
 

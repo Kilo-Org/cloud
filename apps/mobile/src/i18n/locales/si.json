@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "කේත ගබඩා සොයන්න",
       "noMatches": "ගැළපීම් නැත",
       "noRepositories": "ලබාගත හැකි ගබඩා නැත",
-      "noRepositoriesDescription": "ඔබේ ගිණුමට සම්බන්ධ වූ ගබඩා නොමැත.",
+      "noRepositoriesDescription": "ගබඩා පූරණය කිරීමට GitHub හෝ GitLab සම්බන්ධ කරන්න.",
       "loading": "පූරණය වෙමින්…",
       "accessibility": "ගබඩාව: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "ඔබ කෙනෙක්…",
       "tools": "මෙවලම්",
       "wholeToolRule": "මෙම නියෝජිතයා සියලු මෙවලම් සඳහා එකවර එකම රීතිය යොදයි: {{rule}}. මෙම ස්විච කියවීමට පමණක් වේ.",
+      "toolRule": "ගබඩා කළ රීතිය: {{rule}}",
       "visibility": "දෘශ්‍යතාව",
       "visibilityPrimary": "ප්‍රාථමික — පිකර් තුළ පෙන්වා ඇත",
       "visibilitySubagent": "Subagen — අන් අයගෙන් පමණක් ඇමතිය හැකිය",

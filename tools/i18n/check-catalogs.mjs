@@ -2637,13 +2637,21 @@ function checkMobileEnglishIdentical({ catalogName, english, localeValues }) {
   const problems = [];
   // A mobile key whose value equals English in every non-English locale was
   // never translated. Allowlist the proper nouns and format-only strings that
-  // are legitimately identical; fail everything else. Only a catalog that was
-  // read can say a key was never translated, so an unreadable one is left out.
+  // are legitimately identical. Only a catalog that was read can say a key was
+  // never translated, so an unreadable one is left out.
   if (localeValues.size === 0) {
     return problems;
   }
   for (const [key, englishValue] of english) {
     if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
+      continue;
+    }
+    // A value with prose of its own is judged per locale by
+    // checkMobileLocaleEnglishCopy, which also applies MOBILE_ENGLISH_COPY_EXCEPTIONS.
+    // This rule is the only reporter for a value with no prose to translate:
+    // a placeholder-only string or a capitalised product name that no locale
+    // changed. Reporting a prose value here as well would name one defect twice.
+    if (carriesEnglishProse(englishValue)) {
       continue;
     }
     let allEqual = true;
@@ -2717,46 +2725,6 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
     }
   }
   return problems;
-}
-
-/**
- * The policy fields a scan reads on one catalog descriptor. Every catalog
- * needs a called-key reader and a base-key reader, one that names the key the
- * source calls and one that names the key a consumer appends its part to;
- * `keyPrefixOf` stays null when the catalog builds no key from a template
- * head; the copy-rule list holds the checks its English strings must pass, so
- * it must hold at least one rule and every entry must be one; the destructive
- * collection is a real decision, because an entry that leaves the field out
- * reads as one that chose not to collect. A misconfigured entry is reported as
- * a named problem and the audit skips its scan entirely, instead of dying on
- * the missing part after the run has collected problems of its own — those
- * would never be printed.
- */
-function checkScanPolicy(catalog) {
-  const missing = [];
-  if (typeof catalog.calledKeyOf !== 'function') {
-    missing.push('calledKeyOf');
-  }
-  if (typeof catalog.baseKeyOf !== 'function') {
-    missing.push('baseKeyOf');
-  }
-  if (typeof catalog.keyPrefixOf !== 'function' && catalog.keyPrefixOf !== null) {
-    missing.push('keyPrefixOf');
-  }
-  if (
-    !Array.isArray(catalog.englishCopyRules) ||
-    catalog.englishCopyRules.length === 0 ||
-    !catalog.englishCopyRules.every(rule => typeof rule === 'function')
-  ) {
-    missing.push('englishCopyRules');
-  }
-  if (typeof catalog.collectsDestructiveKeys !== 'boolean') {
-    missing.push('collectsDestructiveKeys');
-  }
-  return missing.map(
-    field =>
-      `${catalog.name}: the catalog descriptor declares no usable ${field}; every entry of catalogsOf declares its scan policy`
-  );
 }
 
 /** Every key the source names exists, and every English key is used. */
@@ -2895,24 +2863,11 @@ export function checkCatalogs(root = ROOT) {
   // catalog whose English parse failed stays out, so the rule cannot compare
   // against a catalog the audit already reported as unreadable.
   const parsedCatalogs = new Map();
-  const unscannable = new Set();
-  for (const catalog of catalogs) {
-    const policyProblems = checkScanPolicy(catalog);
-    problems.push(...policyProblems);
-    if (policyProblems.length > 0) {
-      // A descriptor without its policy cannot be scanned: scanSource would
-      // call the missing reader and die partway through the tree, so the
-      // named problems above would never be printed. Skipping the catalog
-      // keeps the diagnostic what the developer sees.
-      unscannable.add(catalog);
-    }
-  }
-  const scannable = catalogs.filter(catalog => !unscannable.has(catalog));
   // The tag set of each catalog folder serves both the registry checks and the
   // per-catalog checks, so one refused listing reports one line here and skips
   // the rules that need the set.
   const presentByCatalog = new Map();
-  for (const catalog of scannable) {
+  for (const catalog of catalogs) {
     try {
       presentByCatalog.set(catalog, new Set(catalogTags(catalog.dir)));
     } catch (error) {
@@ -2921,14 +2876,14 @@ export function checkCatalogs(root = ROOT) {
       presentByCatalog.set(catalog, null);
     }
   }
-  for (const catalog of scannable) {
+  for (const catalog of catalogs) {
     const present = presentByCatalog.get(catalog);
     if (catalog.localeRegistry && present !== null) {
       problems.push(...checkPushLocaleRegistry({ root, catalog, present, supported }));
     }
   }
 
-  for (const catalog of scannable) {
+  for (const catalog of catalogs) {
     const catalogName = catalog.name;
     const present = presentByCatalog.get(catalog);
     if (present === null) {

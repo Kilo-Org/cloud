@@ -443,13 +443,20 @@ const SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS = ['cp', 'mv', 'sed'];
 
 // A shell joins adjacent quoted pieces into one argument, so the file name can
 // carry a quote at any boundary between its letters and the shell still writes
-// the plain name. One quote pair splits the name once, so every one of those
-// boundaries is named here, for both quote characters. A name that carries two
-// quote pairs at once stays outside these rules.
+// the plain name. Every letter boundary is named here for both quote characters,
+// once for one quote pair and once for a doubled pair, so a joined segment of
+// either kind is covered. A name that carries a quote pair on each of two
+// boundaries stays outside these rules.
 const SECURITY_REMEDIATION_CONFIG_NAME_QUOTED_PATTERNS = Array.from(
-  { length: 'config'.length - 1 },
-  (_, index) =>
-    ['"', "'"].map(quote => `${'config'.slice(0, index + 1)}${quote}${'config'.slice(index + 1)}`)
+  { length: 'config'.length },
+  (_, index) => {
+    const prefix = 'config'.slice(0, index + 1);
+    const suffix = 'config'.slice(index + 1);
+    return ['"', "'"].flatMap(quote => [
+      `${prefix}${quote}${suffix}`,
+      `${prefix}${quote}${quote}${suffix}`,
+    ]);
+  }
 ).flat();
 
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
@@ -491,6 +498,13 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git*-c ?*=*',
   'git*-c*.*=*',
   'git*-c*?=*',
+  // The matcher rewrites a backslash to a slash and a shell removes it, so an
+  // inline flag written with an escape reaches a rule as a slash before the `c`.
+  // The rules above need the contiguous `-c`, so the escaped spelling is named
+  // here.
+  'git*-/c*.*',
+  'git*-/c*?=*',
+  'git*-/c*.*=*',
   // git reads the same configuration from the repository's own file, which a
   // shell command can rewrite directly. The CLI evaluates each shell node of a
   // line on its own and never evaluates a `cd` node against this map, so a rule
@@ -592,7 +606,15 @@ const SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED = [
 // a `*` wherever a separator run can sit, so a setting written with a tab or a
 // mixed run is included. A command whose argument text places `-c` before the
 // subcommand is refused too, because a rule cannot tell that text from a setting.
-const SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED = ['git*-c*switch*', 'git*-c*branch*'];
+const SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED = [
+  'git*-c*switch*',
+  'git*-c*branch*',
+  // The matcher rewrites a backslash to a slash and a shell removes it, so an
+  // inline flag written with an escape reaches a rule as a slash before the `c`.
+  // The two rules above need the contiguous `-c`, so the escaped spelling is
+  // named here as well as in the deny set.
+  'git*-/c*',
+];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
   'git reset --hard',

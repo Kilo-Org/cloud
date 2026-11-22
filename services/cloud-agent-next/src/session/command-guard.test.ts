@@ -588,6 +588,11 @@ describe('security-remediation push command guard policy', () => {
       'echo "[alias] p = push --force" >> .git/"config"',
       'echo "mirror = true" >> "config"',
       'echo "mirror = true" >> ~/.gitcon"fig"',
+      // A doubled quote pair inside the name, and an escaped inline flag.
+      'cp /tmp/evil con""fig',
+      "sed -i s/a/b/ c''onfig",
+      'git -\\c remote.origin.mirror=true push',
+      'git -\\c remote.origin.push=+main push',
       // The directory spelling of the configuration target, with a repeated or
       // a dot separator. The shell resolves both to the same file.
       'echo "[alias]" >> .git//config',

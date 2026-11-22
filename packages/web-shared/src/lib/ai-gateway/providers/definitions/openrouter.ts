@@ -1,6 +1,9 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { defineGatewayProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/gateway-provider';
+import {
+  defineGatewayProvider,
+  withApiKey,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/gateway-provider';
 
 export const OPENROUTER = defineGatewayProvider({
   type: 'openrouter',
@@ -9,5 +12,5 @@ export const OPENROUTER = defineGatewayProvider({
 });
 
 export function createUserOpenRouterProvider(apiKey: string): Provider {
-  return { ...OPENROUTER, apiKey };
+  return withApiKey(OPENROUTER, apiKey);
 }

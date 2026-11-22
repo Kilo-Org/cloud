@@ -3565,6 +3565,85 @@ test('a stalled ticket mint reaches the connect backoff', async () => {
   }
 });
 
+test('a slow but successful mint chain fails at one total deadline instead of three hops', async () => {
+  // The mint is a credential lookup, a grant exchange and a ticket POST, each with its own
+  // request deadline. Hops that all succeed would therefore each stay under their own bound and
+  // still hold `connecting` for 20 s here. This pins the total bound: the chain fails at one
+  // deadline, cancels the hop in flight, and the first failure reaches the existing backoff.
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  // Every `setTimeout` below runs on the fake clock `beforeEach` installs, so the hops cost no
+  // wall time, and ES2022/Hermes consumers do not provide Promise.withResolvers.
+  let slow = true;
+  const delayed = (ms: number, answer: () => Response) =>
+    new Promise<Response>(resolve => setTimeout(() => resolve(answer()), ms));
+  const ticketPostSignals: (AbortSignal | null | undefined)[] = [];
+  const fetcher = jest.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith('/exchange'))
+      return slow
+        ? delayed(5_000, () =>
+            Response.json({
+              token: 'grant',
+              expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            })
+          )
+        : Response.json({
+            token: 'grant',
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          });
+    if (path.endsWith('live-ticket')) {
+      ticketPostSignals.push(init?.signal);
+      const answer = () =>
+        Response.json({
+          ticket: 'private-ticket',
+          expiresAt: new Date(Date.now() + 90_000).toISOString(),
+        });
+      // Starts at 10 s and would succeed at 20 s, past the 15 s total bound.
+      return slow ? delayed(10_000, answer) : answer();
+    }
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: () =>
+      slow
+        ? new Promise<string>(resolve => setTimeout(() => resolve('kilo-credential'), 5_000))
+        : Promise.resolve('kilo-credential'),
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  try {
+    await flush();
+    expect(state?.connection).toBe('connecting');
+    await jest.advanceTimersByTimeAsync(14_000);
+    await flush();
+    expect(state?.connection).toBe('connecting');
+    expect(ticketPostSignals).toHaveLength(1);
+    expect(ticketPostSignals[0]?.aborted).toBe(false);
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(state?.connection).toBe('disconnected');
+    expect(state?.error).toBe('request_timeout');
+    // The hop in flight is cancelled at the bound instead of running to its own success.
+    expect(ticketPostSignals[0]?.aborted).toBe(true);
+    slow = false;
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(ticketPostSignals).toHaveLength(2);
+    expect(FakeSocket.sockets).toHaveLength(1);
+    connectedSocket().frame('hello', hello());
+    await flush();
+    expect(state?.connection).toBe('connected');
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
 test('a caller abort during a stalled exchange stays request_canceled', async () => {
   const controller = new AbortController();
   const signals: (AbortSignal | null | undefined)[] = [];

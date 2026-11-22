@@ -283,6 +283,13 @@ export function clearLastOpenedSession(): void {
   // record after the caller dropped it.
   epoch += 1;
   record = null;
+  // The caller has just established that there is no record, so this is the
+  // answer for the run: a later reader must not ask the mirror again and restore
+  // the record the clear removed. That matters because the delete below is
+  // queued behind the mirror chain and is skipped outright while the device is
+  // locked, so a read that ran before it landed would bring the record back.
+  disarmUnlockRetry();
+  hydration = { status: 'answered' };
   if (hadRecord) {
     notify();
   }

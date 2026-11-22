@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deriveLauncherTargets } from './launcher-surfaces';
+import {
+  deferred,
+  flushMirror,
+  flushRetryBudget,
+  KEY,
+  recordFor,
+  refusedRead,
+} from './last-opened-session.test-helpers';
 import { setProtectedDataAvailable } from './protected-data';
 import {
   _hydrateLastOpenedSessionForTests,
@@ -13,8 +21,6 @@ import {
   recordLastOpenedSession,
   subscribeLastOpenedSession,
 } from './last-opened-session';
-
-const KEY = 'last-opened-session';
 
 // Fake SecureStore surface backed by an in-memory Map. The module reads and
 // writes through the shared keychain helpers, so the native module is mocked
@@ -29,40 +35,6 @@ vi.mock('expo-secure-store', () => ({ getItemAsync, setItemAsync, deleteItemAsyn
 vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 
 const store = new Map<string, string>();
-
-function recordFor(sessionId: string, userId: string): string {
-  return JSON.stringify({ sessionId, userId, storedAt: 1_700_000_000_000 });
-}
-
-/** A read that rejects, built without `Promise.reject` so the promise rule
- *  stays satisfied. */
-// eslint-disable-next-line require-await -- an async throw is the rejected promise under test
-async function refusedRead(message: string): Promise<string | null> {
-  throw new Error(message);
-}
-
-function deferred(): { promise: Promise<void>; resolve: () => void } {
-  const { promise, resolve } = Promise.withResolvers<undefined>();
-  return {
-    promise,
-    resolve: () => {
-      resolve(undefined);
-    },
-  };
-}
-
-/**
- * Let the serialized SecureStore mirror drain and the retry cadence land: the
- * mock operations settle in microtasks, and the retry backoff is a timer.
- */
-async function flushMirror(): Promise<void> {
-  await vi.advanceTimersByTimeAsync(1);
-}
-
-/** Run the whole retry budget (250 + 500 + 1000 ms plus the reads between). */
-async function flushRetryBudget(): Promise<void> {
-  await vi.advanceTimersByTimeAsync(2_000);
-}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -200,6 +172,27 @@ describe('last opened session', () => {
 
     expect(deleteItemAsync).toHaveBeenCalledExactlyOnceWith(KEY);
     expect(store.has(KEY)).toBe(false);
+  });
+
+  it('does not let a retryable read undo a clear', async () => {
+    // The mirror still holds a record, and the delete is skipped while the
+    // device is locked, so only the settled state keeps it from coming back.
+    store.set(KEY, recordFor('s1', 'u1'));
+    getItemAsync.mockImplementation(() => refusedRead('keychain unavailable'));
+
+    // Spend the first read so the hydration is retryable.
+    expect(getLastOpenedSession('u1')).toBeNull();
+    await flushRetryBudget();
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+
+    clearLastOpenedSession();
+    await flushMirror();
+
+    // A later reader must not ask the mirror again: the clear is the answer.
+    expect(getLastOpenedSession('u1')).toBeNull();
+    await flushMirror();
+    expect(getLastOpenedSessionSnapshot()).toBeNull();
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
   });
 
   it('settles rapid mirror writes in order, so the last record wins', async () => {

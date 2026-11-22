@@ -189,57 +189,45 @@ export function useSidebarLiveUpdates(options: Options): void {
               return;
           }
           const requested = new Set<string>(worktreeIds);
-          let membershipChanged = false;
-          let foldersChanged = false;
-          queryClient.setQueryData<InfiniteData<WorkspaceListData>>(
-            trpc.cliSessionsV2.listWorkspaces.infiniteQueryKey(scope.workspaceListInput),
-            data => {
-              if (!data) return data;
-              foldersChanged = data.pages
-                .flatMap(page => page.workspaces)
-                .some(
-                  row =>
-                    replacements.has(row.worktreeId) &&
-                    replacements.get(row.worktreeId)?.folderId !== row.folderId
-                );
-              membershipChanged = workspaceRefreshChangesMembership(
-                data.pages.flatMap(page => page.workspaces),
-                result.workspaces,
-                worktreeIds
-              );
-              return {
-                ...data,
-                pages: data.pages.map(page => ({
-                  ...page,
-                  workspaces: page.workspaces.flatMap(row => {
-                    const replacement = replacements.get(row.worktreeId);
-                    return replacement ? [replacement] : requested.has(row.worktreeId) ? [] : [row];
-                  }),
-                })),
-              };
-            }
+          const listKey = trpc.cliSessionsV2.listWorkspaces.infiniteQueryKey(
+            scope.workspaceListInput
           );
-          queryClient.setQueriesData<Outputs['workspaceSummaries']>(
-            {
-              ...trpc.cliSessionsV2.workspaceSummaries.pathFilter(),
-              predicate: query =>
-                sidebarQueryInput(query.queryKey)?.organizationId === scope.organizationId,
-            },
-            data =>
-              data
-                ? {
-                    ...data,
-                    workspaces: data.workspaces.flatMap(row => {
-                      const replacement = lookupReplacements.get(row.worktreeId);
-                      return replacement
-                        ? [replacement]
-                        : requested.has(row.worktreeId)
-                          ? []
-                          : [row];
-                    }),
-                  }
-                : data
+          const cachedRows = queryClient
+            .getQueryData<InfiniteData<WorkspaceListData>>(listKey)
+            ?.pages.flatMap(page => page.workspaces);
+          const membershipChanged =
+            cachedRows &&
+            workspaceRefreshChangesMembership(cachedRows, result.workspaces, worktreeIds);
+          const foldersChanged = cachedRows?.some(
+            row =>
+              replacements.has(row.worktreeId) &&
+              replacements.get(row.worktreeId)?.folderId !== row.folderId
           );
+          const replaceRows = (
+            rows: WorkspaceSummary[],
+            byId: ReadonlyMap<string, WorkspaceSummary>
+          ) =>
+            rows.flatMap(row => {
+              const replacement = byId.get(row.worktreeId);
+              return replacement ? [replacement] : requested.has(row.worktreeId) ? [] : [row];
+            });
+          patchCachedQuery<InfiniteData<WorkspaceListData>>(queryClient, listKey, data => ({
+            ...data,
+            pages: data.pages.map(page => ({
+              ...page,
+              workspaces: replaceRows(page.workspaces, replacements),
+            })),
+          }));
+          for (const [key] of queryClient.getQueriesData<Outputs['workspaceSummaries']>({
+            ...trpc.cliSessionsV2.workspaceSummaries.pathFilter(),
+            predicate: query =>
+              sidebarQueryInput(query.queryKey)?.organizationId === scope.organizationId,
+          })) {
+            patchCachedQuery<Outputs['workspaceSummaries']>(queryClient, key, data => ({
+              ...data,
+              workspaces: replaceRows(data.workspaces, lookupReplacements),
+            }));
+          }
           if (membershipChanged)
             void queryClient.invalidateQueries(
               trpc.cliSessionsV2.listWorkspaces.infiniteQueryFilter(scope.workspaceListInput),

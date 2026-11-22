@@ -573,6 +573,69 @@ describe('useSidebarLiveUpdates', () => {
     expect(mockNetwork.listWorkspaces).not.toHaveBeenCalled();
   });
 
+  it('keeps refreshed workspaces when older list and lookup refetches finish', async () => {
+    const options = scope();
+    const first = workspace();
+    const refreshed = { ...first, name: 'Refreshed workspace' };
+    const listKey = mockTrpc.cliSessionsV2.listWorkspaces.infiniteQueryKey(
+      options.workspaceListInput
+    );
+    const lookupKey = mockTrpc.cliSessionsV2.workspaceSummaries.queryKey({
+      organizationId: ORGANIZATION,
+      worktreeIds: [WORKTREE_A],
+      includeAncestors: true,
+    });
+    const listData = workspacePages([first]);
+    const lookupData = { workspaces: [first] };
+    const listFetch = startDeferredFetch(listKey, listData, listData);
+    const lookupFetch = startDeferredFetch(lookupKey, lookupData, lookupData);
+    mockNetwork.workspaceSummaries.mockResolvedValue({ workspaces: [refreshed] });
+
+    await render(options);
+    await act(async () => emit('workspace.updated', { worktreeId: WORKTREE_A }));
+    await advance(300);
+    listFetch.finish();
+    lookupFetch.finish();
+    await Promise.all([listFetch.done, lookupFetch.done]);
+
+    expect(queryClient.getQueryData(listKey)).toEqual(workspacePages([refreshed]));
+    expect(queryClient.getQueryData(lookupKey)).toEqual({ workspaces: [refreshed] });
+  });
+
+  it('reapplies refreshed workspace rows without losing an in-flight next page', async () => {
+    const options = scope();
+    const first = workspace();
+    const refreshed = { ...first, name: 'Refreshed workspace' };
+    const queryKey = mockTrpc.cliSessionsV2.listWorkspaces.infiniteQueryKey(
+      options.workspaceListInput
+    );
+    const firstPage = { ...workspacePages([first]).pages[0], nextCursor: 'next' as string | null };
+    const nextPage = workspacePages([workspace(WORKTREE_B)]).pages[0];
+    const next = Promise.withResolvers<typeof firstPage>();
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey,
+      queryFn: () => next.promise,
+      initialData: { pages: [firstPage], pageParams: [null] },
+      initialPageParam: null as string | null,
+      getNextPageParam: page => page.nextCursor,
+    });
+    stopObservers.push(observer.subscribe(() => undefined));
+    const pagination = observer.fetchNextPage();
+    mockNetwork.workspaceSummaries.mockResolvedValue({ workspaces: [refreshed] });
+
+    await render(options);
+    await act(async () => emit('workspace.updated', { worktreeId: WORKTREE_A }));
+    await advance(300);
+    expect(observer.getCurrentResult().isFetchingNextPage).toBe(true);
+    next.resolve(nextPage);
+    await pagination;
+
+    expect(queryClient.getQueryData(queryKey)).toEqual({
+      pages: [{ ...firstPage, workspaces: [refreshed] }, nextPage],
+      pageParams: [null, 'next'],
+    });
+  });
+
   it('loads a new stacked layer after another window creates it', async () => {
     const options = scope();
     const first = workspace();

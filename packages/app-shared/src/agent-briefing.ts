@@ -10,9 +10,21 @@ export const BRIEFING_MAX_SESSIONS = 32;
 export const BRIEFING_MAX_SOURCES = 256;
 export const BRIEFING_MAX_SOURCES_PER_SESSION = 32;
 export const BRIEFING_MAX_TITLE_LENGTH = 160;
+// The title's UTF-8 byte budget for screening. It carries the same number as the schema's
+// character bound on purpose: for text outside ASCII the byte cut is the stricter of the two.
+export const BRIEFING_MAX_TITLE_BYTES = 160;
 export const BRIEFING_MAX_URL_LENGTH = 2048;
 export const BRIEFING_MAX_EXCERPT_BYTES = 1024;
 export const BRIEFING_MAX_SNAPSHOT_BYTES = 48 * 1024;
+
+/**
+ * An amount of money in microdollars, one millionth of a US dollar. Every producer of these
+ * fields sums a bigint cost column or rounds with `Math.ceil`, so a fraction is not a value
+ * this contract can receive.
+ */
+const microdollarsSchema = z.number().int();
+/** A duration in whole seconds. */
+const secondsSchema = z.number().int();
 
 export const briefingContextSchema = z.object({
   id: z.string(),
@@ -62,9 +74,9 @@ export const briefingSummarySchema = z.object({
   status: z.enum(['disabled', 'pending', 'running', 'ready', 'failed', 'unavailable']),
   text: z.string().nullable(),
   model: z.string().nullable(),
-  costMicrodollars: z.number(),
+  costMicrodollars: microdollarsSchema,
   chargeStatus: z.enum(['pending', 'settled']),
-  estimatedCostMicrodollars: z.number().nullable(),
+  estimatedCostMicrodollars: microdollarsSchema.nullable(),
   startedAt: z.string().datetime().nullable(),
   finishedAt: z.string().datetime().nullable(),
   error: briefingSummaryErrorSchema.nullable(),
@@ -113,9 +125,9 @@ export const briefingReportSchema = z.object({
 });
 export const briefingEstimateSchema = z.object({
   model: z.string(),
-  estimatedCostMicrodollars: z.number(),
-  maximumCostMicrodollars: z.number(),
-  maxDurationSeconds: z.number(),
+  estimatedCostMicrodollars: microdollarsSchema,
+  maximumCostMicrodollars: microdollarsSchema,
+  maxDurationSeconds: secondsSchema,
   estimateToken: z.string(),
   canGenerate: z.boolean(),
   unavailableReason: briefingSummaryErrorSchema.nullable(),
@@ -124,8 +136,8 @@ export const briefingContextPreferencesSchema = z.object({
   context: briefingContextSchema,
   enabled: z.boolean(),
   model: z.string(),
-  maxDurationSeconds: z.number().int(),
-  maxSpendMicrodollars: z.number().int(),
+  maxDurationSeconds: secondsSchema,
+  maxSpendMicrodollars: microdollarsSchema,
 });
 export const briefingPreferencesSchema = z.object({
   timezone: z.string(),
@@ -353,9 +365,29 @@ function credentialValue(name: string, text: string, from: number): string | und
 }
 
 /**
+ * Every credential assignment in the text, in ascending order: the key's start, the
+ * position its value begins at, and the value itself, which is absent when nothing
+ * resolvable follows the key. Detection and replacement both consume this one walk, so
+ * the definition of a credential site exists once.
+ */
+function credentialAssignmentSites(
+  text: string
+): Array<{ start: number; valueStart: number; value: string | undefined }> {
+  const sites: Array<{ start: number; valueStart: number; value: string | undefined }> = [];
+  for (const match of text.matchAll(CREDENTIAL_KEY)) {
+    const name = match[1];
+    if (!name || !isCredentialKeyName(name)) continue;
+    const start = match.index ?? 0;
+    const valueStart = start + match[0].length;
+    sites.push({ start, valueStart, value: credentialValue(name, text, valueStart) });
+  }
+  return sites;
+}
+
+/**
  * Every credential flag in the text, with the position and text of the value it carries.
  * A flag that does not name a credential is not consumed, so a credential flag that
- * follows it is examined on its own.
+ * follows it is examined on its own. A site is never a redaction placeholder.
  */
 function credentialFlagSites(text: string): Array<{ valueStart: number; value: string }> {
   const pattern = new RegExp(CREDENTIAL_FLAG_SOURCE, 'g');
@@ -369,7 +401,9 @@ function credentialFlagSites(text: string): Array<{ valueStart: number; value: s
     const value = match[4] ?? '';
     const valueStart = match.index + match[0].length - value.length;
     searchFrom = Math.max(valueStart - 1, match.index + 1);
-    if (isCredentialKeyName(flag.replace(/^-+/, ''))) sites.push({ valueStart, value });
+    if (!isCredentialKeyName(flag.replace(/^-+/, ''))) continue;
+    if (REDACTION_PLACEHOLDER.test(value)) continue;
+    sites.push({ valueStart, value });
   }
 }
 
@@ -384,17 +418,12 @@ function briefingExcerptCarriesCredential(text: string): boolean {
   };
   const isOpaque = (tail: string): boolean =>
     RESIDUAL_OPAQUE_TOKEN.test((tail.split(/\s+/)[0] ?? '').split('=')[0] ?? '');
-  for (const match of text.matchAll(CREDENTIAL_KEY)) {
-    const name = match[1];
-    if (!name || !isCredentialKeyName(name)) continue;
-    const valueStart = (match.index ?? 0) + match[0].length;
-    const value = credentialValue(name, text, valueStart);
+  for (const { valueStart, value } of credentialAssignmentSites(text)) {
     const tail = tailAfter(valueStart + (value?.length ?? 0));
     if (tail === undefined) continue;
     if (value === undefined || isOpaque(tail)) return true;
   }
   for (const { valueStart, value } of credentialFlagSites(text)) {
-    if (REDACTION_PLACEHOLDER.test(value)) continue;
     const tail = tailAfter(valueStart + value.length);
     if (tail !== undefined && isOpaque(tail)) return true;
   }
@@ -422,7 +451,6 @@ function replaceSpans(
 function redactCredentialFlags(text: string): string {
   const spans: Array<{ start: number; length: number }> = [];
   for (const { valueStart, value } of credentialFlagSites(text)) {
-    if (REDACTION_PLACEHOLDER.test(value)) continue;
     spans.push({ start: valueStart, length: value.length });
   }
   return replaceSpans(text, spans);
@@ -431,14 +459,9 @@ function redactCredentialFlags(text: string): string {
 /** Replaces the value of every credential assignment. */
 function redactCredentialAssignments(text: string): string {
   const spans: Array<{ start: number; length: number }> = [];
-  for (const key of text.matchAll(CREDENTIAL_KEY)) {
-    const name = key[1];
-    if (!name || !isCredentialKeyName(name)) continue;
-    const start = key.index ?? 0;
-    const valueStart = start + key[0].length;
-    const assigned = credentialValue(name, text, valueStart);
-    if (!assigned || REDACTION_PLACEHOLDER.test(assigned)) continue;
-    spans.push({ start, length: valueStart + assigned.length - start });
+  for (const { start, valueStart, value } of credentialAssignmentSites(text)) {
+    if (!value || REDACTION_PLACEHOLDER.test(value)) continue;
+    spans.push({ start, length: valueStart + value.length - start });
   }
   return replaceSpans(text, spans);
 }
@@ -478,7 +501,7 @@ export function redactBriefingExcerptOrDrop(
  */
 export function redactBriefingTitle(
   value: string,
-  maxBytes = BRIEFING_MAX_TITLE_LENGTH
+  maxBytes = BRIEFING_MAX_TITLE_BYTES
 ): string | undefined {
   const title = redactBriefingExcerptOrDrop(value, maxBytes);
   return title === undefined || title === '' ? undefined : title;

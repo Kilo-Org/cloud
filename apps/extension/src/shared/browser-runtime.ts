@@ -3379,8 +3379,8 @@ export const createBrowserRuntime = ({
           }
         }
 
-        // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this
-        // A call redeems one approval per token it presents; only an approval that names a file exempts it.
+        // A download approval is post-action, so the gate cannot classify it on retry. A call redeems one approval per
+        // Token it presents, and only an approval that names a file exempts that file from the guard.
         const gateApproval = preflight?.ok === true ? preflight.sensitiveToken : undefined;
         const redeemedFromGate = (): RedeemedApproval => {
           if (gateApproval === undefined) {

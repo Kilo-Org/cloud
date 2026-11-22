@@ -2738,12 +2738,65 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
   expect(assetCalls).toBe(2);
 });
 
+/** One stored attachment page; `advertisedBytes` is what the mapping authorizes. */
+function assetSnapshotPage(advertisedBytes = 3) {
+  const hash = 'c'.repeat(64);
+  const reference = `media:${hash}`;
+  return {
+    hash,
+    reference,
+    page: {
+      version: 1,
+      sessionID: 'ses_a',
+      position: 1,
+      revision: 1,
+      next: null,
+      entities: [
+        { kind: 'session', id: 'ses_a', revision: 1, value: sessionMetadata },
+        {
+          kind: 'message',
+          id: 'msg_asset',
+          revision: 1,
+          value: {
+            seq: 0,
+            message: {
+              id: 'msg_asset',
+              type: 'user',
+              time: { created: 1 },
+              text: 'inspect',
+              files: [
+                {
+                  mime: 'image/png',
+                  name: 'image.png',
+                  uri: reference,
+                  source: { type: 'inline' },
+                },
+              ],
+            },
+          },
+        },
+        {
+          kind: 'asset',
+          id: 'asset_owned',
+          revision: 1,
+          value: {
+            entity: { kind: 'message', id: 'msg_asset' },
+            pointer: '/message/files/0',
+            reference,
+            mime: 'image/png',
+            blob: { hash, bytes: advertisedBytes },
+          },
+        },
+      ],
+    },
+  };
+}
+
 function assetSnapshotFixture(response: Response, advertisedBytes = 3) {
   const { client, fetcher } = fixture();
   const ordinary = fetcher.getMockImplementation();
   if (!ordinary) throw new Error('Missing fetch fixture');
-  const hash = 'c'.repeat(64);
-  const reference = `media:${hash}`;
+  const { hash, page: entitiesPage } = assetSnapshotPage(advertisedBytes);
   fetcher.mockImplementation(async (input, init) => {
     const path = new URL(String(input)).pathname;
     if (path.endsWith(`/blobs/${hash}`)) return response;
@@ -2756,52 +2809,7 @@ function assetSnapshotFixture(response: Response, advertisedBytes = 3) {
         revision: 1,
       });
     }
-    if (path === '/v1/sessions/ses_a/entities') {
-      return Response.json({
-        version: 1,
-        sessionID: 'ses_a',
-        position: 1,
-        revision: 1,
-        next: null,
-        entities: [
-          { kind: 'session', id: 'ses_a', revision: 1, value: sessionMetadata },
-          {
-            kind: 'message',
-            id: 'msg_asset',
-            revision: 1,
-            value: {
-              seq: 0,
-              message: {
-                id: 'msg_asset',
-                type: 'user',
-                time: { created: 1 },
-                text: 'inspect',
-                files: [
-                  {
-                    mime: 'image/png',
-                    name: 'image.png',
-                    uri: reference,
-                    source: { type: 'inline' },
-                  },
-                ],
-              },
-            },
-          },
-          {
-            kind: 'asset',
-            id: 'asset_owned',
-            revision: 1,
-            value: {
-              entity: { kind: 'message', id: 'msg_asset' },
-              pointer: '/message/files/0',
-              reference,
-              mime: 'image/png',
-              blob: { hash, bytes: advertisedBytes },
-            },
-          },
-        ],
-      });
-    }
+    if (path === '/v1/sessions/ses_a/entities') return Response.json(entitiesPage);
     return ordinary(input, init);
   });
   snapshot.mockImplementationOnce(
@@ -2892,6 +2900,52 @@ test('rejects an asset stream that ends before the advertised byte count', async
   await expect(client.getSnapshot('ses_a')).rejects.toMatchObject({
     code: 'blob_hash_mismatch',
   });
+});
+
+test('closing a live session drops its retained attachment bodies', async () => {
+  const { client, fetcher } = fixture();
+  const ordinary = fetcher.getMockImplementation();
+  if (!ordinary) throw new Error('Missing fetch fixture');
+  const { hash, page: entitiesPage } = assetSnapshotPage(3);
+  let blobReads = 0;
+  fetcher.mockImplementation(async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith(`/blobs/${hash}`)) {
+      blobReads++;
+      return new Response(new Uint8Array([1, 2, 3]).buffer);
+    }
+    if (path === '/v1/sessions/ses_a') {
+      return Response.json({
+        version: 1,
+        sessionID: 'ses_a',
+        deleted: false,
+        position: 1,
+        revision: 1,
+      });
+    }
+    if (path === '/v1/sessions/ses_a/entities') return Response.json(entitiesPage);
+    return ordinary(input, init);
+  });
+  const actual =
+    jest.requireActual<typeof NativeSnapshotModule>('./native-sync-snapshot').fetchNativeSnapshot;
+  snapshot.mockImplementationOnce(actual).mockImplementationOnce(actual);
+  const key = kilo2AssetKey('msg_asset_000001', `media:${hash}`, 'image/png');
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(), 1);
+  // Drain microtasks until the hello snapshot has published its resolved attachment.
+  for (let tick = 0; tick < 2000 && state?.assetURLs?.[key] === undefined; tick++)
+    await Promise.resolve();
+  expect(state?.assetURLs?.[key]).toBe('data:image/png;base64,AQID');
+  expect(blobReads).toBe(1);
+  connection.close();
+  await flush();
+  const reread = await client.getSnapshot('ses_a');
+  expect(reread.assetURLs?.[key]).toBe('data:image/png;base64,AQID');
+  expect(blobReads).toBe(2);
 });
 
 test('same-path live native tool files invalidate old bytes and resolve only through a newer authoritative snapshot', async () => {

@@ -32,6 +32,13 @@ export const NATIVE_SYNC_RETAINED_WORK_BYTES = 4 * 1024 * 1024;
 export const NATIVE_SYNC_RETAINED_WORK_FRAMES = 1024;
 
 /**
+ * Attachment bytes a native snapshot reader retains across reads of one client, in advertised
+ * blob bytes. Blobs are content addressed, so a retained body can answer any later read of the
+ * same hash. Sized to hold four maximum-size blobs (the service caps one blob at 8 MiB).
+ */
+export const NATIVE_SNAPSHOT_BLOB_CACHE_BYTES = 32 * 1024 * 1024;
+
+/**
  * Longest the CLI live transport waits for one snapshot page read before it
  * stops gating live delivery on it. Matches the per-request deadline the native
  * snapshot reader already applies, so a stalled store degrades the same way on

@@ -44,9 +44,9 @@ import { useTRPC } from '@/lib/trpc';
  *
  * That primary belongs to a whole-surface unavailable state. A caller that
  * embeds the row inside a body owning its own primary passes
- * `presentation="embedded"` instead: the retry takes the outlined face, so it
+ * `presentation="embedded"` instead: the retry takes the quiet emphasis, so it
  * never competes with the body's filled primary, and the connection check keeps
- * that same outlined face instead of the quiet ghost one. Both controls then
+ * that same outlined face instead of the quieter ghost one. Both controls then
  * paint one visible box edge, so the gap above the row and the gap inside it
  * read as the same distance; a ghost check hides its own 48pt box and the row
  * looked like one tight pair and one loose one. The row also drops the margin
@@ -149,7 +149,7 @@ export function PrReviewUnavailableActions({
         icon={RotateCcw}
         onPress={onRetry}
         loading={isRetrying}
-        {...(embedded ? { variant: 'outline' as const } : {})}
+        {...(embedded ? { emphasis: 'quiet' as const } : {})}
       />
       <Button
         size="sm"

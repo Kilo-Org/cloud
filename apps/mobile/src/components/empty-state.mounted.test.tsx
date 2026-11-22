@@ -54,9 +54,9 @@ vi.mock('@/components/ui/activity-indicator', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
-    foreground: '#111111',
     mutedForeground: '#777777',
     primaryForeground: '#ffffff',
+    foreground: '#111111',
   }),
   useMutedDisabledInk: () => '#777777',
 }));
@@ -282,16 +282,10 @@ describe('EmptyState presentation', () => {
 // drawn and only the leading icon becomes the spinner, so a retry never
 // collapses to a ring and the reader can still tell what is running. The
 // control announces the wait and admits no press until it clears.
-async function mountAction(options?: { loading?: boolean; variant?: 'outline' }) {
+async function mountAction(loading?: boolean) {
   const onPress = vi.fn<() => void>();
   const mounted = await renderWithProviders(
-    <StateAction
-      label="Try again"
-      icon={SearchX}
-      onPress={onPress}
-      loading={options?.loading}
-      variant={options?.variant}
-    />
+    <StateAction label="Try again" icon={SearchX} onPress={onPress} loading={loading} />
   );
   const button = mounted.renderer.root.findAllByType('Button')[0];
   if (!button) {
@@ -332,7 +326,7 @@ describe('StateAction busy', () => {
   });
 
   it('keeps the label and replaces only the icon while it is busy', async () => {
-    const { mounted, button, onPress, busy, drawsLabel } = await mountAction({ loading: true });
+    const { mounted, button, onPress, busy, drawsLabel } = await mountAction(true);
 
     expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(0);
     expect(mounted.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
@@ -364,20 +358,29 @@ describe('StateAction busy', () => {
     expect(disabledAction.renderer.root.findByType(SearchX).props.color).toBe('#777777');
     disabledAction.unmount();
   });
+});
 
-  it('takes the outlined face, and its ink, for an embedded state', async () => {
-    // The outlined control paints its label in `foreground`, so the face has to
-    // be the button's `outline` variant rather than a fill of another token.
-    const outlined = await mountAction({ variant: 'outline' });
-    expect(outlined.button.props.variant).toBe('outline');
-    expect(outlined.drawsLabel).toBe(true);
-    outlined.mounted.unmount();
-
-    // Busy keeps the enabled face, so the spinner follows that face's ink too.
-    const busyOutlined = await mountAction({ variant: 'outline', loading: true });
-    expect(busyOutlined.mounted.renderer.root.findByType('ActivityIndicator').props.color).toBe(
-      '#111111'
+// A state slot on a screen that already owns its primary action takes the quiet
+// face: the outlined control's ink in the same 48pt frame, so the screen keeps
+// one brand-filled primary (DESIGN.md 'one primary action per surface').
+describe('StateAction emphasis', () => {
+  it('paints the brand fill by default and an outlined control when quiet', async () => {
+    const primary = await renderWithProviders(
+      <StateAction label="Try again" icon={SearchX} onPress={() => undefined} />
     );
-    busyOutlined.mounted.unmount();
+    expect(primary.renderer.root.findByType('Button').props.variant).toBe('default');
+    expect(primary.renderer.root.findByType(SearchX).props.color).toBe('#ffffff');
+    primary.unmount();
+
+    const quiet = await renderWithProviders(
+      <StateAction label="Try again" icon={SearchX} onPress={() => undefined} emphasis="quiet" />
+    );
+    const button = quiet.renderer.root.findByType('Button');
+    expect(button.props.variant).toBe('outline');
+    // The outline fill is the card step in dark — the same step the card under
+    // this control paints — so the filled neutral separates it.
+    expect(String(button.props.className)).toBe('min-h-[48px] dark:bg-secondary-fill');
+    expect(quiet.renderer.root.findByType(SearchX).props.color).toBe('#111111');
+    quiet.unmount();
   });
 });

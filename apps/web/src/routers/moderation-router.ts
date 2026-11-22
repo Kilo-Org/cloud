@@ -165,6 +165,8 @@ async function listOwnedReports(input: {
 }): Promise<{
   items: {
     receiptId: string;
+    targetKind: string;
+    reason: string;
     triageStatus: string;
     appealStatus: string;
     createdAt: string;
@@ -196,6 +198,8 @@ async function listOwnedReports(input: {
     .select({
       id: content_moderation_reports.id,
       receipt_id: content_moderation_reports.receipt_id,
+      target_kind: content_moderation_reports.target_kind,
+      reason: content_moderation_reports.reason,
       triage_status: content_moderation_reports.triage_status,
       appeal_status: content_moderation_reports.appeal_status,
       created_at: content_moderation_reports.created_at,
@@ -212,6 +216,8 @@ async function listOwnedReports(input: {
   return {
     items: page.map(row => ({
       receiptId: row.receipt_id,
+      targetKind: row.target_kind,
+      reason: row.reason,
       triageStatus: row.triage_status,
       appealStatus: row.appeal_status,
       createdAt: row.created_at,
@@ -267,6 +273,8 @@ export const moderationRouter = createTRPCRouter({
     const row = await getOwnedReport(input.receiptId, ctx.user.id);
     return {
       receiptId: row.receipt_id,
+      targetKind: row.target_kind,
+      reason: row.reason,
       triageStatus: row.triage_status,
       appealStatus: row.appeal_status,
     };

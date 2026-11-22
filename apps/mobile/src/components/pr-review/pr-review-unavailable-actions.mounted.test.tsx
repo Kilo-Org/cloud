@@ -64,6 +64,7 @@ type ActionInstance = {
   props: {
     onPress: () => void;
     variant?: string;
+    emphasis?: string;
     label?: string;
     accessibilityLabel?: string;
   };
@@ -169,10 +170,12 @@ describe('PrReviewUnavailableActions', () => {
       throw new Error('the two recovery buttons did not render');
     }
     // Neither control takes the brand fill: the body the row is embedded in
-    // owns its primary. Both show one box edge, so the gap above the row and
-    // the gap inside it read as the same distance; a ghost check hides its own
-    // 48pt box and the row looked unevenly spaced.
-    expect(retryButton.props.variant).toBe('outline');
+    // owns its primary. The retry asks for the quiet emphasis, which paints the
+    // outlined control, and the check keeps that same face. Both show one box
+    // edge, so the gap above the row and the gap inside it read as the same
+    // distance; a ghost check hides its own 48pt box and the row looked
+    // unevenly spaced.
+    expect(retryButton.props.emphasis).toBe('quiet');
     expect(checkButton.props.variant).toBe('outline');
     // The card's own gap spaces the row, so the appended margin a whole-surface
     // row needs would double it.
@@ -190,8 +193,8 @@ describe('PrReviewUnavailableActions', () => {
     if (!retryButton || !checkButton) {
       throw new Error('the two recovery buttons did not render');
     }
-    // No variant override: the state action keeps the filled default face.
-    expect(retryButton.props.variant).toBeUndefined();
+    // No emphasis override: the state action keeps the filled default face.
+    expect(retryButton.props.emphasis).toBeUndefined();
     expect(checkButton.props.variant).toBe('outline');
     expect(String(findRowRoot(renderer).props.className)).toContain('mt-3');
     unmount();

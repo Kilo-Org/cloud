@@ -10,7 +10,9 @@ import { QueryError } from '@/components/query-error';
 import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { i18n } from '@/i18n';
+import { isolateBidiText } from '@/lib/bidi';
 import { formatDate } from '@/lib/format';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
@@ -70,12 +72,22 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
         time: formatDate(createdDate, i18n.language, { timeStyle: 'short' }),
       })
     : null;
+  // Each kept segment is its own first-strong isolate, so the paragraph
+  // direction cannot reorder one segment's text around a neighbour: without the
+  // pair, a right-to-left screen splits the date between the day number, which
+  // lands next to the sharer, and the month, which follows the branch.
+  //
+  // The owner is isolated inside the sharer sentence as well, because the
+  // first-strong scan of that sentence skips a nested isolate: a catalog that
+  // puts `{{owner}}` first (Urdu does) would otherwise take the sentence's
+  // direction from a Latin name and paint the sentence from its wrong end.
   const subtitle = [
-    t('sharedSession.sharedBy', { owner: ownerName }),
-    metadata?.gitBranch ?? null,
+    t('sharedSession.sharedBy', { owner: isolateBidiText(ownerName) }),
+    sessionBranchLabel(metadata?.gitBranch),
     dateLabel,
   ]
-    .filter(value => value !== null && value !== '')
+    .filter((value): value is string => value !== null && value !== '')
+    .map(value => isolateBidiText(value))
     .join(' · ');
 
   const retry = () => {

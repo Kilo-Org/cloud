@@ -170,6 +170,13 @@ describe('skillNameFromMarkdown', () => {
     expect(skillNameFromMarkdown(skillMarkdown('naïve café'))).toBe('naive-cafe');
   });
 
+  it('folds a compatibility form into the letters it stands for', () => {
+    // It reduced to '' and filled nothing before the fold mapped
+    // compatibility forms; the letters are what the reader pasted.
+    expect(skillNameFromMarkdown(skillMarkdown('Ｍｙ Ｓｋｉｌｌ'))).toBe('my-skill');
+    expect(skillNameFromMarkdown(skillMarkdown('ﬁle'))).toBe('file');
+  });
+
   it('fills nothing for a name written in another script', () => {
     expect(skillNameFromMarkdown(skillMarkdown('مراجعة الجودة'))).toBeUndefined();
   });

@@ -71,9 +71,13 @@ export function appendToolSchemaConstraints(
 
 /**
  * Clear the `strict` flag of every tool whose schema `rewritten` reports it changed, in the way the
- * tool's own API kind expresses an absent flag. `rewritten` mutates the schema and returns whether
- * it changed it; it runs for every tool, including one whose `strict` flag is absent, and only the
- * flag clear is gated on the flag.
+ * tool's own API kind expresses the flag being off. `rewritten` mutates the schema and returns
+ * whether it changed it; it runs for every tool, including one whose `strict` flag is absent, and
+ * only the flag clear is gated on the flag.
+ *
+ * The three arms differ because their SDK types do. A Responses function tool declares `strict` as
+ * required, so it is set to `false`, where `null`, `false` and an absent field all mean not strict.
+ * Chat Completions and Messages declare it optional, so the field is removed instead.
  */
 export function clearRewrittenToolSchemaStrict(
   request: GatewayRequest,

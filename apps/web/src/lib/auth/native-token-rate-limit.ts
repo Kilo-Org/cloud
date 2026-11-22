@@ -5,15 +5,17 @@ import { callerAddressFromHeaders } from './caller-address';
 import { checkFirewallRateLimit } from './firewall-rate-limit';
 
 /**
- * Vercel Firewall rate limits for the native sign-in exchange. The rules live in
- * the project's firewall configuration. Both checks go through the shared
- * check, which reports a rule that is not configured or an answer the firewall
- * blocked through the once-per-rule-per-minute throttle.
+ * Vercel Firewall rate limits for the native credential endpoints. The rules
+ * live in the project's firewall configuration. Both checks go through the
+ * shared check, which reports a rule that is not configured or an answer the
+ * firewall blocked through the once-per-rule-per-minute throttle.
  *
- * The address rule runs before the admission gate and proceeds only on `allowed`.
- * The account rule runs once the account is known and takes no refusal decision
- * of its own, so an unconfigured rule and a blocked answer the rule did not
- * limit let the exchange finish. Both rules use source
+ * The address rule guards both native credential endpoints, sign-in at
+ * `POST /api/auth/native/token` and exchange at `POST /api/auth/native/exchange`,
+ * and each route counts it before its own admission gate and proceeds only on
+ * `allowed`. The account rule runs once the account is known and takes no
+ * refusal decision of its own, so an unconfigured rule and a blocked answer the
+ * rule did not limit let the exchange finish. Both rules use source
  * `native_token_rate_limit`.
  */
 const ADDRESS_RATE_LIMIT_ID = 'native-token-address';

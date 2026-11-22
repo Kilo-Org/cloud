@@ -206,31 +206,34 @@ type StateActionProps = {
   accessibilityLabel?: string;
   /** Extra context a name cannot carry, e.g. what the retry re-reads. */
   accessibilityHint?: string;
-  /**
-   * Which of the two faces the action takes: `primary` is the filled default
-   * the slot's single primary paints, `outline` the bordered surface a caller
-   * embedded in a body that owns its own primary passes instead.
-   */
-  variant?: 'primary' | 'outline';
+  /** How the action reads where it sits. `primary` is a state surface's one way out
+   *  (the default). `quiet` is the same 48pt compact frame as an outlined control,
+   *  for a content card on a screen that already owns its primary action: two
+   *  brand-filled controls on one screen make the eye choose between them
+   *  (`DESIGN.md` 'one primary action per surface'). */
+  emphasis?: 'primary' | 'quiet';
 };
 
 /**
- * The one way a state's `action` slot is filled: the primary, compact,
- * label-sized button, with its leading icon centred together with the label and
- * the shared 48pt state-action floor. Callers own nothing visual — the slot
- * above owns the gap, and this component owns the style — so no state can
- * invent a full-width or shadowed way out of its own.
+ * The one way a state's `action` slot is filled: the compact, label-sized
+ * button, with its leading icon centred together with the label and the shared
+ * 48pt state-action floor. Callers own nothing visual — the slot above owns the
+ * gap, and this component owns the style — so no state can invent a full-width
+ * or shadowed way out.
+ *
+ * `emphasis` picks the weight it paints at, not its frame: `primary` (the
+ * default) is a state surface's one way out, on the brand fill; `quiet` is the
+ * same frame as an outlined control, for an action inside a content card on a
+ * screen whose primary action lives elsewhere. Two brand fills on one screen
+ * make the eye choose between them, so the card's way out takes the quiet face
+ * and the screen keeps its one primary (`DESIGN.md` 'one primary action per
+ * surface').
  *
  * `loading` is a busy state, not a different face of the control: the label and
  * its strength never change while the request runs, only the leading icon
  * becomes a spinner, so a retry stays readable as "the same action, working"
  * instead of collapsing to a ring. The button announces the wait, reports
  * itself disabled, and refuses presses until it clears.
- *
- * `variant` only picks the face: `primary` is the filled control the slot's
- * one primary paints, and `outline` is the same control with a border instead
- * of the fill, for a caller whose body already shows its own primary — the
- * compact size, the tap-target floor and the busy face are all the same.
  */
 export function StateAction({
   label,
@@ -241,26 +244,35 @@ export function StateAction({
   testID,
   accessibilityLabel,
   accessibilityHint,
-  variant = 'primary',
+  emphasis = 'primary',
 }: Readonly<StateActionProps>) {
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const busy = Boolean(loading);
-  const outlined = variant === 'outline';
-  // A busy action keeps its enabled face — the fill or border and the label ink
-  // the button paints on it (`Button` never dims or mutes a control that
-  // announces busy) — so its mark must take that same ink. The muted ink is
-  // only for the disabled face, whose fill is the palette's muted surface; on
-  // the brand fill it measures about 1.4:1 and the spinner all but disappears.
-  // The two faces follow `BUTTON_INK` in `@/components/ui/button`: `default`
-  // marks in `primaryForeground`, `outline` in `foreground`.
-  const enabledMark = outlined ? colors.foreground : colors.primaryForeground;
-  const markColor = disabled === true && !busy ? mutedDisabledInk : enabledMark;
+  const quiet = emphasis === 'quiet';
+  // A busy action keeps its enabled face — the fill and the label ink the
+  // button paints on it (`Button` never dims or mutes a control that announces
+  // busy) — so its mark must take that same ink. The muted ink is only for the
+  // disabled face, whose fill is the palette's muted surface; on the brand fill
+  // it measures about 1.4:1 and the spinner all but disappears.
+  const showMutedInk = disabled === true && !busy;
+  // The quiet face is an outlined control, whose label ink `Button` paints as
+  // `foreground`; only the leading mark's colour is computed here, so it takes
+  // that same ink, and the primary face keeps the brand fill's contrasting ink.
+  let enabledInk = colors.primaryForeground;
+  if (quiet) {
+    enabledInk = colors.foreground;
+  }
+  const markColor = showMutedInk ? mutedDisabledInk : enabledInk;
   return (
     <Button
       size="sm"
-      className={STATE_ACTION_CLASS}
-      {...(outlined ? { variant: 'outline' as const } : {})}
+      variant={quiet ? 'outline' : 'default'}
+      // The `outline` variant paints `bg-card dark:bg-secondary`, and `--card`
+      // is the same step as the `Card` a quiet action sits on, so the control
+      // would lose its fill in dark. The filled neutral takes a visible step
+      // above that card instead, as `AddCreditsButton`'s quiet face does.
+      className={cn(STATE_ACTION_CLASS, quiet && 'dark:bg-secondary-fill')}
       disabled={Boolean(disabled) || busy}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? label}

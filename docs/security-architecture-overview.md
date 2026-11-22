@@ -34,7 +34,7 @@ Required workflow:
 5. Re-check customer-sensitive areas explicitly: public or optionally authenticated ingress, identity and authorization paths, WebSocket controls, model routing and subprocessors, preview or experiment prompt retention, user soft-delete exceptions, runtime secret transport, mobile diagnostic telemetry, logging redaction, and customer-configured integrations.
 6. Update Mermaid diagrams, tables, the Architecture baseline date, Document version, and Version history. Add one concise version-history row describing the refresh. Preserve prior history rows.
 7. Ensure the external integration inventory reflects current repository support while making clear that live production enablement requires environment-specific validation.
-8. Validate the finished Markdown: run the repository formatter, run bun run script/check-md-table-padding.ts docs/security-architecture-overview.md, inspect the diff, and statically inspect Mermaid fences and syntax. Run a focused security-document review before committing.
+8. Validate the finished Markdown: run the repository formatter, run pnpm check:md-table-padding docs/security-architecture-overview.md, inspect the diff, and statically inspect Mermaid fences and syntax. Run a focused security-document review before committing.
 
 Important constraints:
 - This is not a penetration-test report, DPA, subprocessor list, business continuity plan, or compliance attestation.

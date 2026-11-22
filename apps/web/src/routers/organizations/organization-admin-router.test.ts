@@ -2403,8 +2403,8 @@ describe('organization admin router', () => {
           reason: 'nonprofit partner',
           changedByKiloUserId: adminUser.id,
         });
-        expect(result.current.id).toBe(result.history.id);
-        expect(result.history).toMatchObject({
+        expect(result.current.id).toBe(result.created.id);
+        expect(result.created).toMatchObject({
           organizationId: org.id,
           isExempt: true,
           reason: 'nonprofit partner',
@@ -2412,7 +2412,7 @@ describe('organization admin router', () => {
         });
         // Timestamps are normalized to UTC ISO at the API boundary.
         expect(new Date(result.current.createdAt).toISOString()).toBe(result.current.createdAt);
-        expect(new Date(result.history.createdAt).toISOString()).toBe(result.history.createdAt);
+        expect(new Date(result.created.createdAt).toISOString()).toBe(result.created.createdAt);
 
         const view = await caller.organizations.admin.getServiceFeeExemption({
           organizationId: org.id,
@@ -2420,7 +2420,7 @@ describe('organization admin router', () => {
         expect(view.current?.isExempt).toBe(true);
         expect(view.current?.reason).toBe('nonprofit partner');
         expect(view.history).toHaveLength(1);
-        expect(view.history[0].id).toBe(result.history.id);
+        expect(view.history[0].id).toBe(result.created.id);
       } finally {
         await cleanupExemptionTestOrganization(org.id);
       }
@@ -2443,7 +2443,7 @@ describe('organization admin router', () => {
 
         expect(revoked.current.isExempt).toBe(false);
         expect(revoked.current.reason).toBe('revoked after contract review');
-        expect(revoked.current.id).toBe(revoked.history.id);
+        expect(revoked.current.id).toBe(revoked.created.id);
 
         const view = await caller.organizations.admin.getServiceFeeExemption({
           organizationId: org.id,
@@ -2480,7 +2480,7 @@ describe('organization admin router', () => {
 
         expect(second.current.isExempt).toBe(true);
         expect(second.current.reason).toBe('renewed with updated documentation');
-        expect(second.current.id).toBe(second.history.id);
+        expect(second.current.id).toBe(second.created.id);
         expect(second.current.id).not.toBe(first.current.id);
 
         const view = await caller.organizations.admin.getServiceFeeExemption({

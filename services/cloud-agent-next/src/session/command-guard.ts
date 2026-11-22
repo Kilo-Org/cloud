@@ -372,11 +372,13 @@ const SECURITY_REMEDIATION_PUSH_HEAD = 'git*push';
 // A shell joins adjacent quoted pieces into one argument, so quoting changes how
 // one token is read and cannot be bounded by counting its pieces. A push whose
 // text carries either quote is therefore refused rather than classified.
-// The matcher normalizes a backslash to a slash, and a shell removes that
+// The matcher rewrites a backslash to a slash, and a shell removes that
 // backslash before git runs the command, so a word split by an escape reaches a
 // rule as a slash inside the word. The subcommand words that carry a push or a
 // configuration write are a fixed list, so every split position of each is named
-// here; nothing outside that list can split a word into one of them.
+// here, once for one escape in the word and once for two escapes in the same
+// word; nothing outside that list can split a word into one of them. A word that
+// carries three or more escapes stays outside these rules.
 const SECURITY_REMEDIATION_SPLITTABLE_WORDS = [
   'git',
   'push',
@@ -386,16 +388,22 @@ const SECURITY_REMEDIATION_SPLITTABLE_WORDS = [
 ] as const;
 
 const SECURITY_REMEDIATION_SPLIT_WORD_DENIED_PATTERNS =
-  SECURITY_REMEDIATION_SPLITTABLE_WORDS.flatMap(word =>
-    Array.from({ length: word.length - 1 }, (_, index) => {
-      const split = `${word.slice(0, index + 1)}/${word.slice(index + 1)}`;
-      // A split of the command word itself must stay anchored to the command
-      // start, or the rule would refuse any path that happens to contain those
-      // characters. A split of a subcommand word sits inside the command, so it
-      // takes a wildcard on each side.
-      return word === 'git' ? `${split} *` : `*${split}*`;
-    })
-  );
+  SECURITY_REMEDIATION_SPLITTABLE_WORDS.flatMap(word => {
+    const splits: string[] = [];
+    for (let first = 1; first < word.length; first += 1) {
+      splits.push(`${word.slice(0, first)}/${word.slice(first)}`);
+    }
+    for (let first = 1; first < word.length - 1; first += 1) {
+      for (let second = first + 1; second < word.length; second += 1) {
+        splits.push(`${word.slice(0, first)}/${word.slice(first, second)}/${word.slice(second)}`);
+      }
+    }
+    // A split of the command word itself must stay anchored to the command
+    // start, or the rule would refuse any path that happens to contain those
+    // characters. A split of a subcommand word sits inside the command, so it
+    // takes a wildcard on each side.
+    return splits.map(split => (word === 'git' ? `${split} *` : `*${split}*`));
+  });
 
 const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}* -*`,
@@ -432,6 +440,17 @@ const SECURITY_REMEDIATION_GIT_DIR_SPELLINGS = ['.git', '.g?t', '.g*t'];
 // search options that run another program or write a named file are refused
 // below, and a program run from inside one of them stays outside a text rule.
 const SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS = ['cp', 'mv', 'sed'];
+
+// A shell joins adjacent quoted pieces into one argument, so the file name can
+// carry a quote at any boundary between its letters and the shell still writes
+// the plain name. One quote pair splits the name once, so every one of those
+// boundaries is named here, for both quote characters. A name that carries two
+// quote pairs at once stays outside these rules.
+const SECURITY_REMEDIATION_CONFIG_NAME_QUOTED_PATTERNS = Array.from(
+  { length: 'config'.length - 1 },
+  (_, index) =>
+    ['"', "'"].map(quote => `${'config'.slice(0, index + 1)}${quote}${'config'.slice(index + 1)}`)
+).flat();
 
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git config *push*',
@@ -482,7 +501,16 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // name. The bound: a write performed by a program this policy does not allow
   // is not covered here, and neither is a path spelled some other way; the edit
   // tool's own map denies the same file.
-  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [`*${spelling}/co*`]),
+  // A shell joins adjacent quoted pieces into one argument, so a name can carry
+  // a quote at any of its letter boundaries. Each boundary is named, once for
+  // each quote character, and the three rules below then cover the same names
+  // plus a quote before the name or inside it. A name that carries two quote
+  // pairs at once stays outside these rules.
+  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [
+    `*${spelling}/c*`,
+    `*${spelling}/"c*`,
+    `*${spelling}/'c*`,
+  ]),
   // A `cd` node is never evaluated, so a write whose target is the bare name
   // cannot be classified by its directory. These rules refuse that target by
   // name, at the cost of refusing a legitimate write to a file or directory
@@ -501,6 +529,8 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
     `${tool} *"con?ig"*`,
     `${tool} *"con"*`,
     `${tool} *'con'*`,
+    // The same target with a quote joined inside the name at one boundary.
+    ...SECURITY_REMEDIATION_CONFIG_NAME_QUOTED_PATTERNS.map(spelling => `${tool} *${spelling}*`),
   ]),
   // The subcommand form compares a key without regard to case, so a rule names
   // the upper-case spelling as well as the lower-case one. The `include` key
@@ -535,9 +565,15 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // redirection that node carries, so that redirection stays outside these
   // rules; a write whose target is an argument, such as a copy or a move, keeps
   // its target in that text and stays covered.
+  //
+  // The shell strips the quote before the write, so the target is matched with a
+  // quote at each letter boundary as well as at its start.
   '*>*config',
   '*>*confi?',
+  ...['"', "'"].map(quote => `*>*${quote}config*`),
+  ...SECURITY_REMEDIATION_CONFIG_NAME_QUOTED_PATTERNS.map(spelling => `*>*${spelling}*`),
   '*gitconfig*',
+  '*>*gitcon*',
 ];
 
 // Installed after the denies, and only for the branch-creation form, whose `-c`
@@ -547,6 +583,19 @@ const SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED = [
   'git branch -c *',
   'git -?* switch -c *',
   'git -?* branch -c *',
+];
+
+// The branch-creation rules above take a `*` before the subcommand, so that `*`
+// can absorb a global option and the inline setting it carries. These rules are
+// installed after those allows, so an inline setting that carries a dotted key
+// or a `=` value decides the command again. A branch name that carries a dot,
+// written behind a global option, is refused too, because a rule cannot tell
+// that argument from a key.
+const SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED = [
+  'git -c ?*.*',
+  'git -c ?*=*',
+  'git -?* -c ?*.*',
+  'git -?* -c ?*=*',
 ];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
@@ -598,6 +647,7 @@ export function getCommandGuardPolicy(
       allowed: SECURITY_REMEDIATION_ALLOWED_COMMANDS,
       denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS],
       allowedAfterDenied: SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED,
+      deniedAfterAllowedOverrides: SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED,
       // A shell expands a `$` or a backtick before git sees the command, so the
       // text a rule reads is not the text git runs. Installed last, so it
       // decides every command that carries either character.

@@ -564,6 +564,29 @@ describe('security-remediation push command guard policy', () => {
       'git push \\\n--force',
       'git push \\\n--mirror',
       'git push origin \\\n+main',
+      // The branch-creation re-allow takes a `*` before the subcommand, so an
+      // inline setting carried behind a global option must still be refused.
+      'git -c core.hooksPath=/tmp/evil switch -c x',
+      'git -c core.pager=less branch -c a b',
+      'git -C . -c core.x=1 switch -c y',
+      'git --no-pager -c core.pager=cat log',
+      // A word split by two escapes reaches the matcher as two slashes.
+      'git p\\u\\sh --force',
+      'git p\\u\\sh origin +main',
+      'g\\i\\t push --force',
+      'git pu\\s\\h -f',
+      // A quote joined inside the configuration file name at one boundary.
+      'cp /tmp/evil con"fig"',
+      'mv /tmp/evil confi"g"',
+      "sed -i s/a/b/ c'onfig'",
+      'cp /tmp/evil .git/"config"',
+      'mv /tmp/evil .git/c"onfig"',
+      'echo "[alias] p = push --force" >> .git/"config"',
+      'echo "mirror = true" >> "config"',
+      'echo "mirror = true" >> ~/.gitcon"fig"',
+      // A branch name that carries a dot, behind a global option, is refused
+      // too, because a rule cannot tell that argument from a key.
+      'git -C . switch -c release/1.2',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
@@ -612,6 +635,18 @@ describe('security-remediation push command guard policy', () => {
       'git checkout -b fix-cache',
       'git commit -m "fix pre-commit hook"',
       'pnpm test -- package',
+      // These pin the behaviour the narrowed rules must keep: a branch name
+      // whose dot sits behind the `-c` of the branch-creation form stays
+      // allowed, and a quote or a dot inside an ordinary path stays allowed.
+      'git -C . switch -c fix/thing',
+      'git -C . branch -c a b',
+      'git --no-pager switch -c x',
+      'git switch -c release/1.2',
+      'sed -i "s/^x/y/" src/app.ts',
+      'cp "src/a b.ts" dst.ts',
+      'cp config.example.json config.test.json',
+      'mv src/config.ts src/conf.ts',
+      'touch src/config.ts',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
     }

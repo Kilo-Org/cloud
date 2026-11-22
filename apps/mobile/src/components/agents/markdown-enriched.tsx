@@ -8,6 +8,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { ImageViewer } from '@/components/ui/image-viewer';
+import { withoutLeadingDirectionMarks } from '@/lib/rtl-text';
 import { TOKEN_DARK_LIGHT } from '@/lib/pr-review/diff/syntax-colors';
 
 import {
@@ -32,6 +33,13 @@ import { getMarkdownHeadingStyles, type MarkdownPalette } from './markdown-palet
 type MarkdownEnrichedProps = {
   value: string;
   palette: MarkdownPalette;
+  /**
+   * The direction the whole message names (`markdownMessageDirection`), or
+   * `undefined` when it holds no letter. The container carries it, so a block
+   * holding no letter of its own sits on the message's edge instead of the
+   * interface's.
+   */
+  messageDirection: 'ltr' | 'rtl' | undefined;
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
@@ -50,8 +58,10 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
   // strong character. That is the rule for markdown, which is always copy the
   // app did not write: an English reply keeps its left edge and the punctuation
   // that ends it inside a right-to-left interface, and an Arabic one still sits
-  // on the right. Naming the interface's start edge instead right-aligned the
-  // English and left the punctuation of a wrapped line at the wrong end.
+  // on the right. A paragraph with no strong character of its own follows the
+  // container's direction instead (`messageDirection` in `MarkdownEnriched`).
+  // Naming the interface's start edge instead right-aligned the English and
+  // left the punctuation of a wrapped line at the wrong end.
   const heading = (level: keyof typeof headings) => {
     const style = headings[level];
     return {
@@ -155,6 +165,7 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
 export function MarkdownEnriched({
   value,
   palette,
+  messageDirection,
   selectable,
   onLongPressLink,
   onPressLink,
@@ -163,7 +174,8 @@ export function MarkdownEnriched({
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
   // Markdown is always copy the app did not write, so every block keeps the
-  // renderer's own per-paragraph direction (`enrichedStyle`).
+  // renderer's own per-paragraph direction (`enrichedStyle`); `messageDirection`
+  // answers only for a block with no strong character of its own.
   const markdownStyle = useMemo(() => enrichedStyle(palette), [palette]);
   // The renderer's own screen-reader strings (table rows, list items,
   // blockquotes, math, and the iOS rotor) so a translation is spoken in the
@@ -199,23 +211,37 @@ export function MarkdownEnriched({
   );
   const markdown = useMemo(
     () =>
-      gateMarkdownImages(
-        value,
-        images.filter((_, index) => displayable[index] !== '1'),
-        t
+      withoutLeadingDirectionMarks(
+        gateMarkdownImages(
+          value,
+          images.filter((_, index) => displayable[index] !== '1'),
+          t
+        )
       ),
     [value, images, displayable, t]
+  );
+  // A block with no letter of its own lays out in the container's direction,
+  // while a paragraph with a letter of its own still resolves from that letter:
+  // the native paragraph renderer sets no direction of its own, so the platform
+  // reads the view's. Naming the message's direction here is what puts `42 · 7`
+  // on the same edge as the lettered blocks beside it.
+  const containerStyle = useMemo(
+    () => (messageDirection === undefined ? undefined : { direction: messageDirection }),
+    [messageDirection]
   );
   return (
     <>
       <EnrichedMarkdownText
         flavor="github"
-        // The renderer resolves each paragraph from its own first strong
-        // character and draws a list's marker on that paragraph's own leading
-        // edge, so every block of a message follows one rule: nothing here
-        // forces a block to the interface edge, and no mark has to name one.
+        // One rule per message: a block takes the direction of its own first
+        // letter, a mark the content put in front of a block's first character
+        // is stripped so it cannot override that letter, and a block with no
+        // letter at all takes the message's direction from the container. The
+        // renderer draws a list's marker on its item's own leading edge, so the
+        // marker follows the item.
         markdown={markdown}
         markdownStyle={markdownStyle}
+        containerStyle={containerStyle}
         accessibilityLabels={accessibilityLabels}
         selectable={selectable}
         // A long press on a message opens the host's message details; the

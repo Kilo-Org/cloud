@@ -7,11 +7,14 @@ import { flattenStyle } from '@/test/style-sheet-mock';
 import {
   codeFieldTextStyle,
   containsJoinedScript,
+  contentStringDirection,
   contentTextDirection,
   hasRtlScript,
   ltrValueTextStyle,
+  markdownMessageDirection,
   pinsTextDirection,
   rtlBaseMarkedChildren,
+  withoutLeadingDirectionMarks,
   withoutMonoFamily,
 } from './rtl-text';
 
@@ -254,20 +257,141 @@ describe('contentTextDirection', () => {
     expect(contentTextDirection('Русский')).toEqual(LTR);
   });
 
-  // The paragraph direction comes from the first strong character, and a bidi
-  // mark names a direction itself, before any letter is read: the right-to-left
-  // and Arabic letter marks name right to left, the left-to-right mark left to
-  // right, whatever letters follow them.
+  // The paragraph direction comes from its first letter, and a direction mark
+  // is not a letter: a mark the content put in front of a block does not decide
+  // that block's direction, so the letter after it does. Letting the mark
+  // decide is what put two rows of one fallback block on opposite edges.
   it.each([
-    ['\u200FAlpha beta', RTL],
-    ['\u200Eبيتا', LTR],
-    ['\u061CAlpha beta', RTL],
-  ])('names the direction a leading mark chooses', (text, expected) => {
+    ['\u200FAlpha beta', LTR],
+    ['\u200Eبيتا', RTL],
+    ['\u061CAlpha beta', LTR],
+  ])('names the direction a block’s own letter chooses, not a leading mark', (text, expected) => {
     expect(contentTextDirection(text)).toEqual(expected);
   });
 
-  it('leaves copy with no strong character to the interface', () => {
+  it('leaves copy with no letter to the interface', () => {
     expect(contentTextDirection(['42 · ', 7])).toBeUndefined();
+  });
+});
+
+describe('contentStringDirection', () => {
+  it('names a block from its own first letter', () => {
+    expect(contentStringDirection('Latin text and more here.')).toBe('ltr');
+    expect(contentStringDirection('مرحبا')).toBe('rtl');
+  });
+
+  // The HTML render path asks this of a block's own text; a block that holds no
+  // letter is left to the message (`markdownMessageDirection`).
+  it('names nothing for a block whose text holds no letter', () => {
+    expect(contentStringDirection('42 · 7')).toBeUndefined();
+    expect(contentStringDirection('\u200FLatin')).toBe('ltr');
+  });
+});
+
+describe('markdownMessageDirection', () => {
+  it('takes the message direction from its first letter', () => {
+    expect(markdownMessageDirection('- Latin bullet')).toBe('ltr');
+    expect(markdownMessageDirection('مرحبا بك')).toBe('rtl');
+  });
+
+  // The fallback block's own middle row opens on a tag whose name starts with a
+  // Latin letter: markup is not copy, so it must not decide the message.
+  it('reads past HTML tag syntax and its attribute values', () => {
+    expect(
+      markdownMessageDirection('<custom-note class="kilo-block-rtl">Latin text</custom-note>')
+    ).toBe('ltr');
+    expect(markdownMessageDirection('<custom-note>مرحبا</custom-note>')).toBe('rtl');
+  });
+
+  it('reads a leading mark as no letter, so the letter after it decides', () => {
+    expect(markdownMessageDirection('\u200FLatin bullet')).toBe('ltr');
+    expect(markdownMessageDirection('\u200Eمرحبا')).toBe('rtl');
+  });
+
+  it('names nothing for a message that holds no letter', () => {
+    expect(markdownMessageDirection('42 · 7')).toBeUndefined();
+    expect(markdownMessageDirection('<custom-note>\u200F</custom-note>')).toBeUndefined();
+  });
+
+  // Machinery is Latin whatever language the message is in, so a message that
+  // opens with it still names the direction of the Arabic prose after it.
+  it.each([
+    ['a fenced code block', '```bash\npnpm install\n```\n\nمرحبا، هذا نص عربي.'],
+    ['a code span', '`pnpm install` ثم مرحبا بالجميع'],
+    ['a bare URL', 'https://example.com\n\nمرحبا بالجميع'],
+    ['a link reference definition', '[docs]: https://example.com\n\nمرحبا بالجميع'],
+    ['an indented code block', '    pnpm install\n\nمرحبا بالجميع'],
+  ])('reads the prose after %s, not the machinery', (_kind, message) => {
+    expect(markdownMessageDirection(message)).toBe('rtl');
+  });
+
+  // A table header, a link label and an image's alt text are copy a person
+  // reads, so their own letters decide like any other prose.
+  it('keeps the copy a reader reads', () => {
+    expect(markdownMessageDirection('[مرحبا](https://example.com)')).toBe('rtl');
+    expect(markdownMessageDirection('| جدول | b |\n| - | - |')).toBe('rtl');
+    expect(markdownMessageDirection('![مرحبا](https://example.com/a.png)')).toBe('rtl');
+  });
+
+  // A quoted attribute may hold the tag's own closing character, so the scan
+  // tracks the quote instead of stopping at the first `>`.
+  it('skips a whole tag whose attribute holds a closing angle bracket', () => {
+    expect(markdownMessageDirection('<a title="a>b">مرحبا بالجميع')).toBe('rtl');
+    expect(markdownMessageDirection("<a title='a>b'>مرحبا بالجميع")).toBe('rtl');
+  });
+
+  // A code span opens on a run of N backticks and closes on the next run of
+  // exactly N, so a span may hold a shorter run.
+  it('skips a code span opened by a run of backticks', () => {
+    expect(markdownMessageDirection('``a`b`` مرحبا بالجميع')).toBe('rtl');
+    expect(markdownMessageDirection('``a`b`` ثم مرحبا')).toBe('rtl');
+    expect(markdownMessageDirection('``مرحبا`` بالجميع')).toBe('rtl');
+  });
+
+  it('names nothing for a message whose only letters are machinery', () => {
+    expect(markdownMessageDirection('```bash\npnpm install\n```')).toBeUndefined();
+    expect(markdownMessageDirection('``a`b``')).toBeUndefined();
+    expect(markdownMessageDirection('<a title="a>b">')).toBeUndefined();
+  });
+});
+
+describe('withoutLeadingDirectionMarks', () => {
+  // The design gate's fallback block: the third row is a bullet whose content
+  // wrote a right-to-left mark before its Latin text, so the paragraph laid out
+  // right to left while the Latin rows above and below it named their own edge.
+  it('strips the mark a bullet wrote in front of its content', () => {
+    expect(withoutLeadingDirectionMarks('- \u200FLatin bullet')).toBe('- Latin bullet');
+  });
+
+  it('strips a mark in front of a paragraph, a heading, and a nested quote', () => {
+    expect(withoutLeadingDirectionMarks('\u200FLatin text and more here.')).toBe(
+      'Latin text and more here.'
+    );
+    expect(withoutLeadingDirectionMarks('## \u200FHeading')).toBe('## Heading');
+    expect(withoutLeadingDirectionMarks('> > \u200FQuoted')).toBe('> > Quoted');
+    expect(withoutLeadingDirectionMarks('1. \u200FItem')).toBe('1. Item');
+  });
+
+  it('leaves a mark inside a block’s text alone, where it orders its own run', () => {
+    expect(withoutLeadingDirectionMarks('Kilo \u200Fغير متصل')).toBe('Kilo \u200Fغير متصل');
+  });
+
+  it('leaves a continuation line and the rest of the source byte-identical', () => {
+    const value = '\u200FFirst\nsecond \u200Fline\n\n- \u200Fitem';
+    expect(withoutLeadingDirectionMarks(value)).toBe('First\nsecond \u200Fline\n\n- item');
+  });
+
+  it('leaves fenced and indented code untouched', () => {
+    const fenced = '```js\nconst \u200Fa = 1;\n```';
+    expect(withoutLeadingDirectionMarks(fenced)).toBe(fenced);
+    const indented = '\u200FIntro\n\n    const \u200Fa = 1;';
+    expect(withoutLeadingDirectionMarks(indented)).toBe('Intro\n\n    const \u200Fa = 1;');
+  });
+
+  it('returns the same string when there is no mark to strip', () => {
+    expect(withoutLeadingDirectionMarks('42 · 7\n\n- Latin bullet')).toBe(
+      '42 · 7\n\n- Latin bullet'
+    );
   });
 });
 

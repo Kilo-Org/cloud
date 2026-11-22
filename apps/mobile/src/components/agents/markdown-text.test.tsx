@@ -166,6 +166,7 @@ function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] 
 
 type EnrichedHostProps = {
   markdown: string;
+  containerStyle?: { direction?: 'ltr' | 'rtl' };
   markdownStyle: {
     paragraph: { lineHeight: number; textAlign?: 'right' };
     h1: { textAlign?: 'right' };
@@ -1768,6 +1769,13 @@ describe('MarkdownText streaming conversion tail', () => {
 describe('MarkdownText document direction', () => {
   const value = '# Heading\n\nBody text\n\n- one\n- two';
 
+  // The design gate's markdown fallback block, exactly as the target renders it:
+  // a letterless row, an HTML paragraph of Latin text, and a bullet whose
+  // content wrote a right-to-left mark in front of its text.
+  const FALLBACK_VALUE =
+    '42 · 7\n\n<custom-note class="kilo-block-rtl">Latin text and more here.</custom-note>\n\n' +
+    '- \u200FLatin bullet';
+
   it('leaves chat markdown byte-identical in a right-to-left interface', async () => {
     rnStub.I18nManager.isRTL = true;
     rnStub.Platform.OS = 'android';
@@ -1783,6 +1791,38 @@ describe('MarkdownText document direction', () => {
       expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
       expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
       expect(props.markdown).toBe(value);
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+      rnStub.Platform.OS = 'ios';
+    }
+  });
+
+  // The design gate's markdown fallback block, whose three rows sat on
+  // different edges: `42 · 7` has no letter, the HTML paragraph draws in the
+  // HTML renderer, and the bullet's content wrote a right-to-left mark in front
+  // of its Latin text.
+  it('puts every row of one message on the message’s own edge', async () => {
+    rnStub.I18nManager.isRTL = true;
+    rnStub.Platform.OS = 'android';
+    try {
+      const renderer = await mount(<MarkdownText value={FALLBACK_VALUE} />);
+
+      // The message's first letter is Latin, so the letterless row takes that
+      // direction from the container...
+      const containers = renderer.root
+        .findAllByType(EnrichedType)
+        .map(node => (node.props as EnrichedHostProps).containerStyle);
+      expect(containers).toEqual([{ direction: 'ltr' }, { direction: 'ltr' }]);
+
+      // ...and the mark the bullet wrote no longer decides its item.
+      const sources = markdownSources(renderer).map(source => source.trim());
+      expect(sources).toEqual(['42 · 7', '- Latin bullet']);
+      // Nothing invisible is added for the letterless row: the container
+      // carries its direction instead.
+      expect(markdownSources(renderer).join('')).not.toContain('\u200F');
+
+      const arabic = await mount(<MarkdownText value={'42 · 7\n\nمرحبا'} />);
+      expect(enrichedProps(arabic).containerStyle).toMatchObject({ direction: 'rtl' });
     } finally {
       rnStub.I18nManager.isRTL = false;
       rnStub.Platform.OS = 'ios';
@@ -1865,10 +1905,10 @@ describe('MarkdownText document direction', () => {
       // instead of both following the interface.
       expect(await altStyle('shot')).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
       expect(await altStyle('صورة')).toMatchObject({ direction: 'rtl', writingDirection: 'rtl' });
-      // No letter names nothing, so the fallback keeps the interface's edge.
-      const digits = await altStyle('42');
-      expect(digits).not.toHaveProperty('direction');
-      expect(digits).not.toHaveProperty('writingDirection');
+      // An alt with no letter of its own takes the message's direction — this
+      // message's first letter is the `q` of `quoted` — so it sits on the edge
+      // of the blocks beside it instead of the interface's.
+      expect(await altStyle('42')).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
 
       const documentHost = await mount(
         <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />

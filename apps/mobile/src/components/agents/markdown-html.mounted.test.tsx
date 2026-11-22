@@ -137,13 +137,20 @@ function mergedStyle(style: unknown): Record<string, unknown> {
 
 async function mountHtml(
   html: string,
-  documentDirection?: 'ltr'
+  documentDirection?: 'ltr',
+  messageDirection?: 'ltr' | 'rtl'
 ): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
     ref.current = TestRenderer.create(
-      createElement(MarkdownHtml, { html, palette, documentDirection, selectable: true })
+      createElement(MarkdownHtml, {
+        html,
+        palette,
+        documentDirection,
+        messageDirection,
+        selectable: true,
+      })
     );
   });
   if (!ref.current) {
@@ -540,6 +547,77 @@ describe('MarkdownHtml block direction', () => {
     const text = hostStyles(renderer, 'Text').find(entry => entry.style.fontSize === 16);
     expect(text?.style).not.toHaveProperty('direction');
     expect(text?.style).not.toHaveProperty('writingDirection');
+  });
+
+  // The design gate's markdown fallback block: one message of a letterless row,
+  // an HTML paragraph of Latin text and a Latin bullet. Every row sits on one
+  // edge, so the letterless row takes the direction the message's own first
+  // letter names rather than falling back to the interface's.
+  it('gives a letterless block the message’s direction, not the interface’s', async () => {
+    const isRtl = rnStub.I18nManager;
+    isRtl.isRTL = true;
+    try {
+      const renderer = await mountHtml('<p>42 — 7</p><p>Latin text and more here.</p>');
+      const paragraphs = hostStyles(renderer, 'View').filter(entry => entry.tag === 'p');
+
+      expect(paragraphs.map(entry => entry.style.direction)).toEqual(['ltr', 'ltr']);
+
+      // An Arabic message puts its letterless row on the right instead.
+      const arabic = await mountHtml('<p>42 — 7</p><p>مرحبا</p>');
+      const arabicParagraphs = hostStyles(arabic, 'View').filter(entry => entry.tag === 'p');
+      expect(arabicParagraphs.map(entry => entry.style.direction)).toEqual(['rtl', 'rtl']);
+    } finally {
+      isRtl.isRTL = false;
+    }
+  });
+
+  // A mark the content wrote in front of a block's first character is not a
+  // letter, so the block's own letter decides: the fallback block's bullet stays
+  // on the Latin paragraph's edge instead of flipping to the other one.
+  it('decides a mark-prefixed block by its own letter', async () => {
+    const isRtl = rnStub.I18nManager;
+    isRtl.isRTL = true;
+    try {
+      const renderer = await mountHtml(
+        '<p>42 — 7</p><p>\u200FLatin text and more here.</p><p>\u200Eبيتا</p>'
+      );
+      const paragraphs = hostStyles(renderer, 'View').filter(entry => entry.tag === 'p');
+
+      expect(paragraphs.map(entry => entry.style.direction)).toEqual(['ltr', 'ltr', 'rtl']);
+    } finally {
+      isRtl.isRTL = false;
+    }
+  });
+
+  it('reads the message direction past HTML tag syntax', async () => {
+    const isRtl = rnStub.I18nManager;
+    isRtl.isRTL = true;
+    try {
+      // The message opens on a tag whose name starts with a Latin letter, so a
+      // letterless row beside it follows that Latin letter, not the interface.
+      const renderer = await mountHtml('<p>42 — 7</p><p><custom-note>Latin text</custom-note></p>');
+      const paragraphs = hostStyles(renderer, 'View').filter(entry => entry.tag === 'p');
+
+      expect(paragraphs.map(entry => entry.style.direction)).toEqual(['ltr', 'ltr']);
+    } finally {
+      isRtl.isRTL = false;
+    }
+  });
+
+  // A caller that knows the whole message's direction says so: the HTML block
+  // it hands over may hold no letter itself, and its letterless blocks still
+  // belong on the message's edge.
+  it('takes the message direction from its caller', async () => {
+    const isRtl = rnStub.I18nManager;
+    isRtl.isRTL = true;
+    try {
+      const renderer = await mountHtml('<p>42 — 7</p>', undefined, 'rtl');
+      const paragraph = hostStyles(renderer, 'View').find(entry => entry.tag === 'p');
+
+      expect(paragraph?.style).toMatchObject({ direction: 'rtl' });
+    } finally {
+      isRtl.isRTL = false;
+    }
   });
 
   it('keeps one direction for a document body', async () => {

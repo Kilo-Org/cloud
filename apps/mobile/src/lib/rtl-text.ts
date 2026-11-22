@@ -171,12 +171,14 @@ export function codeFieldTextStyle(): TextStyle {
 }
 
 /**
- * A strong character: the characters a paragraph's direction resolves from. A
- * letter, or one of the bidi marks that name a direction themselves — the
- * Arabic letter mark (U+061C) and the right-to-left mark (U+200F) name right to
- * left, the left-to-right mark (U+200E) names left to right.
+ * A strong character: the character a paragraph's direction resolves from, the
+ * bidi algorithm's strong type. Only a letter counts. A direction mark names a
+ * direction itself, but it draws and speaks nothing, so letting one decide
+ * flips a whole block on a character the reader cannot see — which is exactly
+ * how the design gate's markdown fallback block ended up with one of its rows
+ * on each edge. A mark is stripped instead (`withoutLeadingDirectionMarks`).
  */
-const STRONG = /\p{L}|[\u061C\u200E\u200F]/u;
+const STRONG = /\p{L}/u;
 
 /** The first strong character of a React child tree, or `undefined` when it has none. */
 function firstStrong(node: ReactNode): string | undefined {
@@ -214,28 +216,33 @@ function firstStrong(node: ReactNode): string | undefined {
 const RTL_LETTER =
   /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
 
-/** The direction a leading strong character names, or `undefined` when there is none. */
-function directionOfStrong(strong: string | undefined): TextStyle | undefined {
+/** The base direction a strong character names, or `undefined` when there is none. */
+function directionOfStrong(strong: string | undefined): 'ltr' | 'rtl' | undefined {
   if (strong === undefined) {
     return undefined;
   }
-  if (strong === '\u200E') {
-    return LTR_TEXT_DIRECTION;
-  }
-  if (strong === '\u200F' || strong === '\u061C') {
-    return RTL_TEXT_DIRECTION;
-  }
-  return RTL_LETTER.test(strong) ? RTL_TEXT_DIRECTION : LTR_TEXT_DIRECTION;
+  return RTL_LETTER.test(strong) ? 'rtl' : 'ltr';
 }
+
+/**
+ * The paragraph style that names each base direction, from the shared
+ * constants above. A caller that has resolved a direction to `'ltr'` or
+ * `'rtl'` picks the style here rather than rebuilding it.
+ */
+export const DIRECTION_TEXT_STYLES = {
+  ltr: LTR_TEXT_DIRECTION,
+  rtl: RTL_TEXT_DIRECTION,
+} as const;
 
 /**
  * Base direction for copy the app did not write — a server's message, a user's
  * own text, an issue body. The paragraph takes the direction of its own first
- * strong character, so English content keeps its left edge and the punctuation
- * that ends it inside a right-to-left interface, and Arabic content still
- * aligns to the right. A leading direction mark names the direction itself.
- * `undefined` when the copy has no strong character: it then keeps the
- * interface's direction.
+ * letter, so English content keeps its left edge and the punctuation that ends
+ * it inside a right-to-left interface, and Arabic content still aligns to the
+ * right. A leading direction mark is not a strong character, so it never names
+ * the direction here. `undefined` when the copy holds no letter: it then keeps
+ * the interface's direction, and a markdown block in that position takes the
+ * message's own direction instead (`markdownMessageDirection`).
  *
  * The text node's own layout `direction` is named as well as its
  * `writingDirection`. iOS takes a paragraph's alignment from the node's layout
@@ -251,18 +258,258 @@ function directionOfStrong(strong: string | undefined): TextStyle | undefined {
  * the `Text` itself, so the box still sits where the interface's flexbox puts it.
  */
 export function contentTextDirection(children: ReactNode): TextStyle | undefined {
-  return directionOfStrong(firstStrong(children));
+  const direction = directionOfStrong(firstStrong(children));
+  return direction === undefined ? undefined : DIRECTION_TEXT_STYLES[direction];
 }
 
 /**
- * `contentTextDirection` for copy that arrives as a string rather than as a
- * React child tree — an HTML block's own text, which no element wraps. Same
- * rule: the copy's own first strong character names the block's base
- * direction, and `undefined` (no strong character) leaves the interface's
- * direction.
+ * The base direction a block's own text names, from its first letter, or
+ * `undefined` when it holds none. `contentTextDirection` for copy that arrives
+ * as a string rather than as a React child tree — an HTML block's own text,
+ * which no element wraps. The caller picks the style
+ * (`DIRECTION_TEXT_STYLES`) or falls back to the message's direction.
  */
-export function contentStringDirection(text: string): TextStyle | undefined {
+export function contentStringDirection(text: string): 'ltr' | 'rtl' | undefined {
   return directionOfStrong(STRONG.exec(text)?.[0]);
+}
+
+/**
+ * `text` without the markup and inline code a reader never reads as words, and
+ * with every other character left as written.
+ *
+ * Two shapes need more than a regex to skip whole. An HTML tag's quoted
+ * attribute may hold a `>` (`<a title="a>b">مرحبا`), so the scan tracks the
+ * quote it is inside instead of stopping at the first `>`. A code span opens on
+ * a run of N backticks and closes on the next run of exactly N, so its content
+ * may hold a shorter run (`` ``a`b`` ``); a one-backtick regex matched the empty
+ * ` `` ` pair there and let the span's own letters decide the message.
+ *
+ * Both are machinery: a tag name and code are Latin whatever language the
+ * message is in, so neither may name the message's direction.
+ */
+function withoutMarkup(text: string): string {
+  const kept: string[] = [];
+  let index = 0;
+  while (index < text.length) {
+    const char = text[index];
+    if (char === '<') {
+      index = skipTag(text, index);
+    } else if (char === '`') {
+      index = skipCodeSpan(text, index);
+    } else {
+      kept.push(char ?? '');
+      index += 1;
+    }
+  }
+  return kept.join('');
+}
+
+/**
+ * The offset past the HTML tag that starts at `start`, or past the `<` alone
+ * when no tag closes on this line. A quoted attribute value is skipped whole,
+ * so a `>` inside one does not end the tag.
+ */
+function skipTag(text: string, start: number): number {
+  let quote: '"' | "'" | null = null;
+  for (let index = start + 1; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '\n') {
+      // A tag never spans a line: this `<` was comparison or copy.
+      return start + 1;
+    }
+    if (quote === null) {
+      if (char === '>') {
+        return index + 1;
+      }
+      if (char === '"' || char === "'") {
+        quote = char;
+      }
+    } else if (char === quote) {
+      quote = null;
+    }
+  }
+  return start + 1;
+}
+
+/**
+ * The offset past the code span that opens at `start`, where the opening run is
+ * `start`'s backticks; or past the run alone when no run of exactly that length
+ * closes it (a streaming tail, or backticks written as copy).
+ */
+function skipCodeSpan(text: string, start: number): number {
+  let opening = 1;
+  while (text[start + opening] === '`') {
+    opening += 1;
+  }
+  let index = start + opening;
+  while (index < text.length) {
+    const char = text[index];
+    // A code span stays on its line: a run that does not close before the line
+    // ends is the content's own backticks, not a span.
+    if (char === '\n') {
+      return start + opening;
+    }
+    if (char !== '`') {
+      index += 1;
+    } else {
+      let closing = 1;
+      while (text[index + closing] === '`') {
+        closing += 1;
+      }
+      if (closing === opening) {
+        return index + closing;
+      }
+      index += closing;
+    }
+  }
+  return start + opening;
+}
+
+/** A link or image destination: a URL, not the message's prose. The label
+ * before it stays, because a label is copy a person reads. */
+const LINK_DESTINATION = /\]\([^)\n]*\)/g;
+
+/** A bare URL, which opens a message on a Latin host name. */
+const BARE_URL = /\b(?:https?|ftp|mailto):\S+/gi;
+
+/** A link reference definition line, whose destination is a URL. */
+const REFERENCE_DEFINITION = /^ {0,3}\[[^\]]+\]:[ \t]/;
+
+/** A table's delimiter row: dashes and colons, no copy. */
+const TABLE_DELIMITER = /^ {0,3}\|?[ \t:-]*-[ \t:-]*\|?[ \t]*$/;
+
+/**
+ * The prose of `markdown`: everything a reader takes as the message's words.
+ * Code (fenced, indented, and inline), link and image destinations, bare URLs,
+ * link reference definitions, table delimiters and HTML markup are all
+ * machinery, and machinery is Latin whatever language the message is in, so a
+ * message that opens with a fence or a URL still names the direction of the
+ * Arabic prose after it.
+ */
+function markdownProse(markdown: string): string {
+  const prose: string[] = [];
+  let inFence = false;
+  let previousBlank = true;
+  for (const line of markdown.split('\n')) {
+    const body = line.slice(BLOCKQUOTE_START.exec(line)?.[0].length ?? 0);
+    const opensFence = FENCE_START.test(body);
+    const blank = body.trim().length === 0;
+    const indentedCode = previousBlank && INDENTED_CODE.test(body);
+    if (!inFence && !opensFence && !indentedCode && !TABLE_DELIMITER.test(body)) {
+      prose.push(body);
+    }
+    if (opensFence) {
+      inFence = !inFence;
+    }
+    previousBlank = blank;
+  }
+  return withoutMarkup(prose.filter(line => !REFERENCE_DEFINITION.test(line)).join('\n'))
+    .replace(LINK_DESTINATION, ']')
+    .replace(BARE_URL, '');
+}
+
+/**
+ * The base direction a markdown message names, from its first prose letter
+ * (`markdownProse`), or `undefined` when the whole message holds no prose
+ * letter.
+ *
+ * This is the direction a block that holds no letter of its own takes: the one
+ * rule for a message is its own first letter's direction, so a message of
+ * `42 · 7`, an HTML paragraph of Latin text and a bullet of Latin text all sit
+ * on one edge, instead of each falling back to the interface's edge while a
+ * lettered block next to it names its own. The design gate measured exactly
+ * that zig-zag: the middle row of the markdown fallback block started on the
+ * left while the rows above and below it stayed right.
+ */
+export function markdownMessageDirection(markdown: string): 'ltr' | 'rtl' | undefined {
+  return directionOfStrong(STRONG.exec(markdownProse(markdown))?.[0]);
+}
+
+/** A direction mark: the Arabic letter mark and the left-to-right and
+ * right-to-left marks. They draw and speak nothing, so in front of a block's
+ * first character their only effect is to name that block's edge. */
+const DIRECTION_MARK = /[\u061C\u200E\u200F]/;
+
+/** A run of direction marks at a block's first character. */
+const LEADING_DIRECTION_MARK = /^[\u061C\u200E\u200F]+/;
+
+/** A line's blockquote markers, `>` or `> `, nested. */
+const BLOCKQUOTE_START = /^(?: {0,3}>[ \t]?)+/;
+
+/** A list item's marker and the space after it: a bullet, or an ordered number. */
+const LIST_START = /^ {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]+/;
+
+/** An ATX heading's marker and the space after it. */
+const HEADING_START = /^ {0,3}#{1,6}[ \t]+/;
+
+/** A fence line that opens or closes a fenced code block. */
+const FENCE_START = /^ {0,3}(?:```|~~~)/;
+
+/** A line indented enough to be an indented code block after a blank line. */
+const INDENTED_CODE = /^(?: {4}|\t)/;
+
+/**
+ * `line` with the direction marks in front of its own block content removed:
+ * after its blockquote markers (already measured as `quoted`) and, when it is a
+ * list item or a heading, after that marker too.
+ */
+function stripLineMarks(line: string, quoted: number, body: string): string {
+  const marker = (LIST_START.exec(body) ?? HEADING_START.exec(body))?.[0].length ?? 0;
+  const contentStart = quoted + marker;
+  const marks = LEADING_DIRECTION_MARK.exec(line.slice(contentStart))?.[0];
+  return marks === undefined
+    ? line
+    : line.slice(0, contentStart) + line.slice(contentStart + marks.length);
+}
+
+/**
+ * `markdown` with the direction marks in front of each block's first character
+ * removed, and every other character left as written.
+ *
+ * A block's own first letter names its direction, and both renderers resolve a
+ * paragraph from its first strong character — which counts a direction mark as
+ * strong. A bullet the content wrote as `- ‏Latin bullet` therefore laid its
+ * item out right to left inside a left-to-right message: the mark decided
+ * before the `L` was read, so the item sat on the wrong edge from the paragraph
+ * above it (the design gate's markdown fallback block measured exactly that).
+ * A mark in front of a block's first character names that block's edge and
+ * nothing else, so removing it there leaves the block's own letter to decide;
+ * a mark inside a block's text still orders the run it was written for, and
+ * code keeps every character it holds. Nothing is added: a block with no letter
+ * at all takes the message's direction from the renderer's container.
+ *
+ * A block starts at the first line, after a blank line, and at a list,
+ * blockquote or heading line's own content after its marker. A continuation
+ * line of a paragraph or of a list item keeps its marks.
+ */
+export function withoutLeadingDirectionMarks(markdown: string): string {
+  if (!DIRECTION_MARK.test(markdown)) {
+    return markdown;
+  }
+  const lines = markdown.split('\n');
+  let changed = false;
+  let previousBlank = true;
+  let inFence = false;
+  for (const [index, line] of lines.entries()) {
+    const quoted = BLOCKQUOTE_START.exec(line)?.[0].length ?? 0;
+    const body = line.slice(quoted);
+    const blank = body.trim().length === 0;
+    const opensFence = FENCE_START.test(body);
+    // Code is copy in its own right: a mark inside it is part of the code.
+    const code = inFence || (previousBlank && INDENTED_CODE.test(body));
+    const startsBlock = previousBlank || LIST_START.test(body) || HEADING_START.test(body);
+    const stripped =
+      opensFence || code || blank || !startsBlock ? line : stripLineMarks(line, quoted, body);
+    if (opensFence) {
+      inFence = !inFence;
+    }
+    previousBlank = blank;
+    if (stripped !== line) {
+      lines[index] = stripped;
+      changed = true;
+    }
+  }
+  return changed ? lines.join('\n') : markdown;
 }
 
 /**
@@ -317,14 +564,14 @@ export function pinsTextDirection(style: StyleProp<TextStyle> | undefined): bool
  *
  * The mark applies only when the interface is right to left, `holdsRtlScript`
  * is true — the tree holds an Arabic or Hebrew letter (`hasRtlScript`) — and
- * the tree's first strong character does not name a right-to-left direction
- * itself (`directionOfStrong`). Copy that already opens right to left needs no
- * mark, and Latin-only copy such as `Sentry.` keeps its own base direction, so
- * its full stop stays at the end of the word.
+ * the tree's first letter is not a right-to-left one (`directionOfStrong`).
+ * Copy that already opens right to left needs no mark, and Latin-only copy such
+ * as `Sentry.` keeps its own base direction, so its full stop stays at the end
+ * of the word.
  *
  * The caller passes the script flag it already computed, so this helper reads
- * one strong character instead of scanning the whole tree again: `firstStrong`
- * stops at the first one.
+ * one letter instead of scanning the whole tree again: `firstStrong` stops at
+ * the first one.
  *
  * A string child takes the mark in front of it, in one run. Any other node gets
  * the mark as its first sibling, in a fragment: the child keeps its own
@@ -336,7 +583,7 @@ export function rtlBaseMarkedChildren(children: ReactNode, holdsRtlScript: boole
     return children;
   }
   const strong = firstStrong(children);
-  if (strong === undefined || directionOfStrong(strong)?.direction === 'rtl') {
+  if (strong === undefined || directionOfStrong(strong) === 'rtl') {
     return children;
   }
   if (isStringChild(children)) {

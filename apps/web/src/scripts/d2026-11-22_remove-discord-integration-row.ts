@@ -8,10 +8,10 @@
  *     --integration-id=<uuid> --execute
  *
  * Operator sequence: run this command for the row first. It reports every other row that
- * records the same server and refuses a shared one, because the bot's membership there is
- * shared with those connections.
+ * records the same server and refuses a shared one. When it reports none, remove the Kilo
+ * bot from that server in the Discord client, then run this command again with --execute.
  *
- * Removes the local row only; it makes no Discord request.
+ * The command removes the local row only and makes no Discord request.
  *
  * Requires POSTGRES_SCRIPT_URL for the connection, and POSTGRES_URL because the shared client
  * resolves that variable before it selects the script connection. Prints no credential
@@ -161,6 +161,8 @@ async function main(): Promise<void> {
 
   console.log('Action: remove');
   console.log(`Discord server for this row: ${serverId}`);
+  console.log('Remove the Kilo bot from that server in the Discord client. This command');
+  console.log('removes the local row and makes no Discord request.');
 
   if (!execute) {
     console.log('Dry run: nothing deleted');

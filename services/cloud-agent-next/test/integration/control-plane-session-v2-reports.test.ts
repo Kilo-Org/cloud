@@ -583,12 +583,46 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     );
   });
   it('writes one report per terminal message and one batch callback under the session id', async () => {
-    const { sessionId, stub } = await setup();
+    const { sessionId, kiloSessionId, stub } = await setup();
     const captured = await installCapturedQueues(stub);
 
     await stub.send(promptPayload('m1'));
     await stub.send(promptPayload('m2'));
     await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+    await stub.onEvents({
+      events: [
+        ...['m1', 'm2'].map((id, index) => ({
+          type: 'message.updated',
+          properties: {
+            info: { id, sessionID: kiloSessionId, role: 'user', time: { created: index + 1 } },
+          },
+        })),
+        {
+          type: 'message.updated',
+          properties: {
+            info: {
+              id: 'msg_assistant',
+              sessionID: kiloSessionId,
+              role: 'assistant',
+              parentID: 'm2',
+              time: { created: 3 },
+            },
+          },
+        },
+        {
+          type: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'prt_answer',
+              messageID: 'msg_assistant',
+              sessionID: kiloSessionId,
+              type: 'text',
+              text: 'Answer for m2',
+            },
+          },
+        },
+      ],
+    });
 
     await stub.onOutcome({
       sessionId,
@@ -617,6 +651,17 @@ describe('SandboxSessionV2 reports and callbacks', () => {
       status: 'completed',
       messageId: 'm2',
       gateResult: 'fail',
+      lastAssistantMessageText: 'Answer for m2',
+    });
+    const earlierResult = await stub.getMessageResult('m1');
+    expect(earlierResult).toMatchObject({ type: 'found', result: { status: 'completed' } });
+    expect(earlierResult).not.toHaveProperty('result.assistant');
+    expect(await stub.getMessageResult('m2')).toMatchObject({
+      type: 'found',
+      result: {
+        status: 'completed',
+        assistant: { messageId: 'msg_assistant', text: 'Answer for m2' },
+      },
     });
   });
 

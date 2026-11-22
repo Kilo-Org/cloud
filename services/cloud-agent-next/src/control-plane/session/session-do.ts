@@ -2532,7 +2532,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             : { providerOwnership: parsed.providerOwnership }),
           ...(parsed.gateResult === undefined ? {} : { gateResult: parsed.gateResult }),
         },
-        'wrapper_outcome'
+        'wrapper_outcome',
+        parsed.lastMessageId
       );
       // The turn ended: the route is ready for the next one (spec §10).
       if (reduction.changed.length > 0) this.emitCloudStatus({ type: 'ready' });
@@ -3059,6 +3060,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           return this.eventQueries.getAssistantAnswerByMessageId(this.sessionId, assistantMessageId)
             ?.text;
         } catch {
+          logger
+            .withFields({ sessionId: this.sessionId, messageId })
+            .warn('Unable to read the assistant answer for the message result');
           return undefined;
         }
       },
@@ -3066,6 +3070,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         try {
           return readLatestPreparationAttemptForMessage(this.eventQueries, messageId);
         } catch {
+          logger
+            .withFields({ sessionId: this.sessionId, messageId })
+            .warn('Unable to read preparation for the message result');
           return undefined;
         }
       },
@@ -4360,7 +4367,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   private settlementFor(
     message: SessionMessage,
-    facts?: ControlPlaneReportFacts
+    facts: ControlPlaneReportFacts | undefined,
+    outcomeMessageId?: string
   ): MessageSettlement {
     const metadata = this.metadata;
     const settlement: MessageSettlement = {
@@ -4377,7 +4385,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
     }
     const kiloSessionId = metadata?.auth.kiloSessionId;
-    if (message.state === 'completed' && kiloSessionId) {
+    if (message.state === 'completed' && message.messageId === outcomeMessageId && kiloSessionId) {
       try {
         this.partText.flush();
         settlement.assistantMessageId =
@@ -4405,7 +4413,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private async applySettlement(
     reduction: MessageReduction,
     facts?: ControlPlaneReportFacts,
-    source: ControlPlaneMessageSource = 'coordinator'
+    source: ControlPlaneMessageSource = 'coordinator',
+    outcomeMessageId?: string
   ): Promise<void> {
     if (reduction.changed.length === 0) {
       await this.armAlarm();
@@ -4415,7 +4424,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.messages.map(message => [message.messageId, message.state])
     );
     const { messages, changed } = withMessageSettlements(reduction, message =>
-      this.settlementFor(message, facts)
+      this.settlementFor(message, facts, outcomeMessageId)
     );
     this.messages = messages;
     await this.persistMessages(changed);

@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- one store, one harness: the write-pending suites stay beside the write suites they mirror */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { chainSave } from '@/lib/hooks/save-chain';
 import { createSecureStorePreference } from './secure-store-preference';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
 import {
@@ -194,6 +195,112 @@ describe('createSecureStorePreference', () => {
       expect(getItemAsync).toHaveBeenCalledTimes(1);
       expect(store.getHasLoaded()).toBe(true);
     } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for the unlock re-read instead of resolving with the default', async () => {
+    // A caller that asks whenLoaded() during the unlock re-read must wait for
+    // that read: the value is still unknown, so resolving here would hand the
+    // language apply and the widget task the default as if it were stored.
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(read.promise);
+    setProtectedDataAvailable(false);
+
+    // Tracking the timers before construction: the store starts its bounded
+    // wait as it is built.
+    vi.useFakeTimers();
+    try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await store.whenLoaded();
+
+      // The bounded wait ended with the value unknown: nothing may claim it
+      // loaded, and the locked keychain was never read.
+      expect(store.getHasLoaded()).toBe(false);
+      expect(getItemAsync).not.toHaveBeenCalled();
+
+      // The unlock starts the re-read, and the caller that asks now waits for
+      // it instead of being handed the default.
+      setProtectedDataAvailable(true);
+      let settled = false;
+      const waiting = (async () => {
+        await store.whenLoaded();
+        settled = true;
+      })();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(false);
+      expect(store.getHasLoaded()).toBe(false);
+
+      read.resolve('true');
+      await waiting;
+      expect(settled).toBe(true);
+      expect(store.getRequested()).toBe(true);
+      expect(store.getHasLoaded()).toBe(true);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-reads after a clear() that lands during the locked window', async () => {
+    // A sign-out during the locked window must not strand the store. The clear
+    // bumps the epoch of the read that is already waiting, so the read that then
+    // gives up carries an older epoch: an epoch-fenced retry would drop it and
+    // leave the value unknown forever. The retry has to survive the clear and
+    // re-read what the clear left, which `load()` fences by the epoch it began
+    // under.
+    getItemAsync.mockResolvedValue('true');
+    setProtectedDataAvailable(false);
+
+    // A save for the same key is on its way, so the clear's delete queues behind
+    // it and runs after the unlock instead of being refused while locked.
+    const barrier = Promise.withResolvers<undefined>();
+    const chained = chainSave('k', async () => {
+      await barrier.promise;
+    });
+
+    // Tracking the timers before construction: the store starts its bounded
+    // wait as it is built.
+    vi.useFakeTimers();
+    try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
+
+      // The sign-out lands inside the locked window, before the bounded wait
+      // expires and the read gives up.
+      store.clear();
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await store.whenLoaded();
+      expect(store.getHasLoaded()).toBe(false);
+
+      setProtectedDataAvailable(true);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The re-read is waiting for the delete the clear queued.
+      barrier.resolve(undefined);
+      await chained;
+
+      await vi.waitFor(() => {
+        expect(store.getHasLoaded()).toBe(true);
+      });
+      expect(store.get()).toBe(false);
+      expect(getItemAsync).toHaveBeenCalled();
+      expect(deleteItemAsync).toHaveBeenCalled();
+    } finally {
+      barrier.resolve(undefined);
       setProtectedDataAvailable(true);
       vi.useRealTimers();
     }

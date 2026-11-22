@@ -9,7 +9,7 @@ import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import {
   assertProtectedDataAvailable,
   isProtectedDataAvailable,
-  whenProtectedDataAvailable,
+  subscribeToProtectedDataAvailable,
   whenProtectedDataAvailableWithin,
 } from '@/lib/protected-data';
 
@@ -20,10 +20,6 @@ import {
  */
 const LOCKED_KEYCHAIN_WAIT_MS = 1_000;
 
-function noop(): void {
-  // Placeholder until the promise executor hands over its resolve.
-}
-
 /**
  * Module-level store for a SecureStore-backed preference so every hook
  * instance (settings sheet, message list, new-session screen) shares one
@@ -32,7 +28,12 @@ function noop(): void {
  * The read starts at construction, so a synchronous reader of `getRequested()`
  * with no React tree — the Android widget task, the settings registry — sees
  * the persisted value once the read settles instead of the default until some
- * subscriber mounts. A caller can await `whenLoaded()`.
+ * subscriber mounts. A caller can await `whenLoaded()`: it waits for the read
+ * in flight and returns when that read settles, so a caller never resolves
+ * with the default while the value is still on its way. A keychain the device
+ * holds locked past the bounded wait leaves the value unknown until the re-read
+ * at the next unlock, and a caller that asks after that unlock waits for the
+ * re-read rather than reading the default.
  *
  * The rendered value is the durable one: `set()` records a target, one write at
  * a time carries the latest target to disk, and the value the app shows moves
@@ -93,10 +94,10 @@ export function createSecureStorePreference<T>(options: {
    */
   let clearDeletion: Promise<boolean> | undefined = undefined;
   /**
-   * Whether a re-read is waiting for the next unlock. One per locked window: a
-   * read that finds the keychain locked again must not stack a second waiter.
+   * Whether a retry is armed for the next unlock. One per store: a read that
+   * finds the keychain locked again must not stack a second subscription.
    */
-  let awaitingUnlock = false;
+  let retryArmed = false;
   /**
    * Bumped by clear(), and by the `mergeOnLoad` reconcile that repaints the
    * value. A write that started under an earlier epoch still lands (the delete
@@ -111,13 +112,17 @@ export function createSecureStorePreference<T>(options: {
    * only repaints the value.
    */
   let clearEpoch = 0;
-  let markLoaded = noop;
-  // Resolves once the disk read settles, so a caller with no React tree (the
-  // Android widget task) can await the stored value instead of reading the
-  // default.
-  const loaded = new Promise<void>(resolve => {
-    markLoaded = resolve;
-  });
+  // The read in flight, so a caller with no React tree (the Android widget
+  // task, the language apply) awaits the authoritative value instead of the
+  // default. Armed per read: a locked read settles it with the value unknown,
+  // and a re-read arms it again, so a caller that asks after an unlock waits
+  // for that read instead of reading the default.
+  let settleRead: (() => void) | undefined = undefined;
+  let readInFlight: Promise<void> | undefined = undefined;
+  /** Whether a disk read is in flight. One at a time: the read is what settles
+   *  `whenLoaded()` and `hasLoaded`, so a second attempt must not start on top
+   *  of one already running. */
+  let reading = false;
   // Callers that must observe durability (tests, the language apply) await the
   // queue draining instead of polling.
   let drainWaiters: (() => void)[] = [];
@@ -157,6 +162,23 @@ export function createSecureStorePreference<T>(options: {
     for (const release of released) {
       release();
     }
+  };
+
+  /** Arms the settle signal for the read that is about to start. */
+  const armRead = (): void => {
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+    readInFlight = promise;
+    settleRead = () => {
+      resolve(undefined);
+    };
+  };
+
+  /** Releases every `whenLoaded()` caller waiting on the read that just ended. */
+  const settleReadNow = (): void => {
+    const settle = settleRead;
+    settleRead = undefined;
+    readInFlight = undefined;
+    settle?.();
   };
 
   /** Applies a value the disk now holds. Skipped once clear() or a merge
@@ -225,24 +247,43 @@ export function createSecureStorePreference<T>(options: {
   };
 
   /**
-   * Reads once more at the next unlock after a read found the keychain locked.
-   * The re-read is the same `load()` path, so every fence it carries applies,
-   * and a value a later write already settled needs no read.
+   * Arms one retry for the next unlock and releases it when it fires. The retry
+   * is a subscription, not a one-shot waiter: an unlock that lands after the
+   * read gave up is still observed, so a store whose value is unknown cannot
+   * sit on a promise nothing resolves. One per store.
+   *
+   * Armed after any locked read, including one a `clear()` superseded: the value
+   * stays unknown until a read sees the disk, and every
+   * `useSyncExternalStore(…, getHasLoaded)` consumer stays in its loading state
+   * until it does. A read that starts after the clear describes what the clear
+   * left, and `load()` fences a snapshot taken before it.
    */
-  const rereadAtUnlock = async (): Promise<void> => {
-    if (awaitingUnlock) {
+  const armRetryOnUnlock = (): void => {
+    if (retryArmed || hasLoaded) {
       return;
     }
-    awaitingUnlock = true;
-    await whenProtectedDataAvailable();
-    awaitingUnlock = false;
-    if (hasLoaded) {
-      return;
-    }
-    await load();
+    retryArmed = true;
+    const release = subscribeToProtectedDataAvailable(() => {
+      if (!retryArmed) {
+        return;
+      }
+      retryArmed = false;
+      release();
+      // A read already running saw the same unlock and settles the store; the
+      // JS thread cannot interleave an unlock between the failed read and this
+      // subscription, so the subscription always starts from a locked state.
+      if (!reading) {
+        void load();
+      }
+    });
   };
 
   const load = async () => {
+    if (reading) {
+      return;
+    }
+    reading = true;
+    armRead();
     // A clear() that runs after this read starts must win over the bytes it
     // returns, so the read remembers the epoch it began under.
     const loadEpoch = clearEpoch;
@@ -300,12 +341,11 @@ export function createSecureStorePreference<T>(options: {
         // The device stayed locked for the whole bound, or locked again before
         // the read could land. The value is unknown, not absent: nothing may
         // claim it loaded, but `whenLoaded()` still settles so a headless
-        // caller returns, and the store reads again at the next unlock. A
-        // clear() that ran meanwhile owns the disk, so it schedules nothing.
+        // caller returns. A `clear()` that ran meanwhile owns the disk without
+        // stopping the retry: `load()` fences its snapshot with the epoch it
+        // began under, so the re-read describes what the clear left.
         locked = true;
-        if (loadEpoch === clearEpoch) {
-          void rereadAtUnlock();
-        }
+        armRetryOnUnlock();
       }
       // Keep the default on a read failure — this runs at construction, before
       // the user has done anything, so there's nothing actionable to tell them.
@@ -319,7 +359,8 @@ export function createSecureStorePreference<T>(options: {
         loadSettled = true;
         hasLoaded = true;
       }
-      markLoaded();
+      reading = false;
+      settleReadNow();
       emit();
     }
   };
@@ -347,9 +388,14 @@ export function createSecureStorePreference<T>(options: {
   void load();
 
   return {
-    /** Await the disk read the store started at construction. */
+    /**
+     * Awaits the read in flight, so a caller returns only once the store knows
+     * what the disk holds. With no read in flight it returns at once: a lock
+     * that outlasts the bounded wait leaves the value unknown, not absent, and a
+     * headless caller must still return.
+     */
     whenLoaded: async () => {
-      await loaded;
+      await readInFlight;
     },
     subscribe: (listener: () => void) => {
       listeners.add(listener);

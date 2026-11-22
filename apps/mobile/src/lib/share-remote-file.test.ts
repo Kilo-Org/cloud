@@ -5,7 +5,6 @@ import {
   downloadRemoteFile,
   getSafeCacheFilename,
   getShareFailureKind,
-  getShareRemoteFileReason,
   shareLocalFile,
   shareMaterializedRemoteFile,
   shareRemoteFile,
@@ -524,11 +523,3 @@ describe('getShareFailureKind', () => {
   });
 });
 
-describe('getShareRemoteFileReason', () => {
-  it('reads the reason from a typed failure and null otherwise', () => {
-    expect(getShareRemoteFileReason(new ShareRemoteFileError('download-network'))).toBe(
-      'download-network'
-    );
-    expect(getShareRemoteFileReason(new Error('boom'))).toBeNull();
-  });
-});

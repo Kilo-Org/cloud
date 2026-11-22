@@ -14,7 +14,7 @@ const MAX_CACHE_FILENAME_BYTES = 255;
  * finishes a session attachment or an invoice inside this; past it the caller
  * gets `download-timeout` instead of an indefinite spinner.
  */
-export const SHARE_DOWNLOAD_DEADLINE_MS = 30_000;
+const SHARE_DOWNLOAD_DEADLINE_MS = 30_000;
 
 export type ShareRemoteFileReason =
   | 'sharing-unavailable'
@@ -72,13 +72,6 @@ export type MaterializedRemoteFile = {
   uri: string;
   delete: () => void;
 };
-
-export function getShareRemoteFileReason(error: unknown): ShareRemoteFileReason | null {
-  if (error instanceof ShareRemoteFileError) {
-    return error.reason;
-  }
-  return null;
-}
 
 /**
  * A copy of `sink` that reports a rejected write as `download-failed`. `pipeTo`

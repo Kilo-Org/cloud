@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Probeer weer om die rekening te laai",
     "retryLoadingPrivacy": "Probeer weer om die privaatheidskeuses te laai"
   },
+  "accountBlocked": {
+    "title": "Rekening geblokkeer",
+    "description": "Kilo het hierdie rekening geblokkeer, en weer aanmeld sal dit nie ophef nie. Ondersteuning kan die blokkade op versoek hersien.",
+    "domainDescription": "Kilo blokkeer rekeninge op hierdie e-posdomein, en weer aanmeld sal dit nie verander nie. Ondersteuning kan die domein op versoek hersien.",
+    "contactSupport": "Kontak ondersteuning"
+  },
   "addCredits": {
     "cta": "Voeg krediete by",
     "billingPage": "faktureringsbladsy"

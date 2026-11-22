@@ -813,6 +813,21 @@ describe('latency wiring', () => {
     expect(condition({ path: 'some.unlisted.procedure', context: {} })).toBe(false);
   });
 
+  // The server admits a blocked account only for a request whose every call is
+  // a self-cleanup procedure, so each cleanup must ride the single link alone.
+  it('routes every self-cleanup procedure to the single link', async () => {
+    const { condition } = await loadLatencyLinks();
+
+    for (const path of [
+      'user.revokeCurrentDeviceSession',
+      'user.unregisterPushToken',
+      'user.unregisterActivityToken',
+    ]) {
+      expect(condition({ path, context: {} })).toBe(true);
+    }
+    expect(condition({ path: 'organizations.list', context: {} })).toBe(false);
+  });
+
   it('keeps the explicit skipBatch override for every path', async () => {
     const { condition } = await loadLatencyLinks();
 

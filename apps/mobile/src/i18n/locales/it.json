@@ -2568,6 +2568,12 @@
     "translateSummaries": "Traduci i riepiloghi",
     "autoExpandThinkingInactiveSubtitle": "Non ha effetto quando i dettagli del ragionamento sono nascosti."
   },
+  "accountBlocked": {
+    "title": "Account bloccato",
+    "description": "Kilo ha bloccato questo account e un nuovo accesso non lo sbloccherà. L'assistenza può riesaminare il blocco su richiesta.",
+    "domainDescription": "Kilo blocca gli account su questo dominio email e un nuovo accesso non lo cambierà. L'assistenza può riesaminare il dominio su richiesta.",
+    "contactSupport": "Contatta l'assistenza"
+  },
   "addCredits": {
     "cta": "Aggiungi crediti",
     "billingPage": "pagina di fatturazione"

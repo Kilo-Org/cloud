@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Saiatu kontua berriro kargatzen",
     "retryLoadingPrivacy": "Saiatu pribatutasun-aukerak berriro kargatzen"
   },
+  "accountBlocked": {
+    "title": "Kontua blokeatuta",
+    "description": "Kilok kontu hau blokeatu du, eta berriro saioa hasita ez da blokeoa kenduko. Laguntza-taldeak blokeoa berrikusi dezake eskatuz gero.",
+    "domainDescription": "Kilok e-posta domeinu honetako kontuak blokeatzen ditu, eta berriro saioa hasita ez da blokeoa aldatuko. Laguntza-taldeak domeinua berrikusi dezake eskatuz gero.",
+    "contactSupport": "Jarri harremanetan laguntza-taldearekin"
+  },
   "addCredits": {
     "cta": "Gehitu kredituak",
     "billingPage": "fakturazio-orria"

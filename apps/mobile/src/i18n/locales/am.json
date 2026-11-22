@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "መለያውን ለመጫን እንደገና ሞክር",
     "retryLoadingPrivacy": "የግላዊነት ምርጫዎችን ለመጫን እንደገና ሞክር"
   },
+  "accountBlocked": {
+    "title": "መለያ ታግዷል",
+    "description": "Kilo ይህን መለያ ታግዷል፤ እንደገና መግባት ግን አያነሳውም። የድጋፍ ቡድኑ በጥያቄ መሰረት እገዳውን መገምገም ይችላል።",
+    "domainDescription": "Kilo በዚህ የኢሜይል ጎራ ላይ መለያዎችን አይፈቅድም፤ እንደገና መግባት ግን አይለውጠውም። የድጋፍ ቡድኑ በጥያቄ መሰረት ጎራውን መገምገም ይችላል።",
+    "contactSupport": "የድጋፍ ቡድኑን አግኝ"
+  },
   "addCredits": {
     "cta": "ክሬዲት ያክሉ",
     "billingPage": "የክፍያ ገጽ"

@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Jaribu tena kupakia akaunti",
     "retryLoadingPrivacy": "Jaribu tena kupakia chaguo za faragha"
   },
+  "accountBlocked": {
+    "title": "Akaunti imezuiwa",
+    "description": "Kilo imezuia akaunti hii, na kuingia tena hakutazuia zuio hilo. Timu ya usaidizi inaweza kukagua zuio hilo ikiombwa.",
+    "domainDescription": "Kilo imezuia akaunti zinazotumia kikoa hiki cha barua pepe, na kuingia tena hakutabadilisha hilo. Timu ya usaidizi inaweza kukagua kikoa hiki ikiombwa.",
+    "contactSupport": "Wasiliana na timu ya usaidizi"
+  },
   "addCredits": {
     "cta": "Ongeza salio",
     "billingPage": "ukurasa wa malipo"

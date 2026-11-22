@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "Konto erneut laden",
     "retryLoadingPrivacy": "Datenschutzeinstellungen erneut laden"
   },
+  "accountBlocked": {
+    "title": "Konto gesperrt",
+    "description": "Kilo hat dieses Konto gesperrt, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Sperre auf Anfrage prüfen.",
+    "domainDescription": "Kilo sperrt Konten auf dieser E-Mail-Domain, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Domain auf Anfrage prüfen.",
+    "contactSupport": "Support kontaktieren"
+  },
   "addCredits": {
     "cta": "Guthaben aufladen",
     "billingPage": "abrechnungsseite"

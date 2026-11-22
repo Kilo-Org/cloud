@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "Coba muat akun lagi",
     "retryLoadingPrivacy": "Coba muat pilihan privasi lagi"
   },
+  "accountBlocked": {
+    "title": "Akun diblokir",
+    "description": "Kilo memblokir akun ini, dan masuk lagi tidak akan membuka blokirnya. Tim dukungan dapat meninjau pemblokiran jika diminta.",
+    "domainDescription": "Kilo memblokir akun pada domain email ini, dan masuk lagi tidak akan mengubahnya. Tim dukungan dapat meninjau domain jika diminta.",
+    "contactSupport": "Hubungi tim dukungan"
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman penagihan"

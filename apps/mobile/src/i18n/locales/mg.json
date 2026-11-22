@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Andramo ampidirina indray ny kaonty",
     "retryLoadingPrivacy": "Andramo ampidirina indray ny safidy momba ny fiainana manokana"
   },
+  "accountBlocked": {
+    "title": "Kaonty voasakana",
+    "description": "Nosakanan'ny Kilo ity kaonty ity, ary ny hiditra indray dia tsy hanala izany. Afaka mandinika ny fanakanana ny mpanohana raha angatahina.",
+    "domainDescription": "Sakanan'ny Kilo ny kaonty amin'ity sehatra mailaka ity, ary ny hiditra indray dia tsy hanova izany. Afaka mandinika ny sehatra ny mpanohana raha angatahina.",
+    "contactSupport": "Mifandraisa amin'ny mpanohana"
+  },
   "addCredits": {
     "cta": "Ampio kireditra",
     "billingPage": "pejy fandoavana"

@@ -3156,6 +3156,12 @@
     "retryLoadingAccount": "Torna a provar de carregar el compte",
     "retryLoadingPrivacy": "Torna a provar de carregar les opcions de privadesa"
   },
+  "accountBlocked": {
+    "title": "Compte bloquejat",
+    "description": "Kilo ha bloquejat aquest compte i tornar a iniciar sessió no el desbloquejarà. L'equip de suport pot revisar el bloqueig si ho sol·licites.",
+    "domainDescription": "Kilo no permet comptes en aquest domini de correu electrònic, i tornar a iniciar sessió no ho canviarà. L'equip de suport pot revisar el domini si ho sol·licites.",
+    "contactSupport": "Contacta amb l'equip de suport"
+  },
   "addCredits": {
     "cta": "Afegeix crèdits",
     "billingPage": "pàgina de facturació"

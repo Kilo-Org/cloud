@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Proovi konto laadimist uuesti",
     "retryLoadingPrivacy": "Proovi privaatsusvalikute laadimist uuesti"
   },
+  "accountBlocked": {
+    "title": "Konto blokeeritud",
+    "description": "Kilo blokeeris selle konto ja uuesti sisselogimine ei tühista blokeeringut. Tugi saab blokeeringu taotluse korral üle vaadata.",
+    "domainDescription": "Kilo ei luba sellel e-posti domeenil kontosid ja uuesti sisselogimine ei muuda seda. Tugi saab domeeni taotluse korral üle vaadata.",
+    "contactSupport": "Võta ühendust toega"
+  },
   "addCredits": {
     "cta": "Lisa krediiti",
     "billingPage": "arveldusleht"

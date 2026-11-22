@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Cuba memuatkan akaun semula",
     "retryLoadingPrivacy": "Cuba memuatkan pilihan privasi semula"
   },
+  "accountBlocked": {
+    "title": "Akaun disekat",
+    "description": "Kilo telah menyekat akaun ini, dan log masuk semula tidak akan membatalkan sekatan itu. Sokongan boleh menyemak sekatan itu atas permintaan.",
+    "domainDescription": "Kilo menyekat akaun pada domain e-mel ini, dan log masuk semula tidak akan mengubahnya. Sokongan boleh menyemak domain itu atas permintaan.",
+    "contactSupport": "Hubungi sokongan"
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman pengebilan"

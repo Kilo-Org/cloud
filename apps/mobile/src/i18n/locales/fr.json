@@ -2497,6 +2497,12 @@
     "translateSummaries": "Traduire les résumés",
     "autoExpandThinkingInactiveSubtitle": "Aucun effet tant que les détails de la réflexion sont masqués."
   },
+  "accountBlocked": {
+    "title": "Compte bloqué",
+    "description": "Kilo a bloqué ce compte, et une nouvelle connexion ne lèvera pas le blocage. L'assistance peut examiner le blocage sur demande.",
+    "domainDescription": "Kilo bloque les comptes sur ce domaine de messagerie, et une nouvelle connexion ne changera pas cela. L'assistance peut examiner le domaine sur demande.",
+    "contactSupport": "Contacter l'assistance"
+  },
   "addCredits": {
     "cta": "Ajouter des crédits",
     "billingPage": "page de facturation"

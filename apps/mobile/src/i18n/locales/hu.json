@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Fiók betöltésének megismétlése",
     "retryLoadingPrivacy": "Adatvédelmi beállítások betöltésének megismétlése"
   },
+  "accountBlocked": {
+    "title": "Fiók letiltva",
+    "description": "A Kilo letiltotta ezt a fiókot, és az újabb bejelentkezés nem oldja fel a tiltást. Az ügyfélszolgálat kérésre felülvizsgálhatja a tiltást.",
+    "domainDescription": "A Kilo letiltja a fiókokat ezen az e-mail-domainon, és az újabb bejelentkezés nem oldja fel a tiltást. Az ügyfélszolgálat kérésre felülvizsgálhatja a domaint.",
+    "contactSupport": "Kapcsolatfelvétel az ügyfélszolgálattal"
+  },
   "addCredits": {
     "cta": "Egyenleg feltöltése",
     "billingPage": "számlázási oldal"

@@ -3278,6 +3278,12 @@
     "retryLoadingAccount": "Bain triail as an gcuntas a lódáil arís",
     "retryLoadingPrivacy": "Bain triail as na roghanna príobháideachta a lódáil arís"
   },
+  "accountBlocked": {
+    "title": "Cuntas blocáilte",
+    "description": "Chuir Kilo bac ar an gcuntas seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an bac a athbhreithniú ar iarratas.",
+    "domainDescription": "Cuireann Kilo bac ar chuntais a bhaineann leis an bhfearann ríomhphoist seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an fearann a athbhreithniú ar iarratas.",
+    "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta"
+  },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",
     "billingPage": "leathanach billeála"

@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Herrega fe'uuf irra deebi'ii yaali",
     "retryLoadingPrivacy": "Filannoowwan iccitii dhuunfaa fe'uuf irra deebi'ii yaali"
   },
+  "accountBlocked": {
+    "title": "Herregni cufame",
+    "description": "Kilo herregni kana cufeera, akkasumas ammas seenuun cufamummaa kana hin haqu. Deeggarsi gaaffii irratti cufamummaa kana ilaaluu danda'a.",
+    "domainDescription": "Kilo herregoota doomeenii imeelii kana irratti cufeera, akkasumas ammas seenuun cufamummaa kana hin haqu. Deeggarsi gaaffii irratti doomeenii kana ilaaluu danda'a.",
+    "contactSupport": "Deeggarsa qunnami"
+  },
   "addCredits": {
     "cta": "Kiriiditii dabali",
     "billingPage": "fuula kaffaltii"

@@ -1096,6 +1096,31 @@ function checkArmenianSentenceTerminator(tag, values, label) {
   return problems;
 }
 
+/**
+ * The Devanagari danda `।` (U+0964) closes a sentence in the scripts that
+ * write it. A catalog whose own mark is something else must not borrow it: a
+ * batch imported from a danda source leaves one screen with two sentence
+ * terminators, and the mark belongs to another script.
+ */
+const DANDA_SENTENCE_TERMINATORS = new Set(['bn', 'hi', 'mr', 'ne', 'or', 'pa']);
+
+/** Reject a borrowed Devanagari danda in a catalog that writes its own mark. */
+function checkBorrowedDanda(tag, values, label) {
+  const problems = [];
+  if (DANDA_SENTENCE_TERMINATORS.has(tag)) {
+    return problems;
+  }
+  for (const [key, value] of values) {
+    if (!value.includes('\u0964')) {
+      continue;
+    }
+    problems.push(
+      `${label}: "${key}" writes the Devanagari danda «।»; this catalog closes its sentences with its own mark`
+    );
+  }
+  return problems;
+}
+
 /** The `{{token}}` list of one string, in the order it writes them. */
 function placeholderTokens(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
@@ -2600,6 +2625,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkBorrowedDanda(tag, translated, label));
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a

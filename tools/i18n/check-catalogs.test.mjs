@@ -495,6 +495,29 @@ test('folds a Devanagari danda as sentence-final punctuation', () => {
   assert.deepEqual(found, []);
 });
 
+test('accepts the Devanagari danda in a catalog that writes it', () => {
+  const found = run({
+    language: 'hi',
+    english: { first: 'Choose a model', second: 'Try again' },
+    translated: { first: 'मॉडल चुनें।', second: 'फिर से प्रयास करें।' },
+    source: "t('first'); t('second');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a borrowed Devanagari danda in a catalog that writes another mark', () => {
+  const found = run({
+    language: 'kn',
+    english: { first: 'Choose a model', second: 'Try again' },
+    translated: { first: 'ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ।', second: 'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.' },
+    source: "t('first'); t('second');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /mobile\/kn/);
+  assert.match(found[0], /«।»/);
+  assert.match(found[0], /"first"/);
+});
+
 for (const [language, title, badge] of [
   ['tr', 'Çalışıyor', 'ÇALIŞIYOR'],
   ['az', 'İşləyir', 'İŞLƏYİR'],

@@ -48,11 +48,11 @@ function GroupsPageContent({
     ...trpc.organizations.groups.getPolicySettings.queryOptions({ organizationId }),
     enabled: canViewSettings,
   });
-  const permissionSettings = useQuery({
-    ...trpc.organizations.groups.adminPermissionPolicy.settings.queryOptions({ organizationId }),
+  const namedPolicies = useQuery({
+    ...trpc.organizations.groups.adminPermissionPolicy.list.queryOptions({ organizationId }),
     enabled: canViewSettings,
   });
-  const showPermissionPolicies = canViewSettings && permissionSettings.data?.managed === true;
+  const showNamedPolicies = canViewSettings && namedPolicies.data?.managed === true;
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: trpc.organizations.groups.pathKey() });
   }
@@ -92,7 +92,7 @@ function GroupsPageContent({
       {canViewSettings && (
         <Card>
           <CardHeader>
-            <CardTitle>Group policies</CardTitle>
+            <CardTitle>Group Defaults</CardTitle>
             <CardDescription>
               Configure organization defaults, then add independent policies to each group.
             </CardDescription>
@@ -124,13 +124,14 @@ function GroupsPageContent({
                 Manage defaults
               </Button>
             </div>
-            {showPermissionPolicies && (
+            {showNamedPolicies && (
               <div className="grid gap-3 border-t pt-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
                 <div>
-                  <p className="type-body font-medium">Agent permissions</p>
+                  <p className="type-body font-medium">
+                    Agent Permissions and Client Configuration
+                  </p>
                   <p className="type-label text-muted-foreground">
-                    Set the organization baseline for agent permissions. Groups can add
-                    restrictions.
+                    Attach a named policy to the organization default. Groups can add restrictions.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -138,14 +139,20 @@ function GroupsPageContent({
                     variant="outline"
                     onClick={() =>
                       drawer.open({
-                        type: 'permission-policy-editor',
-                        target: { kind: 'default' },
+                        type: 'named-policy-assignments',
+                        scope: { type: 'default' },
                         appliesTo: 'Organization default',
                         canEdit: canManage,
                       })
                     }
                   >
-                    Default permissions
+                    Group Defaults
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => drawer.open({ type: 'named-policy-library' })}
+                  >
+                    Policies
                   </Button>
                   <Button
                     variant="ghost"
@@ -248,15 +255,15 @@ function GroupsPageContent({
                       </span>
                     )}
                   </button>
-                  {showPermissionPolicies && (
+                  {showNamedPolicies && (
                     <Button
                       variant="ghost"
                       size="sm"
                       aria-label={`Permissions for ${group.name}`}
                       onClick={() =>
                         drawer.open({
-                          type: 'permission-policy-editor',
-                          target: { kind: 'group', groupId: group.id },
+                          type: 'named-policy-assignments',
+                          scope: { type: 'group', groupId: group.id },
                           appliesTo: group.name,
                           canEdit: canManage,
                         })

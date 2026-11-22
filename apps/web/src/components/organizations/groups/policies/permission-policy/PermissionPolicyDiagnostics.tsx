@@ -3,30 +3,36 @@ import { useQuery } from '@tanstack/react-query';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { Badge } from '@/components/ui/badge';
 import { useTRPC } from '@/lib/trpc/utils';
-import type {
-  AgentPermissionsPolicy,
-  OrganizationPermissionPolicy,
-  PermissionPolicyExecutionOs,
-} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
-import {
-  agentPermissionSummary,
-  allOsPermissions,
-  permissionSetLabels,
-  permissionSetOptions,
-  policyJson,
-  PolicySelect,
-  policySummary,
-} from './permission-policy-ui';
+import type { PermissionPolicyExecutionOs } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import { namedPolicyKindLabels } from './named-policy-ui';
 
-const executionOsOptions = [...permissionSetOptions, { value: 'other', label: 'Other' }] as const;
+const executionOsOptions = [
+  { value: 'all', label: 'All OS' },
+  { value: 'linux', label: 'Linux' },
+  { value: 'macos', label: 'macOS' },
+  { value: 'windows', label: 'Windows' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+type ExecutionOsChoice = (typeof executionOsOptions)[number]['value'];
+
+const flagLabels = {
+  disable_auto_approve: 'Auto-approval',
+  disable_telemetry: 'Telemetry',
+  hide_session_dollar_values: 'Session dollar values',
+} as const;
+
+function flagText(key: keyof typeof flagLabels, value: boolean | undefined) {
+  if (value) return key === 'hide_session_dollar_values' ? 'Hidden' : 'Disabled';
+  return key === 'hide_session_dollar_values' ? 'Visible' : 'Allowed';
+}
 
 export function PermissionPolicyDiagnostics({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
   const [userId, setUserId] = useState('');
-  const [os, setOs] = useState<PermissionPolicyExecutionOs | 'all'>('all');
-  const executionOs = os === 'all' ? undefined : os;
+  const [os, setOs] = useState<ExecutionOsChoice>('all');
+  const executionOs = os === 'all' ? undefined : (os as PermissionPolicyExecutionOs);
   const organization = useOrganizationWithMembers(organizationId);
-  const groups = useQuery(trpc.organizations.groups.list.queryOptions({ organizationId }));
   const members =
     organization.data?.members.flatMap(member =>
       member.status === 'active'
@@ -46,54 +52,59 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
     ...trpc.organizations.groups.adminPermissionPolicy.diagnostics.queryOptions({
       organizationId,
       userId,
-      ...(executionOs && { executionOs }),
+      executionOs,
     }),
     enabled: Boolean(selectedMember),
   });
-  const groupNames = new Map(groups.data?.groups.map(group => [group.id, group.name]));
   const inspection = diagnostics.data;
-  const policy = inspection?.response.managed ? inspection.response.policy : undefined;
-  const autoApproveBlocked = policy?.agent_permissions?.layers.some(
-    layer => layer.auto_approve === 'deny'
-  );
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 p-5">
       <p className="type-body text-muted-foreground">
-        Inspect the organization policy Cloud delivers to a direct member. Local and device
-        restrictions are not available here and can still be stricter.
+        Inspect the named policies Cloud resolves for a direct member on a chosen execution OS.
+        Local restrictions are not available here and can still be stricter.
       </p>
-      {organization.isError ? (
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid min-w-0 gap-1.5">
+          <span className="type-label font-medium">Member</span>
+          <select
+            aria-label="Member"
+            value={userId}
+            disabled={organization.isLoading || members.length === 0}
+            onChange={event => setUserId(event.target.value)}
+            className="border-input bg-background text-foreground h-9 w-full rounded-md border px-2 text-sm pointer-coarse:h-11"
+          >
+            <option value="" disabled>
+              {organization.isLoading ? 'Loading members…' : 'Choose a direct member'}
+            </option>
+            {members.map(member => (
+              <option key={member.value} value={member.value}>
+                {member.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid min-w-0 gap-1.5">
+          <span className="type-label font-medium">Execution OS</span>
+          <select
+            aria-label="Execution OS"
+            value={os}
+            onChange={event => setOs(event.target.value as ExecutionOsChoice)}
+            className="border-input bg-background text-foreground h-9 w-full rounded-md border px-2 text-sm pointer-coarse:h-11"
+          >
+            {executionOsOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {organization.isError && (
         <p role="alert" className="type-body text-status-destructive">
           Unable to load organization members.
         </p>
-      ) : (
-        <PolicySelect
-          label="Member"
-          value={selectedMember?.value ?? ''}
-          disabled={organization.isLoading || members.length === 0}
-          options={[
-            {
-              value: '',
-              label: organization.isLoading
-                ? 'Loading members…'
-                : members.length
-                  ? 'Choose a direct member'
-                  : 'No direct members',
-              disabled: true,
-            },
-            ...members,
-          ]}
-          onChange={setUserId}
-        />
       )}
-      <PolicySelect
-        label="Execution OS"
-        value={os}
-        options={executionOsOptions}
-        description="All OS and Other show the baseline only. A named OS also includes its additions."
-        onChange={setOs}
-      />
       {selectedMember &&
         (diagnostics.isError ? (
           <p role="alert" className="type-body text-status-destructive">
@@ -114,26 +125,22 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
               <Badge variant="outline">Revision {inspection.response.revision}</Badge>
             </div>
             <p className="type-label text-muted-foreground">
-              The strictest applicable tool or shell decision wins.
+              The strictest applicable tool or shell decision wins. Each Client Configuration flag
+              is independent; a true value from any applicable policy applies.
             </p>
-            <dl className="type-label flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
-              <dt className="font-medium">Auto-approve for managed actions</dt>
-              <dd className="text-muted-foreground">
-                {autoApproveBlocked ? 'Disabled' : 'No organization restriction'}
-              </dd>
-            </dl>
-            <dl className="type-label flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
-              <dt className="font-medium">Session dollar visibility</dt>
-              <dd className="text-muted-foreground">
-                {policy?.client_configuration?.show_session_dollar_values === false
-                  ? 'Hidden'
-                  : 'Visible'}
-              </dd>
+            <dl className="type-label grid gap-1 rounded-md border px-3 py-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              {(Object.keys(flagLabels) as (keyof typeof flagLabels)[]).map(key => (
+                <div key={key} className="flex items-center justify-between gap-2">
+                  <dt className="font-medium">{flagLabels[key]}</dt>
+                  <dd className="text-muted-foreground">
+                    {flagText(key, inspection.response.policy.client_configuration?.[key])}
+                  </dd>
+                </div>
+              ))}
             </dl>
             <PolicySource
               name="Organization default"
               policies={inspection.sources.defaultPolicies}
-              executionOs={executionOs}
             />
             {inspection.sources.groups.length === 0 ? (
               <p className="type-label text-muted-foreground">No group policy contributions.</p>
@@ -141,9 +148,8 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
               inspection.sources.groups.map(source => (
                 <PolicySource
                   key={source.groupId}
-                  name={groupNames.get(source.groupId) ?? `Group ${source.groupId}`}
+                  name={source.groupName}
                   policies={source.policies}
-                  executionOs={executionOs}
                 />
               ))
             )}
@@ -164,81 +170,25 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
 function PolicySource({
   name,
   policies,
-  executionOs,
 }: {
   name: string;
-  policies: OrganizationPermissionPolicy[];
-  executionOs?: PermissionPolicyExecutionOs;
+  policies: { id: string; name: string; kind: keyof typeof namedPolicyKindLabels }[];
 }) {
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border p-3">
       <h4 className="type-body font-medium break-words">{name}</h4>
       {policies.length ? (
-        policies.map(policy =>
-          policy.type === 'agent_permissions' ? (
-            <AgentPolicySource key={policy.type} policy={policy} executionOs={executionOs} />
-          ) : (
-            <PolicySourceDetails
-              key={policy.type}
-              name="Client Configuration"
-              summary={policySummary(policy)}
-              policy={policy}
-            />
-          )
-        )
+        <ul className="type-label grid gap-1">
+          {policies.map(policy => (
+            <li key={`${policy.id}-${policy.kind}`}>
+              <span className="font-medium">{policy.name}</span>
+              <span className="text-muted-foreground"> · {namedPolicyKindLabels[policy.kind]}</span>
+            </li>
+          ))}
+        </ul>
       ) : (
-        <p className="type-label text-muted-foreground">No permission policies at this scope.</p>
+        <p className="type-label text-muted-foreground">No policies at this scope.</p>
       )}
     </section>
-  );
-}
-
-function AgentPolicySource({
-  policy,
-  executionOs,
-}: {
-  policy: AgentPermissionsPolicy;
-  executionOs?: PermissionPolicyExecutionOs;
-}) {
-  const allOs = allOsPermissions(policy.data);
-  const additionOs = executionOs === 'other' ? undefined : executionOs;
-  const addition = additionOs ? policy.data.by_os?.[additionOs] : undefined;
-  return (
-    <>
-      <PolicySourceDetails
-        name="Agent permissions"
-        summary={`${additionOs ? 'All OS · ' : ''}${agentPermissionSummary(allOs)}`}
-        policy={{ ...policy, data: { schema_version: 1, ...allOs } }}
-      />
-      {additionOs && addition && (
-        <PolicySourceDetails
-          name={`${permissionSetLabels[additionOs]} permissions`}
-          summary={agentPermissionSummary(addition)}
-          policy={{ ...policy, data: { schema_version: 1, by_os: { [additionOs]: addition } } }}
-        />
-      )}
-    </>
-  );
-}
-
-function PolicySourceDetails({
-  name,
-  summary,
-  policy,
-}: {
-  name: string;
-  summary: string;
-  policy: OrganizationPermissionPolicy;
-}) {
-  return (
-    <details className="type-label rounded border px-3 py-2">
-      <summary className="cursor-pointer">
-        <span className="font-medium">{name}</span>
-        <span className="text-muted-foreground"> · {summary}</span>
-      </summary>
-      <pre className="bg-background mt-2 max-h-56 overflow-auto rounded border p-2">
-        {policyJson(policy)}
-      </pre>
-    </details>
   );
 }

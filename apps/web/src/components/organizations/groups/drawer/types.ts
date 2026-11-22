@@ -9,10 +9,16 @@ export type OrganizationGroupsDrawerRef =
   | { type: 'policy-list'; target: OrganizationGroupPolicyTarget }
   | { type: 'policy-type-picker'; target: OrganizationGroupPolicyTarget }
   | {
-      type: 'permission-policy-editor';
-      target: OrganizationGroupPolicyTarget;
+      type: 'named-policy-assignments';
+      scope: { type: 'default' } | { type: 'group'; groupId: string };
       appliesTo: string;
       canEdit: boolean;
+    }
+  | { type: 'named-policy-library' }
+  | {
+      type: 'named-policy-editor';
+      policyId: string | null;
+      defaultKind: 'agent_permissions' | 'client_configuration';
     }
   | { type: 'permission-policy-diagnostics' }
   | {

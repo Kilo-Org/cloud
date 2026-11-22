@@ -4,14 +4,17 @@ import {
   ai_gateway_config,
   kilocode_users,
   organization_audit_logs,
+  organization_default_policy_links,
   organization_group_memberships,
+  organization_group_policy_links,
   organization_group_policy_settings,
   organization_groups,
   organization_memberships,
+  organization_named_policies,
   organizations,
 } from '@kilocode/db/schema';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 function loopbackUrl(value: string | undefined, protocols: readonly string[]) {
@@ -105,19 +108,41 @@ function permissionPolicyFixture(db: DrizzleClient['db']) {
           .where(eq(ai_gateway_config.id, 1));
       });
     },
-    async readDefault() {
-      const [row] = await db
-        .select()
+    async readNamedPolicies() {
+      const [policies, defaultLinks, groupLinks] = await Promise.all([
+        db
+          .select()
+          .from(organization_named_policies)
+          .where(eq(organization_named_policies.organization_id, managed.id))
+          .orderBy(asc(organization_named_policies.name), asc(organization_named_policies.id)),
+        db
+          .select()
+          .from(organization_default_policy_links)
+          .where(eq(organization_default_policy_links.organization_id, managed.id)),
+        db
+          .select()
+          .from(organization_group_policy_links)
+          .where(eq(organization_group_policy_links.organization_id, managed.id))
+          .orderBy(asc(organization_group_policy_links.group_id)),
+      ]);
+      return policies.map(policy => ({
+        ...policy,
+        attachments: [
+          ...defaultLinks
+            .filter(link => link.policy_id === policy.id)
+            .map(() => ({ type: 'default' as const })),
+          ...groupLinks
+            .filter(link => link.policy_id === policy.id)
+            .map(link => ({ type: 'group' as const, groupId: link.group_id })),
+        ],
+      }));
+    },
+    async readRevision() {
+      const [settings] = await db
+        .select({ revision: organization_group_policy_settings.policy_revision })
         .from(organization_group_policy_settings)
         .where(eq(organization_group_policy_settings.organization_id, managed.id));
-      return row;
-    },
-    async readGroupPolicies(groupId: string) {
-      const [row] = await db
-        .select({ policies: organization_groups.policies })
-        .from(organization_groups)
-        .where(eq(organization_groups.id, groupId));
-      return row?.policies;
+      return settings?.revision ?? 0;
     },
     async cleanup() {
       await db.transaction(async tx => {
@@ -128,6 +153,15 @@ function permissionPolicyFixture(db: DrizzleClient['db']) {
               ${allowlist} - ${managed.id}::text, false)`,
           })
           .where(eq(ai_gateway_config.id, 1));
+        await tx
+          .delete(organization_group_policy_links)
+          .where(inArray(organization_group_policy_links.organization_id, organizationIds));
+        await tx
+          .delete(organization_default_policy_links)
+          .where(inArray(organization_default_policy_links.organization_id, organizationIds));
+        await tx
+          .delete(organization_named_policies)
+          .where(inArray(organization_named_policies.organization_id, organizationIds));
         await tx
           .delete(organization_audit_logs)
           .where(inArray(organization_audit_logs.organization_id, organizationIds));

@@ -1,10 +1,6 @@
 import { expect, test } from '@chromatic-com/playwright';
-import type { Locator, Page, TestInfo } from '@playwright/test';
-import type {
-  OrganizationPermissionPolicy,
-  PermissionPolicyExecutionOs,
-} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
-import { readFile } from 'node:fs/promises';
+import type { Browser, BrowserContext, Locator, Page, TestInfo } from '@playwright/test';
+import type { PermissionPolicyExecutionOs } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
 import { z } from 'zod';
 import { permissionPolicyTest } from './organization-permission-policy-fixture';
 
@@ -24,105 +20,54 @@ test.describe('organization permission policy API', () => {
   });
 });
 
-const trialConfig = `{
-  // Synthetic local trial configuration; the importer must not include provider settings.
-  "provider": { "example": { "options": { "baseURL": "https://provider.example.com" } } },
-  "autoApprove": true,
-  "permission": {
-    "websearch": "deny",
-    "external_directory": { "/workspace/shared/*": "allow" },
-    "bash": { "*": "deny", "git status*": "allow", "git diff*": "allow" },
-  },
-}`;
+const policyNames = {
+  browser: 'Browser approval',
+  privacy: 'Privacy',
+  unlinked: 'Unlinked tool policy',
+  groupAllow: 'Group browser allow',
+  telemetry: 'Telemetry only',
+  dollarValues: 'Dollar values only',
+  neutral: 'Neutral configuration',
+  shared: 'Shared group policy',
+} as const;
 
-const defaultAgentPolicy = {
-  type: 'agent_permissions',
-  data: {
-    schema_version: 1,
-    unrestricted_mode: 'deny',
-    tools: {
-      websearch: 'deny',
-      external_directory: {
-        rules: [{ pattern: '/workspace/shared/*', action: 'allow' }],
-        fallback: 'ask',
-      },
-    },
-    shell: {
-      bash: {
-        fallback: 'ask',
-        rules: [
-          { pattern: '*', action: 'deny' },
-          { pattern: 'git status*', action: 'allow' },
-          { pattern: 'git diff*', action: 'allow' },
-        ],
-      },
-    },
-  },
-} satisfies OrganizationPermissionPolicy;
+const browserDocument = {
+  tools: { browser_open: 'ask' },
+  by_os: { windows: { tools: { browser_open: 'deny' } } },
+};
+const privacyDocument = { disable_telemetry: true, hide_session_dollar_values: true };
+const unlinkedDocument = { tools: { websearch: 'deny' } };
+const groupAllowDocument = { tools: { browser_open: 'allow' } };
+const telemetryDocument = { disable_telemetry: true };
+const dollarValuesDocument = { hide_session_dollar_values: true };
+const neutralDocument = {};
+const sharedInitialDocument = { tools: { edit: 'ask' } };
+const sharedEditedDocument = { tools: { edit: 'deny' } };
 
-const allOsAgentPolicy = {
-  ...defaultAgentPolicy,
-  data: {
-    ...defaultAgentPolicy.data,
-    tools: { ...defaultAgentPolicy.data.tools, browser_open: 'ask' },
-  },
-} satisfies OrganizationPermissionPolicy;
+const browserAskLayer = { schema_version: 1, tools: { browser_open: 'ask' } };
+const browserDenyLayer = { schema_version: 1, tools: { browser_open: 'deny' } };
+const browserAllowLayer = { schema_version: 1, tools: { browser_open: 'allow' } };
+const editDenyLayer = { schema_version: 1, tools: { edit: 'deny' } };
+const bothClientFlags = { disable_telemetry: true, hide_session_dollar_values: true };
 
-const windowsPermissions = { tools: { browser_open: 'deny' } } as const;
-const osScopedDefaultAgentPolicy = {
-  ...allOsAgentPolicy,
-  data: { ...allOsAgentPolicy.data, by_os: { windows: windowsPermissions } },
-} satisfies OrganizationPermissionPolicy;
-
-const restrictiveDefaultAgentPolicy = {
-  ...osScopedDefaultAgentPolicy,
-  data: { ...osScopedDefaultAgentPolicy.data, auto_approve: 'deny' },
-} satisfies OrganizationPermissionPolicy;
-
-const groupAgentPolicy = {
-  type: 'agent_permissions',
-  data: {
-    schema_version: 1,
-    auto_approve: 'deny',
-    tools: {
-      browser_open: 'allow',
-      external_directory: {
-        rules: [{ pattern: '/workspace/shared/private/*', action: 'deny' }],
-        fallback: 'deny',
-      },
-    },
-  },
-} satisfies OrganizationPermissionPolicy;
-
-const neutralGroupAgentPolicy = {
-  type: 'agent_permissions',
-  data: { schema_version: 1, tools: { edit: 'ask' } },
-} satisfies OrganizationPermissionPolicy;
-
-const hiddenDollarValuesPolicy = {
-  type: 'client_configuration',
-  data: { schema_version: 1, show_session_dollar_values: false },
-} satisfies OrganizationPermissionPolicy;
-
-const visibleDollarValuesPolicy = {
-  ...hiddenDollarValuesPolicy,
-  data: { ...hiddenDollarValuesPolicy.data, show_session_dollar_values: true },
-} satisfies OrganizationPermissionPolicy;
-
-const retiredClientPolicy = {
-  type: 'client_access',
-  data: {
-    schema_version: 1,
-    mode: 'allowlist',
-    clients: [{ feature: 'cli', min_version: '7.2.1' }],
-  },
+type NamedPolicyKind = 'agent_permissions' | 'client_configuration';
+type Attachment = { type: 'default' } | { type: 'group'; groupId: string };
+type NamedPolicyRecord = {
+  id: string;
+  name: string;
+  kind: NamedPolicyKind;
+  document: unknown;
+  attachments: Attachment[];
+};
+type PolicyFixture = {
+  readNamedPolicies: () => Promise<NamedPolicyRecord[]>;
+  readRevision: () => Promise<number>;
 };
 
 const button = (scope: Page | Locator, name: string) =>
   scope.getByRole('button', { name, exact: true });
+const activeDrawer = (page: Page) => page.getByRole('dialog', { name: 'Drawer panel' }).last();
 const groupsPath = (organization: { id: string }) => `/organizations/${organization.id}/groups`;
-const autoApproveLabel = 'Auto-approve for managed actions';
-const autoApproveSummary = 'Auto-approve disabled for managed actions';
 
 async function signInAs(page: Page, email: string, callbackPath: string) {
   const signIn = new URLSearchParams({ fakeUser: email, callbackPath });
@@ -130,17 +75,16 @@ async function signInAs(page: Page, email: string, callbackPath: string) {
   await page.waitForURL(url => url.pathname === callbackPath, { timeout: 60_000 });
 }
 
-async function savePolicy(drawer: Locator, revision: number) {
-  const save = button(drawer, 'Save policy');
-  await save.click();
-  await expect(drawer.getByText(`Revision ${revision}`, { exact: true })).toBeVisible();
-  await expect(save).toBeDisabled();
-  await expect(button(drawer, 'Back')).toHaveCount(0);
+async function closeDrawer(page: Page) {
+  await activeDrawer(page).getByRole('button', { name: 'Close drawer' }).click();
+  await expect(page.getByRole('dialog', { name: 'Drawer panel' })).toHaveCount(0);
 }
 
 async function capture(page: Page, testInfo: TestInfo, name: string) {
   const path = testInfo.outputPath(`${name}.png`);
-  await expect(button(page.getByRole('dialog'), 'Close drawer')).toBeInViewport({ ratio: 1 });
+  await expect(activeDrawer(page).getByRole('button', { name: 'Close drawer' })).toBeInViewport({
+    ratio: 1,
+  });
   await page.screenshot({
     path,
     animations: 'disabled',
@@ -149,7 +93,144 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
   await testInfo.attach(name, { path, contentType: 'image/png' });
 }
 
-permissionPolicyTest.describe('Enterprise permission policy editor', () => {
+async function openPolicyLibrary(page: Page) {
+  await button(page, 'Policies').click();
+  const drawer = activeDrawer(page);
+  await expect(drawer.getByRole('heading', { name: 'Policies', exact: true })).toBeVisible();
+  await expect(button(drawer, 'New policy')).toBeVisible();
+  return drawer;
+}
+
+const policyRow = (drawer: Locator, name: string) => drawer.locator('li').filter({ hasText: name });
+
+async function createNamedPolicy(
+  drawer: Locator,
+  name: string,
+  kind: NamedPolicyKind,
+  document: unknown
+) {
+  await button(drawer, 'New policy').click();
+  await expect(drawer.getByRole('heading', { name: 'New policy', exact: true })).toBeVisible();
+  await drawer.getByLabel('Name', { exact: true }).fill(name);
+  await drawer.getByLabel('Kind', { exact: true }).selectOption(kind);
+  await drawer.getByLabel('Policy JSON', { exact: true }).fill(JSON.stringify(document, null, 2));
+  await button(drawer, 'Create policy').click();
+  await expect(drawer.getByRole('heading', { name: 'New policy', exact: true })).toHaveCount(0);
+  await expect(drawer.getByText(name, { exact: true })).toBeVisible();
+}
+
+async function selectNamedPolicy(drawer: Locator, label: string, name: string) {
+  const select = drawer.getByLabel(label, { exact: true });
+  await expect(select.getByRole('option', { name, exact: true })).toHaveCount(1);
+  await select.selectOption({ label: name });
+}
+
+const attachmentKeys = (attachments: Attachment[]) =>
+  attachments
+    .map(attachment => (attachment.type === 'default' ? 'default' : `group:${attachment.groupId}`))
+    .sort();
+
+async function expectPolicyAttachments(
+  fixture: PolicyFixture,
+  name: string,
+  expected: Attachment[]
+) {
+  await expect
+    .poll(
+      async () => {
+        const policies = await fixture.readNamedPolicies();
+        return attachmentKeys(policies.find(policy => policy.name === name)?.attachments ?? []);
+      },
+      { timeout: 20_000 }
+    )
+    .toEqual(attachmentKeys(expected));
+}
+
+type MemberPolicyClient = {
+  context: BrowserContext;
+  contextPage: Page;
+  getPolicy: (os?: PermissionPolicyExecutionOs, etag?: string) => Promise<Response>;
+};
+
+async function createMemberPolicyClient(params: {
+  browser: Browser;
+  baseURL: string | undefined;
+  email: string;
+  pagePath: string;
+  organization: { id: string };
+}): Promise<MemberPolicyClient> {
+  if (!params.baseURL) throw new Error('Playwright baseURL is required.');
+  const baseURL = params.baseURL;
+  const context = await params.browser.newContext({ baseURL });
+  const contextPage = await context.newPage();
+  await signInAs(contextPage, params.email, params.pagePath);
+  await expect(contextPage.getByText('Your groups', { exact: true })).toBeVisible();
+
+  const organizationApi = new URL(`/api/organizations/${params.organization.id}/`, baseURL);
+  const tokenUrl = new URL('user-tokens', organizationApi);
+  const cookies = await context.cookies(tokenUrl.href);
+  const cookie = cookies.map(({ name, value }) => `${name}=${value}`).join('; ');
+  // Keep the short-lived bearer out of Playwright's HTTP traces.
+  const credential = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { Cookie: cookie },
+    redirect: 'error',
+    signal: AbortSignal.timeout(30_000),
+  });
+  expect(credential.status).toBe(200);
+  const { token } = z.object({ token: z.string().min(1) }).parse(await credential.json());
+
+  function getPolicy(os?: PermissionPolicyExecutionOs, etag?: string) {
+    const url = new URL('policy/permission', organizationApi);
+    if (os) url.searchParams.set('os', os);
+    const headers = new Headers({ Authorization: `Bearer ${token}` });
+    if (etag) headers.set('If-None-Match', etag);
+    return fetch(url, {
+      headers,
+      redirect: 'error',
+      signal: AbortSignal.timeout(30_000),
+    });
+  }
+
+  return { context, contextPage, getPolicy };
+}
+
+async function expectMemberPolicyResponse(params: {
+  response: Response;
+  organization: { id: string };
+  revision: number;
+  layers: unknown[];
+  clientConfiguration?: unknown;
+}) {
+  expect(params.response.status).toBe(200);
+  expect(params.response.headers.get('cache-control')).toBe('private, no-store');
+  const body = await params.response.json();
+  expect(body).toMatchObject({
+    schema_version: 1,
+    organization_id: params.organization.id,
+    managed: true,
+    revision: params.revision,
+    max_age_seconds: expect.any(Number),
+  });
+  const layers = body.policy.agent_permissions?.layers ?? [];
+  expect(layers.map((layer: unknown) => JSON.stringify(layer)).sort()).toEqual(
+    params.layers.map(layer => JSON.stringify(layer)).sort()
+  );
+  if (params.clientConfiguration) {
+    expect(body.policy.client_configuration).toEqual(params.clientConfiguration);
+  } else {
+    expect(body.policy).not.toHaveProperty('client_configuration');
+  }
+  return {
+    body,
+    etag: z
+      .string()
+      .regex(/^"[^"]+"$/)
+      .parse(params.response.headers.get('etag')),
+  };
+}
+
+permissionPolicyTest.describe('Enterprise named permission policy editor', () => {
   permissionPolicyTest.use({ storageState: { cookies: [], origins: [] } });
   permissionPolicyTest.skip(
     process.env.E2E_ORGANIZATION_PERMISSION_POLICY !== 'true',
@@ -157,674 +238,461 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
   );
 
   permissionPolicyTest(
-    'authors organization and group policies and verifies delivered member layers by OS',
+    'authors named policies and verifies resolved member delivery by OS',
     { tag: '@permission-policy-write' },
     async ({ baseURL, browser, page, permissionFixture }, testInfo) => {
       permissionPolicyTest.setTimeout(300_000);
-      const {
-        admin,
-        member,
-        ungroupedMember,
-        managed,
-        disabled,
-        group,
-        neutralGroup,
-        disabledGroup,
-        readDefault,
-        readGroupPolicies,
-      } = permissionFixture;
-      const drawer = page.getByRole('dialog', { name: 'Drawer panel' });
-      const agentHeading = drawer.getByRole('heading', { name: 'Agent permissions', exact: true });
-      const defaultPermissions = button(page, 'Default permissions');
-      const groupPermissions = button(page, `Permissions for ${group.name}`);
-      const neutralGroupPermissions = button(page, `Permissions for ${neutralGroup.name}`);
-      const inspectMemberPolicy = button(page, 'Inspect member policy');
-      const memberSelect = drawer.getByLabel('Member', { exact: true });
-      const autoApprove = drawer.getByLabel(autoApproveLabel, { exact: true });
-      const diagnosticValue = (label: string) =>
-        drawer
-          .locator('dl')
-          .filter({ has: page.getByRole('term').and(page.getByText(label, { exact: true })) })
-          .getByRole('definition');
-      const autoApproveStatus = diagnosticValue(autoApproveLabel);
-      const dollarVisibility = diagnosticValue('Session dollar visibility');
-      const policySource = (name: string) =>
-        drawer.locator('section').filter({ has: page.getByRole('heading', { name, exact: true }) });
-      const defaultSource = policySource('Organization default');
-      const permissionSet = drawer.getByRole('combobox', { name: 'Permission set', exact: true });
-      const executionOs = drawer.getByRole('combobox', { name: 'Execution OS', exact: true });
-      const addWindows = button(drawer, 'Add Windows permissions');
-      const removeWindows = button(drawer, 'Remove Windows permissions');
-      const clientConfiguration = drawer.getByRole('tab', {
-        name: 'Client Configuration',
-        exact: true,
-      });
-      const showDollarValues = drawer.getByRole('switch', {
-        name: 'Show session dollar values',
-        exact: true,
-      });
-      const tool = drawer.getByLabel('Tool', { exact: true });
-      const browserPermission = drawer.getByRole('group', { name: 'browser_open', exact: true });
-      const browserDecision = browserPermission.getByLabel('Tool decision');
-      const resource = drawer.getByRole('group', { name: 'external_directory' });
-      const unmatched = resource.getByLabel('Unmatched calls');
-      const editDecision = drawer
-        .getByRole('group', { name: 'edit', exact: true })
-        .getByLabel('Tool decision');
-      const save = button(drawer, 'Save policy');
+      const { admin, member, managed, disabled, group, neutralGroup, disabledGroup } =
+        permissionFixture;
       const managedPath = groupsPath(managed);
+      const diagnosticValue = (drawer: Locator, label: string) =>
+        drawer.locator('dl > div').filter({ hasText: label }).locator('dd');
+      const policySource = (drawer: Locator, name: string) =>
+        drawer.locator('section').filter({ hasText: name });
+
       await signInAs(page, admin.email, managedPath);
-
-      const existingGroupRevision = ((await readDefault())?.policy_revision ?? 0) + 1;
-      await permissionPolicyTest.step(
-        'Save existing group decisions before tightening the organization default',
-        async () => {
-          const existingGroupPolicy = {
-            type: 'agent_permissions',
-            data: {
-              schema_version: 1,
-              unrestricted_mode: 'allow',
-              tools: { websearch: 'ask', browser_open: 'allow' },
-              shell: {
-                powershell: {
-                  fallback: 'ask',
-                  rules: [{ pattern: 'Get-ChildItem*', action: 'allow' }],
-                },
-              },
-            },
-          } satisfies OrganizationPermissionPolicy;
-          await groupPermissions.click();
-          await expect(agentHeading).toBeVisible();
-          await button(drawer, 'Edit JSON').click();
-          await drawer.getByLabel('Policy JSON').fill(JSON.stringify(existingGroupPolicy, null, 2));
-          await button(drawer, 'Validate JSON').click();
-          await button(drawer, 'Use in editor').click();
-          await savePolicy(drawer, existingGroupRevision);
-          expect(await readGroupPolicies(group.id)).toEqual([existingGroupPolicy]);
-          await button(drawer, 'Close drawer').click();
-        }
-      );
-
-      const initial = await readDefault();
-      const defaultRevision = existingGroupRevision + 1;
-      const groupRevision = defaultRevision + 1;
-      const neutralGroupRevision = groupRevision + 1;
-      const hiddenGroupRevision = neutralGroupRevision + 1;
-      const groupConfigurationRevision = hiddenGroupRevision + 1;
-      const groupRemovalRevision = groupConfigurationRevision + 1;
-      const restrictiveDefaultRevision = groupRemovalRevision + 1;
-      const hiddenDefaultRevision = restrictiveDefaultRevision + 1;
+      await expect(button(page, 'Policies')).toBeVisible();
 
       await permissionPolicyTest.step(
-        'Reject a retired policy and invalid tool key, then review local JSONC',
+        'Reject invalid JSON and duplicate keys without creating a policy',
         async () => {
-          await defaultPermissions.click();
-          await expect(agentHeading).toBeVisible();
-          await expect(drawer.getByRole('button', { name: /^Client access\b/i })).toHaveCount(0);
-          await expect(drawer.getByLabel('Client access mode')).toHaveCount(0);
+          const before = await permissionFixture.readNamedPolicies();
+          const drawer = await openPolicyLibrary(page);
+          await button(drawer, 'New policy').click();
+          await drawer.getByLabel('Name', { exact: true }).fill('Invalid draft');
+          await drawer.getByLabel('Kind', { exact: true }).selectOption('agent_permissions');
+          const json = drawer.getByLabel('Policy JSON', { exact: true });
 
-          await tool.selectOption('websearch');
-          await drawer.getByLabel('Custom tool key').fill('__proto__');
-          await button(drawer, 'Select tool').click();
-          await expect(drawer.getByRole('alert')).toHaveText('Enter a valid tool key.');
-          await expect(tool).toHaveValue('websearch');
+          await json.fill('{"tools":{"browser_open":"ask",}}');
+          await button(drawer, 'Create policy').click();
+          await expect(drawer.getByRole('alert')).toHaveText(/Invalid JSON near offset \d+\./);
 
-          await button(drawer, 'Import JSON/JSONC').click();
-          const config = drawer.getByLabel('Configuration JSON or JSONC');
-          const previewImport = button(drawer, 'Preview import');
-          const preview = drawer.getByLabel('Policy preview');
-          const useDraft = button(drawer, 'Use in editor');
-          await config.fill(JSON.stringify(retiredClientPolicy, null, 2));
-          await previewImport.click();
-          await expect(drawer.getByRole('alert')).toContainText(
-            'Expected an agent_permissions policy document.'
+          await json.fill('{"tools":{"browser_open":"ask","browser_open":"deny"}}');
+          await button(drawer, 'Create policy').click();
+          await expect(drawer.getByRole('alert')).toHaveText(
+            'Duplicate key "browser_open" is not allowed.'
           );
-          await expect(preview).toHaveCount(0);
-          await expect(useDraft).toHaveCount(0);
-          await expect(save).toBeDisabled();
 
-          await config.fill(trialConfig);
-          await previewImport.click();
-          await expect(preview.getByText(/other configuration fields were ignored/i)).toBeVisible();
-          await expect(preview).not.toContainText('provider.example.com');
-          await expect(preview).not.toContainText(/autoApprove|auto_approve/);
-          const importShell = drawer.getByLabel('Shell for imported commands');
-          const importFallback = drawer.getByLabel('Unlisted commands for imported shell');
-          await expect(importShell).toHaveValue('');
-          await expect(importFallback).toHaveValue('');
-          await expect(useDraft).toBeDisabled();
-          await importShell.selectOption('bash');
-          await expect(importFallback).toHaveValue('');
-          await expect(useDraft).toBeDisabled();
-          await importFallback.selectOption('ask');
-          await expect(useDraft).toBeEnabled();
-          await useDraft.click();
-          await expect(unmatched).toHaveValue('inherit');
-          await expect(autoApprove).toHaveValue('inherit');
-          expect(await readDefault()).toEqual(initial);
+          await button(drawer, 'Cancel').click();
+          await expect(drawer.getByText('Invalid draft', { exact: true })).toHaveCount(0);
+          expect(await permissionFixture.readNamedPolicies()).toEqual(before);
+          await closeDrawer(page);
         }
       );
 
       await permissionPolicyTest.step(
-        'Validate an advanced JSON change to the imported All OS draft',
+        'Create named Agent Permissions and Client Configuration policies',
         async () => {
-          await drawer.getByLabel('Unrestricted mode').selectOption('deny');
-          await button(drawer, 'Edit JSON').click();
-          const json = drawer.getByLabel('Policy JSON');
-          const imported = {
-            ...defaultAgentPolicy,
-            data: {
-              ...defaultAgentPolicy.data,
-              tools: {
-                ...defaultAgentPolicy.data.tools,
-                external_directory: {
-                  rules: defaultAgentPolicy.data.tools.external_directory.rules,
-                },
-              },
-            },
-          };
-          expect(JSON.parse(await json.inputValue())).toEqual(imported);
-          await json.fill(JSON.stringify(defaultAgentPolicy, null, 2));
-          await button(drawer, 'Validate JSON').click();
-          await button(drawer, 'Use in editor').click();
-          await expect(unmatched).toHaveValue('ask');
-        }
-      );
-
-      await permissionPolicyTest.step(
-        'Author an independent Windows addition and round-trip the whole native document',
-        async () => {
-          await expect(permissionSet).toHaveValue('all');
-          await tool.selectOption('browser_open');
-          await browserDecision.selectOption('ask');
-          await permissionSet.selectOption('windows');
-          await addWindows.click();
-          await tool.selectOption('browser_open');
-          await expect(browserDecision).toHaveValue('inherit');
-          await browserDecision.selectOption('deny');
-          await savePolicy(drawer, defaultRevision);
-          const persisted = await readDefault();
-          expect(persisted?.policy_revision).toBe(defaultRevision);
-          expect(persisted?.default_policies).toContainEqual(osScopedDefaultAgentPolicy);
-
-          await page.reload();
-          await defaultPermissions.click();
-          await expect(agentHeading).toBeVisible();
-          await expect(
-            drawer.getByText(`Revision ${defaultRevision}`, { exact: true })
-          ).toBeVisible();
-          await expect(unmatched).toHaveValue('ask');
-          await drawer.getByRole('tab', { name: 'Shell', exact: true }).click();
-          const bash = drawer.getByRole('group', { name: 'Bash', exact: true });
-          await expect(bash.getByLabel('Unlisted commands')).toHaveValue('ask');
-          await expect(bash.getByLabel('Command pattern 1')).toHaveValue('*');
-          await expect(bash.getByLabel('Command pattern 2')).toHaveValue('git status*');
-          await expect(bash.getByLabel('Command pattern 3')).toHaveValue('git diff*');
-          await capture(page, testInfo, 'managed-agent-permissions');
-
-          await drawer.getByRole('tab', { name: 'Tools', exact: true }).click();
-          await permissionSet.selectOption('windows');
-          await tool.selectOption('browser_open');
-          await expect(browserDecision).toHaveValue('deny');
-          await browserDecision.scrollIntoViewIfNeeded();
-          await capture(page, testInfo, 'managed-windows-permissions');
-          const [download] = await Promise.all([
-            page.waitForEvent('download'),
-            button(drawer, 'Export JSON').click(),
-          ]);
-          expect(download.suggestedFilename()).toBe('agent_permissions.json');
-          const exportedPolicy = await readFile(await download.path(), 'utf8');
-          expect(JSON.parse(exportedPolicy)).toEqual(osScopedDefaultAgentPolicy);
-
-          await removeWindows.click();
-          await expect(addWindows).toBeVisible();
-          await permissionSet.selectOption('all');
-          await tool.selectOption('browser_open');
-          await expect(browserDecision).toHaveValue('ask');
-          await permissionSet.selectOption('windows');
-          await button(drawer, 'Import JSON/JSONC').click();
-          await drawer.getByLabel('Configuration JSON or JSONC').fill(`{
-            "permission": { "browser_open": "ask" },
-          }`);
-          await button(drawer, 'Preview import').click();
-          await expect(drawer.getByLabel('Policy preview')).toContainText('in Windows only.');
-          await button(drawer, 'Use in editor').click();
-          await button(drawer, 'Edit JSON').click();
-          const json = drawer.getByLabel('Policy JSON');
-          expect(JSON.parse(await json.inputValue())).toEqual({
-            ...allOsAgentPolicy,
-            data: {
-              ...allOsAgentPolicy.data,
-              by_os: { windows: { tools: { browser_open: 'ask' } } },
-            },
-          });
-          await json.fill(exportedPolicy);
-          await button(drawer, 'Validate JSON').click();
-          await button(drawer, 'Use in editor').click();
-          await permissionSet.selectOption('windows');
-          await tool.selectOption('browser_open');
-          await expect(browserDecision).toHaveValue('deny');
-          await expect(save).toBeDisabled();
-          expect(await readDefault()).toEqual(persisted);
-          await button(drawer, 'Close drawer').click();
-        }
-      );
-
-      await permissionPolicyTest.step(
-        'Clear blocked group restrictions and save an explicit resource default in the narrow drawer',
-        async () => {
-          await page.setViewportSize({ width: 390, height: 844 });
-          await groupPermissions.click();
-          await expect(agentHeading).toBeVisible();
-
-          const unrestricted = drawer.getByLabel('Unrestricted mode');
-          await expect(unrestricted).toHaveValue('allow');
-          await expect(
-            unrestricted.getByRole('option', { name: 'Allow', exact: true })
-          ).toBeDisabled();
-          await unrestricted.selectOption('inherit');
-          await expect(unrestricted).toBeDisabled();
-
-          await expect(autoApprove).toHaveValue('inherit');
-          await autoApprove.selectOption({ label: 'Disable auto-approve' });
-          await expect(autoApprove).toHaveValue('deny');
-
-          await tool.selectOption('websearch');
-          const websearch = drawer.getByRole('group', { name: 'websearch', exact: true });
-          await expect(websearch.getByText(/Organization default: Block\./)).toBeVisible();
-          const decision = websearch.getByLabel('Tool decision');
-          const inherit = { name: 'Use inherited policy', exact: true };
-          await expect(decision).toHaveValue('ask');
-          await expect(decision).toBeEnabled();
-          await expect(decision.getByRole('option', inherit)).toBeEnabled();
-          for (const name of ['Allow', 'Require approval', 'Block', 'Resource rules']) {
-            await expect(decision.getByRole('option', { name, exact: true })).toBeDisabled();
-          }
-          await decision.selectOption({ label: inherit.name });
-          await expect(decision).toHaveValue('inherit');
-
-          await tool.selectOption('browser_open');
-          await expect(
-            browserPermission.getByText(/Organization default: Require approval\./)
-          ).toBeVisible();
-          await expect(browserDecision).toHaveValue('allow');
-
-          await drawer.getByRole('tab', { name: 'Shell', exact: true }).click();
-          const powerShell = drawer.getByRole('group', { name: 'PowerShell', exact: true });
-          await expect(powerShell.getByLabel('Unlisted commands')).toBeDisabled();
-          await expect(powerShell.getByLabel('Command pattern 1')).toBeDisabled();
-          const removePowerShell = button(powerShell, 'Remove PowerShell profile');
-          await expect(removePowerShell).toBeEnabled();
-          await removePowerShell.click();
-          await expect(removePowerShell).toHaveCount(0);
-          const shellPolicy = drawer.getByLabel('Shell profile policy');
-          await expect(shellPolicy).toHaveValue('configure');
-          await shellPolicy.selectOption('inherit');
-          await expect(shellPolicy).toHaveValue('inherit');
-
-          await drawer.getByRole('tab', { name: 'Tools', exact: true }).click();
-          await tool.selectOption('external_directory');
-          await expect(
-            resource.getByText(/Organization default: Require approval\./)
-          ).toBeVisible();
-          await resource.getByLabel('Tool decision').selectOption('rules');
-          await expect(unmatched).toHaveValue('inherit');
-          await button(resource, 'Add rule').click();
-          await resource.getByLabel('Resource pattern 1').fill('/workspace/shared/private/*');
-          await unmatched.selectOption('deny');
-          await expect(unmatched).toHaveValue('deny');
-          await save.scrollIntoViewIfNeeded();
-          await expect(save).toBeInViewport();
-          await capture(page, testInfo, 'managed-group-permissions-mobile');
-          await savePolicy(drawer, groupRevision);
-          expect(await readGroupPolicies(group.id)).toEqual([groupAgentPolicy]);
-          await button(drawer, 'Close drawer').click();
-        }
-      );
-
-      await permissionPolicyTest.step(
-        'Save a tool rule in the second group without adding an auto-approve restriction',
-        async () => {
-          await page.setViewportSize({ width: 1440, height: 1120 });
-          await neutralGroupPermissions.click();
-          await expect(agentHeading).toBeVisible();
-          await expect(autoApprove).toBeEnabled();
-          await expect(autoApprove).toHaveValue('inherit');
-          await tool.selectOption('edit');
-          await editDecision.selectOption('ask');
-          await savePolicy(drawer, neutralGroupRevision);
-          expect(await readGroupPolicies(neutralGroup.id)).toEqual([neutralGroupAgentPolicy]);
-          await button(drawer, 'Close drawer').click();
-        }
-      );
-
-      await permissionPolicyTest.step(
-        'Save conflicting client configuration in the two assigned groups',
-        async () => {
-          await groupPermissions.click();
-          await clientConfiguration.click();
-          await expect(showDollarValues).toBeChecked();
-          await showDollarValues.click();
-          await expect(showDollarValues).not.toBeChecked();
-          await savePolicy(drawer, hiddenGroupRevision);
-          expect(await readGroupPolicies(group.id)).toEqual([
-            groupAgentPolicy,
-            hiddenDollarValuesPolicy,
-          ]);
-          await button(drawer, 'Close drawer').click();
-
-          await neutralGroupPermissions.click();
-          await clientConfiguration.click();
-          await expect(showDollarValues).toBeChecked();
-          await showDollarValues.click();
-          await showDollarValues.click();
-          await expect(showDollarValues).toBeChecked();
-          await savePolicy(drawer, groupConfigurationRevision);
-          expect(await readGroupPolicies(neutralGroup.id)).toEqual([
-            neutralGroupAgentPolicy,
-            visibleDollarValuesPolicy,
-          ]);
-          await button(drawer, 'Close drawer').click();
-        }
-      );
-
-      const diagnosedPolicies = await permissionPolicyTest.step(
-        'Inspect Windows and All OS layers, scoped auto-approve, and conflicting group values',
-        async () => {
-          const saved = await readDefault();
-          expect(saved?.policy_revision).toBe(groupConfigurationRevision);
-          expect(saved?.default_policies.filter(policy => policy.type !== 'model_access')).toEqual([
-            osScopedDefaultAgentPolicy,
-          ]);
-          await inspectMemberPolicy.click();
-          await expect(executionOs).toHaveValue('all');
-          await memberSelect.selectOption(member.id);
-          const revision = drawer.getByText(`Revision ${groupConfigurationRevision}`, {
-            exact: true,
-          });
-          await expect(revision).toBeVisible();
-          await expect(autoApproveStatus).toHaveText('Disabled');
-          await expect(dollarVisibility).toHaveText('Hidden');
-          await expect(defaultSource).toBeVisible();
-          await expect(defaultSource).not.toContainText(autoApproveSummary);
-          await expect(defaultSource).not.toContainText('Windows permissions');
-          await expect(policySource(group.name)).toContainText(autoApproveSummary);
-          await expect(policySource(group.name)).toContainText('Session dollar values hidden');
-          await expect(policySource(neutralGroup.name)).toContainText(
-            'Session dollar values visible'
+          const drawer = await openPolicyLibrary(page);
+          await createNamedPolicy(
+            drawer,
+            policyNames.browser,
+            'agent_permissions',
+            browserDocument
           );
-          await expect(policySource(neutralGroup.name)).not.toContainText(autoApproveSummary);
-          await expect(drawer.getByText(/client access/i)).toHaveCount(0);
-          await capture(page, testInfo, 'managed-member-policy-sources');
-          const details = drawer.locator('details').filter({
-            has: page.getByText('Effective policy JSON', { exact: true }),
-          });
-          const effective = details.getByText('Effective policy JSON', { exact: true });
-          async function readSelectedPolicy(layers: unknown[]) {
-            await effective.click();
-            const policy = JSON.parse(await details.locator('pre').innerText());
-            expect(policy).toEqual({
-              agent_permissions: { layers: expect.arrayContaining(layers) },
-              client_configuration: { show_session_dollar_values: false },
-            });
-            expect(policy.agent_permissions.layers).toHaveLength(layers.length);
-            await effective.click();
-            return policy;
+          await createNamedPolicy(
+            drawer,
+            policyNames.privacy,
+            'client_configuration',
+            privacyDocument
+          );
+          await createNamedPolicy(
+            drawer,
+            policyNames.unlinked,
+            'agent_permissions',
+            unlinkedDocument
+          );
+          await createNamedPolicy(
+            drawer,
+            policyNames.groupAllow,
+            'agent_permissions',
+            groupAllowDocument
+          );
+          await createNamedPolicy(
+            drawer,
+            policyNames.telemetry,
+            'client_configuration',
+            telemetryDocument
+          );
+          await createNamedPolicy(
+            drawer,
+            policyNames.dollarValues,
+            'client_configuration',
+            dollarValuesDocument
+          );
+          await createNamedPolicy(
+            drawer,
+            policyNames.neutral,
+            'client_configuration',
+            neutralDocument
+          );
+          await createNamedPolicy(
+            drawer,
+            policyNames.shared,
+            'agent_permissions',
+            sharedInitialDocument
+          );
+
+          for (const name of Object.values(policyNames)) {
+            await expect(policyRow(drawer, name)).toContainText('Unlinked');
           }
-          const allOsLayers = [
-            allOsAgentPolicy.data,
-            groupAgentPolicy.data,
-            neutralGroupAgentPolicy.data,
-          ];
-          const allOs = await readSelectedPolicy(allOsLayers);
+          await capture(page, testInfo, 'named-policy-library');
 
-          await executionOs.selectOption('windows');
-          const windowsSource = defaultSource.getByText('Windows permissions', { exact: true });
-          await expect(defaultSource).toContainText('All OS');
-          await expect(autoApproveStatus).toHaveText('Disabled');
-          await expect(dollarVisibility).toHaveText('Hidden');
-          await windowsSource.click();
-          await capture(page, testInfo, 'managed-windows-member-policy-sources');
-          await windowsSource.click();
-          const windows = await readSelectedPolicy([
-            ...allOsLayers,
-            { schema_version: 1, ...windowsPermissions },
-          ]);
-
-          await executionOs.selectOption('linux');
-          await expect(defaultSource).not.toContainText('Windows permissions');
-          expect(await readSelectedPolicy(allOsLayers)).toEqual(allOs);
-
-          await executionOs.selectOption('all');
-          await memberSelect.selectOption(admin.id);
-          await expect(autoApproveStatus).toHaveText('No organization restriction');
-          await expect(dollarVisibility).toHaveText('Visible');
-          await expect(drawer.getByText('No group policy contributions.')).toBeVisible();
-          await expect(defaultSource).toBeVisible();
-          await expect(policySource(group.name)).toHaveCount(0);
-          await expect(policySource(neutralGroup.name)).toHaveCount(0);
-          return { allOs, windows };
+          const policies = await permissionFixture.readNamedPolicies();
+          expect(policies.map(policy => policy.name).sort()).toEqual(
+            Object.values(policyNames).sort()
+          );
+          expect(policies.every(policy => policy.attachments.length === 0)).toBe(true);
+          await closeDrawer(page);
         }
       );
 
       await permissionPolicyTest.step(
-        'Retrieve only the selected anonymous layers and validate the exact Windows ETag',
+        'Link one Agent Permissions default and one group configuration',
         async () => {
-          const memberContext = await browser.newContext({ baseURL });
+          await button(page, 'Group Defaults').click();
+          let drawer = activeDrawer(page);
+          await expect(
+            drawer.getByRole('heading', { name: 'Group Defaults', exact: true })
+          ).toBeVisible();
+          await selectNamedPolicy(drawer, 'Agent permissions', policyNames.browser);
+          await expectPolicyAttachments(permissionFixture, policyNames.browser, [
+            { type: 'default' },
+          ]);
+          await closeDrawer(page);
+
+          await button(page, `Permissions for ${group.name}`).click();
+          drawer = activeDrawer(page);
+          await selectNamedPolicy(drawer, 'Agent permissions', policyNames.groupAllow);
+          await selectNamedPolicy(drawer, 'Client configuration', policyNames.privacy);
+          await expectPolicyAttachments(permissionFixture, policyNames.groupAllow, [
+            { type: 'group', groupId: group.id },
+          ]);
+          await expectPolicyAttachments(permissionFixture, policyNames.privacy, [
+            { type: 'group', groupId: group.id },
+          ]);
+          await capture(page, testInfo, 'named-policy-group-assignments');
+          await closeDrawer(page);
+        }
+      );
+
+      await permissionPolicyTest.step(
+        'Inspect Windows diagnostics with separate All OS and OS layers',
+        async () => {
+          await button(page, 'Inspect member policy').click();
+          const drawer = activeDrawer(page);
+          await drawer.getByLabel('Member', { exact: true }).selectOption(member.id);
+          const revision = await permissionFixture.readRevision();
+          await expect(drawer.getByText(`Revision ${revision}`, { exact: true })).toBeVisible();
+          await expect(diagnosticValue(drawer, 'Auto-approval')).toHaveText('Allowed');
+          await expect(diagnosticValue(drawer, 'Telemetry')).toHaveText('Disabled');
+          await expect(diagnosticValue(drawer, 'Session dollar values')).toHaveText('Hidden');
+
+          const details = drawer.locator('details');
+          await details.locator('summary').click();
+          await expect(details).toHaveAttribute('open', '');
+          const readPolicy = async () =>
+            JSON.parse((await details.locator('pre').textContent()) ?? '');
+          const allOs = await readPolicy();
+          expect(
+            allOs.agent_permissions.layers.map((layer: unknown) => JSON.stringify(layer)).sort()
+          ).toEqual(
+            [browserAskLayer, browserAllowLayer].map(layer => JSON.stringify(layer)).sort()
+          );
+          expect(allOs.client_configuration).toEqual(bothClientFlags);
+
+          await drawer.getByLabel('Execution OS', { exact: true }).selectOption('windows');
+          await expect(diagnosticValue(drawer, 'Telemetry')).toHaveText('Disabled');
+          await expect(details.locator('pre')).toContainText('"browser_open": "deny"');
+          const windows = await readPolicy();
+          expect(
+            windows.agent_permissions.layers.map((layer: unknown) => JSON.stringify(layer)).sort()
+          ).toEqual(
+            [browserAskLayer, browserDenyLayer, browserAllowLayer]
+              .map(layer => JSON.stringify(layer))
+              .sort()
+          );
+
+          const defaultSource = policySource(drawer, 'Organization default');
+          await expect(defaultSource).toContainText(policyNames.browser);
+          const groupSource = policySource(drawer, group.name);
+          await expect(groupSource).toContainText(policyNames.groupAllow);
+          await expect(groupSource).toContainText(policyNames.privacy);
+          await expect(drawer.getByText(policyNames.unlinked, { exact: true })).toHaveCount(0);
+          await capture(page, testInfo, 'named-policy-diagnostics-windows');
+          await closeDrawer(page);
+        }
+      );
+
+      await permissionPolicyTest.step(
+        'Verify the member bearer response and exact-scope ETags',
+        async () => {
+          const client = await createMemberPolicyClient({
+            browser,
+            baseURL,
+            email: member.email,
+            pagePath: managedPath,
+            organization: managed,
+          });
           try {
-            const memberPage = await memberContext.newPage();
-            await signInAs(memberPage, member.email, managedPath);
-            await expect(memberPage.getByText('Your groups', { exact: true })).toBeVisible();
-            await expect(button(memberPage, 'Default permissions')).toHaveCount(0);
-            await expect(button(memberPage, 'Inspect member policy')).toHaveCount(0);
-            const organizationApi = new URL(`/api/organizations/${managed.id}/`, baseURL);
-            const tokenUrl = new URL('user-tokens', organizationApi);
-            const cookies = await memberContext.cookies(tokenUrl.href);
-            const cookie = cookies.map(({ name, value }) => `${name}=${value}`).join('; ');
-            // Keep the short-lived bearer out of Playwright's HTTP traces.
-            const credential = await fetch(tokenUrl, {
-              method: 'POST',
-              headers: { Cookie: cookie },
-              redirect: 'error',
-              signal: AbortSignal.timeout(30_000),
+            await expect(button(client.contextPage, 'Inspect member policy')).toHaveCount(0);
+            await expect(button(client.contextPage, 'Policies')).toHaveCount(0);
+            const revision = await permissionFixture.readRevision();
+            const expected = (layers: unknown[]) => ({
+              organization: managed,
+              revision,
+              layers,
+              clientConfiguration: bothClientFlags,
             });
-            expect(credential.status).toBe(200);
-            const { token } = z.object({ token: z.string().min(1) }).parse(await credential.json());
-            function getPolicy(os?: PermissionPolicyExecutionOs, etag?: string) {
-              const url = new URL('policy/permission', organizationApi);
-              if (os) url.searchParams.set('os', os);
-              const headers = new Headers({ Authorization: `Bearer ${token}` });
-              if (etag) headers.set('If-None-Match', etag);
-              return fetch(url, {
-                headers,
-                redirect: 'error',
-                signal: AbortSignal.timeout(30_000),
-              });
-            }
-            async function expectPolicyResponse(response: Response, policy: unknown) {
-              expect(response.status).toBe(200);
-              expect(response.headers.get('cache-control')).toBe('private, no-store');
-              expect(await response.json()).toEqual({
-                schema_version: 1,
-                organization_id: managed.id,
-                managed: true,
-                revision: groupConfigurationRevision,
-                max_age_seconds: expect.any(Number),
-                policy,
-              });
-              return z
-                .string()
-                .regex(/^"[^"]+"$/)
-                .parse(response.headers.get('etag'));
-            }
-            const omitted = await expectPolicyResponse(await getPolicy(), diagnosedPolicies.allOs);
-            const linux = await expectPolicyResponse(
-              await getPolicy('linux'),
-              diagnosedPolicies.allOs
-            );
-            const other = await expectPolicyResponse(
-              await getPolicy('other'),
-              diagnosedPolicies.allOs
-            );
-            const windows = await expectPolicyResponse(
-              await getPolicy('windows'),
-              diagnosedPolicies.windows
-            );
-            expect(new Set([omitted, linux, other, windows]).size).toBe(4);
 
-            const unchanged = await getPolicy('windows', windows);
-            expect(unchanged.status).toBe(304);
-            expect(unchanged.headers.get('etag')).toBe(windows);
-            expect(unchanged.headers.get('cache-control')).toBe('private, no-store');
-            expect(await unchanged.text()).toBe('');
-            const differentOs = await getPolicy('linux', windows);
-            expect(await expectPolicyResponse(differentOs, diagnosedPolicies.allOs)).toBe(linux);
+            const omitted = await expectMemberPolicyResponse({
+              ...expected([browserAskLayer, browserAllowLayer]),
+              response: await client.getPolicy(),
+            });
+            const linux = await expectMemberPolicyResponse({
+              ...expected([browserAskLayer, browserAllowLayer]),
+              response: await client.getPolicy('linux'),
+            });
+            const other = await expectMemberPolicyResponse({
+              ...expected([browserAskLayer, browserAllowLayer]),
+              response: await client.getPolicy('other'),
+            });
+            const windows = await expectMemberPolicyResponse({
+              ...expected([browserAskLayer, browserDenyLayer, browserAllowLayer]),
+              response: await client.getPolicy('windows'),
+            });
+            expect(other.body.policy).toEqual(omitted.body.policy);
+            expect(linux.body.policy).toEqual(omitted.body.policy);
+            expect(windows.etag).not.toBe(linux.etag);
+
+            const linuxAgain = await client.getPolicy('linux', linux.etag);
+            expect(linuxAgain.status).toBe(304);
+            expect(linuxAgain.headers.get('etag')).toBe(linux.etag);
+            expect(linuxAgain.headers.get('cache-control')).toBe('private, no-store');
+            expect(await linuxAgain.text()).toBe('');
+
+            const windowsAgain = await client.getPolicy('windows', windows.etag);
+            expect(windowsAgain.status).toBe(304);
+            expect(windowsAgain.headers.get('etag')).toBe(windows.etag);
+
+            const linuxFromWindowsEtag = await expectMemberPolicyResponse({
+              ...expected([browserAskLayer, browserAllowLayer]),
+              response: await client.getPolicy('linux', windows.etag),
+            });
+            expect(linuxFromWindowsEtag.etag).toBe(linux.etag);
           } finally {
-            await memberContext.close();
+            await client.context.close();
           }
         }
       );
 
       await permissionPolicyTest.step(
-        'Remove the group agent policy without changing client configuration or the default',
+        'Resolve each Client Configuration flag from an independent policy',
         async () => {
-          await button(drawer, 'Close drawer').click();
-          await groupPermissions.click();
-          await button(drawer, 'Remove policy').click();
-          await button(drawer, 'Remove').click();
-          await expect(
-            drawer.getByText(`Revision ${groupRemovalRevision}`, { exact: true })
-          ).toBeVisible();
-          await expect(button(drawer, 'Remove policy')).toHaveCount(0);
-          await expect(save).toBeDisabled();
-          expect(await readGroupPolicies(group.id)).toEqual([hiddenDollarValuesPolicy]);
-          expect(await readGroupPolicies(neutralGroup.id)).toEqual([
-            neutralGroupAgentPolicy,
-            visibleDollarValuesPolicy,
+          await button(page, `Permissions for ${group.name}`).click();
+          let drawer = activeDrawer(page);
+          await selectNamedPolicy(drawer, 'Client configuration', policyNames.telemetry);
+          await expectPolicyAttachments(permissionFixture, policyNames.telemetry, [
+            { type: 'group', groupId: group.id },
           ]);
-          expect((await readDefault())?.default_policies).toContainEqual(
-            osScopedDefaultAgentPolicy
+          await closeDrawer(page);
+
+          await button(page, `Permissions for ${neutralGroup.name}`).click();
+          drawer = activeDrawer(page);
+          await selectNamedPolicy(drawer, 'Client configuration', policyNames.dollarValues);
+          await expectPolicyAttachments(permissionFixture, policyNames.dollarValues, [
+            { type: 'group', groupId: neutralGroup.id },
+          ]);
+          await closeDrawer(page);
+          await expectPolicyAttachments(permissionFixture, policyNames.privacy, []);
+
+          await button(page, 'Inspect member policy').click();
+          drawer = activeDrawer(page);
+          await drawer.getByLabel('Member', { exact: true }).selectOption(member.id);
+          await expect(diagnosticValue(drawer, 'Auto-approval')).toHaveText('Allowed');
+          await expect(diagnosticValue(drawer, 'Telemetry')).toHaveText('Disabled');
+          await expect(diagnosticValue(drawer, 'Session dollar values')).toHaveText('Hidden');
+
+          const details = drawer.locator('details');
+          await details.locator('summary').click();
+          await expect(details).toHaveAttribute('open', '');
+          const effective = JSON.parse((await details.locator('pre').textContent()) ?? '');
+          expect(effective.client_configuration).toEqual(bothClientFlags);
+          expect(effective.client_configuration).not.toHaveProperty('disable_auto_approve');
+          await expect(policySource(drawer, group.name)).toContainText(policyNames.telemetry);
+          await expect(policySource(drawer, neutralGroup.name)).toContainText(
+            policyNames.dollarValues
           );
-          await button(drawer, 'Close drawer').click();
+          await expect(drawer.getByText(policyNames.neutral, { exact: true })).toHaveCount(0);
+          await expectPolicyAttachments(permissionFixture, policyNames.neutral, []);
+          await closeDrawer(page);
         }
       );
 
       await permissionPolicyTest.step(
-        'Disable auto-approve at the organization default and verify the inherited lock',
+        'Reuse one agent policy in two groups, edit it once, and resolve the edit twice',
         async () => {
-          await defaultPermissions.click();
-          await expect(autoApprove).toHaveValue('inherit');
-          await autoApprove.selectOption('deny');
-          await savePolicy(drawer, restrictiveDefaultRevision);
-          expect((await readDefault())?.default_policies).toContainEqual(
-            restrictiveDefaultAgentPolicy
-          );
-          await button(drawer, 'Close drawer').click();
+          await button(page, `Permissions for ${group.name}`).click();
+          let drawer = activeDrawer(page);
+          await selectNamedPolicy(drawer, 'Agent permissions', policyNames.shared);
+          await closeDrawer(page);
 
-          await neutralGroupPermissions.click();
-          await expect(autoApprove).toHaveValue('inherit');
-          await expect(autoApprove).toBeDisabled();
-          await expect(autoApprove).toHaveAccessibleDescription(
-            /^Disabled by the organization default\./
-          );
-          await tool.selectOption('edit');
-          await expect(editDecision).toHaveValue('ask');
-          await expect(autoApprove).toBeInViewport({ ratio: 1 });
-          await capture(page, testInfo, 'managed-auto-approve-inherited');
-          await button(drawer, 'Close drawer').click();
+          await button(page, `Permissions for ${neutralGroup.name}`).click();
+          drawer = activeDrawer(page);
+          await selectNamedPolicy(drawer, 'Agent permissions', policyNames.shared);
+          await closeDrawer(page);
+          await expectPolicyAttachments(permissionFixture, policyNames.shared, [
+            { type: 'group', groupId: group.id },
+            { type: 'group', groupId: neutralGroup.id },
+          ]);
 
-          await inspectMemberPolicy.click();
-          for (const { id } of [admin, ungroupedMember]) {
-            await memberSelect.selectOption(id);
-            await expect(
-              drawer.getByText(`Revision ${restrictiveDefaultRevision}`, { exact: true })
-            ).toBeVisible();
-            await expect(autoApproveStatus).toHaveText('Disabled');
-            await expect(defaultSource).toContainText(autoApproveSummary);
-            await expect(drawer.getByText('No group policy contributions.')).toBeVisible();
+          drawer = await openPolicyLibrary(page);
+          await expect(policyRow(drawer, policyNames.shared)).toContainText('2 attachments');
+          await button(policyRow(drawer, policyNames.shared), 'Edit').click();
+          await expect(
+            drawer.getByRole('heading', { name: 'Edit policy', exact: true })
+          ).toBeVisible();
+          await expect(drawer.getByLabel('Name', { exact: true })).toHaveValue(policyNames.shared);
+          await capture(page, testInfo, 'named-policy-editor');
+          await drawer
+            .getByLabel('Policy JSON', { exact: true })
+            .fill(JSON.stringify(sharedEditedDocument, null, 2));
+          await button(drawer, 'Save changes').click();
+          await expect(
+            drawer.getByRole('heading', { name: 'Edit policy', exact: true })
+          ).toHaveCount(0);
+          await expect(policyRow(drawer, policyNames.shared)).toContainText('2 attachments');
+          await closeDrawer(page);
+
+          const stored = (await permissionFixture.readNamedPolicies()).find(
+            policy => policy.name === policyNames.shared
+          );
+          expect(stored?.document).toEqual(sharedEditedDocument);
+
+          await button(page, 'Inspect member policy').click();
+          drawer = activeDrawer(page);
+          await drawer.getByLabel('Member', { exact: true }).selectOption(member.id);
+          await expect(policySource(drawer, group.name)).toContainText(policyNames.shared);
+          await expect(policySource(drawer, neutralGroup.name)).toContainText(policyNames.shared);
+          const details = drawer.locator('details');
+          await details.locator('summary').click();
+          await expect(details.locator('pre')).toContainText('"edit": "deny"');
+          await expect(details).toHaveAttribute('open', '');
+          const effective = JSON.parse((await details.locator('pre').textContent()) ?? '');
+          expect(
+            effective.agent_permissions.layers.map((layer: unknown) => JSON.stringify(layer)).sort()
+          ).toEqual([browserAskLayer, editDenyLayer].map(layer => JSON.stringify(layer)).sort());
+          await closeDrawer(page);
+
+          const client = await createMemberPolicyClient({
+            browser,
+            baseURL,
+            email: member.email,
+            pagePath: managedPath,
+            organization: managed,
+          });
+          try {
+            await expectMemberPolicyResponse({
+              organization: managed,
+              revision: await permissionFixture.readRevision(),
+              layers: [browserAskLayer, editDenyLayer],
+              clientConfiguration: bothClientFlags,
+              response: await client.getPolicy('linux'),
+            });
+          } finally {
+            await client.context.close();
           }
-          await button(drawer, 'Close drawer').click();
         }
       );
 
       await permissionPolicyTest.step(
-        'Apply default client configuration independently of agent permissions',
+        'Refuse deleting an attached policy, then unlink it and delete',
         async () => {
-          await defaultPermissions.click();
-          await clientConfiguration.click();
-          await expect(showDollarValues).toBeChecked();
-          await showDollarValues.click();
-          await savePolicy(drawer, hiddenDefaultRevision);
-          expect((await readDefault())?.default_policies).toEqual([
-            { type: 'model_access', data: { mode: 'all' } },
-            restrictiveDefaultAgentPolicy,
-            hiddenDollarValuesPolicy,
-          ]);
-          await button(drawer, 'Close drawer').click();
+          let drawer = await openPolicyLibrary(page);
+          await button(policyRow(drawer, policyNames.shared), 'Delete').click();
+          const confirm = button(policyRow(drawer, policyNames.shared), 'Confirm delete');
+          await expect(confirm).toBeDisabled();
+          expect(
+            (await permissionFixture.readNamedPolicies()).some(
+              policy => policy.name === policyNames.shared
+            )
+          ).toBe(true);
+          await closeDrawer(page);
 
-          await neutralGroupPermissions.click();
-          await clientConfiguration.click();
-          await expect(showDollarValues).not.toBeChecked();
-          await expect(showDollarValues).toBeDisabled();
-          await expect(showDollarValues).toHaveAccessibleDescription(
-            'Hidden by the organization default. A group cannot make them visible.'
-          );
+          await button(page, `Permissions for ${group.name}`).click();
+          drawer = activeDrawer(page);
+          await selectNamedPolicy(drawer, 'Agent permissions', 'None');
+          await closeDrawer(page);
+
+          drawer = await openPolicyLibrary(page);
+          await expect(policyRow(drawer, policyNames.shared)).toContainText('1 attachment');
+          await button(policyRow(drawer, policyNames.shared), 'Delete').click();
           await expect(
-            drawer.getByText('Saved at this scope: Visible.', { exact: true })
-          ).toBeVisible();
-          await capture(page, testInfo, 'managed-client-configuration-inherited');
-          await button(drawer, 'Close drawer').click();
+            button(policyRow(drawer, policyNames.shared), 'Confirm delete')
+          ).toBeDisabled();
+          await closeDrawer(page);
 
-          await inspectMemberPolicy.click();
-          await memberSelect.selectOption(ungroupedMember.id);
-          await expect(dollarVisibility).toHaveText('Hidden');
-          await expect(drawer.getByText('No group policy contributions.')).toBeVisible();
-          await button(drawer, 'Close drawer').click();
+          await button(page, `Permissions for ${neutralGroup.name}`).click();
+          drawer = activeDrawer(page);
+          await selectNamedPolicy(drawer, 'Agent permissions', 'None');
+          await closeDrawer(page);
+          await expectPolicyAttachments(permissionFixture, policyNames.shared, []);
 
-          await defaultPermissions.click();
-          await clientConfiguration.click();
-          await expect(showDollarValues).not.toBeChecked();
-          await showDollarValues.click();
-          await savePolicy(drawer, hiddenDefaultRevision + 1);
-          expect((await readDefault())?.default_policies).toEqual([
-            { type: 'model_access', data: { mode: 'all' } },
-            restrictiveDefaultAgentPolicy,
-            visibleDollarValuesPolicy,
+          drawer = await openPolicyLibrary(page);
+          await expect(policyRow(drawer, policyNames.shared)).toContainText('Unlinked');
+          await button(policyRow(drawer, policyNames.shared), 'Delete').click();
+          const enabledConfirm = button(policyRow(drawer, policyNames.shared), 'Confirm delete');
+          await expect(enabledConfirm).toBeEnabled();
+          await enabledConfirm.click();
+          await expect(drawer.getByText(policyNames.shared, { exact: true })).toHaveCount(0);
+          await closeDrawer(page);
+
+          await expect
+            .poll(async () =>
+              (await permissionFixture.readNamedPolicies()).some(
+                policy => policy.name === policyNames.shared
+              )
+            )
+            .toBe(false);
+          await expectPolicyAttachments(permissionFixture, policyNames.browser, [
+            { type: 'default' },
           ]);
-          await button(drawer, 'Close drawer').click();
-
-          await inspectMemberPolicy.click();
-          await memberSelect.selectOption(ungroupedMember.id);
-          await expect(dollarVisibility).toHaveText('Visible');
-          await expect(autoApproveStatus).toHaveText('Disabled');
-          await button(drawer, 'Close drawer').click();
         }
       );
 
       await permissionPolicyTest.step(
-        'Leave the disabled Enterprise tenant on its existing Groups UI',
+        'Leave the disabled Enterprise tenant on the existing Groups UI',
         async () => {
-          const [settings] = await Promise.all([
+          const [list] = await Promise.all([
             page.waitForResponse(response =>
-              response.url().includes('organizations.groups.adminPermissionPolicy.settings')
+              response.url().includes('organizations.groups.adminPermissionPolicy.list')
             ),
             page.goto(groupsPath(disabled)),
           ]);
-          expect(await settings.json()).toContainEqual({
-            result: {
-              data: {
-                managed: false,
-                writesEnabled: false,
-                policies: [],
-                policyRevision: expect.any(Number),
-              },
-            },
+          expect(await list.json()).toContainEqual({
+            result: { data: expect.objectContaining({ managed: false, policies: [] }) },
           });
+
+          await expect(
+            page.getByText('Model access: All organization-approved models', { exact: true })
+          ).toBeVisible();
           await expect(button(page, 'Manage defaults')).toBeVisible();
           await expect(page.getByText(disabledGroup.name, { exact: true })).toBeVisible();
-          await expect(button(page, 'Default permissions')).toHaveCount(0);
+          await expect(button(page, 'Group Defaults')).toHaveCount(0);
+          await expect(button(page, 'Policies')).toHaveCount(0);
           await expect(button(page, 'Inspect member policy')).toHaveCount(0);
           await expect(button(page, `Permissions for ${disabledGroup.name}`)).toHaveCount(0);
+
+          await button(page, 'Manage defaults').click();
+          const drawer = activeDrawer(page);
+          await expect(
+            drawer.getByRole('heading', { name: 'Default policies', exact: true })
+          ).toBeVisible();
+          await expect(drawer.getByText('Model access', { exact: true })).toBeVisible();
+          await expect(
+            drawer.getByText('All organization-approved models', { exact: true })
+          ).toBeVisible();
+          await closeDrawer(page);
         }
       );
     }

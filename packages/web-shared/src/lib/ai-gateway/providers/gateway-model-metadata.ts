@@ -198,7 +198,7 @@ export function formatModelIds(modelIds: readonly string[]) {
 }
 
 /** The jsonb key one model's stored endpoints are projected under. */
-export const STORED_ENDPOINTS_KEY = 'endpoints';
+const STORED_ENDPOINTS_KEY = 'endpoints';
 const StoredEndpointsSchema = z.strictObject({
   [STORED_ENDPOINTS_KEY]: z.array(EndpointSchema),
 });

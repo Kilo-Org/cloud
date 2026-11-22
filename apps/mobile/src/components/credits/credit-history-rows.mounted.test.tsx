@@ -95,7 +95,7 @@ function paintedAmountAndDate(renderer: TestRenderer.ReactTestRenderer): {
   date: string;
 } {
   const painted = texts(renderer).map(text => readable(text));
-  const amountIndex = painted.findIndex(text => /^[+-]?\$/.test(text));
+  const amountIndex = painted.findIndex(text => /^[+-]?\$[\d,]+\.\d{2}$/.test(text));
   const amount = painted[amountIndex];
   const date = painted[amountIndex + 1];
   if (amount === undefined || date === undefined) {

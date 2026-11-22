@@ -38,7 +38,8 @@ export const UNMEASURED_VALUE = '—';
  * fraction digits the surface needs, from none (`$49`) up to four below half a
  * cent.
  *
- * Amounts that round to zero display without a sign.
+ * The formatter overrides `style` and `signDisplay`. Only amounts that round
+ * to a negative value display a sign.
  */
 export function formatPrefixedUsd(
   amount: number,

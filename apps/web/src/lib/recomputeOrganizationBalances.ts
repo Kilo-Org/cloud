@@ -23,7 +23,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, asc, gt } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { computeExpiration } from '@kilocode/db/credit-expiration';
+import { computeExpiration, ORGANIZATION_CREDIT_ACTOR } from '@kilocode/db/credit-expiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
 import { mergeSortedByCreatedAt } from '@/lib/user/recompute-balances';
 
@@ -199,7 +199,7 @@ export async function recomputeOrganizationBalances(args: {
           expiringTransactions,
           { id: org.id, microdollars_used: cumulativeUsage },
           lastExpirationTime,
-          'system'
+          ORGANIZATION_CREDIT_ACTOR
         ).newBaselines,
       ]);
 

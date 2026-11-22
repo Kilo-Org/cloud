@@ -393,8 +393,7 @@ describe('Claude customer-billed routing', () => {
       .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
     expect(await checkClaudeBilling(input())).toEqual({
       kind: 'unavailable',
-      message:
-        'Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time.',
+      message: `Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time. Manage the connection at ${APP_URL}/byok.`,
     });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -436,7 +435,7 @@ describe('Claude customer-billed routing', () => {
   ])('does not switch payer for the %s API', async (_name, gatewayRequest) => {
     expect(await checkClaudeBilling({ ...input(), request: gatewayRequest })).toMatchObject({
       kind: 'unavailable',
-      message: 'Use the Messages API with your Claude link.',
+      message: `Use the Messages API with your Claude link. Manage the connection at ${APP_URL}/byok.`,
     });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -444,5 +443,36 @@ describe('Claude customer-billed routing', () => {
   it('keeps unrelated models on their existing route', async () => {
     expect(await checkClaudeBilling({ ...input(), requestedModel: 'openai/gpt-model' })).toBeNull();
     expect(getGrantedClaudeBillingConnection).not.toHaveBeenCalled();
+  });
+
+  it('names the manage-connection page on every cause the customer can act on', async () => {
+    const pointer = `Manage the connection at ${APP_URL}/byok.`;
+
+    const noRequester = await checkClaudeBilling({
+      ...input(),
+      userId: null,
+      organizationId: 'organization',
+    });
+    if (noRequester?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(noRequester.message).toContain(pointer);
+
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
+    const parseMismatch = await checkClaudeBilling(input());
+    if (parseMismatch?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(parseMismatch.message).toContain(pointer);
+
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockRejectedValueOnce(new Error('database unavailable'));
+    const readFailure = await checkClaudeBilling(input());
+    if (readFailure?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(readFailure.message).toContain(pointer);
+
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
+    const operatorGap = await checkClaudeBilling(input());
+    if (operatorGap?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(operatorGap.message).not.toContain(pointer);
   });
 });

@@ -28,10 +28,17 @@ import { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 /**
+ * The pointer to the page that manages a Claude billing connection, appended to
+ * each message whose fix starts there. One declaration keeps every such message
+ * naming the same place.
+ */
+const MANAGE_CONNECTION_POINTER = `Manage the connection at ${APP_URL}/byok.`;
+
+/**
  * The customer-facing message for a connection that exists but cannot bill. It
  * owns its complete text, including the manage-connection pointer.
  */
-export const CLAUDE_BILLING_REQUIRED_MESSAGE = `Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/linked-platforms. Manage the connection at ${APP_URL}/byok.`;
+export const CLAUDE_BILLING_REQUIRED_MESSAGE = `Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/linked-platforms. ${MANAGE_CONNECTION_POINTER}`;
 
 /**
  * Kilo's own missing server-side operator credential. It names no customer
@@ -190,8 +197,7 @@ export async function checkClaudeBilling(
     return input.organizationId
       ? {
           kind: 'unavailable',
-          message:
-            'Linked billing with Claude Platform is not enabled. Remove the link to use another payment method.',
+          message: `Linked billing with Claude Platform is not enabled. Remove the link to use another payment method. ${MANAGE_CONNECTION_POINTER}`,
         }
       : null;
   }
@@ -208,13 +214,12 @@ export async function checkClaudeBilling(
     if (error instanceof ClaudeBillingPayerStateParseError) {
       return {
         kind: 'unavailable',
-        message:
-          'Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time.',
+        message: `Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time. ${MANAGE_CONNECTION_POINTER}`,
       };
     }
     return {
       kind: 'unavailable',
-      message: 'We could not check your Claude link. Try again.',
+      message: `We could not check your Claude link. Try again. ${MANAGE_CONNECTION_POINTER}`,
       retryable: true,
     };
   }
@@ -229,7 +234,7 @@ export async function checkClaudeBilling(
   if (!servesApiKind(input.request)) {
     return {
       kind: 'unavailable',
-      message: 'Use the Messages API with your Claude link.',
+      message: `Use the Messages API with your Claude link. ${MANAGE_CONNECTION_POINTER}`,
     };
   }
   if (!isClaudeOperatorConfigured()) {

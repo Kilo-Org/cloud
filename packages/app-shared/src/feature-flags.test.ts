@@ -21,13 +21,15 @@ const KEYS = CROSS_APP_FEATURE_FLAG_KEYS;
 
 // Written out here, not derived: the values below are what the two clients and
 // the PostHog project already agree on, so a changed string in the object fails
-// instead of agreeing with itself.
-const EXPECTED_KEYS = [
-  'code-review-md-conversion',
-  'code-review-council',
-  'organization-auto-model-routing',
-  'sign-in-with-chatgpt',
-];
+// instead of agreeing with itself. The member names are part of the expectation,
+// so swapping two values between members fails too; a sorted comparison of
+// values would accept that swap.
+const EXPECTED_KEYS: typeof CROSS_APP_FEATURE_FLAG_KEYS = {
+  codeReviewMdConversion: 'code-review-md-conversion',
+  codeReviewCouncil: 'code-review-council',
+  organizationAutoModel: 'organization-auto-model-routing',
+  chatGptSignIn: 'sign-in-with-chatgpt',
+};
 
 const FLAG_CONSTANTS = [
   CHATGPT_ACCESS_FLAG,
@@ -38,7 +40,7 @@ const FLAG_CONSTANTS = [
 
 describe('cross-app feature flags', () => {
   it('publishes the key strings the clients and the project already use', () => {
-    expect([...Object.values(KEYS)].sort()).toEqual([...EXPECTED_KEYS].sort());
+    expect(KEYS).toEqual(EXPECTED_KEYS);
   });
 
   it('aliases each constant to its canonical member', () => {

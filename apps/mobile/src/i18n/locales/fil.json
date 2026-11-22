@@ -1329,7 +1329,7 @@
       "findingsInProgress": "Nagpapatuloy pa ang pagsusuri. Lalabas dito ang mga resulta kapag natapos na ito.",
       "findingsEndedWithoutResults": "Natapos ang pagsusuri nang hindi nakalikha ng anumang resulta.",
       "serviceUnavailable": "Hindi makakonekta sa serbisyo ng pagsusuri ng code. Subukang muli ang pagsusuri kapag available na ang serbisyo.",
-      "reviewFailed": "Nabigo ang pagsusuri. Pakisubukang muli.",
+      "reviewFailed": "Nabigo ang pagsusuri.",
       "showMore": "Magpakita ng higit pa",
       "created": "Nalikha",
       "started": "Nagsimula",

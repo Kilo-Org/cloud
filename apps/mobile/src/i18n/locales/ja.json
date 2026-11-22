@@ -829,7 +829,7 @@
       "findingsInProgress": "このレビューはまだ進行中です。完了すると、ここに指摘が表示されます。",
       "findingsEndedWithoutResults": "このレビューは、指摘が生成される前に終了しました。",
       "serviceUnavailable": "コードレビューサービスに接続できませんでした。サービスが利用可能になったら、レビューを再試行してください。",
-      "reviewFailed": "レビューに失敗しました。もう一度お試しください。",
+      "reviewFailed": "レビューに失敗しました。",
       "retryMessage": "コードレビューをもう一度実行します。",
       "retryReview": "レビューを再試行",
       "retryNeedsSettings": "コードレビュアーがオフになっているか、設定の確認が必要です。設定を修正してから、このレビューを再試行してください。",

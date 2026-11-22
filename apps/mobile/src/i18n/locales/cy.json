@@ -1441,7 +1441,7 @@
       "findingsInProgress": "Mae'r adolygiad hwn dal ar waith. Bydd y canfyddiadau'n ymddangos yma pan fydd wedi gorffen.",
       "findingsEndedWithoutResults": "Gorffennodd yr adolygiad hwn cyn iddo gynhyrchu unrhyw ganfyddiadau.",
       "serviceUnavailable": "Ni ellid cysylltu â'r gwasanaeth adolygu cod. Rhowch gynnig arall ar yr adolygiad pan fydd y gwasanaeth ar gael.",
-      "reviewFailed": "Methodd yr adolygiad. Rhowch gynnig arall arni.",
+      "reviewFailed": "Methodd yr adolygiad.",
       "showMore": "Dangos mwy",
       "created": "Crëwyd",
       "started": "Dechreuwyd",

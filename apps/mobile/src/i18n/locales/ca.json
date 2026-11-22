@@ -1357,7 +1357,7 @@
       "findingsInProgress": "Aquesta revisió encara està en curs. Les incidències apareixeran aquí quan finalitzi.",
       "findingsEndedWithoutResults": "Aquesta revisió ha finalitzat abans de produir cap incidència.",
       "serviceUnavailable": "No s'ha pogut connectar amb el servei de revisió de codi. Torna a provar la revisió quan el servei estigui disponible.",
-      "reviewFailed": "La revisió ha fallat. Si us plau, torna-ho a provar.",
+      "reviewFailed": "La revisió ha fallat.",
       "showMore": "Mostra'n més",
       "created": "Data de creació",
       "started": "Data d'inici",

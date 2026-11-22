@@ -833,7 +833,7 @@
       "findingsInProgress": "Ten przegląd jest jeszcze w toku. Wyniki pojawią się tutaj po jego zakończeniu.",
       "findingsEndedWithoutResults": "Ten przegląd zakończył się przedwcześnie, nie generując żadnych wyników.",
       "serviceUnavailable": "Nie udało się połączyć z usługą przeglądu kodu. Ponów przegląd, gdy usługa będzie dostępna.",
-      "reviewFailed": "Przegląd się nie powiódł. Spróbuj ponownie.",
+      "reviewFailed": "Przegląd się nie powiódł.",
       "retryMessage": "Spowoduje to ponowne uruchomienie przeglądu kodu.",
       "retryReview": "Ponów przegląd",
       "retryNeedsSettings": "Asystent przeglądu kodu jest wyłączony albo jego ustawienia wymagają uwagi. Popraw ustawienia, a następnie ponów ten przegląd.",

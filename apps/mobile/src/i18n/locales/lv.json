@@ -1357,7 +1357,7 @@
       "findingsInProgress": "Šī pārskatīšana vēl notiek. Konstatējumi šeit parādīsies, kad tā tiks pabeigta.",
       "findingsEndedWithoutResults": "Šī pārskatīšana tika pārtraukta, pirms tika iegūti kādi konstatējumi.",
       "serviceUnavailable": "Neizdevās izveidot savienojumu ar koda pārskatīšanas pakalpojumu. Atkārtojiet koda pārskatīšanu, kad pakalpojums būs pieejams.",
-      "reviewFailed": "Koda pārskatīšana neizdevās. Lūdzu, mēģiniet vēlreiz.",
+      "reviewFailed": "Koda pārskatīšana neizdevās.",
       "showMore": "Rādīt vairāk",
       "created": "Izveidota",
       "started": "Sākta",

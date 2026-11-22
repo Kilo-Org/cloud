@@ -1385,7 +1385,7 @@
       "findingsInProgress": "Ta pregled je še v teku. Ugotovitve se prikažejo tukaj, ko se zaključi.",
       "findingsEndedWithoutResults": "Ta pregled se je končal, preden je prinesel kakršne koli ugotovitve.",
       "serviceUnavailable": "Povezave s storitvijo za pregled kode ni bilo mogoče vzpostaviti. Znova zaženi pregled, ko bo storitev na voljo.",
-      "reviewFailed": "Pregled ni uspel. Poskusi znova.",
+      "reviewFailed": "Pregled ni uspel.",
       "showMore": "Prikaži več",
       "created": "Ustvarjeno",
       "started": "Začeto",

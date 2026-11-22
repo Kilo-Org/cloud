@@ -1329,7 +1329,7 @@
       "findingsInProgress": "Bu kod yoxlaması hələ davam edir. Bitəndə tapıntılar burada görünəcək.",
       "findingsEndedWithoutResults": "Bu kod yoxlaması hər hansı bir tapıntı meydana gəlmədən başa çatdı.",
       "serviceUnavailable": "Kod yoxlaması xidmətinə qoşulmaq mümkün olmadı. Xidmət əlçatan olduqda yoxlamanı təkrarla.",
-      "reviewFailed": "Kod yoxlaması uğursuz oldu. Zəhmət olmasa, yenidən cəhd et.",
+      "reviewFailed": "Kod yoxlaması uğursuz oldu.",
       "showMore": "Daha çox göstər",
       "created": "Yaradılıb",
       "started": "Başlanıb",

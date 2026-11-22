@@ -1385,7 +1385,7 @@
       "findingsInProgress": "Ši peržiūra vis dar vyksta. Radiniai čia atsiras jai pasibaigus.",
       "findingsEndedWithoutResults": "Ši peržiūra baigėsi, nespėjusi pateikti jokių radinių.",
       "serviceUnavailable": "Nepavyko prisijungti prie kodo peržiūros paslaugos. Pakartokite peržiūrą, kai paslauga bus pasiekiama.",
-      "reviewFailed": "Peržiūra nepavyko. Bandyk dar kartą.",
+      "reviewFailed": "Peržiūra nepavyko.",
       "showMore": "Rodyti daugiau",
       "created": "Sukurta",
       "started": "Pradėta",

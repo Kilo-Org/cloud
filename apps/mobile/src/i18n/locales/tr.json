@@ -829,7 +829,7 @@
       "findingsInProgress": "Bu inceleme hâlâ sürüyor. İnceleme tamamlandığında bulgular burada görünür.",
       "findingsEndedWithoutResults": "Bu inceleme, herhangi bir bulgu üretmeden sona erdi.",
       "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",
-      "reviewFailed": "İnceleme başarısız oldu. Lütfen tekrar dene.",
+      "reviewFailed": "İnceleme başarısız oldu.",
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",
       "retryReview": "İncelemeyi tekrar dene",
       "retryNeedsSettings": "Kod inceleyici kapalı veya ayarlarının ilgilenilmesi gerekiyor. Ayarları düzeltin, ardından bu incelemeyi tekrar deneyin.",

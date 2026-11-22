@@ -829,7 +829,7 @@
       "findingsInProgress": "Deze review is nog niet afgerond. De bevindingen verschijnen hier zodra hij klaar is.",
       "findingsEndedWithoutResults": "Deze review is beëindigd voordat er bevindingen waren.",
       "serviceUnavailable": "De codereviewservice kon niet worden bereikt. Probeer de review opnieuw wanneer de service beschikbaar is.",
-      "reviewFailed": "De review is mislukt. Probeer het opnieuw.",
+      "reviewFailed": "De review is mislukt.",
       "retryMessage": "Dit voert de codereview opnieuw uit.",
       "retryReview": "Review opnieuw proberen",
       "retryNeedsSettings": "De Codebeoordelaar staat uit of de instellingen vragen aandacht. Herstel de instellingen en probeer deze review daarna opnieuw.",

@@ -1329,7 +1329,7 @@
       "findingsInProgress": "Semakan ini masih dijalankan. Penemuan akan dipaparkan di sini apabila ia selesai.",
       "findingsEndedWithoutResults": "Semakan ini tamat sebelum menghasilkan sebarang penemuan.",
       "serviceUnavailable": "Tidak dapat menghubungi perkhidmatan semakan kod. Cuba semakan semula apabila perkhidmatan tersedia.",
-      "reviewFailed": "Semakan gagal. Sila cuba lagi.",
+      "reviewFailed": "Semakan gagal.",
       "showMore": "Tunjukkan lebih banyak",
       "created": "Dicipta",
       "started": "Dimulakan",

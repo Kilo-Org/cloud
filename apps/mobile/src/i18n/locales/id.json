@@ -829,7 +829,7 @@
       "findingsInProgress": "Tinjauan ini masih berlangsung. Temuan akan muncul di sini setelah selesai.",
       "findingsEndedWithoutResults": "Tinjauan ini berakhir sebelum menghasilkan temuan apa pun.",
       "serviceUnavailable": "Tidak dapat terhubung ke layanan tinjauan kode. Coba tinjauan lagi saat layanan tersedia.",
-      "reviewFailed": "Tinjauan gagal. Silakan coba lagi.",
+      "reviewFailed": "Tinjauan gagal.",
       "retryMessage": "Ini akan menjalankan ulang tinjauan kode.",
       "retryReview": "Coba tinjauan lagi",
       "retryNeedsSettings": "Peninjau kode nonaktif atau pengaturannya perlu diperhatikan. Perbaiki pengaturan, lalu coba tinjauan ini lagi.",

@@ -1329,7 +1329,7 @@
       "findingsInProgress": "Bu ko'rib chiqish hali davom etmoqda. Tugagach, muammolar shu yerda paydo bo'ladi.",
       "findingsEndedWithoutResults": "Bu ko'rib chiqish hech qanday muammo aniqlamaydan tugadi.",
       "serviceUnavailable": "Kodni ko'rib chiqish xizmatiga ulanib bo'lmadi. Xizmat mavjud bo'lganda ko'rib chiqishni qayta urinib ko'ring.",
-      "reviewFailed": "Ko'rib chiqish muvaffaqiyatsiz tugadi. Iltimos, qayta urinib ko'ring.",
+      "reviewFailed": "Ko'rib chiqish muvaffaqiyatsiz tugadi.",
       "showMore": "Ko'proq ko'rsatish",
       "created": "Yaratilgan",
       "started": "Boshlangan",

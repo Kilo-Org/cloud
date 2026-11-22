@@ -1329,7 +1329,7 @@
       "findingsInProgress": "Hierdie hersiening is nog besig. Bevindings verskyn hier wanneer dit klaar is.",
       "findingsEndedWithoutResults": "Hierdie hersiening het geëindig voordat dit enige bevindings opgelewer het.",
       "serviceUnavailable": "Die kodehersieningsdiens kon nie bereik word nie. Probeer die hersiening weer wanneer die diens beskikbaar is.",
-      "reviewFailed": "Die hersiening het misluk. Probeer asseblief weer.",
+      "reviewFailed": "Die hersiening het misluk.",
       "showMore": "Wys meer",
       "created": "Geskep",
       "started": "Begin",

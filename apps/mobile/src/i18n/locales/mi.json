@@ -1329,7 +1329,7 @@
       "findingsInProgress": "Kei te haere tonu tēnei arotake. Ka puta ngā kitenga i konei ina oti.",
       "findingsEndedWithoutResults": "I mutu tēnei arotake i mua i te puta o tētahi kitenga.",
       "serviceUnavailable": "Kāore i taea te hono atu ki te ratonga arotake waehere. Whakamātau anō i te arotake ina wātea te ratonga.",
-      "reviewFailed": "I rahua te arotake. Tēnā, whakamātau anō.",
+      "reviewFailed": "I rahua te arotake.",
       "showMore": "Whakaaturia ētahi atu",
       "created": "I waihangatia",
       "started": "I tīmata",

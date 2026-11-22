@@ -25,6 +25,7 @@ import { z } from 'zod';
 import * as Notifications from 'expo-notifications';
 
 import {
+  ANSWER_DRAFT_MAX_LENGTH,
   androidChannelIdForPushData,
   genericPushContentForPushData,
   NEEDS_INPUT_ACTION_IDS,
@@ -406,7 +407,7 @@ export function pendingDeepLinkOptionsForData(data: PushData): PendingDeepLinkOp
  * already typed instead of losing it. Only a retryable reply carries a draft;
  * every other result has none, and the tap changes nothing.
  */
-function restoreReplyDraftFromData(data: PushData): void {
+export function restoreReplyDraftFromData(data: PushData): void {
   if (data.type !== 'cloud_agent_session' || data.answerDraft === undefined) {
     return;
   }
@@ -528,9 +529,6 @@ function resultTitleFor(args: {
   return args.actedOnTitle ?? i18n.t('notifications.category.agentAttentionTitle');
 }
 
-/** The length the push schema keeps of an undelivered reply draft. */
-const ANSWER_DRAFT_MAX_LENGTH = 2000;
-
 /**
  * The payload the posted result carries.
  *
@@ -552,6 +550,8 @@ function resumeAnswerDraft(
   if (!hasVisibleComposerText(text)) {
     return data;
   }
+  // The schema owns the bound: this slice keeps the posted payload valid, and
+  // the reader never sees a value the shared contract would refuse.
   return { ...data, answerDraft: text.slice(0, ANSWER_DRAFT_MAX_LENGTH) };
 }
 

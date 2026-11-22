@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 
 jest.mock('@kilocode/web-shared/lib/posthog', () => {
   const mockGetFeatureFlag = jest.fn();
@@ -263,7 +263,9 @@ describe('shared flag cache', () => {
     jest.setSystemTime(secondMissAt + 29_000);
     await expect(isReleaseToggleEnabled('stalled-twice-flag', 'user-i')).resolves.toBe(false);
     expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
-    expect(mockCaptureException).toHaveBeenCalledTimes(2);
+    // The second miss falls inside the flag name's report window, so only the
+    // first miss reported; the cache backoff still keeps the second miss.
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
 
     jest.setSystemTime(secondMissAt + 30_001);
     const third = isReleaseToggleEnabled('stalled-twice-flag', 'user-i');
@@ -335,5 +337,94 @@ describe('shared flag cache', () => {
 
     await isFeatureFlagEnabled('bounded-flag', 'user-0');
     expect(mockGetFeatureFlag).toHaveBeenCalledTimes(502);
+  });
+});
+
+describe('failure report throttle', () => {
+  // These cases leave fake timers installed; the suite's afterAll hook needs
+  // real ones to run its shutdown.
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('reports one failure for two distinct ids of the same flag in one window', async () => {
+    jest.useFakeTimers();
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockGetFeatureFlag.mockReturnValue(new Promise(() => {}));
+
+      const first = isReleaseToggleEnabled('survey-credits', 'user-one');
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(first).resolves.toBe(false);
+
+      // A different distinct id is a different cache key, so it reads and misses
+      // on its own, but it must not add a second report for the same flag name.
+      const second = isReleaseToggleEnabled('survey-credits', 'user-two');
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(second).resolves.toBe(false);
+
+      expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        'Error checking boolean feature flag:',
+        'survey-credits',
+        expect.objectContaining({ message: expect.stringContaining('did not answer') })
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test('reports each flag name independently', async () => {
+    jest.useFakeTimers();
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockGetFeatureFlag.mockReturnValue(new Promise(() => {}));
+
+      const first = isReleaseToggleEnabled('survey-credits', 'user-one');
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(first).resolves.toBe(false);
+
+      const second = isReleaseToggleEnabled('cloud-data-export-ui', 'user-two');
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(second).resolves.toBe(false);
+
+      expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
+      expect(mockCaptureException).toHaveBeenCalledTimes(2);
+      expect(consoleError).toHaveBeenCalledTimes(2);
+      expect(consoleError).toHaveBeenNthCalledWith(
+        2,
+        'Error checking boolean feature flag:',
+        'cloud-data-export-ui',
+        expect.anything()
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test('reports the same flag name again once its window has passed', async () => {
+    jest.useFakeTimers();
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockGetFeatureFlag.mockReturnValue(new Promise(() => {}));
+
+      const first = isReleaseToggleEnabled('survey-credits', 'user-one');
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(first).resolves.toBe(false);
+      const firstReportedAt = Date.now();
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+
+      jest.setSystemTime(firstReportedAt + 30_001);
+      const afterWindow = isReleaseToggleEnabled('survey-credits', 'user-three');
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(afterWindow).resolves.toBe(false);
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(2);
+      expect(consoleError).toHaveBeenCalledTimes(2);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

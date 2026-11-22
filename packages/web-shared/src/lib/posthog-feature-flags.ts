@@ -33,7 +33,7 @@ const FLAG_READ_TIMEOUT_MS = 1_000;
  * Window a second consecutive miss of the same key opens. Reads of that key
  * answer with their caller's default for this window, so an unreachable PostHog
  * costs one deadline per key per window instead of one per request, and reports
- * one failure per window instead of one per failed check.
+ * one failure per flag name per window instead of one per failed check.
  */
 const FLAG_FAILURE_BACKOFF_MS = 30_000;
 
@@ -54,6 +54,12 @@ const FLAG_FIRST_FAILURE_BACKOFF_MS = 10_000;
  */
 const MAX_CACHED_FLAGS = 500;
 
+/**
+ * Cap on the flag names tracked for failure reporting. The repo reads a small
+ * fixed flag set, so this only bounds a caller that passes arbitrary names.
+ */
+const MAX_REPORTED_FLAGS = 100;
+
 /** A resolved PostHog flag value; `undefined` means the flag has no value. */
 type FlagValue = string | boolean | undefined;
 
@@ -70,6 +76,43 @@ type FlagCacheEntry =
 const READ_TIMED_OUT = Symbol('flag-read-timed-out');
 
 const flagCache = new Map<string, FlagCacheEntry>();
+
+/**
+ * Epoch ms of the last reported failure per flag name, so one outage costs one
+ * `console.error` and one `captureException` per flag name per window. A report
+ * per cache key would multiply by the number of distinct ids: the survey and
+ * data-export flags are keyed by user id and email, so `MAX_CACHED_FLAGS` keys
+ * of one flag could otherwise produce that many exception events and forwarded
+ * `console.error` logs in each window. The map is pruned of expired names before
+ * it reaches `MAX_REPORTED_FLAGS`, which no real flag set approaches.
+ */
+const flagLastReportedAt = new Map<string, number>();
+
+/** Whether this miss of `flagName` is the one to report, recording it if so. */
+function shouldReportFailure(flagName: string, now: number): boolean {
+  const lastReportedAt = flagLastReportedAt.get(flagName);
+  if (lastReportedAt !== undefined && now - lastReportedAt < FLAG_FAILURE_BACKOFF_MS) {
+    return false;
+  }
+  flagLastReportedAt.delete(flagName);
+  if (flagLastReportedAt.size >= MAX_REPORTED_FLAGS) {
+    // Pruning expired names first keeps the cap from dropping a name whose
+    // window has not passed, so a busy flag set still reports each name once.
+    for (const [candidate, reportedAt] of flagLastReportedAt) {
+      if (now - reportedAt >= FLAG_FAILURE_BACKOFF_MS) {
+        flagLastReportedAt.delete(candidate);
+      }
+    }
+    if (flagLastReportedAt.size >= MAX_REPORTED_FLAGS) {
+      const oldest = flagLastReportedAt.keys().next();
+      if (!oldest.done) {
+        flagLastReportedAt.delete(oldest.value);
+      }
+    }
+  }
+  flagLastReportedAt.set(flagName, now);
+  return true;
+}
 
 type FlagRead = {
   flagName: string;
@@ -162,8 +205,10 @@ async function readFromPostHog({
  * Shared PostHog read-and-report wrapper. Reuses one resolved answer per flag,
  * distinct id and person properties for `FLAG_CACHE_TTL_MS`, shares one read
  * between concurrent callers, and bounds each read. On failure it logs and
- * reports with the initiating caller's tag and extra payload, then returns
- * `undefined` so each caller applies its own failure default.
+ * reports with the initiating caller's tag and extra payload — at most once per
+ * flag name per `FLAG_FAILURE_BACKOFF_MS`, so one outage cannot multiply the
+ * report by the number of distinct ids — then returns `undefined` so each caller
+ * applies its own failure default.
  */
 async function readFlag(meta: FlagRead): Promise<FlagValue> {
   const key = cacheKey(meta);
@@ -197,11 +242,13 @@ async function readFlag(meta: FlagRead): Promise<FlagValue> {
     return settled.value;
   }
 
-  console.error(meta.logMessage, meta.flagName, settled.error);
-  captureException(settled.error, {
-    tags: { source: meta.source },
-    extra: meta.extra,
-  });
+  if (shouldReportFailure(meta.flagName, Date.now())) {
+    console.error(meta.logMessage, meta.flagName, settled.error);
+    captureException(settled.error, {
+      tags: { source: meta.source },
+      extra: meta.extra,
+    });
+  }
   const misses = previousMisses + 1;
   storeEntry(key, {
     kind: 'failed',
@@ -212,9 +259,13 @@ async function readFlag(meta: FlagRead): Promise<FlagValue> {
   return undefined;
 }
 
-/** Drops every cached flag read. Tests call this between cases. */
+/**
+ * Drops every cached flag read and every recorded failure report. Tests call
+ * this between cases.
+ */
 export function resetFeatureFlagCache(): void {
   flagCache.clear();
+  flagLastReportedAt.clear();
 }
 
 /**

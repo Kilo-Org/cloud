@@ -84,6 +84,19 @@ const hello = (runnerConnected = true) => ({
 async function flush() {
   for (let index = 0; index < 25; index++) await Promise.resolve();
 }
+/** Records how a promise settles without leaving its rejection unhandled. */
+function trackOutcome(operation: Promise<unknown>) {
+  const state = { code: 'pending' };
+  void operation.then(
+    () => {
+      state.code = 'resolved';
+    },
+    (error: { code?: string }) => {
+      state.code = error.code ?? 'failed';
+    }
+  );
+  return state;
+}
 function fixture(respond?: (path: string) => Promise<Response> | undefined) {
   const calls: {
     path: string;
@@ -3149,7 +3162,9 @@ test('a later missing terminal tool frame keeps its own frontier while an earlie
 });
 
 test('a response whose body never arrives times out like a stalled connect', async () => {
-  const neverEnding = () => new Response(new ReadableStream({ start() {} }));
+  // Both halves stall after the headers: the success path reads JSON, and the failing status
+  // path reads an error body before it can report the status.
+  const neverEnding = () => new ReadableStream({ start() {} });
   let stallBody = true;
   const fetcher = jest.fn(async (input: string | URL | Request) => {
     const path = new URL(String(input)).pathname;
@@ -3159,8 +3174,8 @@ test('a response whose body never arrives times out like a stalled connect', asy
         expiresAt: new Date(Date.now() + 300_000).toISOString(),
       });
     if (!stallBody) return Response.json({ items: [], cursor: null });
-    if (path === '/v1/sessions') return neverEnding();
-    return new Response(new ReadableStream({ start() {} }), { status: 503 });
+    if (path === '/v1/sessions') return new Response(neverEnding());
+    return new Response(neverEnding(), { status: 503 });
   });
   const client = new NativeSyncClient({
     baseUrl: 'https://sync.test',
@@ -3168,25 +3183,13 @@ test('a response whose body never arrives times out like a stalled connect', asy
     fetch: fetcher,
     WebSocket: FakeSocket,
   });
-  const track = (operation: Promise<unknown>) => {
-    const state = { code: 'pending' };
-    void operation.then(
-      () => {
-        state.code = 'resolved';
-      },
-      (error: { code?: string }) => {
-        state.code = error.code ?? 'failed';
-      }
-    );
-    return state;
-  };
-  const first = track(client.listSessions());
+  const first = trackOutcome(client.listSessions());
   await flush();
   await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
   await flush();
   expect(first.code).toBe('request_timeout');
-  // The failing status path reads a body too, so it carries the same bound.
-  const failing = track(client.request('/v1/sessions'));
+  // A different path reaches the failing status, whose error body stalls the same way.
+  const failing = trackOutcome(client.request('/v1/sessions/ses_a/commands'));
   await flush();
   await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
   await flush();
@@ -3195,13 +3198,15 @@ test('a response whose body never arrives times out like a stalled connect', asy
   await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
 });
 
-test('a stalled grant exchange times out, fails the call, and is replaced on the next call', async () => {
+test('a stalled grant exchange times out, aborts its request, and is replaced on the next call', async () => {
   let exchanges = 0;
   let stallExchange = true;
-  const fetcher = jest.fn(async (input: string | URL | Request) => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const fetcher = jest.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     if (path === '/v1/auth/exchange') {
       exchanges++;
+      signals.push(init?.signal);
       if (stallExchange) return new Promise<Response>(() => {});
       return Response.json({
         token: 'grant',
@@ -3217,19 +3222,15 @@ test('a stalled grant exchange times out, fails the call, and is replaced on the
     WebSocket: FakeSocket,
   });
   const call = client.listSessions();
-  let settled = 'pending';
-  void call.then(
-    () => {
-      settled = 'resolved';
-    },
-    (error: { code?: string }) => {
-      settled = error.code ?? 'failed';
-    }
-  );
+  const settled = trackOutcome(call);
   await flush();
+  const wire = signals[0];
+  expect(wire?.aborted).toBe(false);
   await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
   await flush();
-  expect(settled).toBe('request_timeout');
+  expect(settled.code).toBe('request_timeout');
+  // The deadline reaches the request itself, not just the promise waiting on it.
+  expect(wire?.aborted).toBe(true);
   await expect(call).rejects.toMatchObject({ code: 'request_timeout' });
   // A cached rejected promise would answer the second call without a new exchange.
   stallExchange = false;
@@ -3287,13 +3288,15 @@ test('a stalled ticket mint reaches the connect backoff', async () => {
 
 test('a caller abort during a stalled exchange stays request_canceled', async () => {
   const controller = new AbortController();
-  const fetcher = jest.fn(async (input: string | URL | Request) => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const fetcher = jest.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     if (path === '/v1/auth/exchange')
       return Response.json({
         token: 'grant',
         expiresAt: new Date(Date.now() + 300_000).toISOString(),
       });
+    signals.push(init?.signal);
     if (path === '/v1/sessions/ses_a') return new Promise<Response>(() => {});
     return Response.json({ status: 'queued' });
   });
@@ -3308,22 +3311,17 @@ test('a caller abort during a stalled exchange stays request_canceled', async ()
     return { position: 0, revision: 1, session: sessionMetadata, entities: [], messages: [] };
   });
   const pending = client.getSnapshot('ses_a', undefined, controller.signal);
-  let settled = 'pending';
-  void pending.then(
-    () => {
-      settled = 'resolved';
-    },
-    (error: { code?: string }) => {
-      settled = error.code ?? 'failed';
-    }
-  );
+  const settled = trackOutcome(pending);
   await flush();
+  const wire = signals.at(-1);
+  expect(wire?.aborted).toBe(false);
   controller.abort();
   await flush();
-  expect(settled).toBe('request_canceled');
-  // The deadline never rewrites a failure the caller already caused.
+  expect(settled.code).toBe('request_canceled');
+  // The caller's cancellation reaches the request, and the later deadline does not rewrite it.
+  expect(wire?.aborted).toBe(true);
   await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
   await flush();
-  expect(settled).toBe('request_canceled');
+  expect(settled.code).toBe('request_canceled');
   await expect(pending).rejects.toMatchObject({ code: 'request_canceled' });
 });

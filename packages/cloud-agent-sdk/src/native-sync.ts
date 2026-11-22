@@ -495,7 +495,10 @@ export class NativeSyncClient {
     try {
       return await pending;
     } catch (error) {
-      if (this.grants.get(key) === pending) this.grants.delete(key);
+      // Only this exchange can be cached under the key: `get` and `set` run without an await,
+      // so a concurrent caller reuses this pending promise instead of starting another, and the
+      // 401 replacement is written only after this one resolved.
+      this.grants.delete(key);
       throw error;
     }
   }

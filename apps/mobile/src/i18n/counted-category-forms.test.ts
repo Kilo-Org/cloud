@@ -131,8 +131,7 @@ describe('counted duration copy', () => {
     // The count now selects a category, so a catalog whose minute noun agrees
     // with the number can spell a different form at 1. English does not
     // inflect, and every category keeps the placeholder the formatted number
-    // arrives in. The Greek catalog still carries one string, so its own
-    // agreement assertion belongs to the catalog slice that lands the family.
+    // arrives in.
     for (const category of ['one', 'other'] as const) {
       const form = i18n.getResource(
         'en',
@@ -142,9 +141,9 @@ describe('counted duration copy', () => {
       expect(typeof form, category).toBe('string');
       expect(form, category).toContain('{{minutes}}');
     }
-    const render = (count: number) =>
+    const render = (count: number, lng = 'en') =>
       i18n.t('agentBriefing.paidDisclosure', {
-        lng: 'en',
+        lng,
         count,
         estimate: '$0.12',
         maximum: '$0.30',
@@ -157,5 +156,10 @@ describe('counted duration copy', () => {
     expect(render(1).replace('1-minute', '{{minutes}}-minute')).toBe(
       render(10).replace('10-minute', '{{minutes}}-minute')
     );
+    // A catalog whose minute noun agrees with the number spells the singular
+    // form at a one-minute limit and the plural form past it.
+    expect(render(1, 'el')).toContain('λεπτό');
+    expect(render(10, 'el')).toContain('λεπτά');
+    expect(render(1, 'el')).not.toContain('λεπτά');
   });
 });

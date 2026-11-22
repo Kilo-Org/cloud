@@ -6,6 +6,7 @@ import {
   setAccountMetadata,
 } from '@/lib/auth/account-metadata-write';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/protected-data';
 
 function noop(): void {
   // Placeholder until the promise executor hands over its resolve.
@@ -210,6 +211,17 @@ export function createSecureStorePreference<T>(options: {
     // A clear() that runs after this read starts must win over the bytes it
     // returns, so the read remembers the epoch it began under.
     const loadEpoch = clearEpoch;
+    // The read starts at module evaluation, which a background push or a
+    // resumed timer can reach while iOS still holds the keychain locked. A
+    // locked keychain is not an absent value, so wait for unlock instead of
+    // latching the default for the rest of the process. While the data is
+    // available the check is synchronous, so the read still starts in the
+    // construction turn.
+    if (!isProtectedDataAvailable()) {
+      await whenProtectedDataAvailable();
+    }
+    // Read after the wait: a clear() that ran meanwhile queued a delete this
+    // read must observe and await.
     const deletion = clearDeletion;
     try {
       if (deletion && !(await deletion)) {
@@ -244,9 +256,10 @@ export function createSecureStorePreference<T>(options: {
     } catch {
       // Keep the default on read failure — this runs at construction, before
       // the user has done anything, so there's nothing actionable to tell them.
-      // The SecureStore read path already reports the rejection once (a
-      // warning event for a real failure, a breadcrumb for a locked device's
-      // refusal), so a second record here would only duplicate it.
+      // The read waits for keychain availability first, so a rejection here is
+      // a real read failure rather than a locked-device refusal. The SecureStore
+      // read path already reports that rejection once: a second record here
+      // would only duplicate it.
     } finally {
       loadSettled = true;
       hasLoaded = true;
@@ -395,9 +408,9 @@ export function createSecureStorePreference<T>(options: {
       // A clear before the initial load resolves must still win, even with
       // mergeOnLoad set.
       cleared = true;
-      // Recorded before emit() and before clear() returns, so any read that
-      // begins under it waits for the delete instead of reading the snapshot
-      // this clear removed: until the delete lands, the disk still holds it.
+      // Recorded before emit() and before clear() returns, so a read waits for
+      // the delete instead of reading the snapshot this clear removed: until
+      // the delete lands, the disk still holds it.
       // remove() never rejects, so holding it is safe.
       clearDeletion = remove();
       emit();

@@ -80,9 +80,10 @@ function hasLoadedPreferences(): boolean {
 /**
  * The only bridge from disk to the pure runtime: both stores push the loaded or
  * changed preference into the runtime, which covers the app-start case too
- * because the module-scope preload emits when the reads settle. The first read
- * to settle cannot enable the runtime on its own — `hasLoadedPreferences` keeps
- * it off until the model is known too.
+ * because the stores start their reads when they are constructed (module
+ * evaluation) and emit when the reads settle. The first read to settle cannot
+ * enable the runtime on its own — `hasLoadedPreferences` keeps it off until the
+ * model is known too.
  */
 function syncRuntime(): void {
   if (!hasLoadedPreferences()) {
@@ -130,8 +131,9 @@ export function useToolSummaryTranslationPreference(): ToolSummaryTranslationPre
 }
 
 /**
- * Mount in the app root so importing this module at app start runs the
- * module-scope preload and sync. Renders nothing.
+ * Mount in the app root. Importing this module at app start runs the reads the
+ * stores start at construction, and the `subscribe(syncRuntime)` calls keep the
+ * runtime in step with every emit. Renders nothing.
  */
 export function ToolSummaryTranslationRuntimeBootstrap(): null {
   useToolSummaryTranslationPreference();

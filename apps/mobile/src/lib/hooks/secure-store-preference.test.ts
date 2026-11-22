@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSecureStorePreference } from './secure-store-preference';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   setBreadcrumbSink,
   setTelemetrySink,
@@ -124,6 +125,37 @@ describe('createSecureStorePreference', () => {
       setTelemetrySink(null);
       setBreadcrumbSink(null);
       vi.useRealTimers();
+    }
+  });
+
+  it('waits for the keychain to unlock instead of latching the default', async () => {
+    // The read starts at construction, which a background push or a resumed
+    // timer can reach while iOS still holds the keychain locked. The store must
+    // not read in that state, and must not report the default as loaded: it
+    // waits for unlock, then reads the persisted value.
+    getItemAsync.mockResolvedValue('true');
+    setProtectedDataAvailable(false);
+    try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
+      await flushMicrotasks();
+
+      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(store.getHasLoaded()).toBe(false);
+      expect(store.getRequested()).toBe(false);
+
+      setProtectedDataAvailable(true);
+      await store.whenLoaded();
+
+      expect(getItemAsync).toHaveBeenCalledTimes(1);
+      expect(store.getRequested()).toBe(true);
+      expect(store.getHasLoaded()).toBe(true);
+    } finally {
+      setProtectedDataAvailable(true);
     }
   });
 
@@ -502,7 +534,7 @@ describe('createSecureStorePreference', () => {
     expect(setItemAsync).toHaveBeenLastCalledWith('k', '["new"]');
   });
 
-  it('reads no disk value when the delete a clear() queued failed', async () => {
+  it('shows no disk value when the delete a clear() queued failed', async () => {
     deleteItemAsync.mockRejectedValue(new Error('keychain refused'));
     getItemAsync.mockResolvedValue('true');
     const store = createSecureStorePreference<boolean>({

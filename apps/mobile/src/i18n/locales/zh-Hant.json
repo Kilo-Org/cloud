@@ -522,12 +522,13 @@
       "receiptLabel": "回執",
       "copyReceiptId": "複製回執 ID",
       "appealLabel": "申訴",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "已收到",
       "triageOpen": "審查中",
       "triageActioned": "成立",
       "triageRejected": "不成立",
       "appealNone": "未提交",
-      "appealSubmitted": "審查中",
+      "appealSubmitted": "申訴審查中",
       "appealAccepted": "已接受",
       "appealRejected": "已駁回",
       "appeal": "對此決定提出申訴",
@@ -539,13 +540,23 @@
       "nextStepInReview": "結果會顯示於此畫面，決定後即可提出申訴。",
       "nextStepAppeal": "申訴結果會顯示於此畫面。",
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
-      "viewReceipt": "檢視回執"
+      "viewReceipt": "檢視回執",
+      "targetLabel": "檢舉項目",
+      "reasonLabel": "檢舉原因",
+      "targetMessage": "AI 回覆",
+      "targetComment": "提取請求留言",
+      "targetUser": "使用者",
+      "reasonHarmful": "有害內容",
+      "reasonIllegal": "違法內容",
+      "reasonHarassment": "騷擾",
+      "reasonSpam": "垃圾訊息",
+      "reasonOther": "其他原因"
     },
     "reportReceipts": {
       "title": "檢舉記錄",
       "rowSubtitle": "你提交的檢舉及其結果",
       "emptyTitle": "尚無檢舉記錄",
-      "emptyDescription": "你從留言或 AI 回應提交的檢舉會顯示在這裡。",
+      "emptyDescription": "你從提取要求討論中的留言或代理工作階段中的 AI 回應提交的檢舉，會連同處理結果顯示在這裡。",
       "couldNotLoad": "無法載入你的檢舉",
       "capped": "僅顯示你最近的檢舉。"
     },
@@ -735,6 +746,7 @@
       "manageAccess": "管理存取權限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作區中沒有可用的存放庫。",
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
+      "githubNoRepositoriesDescription": "請檢查 Kilo GitHub 應用程式的儲存庫存取權限，再重新整理。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
       "repositoryAccess": "存放庫存取權限",
@@ -829,7 +841,7 @@
       "findingsInProgress": "此審查仍在進行中。完成後，發現的問題會顯示在這裡。",
       "findingsEndedWithoutResults": "此審查在發現任何問題前即已結束。",
       "serviceUnavailable": "無法連線至程式碼審查服務。請在服務可用時重新嘗試審查。",
-      "reviewFailed": "審查失敗。請再試一次。",
+      "reviewFailed": "審查失敗。",
       "retryMessage": "這會重新執行程式碼審查。",
       "retryReview": "重新嘗試審查",
       "retryNeedsSettings": "程式碼審查助手已關閉，或其設定需要處理。請修正設定，然後重新嘗試此審查。",
@@ -1602,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 個工作階段",
       "sectionAccessibility": "{{title}}：{{displayCount}} 個工作階段",
       "live": "即時",
-      "updating": "更新中"
+      "updating": "更新中",
+      "retentionLimit": "顯示您最近的工作階段。"
     },
     "sessionRow": {
       "deleteTitle": "要刪除工作階段嗎？",
@@ -1672,7 +1685,6 @@
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
       "emptyReadOnlyTitle": "此工作階段中沒有訊息",
-      "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
       "historyTooLarge": "此工作階段的對話記錄過大，無法載入。",
@@ -2008,7 +2020,6 @@
       "noMatches": "沒有相符項目",
       "noRepositories": "沒有可用的儲存庫",
       "noRepositoriesDescription": "若要載入儲存庫，請連結 GitHub 或 GitLab。",
-      "loading": "載入中…",
       "accessibility": "儲存庫：{{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2522,6 +2533,12 @@
     "retryLoadingAccount": "重新載入帳戶",
     "retryLoadingPrivacy": "重新載入隱私權選項"
   },
+  "accountBlocked": {
+    "title": "帳號已封鎖",
+    "description": "Kilo 已封鎖此帳號，重新登入也不會解除封鎖。如有請求，客服可以複核封鎖。",
+    "domainDescription": "Kilo 不允許使用此電子郵件網域的帳號，重新登入也不會改變。如有請求，客服可以複核該網域。",
+    "contactSupport": "聯絡客服"
+  },
   "addCredits": {
     "cta": "加值點數",
     "billingPage": "帳單頁面"
@@ -2594,8 +2611,7 @@
     "timeoutDescription": "請求逾時，未能完成。請再試一次。"
   },
   "screenHeader": {
-    "openMenu": "開啟選單",
-    "openMenuFor": "開啟 {{title}} 的選單"
+    "openMenu": "開啟選單"
   },
   "picker": {
     "optionsExpired": "選項已過期",
@@ -2880,8 +2896,9 @@
       "checkActiveConnection": "連線已啟用，但此項目仍無法載入。",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
-      "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
+      "reconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
       "bitbucketNotConnectedTitle": "尚未連結 Bitbucket",
+      "bitbucketAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員進行連結。",
       "adminOnlyConnectDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
@@ -4689,6 +4706,7 @@
     "contextAll": "所有使用情境",
     "dismiss": "忽略簡報",
     "dismissFailed": "暫時無法忽略此簡報。系統會在背景自動重試。",
+    "readMarkFailed": "暫時無法將此簡報標示為已讀。簡報重新載入時會再試一次。",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的簡報 · 無法重新整理",
     "summary": "AI 摘要",
@@ -4708,6 +4726,9 @@
     "morningEnd": "簡報可用至",
     "timeHint": "簡報時段結束時，首頁卡片會恢復顯示即時狀態，即使離線也一樣。",
     "invalidSchedule": "請選擇有效的時區，以及非空白的簡報時段。",
+    "scheduleEmptyNight": "簡報時段是空白的。請選擇晚於時段開始時間的就緒時間。",
+    "scheduleEmptyMorning": "就緒時間與可用至時間相同。請選擇簡報保持可用的時長。",
+    "scheduleFullDay": "這兩個時段涵蓋了一整天。請將一天中的部分時間保留在簡報時段之外。",
     "notificationsHint": "每個排定的簡報會傳送一則一般通知。與付費 AI 摘要無關。",
     "notificationPermission": "請開啟推播通知以接收簡報。",
     "defaultModel": "使用 Kilo 的預設模型",
@@ -4717,7 +4738,9 @@
     "estimate": "預估 {{estimate}} · 上限 {{maximum}}",
     "estimateUnavailable": "這些設定無法提供付費摘要。請變更模型或上限，或稍後再試。",
     "confirmPaid": "要為 {{context}} 啟用付費摘要嗎？",
+    "paidDisclosure_one": "預估 {{estimate}}，最高 {{maximum}}，時間上限 {{minutes}} 分鐘。即使產生失敗仍會收費。",
     "paidDisclosure": "預估 {{estimate}}，最高 {{maximum}}，時間上限 {{minutes}} 分鐘。即使產生失敗仍會收費。",
+    "paidDisclosure_other": "預估 {{estimate}}，最高 {{maximum}}，時間上限 {{minutes}} 分鐘。即使產生失敗仍會收費。",
     "enable": "啟用付費摘要",
     "allContexts": "個人與組織的簡報會分開保存。",
     "emptyHistory": "沒有已儲存的簡報",
@@ -4756,7 +4779,7 @@
     "sourceActivity": "未命名活動",
     "metadataFailureProvider": "提供者錯誤",
     "metadataFailureTool": "工具錯誤",
-    "metadataFailureCancelled": "已取消",
+    "metadataStopped": "上一輪已停止",
     "metadataFailureOther": "未指定錯誤",
     "metadataPlan_one": "計畫：已完成 {{displayDone}}/{{displayTotal}} 個步驟",
     "metadataFiles_one": "{{displayCount}} 個檔案已變更",
@@ -4881,6 +4904,9 @@
       "runAsCreator": "以我的身分執行",
       "runAsCreatorDescription": "每次執行都會使用你的帳戶，因此必須提供密鑰標頭。",
       "saveFailedTitle": "無法儲存觸發器",
+      "nameTaken": "名為「{{name}}」的觸發器已存在。",
+      "saveFailedRetry": "無法連線到伺服器。請檢查連線後再試一次。",
+      "saveFailedCheck": "請檢查表單中的值，然後再試一次。",
       "deleteTitle": "要刪除此觸發器嗎？",
       "deleteMessage": "對 {{name}} 的呼叫將會失敗。此動作無法復原。",
       "deleteMessageScheduled": "{{name}} 觸發器的已排程執行將會停止。此動作無法復原。",

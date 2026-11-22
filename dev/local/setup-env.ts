@@ -404,6 +404,13 @@ async function main(): Promise<void> {
     }
   }
 
+  // The reset runs as a script and empties `POSTGRES_SCRIPT_URL`, while the migrate step that
+  // follows re-creates the schema on `POSTGRES_URL`, so this step publishes one database to both.
+  const appDatabaseUrl = collected.get('POSTGRES_URL');
+  if (appDatabaseUrl) {
+    collected.set('POSTGRES_SCRIPT_URL', appDatabaseUrl);
+  }
+
   if (baseUrl) {
     // Derive APP_URL_OVERRIDE from the final NEXTAUTH_URL rather than from
     // the raw BASE_URL input, so the two stay in sync even if the user

@@ -522,13 +522,14 @@
       "receiptLabel": "Resit",
       "copyReceiptId": "Salin ID resit",
       "appealLabel": "Rayuan",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Diterima",
       "triageOpen": "Dalam semakan",
       "triageActioned": "Disahkan",
       "triageRejected": "Tidak disahkan",
       "appealNone": "Tiada yang diserahkan",
       "appealSubmitted": "Sedang disemak",
-      "appealAccepted": "Diterima",
+      "appealAccepted": "Rayuan diterima",
       "appealRejected": "Ditolak",
       "appeal": "Rayu keputusan ini",
       "appealTitle": "Rayu keputusan ini?",
@@ -539,13 +540,23 @@
       "nextStepInReview": "Hasil semakan akan dipaparkan pada skrin ini, dan anda boleh merayu selepas keputusan dibuat.",
       "nextStepAppeal": "Hasil rayuan akan dipaparkan pada skrin ini.",
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
-      "viewReceipt": "Lihat resit"
+      "viewReceipt": "Lihat resit",
+      "targetLabel": "Perkara dilaporkan",
+      "reasonLabel": "Sebab laporan",
+      "targetMessage": "Balasan AI",
+      "targetComment": "Komen permintaan tarik",
+      "targetUser": "Pengguna",
+      "reasonHarmful": "Kandungan berbahaya",
+      "reasonIllegal": "Kandungan menyalahi undang-undang",
+      "reasonHarassment": "Gangguan",
+      "reasonSpam": "Iklan tidak diingini",
+      "reasonOther": "Sebab lain"
     },
     "reportReceipts": {
       "title": "Laporan",
       "rowSubtitle": "Laporan yang anda failkan dan hasilnya",
       "emptyTitle": "Belum ada laporan",
-      "emptyDescription": "Laporan yang anda failkan daripada ulasan atau respons AI akan dipaparkan di sini.",
+      "emptyDescription": "Laporan yang anda failkan daripada ulasan dalam perbincangan pull request, atau daripada respons AI dalam sesi ejen, akan dipaparkan di sini bersama hasilnya.",
       "couldNotLoad": "Tidak dapat memuatkan laporan anda",
       "capped": "Memaparkan laporan terkini anda."
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "Sambungan aktif, tetapi item ini masih tidak dapat dimuatkan.",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
-      "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
+      "reconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak disambungkan",
+      "bitbucketAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
       "adminOnlyConnectDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
@@ -1296,6 +1308,7 @@
       "manageAccess": "Urus akses",
       "bitbucketNoRepositoriesDescription": "Tiada repositori tersedia dalam ruang kerja Bitbucket ini.",
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
+      "githubNoRepositoriesDescription": "Semak akses repositori untuk apl GitHub Kilo, kemudian muat semula.",
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Benarkan apl GitHub Kilo mengakses repositori yang anda mahu disemak.",
       "repositoryAccess": "akses repositori",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "Semakan ini masih dijalankan. Penemuan akan dipaparkan di sini apabila ia selesai.",
       "findingsEndedWithoutResults": "Semakan ini tamat sebelum menghasilkan sebarang penemuan.",
       "serviceUnavailable": "Tidak dapat menghubungi perkhidmatan semakan kod. Cuba semakan semula apabila perkhidmatan tersedia.",
-      "reviewFailed": "Semakan gagal. Sila cuba lagi.",
+      "reviewFailed": "Semakan gagal.",
       "showMore": "Tunjukkan lebih banyak",
       "created": "Dicipta",
       "started": "Dimulakan",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesi",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesi",
       "live": "LANGSUNG",
-      "updating": "Mengemas kini"
+      "updating": "Mengemas kini",
+      "retentionLimit": "Memaparkan sesi terkini."
     },
     "sessionRow": {
       "deleteTitle": "Padam sesi?",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
       "emptyReadOnlyTitle": "Tiada mesej dalam sesi ini",
-      "renameAccessibility": "Namakan semula sesi: {{title}}",
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuatkan.",
@@ -2569,7 +2582,6 @@
       "noMatches": "Tiada padanan",
       "noRepositories": "Tiada repositori tersedia",
       "noRepositoriesDescription": "Untuk memuatkan repositori, sambungkan akaun GitHub atau GitLab.",
-      "loading": "Memuatkan…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3083,6 +3095,12 @@
     "retryLoadingAccount": "Cuba memuatkan akaun semula",
     "retryLoadingPrivacy": "Cuba memuatkan pilihan privasi semula"
   },
+  "accountBlocked": {
+    "title": "Akaun disekat",
+    "description": "Kilo telah menyekat akaun ini, dan log masuk semula tidak akan membatalkan sekatan itu. Sokongan boleh menyemak sekatan itu atas permintaan.",
+    "domainDescription": "Kilo menyekat akaun pada domain e-mel ini, dan log masuk semula tidak akan mengubahnya. Sokongan boleh menyemak domain itu atas permintaan.",
+    "contactSupport": "Hubungi sokongan"
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman pengebilan"
@@ -3155,8 +3173,7 @@
     "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },
   "screenHeader": {
-    "openMenu": "Buka menu",
-    "openMenuFor": "Buka menu untuk {{title}}"
+    "openMenu": "Buka menu"
   },
   "picker": {
     "optionsExpired": "Pilihan tamat tempoh",
@@ -4689,6 +4706,7 @@
     "contextAll": "Semua konteks",
     "dismiss": "Ketepikan laporan",
     "dismissFailed": "Laporan ini masih belum dapat diketepikan. Ia akan dicuba semula di latar belakang.",
+    "readMarkFailed": "Laporan ini tidak dapat ditanda sebagai dibaca. Ia akan dicuba semula apabila laporan dimuat semula.",
     "offline": "Luar talian · laporan disimpan",
     "cached": "Laporan disimpan · muat semula tidak tersedia",
     "summary": "Ringkasan AI",
@@ -4708,6 +4726,9 @@
     "morningEnd": "Laporan tersedia sehingga",
     "timeHint": "Kad Utama memulihkan status langsung apabila tempoh laporan tamat, walaupun luar talian.",
     "invalidSchedule": "Pilih zon waktu yang sah dan tempoh laporan yang tidak kosong.",
+    "scheduleEmptyNight": "Tempoh laporan kosong. Pilih masa sedia yang lebih lewat daripada permulaan tempoh.",
+    "scheduleEmptyMorning": "Masa sedia dan masa tersedia sehingga adalah sama. Pilih berapa lama laporan kekal tersedia.",
+    "scheduleFullDay": "Kedua-dua tempoh meliputi satu hari penuh. Biarkan sebahagian hari di luar tempoh laporan.",
     "notificationsHint": "Satu pemberitahuan umum setiap laporan berjadual. Bebas daripada ringkasan AI berbayar.",
     "notificationPermission": "Hidupkan pemberitahuan push untuk menerima laporan anda.",
     "defaultModel": "Guna model lalai Kilo",
@@ -4717,7 +4738,9 @@
     "estimate": "Anggaran {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini. Tukar model atau had, atau cuba lagi nanti.",
     "confirmPaid": "Dayakan ringkasan berbayar untuk {{context}}?",
+    "paidDisclosure_one": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
     "paidDisclosure": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
+    "paidDisclosure_other": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
     "enable": "Dayakan ringkasan berbayar",
     "allContexts": "Laporan peribadi dan organisasi kekal berasingan.",
     "emptyHistory": "Tiada laporan tersimpan",
@@ -4756,7 +4779,7 @@
     "sourceActivity": "Aktiviti tanpa tajuk",
     "metadataFailureProvider": "ralat pembekal",
     "metadataFailureTool": "ralat alat",
-    "metadataFailureCancelled": "Dibatalkan",
+    "metadataStopped": "Pusingan terakhir dihentikan",
     "metadataFailureOther": "ralat tidak dinyatakan",
     "metadataPlan_one": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
     "metadataFiles_one": "{{displayCount}} fail diubah",
@@ -4881,6 +4904,9 @@
       "runAsCreator": "Jalankan sebagai saya",
       "runAsCreatorDescription": "Setiap larian menggunakan akaun anda, jadi pengepala rahsia diperlukan.",
       "saveFailedTitle": "Tidak dapat menyimpan pencetus",
+      "nameTaken": "Pencetus bernama \"{{name}}\" sudah wujud.",
+      "saveFailedRetry": "Tidak dapat menghubungi pelayan. Semak sambungan anda dan cuba lagi.",
+      "saveFailedCheck": "Semak nilai dalam borang dan cuba lagi.",
       "deleteTitle": "Padamkan pencetus ini?",
       "deleteMessage": "Panggilan ke {{name}} akan gagal. Tindakan ini tidak boleh dibatalkan.",
       "deleteMessageScheduled": "Larian yang dijadualkan bagi pencetus {{name}} akan berhenti. Tindakan ini tidak boleh dibatalkan.",

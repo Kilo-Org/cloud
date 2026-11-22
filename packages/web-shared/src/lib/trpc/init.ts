@@ -1,5 +1,6 @@
 import 'server-only';
 import { headers } from 'next/headers';
+import { accountBlockedRefusalReason, isSelfCleanupProcedureCall } from '@kilocode/app-shared/auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
@@ -39,7 +40,11 @@ import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { captureMessage, setTag, trpcMiddleware } from '@sentry/nextjs';
-import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
+import {
+  AccountBlockedError,
+  AuthContextError,
+  trpcErrorFormatter,
+} from '@kilocode/web-shared/lib/trpc/transport';
 import {
   appUpdateRequiredError,
   enforceMinimumVersion,
@@ -61,6 +66,26 @@ import {
 } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
 export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+
+// The admission is keyed on the whole request, never on the first call: a
+// batch that mixes a cleanup with any other call is refused as before, so the
+// exemption cannot carry another procedure through the gate. Which procedures
+// count as a cleanup, and why, is the shared list the mobile client also reads
+// (`@kilocode/app-shared/auth`): it keeps those calls out of its batch, so the
+// two sides cannot drift.
+//
+// The exemption covers self-scoped writes only. The request must itself be a
+// mutation, and each call must be a listed cleanup declared as one, so a query
+// never enters the exemption even if its path were added to the shared list: a
+// refused account cannot gain a read this way.
+function admitsRefusedAccount(info: ControlPlaneRequestInfo | null | undefined): boolean {
+  const type = info?.type;
+  const calls = info?.calls;
+  if (type !== 'mutation') return false;
+  if (!calls || calls.length === 0) return false;
+  return calls.every(call => isSelfCleanupProcedureCall({ path: call.path, type }));
+}
+
 // Define the context type
 export type TRPCContext = {
   user: User;
@@ -167,6 +192,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     internalApiUse,
     webSessionId,
     webSessionPepper,
+    refusalReason,
   } = await withControlPlaneBudget({
     path: controlPlanePathFromInfo(opts?.info),
     type: controlPlaneTypeFromInfo(opts?.info),
@@ -176,10 +202,40 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
         adminOnly: false,
         requestHeaders: headersList,
         requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
+        // A refused account still owns the session it is signing out of. The
+        // admission covers only the cleanup procedures (see
+        // admitsRefusedAccount), so every other call keeps the block refusal
+        // below.
+        allowRefusedAccountSelfCleanup: admitsRefusedAccount(opts?.info),
       }),
     startedAt,
     surface: 'context',
   });
+  // Authorization refused the account itself (R0 domain blacklist / R1 blocked
+  // account) while the session is intact. That is a different answer from a
+  // missing session: the mobile app must show why the account cannot be used
+  // and keep the user signed in, so this refuses with its own cause instead of
+  // reaching the AuthContextError branch below.
+  //
+  // Both refusals keep the same HTTP/tRPC shape (FORBIDDEN, `data.accountBlocked`)
+  // and differ only in the reason published beside it. The reason is what lets
+  // the app drop a retry: R1 (`account_blocked`) is one account's property,
+  // which support can lift, while R0 (`email_domain_blocked`) is the email
+  // domain's, so no retry, sign-out or sign-in can satisfy it.
+  //
+  // Only the first-party mobile client gets that answer. The web app already
+  // routes a blocked account to /account-blocked from its UNAUTHORIZED path
+  // (sign-in -> after-sign-in -> /account-blocked), and no web consumer reads
+  // `data.accountBlocked`, so every other client falls through to the
+  // merge-base UNAUTHORIZED answer unchanged.
+  const accountBlockedReason = accountBlockedRefusalReason(refusalReason);
+  if (accountBlockedReason !== null && isMobileClient(headersList?.get(APP_CLIENT_HEADER))) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Account access is blocked',
+      cause: new AccountBlockedError(accountBlockedReason),
+    });
+  }
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',

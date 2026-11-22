@@ -41,6 +41,8 @@ export function moveInvalidPropertyKeys(schema: unknown): string[] {
 /**
  * Anthropic rejects strict tools that use `patternProperties`, so a tool with
  * moved properties loses its `strict` flag rather than failing the request.
+ * `clearRewrittenToolSchemaStrict` clears it the way each request kind
+ * expresses the flag being off.
  */
 export function moveInvalidToolPropertyKeys(request: GatewayRequest): void {
   const changedTools: { name: string; properties: string[]; strict: boolean }[] = [];

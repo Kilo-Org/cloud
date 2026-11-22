@@ -524,12 +524,13 @@
       "receiptLabel": "Comprovativo",
       "copyReceiptId": "Copiar ID do comprovativo",
       "appealLabel": "Recurso",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Recebida",
       "triageOpen": "Em análise",
       "triageActioned": "Procedente",
       "triageRejected": "Não procedente",
       "appealNone": "Nenhum enviado",
-      "appealSubmitted": "Em análise",
+      "appealSubmitted": "Recurso em análise",
       "appealAccepted": "Aceite",
       "appealRejected": "Recusado",
       "appeal": "Recorrer desta decisão",
@@ -541,13 +542,23 @@
       "nextStepInReview": "O resultado aparecerá neste ecrã e pode recorrer após a decisão.",
       "nextStepAppeal": "O resultado do recurso aparecerá neste ecrã.",
       "nextStepFinal": "A decisão do recurso é final. Não é possível apresentar novo recurso.",
-      "viewReceipt": "Ver comprovativo"
+      "viewReceipt": "Ver comprovativo",
+      "targetLabel": "Item denunciado",
+      "reasonLabel": "Motivo da denúncia",
+      "targetMessage": "Resposta da IA",
+      "targetComment": "Comentário do PR",
+      "targetUser": "Utilizador",
+      "reasonHarmful": "Conteúdo nocivo",
+      "reasonIllegal": "Conteúdo ilegal",
+      "reasonHarassment": "Assédio",
+      "reasonSpam": "Publicidade não solicitada",
+      "reasonOther": "Outro motivo"
     },
     "reportReceipts": {
       "title": "Denúncias",
       "rowSubtitle": "As denúncias que fizeste e os respetivos resultados",
       "emptyTitle": "Ainda não há denúncias",
-      "emptyDescription": "As denúncias que fizeres a partir de um comentário ou de uma resposta de IA aparecem aqui.",
+      "emptyDescription": "As denúncias que fizeres a partir de um comentário numa discussão de pull request ou de uma resposta da IA numa sessão de agente aparecem aqui com o respetivo resultado.",
       "couldNotLoad": "Não foi possível carregar as tuas denúncias",
       "capped": "A mostrar as tuas denúncias mais recentes."
     },
@@ -1038,8 +1049,9 @@
       "checkActiveConnection": "A ligação está ativa, mas este item ainda não pode ser carregado.",
       "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
-      "gitlabReconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
+      "reconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
       "bitbucketNotConnectedTitle": "O Bitbucket não está ligado",
+      "bitbucketAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que o ligue.",
       "adminOnlyConnectDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a sua conta pessoal"
@@ -1352,6 +1364,7 @@
       "manageAccess": "Gerir acesso",
       "bitbucketNoRepositoriesDescription": "Não há repositórios disponíveis neste espaço de trabalho do Bitbucket.",
       "gitlabNoRepositoriesDescription": "Podes precisar de conceder acesso a mais grupos ou projetos no GitLab.",
+      "githubNoRepositoriesDescription": "Verifique as permissões de acesso da aplicação Kilo para GitHub e atualize a lista.",
       "installGithubApp": "Instalar a aplicação do GitHub nos repositórios",
       "installGithubAppDescription": "Dá à aplicação do Kilo no GitHub acesso aos repositórios que queres rever.",
       "repositoryAccess": "acesso ao repositório",
@@ -1385,7 +1398,7 @@
       "findingsInProgress": "Esta revisão ainda está em curso. As ocorrências aparecem aqui quando terminar.",
       "findingsEndedWithoutResults": "Esta revisão terminou antes de produzir ocorrências.",
       "serviceUnavailable": "Não foi possível estabelecer ligação ao serviço de revisão de código. Repita a revisão quando o serviço estiver disponível.",
-      "reviewFailed": "A revisão falhou. Tente novamente.",
+      "reviewFailed": "A revisão falhou.",
       "showMore": "Mostrar mais",
       "created": "Criada",
       "started": "Iniciada",
@@ -2257,7 +2270,8 @@
       "sectionAccessibility_zero": "{{title}}: {{displayCount}} sessões",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessões",
       "live": "EM TEMPO REAL",
-      "updating": "A atualizar"
+      "updating": "A atualizar",
+      "retentionLimit": "A mostrar as sessões mais recentes."
     },
     "sessionRow": {
       "deleteTitle": "Eliminar sessão?",
@@ -2331,7 +2345,6 @@
       "scrollToBottom": "Ir para o fim da conversa",
       "emptyTitle": "Ainda sem mensagens",
       "emptyReadOnlyTitle": "Não há mensagens nesta sessão",
-      "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "A clonar a sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
       "historyTooLarge": "A transcrição desta sessão é demasiado grande para ser carregada.",
@@ -2675,7 +2688,6 @@
       "noMatches": "Sem resultados",
       "noRepositories": "Nenhum repositório disponível",
       "noRepositoriesDescription": "Para carregar repositórios, ligue uma conta do GitHub ou do GitLab.",
-      "loading": "A carregar…",
       "accessibility": "Repositório: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3205,6 +3217,12 @@
     "retryLoadingAccount": "Tentar carregar a conta novamente",
     "retryLoadingPrivacy": "Tentar carregar as preferências de privacidade novamente"
   },
+  "accountBlocked": {
+    "title": "Conta bloqueada",
+    "description": "O Kilo bloqueou esta conta e iniciar sessão novamente não vai desfazer o bloqueio. O suporte pode rever o bloqueio a pedido.",
+    "domainDescription": "O Kilo não permite contas neste domínio de e-mail e iniciar sessão novamente não vai alterar o bloqueio. O suporte pode rever o domínio a pedido.",
+    "contactSupport": "Contactar o suporte"
+  },
   "addCredits": {
     "cta": "Adicionar créditos",
     "billingPage": "página de faturação"
@@ -3277,8 +3295,7 @@
     "timeoutDescription": "O pedido não terminou a tempo. Tenta novamente."
   },
   "screenHeader": {
-    "openMenu": "Abrir menu",
-    "openMenuFor": "Abrir menu de {{title}}"
+    "openMenu": "Abrir menu"
   },
   "picker": {
     "optionsExpired": "Opções desatualizadas",
@@ -4857,6 +4874,7 @@
     "contextAll": "Todos os contextos",
     "dismiss": "Ignorar relatório",
     "dismissFailed": "Ainda não foi possível ignorar este relatório. Tentaremos novamente em segundo plano.",
+    "readMarkFailed": "Não foi possível marcar este relatório como lido. Tentaremos novamente quando o relatório for recarregado.",
     "offline": "Offline · relatório guardado",
     "cached": "Relatório guardado · atualização indisponível",
     "summary": "Resumo de IA",
@@ -4876,6 +4894,9 @@
     "morningEnd": "Relatório disponível até",
     "timeHint": "O cartão Início volta ao estado em direto quando o período do relatório termina, mesmo offline.",
     "invalidSchedule": "Escolha um fuso horário válido e um período do relatório não vazio.",
+    "scheduleEmptyNight": "O período do relatório está vazio. Escolha um horário de prontidão posterior ao início do período.",
+    "scheduleEmptyMorning": "O horário de prontidão e o horário até ao qual o relatório está disponível coincidem. Escolha durante quanto tempo o relatório fica disponível.",
+    "scheduleFullDay": "Os dois períodos cobrem um dia inteiro. Deixe parte do dia fora do período do relatório.",
     "notificationsHint": "Uma notificação genérica por relatório agendado. Independente dos resumos de IA pagos.",
     "notificationPermission": "Ative as notificações push para receber o seu relatório.",
     "defaultModel": "Usar o modelo predefinido da Kilo",
@@ -4885,7 +4906,11 @@
     "estimate": "Estimativa {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Não está disponível um resumo pago para estas definições. Altere o modelo ou os limites, ou tente novamente mais tarde.",
     "confirmPaid": "Ativar resumos pagos para {{context}}?",
-    "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} min. As cobranças aplicam-se mesmo que a geração falhe.",
+    "paidDisclosure_one": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} minuto. As cobranças aplicam-se mesmo que a geração falhe.",
+    "paidDisclosure_many": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} minutos. As cobranças aplicam-se mesmo que a geração falhe.",
+    "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} minutos. As cobranças aplicam-se mesmo que a geração falhe.",
+    "paidDisclosure_other": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} minutos. As cobranças aplicam-se mesmo que a geração falhe.",
+    "paidDisclosure_zero": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} minutos. As cobranças aplicam-se mesmo que a geração falhe.",
     "enable": "Ativar resumos pagos",
     "allContexts": "Os relatórios pessoais e da organização são mantidos em separado.",
     "emptyHistory": "Sem relatórios guardados",
@@ -4936,7 +4961,7 @@
     "sourceActivity": "Atividade sem título",
     "metadataFailureProvider": "erro do provedor",
     "metadataFailureTool": "erro da ferramenta",
-    "metadataFailureCancelled": "Cancelada",
+    "metadataStopped": "A última interação foi interrompida",
     "metadataFailureOther": "erro não especificado"
   },
   "systemSearch": {
@@ -5057,6 +5082,9 @@
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Todas as execuções usam a sua conta, por isso o cabeçalho secreto é obrigatório.",
       "saveFailedTitle": "Não foi possível guardar o acionador",
+      "nameTaken": "Já existe um acionador chamado «{{name}}».",
+      "saveFailedRetry": "Não foi possível contactar o servidor. Verifique a ligação e tente novamente.",
+      "saveFailedCheck": "Verifique os valores do formulário e tente novamente.",
       "deleteTitle": "Eliminar este acionador?",
       "deleteMessage": "As chamadas para {{name}} vão falhar. Esta ação não pode ser anulada.",
       "deleteMessageScheduled": "As execuções agendadas de {{name}} param. Esta ação não pode ser anulada.",

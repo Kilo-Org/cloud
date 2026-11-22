@@ -522,13 +522,14 @@
       "receiptLabel": "Tanda terima",
       "copyReceiptId": "Salin ID tanda terima",
       "appealLabel": "Banding",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Diterima",
       "triageOpen": "Sedang ditinjau",
       "triageActioned": "Dikabulkan",
       "triageRejected": "Tidak dikabulkan",
       "appealNone": "Belum ada yang diajukan",
-      "appealSubmitted": "Sedang ditinjau",
-      "appealAccepted": "Diterima",
+      "appealSubmitted": "Banding sedang ditinjau",
+      "appealAccepted": "Banding diterima",
       "appealRejected": "Ditolak",
       "appeal": "Ajukan banding atas keputusan ini",
       "appealTitle": "Ajukan banding atas keputusan ini?",
@@ -539,13 +540,23 @@
       "nextStepInReview": "Hasil laporan ini akan muncul di layar ini, dan Anda dapat mengajukan banding setelah ada keputusan.",
       "nextStepAppeal": "Hasil banding akan muncul di layar ini.",
       "nextStepFinal": "Keputusan banding bersifat final. Banding lebih lanjut tidak dapat diajukan.",
-      "viewReceipt": "Lihat tanda terima"
+      "viewReceipt": "Lihat tanda terima",
+      "targetLabel": "Yang dilaporkan",
+      "reasonLabel": "Alasan laporan",
+      "targetMessage": "Balasan AI",
+      "targetComment": "Komentar PR",
+      "targetUser": "Pengguna",
+      "reasonHarmful": "Konten berbahaya",
+      "reasonIllegal": "Konten ilegal",
+      "reasonHarassment": "Pelecehan",
+      "reasonSpam": "Iklan spam",
+      "reasonOther": "Alasan lain"
     },
     "reportReceipts": {
       "title": "Laporan",
       "rowSubtitle": "Laporan yang Anda ajukan dan hasilnya",
       "emptyTitle": "Belum ada laporan",
-      "emptyDescription": "Laporan yang Anda ajukan dari komentar atau respons AI akan muncul di sini.",
+      "emptyDescription": "Laporan yang Anda ajukan dari komentar dalam diskusi pull request, atau dari balasan AI dalam sesi agen, muncul di sini beserta hasilnya.",
       "couldNotLoad": "Tidak dapat memuat laporan Anda",
       "capped": "Menampilkan laporan terbaru Anda."
     },
@@ -735,6 +746,7 @@
       "manageAccess": "Kelola akses",
       "bitbucketNoRepositoriesDescription": "Tidak ada repositori yang tersedia di ruang kerja Bitbucket ini.",
       "gitlabNoRepositoriesDescription": "Kamu mungkin perlu memberikan akses ke lebih banyak grup atau proyek di GitLab.",
+      "githubNoRepositoriesDescription": "Periksa akses repositori untuk aplikasi Kilo di GitHub, lalu muat ulang.",
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
       "repositoryAccess": "akses repositori",
@@ -829,7 +841,7 @@
       "findingsInProgress": "Tinjauan ini masih berlangsung. Temuan akan muncul di sini setelah selesai.",
       "findingsEndedWithoutResults": "Tinjauan ini berakhir sebelum menghasilkan temuan apa pun.",
       "serviceUnavailable": "Tidak dapat terhubung ke layanan tinjauan kode. Coba tinjauan lagi saat layanan tersedia.",
-      "reviewFailed": "Tinjauan gagal. Silakan coba lagi.",
+      "reviewFailed": "Tinjauan gagal.",
       "retryMessage": "Ini akan menjalankan ulang tinjauan kode.",
       "retryReview": "Coba tinjauan lagi",
       "retryNeedsSettings": "Peninjau kode nonaktif atau pengaturannya perlu diperhatikan. Perbaiki pengaturan, lalu coba tinjauan ini lagi.",
@@ -1602,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesi",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesi",
       "live": "LANGSUNG",
-      "updating": "Memperbarui"
+      "updating": "Memperbarui",
+      "retentionLimit": "Menampilkan sesi terbaru."
     },
     "sessionRow": {
       "deleteTitle": "Hapus sesi?",
@@ -1672,7 +1685,6 @@
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
       "emptyReadOnlyTitle": "Tidak ada pesan dalam sesi ini",
-      "renameAccessibility": "Ganti nama sesi: {{title}}",
       "cloningSession": "Menyalin sesi",
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuat.",
@@ -2012,7 +2024,6 @@
       "noMatches": "Tidak ada hasil yang cocok",
       "noRepositories": "Tidak ada repositori yang tersedia",
       "noRepositoriesDescription": "Hubungkan GitHub atau GitLab untuk memuat repositori.",
-      "loading": "Memuat…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2522,6 +2533,12 @@
     "retryLoadingAccount": "Coba muat akun lagi",
     "retryLoadingPrivacy": "Coba muat pilihan privasi lagi"
   },
+  "accountBlocked": {
+    "title": "Akun diblokir",
+    "description": "Kilo memblokir akun ini, dan masuk lagi tidak akan membuka blokirnya. Tim dukungan dapat meninjau pemblokiran jika diminta.",
+    "domainDescription": "Kilo memblokir akun pada domain email ini, dan masuk lagi tidak akan mengubahnya. Tim dukungan dapat meninjau domain jika diminta.",
+    "contactSupport": "Hubungi tim dukungan"
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman penagihan"
@@ -2594,8 +2611,7 @@
     "timeoutDescription": "Permintaan melebihi batas waktu sebelum selesai. Coba lagi."
   },
   "screenHeader": {
-    "openMenu": "Buka menu",
-    "openMenuFor": "Buka menu untuk {{title}}"
+    "openMenu": "Buka menu"
   },
   "picker": {
     "optionsExpired": "Pilihan tidak lagi berlaku",
@@ -2880,8 +2896,9 @@
       "checkActiveConnection": "Koneksi aktif, tetapi item ini tetap tidak dapat dimuat.",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
-      "gitlabReconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
+      "reconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak terhubung",
+      "bitbucketAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
       "adminOnlyConnectDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
@@ -4689,6 +4706,7 @@
     "contextAll": "Semua konteks",
     "dismiss": "Abaikan laporan",
     "dismissFailed": "Belum bisa mengabaikan laporan ini. Akan dicoba ulang di latar belakang.",
+    "readMarkFailed": "Belum bisa menandai laporan ini sebagai sudah dibaca. Akan dicoba ulang saat laporan dimuat ulang.",
     "offline": "Offline · laporan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
     "summary": "Ringkasan AI",
@@ -4708,6 +4726,9 @@
     "morningEnd": "Laporan tersedia hingga",
     "timeHint": "Kartu Beranda kembali menampilkan status langsung saat periode laporan berakhir, bahkan saat offline.",
     "invalidSchedule": "Pilih zona waktu yang valid dan periode laporan yang tidak kosong.",
+    "scheduleEmptyNight": "Jendela laporan kosong. Pilih waktu siap setelah awal jendela.",
+    "scheduleEmptyMorning": "Waktu siap dan waktu tersedia hingga sama. Pilih berapa lama laporan tetap tersedia.",
+    "scheduleFullDay": "Kedua jendela mencakup satu hari penuh. Sisakan sebagian hari di luar jendela laporan.",
     "notificationsHint": "Satu notifikasi umum per laporan terjadwal. Terpisah dari ringkasan AI berbayar.",
     "notificationPermission": "Aktifkan notifikasi push untuk menerima laporan Anda.",
     "defaultModel": "Gunakan model default Kilo",
@@ -4717,7 +4738,9 @@
     "estimate": "Estimasi {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk pengaturan ini. Ubah model atau batasnya, atau coba lagi nanti.",
     "confirmPaid": "Aktifkan ringkasan berbayar untuk {{context}}?",
+    "paidDisclosure_other": "Perkiraan {{estimate}}, hingga {{maximum}}, dengan batas {{minutes}} menit. Biaya tetap berlaku meskipun pembuatan gagal.",
     "paidDisclosure": "Perkiraan {{estimate}}, hingga {{maximum}}, dengan batas {{minutes}} menit. Biaya tetap berlaku meskipun pembuatan gagal.",
+    "paidDisclosure_one": "Perkiraan {{estimate}}, hingga {{maximum}}, dengan batas {{minutes}} menit. Biaya tetap berlaku meskipun pembuatan gagal.",
     "enable": "Aktifkan ringkasan berbayar",
     "allContexts": "Laporan pribadi dan organisasi tetap terpisah.",
     "emptyHistory": "Belum ada laporan tersimpan",
@@ -4756,7 +4779,7 @@
     "sourceActivity": "Aktivitas tanpa judul",
     "metadataFailureProvider": "kesalahan penyedia",
     "metadataFailureTool": "kesalahan alat",
-    "metadataFailureCancelled": "Dibatalkan",
+    "metadataStopped": "Giliran terakhir dihentikan",
     "metadataFailureOther": "kesalahan tidak diketahui",
     "metadataPlan_one": "Rencana: {{displayDone}} dari {{displayTotal}} langkah selesai",
     "metadataFiles_one": "{{displayCount}} file diubah",
@@ -4881,6 +4904,9 @@
       "runAsCreator": "Jalankan sebagai saya",
       "runAsCreatorDescription": "Setiap eksekusi menggunakan akun Anda, sehingga header rahasia wajib diisi.",
       "saveFailedTitle": "Tidak dapat menyimpan pemicu",
+      "nameTaken": "Pemicu bernama “{{name}}” sudah ada.",
+      "saveFailedRetry": "Tidak dapat menghubungi server. Periksa koneksi Anda, lalu coba lagi.",
+      "saveFailedCheck": "Periksa nilai pada formulir, lalu coba lagi.",
       "deleteTitle": "Hapus pemicu ini?",
       "deleteMessage": "Panggilan ke {{name}} akan gagal. Tindakan ini tidak dapat dibatalkan.",
       "deleteMessageScheduled": "Eksekusi terjadwal pemicu {{name}} akan berhenti. Tindakan ini tidak dapat dibatalkan.",

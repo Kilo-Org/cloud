@@ -24,11 +24,8 @@ jest.mock('@octokit/auth-app', () => ({
   createAppAuth: jest.fn(() => async () => ({ token: 'mock-token', expiresAt: '2099-01-01' })),
 }));
 
-import {
-  GITHUB_LISTING_TIMEOUT_MS,
-  GitHubListingBudgetExceededError,
-  hasPRCommentWithMarker,
-} from './adapter';
+import { hasPRCommentWithMarker } from './adapter';
+import { GITHUB_LISTING_TIMEOUT_MS, GitHubListingBudgetExceededError } from './listing-budget';
 
 const MARKER = '<!-- kilo-billing-notice -->';
 

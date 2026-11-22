@@ -891,6 +891,32 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     ).rejects.toThrow('GitHub authorization revocation failed');
     expect(database.deleted).toBe(false);
   });
+
+  it('rejects a disconnect whose stated authorization id is not the stored one', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: 'authorization_2',
+        credentialVersion: 1,
+      })
+    ).rejects.toThrow('github_identity_conflict');
+    expect(database.deleted).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a null precondition while an authorization is stored', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: null,
+        credentialVersion: null,
+      })
+    ).rejects.toThrow('github_identity_conflict');
+    expect(database.deleted).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });
 
 describe('GitHubUserAuthorizationService.getUserAccessToken', () => {

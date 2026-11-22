@@ -17,6 +17,7 @@ import {
   type OrgModeFormErrorCode,
   type OrgModeFormErrors,
   orgModeFormSaveValues,
+  type OrgModeFormTarget,
   type OrgModeFormValues,
   orgModeFormValues,
   validateOrgModeForm,
@@ -222,13 +223,16 @@ function ModeFormBody({
     groups: nextGroups,
   });
 
-  // One list for the suggestion and the save, so the hint cannot offer an
-  // identifier the save would then derive differently: the suggestion below and
-  // `save` both read `takenSlugs`, re-derived from the current `existingModes`.
+  // One list for the suggestion and the save, so the placeholder cannot offer
+  // an identifier the save would then derive differently: the suggestion below
+  // and `save` both read `takenSlugs`, re-derived from the current
+  // `existingModes`.
   const takenSlugs = existingModes.map(m => m.slug);
   // Derived every render, not stored: a create route may mount while the modes
   // query is still pending (an empty list) and a later refetch replaces the
-  // list, and the hint must follow the list the save will actually read.
+  // list, and the placeholder must follow the list the save will actually read.
+  // Offered as the identifier field's placeholder rather than as typed text, so
+  // an empty field never looks filled.
   const suggestion =
     mode === undefined && hintInputs.slug.length === 0
       ? modeSlugFromName(hintInputs.name, takenSlugs)
@@ -302,28 +306,31 @@ function ModeFormBody({
   };
 
   const save = () => {
+    // One target for the whole save: the same fact decides the derivation, the
+    // refusal and the mutation, so the three cannot disagree.
+    const target: OrgModeFormTarget =
+      mode === undefined ? { kind: 'create' } : { kind: 'update', modeId: mode.id };
     // Slug strings, not the router output records: `orgModeFormSaveValues`
     // takes just the slugs, so the form narrows before the call.
-    const next = orgModeFormSaveValues(
-      currentValues(),
-      mode === undefined ? 'create' : 'update',
-      takenSlugs
-    );
-    const found = validateOrgModeForm(next, existingModes, mode?.id);
+    const next = orgModeFormSaveValues(currentValues(), target.kind, takenSlugs);
+    const found = validateOrgModeForm(next, existingModes, target);
     setErrors(found);
     const firstInvalid = FIELD_ORDER.find(field => found[field] !== undefined);
     if (firstInvalid !== undefined) {
       scrollToField(firstInvalid);
       return;
     }
-    const config = orgModeConfigInput(next, mode === undefined ? 'create' : 'update');
+    const config = orgModeConfigInput(next, target.kind);
     const name = next.name.trim();
     const slug = next.slug.trim();
-    if (mode === undefined) {
+    if (target.kind === 'create') {
       mutations.create.mutate({ name, slug, config }, { onSuccess: leaveAfterSave });
       return;
     }
-    mutations.update.mutate({ modeId: mode.id, name, slug, config }, { onSuccess: leaveAfterSave });
+    mutations.update.mutate(
+      { modeId: target.modeId, name, slug, config },
+      { onSuccess: leaveAfterSave }
+    );
   };
 
   const remove = () => {
@@ -377,8 +384,9 @@ function ModeFormBody({
           <View className="gap-1.5" onLayout={fieldLayout('slug')}>
             <FormField
               label={t('organization.modes.identifierLabel')}
-              required
+              required={mode !== undefined}
               defaultValue={values.slug}
+              placeholder={suggestion.length > 0 ? suggestion : undefined}
               maxLength={MODE_SLUG_MAX_LENGTH}
               autoCapitalize="none"
               autoCorrect={false}
@@ -395,11 +403,7 @@ function ModeFormBody({
                 }
               }}
             />
-            <Text variant="caption">
-              {suggestion.length === 0
-                ? t('organization.modes.identifierHint')
-                : `${suggestion} · ${t('organization.modes.identifierHint')}`}
-            </Text>
+            <Text variant="caption">{t('organization.modes.identifierHint')}</Text>
           </View>
           <FormField
             label={t('organization.modes.roleLabel')}

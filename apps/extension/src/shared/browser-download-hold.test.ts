@@ -1351,6 +1351,64 @@ describe('the recorded state', () => {
     expect(downloads.order).toEqual(['suggest']);
     expect(hold.drain('session-1')).toEqual([]);
   });
+
+  /**
+   * A registration that arrives after the record was read: the record holds a session's facts only while the session
+   * is live, so this approval and this tab are not kept.
+   */
+  it('keeps nothing a closed session registers after the record was read', async () => {
+    const storage = makeStorage({});
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    // The record is read, so a registration lands in the mirror and in the record from here on.
+    await vi.advanceTimersByTimeAsync(0);
+
+    hold.closeSession('session-1');
+    hold.arm(armedNeed({ url: 'https://app.example/reports/q4.pdf' }));
+    hold.tab(agentTab());
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(storage.recordKeys()).toStrictEqual([]);
+    expect(hold.needOf('session-1')).toBeUndefined();
+    // Its tab is not the agent's any more, so a download there is the user's and passes untouched.
+    expect(
+      hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(downloads.order).toStrictEqual(['suggest']);
+    expect(hold.drain('session-1')).toEqual([]);
+  });
+
+  /**
+   * The same rule for the writer a stop runs: a stopped file reports when its cancel and its look-up have answered, and
+   * a session that had closed by then keeps no report.
+   */
+  it('keeps a report a stop queued after the close out of the record', async () => {
+    const storage = makeStorage({});
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    hold.tab(agentTab());
+
+    // The stop's own awaits are still pending here: the cancel has been asked for, and the report is queued after the
+    // Look-up that follows it.
+    expect(
+      hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(true);
+
+    hold.closeSession('session-1');
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The file was still stopped, and the record keeps nothing: a closed session has no entry.
+    expect(downloads.order.indexOf('cancel')).toBeLessThan(downloads.order.indexOf('suggest'));
+    expect(storage.recordKeys()).toStrictEqual([]);
+  });
 });
 
 describe('a sign-gated settle', () => {

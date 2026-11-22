@@ -1,11 +1,13 @@
-import { isValidBitbucketRepositoryPaginationUrl } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
+import {
+  BITBUCKET_MAX_REPOSITORY_ITEMS,
+  isValidBitbucketRepositoryPaginationUrl,
+} from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { z } from 'zod';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
 import { ResponseTooLargeError, readBoundedJsonBody } from './lib/bounded-read.js';
 
 const BITBUCKET_REPOSITORY_PAGE_LENGTH = 50;
 const BITBUCKET_MAX_REPOSITORY_PAGES = 100;
-const BITBUCKET_MAX_REPOSITORY_ITEMS = 5000;
 const BITBUCKET_MAX_RESPONSE_BYTES = 1_000_000;
 const BITBUCKET_REQUEST_TIMEOUT_MS = 10_000;
 const BITBUCKET_MAX_REQUEST_TIMEOUT_MS = 30_000;

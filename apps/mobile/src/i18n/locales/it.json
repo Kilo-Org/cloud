@@ -523,12 +523,13 @@
       "receiptLabel": "Ricevuta",
       "copyReceiptId": "Copia ID ricevuta",
       "appealLabel": "Ricorso",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ricevuta",
       "triageOpen": "In revisione",
       "triageActioned": "Accolta",
       "triageRejected": "Non accolta",
       "appealNone": "Nessuno inviato",
-      "appealSubmitted": "In revisione",
+      "appealSubmitted": "Ricorso in revisione",
       "appealAccepted": "Accolto",
       "appealRejected": "Respinto",
       "appeal": "Presenta ricorso contro questa decisione",
@@ -540,13 +541,23 @@
       "nextStepInReview": "L'esito apparirà su questa schermata e potrai presentare ricorso dopo la decisione.",
       "nextStepAppeal": "L'esito del ricorso apparirà su questa schermata.",
       "nextStepFinal": "La decisione sul ricorso è definitiva. Non è possibile presentare altri ricorsi.",
-      "viewReceipt": "Visualizza ricevuta"
+      "viewReceipt": "Visualizza ricevuta",
+      "targetLabel": "Elemento segnalato",
+      "reasonLabel": "Motivo della segnalazione",
+      "targetMessage": "Risposta AI",
+      "targetComment": "Commento PR",
+      "targetUser": "Utente",
+      "reasonHarmful": "Contenuto dannoso",
+      "reasonIllegal": "Contenuto illegale",
+      "reasonHarassment": "Molestie",
+      "reasonSpam": "Pubblicità indesiderata",
+      "reasonOther": "Altro motivo"
     },
     "reportReceipts": {
       "title": "Segnalazioni",
       "rowSubtitle": "Le segnalazioni che hai inviato e i loro esiti",
       "emptyTitle": "Ancora nessuna segnalazione",
-      "emptyDescription": "Le segnalazioni che invii da un commento o da una risposta AI compaiono qui.",
+      "emptyDescription": "Le segnalazioni che invii da un commento in una discussione di una pull request, oppure da una risposta AI in una sessione dell'agente, compaiono qui con il loro esito.",
       "couldNotLoad": "Impossibile caricare le tue segnalazioni",
       "capped": "Vengono mostrate le tue segnalazioni più recenti."
     },
@@ -704,6 +715,7 @@
       "manageAccess": "Gestisci l'accesso",
       "bitbucketNoRepositoriesDescription": "Non ci sono repository disponibili in questa area di lavoro di Bitbucket.",
       "gitlabNoRepositoriesDescription": "Potresti dover concedere l'accesso a più gruppi o progetti su GitLab.",
+      "githubNoRepositoriesDescription": "Controlla le autorizzazioni di accesso ai repository dell'app Kilo per GitHub, poi aggiorna l'elenco.",
       "installGithubApp": "Installa l'app GitHub sui repository",
       "installGithubAppDescription": "Concedi all'app GitHub di Kilo l'accesso ai repository che vuoi far esaminare.",
       "repositoryAccess": "accesso al repository",
@@ -798,7 +810,7 @@
       "findingsInProgress": "Questa revisione è ancora in corso. Le segnalazioni compariranno qui al termine.",
       "findingsEndedWithoutResults": "Questa revisione è terminata prima di produrre segnalazioni.",
       "serviceUnavailable": "Impossibile contattare il servizio di revisione del codice. Ripeti la revisione quando il servizio sarà disponibile.",
-      "reviewFailed": "La revisione non è riuscita. Riprova.",
+      "reviewFailed": "La revisione non è riuscita.",
       "retryMessage": "Questa azione rieseguirà la revisione del codice.",
       "retryReview": "Ripeti la revisione",
       "retryNeedsSettings": "Il Revisore di codice è disattivato o le sue impostazioni richiedono attenzione. Correggi le impostazioni, poi ripeti questa revisione.",
@@ -1590,7 +1602,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioni",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessioni",
       "live": "IN TEMPO REALE",
-      "updating": "Aggiornamento in corso"
+      "updating": "Aggiornamento in corso",
+      "retentionLimit": "Vengono mostrate le sessioni più recenti."
     },
     "sessionRow": {
       "deleteTitle": "Eliminare la sessione?",
@@ -1662,7 +1675,6 @@
       "scrollToBottom": "Scorri fino in fondo",
       "emptyTitle": "Ancora nessun messaggio",
       "emptyReadOnlyTitle": "Nessun messaggio in questa sessione",
-      "renameAccessibility": "Rinomina la sessione: {{title}}",
       "cloningSession": "Clonazione in corso…",
       "couldNotLoadThisSession": "Impossibile caricare questa sessione.",
       "historyTooLarge": "La trascrizione di questa sessione è troppo grande da caricare.",
@@ -2002,7 +2014,6 @@
       "noMatches": "Nessun risultato",
       "noRepositories": "Nessun repository disponibile",
       "noRepositoriesDescription": "Collega GitHub o GitLab per caricare i repository.",
-      "loading": "Caricamento…",
       "accessibility": "Repository selezionato: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2557,6 +2568,12 @@
     "translateSummaries": "Traduci i riepiloghi",
     "autoExpandThinkingInactiveSubtitle": "Non ha effetto quando i dettagli del ragionamento sono nascosti."
   },
+  "accountBlocked": {
+    "title": "Account bloccato",
+    "description": "Kilo ha bloccato questo account e un nuovo accesso non lo sbloccherà. L'assistenza può riesaminare il blocco su richiesta.",
+    "domainDescription": "Kilo blocca gli account su questo dominio email e un nuovo accesso non lo cambierà. L'assistenza può riesaminare il dominio su richiesta.",
+    "contactSupport": "Contatta l'assistenza"
+  },
   "addCredits": {
     "cta": "Aggiungi crediti",
     "billingPage": "pagina di fatturazione"
@@ -2629,8 +2646,7 @@
     "timeoutDescription": "La richiesta è scaduta prima di essere completata. Riprova."
   },
   "screenHeader": {
-    "openMenu": "Apri il menu",
-    "openMenuFor": "Apri il menu di {{title}}"
+    "openMenu": "Apri il menu"
   },
   "picker": {
     "optionsExpired": "Opzioni scadute",
@@ -2921,8 +2937,9 @@
       "checkActiveConnection": "La connessione è attiva, ma non è ancora possibile caricare questo elemento.",
       "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Questo account non ha ancora nessuna organizzazione. Le pull request Bitbucket possono essere revisionate una volta che crei un'organizzazione o ne entri a far parte.",
-      "gitlabReconnectAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di riconnetterla.",
+      "reconnectAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di riconnetterla.",
       "bitbucketNotConnectedTitle": "Bitbucket non è connesso",
+      "bitbucketAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di connetterlo.",
       "adminOnlyConnectDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
       "contextLine": "Per {{organization}}",
       "contextLinePersonal": "Per il tuo account personale"
@@ -4773,6 +4790,7 @@
     "contextAll": "Tutti i contesti",
     "dismiss": "Ignora il briefing",
     "dismissFailed": "Non è stato possibile ignorare subito questo briefing. Verrà ritentato automaticamente in background.",
+    "readMarkFailed": "Non è stato possibile contrassegnare questo briefing come letto. Verrà ritentato al prossimo caricamento del briefing.",
     "offline": "Offline · briefing salvato",
     "cached": "Briefing salvato · aggiornamento non disponibile",
     "summary": "Riepilogo AI",
@@ -4792,6 +4810,9 @@
     "morningEnd": "Briefing disponibile fino alle",
     "timeHint": "La scheda Home ripristina lo stato live al termine della finestra di briefing, anche offline.",
     "invalidSchedule": "Scegli un fuso orario valido e una finestra di briefing non vuota.",
+    "scheduleEmptyNight": "La finestra di briefing è vuota. Scegli un orario di disponibilità successivo all'inizio della finestra.",
+    "scheduleEmptyMorning": "L'orario di disponibilità e l'orario di fine disponibilità coincidono. Scegli per quanto tempo il briefing resta disponibile.",
+    "scheduleFullDay": "Le due finestre coprono un giorno intero. Lascia parte della giornata al di fuori del briefing.",
     "notificationsHint": "Una notifica generica per ogni briefing programmato. Indipendente dai riepiloghi AI a pagamento.",
     "notificationPermission": "Attiva le notifiche push per ricevere il tuo briefing.",
     "defaultModel": "Usa il modello predefinito di Kilo",
@@ -4801,6 +4822,9 @@
     "estimate": "Stima {{estimate}} · massimo {{maximum}}",
     "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni. Modifica il modello o i limiti, oppure riprova più tardi.",
     "confirmPaid": "Attivare i riepiloghi a pagamento per {{context}}?",
+    "paidDisclosure_one": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
+    "paidDisclosure_many": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
+    "paidDisclosure_other": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
     "paidDisclosure": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
     "enable": "Attiva riepiloghi a pagamento",
     "allContexts": "I briefing personali e dell'organizzazione restano separati.",
@@ -4848,7 +4872,7 @@
     "sourceActivity": "Attività senza titolo",
     "metadataFailureProvider": "errore del provider",
     "metadataFailureTool": "errore dello strumento",
-    "metadataFailureCancelled": "Annullata",
+    "metadataStopped": "Ultimo turno interrotto",
     "metadataFailureOther": "errore non specificato"
   },
   "systemSearch": {
@@ -4969,6 +4993,9 @@
       "runAsCreator": "Esegui come me",
       "runAsCreatorDescription": "Ogni esecuzione usa il tuo account, quindi l'intestazione segreta è obbligatoria.",
       "saveFailedTitle": "Impossibile salvare l'attivatore",
+      "nameTaken": "Esiste già un attivatore chiamato «{{name}}».",
+      "saveFailedRetry": "Impossibile raggiungere il server. Controlla la connessione e riprova.",
+      "saveFailedCheck": "Controlla i valori nel modulo e riprova.",
       "deleteTitle": "Eliminare questo attivatore?",
       "deleteMessage": "Le chiamate a {{name}} non riusciranno. L'operazione non può essere annullata.",
       "deleteMessageScheduled": "Le esecuzioni pianificate di {{name}} si interrompono. L'operazione non può essere annullata.",

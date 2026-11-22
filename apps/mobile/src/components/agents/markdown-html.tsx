@@ -1,12 +1,14 @@
 /* oxlint-disable max-lines -- cohesive HTML segmentation, sanitization, and image/link wiring share one renderer */
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { marked, type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
+  type LayoutChangeEvent,
   Platform,
   Text,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import RenderHTML, {
   type CustomBlockRenderer,
@@ -739,7 +741,21 @@ export function MarkdownHtml({
   onLongPressLink,
   onPressLink,
 }: Readonly<MarkdownHtmlProps>) {
-  const { width } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  // The engine sizes the blocks it lays out from one number, and the app
+  // overrides every renderer that reads it today. Hosts still insets this
+  // renderer — a chat bubble keeps 82 % of the row and pads its content, a card
+  // pads its body — so the window is the wrong box to report: measuring the
+  // container gives the engine the width it actually lays out in, on every
+  // host, without each one passing its own inset. The window width answers for
+  // the first frame, before any layout has been reported.
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setMeasuredWidth(previous =>
+      previous !== null && Math.abs(previous - next) < 0.5 ? previous : next
+    );
+  }, []);
   const source = useMemo(() => ({ html }), [html]);
   const baseStyle = useMemo(
     () => ({
@@ -873,19 +889,21 @@ export function MarkdownHtml({
   }, [baseStyle, documentDirection, onLongPressLink, onPressLink, selectable]);
 
   return (
-    <RenderHTML
-      baseStyle={baseStyle}
-      classesStyles={classesStyles}
-      contentWidth={width}
-      customHTMLElementModels={HTML_ELEMENT_MODELS}
-      defaultTextProps={{ selectable }}
-      domVisitors={domVisitors}
-      enableCSSInlineProcessing={false}
-      ignoredDomTags={IGNORED_HTML_TAGS}
-      renderers={renderers}
-      renderersProps={renderersProps}
-      source={source}
-      tagsStyles={tagsStyles}
-    />
+    <View onLayout={handleLayout}>
+      <RenderHTML
+        baseStyle={baseStyle}
+        classesStyles={classesStyles}
+        contentWidth={measuredWidth ?? windowWidth}
+        customHTMLElementModels={HTML_ELEMENT_MODELS}
+        defaultTextProps={{ selectable }}
+        domVisitors={domVisitors}
+        enableCSSInlineProcessing={false}
+        ignoredDomTags={IGNORED_HTML_TAGS}
+        renderers={renderers}
+        renderersProps={renderersProps}
+        source={source}
+        tagsStyles={tagsStyles}
+      />
+    </View>
   );
 }

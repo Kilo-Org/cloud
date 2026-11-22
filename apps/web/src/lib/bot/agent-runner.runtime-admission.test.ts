@@ -88,10 +88,13 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     platform_installation_id: 'installation-1',
     github_app_type: 'standard',
   }),
+  getIntegrationForOwner: jest.fn(),
 }));
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
   assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
 }));
+jest.mock('@/lib/integrations/core/health', () => ({ isPlatformIntegrationHealthy: () => true }));
+jest.mock('@/lib/integrations/gitlab-service', () => ({ getValidGitLabToken: jest.fn() }));
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({}));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({}));
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({

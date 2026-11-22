@@ -139,7 +139,7 @@ describe('Repository picker accessible name', () => {
 
     const loading = loadingFrame(renderer);
     expect(loading).toBeDefined();
-    expect(loading?.props.accessibilityLabel).toBe('Repository: Loading...');
+    expect(loading?.props.accessibilityLabel).toBe('Repository: Loading…');
 
     unmount();
   });

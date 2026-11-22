@@ -12,11 +12,8 @@ import type {
   GetCloudAgentRootSessionMessagesParams,
   ListCloudAgentRootSessionsParams,
 } from '../session-ingest-binding.js';
-import {
-  fetchOrgIdForSession,
-  validateBalanceOnly,
-  type BalanceOnlyResult,
-} from '../balance-validation.js';
+import { validateBalanceOnly, type BalanceOnlyResult } from '../balance-validation.js';
+import { requireCurrentSessionAccess } from '../session-access.js';
 import type {
   QueueExecutionTurnCommand,
   SubmittedSessionMessageRequest,
@@ -238,6 +235,19 @@ function isSessionIngestKiloSessionId(kiloSessionId: string): boolean {
 
 function missingRootKiloSessionResponse(): Response {
   return facadeError(404, 'KILO_SESSION_NOT_FOUND', 'Cloud Agent root Kilo session was not found');
+}
+
+/**
+ * Projects a failed payer balance check. A payer scope the caller cannot reach
+ * reads as a hidden root, so it does not confirm that the session exists.
+ */
+function promptBalanceFailureResponse(
+  balance: Extract<BalanceOnlyResult, { success: false }>
+): Response {
+  if (balance.status === 404) return missingRootKiloSessionResponse();
+  const response = facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+  if (balance.status === 503) response.headers.set('Retry-After', '1');
+  return response;
 }
 
 function pendingSessionSnapshotResponse(): Response {
@@ -555,14 +565,102 @@ async function readRequestJson(request: Request): Promise<ReadRequestJsonResult>
   }
 }
 
+function promptPayerScopeFailure(error: unknown): BalanceOnlyResult {
+  if (error instanceof TRPCError && error.code === 'FORBIDDEN') {
+    return { success: false, status: 404, message: 'Cloud Agent session was not found' };
+  }
+  return {
+    success: false,
+    status: 503,
+    message: 'Session access is temporarily unavailable; retry the request',
+  };
+}
+
+/** The payer read is repeated within this attempt count before it reports a failure. */
+const PROMPT_PAYER_SCOPE_READ_ATTEMPTS = 2;
+/** Pause between attempts. */
+const PROMPT_PAYER_SCOPE_RETRY_MS = 50;
+/**
+ * A failure slower than this may already have spent the pool's connection
+ * timeout, so repeating it would double the wait before the answer. Only a fast
+ * failure is repeated.
+ */
+const PROMPT_PAYER_SCOPE_SLOW_FAILURE_MS = 1_000;
+
+/**
+ * Reads the payer scope, repeating a quick failure within the attempt bound. A
+ * slow failure and a denial are reported at once.
+ */
+async function readPromptPayerScope(params: {
+  env: Env;
+  userId: string;
+  cloudAgentSessionId: string;
+}): Promise<string | null> {
+  for (let attempt = 1; ; attempt += 1) {
+    const startedAt = Date.now();
+    try {
+      const { organizationId } = await requireCurrentSessionAccess({
+        env: params.env,
+        kiloUserId: params.userId,
+        cloudAgentSessionId: params.cloudAgentSessionId,
+      });
+      return organizationId;
+    } catch (error) {
+      if (error instanceof TRPCError && error.code === 'FORBIDDEN') throw error;
+      if (attempt >= PROMPT_PAYER_SCOPE_READ_ATTEMPTS) throw error;
+      if (Date.now() - startedAt >= PROMPT_PAYER_SCOPE_SLOW_FAILURE_MS) throw error;
+      const wait = Promise.withResolvers<void>();
+      setTimeout(wait.resolve, PROMPT_PAYER_SCOPE_RETRY_MS);
+      await wait.promise;
+    }
+  }
+}
+
+/** Records the final failure once, with the identifiers and the underlying error text. */
+function logPromptPayerScopeFailure(
+  error: unknown,
+  params: { userId: string; cloudAgentSessionId: string }
+): void {
+  const cause = error instanceof TRPCError ? error.cause : undefined;
+  logger
+    .withFields({
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      userId: params.userId,
+      error: cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause ?? error),
+    })
+    .warn('Prompt payer scope read failed');
+}
+
+/**
+ * Resolves the payer from the stored session ownership record, the same source
+ * the tRPC balance middleware uses, so a facade prompt and a tRPC prompt check
+ * one payer. A failed read is repeated within a bound; a read that still fails
+ * answers closed, is recorded once, and the caller may retry.
+ */
 async function defaultValidatePromptBalance(params: {
   env: Env;
   authToken: string;
   userId: string;
   cloudAgentSessionId: string;
 }): Promise<BalanceOnlyResult> {
-  const orgId = await fetchOrgIdForSession(params.env, params.userId, params.cloudAgentSessionId);
-  return validateBalanceOnly(params.authToken, orgId, params.env);
+  let organizationId: string | null;
+  try {
+    organizationId = await readPromptPayerScope({
+      env: params.env,
+      userId: params.userId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
+    });
+  } catch (error) {
+    // A denial answers as a missing session and is not recorded.
+    if (!(error instanceof TRPCError && error.code === 'FORBIDDEN')) {
+      logPromptPayerScopeFailure(error, {
+        userId: params.userId,
+        cloudAgentSessionId: params.cloudAgentSessionId,
+      });
+    }
+    return promptPayerScopeFailure(error);
+  }
+  return validateBalanceOnly(params.authToken, organizationId ?? undefined, params.env);
 }
 
 async function defaultAdmitPrompt(params: {
@@ -650,7 +748,7 @@ async function admitBasicPrompt(params: {
     cloudAgentSessionId: params.cloudAgentSessionId,
   });
   if (!balance.success) {
-    return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+    return promptBalanceFailureResponse(balance);
   }
   const command = {
     turn: {
@@ -1546,7 +1644,7 @@ async function admitHostedCommand(params: {
     cloudAgentSessionId: params.cloudAgentSessionId,
   });
   if (!balance.success) {
-    return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+    return promptBalanceFailureResponse(balance);
   }
   const messageId = params.body.messageID ?? createMessageId();
   const command = {

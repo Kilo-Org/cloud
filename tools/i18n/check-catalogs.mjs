@@ -1096,6 +1096,34 @@ function checkArmenianSentenceTerminator(tag, values, label) {
   return problems;
 }
 
+/**
+ * The Devanagari danda `।` (U+0964) closes a sentence in the scripts that
+ * write it. A catalog states its own sentence mark in `common.sentenceJoiner`,
+ * so a catalog that joins its sentences with another mark must not borrow it:
+ * a batch imported from a danda source leaves one screen with two sentence
+ * terminators, and the mark belongs to another script. The notifications push
+ * catalog carries no joiner at all and writes no sentence mark, so a danda
+ * there is reported too.
+ */
+function checkBorrowedDanda(values, label) {
+  const problems = [];
+  const joiner = values.get('common.sentenceJoiner');
+  if (typeof joiner === 'string' && joiner.startsWith('\u0964')) {
+    return problems;
+  }
+  for (const [key, value] of values) {
+    if (!value.includes('\u0964')) {
+      continue;
+    }
+    problems.push(
+      typeof joiner === 'string'
+        ? `${label}: "${key}" writes the Devanagari danda «।» while this catalog joins its sentences with "${joiner}"`
+        : `${label}: "${key}" writes the Devanagari danda «।», and this catalog writes no sentence mark of its own`
+    );
+  }
+  return problems;
+}
+
 /** The `{{token}}` list of one string, in the order it writes them. */
 function placeholderTokens(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
@@ -2600,6 +2628,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkBorrowedDanda(translated, label));
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a

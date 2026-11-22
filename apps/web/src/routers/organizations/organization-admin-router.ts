@@ -740,7 +740,7 @@ export const organizationAdminRouter = createTRPCRouter({
     .output(
       z.object({
         current: AdminOrganizationServiceFeeExemptionRecordSchema,
-        history: AdminOrganizationServiceFeeExemptionRecordSchema,
+        created: AdminOrganizationServiceFeeExemptionRecordSchema,
       })
     )
     .mutation(async ({ input, ctx }) => {

@@ -10,6 +10,7 @@ import {
 } from '@/lib/user';
 import {
   claimEmailCodeSend,
+  cleanupExpiredPendingAuthLinks,
   completePendingLink,
   createPendingLink,
   createPendingLinkForDifferentOAuth,
@@ -377,5 +378,94 @@ describe('new sign-in method notice', () => {
     const user = await makeUser('pending-notice-fails@example.com');
     const result = await linkAccountToExistingUser(user.id, githubIdentity(user.google_user_email));
     expect(result.success).toBe(true);
+  });
+});
+
+describe('cleanupExpiredPendingAuthLinks', () => {
+  it('deletes rows past the one-day grace period and keeps live ones', async () => {
+    const user = await makeUser('pending-cleanup-a@example.com');
+    const other = await makeUser('pending-cleanup-b@example.com');
+    const stale = await createPendingLink({
+      kiloUserId: user.id,
+      kind: 'existing_account',
+      identity: githubIdentity(user.google_user_email, 'github-cleanup-stale'),
+      emailCodeAllowed: true,
+    });
+    const recentlyExpired = await createPendingLink({
+      kiloUserId: other.id,
+      kind: 'existing_account',
+      identity: githubIdentity(other.google_user_email, 'github-cleanup-recent'),
+      emailCodeAllowed: true,
+    });
+    const live = await createPendingLink({
+      kiloUserId: user.id,
+      kind: 'existing_account',
+      identity: githubIdentity(user.google_user_email, 'github-cleanup-live'),
+      emailCodeAllowed: true,
+    });
+    await db
+      .update(pending_auth_links)
+      .set({ expires_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() })
+      .where(eq(pending_auth_links.id, stale.pendingLink.id));
+    await db
+      .update(pending_auth_links)
+      .set({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+      .where(eq(pending_auth_links.id, recentlyExpired.pendingLink.id));
+
+    const deleted = await cleanupExpiredPendingAuthLinks();
+
+    const rows = await db
+      .select({ id: pending_auth_links.id })
+      .from(pending_auth_links)
+      .where(
+        inArray(pending_auth_links.id, [
+          stale.pendingLink.id,
+          recentlyExpired.pendingLink.id,
+          live.pendingLink.id,
+        ])
+      );
+    const remaining = rows.map(row => row.id);
+    expect(remaining).not.toContain(stale.pendingLink.id);
+    expect(remaining).toContain(recentlyExpired.pendingLink.id);
+    expect(remaining).toContain(live.pendingLink.id);
+    // Other test workers share this table, so the sweep may also delete their
+    // rows; only the lower bound is stable.
+    expect(deleted).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does not sweep the table when a link is created', async () => {
+    const user = await makeUser('pending-cleanup-create@example.com');
+    const other = await makeUser('pending-cleanup-old@example.com');
+    const [oldRow] = await db
+      .insert(pending_auth_links)
+      .values({
+        secret_hash: hashPendingLinkSecret('old-secret-for-cleanup-test'),
+        kilo_user_id: other.id,
+        kind: 'existing_account',
+        provider: 'github',
+        provider_account_id: 'github-cleanup-old',
+        email: other.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: '@@github@@',
+        email_code_allowed: true,
+        callback_path: null,
+        expires_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .returning();
+    expect(oldRow).toBeDefined();
+
+    await createPendingLink({
+      kiloUserId: user.id,
+      kind: 'existing_account',
+      identity: githubIdentity(user.google_user_email, 'github-cleanup-new'),
+      emailCodeAllowed: true,
+    });
+
+    const rows = await db
+      .select({ id: pending_auth_links.id })
+      .from(pending_auth_links)
+      .where(eq(pending_auth_links.id, oldRow!.id));
+    expect(rows.map(row => row.id)).toEqual([oldRow!.id]);
   });
 });

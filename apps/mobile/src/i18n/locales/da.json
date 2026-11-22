@@ -522,12 +522,13 @@
       "receiptLabel": "Kvittering",
       "copyReceiptId": "Kopier kvitterings-id",
       "appealLabel": "Klage",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Modtaget",
       "triageOpen": "Under behandling",
       "triageActioned": "Taget til følge",
       "triageRejected": "Ikke taget til følge",
       "appealNone": "Ingen indsendt",
-      "appealSubmitted": "Under behandling",
+      "appealSubmitted": "Klage under behandling",
       "appealAccepted": "Imødekommet",
       "appealRejected": "Afvist",
       "appeal": "Klag over denne afgørelse",
@@ -539,13 +540,23 @@
       "nextStepInReview": "Resultatet vises på denne skærm, og du kan klage, når der er truffet en afgørelse.",
       "nextStepAppeal": "Resultatet af din klage vises på denne skærm.",
       "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
-      "viewReceipt": "Se kvittering"
+      "viewReceipt": "Se kvittering",
+      "targetLabel": "Anmeldt element",
+      "reasonLabel": "Årsag til anmeldelse",
+      "targetMessage": "AI-svar",
+      "targetComment": "PR-kommentar",
+      "targetUser": "Bruger",
+      "reasonHarmful": "Skadeligt indhold",
+      "reasonIllegal": "Ulovligt indhold",
+      "reasonHarassment": "Chikane",
+      "reasonSpam": "Uønsket reklame",
+      "reasonOther": "Anden årsag"
     },
     "reportReceipts": {
       "title": "Anmeldelser",
       "rowSubtitle": "Dine indsendte anmeldelser og deres resultater",
       "emptyTitle": "Ingen anmeldelser endnu",
-      "emptyDescription": "Anmeldelser, du indsender fra en kommentar eller et AI-svar, vises her.",
+      "emptyDescription": "Anmeldelser, du indsender fra en kommentar i en pull request-diskussion eller fra et AI-svar i en agentsession, vises her sammen med resultatet.",
       "couldNotLoad": "Kunne ikke indlæse dine anmeldelser",
       "capped": "Viser dine seneste anmeldelser."
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "Forbindelsen er aktiv, men dette element kan stadig ikke indlæses.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
-      "gitlabReconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
+      "reconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
       "bitbucketNotConnectedTitle": "Bitbucket er ikke tilsluttet",
+      "bitbucketAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
       "adminOnlyConnectDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
@@ -1296,6 +1308,7 @@
       "manageAccess": "Administrér adgang",
       "bitbucketNoRepositoriesDescription": "Der er ingen tilgængelige kodelagre i dette Bitbucket-arbejdsområde.",
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
+      "githubNoRepositoriesDescription": "Kontrollér, at Kilos GitHub-app har adgang til dine kodelagre, og opdatér derefter listen.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
       "repositoryAccess": "adgang til kodelagre",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "Denne gennemgang er stadig i gang. Fund vises her, når den er færdig.",
       "findingsEndedWithoutResults": "Denne gennemgang sluttede, før den gav nogen fund.",
       "serviceUnavailable": "Kunne ikke oprette forbindelse til tjenesten til kodegennemgang. Prøv gennemgangen igen, når tjenesten er tilgængelig.",
-      "reviewFailed": "Gennemgangen mislykkedes. Prøv igen.",
+      "reviewFailed": "Gennemgangen mislykkedes.",
       "showMore": "Vis mere",
       "created": "Oprettet",
       "started": "Startet",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioner",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessioner",
       "live": "I REALTID",
-      "updating": "Opdaterer"
+      "updating": "Opdaterer",
+      "retentionLimit": "Viser de seneste sessioner."
     },
     "sessionRow": {
       "deleteTitle": "Slet session?",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
       "emptyReadOnlyTitle": "Ingen beskeder i denne session",
-      "renameAccessibility": "Omdøb session: {{title}}",
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
       "historyTooLarge": "Denne sessions transskription er for stor at indlæse.",
@@ -2569,7 +2582,6 @@
       "noMatches": "Ingen resultater",
       "noRepositories": "Ingen tilgængelige kodelagre",
       "noRepositoriesDescription": "Tilknyt GitHub eller GitLab for at indlæse kodelagre.",
-      "loading": "Indlæser…",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3083,6 +3095,12 @@
     "retryLoadingAccount": "Prøv at indlæse kontoen igen",
     "retryLoadingPrivacy": "Prøv at indlæse privatlivsindstillingerne igen"
   },
+  "accountBlocked": {
+    "title": "Konto blokeret",
+    "description": "Kilo har blokeret denne konto, og det hjælper ikke at logge ind igen. Support kan gennemgå blokeringen efter anmodning.",
+    "domainDescription": "Kilo blokerer konti på dette e-maildomæne, og det ændrer ikke noget at logge ind igen. Support kan gennemgå domænet efter anmodning.",
+    "contactSupport": "Kontakt support"
+  },
   "addCredits": {
     "cta": "Tilføj kreditter",
     "billingPage": "faktureringsside"
@@ -3155,8 +3173,7 @@
     "timeoutDescription": "Anmodningen fik timeout, før den blev gennemført. Prøv igen."
   },
   "screenHeader": {
-    "openMenu": "Åbn menu",
-    "openMenuFor": "Åbn menu for {{title}}"
+    "openMenu": "Åbn menu"
   },
   "picker": {
     "optionsExpired": "Valgmuligheder udløbet",
@@ -4689,6 +4706,7 @@
     "contextAll": "Alle kontekster",
     "dismiss": "Afvis briefing",
     "dismissFailed": "Denne briefing kunne ikke afvises endnu. Der forsøges igen i baggrunden.",
+    "readMarkFailed": "Denne briefing kunne ikke markeres som læst. Der forsøges igen, når briefingen indlæses.",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt briefing · kan ikke opdateres",
     "summary": "AI-resumé",
@@ -4708,6 +4726,9 @@
     "morningEnd": "Briefing tilgængelig indtil",
     "timeHint": "Hjem-kortet viser live-status igen, når briefingvinduet slutter, også offline.",
     "invalidSchedule": "Vælg en gyldig tidszone og et ikke-tomt briefingvindue.",
+    "scheduleEmptyNight": "Briefingvinduet er tomt. Vælg et klartidspunkt senere end vinduets start.",
+    "scheduleEmptyMorning": "Klartidspunktet og tidspunktet for tilgængelighedens udløb er ens. Vælg, hvor længe briefingen forbliver tilgængelig.",
+    "scheduleFullDay": "De to briefingvinduer dækker et helt døgn. Lad en del af døgnet ligge uden for briefingen.",
     "notificationsHint": "Én generisk notifikation pr. planlagt briefing. Uafhængigt af betalte AI-resuméer.",
     "notificationPermission": "Slå push-notifikationer til for at modtage din briefing.",
     "defaultModel": "Brug Kilos standardmodel",
@@ -4721,6 +4742,8 @@
     "estimateModelNotAllowed": "Denne model er ikke tilladt i denne kontekst. Vælg en anden model.",
     "estimateSpendLimitTooLow": "Hæv forbrugsgrænsen for at tillade denne opsummering.",
     "confirmPaid": "Slå betalte resuméer til for {{context}}?",
+    "paidDisclosure_one": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} min. Der opkræves betaling, selv hvis genereringen mislykkes.",
+    "paidDisclosure_other": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} min. Der opkræves betaling, selv hvis genereringen mislykkes.",
     "paidDisclosure": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} min. Der opkræves betaling, selv hvis genereringen mislykkes.",
     "enable": "Slå betalte resuméer til",
     "allContexts": "Personlige briefinger og organisationsbriefinger holdes adskilt.",
@@ -4760,7 +4783,7 @@
     "sourceActivity": "Aktivitet uden titel",
     "metadataFailureProvider": "udbyderfejl",
     "metadataFailureTool": "værktøjsfejl",
-    "metadataFailureCancelled": "Annulleret",
+    "metadataStopped": "Seneste kørsel blev stoppet",
     "metadataFailureOther": "uspecificeret fejl"
   },
   "systemSearch": {
@@ -4881,6 +4904,9 @@
       "runAsCreator": "Kør som mig",
       "runAsCreatorDescription": "Hver kørsel bruger din konto, så det hemmelige headerfelt er påkrævet.",
       "saveFailedTitle": "Kunne ikke gemme udløseren",
+      "nameTaken": "Der findes allerede en udløser med navnet »{{name}}«.",
+      "saveFailedRetry": "Kunne ikke få kontakt til serveren. Tjek din forbindelse og prøv igen.",
+      "saveFailedCheck": "Tjek værdierne i formularen og prøv igen.",
       "deleteTitle": "Slet denne udløser?",
       "deleteMessage": "Kald til {{name}} vil fejle. Dette kan ikke fortrydes.",
       "deleteMessageScheduled": "Planlagte kørsler af {{name}} stopper. Dette kan ikke fortrydes.",

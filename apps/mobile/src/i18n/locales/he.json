@@ -523,13 +523,14 @@
       "receiptLabel": "אישור",
       "copyReceiptId": "העתקת מזהה האישור",
       "appealLabel": "ערעור",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "התקבל",
       "triageOpen": "בבדיקה",
       "triageActioned": "אושר",
       "triageRejected": "לא אושר",
       "appealNone": "לא הוגש",
-      "appealSubmitted": "בבדיקה",
-      "appealAccepted": "התקבל",
+      "appealSubmitted": "הערעור בבדיקה",
+      "appealAccepted": "הערעור התקבל",
       "appealRejected": "נדחה",
       "appeal": "ערעור על ההחלטה",
       "appealTitle": "לערער על ההחלטה?",
@@ -540,13 +541,23 @@
       "nextStepInReview": "התוצאה תופיע במסך זה, ואפשר לערער לאחר ההחלטה.",
       "nextStepAppeal": "תוצאת הערעור תופיע במסך זה.",
       "nextStepFinal": "החלטת הערעור סופית. לא ניתן להגיש ערעור נוסף.",
-      "viewReceipt": "הצגת האישור"
+      "viewReceipt": "הצגת האישור",
+      "targetLabel": "פריט מדווח",
+      "reasonLabel": "סיבת הדיווח",
+      "targetMessage": "תשובת AI",
+      "targetComment": "תגובה בבקשת משיכה",
+      "targetUser": "משתמש",
+      "reasonHarmful": "תוכן מזיק",
+      "reasonIllegal": "תוכן לא חוקי",
+      "reasonHarassment": "הטרדה",
+      "reasonSpam": "ספאם",
+      "reasonOther": "סיבה אחרת"
     },
     "reportReceipts": {
       "title": "דיווחים",
       "rowSubtitle": "דיווחים שהגשת והתוצאות שלהם",
       "emptyTitle": "אין עדיין דיווחים",
-      "emptyDescription": "דיווחים שתגיש מתגובה או מתשובת AI יופיעו כאן.",
+      "emptyDescription": "דיווחים שתגיש מתגובה בדיון בבקשת משיכה, או מתשובת AI בסשן של סוכן, יופיעו כאן עם התוצאה שלהם.",
       "couldNotLoad": "לא ניתן לטעון את הדיווחים שלך",
       "capped": "מוצגים הדיווחים האחרונים שלך."
     },
@@ -737,6 +748,7 @@
       "manageAccess": "ניהול גישה",
       "bitbucketNoRepositoriesDescription": "אין מאגרים זמינים בסביבת העבודה הזו של Bitbucket.",
       "gitlabNoRepositoriesDescription": "ייתכן שתצטרך להעניק גישה לעוד קבוצות או פרויקטים ב-GitLab.",
+      "githubNoRepositoriesDescription": "בדוק את הרשאות הגישה למאגרים של אפליקציית Kilo ב-GitHub, ואז רענן את הרשימה.",
       "installGithubApp": "התקנת אפליקציית GitHub במאגרים",
       "installGithubAppDescription": "תן לאפליקציית Kilo ב-GitHub גישה למאגרים שברצונך לסקור.",
       "repositoryAccess": "גישה למאגר",
@@ -831,7 +843,7 @@
       "findingsInProgress": "הסקירה הזו עדיין בתהליך. הממצאים יופיעו כאן כשהיא תסתיים.",
       "findingsEndedWithoutResults": "הסקירה הזו הסתיימה לפני שהניבה ממצאים.",
       "serviceUnavailable": "לא ניתן להתחבר לשירות סקירת הקוד. יש להריץ את הסקירה שוב כשהשירות יהיה זמין.",
-      "reviewFailed": "הסקירה נכשלה. נא לנסות שוב.",
+      "reviewFailed": "הסקירה נכשלה.",
       "retryMessage": "פעולה זו תריץ מחדש את סקירת הקוד.",
       "retryReview": "הרצת הסקירה שוב",
       "retryNeedsSettings": "סוקר הקוד כבוי או שההגדרות שלו דורשות טיפול. יש לתקן את ההגדרות ואז להריץ את הסקירה הזו שוב.",
@@ -1623,7 +1635,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} סשנים",
       "sectionAccessibility": "{{title}}: {{displayCount}} סשנים",
       "live": "בזמן אמת",
-      "updating": "העדכון מתבצע"
+      "updating": "העדכון מתבצע",
+      "retentionLimit": "מוצגות השיחות העדכניות ביותר."
     },
     "sessionRow": {
       "deleteTitle": "למחוק את השיחה?",
@@ -1695,7 +1708,6 @@
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",
       "emptyReadOnlyTitle": "אין הודעות בסשן הזה",
-      "renameAccessibility": "שינוי שם הסשן: {{title}}",
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "historyTooLarge": "ההתעתק של הסשן הזה גדול מדי מכדי לטעון.",
@@ -2039,7 +2051,6 @@
       "noMatches": "אין התאמות",
       "noRepositories": "אין מאגרים זמינים",
       "noRepositoriesDescription": "כדי לטעון מאגרים, יש לחבר את GitHub או GitLab.",
-      "loading": "טוען…",
       "accessibility": "מאגר: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2557,6 +2568,12 @@
     "retryLoadingAccount": "ניסיון נוסף לטעינת החשבון",
     "retryLoadingPrivacy": "ניסיון נוסף לטעינת העדפות הפרטיות"
   },
+  "accountBlocked": {
+    "title": "החשבון חסום",
+    "description": "Kilo חסמה את החשבון הזה, והתחברות מחדש לא תסיר את החסימה. התמיכה יכולה לבדוק את החסימה לפי בקשה.",
+    "domainDescription": "Kilo חוסמת חשבונות בדומיין האימייל הזה, והתחברות מחדש לא תשנה את החסימה. התמיכה יכולה לבדוק את הדומיין לפי בקשה.",
+    "contactSupport": "פנייה לתמיכה"
+  },
   "addCredits": {
     "cta": "הוספת קרדיטים",
     "billingPage": "דף החיוב"
@@ -2629,8 +2646,7 @@
     "timeoutDescription": "הבקשה לא הספיקה להסתיים בזמן. נסה שוב."
   },
   "screenHeader": {
-    "openMenu": "פתיחת התפריט",
-    "openMenuFor": "פתיחת התפריט של {{title}}"
+    "openMenu": "פתיחת התפריט"
   },
   "picker": {
     "optionsExpired": "האפשרויות כבר אינן זמינות",
@@ -2921,8 +2937,9 @@
       "checkActiveConnection": "החיבור פעיל, אבל עדיין לא ניתן לטעון את הפריט הזה.",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
-      "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
+      "reconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
       "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
+      "bitbucketAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו.",
       "adminOnlyConnectDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
@@ -4773,6 +4790,7 @@
     "contextAll": "כל ההקשרים",
     "dismiss": "התעלמות מהדוח",
     "dismissFailed": "עדיין לא ניתן להתעלם מהדוח הזה. הניסיון נמשך ברקע.",
+    "readMarkFailed": "לא ניתן לסמן את הדוח הזה כנקרא. ננסה שוב כשהדוח ייטען מחדש.",
     "offline": "לא מקוון · דוח שמור",
     "cached": "דוח שמור · רענון לא זמין",
     "summary": "סיכום AI",
@@ -4792,6 +4810,9 @@
     "morningEnd": "הדוח זמין עד",
     "timeHint": "כרטיס הבית חוזר לסטטוס חי בסוף חלון הדוח, גם במצב לא מקוון.",
     "invalidSchedule": "יש לבחור אזור זמן תקין וחלון דוח לא ריק.",
+    "scheduleEmptyNight": "חלון הדוח ריק. יש לבחור זמן מוכנות מאוחר מתחילת החלון.",
+    "scheduleEmptyMorning": "זמן המוכנות וזמן הזמינות תואמים. יש לבחור כמה זמן הדוח יישאר זמין.",
+    "scheduleFullDay": "שני החלונות מכסים יום שלם. יש להשאיר חלק מהיום מחוץ לדוח.",
     "notificationsHint": "התראה כללית אחת לכל דוח מתוזמן. לא תלויה בסיכומי AI בתשלום.",
     "notificationPermission": "יש להפעיל התראות דחיפה כדי לקבל את הדוח.",
     "defaultModel": "שימוש במודל ברירת המחדל של Kilo",
@@ -4801,6 +4822,9 @@
     "estimate": "הערכת עלות {{estimate}} · מקסימום {{maximum}}",
     "estimateUnavailable": "סיכום בתשלום אינו זמין עבור הגדרות אלה. יש לשנות את המודל או המגבלות, או לנסות שוב מאוחר יותר.",
     "confirmPaid": "להפעיל סיכומים בתשלום עבור {{context}}?",
+    "paidDisclosure_one": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
+    "paidDisclosure_two": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
+    "paidDisclosure_other": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
     "paidDisclosure": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
     "enable": "הפעלת סיכומים בתשלום",
     "allContexts": "דוחות אישיים ודוחות ארגון נשמרים בנפרד.",
@@ -4848,7 +4872,7 @@
     "sourceActivity": "פעילות ללא שם",
     "metadataFailureProvider": "שגיאת ספק",
     "metadataFailureTool": "שגיאת כלי",
-    "metadataFailureCancelled": "בוטל",
+    "metadataStopped": "הסבב האחרון הופסק",
     "metadataFailureOther": "שגיאה לא צוינה"
   },
   "systemSearch": {
@@ -4969,6 +4993,9 @@
       "runAsCreator": "הרצה בשמי",
       "runAsCreatorDescription": "כל הרצה משתמשת בחשבון שלך, לכן כותרת הסוד נדרשת.",
       "saveFailedTitle": "לא ניתן היה לשמור את הטריגר",
+      "nameTaken": "טריגר בשם \"{{name}}\" כבר קיים.",
+      "saveFailedRetry": "לא ניתן היה להגיע לשרת. בדקו את החיבור ונסו שוב.",
+      "saveFailedCheck": "בדקו את הערכים בטופס ונסו שוב.",
       "deleteTitle": "למחוק את הטריגר הזה?",
       "deleteMessage": "קריאות אל {{name}} ייכשלו. לא ניתן לבטל זאת.",
       "deleteMessageScheduled": "הריצות המתוזמנות של {{name}} ייעצרו. לא ניתן לבטל זאת.",

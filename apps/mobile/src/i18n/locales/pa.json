@@ -522,6 +522,7 @@
       "receiptLabel": "ਰਸੀਦ",
       "copyReceiptId": "ਰਸੀਦ ਦੀ ID ਕਾਪੀ ਕਰੋ",
       "appealLabel": "ਅਪੀਲ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ਪ੍ਰਾਪਤ ਹੋਈ",
       "triageOpen": "ਸਮੀਖਿਆ ਅਧੀਨ",
       "triageActioned": "ਸਹੀ ਪਾਈ ਗਈ",
@@ -539,13 +540,23 @@
       "nextStepInReview": "ਨਤੀਜਾ ਇਸ ਸਕ੍ਰੀਨ ਉੱਤੇ ਦਿਖੇਗਾ, ਅਤੇ ਫ਼ੈਸਲੇ ਤੋਂ ਬਾਅਦ ਤੁਸੀਂ ਅਪੀਲ ਕਰ ਸਕਦੇ ਹੋ।",
       "nextStepAppeal": "ਅਪੀਲ ਦਾ ਨਤੀਜਾ ਇਸ ਸਕ੍ਰੀਨ ਉੱਤੇ ਦਿਖੇਗਾ।",
       "nextStepFinal": "ਅਪੀਲ ਦਾ ਫ਼ੈਸਲਾ ਅੰਤਿਮ ਹੈ। ਹੋਰ ਅਪੀਲ ਦਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
-      "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
+      "viewReceipt": "ਰਸੀਦ ਦੇਖੋ",
+      "targetLabel": "ਰਿਪੋਰਟ ਕੀਤੀ ਚੀਜ਼",
+      "reasonLabel": "ਰਿਪੋਰਟ ਦਾ ਕਾਰਨ",
+      "targetMessage": "AI ਦਾ ਜਵਾਬ",
+      "targetComment": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਟਿੱਪਣੀ",
+      "targetUser": "ਵਰਤੋਂਕਾਰ",
+      "reasonHarmful": "ਨੁਕਸਾਨਦਾਇਕ ਸਮੱਗਰੀ",
+      "reasonIllegal": "ਗੈਰ-ਕਾਨੂੰਨੀ ਸਮੱਗਰੀ",
+      "reasonHarassment": "ਛੇੜਛਾੜ",
+      "reasonSpam": "ਅਣਚਾਹੀ ਇਸ਼ਤਿਹਾਰਬਾਜ਼ੀ",
+      "reasonOther": "ਹੋਰ ਕਾਰਨ"
     },
     "reportReceipts": {
       "title": "ਰਿਪੋਰਟਾਂ",
       "rowSubtitle": "ਤੁਹਾਡੀਆਂ ਦਰਜ ਕੀਤੀਆਂ ਰਿਪੋਰਟਾਂ ਅਤੇ ਉਨ੍ਹਾਂ ਦੇ ਨਤੀਜੇ",
       "emptyTitle": "ਹਾਲੇ ਕੋਈ ਰਿਪੋਰਟ ਨਹੀਂ",
-      "emptyDescription": "ਕਿਸੇ ਟਿੱਪਣੀ ਜਾਂ AI ਜਵਾਬ ਤੋਂ ਤੁਸੀਂ ਜੋ ਰਿਪੋਰਟਾਂ ਦਰਜ ਕਰਦੇ ਹੋ, ਉਹ ਇੱਥੇ ਦਿਖਦੀਆਂ ਹਨ।",
+      "emptyDescription": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਚਰਚਾ ਦੀ ਕਿਸੇ ਟਿੱਪਣੀ ਤੋਂ ਜਾਂ ਏਜੰਟ ਸੈਸ਼ਨ ਦੇ AI ਜਵਾਬ ਤੋਂ ਤੁਸੀਂ ਜੋ ਰਿਪੋਰਟਾਂ ਦਰਜ ਕਰਦੇ ਹੋ, ਉਹ ਆਪਣੇ ਨਤੀਜਿਆਂ ਸਮੇਤ ਇੱਥੇ ਦਿਖਦੀਆਂ ਹਨ।",
       "couldNotLoad": "ਤੁਹਾਡੀਆਂ ਰਿਪੋਰਟਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
       "capped": "ਤੁਹਾਡੀਆਂ ਸਭ ਤੋਂ ਹਾਲੀਆ ਰਿਪੋਰਟਾਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।"
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਹੈ, ਪਰ ਇਹ ਆਈਟਮ ਅਜੇ ਵੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਦੀ।",
       "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
       "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
-      "gitlabReconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
+      "reconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
       "bitbucketNotConnectedTitle": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
+      "bitbucketAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
       "adminOnlyConnectDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
@@ -1296,6 +1308,7 @@
       "manageAccess": "ਪਹੁੰਚ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ",
       "bitbucketNoRepositoriesDescription": "ਇਸ Bitbucket ਵਰਕਸਪੇਸ ਵਿੱਚ ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "gitlabNoRepositoriesDescription": "ਤੁਹਾਨੂੰ GitLab 'ਤੇ ਹੋਰ ਸਮੂਹਾਂ ਜਾਂ ਪ੍ਰੋਜੈਕਟਾਂ ਤੱਕ ਪਹੁੰਚ ਦੇਣ ਦੀ ਲੋੜ ਹੋ ਸਕਦੀ ਹੈ।",
+      "githubNoRepositoriesDescription": "ਜਾਂਚੋ ਕਿ Kilo GitHub ਐਪ ਨੂੰ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਹੈ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
       "installGithubApp": "ਰਿਪੋਜ਼ਟਰੀਆਂ 'ਤੇ GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ",
       "installGithubAppDescription": "Kilo GitHub ਐਪ ਨੂੰ ਉਨ੍ਹਾਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦਿਓ ਜਿਨ੍ਹਾਂ ਦੀ ਤੁਸੀਂ ਸਮੀਖਿਆ ਕਰਵਾਉਣੀ ਚਾਹੁੰਦੇ ਹੋ।",
       "repositoryAccess": "ਰਿਪੋਜ਼ਟਰੀ ਤੱਕ ਪਹੁੰਚ",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "ਇਹ ਸਮੀਖਿਆ ਹਾਲੇ ਚੱਲ ਰਹੀ ਹੈ। ਪੂਰੀ ਹੋਣ 'ਤੇ ਸਮੱਸਿਆਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "findingsEndedWithoutResults": "ਇਹ ਸਮੀਖਿਆ ਸਮੇਂ ਤੋਂ ਪਹਿਲਾਂ ਖ਼ਤਮ ਹੋ ਗਈ — ਇਸ ਨੇ ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
       "serviceUnavailable": "ਕੋਡ ਸਮੀਖਿਆ ਸੇਵਾ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਸੇਵਾ ਉਪਲਬਧ ਹੋਣ 'ਤੇ ਸਮੀਖਿਆ ਦੁਬਾਰਾ ਕਰੋ।",
-      "reviewFailed": "ਸਮੀਖਿਆ ਅਸਫਲ ਹੋ ਗਈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "reviewFailed": "ਸਮੀਖਿਆ ਅਸਫਲ ਹੋ ਗਈ।",
       "showMore": "ਹੋਰ ਦਿਖਾਓ",
       "created": "ਬਣਾਇਆ ਗਿਆ",
       "started": "ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ਸੈਸ਼ਨ",
       "sectionAccessibility": "{{title}}: {{displayCount}} ਸੈਸ਼ਨ",
       "live": "ਲਾਈਵ",
-      "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
+      "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵੇਂ ਸੈਸ਼ਨ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ।"
     },
     "sessionRow": {
       "deleteTitle": "ਕੀ ਸੈਸ਼ਨ ਮਿਟਾਉਣਾ ਹੈ?",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "ਸਭ ਤੋਂ ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
       "emptyReadOnlyTitle": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
-      "renameAccessibility": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ: {{title}}",
       "cloningSession": "ਸੈਸ਼ਨ ਕਲੋਨ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "couldNotLoadThisSession": "ਇਹ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "historyTooLarge": "ਇਸ ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ ਲੋਡ ਕਰਨ ਲਈ ਬਹੁਤ ਵੱਡੀ ਹੈ।",
@@ -2569,7 +2582,6 @@
       "noMatches": "ਕੋਈ ਮੇਲ ਨਹੀਂ",
       "noRepositories": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਉਪਲਬਧ ਨਹੀਂ",
       "noRepositoriesDescription": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਕਰਨ ਲਈ GitHub ਜਾਂ GitLab ਖਾਤਾ ਜੋੜੋ।",
-      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
       "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3083,6 +3095,12 @@
     "retryLoadingAccount": "ਖਾਤਾ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
     "retryLoadingPrivacy": "ਪਰਦੇਦਾਰੀ ਦੇ ਵਿਕਲਪ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
   },
+  "accountBlocked": {
+    "title": "ਖਾਤਾ ਬਲਾਕ ਹੋ ਗਿਆ",
+    "description": "Kilo ਨੇ ਇਹ ਖਾਤਾ ਬਲਾਕ ਕਰ ਦਿੱਤਾ ਹੈ, ਅਤੇ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨ ਨਾਲ ਇਹ ਨਹੀਂ ਖੁੱਲ੍ਹੇਗਾ। ਬੇਨਤੀ 'ਤੇ ਸਹਾਇਤਾ ਟੀਮ ਬਲਾਕ ਦੀ ਸਮੀਖਿਆ ਕਰ ਸਕਦੀ ਹੈ।",
+    "domainDescription": "Kilo ਇਸ ਈਮੇਲ ਡੋਮੇਨ 'ਤੇ ਖਾਤਿਆਂ ਨੂੰ ਬਲਾਕ ਕਰ ਦਿੰਦਾ ਹੈ, ਅਤੇ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨ ਨਾਲ ਇਹ ਨਹੀਂ ਬਦਲੇਗਾ। ਬੇਨਤੀ 'ਤੇ ਸਹਾਇਤਾ ਟੀਮ ਡੋਮੇਨ ਦੀ ਸਮੀਖਿਆ ਕਰ ਸਕਦੀ ਹੈ।",
+    "contactSupport": "ਸਹਾਇਤਾ ਟੀਮ ਨਾਲ ਸੰਪਰਕ ਕਰੋ"
+  },
   "addCredits": {
     "cta": "ਕ੍ਰੈਡਿਟ ਜੋੜੋ",
     "billingPage": "ਬਿਲਿੰਗ ਪੰਨਾ"
@@ -3155,8 +3173,7 @@
     "timeoutDescription": "ਬੇਨਤੀ ਪੂਰੀ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਹੀ ਸਮਾਂ ਸਮਾਪਤ ਹੋ ਗਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "screenHeader": {
-    "openMenu": "ਮੀਨੂ ਖੋਲ੍ਹੋ",
-    "openMenuFor": "{{title}} ਲਈ ਮੀਨੂ ਖੋਲ੍ਹੋ"
+    "openMenu": "ਮੀਨੂ ਖੋਲ੍ਹੋ"
   },
   "picker": {
     "optionsExpired": "ਵਿਕਲਪਾਂ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ",
@@ -4689,6 +4706,7 @@
     "contextAll": "ਸਾਰੇ ਸੰਦਰਭ",
     "dismiss": "ਬ੍ਰੀਫਿੰਗ ਖਾਰਜ ਕਰੋ",
     "dismissFailed": "ਇਹ ਬ੍ਰੀਫਿੰਗ ਹਾਲੇ ਖਾਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਇਹ ਬੈਕਗਰਾਉਂਡ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਦੀ ਹੈ।",
+    "readMarkFailed": "ਇਹ ਬ੍ਰੀਫਿੰਗ ਪੜ੍ਹੀ ਹੋਈ ਵਜੋਂ ਨਿਸ਼ਾਨਿਤ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਬ੍ਰੀਫਿੰਗ ਦੁਬਾਰਾ ਲੋਡ ਹੋਣ ’ਤੇ ਇਹ ਫਿਰ ਕੋਸ਼ਿਸ਼ ਕਰੇਗੀ।",
     "offline": "ਆਫਲਾਈਨ · ਸੰਭਾਲੀ ਬ੍ਰੀਫਿੰਗ",
     "cached": "ਸੰਭਾਲੀ ਬ੍ਰੀਫਿੰਗ · ਤਾਜ਼ਾ ਕਰਨਾ ਉਪਲਬਧ ਨਹੀਂ",
     "summary": "AI ਸਾਰ",
@@ -4708,6 +4726,9 @@
     "morningEnd": "ਬ੍ਰੀਫਿੰਗ ਉਪਲਬਧ ਰਹਿਣ ਦਾ ਅੰਤਿਮ ਸਮਾਂ",
     "timeHint": "ਹੋਮ ਕਾਰਡ ਬ੍ਰੀਫਿੰਗ ਦੀ ਮਿਆਦ ਖਤਮ ਹੋਣ 'ਤੇ ਲਾਈਵ ਸਥਿਤੀ ਮੁੜ ਦਿਖਾਉਂਦਾ ਹੈ, ਆਫਲਾਈਨ ਵੀ।",
     "invalidSchedule": "ਇੱਕ ਸਹੀ ਸਮਾਂ ਖੇਤਰ ਅਤੇ ਇੱਕ ਗੈਰ-ਖਾਲੀ ਬ੍ਰੀਫਿੰਗ ਮਿਆਦ ਚੁਣੋ।",
+    "scheduleEmptyNight": "ਬ੍ਰੀਫਿੰਗ ਦੀ ਮਿਆਦ ਖਾਲੀ ਹੈ। ਮਿਆਦ ਦੇ ਸ਼ੁਰੂ ਹੋਣ ਤੋਂ ਬਾਅਦ ਦਾ ਤਿਆਰ ਹੋਣ ਦਾ ਸਮਾਂ ਚੁਣੋ।",
+    "scheduleEmptyMorning": "ਤਿਆਰ ਹੋਣ ਦਾ ਸਮਾਂ ਅਤੇ ਉਪਲਬਧ ਰਹਿਣ ਦਾ ਅੰਤਿਮ ਸਮਾਂ ਇੱਕੋ ਜਿਹੇ ਹਨ। ਚੁਣੋ ਕਿ ਬ੍ਰੀਫਿੰਗ ਕਿੰਨੀ ਦੇਰ ਉਪਲਬਧ ਰਹੇਗੀ।",
+    "scheduleFullDay": "ਦੋਵੇਂ ਮਿਆਦਾਂ ਇੱਕ ਪੂਰਾ ਦਿਨ ਕਵਰ ਕਰਦੀਆਂ ਹਨ। ਦਿਨ ਦਾ ਕੁਝ ਹਿੱਸਾ ਬ੍ਰੀਫਿੰਗ ਤੋਂ ਬਾਹਰ ਛੱਡੋ।",
     "notificationsHint": "ਹਰ ਨਿਰਧਾਰਿਤ ਬ੍ਰੀਫਿੰਗ ਲਈ ਇੱਕ ਆਮ ਸੂਚਨਾ। ਭੁਗਤਾਨ ਵਾਲੇ AI ਸਾਰਾਂ ਤੋਂ ਸੁਤੰਤਰ।",
     "notificationPermission": "ਆਪਣੀ ਬ੍ਰੀਫਿੰਗ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਪੁਸ਼ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਕਰੋ।",
     "defaultModel": "Kilo ਦਾ ਡਿਫਾਲਟ ਮਾਡਲ ਵਰਤੋ",
@@ -4717,7 +4738,9 @@
     "estimate": "ਅਨੁਮਾਨ {{estimate}} · ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}",
     "estimateUnavailable": "ਇਨ੍ਹਾਂ ਸੈਟਿੰਗਾਂ ਲਈ ਭੁਗਤਾਨ ਵਾਲਾ ਸਾਰ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਮਾਡਲ ਜਾਂ ਸੀਮਾਵਾਂ ਬਦਲੋ, ਜਾਂ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "confirmPaid": "ਕੀ {{context}} ਲਈ ਭੁਗਤਾਨ ਵਾਲੇ ਸਾਰ ਚਾਲੂ ਕਰਨੇ ਹਨ?",
+    "paidDisclosure_one": "ਅਨੁਮਾਨਿਤ {{estimate}}, ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}, {{minutes}} ਮਿੰਟ ਦੀ ਸੀਮਾ ਨਾਲ। ਸਾਰ ਬਣਾਉਣਾ ਅਸਫਲ ਹੋਣ 'ਤੇ ਵੀ ਖਰਚੇ ਲੱਗਦੇ ਹਨ।",
     "paidDisclosure": "ਅਨੁਮਾਨਿਤ {{estimate}}, ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}, {{minutes}} ਮਿੰਟ ਦੀ ਸੀਮਾ ਨਾਲ। ਸਾਰ ਬਣਾਉਣਾ ਅਸਫਲ ਹੋਣ 'ਤੇ ਵੀ ਖਰਚੇ ਲੱਗਦੇ ਹਨ।",
+    "paidDisclosure_other": "ਅਨੁਮਾਨਿਤ {{estimate}}, ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}, {{minutes}} ਮਿੰਟ ਦੀ ਸੀਮਾ ਨਾਲ। ਸਾਰ ਬਣਾਉਣਾ ਅਸਫਲ ਹੋਣ 'ਤੇ ਵੀ ਖਰਚੇ ਲੱਗਦੇ ਹਨ।",
     "enable": "ਭੁਗਤਾਨ ਵਾਲੇ ਸਾਰ ਚਾਲੂ ਕਰੋ",
     "allContexts": "ਨਿੱਜੀ ਅਤੇ ਸੰਸਥਾ ਬ੍ਰੀਫਿੰਗਾਂ ਵੱਖਰੀਆਂ ਰਹਿੰਦੀਆਂ ਹਨ।",
     "emptyHistory": "ਕੋਈ ਸੁਰੱਖਿਅਤ ਕੀਤੀਆਂ ਬ੍ਰੀਫਿੰਗਾਂ ਨਹੀਂ",
@@ -4760,7 +4783,7 @@
     "sourceActivity": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਵਾਲੀ ਗਤੀਵਿਧੀ",
     "metadataFailureProvider": "ਪ੍ਰਦਾਤਾ ਗਲਤੀ",
     "metadataFailureTool": "ਟੂਲ ਗਲਤੀ",
-    "metadataFailureCancelled": "ਰੱਦ",
+    "metadataStopped": "ਪਿਛਲਾ ਟਰਨ ਰੋਕਿਆ ਗਿਆ",
     "metadataFailureOther": "ਅਣਦੱਸੀ ਗਲਤੀ"
   },
   "systemSearch": {
@@ -4881,6 +4904,9 @@
       "runAsCreator": "ਮੇਰੇ ਵਜੋਂ ਚਲਾਓ",
       "runAsCreatorDescription": "ਹਰ ਰਨ ਤੁਹਾਡੇ ਖਾਤੇ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ, ਇਸ ਲਈ ਗੁਪਤ ਹੈਡਰ ਲਾਜ਼ਮੀ ਹੈ।",
       "saveFailedTitle": "ਟ੍ਰਿਗਰ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
+      "nameTaken": "“{{name}}” ਨਾਮ ਦਾ ਟ੍ਰਿਗਰ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ।",
+      "saveFailedRetry": "ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕੇ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "saveFailedCheck": "ਫ਼ਾਰਮ ਵਿੱਚ ਦਿੱਤੇ ਮੁੱਲ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "deleteTitle": "ਇਹ ਟ੍ਰਿਗਰ ਮਿਟਾਉਣਾ ਹੈ?",
       "deleteMessage": "{{name}} ਲਈ ਕਾਲਾਂ ਫੇਲ੍ਹ ਹੋਣਗੀਆਂ। ਇਸਨੂੰ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
       "deleteMessageScheduled": "{{name}} ਟ੍ਰਿਗਰ ਦੇ ਨਿਰਧਾਰਿਤ ਰਨ ਰੁਕ ਜਾਣਗੇ। ਇਸਨੂੰ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",

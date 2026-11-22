@@ -371,6 +371,17 @@ export async function resolveEffectiveSessionConfiguration(
     modelContextLimits,
     webSearchPreference
   );
+  if (resolved?.skippedAgentSlugs !== undefined) {
+    // A stored profile agent that carries a CLI agent id no longer reaches a
+    // session; record it so the rows that stop applying are measurable.
+    logger
+      .withFields({
+        userId: ctx.userId,
+        profileId: resolved.resolvedProfileId ?? null,
+        slugs: resolved.skippedAgentSlugs,
+      })
+      .warn('Stored profile agents omitted from the session: their ids belong to the CLI');
+  }
   assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
   // The reference and the allocation travel beside the merged configuration;
   // a client cannot set them.

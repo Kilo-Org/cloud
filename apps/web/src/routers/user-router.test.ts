@@ -4,6 +4,8 @@ import {
   createNativeCallerForUser,
   createSessionCallerForUser,
 } from '@/routers/test-utils';
+import { userRouter } from '@/routers/user-router';
+import { SELF_CLEANUP_PROCEDURES } from '@kilocode/app-shared/auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
@@ -3400,5 +3402,35 @@ describe('user router - passkeys', () => {
       .from(session_step_up_proofs)
       .where(eq(session_step_up_proofs.passkey_credential_id, row!.id));
     expect(proofs).toHaveLength(0);
+  });
+});
+
+// The blocked-account exemption admits a refused account for these procedures
+// only because they are self-scoped writes. If one were ever declared a query,
+// the shared list would claim a mutation the router does not have and the
+// admission would keep the exemption while the route changed kind, so the
+// mismatch has to fail here.
+describe('user router - self-cleanup procedures', () => {
+  it('declares every shared self-cleanup path a mutation of this router', () => {
+    const procedures = userRouter._def.procedures as Record<
+      string,
+      { _def?: { type?: string } } | undefined
+    >;
+    const problems: string[] = [];
+
+    for (const entry of SELF_CLEANUP_PROCEDURES) {
+      const name = entry.path.replace(/^user\./, '');
+      const procedure = procedures[name];
+      if (!procedure) {
+        problems.push(`${entry.path} (no procedure)`);
+        continue;
+      }
+      const actualType = procedure._def?.type ?? 'query';
+      if (actualType !== entry.type) {
+        problems.push(`${entry.path}: ${actualType}, expected ${entry.type}`);
+      }
+    }
+
+    expect(problems).toEqual([]);
   });
 });

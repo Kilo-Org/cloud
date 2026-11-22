@@ -522,12 +522,13 @@
       "receiptLabel": "Kvitto",
       "copyReceiptId": "Kopiera kvittoid",
       "appealLabel": "Överklagande",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Mottagen",
       "triageOpen": "Granskas",
       "triageActioned": "Bifallen",
       "triageRejected": "Inte bifallen",
       "appealNone": "Inget inskickat",
-      "appealSubmitted": "Granskas",
+      "appealSubmitted": "Överklagandet granskas",
       "appealAccepted": "Godkändes",
       "appealRejected": "Avslogs",
       "appeal": "Överklaga beslutet",
@@ -539,13 +540,23 @@
       "nextStepInReview": "Utfallet visas på den här skärmen, och du kan överklaga efter ett beslut.",
       "nextStepAppeal": "Utfallet av överklagandet visas på den här skärmen.",
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
-      "viewReceipt": "Visa kvitto"
+      "viewReceipt": "Visa kvitto",
+      "targetLabel": "Anmält objekt",
+      "reasonLabel": "Orsak till anmälan",
+      "targetMessage": "AI-svar",
+      "targetComment": "PR-kommentar",
+      "targetUser": "Användare",
+      "reasonHarmful": "Skadligt innehåll",
+      "reasonIllegal": "Olagligt innehåll",
+      "reasonHarassment": "Trakasserier",
+      "reasonSpam": "Skräppost",
+      "reasonOther": "Annan anledning"
     },
     "reportReceipts": {
       "title": "Anmälningar",
       "rowSubtitle": "Anmälningar du skickat in och deras utfall",
       "emptyTitle": "Inga anmälningar än",
-      "emptyDescription": "Anmälningar du skickar in från en kommentar eller ett AI-svar visas här.",
+      "emptyDescription": "Anmälningar du skickar in från en kommentar i en diskussion om en pull request, eller från ett AI-svar i en agentsession, visas här tillsammans med utfallet.",
       "couldNotLoad": "Det gick inte att läsa in dina anmälningar",
       "capped": "Visar dina senaste anmälningar."
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "Anslutningen är aktiv, men det här objektet kan fortfarande inte läsas in.",
       "bitbucketOrgOnlyDescription": "Växla kontot ovan till en organisation för att granska dess PR:er i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Det här kontot har inga organisationer ännu. Bitbucket-PR:er kan granskas när du har skapat eller gått med i en organisation.",
-      "gitlabReconnectAdminOnlyDescription": "Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den på nytt.",
+      "reconnectAdminOnlyDescription": "Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den på nytt.",
       "bitbucketNotConnectedTitle": "Bitbucket är inte anslutet",
+      "bitbucketAdminOnlyDescription": "Be en organisationsägare, administratör eller faktureringsansvarig att ansluta Bitbucket.",
       "adminOnlyConnectDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ansluta Bitbucket.",
       "contextLine": "För {{organization}}",
       "contextLinePersonal": "För ditt personliga konto"
@@ -1296,6 +1308,7 @@
       "manageAccess": "Hantera åtkomst",
       "bitbucketNoRepositoriesDescription": "Inga kodarkiv är tillgängliga i den här Bitbucket-arbetsytan.",
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
+      "githubNoRepositoriesDescription": "Kontrollera vilka kodarkiv Kilos GitHub-app har åtkomst till och uppdatera sedan listan.",
       "installGithubApp": "Installera GitHub-appen på kodarkiv",
       "installGithubAppDescription": "Ge Kilos GitHub-app åtkomst till de kodarkiv du vill få granskade.",
       "repositoryAccess": "åtkomst till kodarkiv",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "Den här granskningen pågår fortfarande. Fynden visas här när den är klar.",
       "findingsEndedWithoutResults": "Den här granskningen avslutades innan den gav några fynd.",
       "serviceUnavailable": "Kunde inte ansluta till tjänsten för kodgranskning. Gör om granskningen när tjänsten är tillgänglig.",
-      "reviewFailed": "Granskningen misslyckades. Försök igen.",
+      "reviewFailed": "Granskningen misslyckades.",
       "showMore": "Visa mer",
       "created": "Skapad",
       "started": "Startad",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioner",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessioner",
       "live": "I REALTID",
-      "updating": "Uppdaterar"
+      "updating": "Uppdaterar",
+      "retentionLimit": "Visar de senaste sessionerna."
     },
     "sessionRow": {
       "deleteTitle": "Ta bort session?",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
       "emptyReadOnlyTitle": "Inga meddelanden i den här sessionen",
-      "renameAccessibility": "Byt namn på sessionen: {{title}}",
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
       "historyTooLarge": "Den här sessionens logg är för stor för att läsas in.",
@@ -2569,7 +2582,6 @@
       "noMatches": "Inga träffar",
       "noRepositories": "Inga kodarkiv tillgängliga",
       "noRepositoriesDescription": "Anslut GitHub eller GitLab för att läsa in kodarkiv.",
-      "loading": "Läser in…",
       "accessibility": "Kodarkiv: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3083,6 +3095,12 @@
     "retryLoadingAccount": "Försök läsa in kontot igen",
     "retryLoadingPrivacy": "Försök läsa in dina sekretessval igen"
   },
+  "accountBlocked": {
+    "title": "Kontot blockerat",
+    "description": "Kilo har blockerat det här kontot och en ny inloggning häver inte blockeringen. Supporten kan granska blockeringen på begäran.",
+    "domainDescription": "Kilo tillåter inte konton på den här e-postdomänen och en ny inloggning ändrar inte det. Supporten kan granska domänen på begäran.",
+    "contactSupport": "Kontakta supporten"
+  },
   "addCredits": {
     "cta": "Fyll på krediter",
     "billingPage": "faktureringssidan"
@@ -3155,8 +3173,7 @@
     "timeoutDescription": "Begäran tog för lång tid att slutföras. Försök igen."
   },
   "screenHeader": {
-    "openMenu": "Öppna menyn",
-    "openMenuFor": "Öppna menyn för {{title}}"
+    "openMenu": "Öppna menyn"
   },
   "picker": {
     "optionsExpired": "Alternativen har upphört att gälla",
@@ -4689,6 +4706,7 @@
     "contextAll": "Alla kontexter",
     "dismiss": "Avskriv rapport",
     "dismissFailed": "Det gick inte att avfärda den här rapporten ännu. Den försöker igen i bakgrunden.",
+    "readMarkFailed": "Det gick inte att markera den här rapporten som läst. Det görs ett nytt försök när rapporten läses in igen.",
     "offline": "Offline · sparad rapport",
     "cached": "Sparad rapport · kan inte uppdateras",
     "summary": "AI-sammanfattning",
@@ -4708,6 +4726,9 @@
     "morningEnd": "Rapport tillgänglig till",
     "timeHint": "Hem-kortet återgår till livestatus när rapportperioden slutar, även offline.",
     "invalidSchedule": "Välj en giltig tidszon och en rapportperiod som inte är tom.",
+    "scheduleEmptyNight": "Rapportperioden är tom. Välj en tid då rapporten är klar som infaller senare än periodens början.",
+    "scheduleEmptyMorning": "Tiden då rapporten är klar och tiden den är tillgänglig till sammanfaller. Välj hur länge rapporten ska vara tillgänglig.",
+    "scheduleFullDay": "De två perioderna täcker ett helt dygn. Lämna en del av dygnet utanför rapporten.",
     "notificationsHint": "En allmän avisering per schemalagd rapport. Oberoende av betalda AI-sammanfattningar.",
     "notificationPermission": "Aktivera push-notiser för att få din rapport.",
     "defaultModel": "Använd Kilos standardmodell",
@@ -4717,7 +4738,9 @@
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar. Ändra modellen eller gränserna, eller försök igen senare.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
+    "paidDisclosure_one": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
     "paidDisclosure": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
+    "paidDisclosure_other": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
     "enable": "Aktivera betalda sammanfattningar",
     "allContexts": "Personliga rapporter och organisationsrapporter hålls åtskilda.",
     "emptyHistory": "Inga sparade rapporter",
@@ -4760,7 +4783,7 @@
     "sourceActivity": "Namnlös aktivitet",
     "metadataFailureProvider": "leverantörsfel",
     "metadataFailureTool": "verktygsfel",
-    "metadataFailureCancelled": "Avbruten",
+    "metadataStopped": "Förra omgången stoppades",
     "metadataFailureOther": "ospecificerat fel"
   },
   "systemSearch": {
@@ -4881,6 +4904,9 @@
       "runAsCreator": "Kör som jag",
       "runAsCreatorDescription": "Varje körning använder ditt konto, så det hemliga sidhuvudet krävs.",
       "saveFailedTitle": "Det gick inte att spara utlösaren",
+      "nameTaken": "Det finns redan en utlösare som heter ”{{name}}”.",
+      "saveFailedRetry": "Det gick inte att nå servern. Kontrollera anslutningen och försök igen.",
+      "saveFailedCheck": "Kontrollera värdena i formuläret och försök igen.",
       "deleteTitle": "Ta bort den här utlösaren?",
       "deleteMessage": "Anrop till {{name}} kommer att misslyckas. Detta kan inte ångras.",
       "deleteMessageScheduled": "Schemalagda körningar av {{name}} stoppas. Detta kan inte ångras.",

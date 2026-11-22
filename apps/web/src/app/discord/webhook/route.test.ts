@@ -1,4 +1,5 @@
 import { after, NextRequest } from 'next/server';
+import type { PlatformIntegration } from '@kilocode/db';
 import { processDiscordBotMessage } from '@/lib/discord-bot';
 import {
   addDiscordReaction,
@@ -10,6 +11,9 @@ import type { ForwardedGatewayEvent } from '@/lib/discord-bot/forwarded-gateway-
 import { POST } from './route';
 
 const mockRedisSet = jest.fn<Promise<'OK' | null>, [string, string, { nx: boolean; ex: number }]>();
+const mockGetInstallationByGuildId = jest.fn(
+  async (_guildId: string): Promise<PlatformIntegration | null> => null
+);
 
 jest.mock('next/server', () => ({
   ...jest.requireActual('next/server'),
@@ -27,6 +31,7 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 }));
 jest.mock('@/lib/discord-bot', () => ({ processDiscordBotMessage: jest.fn() }));
 jest.mock('@/lib/integrations/discord-service', () => ({
+  getInstallationByGuildId: (guildId: string) => mockGetInstallationByGuildId(guildId),
   addDiscordReaction: jest.fn(),
   postDiscordMessage: jest.fn(),
   removeDiscordReaction: jest.fn(),
@@ -75,6 +80,19 @@ function expectNoEffects() {
   expect(addDiscordReaction).not.toHaveBeenCalled();
   expect(removeDiscordReaction).not.toHaveBeenCalled();
   expect(postDiscordMessage).not.toHaveBeenCalled();
+}
+
+function discordInstallation(
+  overrides: { integration_status: string; suspended_at?: string | null } = {
+    integration_status: 'active',
+  }
+): PlatformIntegration {
+  return {
+    platform: 'discord',
+    platform_installation_id: GUILD_ID,
+    integration_status: overrides.integration_status,
+    suspended_at: overrides.suspended_at ?? null,
+  } as PlatformIntegration;
 }
 
 function expectCompletedMessages(messageIds: string[]) {
@@ -127,6 +145,8 @@ describe('Discord forwarded message admission', () => {
       acceptedUntil.set(key, nowMs + options.ex * 1000);
       return 'OK';
     });
+    mockGetInstallationByGuildId.mockReset();
+    mockGetInstallationByGuildId.mockResolvedValue(discordInstallation());
     jest.mocked(processDiscordBotMessage).mockReset();
     jest.mocked(processDiscordBotMessage).mockResolvedValue({
       response: 'Test reply',
@@ -162,6 +182,98 @@ describe('Discord forwarded message admission', () => {
       { nx: true, ex: 900 }
     );
     expect(verifyDiscordRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: 'a suspended connection', state: { integration_status: 'suspended' } },
+    {
+      label: 'a connection carrying a suspension marker',
+      state: { integration_status: 'active', suspended_at: new Date().toISOString() },
+    },
+  ])('leaves $label without a reaction, reply, or session', async ({ state }) => {
+    mockGetInstallationByGuildId.mockResolvedValue(discordInstallation(state));
+
+    expect((await deliver(makeEvent())).status).toBe(200);
+    await finishBackgroundWork();
+
+    expect(mockGetInstallationByGuildId).toHaveBeenCalledWith(GUILD_ID);
+    expectNoEffects();
+    expect(console.log).toHaveBeenCalledWith(
+      '[DiscordBot:Webhook] Refused gateway message for inactive installation',
+      expect.objectContaining({ guildId: GUILD_ID, integrationStatus: state.integration_status })
+    );
+  });
+
+  it('leaves a message for an unknown installation without effects', async () => {
+    mockGetInstallationByGuildId.mockResolvedValue(null);
+
+    expect((await deliver(makeEvent())).status).toBe(200);
+    await finishBackgroundWork();
+
+    expectNoEffects();
+  });
+
+  it('skips the reply when the bot reports an inactive installation', async () => {
+    jest.mocked(processDiscordBotMessage).mockResolvedValueOnce({
+      response: '',
+      modelUsed: '',
+      toolCallsMade: [],
+      error: 'installation_not_active',
+      installation: discordInstallation(),
+    });
+
+    expect((await deliver(makeEvent())).status).toBe(200);
+    await finishBackgroundWork();
+
+    expect(addDiscordReaction).toHaveBeenCalledTimes(1);
+    expect(addDiscordReaction).toHaveBeenCalledWith(CHANNEL_ID, MESSAGE_ID, '\u23f3');
+    expect(postDiscordMessage).not.toHaveBeenCalled();
+    // The hourglass is removed, so the message is not left processing forever.
+    expect(removeDiscordReaction).toHaveBeenCalledTimes(1);
+    expect(removeDiscordReaction).toHaveBeenCalledWith(CHANNEL_ID, MESSAGE_ID, '\u23f3');
+  });
+
+  it('retries the hourglass removal once when the bot reports an inactive installation', async () => {
+    jest.mocked(processDiscordBotMessage).mockResolvedValueOnce({
+      response: '',
+      modelUsed: '',
+      toolCallsMade: [],
+      error: 'installation_not_active',
+      installation: discordInstallation(),
+    });
+    jest
+      .mocked(removeDiscordReaction)
+      .mockResolvedValueOnce({ ok: false, error: 'rate limited' })
+      .mockResolvedValueOnce({ ok: true });
+
+    expect((await deliver(makeEvent())).status).toBe(200);
+    await finishBackgroundWork();
+
+    expect(removeDiscordReaction).toHaveBeenCalledTimes(2);
+    expect(removeDiscordReaction).toHaveBeenCalledWith(CHANNEL_ID, MESSAGE_ID, '\u23f3');
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('reports the hourglass that stayed when the retry also fails', async () => {
+    jest.mocked(processDiscordBotMessage).mockResolvedValueOnce({
+      response: '',
+      modelUsed: '',
+      toolCallsMade: [],
+      error: 'installation_not_active',
+      installation: discordInstallation(),
+    });
+    jest.mocked(removeDiscordReaction).mockResolvedValue({ ok: false, error: 'rate limited' });
+
+    expect((await deliver(makeEvent())).status).toBe(200);
+    await finishBackgroundWork();
+
+    expect(removeDiscordReaction).toHaveBeenCalledTimes(2);
+    // Nothing replaces the hourglass, so the failed removal is the operator's
+    // only record of it.
+    expect(console.error).toHaveBeenCalledWith(
+      '[DiscordBot:Webhook] Failed to remove processing reaction',
+      { guildId: GUILD_ID, messageId: MESSAGE_ID, error: 'rate limited' }
+    );
   });
 
   it('processes concurrent deliveries of one message only once', async () => {

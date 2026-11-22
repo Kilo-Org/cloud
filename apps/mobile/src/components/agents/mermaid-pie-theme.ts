@@ -9,10 +9,14 @@ import { pieThemeVariables } from './mermaid-pie-fills';
  * TypeScript program can read it), and this module names the page they are
  * measured against.
  *
- * Light mode is out of scope here, and carries the same defect: mermaid's
- * light theme derives `pie1` as `#ECECFF`, which is 1.12:1 on the light
- * diagram page. It needs its own ramp against that page, and its own ink for
- * the fills that ramp would use, so it is deliberately not changed here.
+ * The ramp carries the light palette's hues, muted and lifted so the fills stay
+ * legible on the dark page: a pie chart names its series in the same hue family
+ * in both modes, and only the saturation and lightness change with the page.
+ *
+ * Light mode itself is out of scope here and still renders mermaid's default
+ * palette, whose `pie1` is `#ECECFF` at 1.12:1 on the light diagram page. That
+ * is a contrast defect on the light side, not a hue one: fixing it means its
+ * own ramp and ink against the light page, deliberately not changed here.
  */
 
 /** The dark diagram page: the same composition `markdown-palette` makes for a

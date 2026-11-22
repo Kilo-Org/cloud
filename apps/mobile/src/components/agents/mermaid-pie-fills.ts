@@ -15,27 +15,39 @@
  * run. Mermaid's own dark theme derives `pie1..pie12` by shifting its primary
  * colour, which lands the first slice — and its legend swatch — near the page
  * colour, so the twelve fills are stated here instead.
+ *
+ * The twelve hues are the light theme's own, so a series has the same name in
+ * both modes: light mode renders mermaid's default palette (measured from the
+ * vendored bundle, see `mermaid-pie-theme.test.ts`), and each dark fill keeps
+ * that default fill's hue while muting its saturation and lifting its
+ * lightness for the dark page. A dark pie chart is therefore the light one with
+ * the glare taken out, not a second, starker palette that renames the series.
  */
 
 /**
- * The twelve slice fills, in the order mermaid paints `pie1`..`pie12`. Every
- * one clears WCAG AA text contrast both on the page and on the section ink, so
- * a percentage stays readable on its wedge whatever a diagram's proportions
- * give it. `mermaid-pie-theme.test.ts` measures both pairs.
+ * The twelve slice fills, in the order mermaid paints `pie1`..`pie12`.
+ *
+ * Each is the light default fill's hue, held to a low saturation and an
+ * even lightness so no slice pulls the eye away from the chart's content: the
+ * whole ramp sits inside a 60–80% HSL lightness band and varies by a dozen
+ * points at most. Every one clears WCAG AA text contrast on the page and on the
+ * section ink, so a percentage stays readable on its wedge whatever a
+ * diagram's proportions give it. `mermaid-pie-theme.test.ts` measures the
+ * contrast, the muted band and the hue parity.
  */
 export const DARK_PIE_FILLS = [
-  '#E4AF95',
-  '#D8C564',
-  '#CAE495',
-  '#77D864',
-  '#95E4AF',
-  '#64D8C5',
-  '#95CAE4',
-  '#6477D8',
-  '#AF95E4',
-  '#C564D8',
-  '#E495CA',
-  '#D86477',
+  '#ADA9D1',
+  '#D3D4AF',
+  '#AFC195',
+  '#848EC2',
+  '#CBC49A',
+  '#BACCA4',
+  '#C8A2C8',
+  '#97C0C4',
+  '#C99A97',
+  '#D4AFD0',
+  '#A7CDBB',
+  '#C4878B',
 ] as const;
 
 /**

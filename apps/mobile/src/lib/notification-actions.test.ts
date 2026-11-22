@@ -479,6 +479,28 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     }
   );
 
+  it('keeps the acted-on raise but still republishes when an answered raise fails to publish', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+    const refreshGlanceableSurfaces = vi.fn().mockResolvedValue(undefined);
+
+    await handleNeedsInputNotificationResponse(raiseResponse({ identifier: 'fcm-remote-1' }), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      refreshGlanceableSurfaces,
+    });
+
+    // The post never landed, so the acted-on push is the only thing on screen.
+    expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
+    // The raise was still answered, so the surfaces that count tray rows catch up.
+    expect(refreshGlanceableSurfaces).toHaveBeenCalledTimes(1);
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+  });
+
   it('replaces an inline reply in place, because Android keeps it for the reply', async () => {
     mocks.runNeedsInputInteraction.mockResolvedValue('ok');
 

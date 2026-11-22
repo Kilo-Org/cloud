@@ -11,18 +11,17 @@ import {
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
 } from './markdown-handlers';
-import { convertHtmlToMarkdown } from './markdown-html-convert';
+import { convertHtmlToMarkdown, convertHtmlToMarkdownWithTail } from './markdown-html-convert';
 import {
   MarkdownHtml,
   type MarkdownHtmlIncrementalConverted,
   type MarkdownHtmlIncrementalInput,
   type MarkdownHtmlSegment,
-  type MarkdownHtmlSplit,
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
 import { MarkdownMermaid } from './markdown-mermaid';
 import { getPalette, type MarkdownPalette, type MarkdownVariant } from './markdown-palette';
-import { markdownHtmlSplitCache } from './markdown-parse-cache';
+import { type CachedMarkdownHtmlSplit, markdownHtmlSplitCache } from './markdown-parse-cache';
 
 /**
  * The splitter input one publish passes: the extends-previous record's shape
@@ -44,33 +43,23 @@ export function incrementalInput(
 }
 
 /**
- * The offset where the raw value's final blank-line run begins, or null when
- * the value does not end with one. A blank line ends every open block: a
- * paragraph (including any inline tag it holds, which the conversion closed at
- * the line end), a fence, a code span, a list, and a quote are all finalized
- * behind it, so the appended region starts a fresh block and converting it
- * alone cannot rewrite the converted prefix. A value that ends inside a line
- * (mid-word, mid-tag, or with a lone newline a lazy continuation can join)
- * has no such boundary and must not compose.
+ * One publish's connection to the previous one: `appended` is the raw region
+ * the value grew by, which the splitter folds through the previous conversion,
+ * and `wholeConverted` is the whole value's conversion when the composition
+ * could not be reproduced exactly.
  */
-const TRAILING_BLANK_RUN = /(?:[ \t]*\r?\n)+$/;
-function trailingBlankRunBoundary(rawValue: string): number | null {
-  const run = TRAILING_BLANK_RUN.exec(rawValue);
-  if (run === null) {
-    return null;
-  }
-  const newlines = run[0].split('\n').length - 1;
-  // One newline only ends the current line; a lazy continuation can join it,
-  // so a full blank line (two or more newlines) is required.
-  return newlines >= 2 ? run.index : null;
-}
-
 export type TailRecord =
   | {
       appended: string;
+      /**
+       * Where the whole conversion stops being final and that region's
+       * conversion, both taken from the region the composition check already
+       * converted, so `converted` is exactly `convert(value.slice(start))`.
+       */
+      tail: { start: number; converted: string };
       wholeConverted?: undefined;
     }
-  | { appended?: undefined; wholeConverted: string };
+  | { appended?: undefined; tail?: undefined; wholeConverted: string };
 
 /**
  * What one publish hands its effect: the segments to render, and the seed the
@@ -79,36 +68,54 @@ export type TailRecord =
  */
 type PublishSeed = {
   rawValue: string;
-  split: MarkdownHtmlSplit;
+  split: CachedMarkdownHtmlSplit;
   record: MarkdownHtmlIncrementalConverted;
 };
 
 /**
  * The previous-publish record the next publish reuses: the split's snapshot as
- * the tail, the raw value the split segmented, and the conversion closure that
- * folds an appended region after the previous converted source. The cache-hit
- * and miss paths build it over the same shape, so a remounted row that reuses
- * a cached split still extends it instead of re-converting whole.
+ * the tail, the raw value the split segmented, the open region recursively
+ * found by the conversion itself, and the conversion closure that folds an
+ * appended region after the previous converted source. The cache-hit and miss
+ * paths build it over the same shape, so a remounted row that reuses a cached
+ * split still extends it instead of re-converting whole.
  */
-function buildTailRecord(rawValue: string, split: MarkdownHtmlSplit): PublishSeed {
+function buildTailRecord(rawValue: string, split: CachedMarkdownHtmlSplit): PublishSeed {
   return {
     rawValue,
     split,
     record: {
       tail: split.snapshot,
       rawValue,
+      tailStart: split.tailStart,
+      tailConverted: split.tailConverted,
       convert: (suffix, previous) =>
         suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
     },
   };
 }
 
+// A root construct whose conversion reads what precedes it: a markdown block
+// needs its blank line before it and a `<br>` needs the text before it on its
+// line, so a region that begins with one does not convert the way it does in
+// place.
+const LEADING_ROOT = /^\s*<(?:p|h[1-6]|blockquote|ul|ol|pre|hr|table|br)[\s/>]/i;
+// A line indented enough to be code: code at the start of a value, but the
+// continuation of a paragraph directly above it.
+const INDENTED_LINE = /^(?: {4}|\t| {1,3}\t)/;
+
+/** The start of the line above the one that starts at `at`. */
+function previousLineStart(value: string, at: number): number {
+  return at <= 1 ? 0 : value.lastIndexOf('\n', at - 2) + 1;
+}
+
 /**
  * Whether `value` extends `prior`'s raw value, and what the publish passes to
- * the splitter: when it does, the appended raw region, re-verified by
- * re-converting from the last stable raw boundary and comparing with the
- * previous publish's converted source; otherwise nothing, with the whole
- * value re-converted and the previous snapshot passed for head reuse.
+ * the splitter: when it does, the appended raw region, verified by reproducing
+ * the previous publish's conversion of the open region exactly, plus that
+ * region's start and conversion — the conversion of `value.slice(start)`, taken
+ * from the region this check already converted; otherwise nothing, with the
+ * whole value re-converted and the previous snapshot passed for head reuse.
  */
 export function extendsPreviousRaw(
   value: string,
@@ -122,29 +129,105 @@ export function extendsPreviousRaw(
     return null;
   }
   const appended = value.slice(rawValue.length);
-  // The appended region alone can rewrite the converted prefix: an unclosed
-  // code span or fence runs to the new end, an inline tag closes there.
-  // Composition joins the previous converted source with the appended
-  // region's own conversion, so it is sound only when the previous raw value
-  // ended at a blank-line run: there every earlier construct is finalized and
-  // the appended region starts a fresh block. A value still open at its end
-  // (an unclosed inline tag, fence, or code span) can convert the appended
-  // content differently from the whole value, so it declines.
-  const rawBoundary = trailingBlankRunBoundary(rawValue);
-  if (rawBoundary === null) {
+  const boundary = prior.tailStart;
+  if (boundary === undefined || boundary === 0) {
     return { wholeConverted: convertHtmlToMarkdown(value) };
   }
-  const previousConvertedTail = prior.convert(rawValue.slice(rawBoundary), '');
-  const reconverted = convertHtmlToMarkdown(value.slice(rawBoundary));
-  // `previousConvertedTail` recomputes the previous publish's conversion of
-  // the finalized region from the same boundary; if the conversion that also
-  // covers the appended content no longer starts with it, the append rewrote
-  // that region (an unclosed code span or fence now runs further, an inline
-  // tag closes at the new end) and the whole value is converted instead.
-  if (!reconverted.startsWith(previousConvertedTail)) {
+  const converted = prior.tail.value;
+  if (boundary >= rawValue.length) {
+    // Every byte of the previous conversion is final. The appended text starts
+    // on a fresh line, so only a construct that reads what precedes it can
+    // convert differently here than alone: a root block needs its blank line
+    // and a `<br>` the text before it, an indented line continues a paragraph,
+    // and an inline construct reads the character before it, which has to stay
+    // a line break.
+    if (LEADING_ROOT.test(appended) || INDENTED_LINE.test(appended) || !converted.endsWith('\n')) {
+      return { wholeConverted: convertHtmlToMarkdown(value) };
+    }
+    // The appended text is the only region that can still change, so its own
+    // open region — offset by where it begins — is the whole value's. Scanning
+    // it keeps that region at the appended size: a later publish that extends a
+    // blank-line-terminated append then re-opens only its own text instead of
+    // the growing run behind it.
+    const appendedTail = convertHtmlToMarkdownWithTail(appended);
+    const tailSource = appended.slice(appendedTail.tailStart);
+    return {
+      appended,
+      tail: {
+        start: rawValue.length + appendedTail.tailStart,
+        converted: convertHtmlToMarkdown(tailSource),
+      },
+    };
+  }
+  // A whitespace run collapses across the seam: a trailing space and a leading
+  // space convert to one space together, so the two regions do not compose.
+  if (/\s$/.test(rawValue) && /^\s/.test(appended)) {
     return { wholeConverted: convertHtmlToMarkdown(value) };
   }
-  return { appended };
+  const region = value.slice(boundary);
+  if (LEADING_ROOT.test(region) || LEADING_ROOT.test(appended)) {
+    return { wholeConverted: convertHtmlToMarkdown(value) };
+  }
+  // An indented first line below anything but a blank line continues that
+  // line's paragraph instead of starting code, so the region reads it as the
+  // value does not.
+  if (
+    INDENTED_LINE.test(region) &&
+    !/^[ \t]*$/.test(rawValue.slice(previousLineStart(rawValue, boundary), boundary))
+  ) {
+    return { wholeConverted: convertHtmlToMarkdown(value) };
+  }
+  // The previous publish's conversion of this region, and the same region with
+  // the appended text. Composition holds only when appending the region's
+  // conversion reproduces the region's new conversion exactly: an unclosed code
+  // span or fence now runs further, an inline tag closes at the new end, and the
+  // region converts differently from the whole value. The stored tail is the
+  // previous publish's own conversion of that region, so this costs one region
+  // conversion; without it, converting the region again gives the same answer.
+  const previousTail = prior.tailConverted ?? convertHtmlToMarkdown(rawValue.slice(boundary));
+  if (previousTail === '' || !converted.endsWith(previousTail)) {
+    return { wholeConverted: convertHtmlToMarkdown(value) };
+  }
+  const reconverted = convertHtmlToMarkdown(region);
+  if (`${previousTail}${convertHtmlToMarkdown(appended)}` !== reconverted) {
+    return { wholeConverted: convertHtmlToMarkdown(value) };
+  }
+  // `reconverted` is this region's conversion, so the next publish's gate can
+  // reproduce the previous conversion without converting the region again.
+  return { appended, tail: { start: boundary, converted: reconverted } };
+}
+
+/**
+ * One publish's conversion of the raw value plus the tail its record carries:
+ * the splitter input, where the publish's conversion stops being final, and
+ * that region's conversion.
+ */
+type PublishConversion = {
+  input: MarkdownHtmlIncrementalInput;
+  tailStart: number;
+  tailConverted: string;
+};
+
+/**
+ * The publish's conversion and its tail. A gated publish passes the tail its
+ * record already carries, so it converts only the regions the gate compared;
+ * a declined or first publish asks the conversion itself for the whole value.
+ */
+function publishConversion(
+  value: string,
+  record: TailRecord | null,
+  prior: MarkdownHtmlIncrementalConverted | undefined
+): PublishConversion {
+  const input = incrementalInput(value, record, prior);
+  if (record?.tail !== undefined) {
+    return { input, tailStart: record.tail.start, tailConverted: record.tail.converted };
+  }
+  const { tailStart } = convertHtmlToMarkdownWithTail(value);
+  return {
+    input,
+    tailStart,
+    tailConverted: tailStart === 0 ? '' : convertHtmlToMarkdown(value.slice(tailStart)),
+  };
 }
 
 export type MarkdownTextProps = {
@@ -196,9 +279,11 @@ export function MarkdownText({
   // only change that region, so the head segments (and the elements keyed by
   // index) stay stable while the message grows. The memo keeps an unrelated
   // re-render from re-lexing an unchanged value; the ref survives it so the
-  // next value still extends the snapshot. The split inherits the previous
-  // split's converted markdown and converts only the appended region, so the
-  // conversion step is tail-bounded like the lexing step.
+  // next value still extends the snapshot. The conversion is bounded by the
+  // open region the previous publish reported, not by the message: a gated
+  // publish converts the appended region and the open region alone. When the
+  // composition cannot reproduce the whole conversion exactly the publish
+  // declines and converts the whole value once.
   const previousRef = useRef<MarkdownHtmlIncrementalConverted | undefined>(undefined);
   const publish = useMemo<{
     segments: MarkdownHtmlSegment[];
@@ -221,16 +306,22 @@ export function MarkdownText({
     // extends exactly what the previous publish's raw value was: the guard
     // compares raw to raw, since the converted tail re-closes streamed tags
     // and no longer equals the raw source. When it engages, the previous
-    // converted source is reproduced from a raw region whose earlier
-    // constructs are all finalized (the last blank-line boundary), verified by
-    // string comparison against the previous publish, so a construct whose
-    // masking or closing spans the boundary (an unclosed code span or fence,
-    // an inline tag the new end closes) falls back to converting the whole
-    // value.
+    // converted source is reproduced from the previous publish's own
+    // conversion of the still-open raw region, and the composition is accepted
+    // only when that region plus the appended text converts byte for byte to
+    // the same markdown: a construct whose masking or closing spans the
+    // boundary (an unclosed code span or fence, an inline tag the new end
+    // closes) falls back to converting the whole value.
     const record = extendsPreviousRaw(value, prior);
-    const input = incrementalInput(value, record, prior);
-    const result = splitMarkdownHtmlIncremental(input);
-    return { segments: result.segments, seed: buildTailRecord(value, result) };
+    const conversion = publishConversion(value, record, prior);
+    const result = splitMarkdownHtmlIncremental(conversion.input);
+    const split: CachedMarkdownHtmlSplit = {
+      segments: result.segments,
+      snapshot: result.snapshot,
+      tailStart: conversion.tailStart,
+      tailConverted: conversion.tailConverted,
+    };
+    return { segments: result.segments, seed: buildTailRecord(value, split) };
   }, [value]);
 
   // The record the next publish reuses is written after render, so a render

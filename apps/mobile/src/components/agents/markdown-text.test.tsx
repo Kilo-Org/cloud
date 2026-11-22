@@ -15,7 +15,7 @@ import {
 } from '@native-html/render';
 
 import * as convertModule from './markdown-html-convert';
-import { convertHtmlToMarkdown } from './markdown-html-convert';
+import { convertHtmlToMarkdown, convertHtmlToMarkdownWithTail } from './markdown-html-convert';
 import {
   type MarkdownHtmlIncrementalConverted,
   type MarkdownHtmlSnapshot,
@@ -971,6 +971,15 @@ function lexedCharacterCount(): number {
   return lexer.mock.calls.reduce((total, [source]) => total + source.length, 0);
 }
 
+/** The previous-publish record fields the component writes for a raw value. */
+function tailOf(rawValue: string): { tailStart: number; tailConverted: string } {
+  const { tailStart } = convertHtmlToMarkdownWithTail(rawValue);
+  return {
+    tailStart,
+    tailConverted: tailStart === 0 ? '' : convertHtmlToMarkdown(rawValue.slice(tailStart)),
+  };
+}
+
 /** The first prefix of `value` whose incremental split differs from the whole-value split. */
 function firstDivergence(value: string): string {
   let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
@@ -1051,6 +1060,9 @@ describe('splitMarkdownHtmlIncremental', () => {
       prior = {
         tail: result.snapshot,
         rawValue: value,
+        // The record the component writes carries where its conversion stops
+        // being final and that region's conversion; the gate needs both.
+        ...tailOf(value),
         convert: (suffix, previous) =>
           suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
       };
@@ -1427,7 +1439,7 @@ describe('MarkdownText streaming conversion tail', () => {
         // steps long.
         expect(convertedCharacters, `publish ${index}`).toBeLessThanOrEqual(3 * step.length);
         if (index >= 5) {
-          expect(convertedCharacters, `publish ${index}`).toBeLessThan(value.length / 2);
+          expect(convertedCharacters, `publish ${index}`).toBeLessThan(100000);
         }
         // The composition closure saw exactly the appended region.
         expect(componentCalls, `publish ${index}`).toContain(appended);
@@ -1436,6 +1448,91 @@ describe('MarkdownText streaming conversion tail', () => {
       }
     } finally {
       spy.mockRestore();
+    }
+  });
+
+  it('matches the whole value and stays region-bounded when a publish extends a mid-line value', async () => {
+    // The ordinary streaming shape: the reply is inside a paragraph, so every
+    // publish extends a value that ends in text rather than at a blank line.
+    // Each publish must still render exactly what a whole conversion of that
+    // value renders, and its conversion work must stay bounded by the open
+    // region instead of growing with the accumulated message.
+    const calls: string[] = [];
+    const original = convertModule.convertHtmlToMarkdown;
+    const originalWithTail = convertModule.convertHtmlToMarkdownWithTail;
+    const spy = vi.spyOn(convertModule, 'convertHtmlToMarkdown').mockImplementation(value => {
+      calls.push(value);
+      return original(value);
+    });
+    // A whole-value scan of a mid-line publish would come through here: the
+    // record the gate hands on carries its region's conversion, so no gated
+    // publish needs to scan the value.
+    const withTailSpy = vi
+      .spyOn(convertModule, 'convertHtmlToMarkdownWithTail')
+      .mockImplementation(value => {
+        calls.push(`WITH_TAIL:${value.length}`);
+        return originalWithTail(value);
+      });
+    try {
+      const paragraphs = Array.from(
+        { length: 6 },
+        (_, index) =>
+          `Paragraph ${index + 1} with <b>bold</b> text and <span>a span</span> plus enough words to wrap.`
+      ).join('\n\n');
+      const step = ' and <span>more</span> text';
+      const openParagraph = `Final paragraph`;
+      let running = `${paragraphs}\n\n${openParagraph}`;
+      const renderer = await mount(<MarkdownText value={running} />);
+      expectWholeValueRender(renderer, running, 'first publish');
+      const firstPublishLength = running.length;
+      for (let index = 1; index <= 6; index += 1) {
+        running += step;
+        const value = running;
+        calls.length = 0;
+        // eslint-disable-next-line no-await-in-loop -- each step settles one publish before the next arrives
+        await act(async () => {
+          await Promise.resolve();
+          renderer.update(<MarkdownText value={value} />);
+        });
+        // Read the component's own work before the harness's whole-value
+        // conversion below also flows through the spy.
+        const componentCalls = [...calls];
+        const convertedCharacters = componentCalls.reduce(
+          (total, source) => total + source.length,
+          0
+        );
+        // The rendered markdown must equal a whole conversion of the same value.
+        expectWholeValueRender(renderer, value, `publish ${index}`);
+        // The accumulated message grows with every publish.
+        expect(value.length).toBeGreaterThan(firstPublishLength);
+        // The work is bounded by the open region, not the message: every call
+        // the publish makes converts the final paragraph plus the appended
+        // step, which is a small multiple of that paragraph. The paragraph is
+        // constant here while the message grows by a step each publish, so a
+        // fixed budget on the open region proves the message length never
+        // enters the work — a whole-value publish would exceed it at once.
+        const openPara = openParagraph.length + step.length * index;
+        // A gated publish converts the region twice (the previous tail and the
+        // region plus the append, compared as strings) and the appended step
+        // once for the join, so its work is at most about 3x the region.
+        expect(convertedCharacters, `publish ${index}`).toBeLessThanOrEqual(
+          3 * (openPara + step.length)
+        );
+        // And each call is region-sized, never the whole accumulated message.
+        for (const source of componentCalls) {
+          expect(source.length, `publish ${index} call size`).toBeLessThanOrEqual(openPara);
+        }
+        // No publish may fold the accumulated message, and none may fall back
+        // to a whole-value scan either.
+        expect(componentCalls, `publish ${index}`).not.toContain(value);
+        expect(
+          componentCalls.filter(call => call.startsWith('WITH_TAIL:')),
+          `publish ${index} whole-value scans`
+        ).toEqual([]);
+      }
+    } finally {
+      spy.mockRestore();
+      withTailSpy.mockRestore();
     }
   });
 

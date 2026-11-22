@@ -314,6 +314,18 @@ export type MarkdownHtmlIncrementalConverted = {
   tail: MarkdownHtmlSnapshot;
   /** The raw source the previous publish saw, for the extends-previous guard. */
   rawValue?: string;
+  /**
+   * Offset where the previous publish's conversion stops being final: the start
+   * of the raw region the next publish converts again (`0` when nothing is
+   * final, `rawValue.length` when all of it is).
+   */
+  tailStart?: number;
+  /**
+   * The conversion of `rawValue.slice(tailStart)`, so the next publish proves
+   * its composition against the previous one instead of converting the region
+   * a second time.
+   */
+  tailConverted?: string;
   convert: (suffix: string, previous: string) => string;
 };
 

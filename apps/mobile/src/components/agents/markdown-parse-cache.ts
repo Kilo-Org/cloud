@@ -9,7 +9,20 @@ import { type MarkdownHtmlSplit } from './markdown-html';
 const MARKDOWN_PARSE_CACHE_CHARACTERS = 2_000_000;
 
 const markdownTokenCache = new CharacterBoundedCache<TokensList>(MARKDOWN_PARSE_CACHE_CHARACTERS);
-export const markdownHtmlSplitCache = new CharacterBoundedCache<MarkdownHtmlSplit>(
+
+/**
+ * A cached split plus the previous-publish record fields the publish that
+ * produced it wrote. A remounted row starts without a record, so the offset
+ * where its conversion stops being final and that region's conversion travel
+ * with the split; without them the first publish after the remount would have
+ * to convert the whole value to learn where its conversion stays final.
+ */
+export type CachedMarkdownHtmlSplit = MarkdownHtmlSplit & {
+  tailStart: number;
+  tailConverted: string;
+};
+
+export const markdownHtmlSplitCache = new CharacterBoundedCache<CachedMarkdownHtmlSplit>(
   MARKDOWN_PARSE_CACHE_CHARACTERS
 );
 

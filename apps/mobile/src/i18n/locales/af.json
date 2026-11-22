@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Reëllêers wat hier bygevoeg word, word op elke sessie toegepas wat hierdie profiel gebruik.",
     "instructionNameRequired": "Voer 'n lêernaam in",
     "instructionNameTooLong": "Lêernaam moet {{max}} karakters of minder wees",
-    "instructionNameInvalid": "Begin met 'n letter of syfer en gebruik net kleinletters, syfers en strepies",
+    "instructionNameInvalid": "Begin met 'n ASCII-letter of syfer en gebruik net ASCII-kleinletters, syfers en strepies",
     "instructionNameReserved": "Daardie lêernaam is gereserveer. Kies 'n ander een.",
     "instructionContentRequired": "Voer die reëls-markdown in",
     "instructionNamePreview": "Stoor as {{name}}",

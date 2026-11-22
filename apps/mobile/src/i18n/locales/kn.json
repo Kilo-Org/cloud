@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "ಇಲ್ಲಿ ಸೇರಿಸಲಾದ ನಿಯಮ ಫೈಲ್‌ಗಳನ್ನು ಈ ಪ್ರೊಫೈಲ್ ಬಳಸುವ ಪ್ರತಿ ಸೆಷನ್‌ಗೆ ಅನ್ವಯಿಸಲಾಗುತ್ತದೆ.",
     "instructionNameRequired": "ಫೈಲ್ ಹೆಸರು ನಮೂದಿಸಿ",
     "instructionNameTooLong": "ಫೈಲ್ ಹೆಸರು {{max}} ಅಕ್ಷರಗಳು ಅಥವಾ ಕಡಿಮೆ ಇರಬೇಕು",
-    "instructionNameInvalid": "ಅಕ್ಷರ ಅಥವಾ ಅಂಕಿಯಿಂದ ಪ್ರಾರಂಭಿಸಿ, ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಅಂಕಿಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಿ",
+    "instructionNameInvalid": "ಅಕ್ಷರ ಅಥವಾ ಅಂಕಿಯಿಂದ ಪ್ರಾರಂಭಿಸಿ, ASCII ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಅಂಕಿಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಿ",
     "instructionNameReserved": "ಆ ಫೈಲ್ ಹೆಸರು ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ. ಬೇರೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
     "instructionContentRequired": "ನಿಯಮಗಳ ಮಾರ್ಕ್‌ಡೌನ್ ನಮೂದಿಸಿ",
     "instructionNamePreview": "{{name}} ಎಂದು ಉಳಿಸಲಾಗುತ್ತದೆ",

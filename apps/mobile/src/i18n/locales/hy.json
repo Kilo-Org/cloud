@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Այստեղ ավելացված կանոնների ֆայլերը կիրառվում են այս պրոֆիլն օգտագործող յուրաքանչյուր սեսիայում։",
     "instructionNameRequired": "Մուտքագրեք ֆայլի անուն",
     "instructionNameTooLong": "Ֆայլի անունը պետք է լինի {{max}} նիշ կամ ավելի քիչ",
-    "instructionNameInvalid": "Սկսեք տառով կամ թվանշանով և օգտագործեք միայն փոքրատառեր, թվանշաններ և գծիկներ",
+    "instructionNameInvalid": "Սկսեք տառով կամ թվանշանով և օգտագործեք միայն ASCII փոքրատառեր, թվանշաններ և գծիկներ",
     "instructionNameReserved": "Այդ ֆայլի անունը արգելված է։ Ընտրեք այլ անուն։",
     "instructionContentRequired": "Մուտքագրեք կանոնների markdown-ը",
     "instructionNamePreview": "Կպահվի որպես {{name}}",

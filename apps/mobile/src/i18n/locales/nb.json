@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Regelfiler som legges til her, gjelder for alle økter som bruker denne profilen.",
     "instructionNameRequired": "Skriv inn et filnavn",
     "instructionNameTooLong": "Filnavnet kan ha maksimalt {{max}} tegn",
-    "instructionNameInvalid": "Start med en bokstav eller et tall, og bruk bare små bokstaver, tall og bindestreker",
+    "instructionNameInvalid": "Start med en liten ASCII-bokstav eller et tall, og bruk bare små ASCII-bokstaver, tall og bindestreker",
     "instructionNameReserved": "Dette filnavnet er reservert. Velg et annet.",
     "instructionContentRequired": "Skriv inn reglene i markdown",
     "instructionNamePreview": "Lagres som {{name}}",

@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "ഇവിടെ ചേർത്തിരിക്കുന്ന നിയമ ഫയലുകൾ ഈ പ്രൊഫൈൽ ഉപയോഗിക്കുന്ന എല്ലാ സെഷനുകളിലും ബാധകമാണ്.",
     "instructionNameRequired": "ഒരു ഫയൽ നാമം നൽകുക",
     "instructionNameTooLong": "ഫയൽ നാമം {{max}} പ്രതീകങ്ങളോ അതിൽ കുറവോ ആയിരിക്കണം",
-    "instructionNameInvalid": "ഒരു അക്ഷരത്തിലോ അക്കത്തിലോ തുടങ്ങി ചെറിയ അക്ഷരങ്ങൾ, അക്കങ്ങൾ, ഡാഷുകൾ മാത്രം ഉപയോഗിക്കുക",
+    "instructionNameInvalid": "ഒരു ചെറിയ ASCII അക്ഷരത്തിലോ അക്കത്തിലോ തുടങ്ങി ചെറിയ ASCII അക്ഷരങ്ങൾ, അക്കങ്ങൾ, ഡാഷുകൾ മാത്രം ഉപയോഗിക്കുക",
     "instructionNameReserved": "ആ ഫയൽ നാമം മാറ്റിവയ്ക്കപ്പെട്ടതാണ്. മറ്റൊന്ന് തിരഞ്ഞെടുക്കുക.",
     "instructionContentRequired": "നിയമ മാർക്ക്ഡൗൺ നൽകുക",
     "instructionNamePreview": "{{name}} എന്നായി സേവ് ചെയ്യും",

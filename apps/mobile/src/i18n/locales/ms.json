@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Fail peraturan yang ditambahkan di sini digunakan pada setiap sesi yang menggunakan profil ini.",
     "instructionNameRequired": "Masukkan nama fail",
     "instructionNameTooLong": "Nama fail mesti {{max}} aksara atau kurang",
-    "instructionNameInvalid": "Mulakan dengan huruf atau digit dan gunakan hanya huruf kecil, digit dan sengkang",
+    "instructionNameInvalid": "Mulakan dengan huruf kecil ASCII atau digit dan gunakan hanya huruf kecil ASCII, digit dan sengkang",
     "instructionNameReserved": "Nama fail itu terpelihara. Pilih yang lain.",
     "instructionContentRequired": "Masukkan markdown peraturan",
     "instructionNamePreview": "Disimpan sebagai {{name}}",

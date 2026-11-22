@@ -4490,7 +4490,7 @@
     "instructionsEmptyDescriptionReadOnly": "Čia pridėti taisyklių failai taikomi kiekvienai sesijai, kurioje naudojamas šis profilis.",
     "instructionNameRequired": "Įveskite failo pavadinimą",
     "instructionNameTooLong": "Failo pavadinimas turi būti ne ilgesnis kaip {{max}} simbolių",
-    "instructionNameInvalid": "Pradėkite raide arba skaičiumi ir naudokite tik mažąsias raides, skaičius ir brūkšnelius",
+    "instructionNameInvalid": "Pradėkite raide arba skaičiumi ir naudokite tik mažąsias ASCII raides, skaičius ir brūkšnelius",
     "instructionNameReserved": "Šis failo pavadinimas rezervuotas. Pasirinkite kitą.",
     "instructionContentRequired": "Įveskite taisykles „markdown“ formatu",
     "instructionNamePreview": "Išsaugoma kaip {{name}}",

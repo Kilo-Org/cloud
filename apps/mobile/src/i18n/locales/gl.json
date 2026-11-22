@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Os ficheiros de regras engadidos aquí aplícanse a todas as sesións que usan este perfil.",
     "instructionNameRequired": "Introduce un nome de ficheiro",
     "instructionNameTooLong": "O nome do ficheiro debe ter {{max}} caracteres ou menos",
-    "instructionNameInvalid": "Comeza cunha letra ou un díxito e usa só letras minúsculas, díxitos e guións",
+    "instructionNameInvalid": "Comeza cunha letra ou un díxito e usa só letras ASCII minúsculas, díxitos e guións",
     "instructionNameReserved": "Ese nome de ficheiro está reservado. Escolle outro.",
     "instructionContentRequired": "Introduce as regras en markdown",
     "instructionNamePreview": "Gárdase como {{name}}",

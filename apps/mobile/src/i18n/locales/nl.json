@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Regelbestanden die hier zijn toegevoegd, worden toegepast op elke sessie die dit profiel gebruikt.",
     "instructionNameRequired": "Voer een bestandsnaam in",
     "instructionNameTooLong": "Bestandsnaam mag maximaal {{max}} tekens bevatten",
-    "instructionNameInvalid": "Begin met een letter of cijfer en gebruik alleen kleine letters, cijfers en streepjes",
+    "instructionNameInvalid": "Begin met een kleine ASCII-letter of cijfer en gebruik alleen kleine ASCII-letters, cijfers en streepjes",
     "instructionNameReserved": "Die bestandsnaam is gereserveerd. Kies een andere.",
     "instructionContentRequired": "Voer de regels-markdown in",
     "instructionNamePreview": "Wordt opgeslagen als {{name}}",

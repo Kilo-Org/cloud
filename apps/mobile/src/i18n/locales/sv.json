@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Regelfiler som läggs till här tillämpas på varje session som använder den här profilen.",
     "instructionNameRequired": "Ange ett filnamn",
     "instructionNameTooLong": "Filnamnet får vara högst {{max}} tecken",
-    "instructionNameInvalid": "Börja med en bokstav eller siffra och använd bara gemena bokstäver, siffror och bindestreck",
+    "instructionNameInvalid": "Börja med en bokstav eller siffra och använd bara gemena ASCII-bokstäver, siffror och bindestreck",
     "instructionNameReserved": "Filnamnet är reserverat. Välj ett annat.",
     "instructionContentRequired": "Ange reglerna i markdown",
     "instructionNamePreview": "Sparas som {{name}}",

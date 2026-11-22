@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Berkas aturan yang ditambahkan di sini diterapkan ke setiap sesi yang menggunakan profil ini.",
     "instructionNameRequired": "Masukkan nama file",
     "instructionNameTooLong": "Nama file harus {{max}} karakter atau kurang",
-    "instructionNameInvalid": "Awali dengan huruf atau angka dan gunakan hanya huruf kecil, angka, dan tanda hubung",
+    "instructionNameInvalid": "Awali dengan huruf atau angka dan gunakan hanya huruf kecil ASCII, angka, dan tanda hubung",
     "instructionNameReserved": "Nama file itu dicadangkan. Pilih yang lain.",
     "instructionContentRequired": "Masukkan markdown aturan",
     "instructionNamePreview": "Disimpan sebagai {{name}}",

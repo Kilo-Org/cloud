@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   instructionErrorKey,
   instructionNameErrorShown,
-  instructionNamePreview,
+  instructionNameHint,
 } from '@/components/profiles/instruction-model';
 import {
   cleanInstructionName,
@@ -72,7 +72,7 @@ describe('cleanInstructionName', () => {
 
   it('folds compatibility forms into the letters they stand for', () => {
     expect(cleanInstructionName('Ｒｅｌｅａｓｅ Ｎｏｔｅｓ')).toBe('release-notes');
-    expect(instructionNamePreview('ｒｕｌｅｓ')).toBe('rules');
+    expect(instructionNameHint('ｒｕｌｅｓ')).toEqual({ kind: 'preview', slug: 'rules' });
   });
 
   it('leaves nothing for a name written in another script', () => {
@@ -86,18 +86,28 @@ describe('cleanInstructionName', () => {
   });
 });
 
-describe('instructionNamePreview', () => {
+describe('instructionNameHint', () => {
   it('names the slug a save will store when it differs', () => {
-    expect(instructionNamePreview('Release Notes')).toBe('release-notes');
+    expect(instructionNameHint('Release Notes')).toEqual({
+      kind: 'preview',
+      slug: 'release-notes',
+    });
   });
 
-  it('stays silent for a blank or already-normalized name', () => {
-    expect(instructionNamePreview('   ')).toBeNull();
-    expect(instructionNamePreview('release-notes')).toBeNull();
+  it('says nothing for a blank or already-normalized name', () => {
+    expect(instructionNameHint('   ')).toEqual({ kind: 'none' });
+    expect(instructionNameHint('release-notes')).toEqual({ kind: 'none' });
   });
 
-  it('stays silent when the fold leaves no ASCII name to show', () => {
-    expect(instructionNamePreview('規則')).toBeNull();
+  it('states the rule when the fold leaves no ASCII name to save', () => {
+    expect(instructionNameHint('規則')).toEqual({ kind: 'rule' });
+    expect(instructionNameHint('पुणे कार्यालय नियम')).toEqual({ kind: 'rule' });
+    expect(instructionNameHint('დრო')).toEqual({ kind: 'rule' });
+  });
+
+  it('previews a name the fold narrows but does not empty', () => {
+    expect(instructionNameHint('Café Notes')).toEqual({ kind: 'preview', slug: 'cafe-notes' });
+    expect(instructionNameHint('é')).toEqual({ kind: 'preview', slug: 'e' });
   });
 });
 

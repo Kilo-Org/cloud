@@ -4490,7 +4490,7 @@
     "instructionsEmptyDescriptionReadOnly": "Dodane tutaj pliki reguł są stosowane w każdej sesji korzystającej z tego profilu.",
     "instructionNameRequired": "Podaj nazwę pliku",
     "instructionNameTooLong": "Nazwa pliku może mieć maksymalnie {{max}} znaków",
-    "instructionNameInvalid": "Zacznij od litery lub cyfry i używaj tylko małych liter, cyfr i myślników",
+    "instructionNameInvalid": "Zacznij od małej litery ASCII lub cyfry i używaj tylko małych liter ASCII, cyfr i myślników",
     "instructionNameReserved": "Ta nazwa pliku jest zarezerwowana. Wybierz inną.",
     "instructionContentRequired": "Wpisz reguły markdown",
     "instructionNamePreview": "Zapisze się jako {{name}}",

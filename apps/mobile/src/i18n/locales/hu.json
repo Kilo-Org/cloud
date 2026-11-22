@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Az itt hozzáadott szabályfájlok minden, ezt a profilt használó munkamenetre érvényesek.",
     "instructionNameRequired": "Adj meg egy fájlnevet",
     "instructionNameTooLong": "A fájlnév legfeljebb {{max}} karakter lehet",
-    "instructionNameInvalid": "Kezdődjön betűvel vagy számmal, és csak kisbetűket, számokat és kötőjeleket tartalmazzon",
+    "instructionNameInvalid": "Kezdődjön betűvel vagy számmal, és csak ASCII kisbetűket, számokat és kötőjeleket tartalmazzon",
     "instructionNameReserved": "Ez a fájlnév foglalt. Válassz másikat.",
     "instructionContentRequired": "Add meg a szabályokat markdown formátumban",
     "instructionNamePreview": "Mentés így: {{name}}",

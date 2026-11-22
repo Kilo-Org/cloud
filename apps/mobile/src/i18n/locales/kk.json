@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Осында қосылған ереже файлдары осы профильді пайдаланатын әрбір сеансқа қолданылады.",
     "instructionNameRequired": "Файл атауын енгізіңіз",
     "instructionNameTooLong": "Файл атауы {{max}} таңбадан аспауы керек",
-    "instructionNameInvalid": "Әріп немесе цифрдан басталып, тек кіші әріптер, цифрлар және сызықшаларды пайдаланыңыз",
+    "instructionNameInvalid": "Әріп немесе цифрдан басталып, тек кіші ASCII әріптерін, цифрлар және сызықшаларды пайдаланыңыз",
     "instructionNameReserved": "Бұл файл атауы қорғалған. Басқасын таңдаңыз.",
     "instructionContentRequired": "Ережелер markdown енгізіңіз",
     "instructionNamePreview": "{{name}} ретінде сақталады",

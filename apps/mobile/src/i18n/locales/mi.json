@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Ka whakamahia ngā kōnae ture kua tāpirihia ki konei mō ia wātū e whakamahi ana i tēnei kōtaha.",
     "instructionNameRequired": "Whakaurua he ingoa kōnae",
     "instructionNameTooLong": "Kia {{max}} pūāhua iti iho rānei te ingoa kōnae",
-    "instructionNameInvalid": "Tīmata ki tētahi pūāhua, mati rānei, ā, whakamahia anake ngā pūāhua iti, ngā mati, me ngā tohu rīhanga",
+    "instructionNameInvalid": "Tīmata ki tētahi reta ASCII, mati rānei, ā, whakamahia anake ngā reta ASCII iti, ngā mati, me ngā tohu rīhanga",
     "instructionNameReserved": "Kua rāhuitia tērā ingoa kōnae. Kōwhiria tētahi atu.",
     "instructionContentRequired": "Whakaurua ngā ture markdown",
     "instructionNamePreview": "Ka tiakina hei {{name}}",

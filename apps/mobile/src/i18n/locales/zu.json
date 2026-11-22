@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Amafayela emithetho afakwe lapha asetshenziswa kuyo yonke iseshini esebenzisa le phrofayela.",
     "instructionNameRequired": "Faka igama lefayela",
     "instructionNameTooLong": "Igama lefayela kufanele libe nezinhlamvu ezingu-{{max}} noma ngaphansi",
-    "instructionNameInvalid": "Qala ngohlamvu noma ngedijithi futhi sebenzisa kuphela izinhlamvu ezincane, amadijithi, nemigqa",
+    "instructionNameInvalid": "Qala ngohlamvu noma ngedijithi futhi sebenzisa kuphela izinhlamvu ezincane ze-ASCII, amadijithi, nemigqa",
     "instructionNameReserved": "Lelo gama lefayela lingeligenge. Khetha elinye.",
     "instructionContentRequired": "Faka imitherho ye-markdown",
     "instructionNamePreview": "Kugcinwa njengokuthi {{name}}",

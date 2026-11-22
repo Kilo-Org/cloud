@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Siia lisatud reeglifailid rakenduvad igale sessioonile, mis seda profiili kasutab.",
     "instructionNameRequired": "Sisesta faili nimi",
     "instructionNameTooLong": "Faili nimi tohib olla kuni {{max}} märki",
-    "instructionNameInvalid": "Alusta tähe või numbriga ning kasuta ainult väiketähti, numbreid ja sidekriipse",
+    "instructionNameInvalid": "Alusta ASCII tähe või numbriga ning kasuta ainult ASCII väiketähti, numbreid ja sidekriipse",
     "instructionNameReserved": "See faili nimi on reserveeritud. Vali teine.",
     "instructionContentRequired": "Sisesta reeglite markdown",
     "instructionNamePreview": "Salvestatakse nimega {{name}}",

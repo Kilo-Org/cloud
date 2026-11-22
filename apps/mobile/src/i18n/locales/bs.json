@@ -4411,7 +4411,7 @@
     "instructionsEmptyDescriptionReadOnly": "Datoteke s pravilima dodane ovdje primjenjuju se na svaku sesiju koja koristi ovaj profil.",
     "instructionNameRequired": "Unesite naziv datoteke",
     "instructionNameTooLong": "Naziv datoteke može imati najviše {{max}} znakova",
-    "instructionNameInvalid": "Počnite slovom ili brojem i koristite samo mala slova, brojeve i crtice",
+    "instructionNameInvalid": "Počnite ASCII slovom ili brojem i koristite samo mala ASCII slova, brojeve i crtice",
     "instructionNameReserved": "Taj naziv datoteke je rezervisan. Odaberite drugi.",
     "instructionContentRequired": "Unesite pravila u markdownu",
     "instructionNamePreview": "Sprema se kao {{name}}",

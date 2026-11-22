@@ -8,7 +8,8 @@ import {
   instructionContentErrorKey,
   instructionErrorKey,
   instructionNameErrorShown,
-  instructionNamePreview,
+  instructionNameHint,
+  type InstructionNameHint,
 } from '@/components/profiles/instruction-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -59,12 +60,14 @@ type InstructionFormSheetProps = Readonly<{
  * only while open, so every open seeds the fields from the instruction it
  * edits. Fields are uncontrolled (refs), per the app's text-input rule.
  *
- * The name is reduced to the server's slug rule on save and the preview under
- * the field says so first, so a typed `Release Notes` is never silently stored
- * as another file name. Save validates the name as typed through
- * `validateInstructionInput`; a name with nothing left in ASCII after the fold
- * is refused as invalid, not as empty. A refused input shows the matching
- * `profiles.instruction*` message under the field at fault.
+ * The name is reduced to the server's slug rule on save and the line under the
+ * field says so first, so a typed `Release Notes` is never silently stored as
+ * another file name. A name with nothing left in ASCII after the fold shows the
+ * rule itself there, before Save, because the fold would otherwise leave the
+ * field silent on exactly the input the save refuses. Save validates the name as
+ * typed through `validateInstructionInput`; a name with nothing left in ASCII
+ * after the fold is refused as invalid, not as empty. A refused input shows the
+ * matching `profiles.instruction*` message under the field at fault.
  */
 export function InstructionFormSheet({
   draftScope,
@@ -79,7 +82,9 @@ export function InstructionFormSheet({
   const insets = useSafeAreaInsets();
   const nameRef = useFormDraftRef(draftScope, 'name', instruction?.name ?? '');
   const contentRef = useFormDraftRef(draftScope, 'content', instruction?.content ?? '');
-  const [namePreview, setNamePreview] = useState(() => instructionNamePreview(nameRef.current));
+  const [nameHint, setNameHint] = useState<InstructionNameHint>(() =>
+    instructionNameHint(nameRef.current)
+  );
   const [error, setError] = useState<InstructionInputError | null>(null);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'status' | 'name' | 'content'
@@ -183,15 +188,17 @@ export function InstructionFormSheet({
           containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value;
-            setNamePreview(instructionNamePreview(value));
+            setNameHint(instructionNameHint(value));
             if (error !== null && instructionNameErrorShown(error)) {
               setError(null);
             }
           }}
         />
-        {namePreview === null ? null : (
+        {nameHint.kind === 'none' ? null : (
           <Text variant="muted" className="-mt-2 text-xs">
-            {t('profiles.instructionNamePreview', { name: namePreview })}
+            {nameHint.kind === 'preview'
+              ? t('profiles.instructionNamePreview', { name: nameHint.slug })
+              : t('profiles.instructionNameInvalid')}
           </Text>
         )}
         <FormField

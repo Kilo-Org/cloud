@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Faịlụ iwu ndị a gbakwụnyere ebe a na-emetụta nnọkọ ọ bụla nke na-eji profaịlụ a.",
     "instructionNameRequired": "Tinye aha faịlụ",
     "instructionNameTooLong": "Aha faịlụ aghaghị ịdị mkpụrụ edemede {{max}} ma ọ bụ obere",
-    "instructionNameInvalid": "Malite na mkpụrụ edemede ma ọ bụ ọnụọgụ, jiri naanị mkpụrụ edemede obere, ọnụọgụ, na akara dịka (-)",
+    "instructionNameInvalid": "Malite na mkpụrụ edemede ma ọ bụ ọnụọgụ, jiri naanị mkpụrụ edemede obere ASCII, ọnụọgụ, na akara dịka (-)",
     "instructionNameReserved": "Aha faịlụ ahụ edobere. Họrọ ọzọ.",
     "instructionContentRequired": "Tinye iwu markdown",
     "instructionNamePreview": "A na-echekwa dịka {{name}}",

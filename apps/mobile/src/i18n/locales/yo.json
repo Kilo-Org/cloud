@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Àwọn fáìlì ìlànà tí a fi kún níbí ni a máa ń lò nínú gbogbo àkókò ìlò tí ó bá ń lo profáìlì yìí.",
     "instructionNameRequired": "Tẹ orúkọ fáìlì kan",
     "instructionNameTooLong": "Orúkọ fáìlì gbọ́dọ̀ jẹ́ {{max}} kíkà tàbí kéré sí i",
-    "instructionNameInvalid": "Bẹ̀rẹ̀ pẹ̀lú lẹ́tà tàbí nọ́mbà, kí o sì lo lẹ́tà kékeré, nọ́mbà àti dáàṣì nìkan",
+    "instructionNameInvalid": "Bẹ̀rẹ̀ pẹ̀lú lẹ́tà tàbí nọ́mbà, kí o sì lo lẹ́tà ASCII kékeré, nọ́mbà àti dáàṣì nìkan",
     "instructionNameReserved": "Orúkọ fáìlì yẹn ti wà ní àpamọ́. Yan òmíràn.",
     "instructionContentRequired": "Tẹ markdown ìlànà náà",
     "instructionNamePreview": "Yóò fi pamọ́ bí {{name}}",

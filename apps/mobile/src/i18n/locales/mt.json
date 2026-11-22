@@ -4569,7 +4569,7 @@
     "instructionsEmptyDescriptionReadOnly": "Il-fajls tar-regoli miżjuda hawn japplikaw għal kull sessjoni li tuża dan il-profil.",
     "instructionNameRequired": "Daħħal isem tal-fajl",
     "instructionNameTooLong": "Isem il-fajl irid ikun {{max}} karattri jew inqas",
-    "instructionNameInvalid": "Ibda b'ittra jew numru u uża biss ittri żgħar, numri u sing tal-linja",
+    "instructionNameInvalid": "Ibda b'ittra żgħira ASCII jew numru u uża biss ittri żgħar ASCII, numri u sing tal-linja",
     "instructionNameReserved": "Dan l-isem tal-fajl huwa riżervat. Agħżel ieħor.",
     "instructionContentRequired": "Daħħal ir-regoli markdown",
     "instructionNamePreview": "Jiġi salvat bħala {{name}}",

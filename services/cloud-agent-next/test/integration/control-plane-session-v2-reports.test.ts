@@ -620,7 +620,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     });
   });
 
-  it('writes a failed report with its stage/code and one callback for a failure batch', async () => {
+  it('writes failed reports and matches polling failures to the batch callback', async () => {
     const { stub, peer } = await setup();
     const captured = await installCapturedQueues(stub);
 
@@ -645,10 +645,64 @@ describe('SandboxSessionV2 reports and callbacks', () => {
       expect(report.run.diagnostic).toBeDefined();
     }
     expect(captured.callbacks).toHaveLength(1);
-    expect(captured.callbacks[0]?.payload.status).toBe('failed');
-    expect(captured.callbacks[0]?.payload.clientError).toMatchObject({
-      code: 'WORKSPACE_SETUP_FAILED',
-      retryable: true,
+    const callback = captured.callbacks[0]?.payload;
+    const failure = {
+      stage: 'pre_dispatch',
+      code: 'workspace_setup_failed',
+      subtype: 'git_rate_limited',
+    };
+    expect(callback).toMatchObject({
+      messageId: 'm2',
+      status: 'failed',
+      failure,
+      clientError: { code: 'WORKSPACE_SETUP_FAILED', retryable: true },
+    });
+    const result = await stub.getMessageResult('m2');
+    expect(result).toMatchObject({ type: 'found', result: { messageId: 'm2', status: 'failed' } });
+    expect(result).toHaveProperty('result.failure', {
+      ...callback?.failure,
+      retryable: callback?.clientError?.retryable,
+    });
+    expect(await stub.getMessageResult('m1')).toMatchObject({
+      type: 'found',
+      result: { messageId: 'm1', status: 'failed', failure },
+    });
+  });
+
+  it('matches the polling failure to the callback for a BYOK assistant rate limit', async () => {
+    const { sessionId, stub } = await setup();
+    const captured = await installCapturedQueues(stub);
+
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+    await stub.onOutcome({
+      sessionId,
+      status: 'failed',
+      reason: 'Assistant request was rate limited',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'byok',
+      lastMessageId: 'm1',
+    });
+    await flush(stub);
+
+    expect(captured.callbacks).toHaveLength(1);
+    const callback = captured.callbacks[0]?.payload;
+    expect(callback).toMatchObject({
+      messageId: 'm1',
+      status: 'failed',
+      failure: {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: 'rate_limited',
+        providerOwnership: 'byok',
+      },
+      clientError: { retryable: expect.any(Boolean) },
+    });
+    const result = await stub.getMessageResult('m1');
+    expect(result).toMatchObject({ type: 'found', result: { messageId: 'm1', status: 'failed' } });
+    expect(result).toHaveProperty('result.failure', {
+      ...callback?.failure,
+      retryable: callback?.clientError?.retryable,
     });
   });
 
@@ -820,7 +874,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect(callbacks).toHaveLength(1);
   });
 
-  it('reports the last assistant message of the turn after a mid-turn synthetic message', async () => {
+  it('matches each completed turn to its callback after a mid-turn synthetic message and a follow-up', async () => {
     const { sessionId, kiloSessionId, stub } = await setup();
     const captured = await installCapturedQueues(stub);
     const promptId = createMessageId();
@@ -844,12 +898,12 @@ describe('SandboxSessionV2 reports and callbacks', () => {
         ...(parentID === undefined ? {} : { parentID }),
       },
     });
-    const assistant = (id: string, text: string, parentID: string) =>
+    const assistant = (id: string, text: string, parentID: string, created = 2) =>
       conversationMessage(
         {
           id,
           type: 'assistant',
-          time: { created: 2, completed: 3 },
+          time: { created, completed: created + 1 },
           content: [{ type: 'text', text }],
         },
         parentID
@@ -870,15 +924,78 @@ describe('SandboxSessionV2 reports and callbacks', () => {
         assistant('msg_assistant_final', 'Final answer', 'msg_synthetic'),
       ],
     });
-    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: promptId });
+    await stub.onOutcome({
+      sessionId,
+      status: 'completed',
+      lastMessageId: promptId,
+      gateResult: 'pass',
+    });
     await flush(stub);
 
     expect(captured.callbacks).toHaveLength(1);
-    expect(captured.callbacks[0]?.payload).toMatchObject({
+    const firstCallback = captured.callbacks[0]?.payload;
+    expect(firstCallback).toMatchObject({
       messageId: promptId,
       status: 'completed',
       lastAssistantMessageText: 'Final answer',
+      lastSeenBranch: 'main',
+      gateResult: 'pass',
     });
+    const firstResult = await stub.getMessageResult(promptId);
+    expect(firstResult).toMatchObject({
+      type: 'found',
+      result: {
+        messageId: promptId,
+        status: 'completed',
+        assistant: {
+          messageId: 'msg_assistant_final',
+          text: firstCallback?.lastAssistantMessageText,
+        },
+        branch: firstCallback?.lastSeenBranch,
+        gateResult: firstCallback?.gateResult,
+      },
+    });
+
+    const followUpId = createMessageId();
+    await stub.send(promptPayload(followUpId, 'follow-up'));
+    await waitFor(async () => expect(await messageStatus(stub, followUpId)).toBe('running'));
+    await stub.onEvents({
+      events: [
+        conversationMessage({
+          id: followUpId,
+          type: 'user',
+          time: { created: 4 },
+          text: 'follow-up',
+        }),
+        assistant('msg_assistant_follow_up', 'Follow-up answer', followUpId, 5),
+      ],
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: followUpId });
+    await flush(stub);
+
+    expect(captured.callbacks).toHaveLength(2);
+    const followUpCallback = captured.callbacks[1]?.payload;
+    expect(followUpCallback).toMatchObject({
+      messageId: followUpId,
+      status: 'completed',
+      lastAssistantMessageText: 'Follow-up answer',
+      lastSeenBranch: 'main',
+    });
+    const followUpResult = await stub.getMessageResult(followUpId);
+    expect(followUpResult).toMatchObject({
+      type: 'found',
+      result: {
+        messageId: followUpId,
+        status: 'completed',
+        assistant: {
+          messageId: 'msg_assistant_follow_up',
+          text: followUpCallback?.lastAssistantMessageText,
+        },
+        branch: followUpCallback?.lastSeenBranch,
+      },
+    });
+    expect(followUpResult).not.toHaveProperty('result.gateResult');
+    expect(await stub.getMessageResult(promptId)).toEqual(firstResult);
   });
 
   it('attributes initial and follow-up turns to the runtime harness the connected wrapper reported', async () => {

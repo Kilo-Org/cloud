@@ -173,8 +173,8 @@ describe('CloudAgentNextClient review message results', () => {
     mockCreateTRPCClient.mockReturnValueOnce({ getMessageResult: { query } });
   });
 
-  it('returns terminal assistant text and timestamps', async () => {
-    query.mockResolvedValue({
+  it('returns terminal assistant text, timestamps, branch, and preparation', async () => {
+    const result = {
       ...input,
       status: 'completed',
       createdAt: 1,
@@ -183,19 +183,14 @@ describe('CloudAgentNextClient review message results', () => {
       terminalAt: 4,
       completionSource: 'assistant_message_event',
       gateResult: 'pass',
+      branch: '',
+      preparation: { status: 'completed' },
       assistant: { messageId: 'msg_abcdef123456ABCDEF123456', text: 'terminal text' },
-    });
-    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
-      ...input,
-      status: 'completed',
-      createdAt: 1,
-      queuedAt: 2,
-      acceptedAt: 3,
-      terminalAt: 4,
-      completionSource: 'assistant_message_event',
-      gateResult: 'pass',
-      assistant: { messageId: 'msg_abcdef123456ABCDEF123456', text: 'terminal text' },
-    });
+    };
+    query.mockResolvedValue(result);
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual(
+      result
+    );
     expect(query).toHaveBeenCalledWith(input);
   });
 
@@ -215,8 +210,8 @@ describe('CloudAgentNextClient review message results', () => {
     });
   });
 
-  it('preserves a terminal failure without stripping it to status', async () => {
-    query.mockResolvedValue({
+  it('preserves a legacy failure without a stage and returns safe preparation details', async () => {
+    const result = {
       ...input,
       status: 'failed',
       createdAt: 1,
@@ -228,20 +223,16 @@ describe('CloudAgentNextClient review message results', () => {
         message: 'safe failure',
         retryable: true,
       },
-    });
-    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
-      ...input,
-      status: 'failed',
-      createdAt: 1,
-      terminalAt: 2,
-      completionSource: 'wrapper_failure',
-      failure: {
-        code: 'workspace_setup_failed',
-        subtype: 'git_clone_timeout',
-        message: 'safe failure',
-        retryable: true,
+      preparation: {
+        status: 'failed',
+        failedStepLabel: 'Clone repository',
+        reason: 'Clone timed out',
       },
-    });
+    };
+    query.mockResolvedValue(result);
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual(
+      result
+    );
   });
 
   it('distinguishes the exact message-not-found response from missing sessions', async () => {

@@ -27,27 +27,33 @@
 /**
  * The twelve slice fills, in the order mermaid paints `pie1`..`pie12`.
  *
- * Each is the light default fill's hue, held to a low saturation and an
- * even lightness so no slice pulls the eye away from the chart's content: the
- * whole ramp sits inside a 60–80% HSL lightness band and varies by a dozen
- * points at most. Every one clears WCAG AA text contrast on the page and on the
- * section ink, so a percentage stays readable on its wedge whatever a
- * diagram's proportions give it. `mermaid-pie-theme.test.ts` measures the
- * contrast, the muted band and the hue parity.
+ * Each is the light default fill's hue, held to a low saturation and one
+ * 60–80% HSL lightness band. Every one clears WCAG AA text contrast on the page
+ * and on the section ink, so a percentage stays readable on its wedge whatever
+ * a diagram's proportions give it.
+ *
+ * Distance on the ramp, not lightness alone, is what keeps the wedges apart.
+ * Mermaid paints these in slice order, so a pie with fewer than twelve slices
+ * drops the tail: a six-slice chart paints `pie1..pie6`, which repeats the
+ * lavender, yellow and yellow-green families. Each of those twins therefore
+ * takes a different part of the lightness band, and every pair of the twelve —
+ * not just the twins — sits at least 16 CIE76 ΔE apart, so no two wedges or
+ * their legend swatches read as one colour. `mermaid-pie-theme.test.ts` measures
+ * that pairwise distance, the contrast, the muted band and the hue parity.
  */
 export const DARK_PIE_FILLS = [
-  '#ADA9D1',
-  '#D3D4AF',
-  '#AFC195',
-  '#848EC2',
-  '#CBC49A',
-  '#BACCA4',
-  '#C8A2C8',
-  '#97C0C4',
-  '#C99A97',
-  '#D4AFD0',
-  '#A7CDBB',
-  '#C4878B',
+  '#828DB7',
+  '#CCC5AF',
+  '#95BC78',
+  '#8579BB',
+  '#BFBA7B',
+  '#9DB189',
+  '#B47BBF',
+  '#A3CBD2',
+  '#B29690',
+  '#B992BB',
+  '#83B9A8',
+  '#BD787D',
 ] as const;
 
 /**

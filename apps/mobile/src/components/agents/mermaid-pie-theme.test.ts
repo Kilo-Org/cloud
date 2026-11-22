@@ -63,6 +63,25 @@ const MAX_LIGHTNESS = 0.8;
  * points. Pinned so a future edit cannot brighten one slice without the rest. */
 const MAX_LIGHTNESS_SPREAD = 0.14;
 
+/**
+ * The largest CIE76 ΔE, in CIELAB (D65), any two of the twelve fills may sit
+ * apart.
+ *
+ * Mermaid paints `pie1..pie12` in slice order, so a pie with fewer than twelve
+ * slices drops the tail of the ramp and a reader has to tell the remaining
+ * wedges apart with nothing else to go on.
+ *
+ * The distance is CIE76 ΔE in CIELAB, the plain Euclidean distance between two
+ * colours' L\*a\*b\* coordinates. WCAG contrast cannot stand in for it: WCAG
+ * measures relative luminance alone, so two fills with different hues and
+ * similar lightness score about 1.00:1 while reading as clearly different
+ * colours, and two fills of the same hue can score well over 1.00:1 while
+ * reading as one. Measured on this palette, `pie3` `#AFC195` against `pie10`
+ * `#D4AFD0` scores 1.00:1 contrast at ΔE 45.8: the luminance metric calls that
+ * pair identical, which is exactly the defect the ramp is checked for.
+ */
+const MAX_PAIR_LAB_DISTANCE = 12;
+
 /** WCAG 2.x contrast of two colours the shipped luminance helper parses. */
 function contrastRatio(foreground: string, background: string): number {
   const foregroundLuminance = relativeLuminance(foreground);
@@ -75,14 +94,26 @@ function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+/** One channel pair of a `#rrggbb` colour as a 0–255 integer.
+ *
+ * Reads its own pair and rejects anything that is not two hex digits, so a
+ * malformed colour throws here instead of reaching the HSL maths as `NaN` and
+ * making every comparison below quietly false. */
+function hexChannel(value: string, offset: number): number {
+  const pair = value.slice(offset, offset + 2);
+  if (!/^[0-9a-f]{2}$/i.test(pair)) {
+    throw new Error(`expected a #rrggbb colour, got "#${value}"`);
+  }
+  return Number.parseInt(pair, 16);
+}
+
 /** The HSL of a `#rrggbb` colour, with hue in degrees and saturation and
  * lightness as fractions of one. */
 function hexToHsl(hex: string): { hue: number; saturation: number; lightness: number } {
   const value = hex.replace('#', '');
-  const [red, green, blue] = [0, 2, 4].map(offset =>
-    Number.parseInt(value.slice(offset, offset + 2), 16)
-  );
-  const [r, g, b] = [red / 255, green / 255, blue / 255];
+  const r = hexChannel(value, 0) / 255;
+  const g = hexChannel(value, 2) / 255;
+  const b = hexChannel(value, 4) / 255;
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const lightness = (max + min) / 2;
@@ -107,6 +138,84 @@ function hexToHsl(hex: string): { hue: number; saturation: number; lightness: nu
 function hueDistance(first: number, second: number): number {
   const raw = Math.abs(first - second) % 360;
   return raw > 180 ? 360 - raw : raw;
+}
+
+/** The sRGB transfer function's inverse: one 0–255 channel as linear light. */
+function channelToLinear(channel: number): number {
+  const value = channel / 255;
+  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+/** CIELAB's cube-root curve, with its linear segment for dark inputs. */
+function labCurve(value: number): number {
+  return value > 0.008856 ? Math.cbrt(value) : 7.787 * value + 16 / 116;
+}
+
+/** The CIELAB (D65) coordinates of a `#rrggbb` colour.
+ *
+ * sRGB channels are linearised, mixed by the sRGB → XYZ matrix with the D65
+ * white point (Xn 0.95047, Yn 1, Zn 1.08883), then mapped through CIELAB's
+ * cube-root curve. `lightness` is L\*, `a` is the green-to-red axis and `b` the
+ * blue-to-yellow one. The channels come from `hexChannel`, so a malformed
+ * colour throws rather than producing `NaN` coordinates that would compare as
+ * equal to everything. */
+function hexToLab(hex: string): { lightness: number; a: number; b: number } {
+  const value = hex.replace('#', '');
+  const red = channelToLinear(hexChannel(value, 0));
+  const green = channelToLinear(hexChannel(value, 2));
+  const blue = channelToLinear(hexChannel(value, 4));
+  const x = red * 0.4124564 + green * 0.3575761 + blue * 0.1804375;
+  const y = red * 0.2126729 + green * 0.7151522 + blue * 0.072175;
+  const z = red * 0.0193339 + green * 0.119192 + blue * 0.9503041;
+  const fx = labCurve(x / 0.95047);
+  const fy = labCurve(y / 1);
+  const fz = labCurve(z / 1.08883);
+  return {
+    lightness: 116 * fy - 16,
+    a: 500 * (fx - fy),
+    b: 200 * (fy - fz),
+  };
+}
+
+/** The CIE76 colour difference between two `#rrggbb` colours: the Euclidean
+ * distance between their CIELAB coordinates, where about 2.3 is a just
+ * noticeable difference and anything under about 10 reads as the same colour
+ * on two large adjacent areas. */
+function labDistance(first: string, second: string): number {
+  const firstLab = hexToLab(first);
+  const secondLab = hexToLab(second);
+  return Math.hypot(
+    firstLab.lightness - secondLab.lightness,
+    firstLab.a - secondLab.a,
+    firstLab.b - secondLab.b
+  );
+}
+
+/** The dark fill at `index`, with the read checked.
+ *
+ * `noUncheckedIndexedAccess` makes every indexed read possibly missing, and a
+ * test that quietly skipped a missing slice would pass on a shorter ramp than
+ * the one mermaid paints, so a missing entry throws instead. */
+function darkFillAt(index: number): string {
+  const fill = DARK_PIE_FILLS[index];
+  if (fill === undefined) {
+    throw new Error(`the dark ramp has no fill at index ${index}`);
+  }
+  return fill;
+}
+
+/**
+ * Every unordered pair of ramp indices, which is the 66 pairs a twelve slice
+ * pie can paint.
+ */
+function allIndexPairs(): (readonly [number, number])[] {
+  const pairs: (readonly [number, number])[] = [];
+  for (let first = 0; first < DARK_PIE_FILLS.length; first += 1) {
+    for (let second = first + 1; second < DARK_PIE_FILLS.length; second += 1) {
+      pairs.push([first, second]);
+    }
+  }
+  return pairs;
 }
 
 describe('dark pie fills', () => {
@@ -177,8 +286,12 @@ describe('dark pie fills', () => {
     // The two modes must name the same series in the same hue family: a reader
     // who knows the last slice is red in light mode has to see red, muted, in
     // dark mode. Only saturation and lightness may change with the page.
-    for (const [index, fill] of DARK_PIE_FILLS.entries()) {
-      const lightFill = LIGHT_PIE_FILLS[index];
+    const darkFills = [...DARK_PIE_FILLS];
+    for (const [index, lightFill] of LIGHT_PIE_FILLS.entries()) {
+      const fill = darkFills[index];
+      if (fill === undefined) {
+        throw new Error(`no dark fill at index ${index} for light fill ${lightFill}`);
+      }
       const darkHue = hexToHsl(fill).hue;
       const lightHue = hexToHsl(lightFill).hue;
       const distance = hueDistance(darkHue, lightHue);
@@ -186,6 +299,24 @@ describe('dark pie fills', () => {
         distance,
         `${fill} (hue ${darkHue.toFixed(1)}°) stands in for ${lightFill} (hue ${lightHue.toFixed(1)}°), ${distance.toFixed(1)}° away`
       ).toBeLessThanOrEqual(MAX_HUE_DRIFT);
+    }
+  });
+
+  it('keeps every pair of fills perceptually apart', () => {
+    // A pie has no axis or scale to fall back on: a wedge's colour is the only
+    // thing that says which slice it is, and a six-slice chart paints just
+    // `pie1..pie6`. WCAG contrast cannot make this call, because it measures
+    // luminance alone: `pie3` `#AFC195` against `pie10` `#D4AFD0` scores
+    // 1.00:1 there while being 45.8 ΔE apart. CIE76 ΔE in CIELAB is the
+    // distance a reader sees.
+    for (const [first, second] of allIndexPairs()) {
+      const firstFill = darkFillAt(first);
+      const secondFill = darkFillAt(second);
+      const distance = labDistance(firstFill, secondFill);
+      expect(
+        distance,
+        `pie${first + 1} ${firstFill} and pie${second + 1} ${secondFill} are only ${distance.toFixed(1)} ΔE apart, below the ${MAX_PAIR_LAB_DISTANCE} ΔE perceptual bar`
+      ).toBeGreaterThanOrEqual(MAX_PAIR_LAB_DISTANCE);
     }
   });
 });

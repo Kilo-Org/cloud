@@ -401,11 +401,13 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git*-c*',
 ];
 
-// Installed after the denies, and only for the branch-creation form.
+// Installed after the denies, and only for the branch-creation form, whose `-c`
+// copies a branch and consumes its arguments.
 const SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED = [
   'git switch -c *',
   'git branch -c *',
   'git -?* switch -c *',
+  'git -?* branch -c *',
 ];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [

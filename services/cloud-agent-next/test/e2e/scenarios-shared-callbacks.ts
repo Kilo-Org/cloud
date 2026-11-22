@@ -427,6 +427,11 @@ async function runCallbackCompletion(
       payload.lastSeenBranch,
       'follow-up result branch and callback'
     );
+    assert.equal(
+      followupResult.gateResult,
+      payload.gateResult,
+      'follow-up result gate and callback'
+    );
     completed = true;
 
     return {

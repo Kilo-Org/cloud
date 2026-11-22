@@ -194,19 +194,21 @@ describe('CloudAgentNextClient review message results', () => {
     expect(query).toHaveBeenCalledWith(input);
   });
 
-  it('tolerates a newer Worker field without dropping the known result', async () => {
+  it('tolerates newer Worker fields at the top level and inside preparation', async () => {
     query.mockResolvedValue({
       ...input,
       status: 'completed',
       createdAt: 1,
       assistant: { messageId: 'msg_abcdef123456ABCDEF123456', text: 'terminal text' },
       futureLifecycleField: 'added by a newer Worker',
+      preparation: { status: 'completed', futurePreparationField: 'added by a newer Worker' },
     });
     await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
       ...input,
       status: 'completed',
       createdAt: 1,
       assistant: { messageId: 'msg_abcdef123456ABCDEF123456', text: 'terminal text' },
+      preparation: { status: 'completed' },
     });
   });
 

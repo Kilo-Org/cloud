@@ -1758,6 +1758,7 @@ describe('callback scenario behaviour under both profiles', () => {
             status: 'completed',
             assistant: { messageId: 'assistant_followup', text: 'done' },
             branch: 'test-branch',
+            gateResult: 'pass',
           }
     );
     mocks.startSession.mockResolvedValue({
@@ -1819,6 +1820,7 @@ describe('callback scenario behaviour under both profiles', () => {
       status: 'completed',
       lastAssistantMessageText: 'done',
       lastSeenBranch: 'test-branch',
+      gateResult: 'pass',
     });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-completion'], {

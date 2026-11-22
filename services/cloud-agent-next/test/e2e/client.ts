@@ -902,6 +902,7 @@ const messageResultSchema = z.object({
     retryable: z.boolean(),
   }).optional(),
   assistant: z.object({ messageId: z.string().min(1), text: z.string().optional() }).optional(),
+  gateResult: z.enum(['pass', 'fail']).optional(),
   branch: z.string().optional(),
   preparation: z
     .object({

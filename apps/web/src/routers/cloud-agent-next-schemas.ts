@@ -760,7 +760,6 @@ export const baseGetMessageResultNextOutputSchema = z.object({
       failedStepLabel: z.string().optional(),
       reason: z.string().max(CLOUD_AGENT_SAFE_FAILURE_MESSAGE_MAX_LENGTH).optional(),
     })
-    .strict()
     .optional(),
   assistant: z
     .object({

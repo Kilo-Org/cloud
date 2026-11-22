@@ -14,7 +14,7 @@ import { type LucideProps } from '@/components/ui/icons';
 import { type RowEllipsizeMode } from '@/components/ui/row-value';
 import { renderRowTrailing, type RowTrailingSpec } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
-import { ROW_FRAME_CONTENT_PRESS_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_FRAME_CONTENT_PRESS_CLASS, rowTargetHostClass } from '@/lib/a11y/tap-target';
 import { useIsLargeFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { NEUTRAL_TINT, type Tint } from '@/lib/agent-color';
 import { cn } from '@/lib/utils';
@@ -257,14 +257,29 @@ export function RowFrame({
       ? cn(stack ? ROW_FRAME_STACK_CLASS : ROW_FRAME_CLASS, className)
       : cn(ROW_FRAME_COLUMN_CLASS, className);
 
+  // The line lays its cells out on the row's 27pt content band, so a
+  // trailing cell that occupies the platform target in this presentation —
+  // a control carrying it on its own node, or the placeholder that reserves
+  // the same space — would be delivered through this wrapper's band, not
+  // the row's padded bounds: Android delivers a touch only inside every
+  // ancestor view. A spec that marks its cell as such (`target`) takes the
+  // host at the target, which grows this line to the target in the stacked
+  // presentation only (`rowTargetHostClass`).
+  const trailingClass =
+    trailing?.kind === 'node' && trailing.target === true
+      ? cn('shrink-0', rowTargetHostClass())
+      : 'shrink-0';
+
   /**
    * A stack's top line: the leading cell and the trailing cell above the text,
    * so a long title takes the row's full width instead of sharing it with them.
+   * A press handed to the content uses the same line, so the stacked shape is
+   * one shape whether the row press covers the whole row or not.
    */
   const stackLine = (
     <View className={cn('w-full', ROW_FRAME_LINE_CLASS)}>
       {leadingNode}
-      {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
+      {trailingNode ? <View className={trailingClass}>{trailingNode}</View> : null}
     </View>
   );
 

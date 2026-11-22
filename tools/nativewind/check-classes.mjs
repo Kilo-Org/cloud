@@ -60,16 +60,21 @@ import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /**
- * The app's source root, built once. The walk below scans it, the theme tokens
- * come from its `global.css`, and the formatter rule scopes itself by it, so a
- * moved or renamed app root reaches all three together instead of leaving one
- * of them reading a path the walk no longer parses.
+ * The app's base, repo-relative, and its source root built from it. The walk
+ * below scans the source root, the theme tokens come from its `global.css`, and
+ * the formatter rule scopes itself by it, so a moved or renamed app root
+ * reaches all three together instead of leaving one of them reading a path the
+ * walk no longer parses. The layout allowlist and exempt trees are written
+ * under the same base, so the prefix the layout rules test and the slice they
+ * take are one path, not two spellings of it.
  */
-const APP_SRC = join(ROOT, 'apps/mobile/src');
+const APP_RELATIVE = 'apps/mobile';
+const APP_SRC_RELATIVE = `${APP_RELATIVE}/src`;
+const APP_SRC = join(ROOT, APP_SRC_RELATIVE);
 const SOURCE_DIRS = [APP_SRC, join(ROOT, 'packages/app-shared/src')];
 
 /**
- * The modules that own the layout scale, relative to `apps/mobile`: the UI
+ * The modules that own the layout scale, relative to `APP_RELATIVE`: the UI
  * primitives, the two headers, and the two constant modules a screen reads its
  * geometry from. Everything else states layout with the scale.
  */
@@ -82,9 +87,10 @@ const LAYOUT_ALLOWLIST = [
 ];
 
 /**
- * Trees the layout rules never read: the glanceable widgets and Live Activities
- * are stringified into the home-screen and lock-screen renderers, not React
- * Native views, so a layout class or a UI primitive has no meaning there.
+ * Trees, relative to `APP_RELATIVE`, the layout rules never read: the glanceable
+ * widgets and Live Activities are stringified into the home-screen and
+ * lock-screen renderers, not React Native views, so a layout class or a UI
+ * primitive has no meaning there.
  */
 const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
 
@@ -331,7 +337,7 @@ function readThemeTokens() {
   } catch (error) {
     return {
       tokens: null,
-      failure: `check-classes: cannot read the @theme inline tokens from apps/mobile/src/global.css (${firstLine(error)}) — the /opacity modifier rule cannot run without them and was skipped`,
+      failure: `check-classes: cannot read the @theme inline tokens from ${APP_SRC_RELATIVE}/global.css (${firstLine(error)}) — the /opacity modifier rule cannot run without them and was skipped`,
     };
   }
 }
@@ -433,52 +439,150 @@ function isScrollContainer(name) {
 }
 
 /**
- * Every string chunk one syntax tree holds, with where each chunk starts in
- * the source text and the two readings of its content. These are the only
- * places a class name can be written: a comment, a regular expression and an
- * identifier are nodes of their own, so a ban can no longer fire on text that
- * only reads like a class.
+ * The string chunk one node holds, or null when it holds none: a string
+ * `Literal`, or a `TemplateElement`. These are the only places a class name can
+ * be written: a comment, a regular expression and an identifier are nodes of
+ * their own, so a ban can no longer fire on text that only reads like a class.
  *
  * Each chunk is read two ways, and which reading a rule takes is the rule's
  * choice:
- * - `raw` is the chunk's source text — a string literal keeps its quotes —
- *   so a match's offset inside it maps straight back to the file's line,
- *   escapes included. The ban-list rules match on this.
+ * - `raw` is the chunk's source text — a string literal keeps its quotes — so
+ *   `start`, the origin of that text, is the opening quote for a `Literal` and
+ *   the character just inside the delimiters for a `TemplateElement`. The
+ *   ban-list rules add a match's index in `raw` to `start`, and the collection
+ *   is ordered by `start`.
  * - `value` is the string the code evaluates to (`cooked ?? raw` for a
- *   template chunk), so an escaped literal reads as its class name. The
- *   scroll-padding rule reads this.
- */
-function stringChunks(root, text) {
-  const chunks = [];
-  walk(root, node => {
-    const chunk = chunkOf(node, text);
-    if (chunk !== null) {
-      chunks.push(chunk);
-    }
-  });
-  return chunks;
-}
-
-/**
- * The string chunk one node holds, or null when it holds none: a string
- * `Literal`, or a `TemplateElement`, whose node spans its delimiters so the
- * chunk itself starts just inside.
+ *   template chunk), so an escaped literal reads as its class name. The layout
+ *   rules match on this.
+ *
+ * An index in `value` is not an offset in the source: every escape, line
+ * continuation and CRLF ahead of it takes source characters `value` never
+ * counts, so adding it to `start` names an earlier line — the previous one
+ * whenever the class is the first thing on its line. `offsetOf(index)` carries
+ * that mapping. The chunk's content is the text between its delimiters; where
+ * it equals `value` the offset is the content's own start plus the index, and
+ * otherwise the escapes are walked once against `value`, recording where each
+ * cooked character was written. The walk stops at whichever reading ends first,
+ * so a chunk it cannot place still names a real line instead of throwing.
  */
 function chunkOf(node, text) {
   if (node.type === 'Literal') {
     const value = stringLiteralValue(node);
     return value === null
       ? null
-      : { start: node.start, raw: text.slice(node.start, node.end), value };
+      : chunkFrom(text, {
+          start: node.start,
+          contentStart: node.start + 1,
+          contentEnd: node.end - 1,
+          raw: text.slice(node.start, node.end),
+          value,
+        });
   }
   if (node.type === 'TemplateElement') {
-    return {
+    return chunkFrom(text, {
       start: node.start + 1,
+      contentStart: node.start + 1,
+      // The node spans from the opening backtick or `}` through the closing
+      // backtick or the `${` that opens the next interpolation, so the content
+      // ends before whichever of those terminated it.
+      contentEnd: text[node.end - 1] === '{' ? node.end - 2 : node.end - 1,
       raw: node.value.raw,
       value: node.value.cooked ?? node.value.raw,
-    };
+    });
   }
   return null;
+}
+
+/**
+ * One chunk record from where its content sits, with the `offsetOf` map built
+ * only where the content and `value` differ. `contentStart` is the content's
+ * first character and `contentEnd` one past its last, so the content is the
+ * chunk's own source text between its delimiters.
+ */
+function chunkFrom(text, { start, contentStart, contentEnd, raw, value }) {
+  const content = text.slice(contentStart, contentEnd);
+  const origins = content === value ? null : contentOrigins(content, contentStart, value);
+  return {
+    start,
+    raw,
+    value,
+    offsetOf: index => {
+      if (origins === null) {
+        return contentStart + index;
+      }
+      return origins[index] ?? origins[origins.length - 1] ?? contentStart;
+    },
+  };
+}
+
+/**
+ * How one escape in a chunk's content is written and cooked: `source` is the
+ * number of content characters it occupies, `value` the number of UTF-16 units
+ * it becomes — 0 for a line continuation, which joins two source lines without
+ * leaving anything behind, and 2 for an escape above the BMP, which cooks to a
+ * surrogate pair.
+ */
+function escapeCost(content, index) {
+  const next = content[index + 1];
+  if (next === 'u' && content[index + 2] === '{') {
+    const close = content.indexOf('}', index + 3);
+    if (close !== -1) {
+      const codePoint = Number.parseInt(content.slice(index + 3, close), 16);
+      return { source: close - index + 1, value: codePoint > 0xffff ? 2 : 1 };
+    }
+  }
+  if (next === 'u' && /^[0-9a-fA-F]{4}$/.test(content.slice(index + 2, index + 6))) {
+    return { source: 6, value: 1 };
+  }
+  if (next === 'x' && /^[0-9a-fA-F]{2}$/.test(content.slice(index + 2, index + 4))) {
+    return { source: 4, value: 1 };
+  }
+  if (next === '\r') {
+    // A backslash before a line terminator is a line continuation: CRLF is the
+    // whole terminator, or the CR is one on its own.
+    return { source: content[index + 2] === '\n' ? 3 : 2, value: 0 };
+  }
+  if (next === '\n') {
+    return { source: 2, value: 0 };
+  }
+  return { source: 2, value: 1 };
+}
+
+/**
+ * The source offset of each character of `value`, read back from the content
+ * that produced it. `origins[vi]` is `contentStart + ci`, so a match at index
+ * `vi` names the character the class was actually written at. A CRLF in a
+ * template chunk's content is one line ending in the source and one `\n` in
+ * `value`, so the two characters are consumed against the one; every other
+ * content character stands for itself.
+ *
+ * The walk ends when either reading runs out, and a `value` longer than the
+ * content it could place repeats the last offset it reached, so a truncated
+ * chunk cannot make `offsetOf` answer `undefined` or throw.
+ */
+function contentOrigins(content, contentStart, value) {
+  const origins = [];
+  let ci = 0;
+  let vi = 0;
+  while (ci < content.length && vi < value.length) {
+    const origin = contentStart + ci;
+    if (content[ci] === '\\') {
+      const cost = escapeCost(content, ci);
+      for (let unit = 0; unit < cost.value; unit++) {
+        origins[vi + unit] = origin;
+      }
+      ci += cost.source;
+      vi += cost.value;
+      continue;
+    }
+    origins[vi] = origin;
+    ci += content[ci] === '\r' && content[ci + 1] === '\n' ? 2 : 1;
+    vi += 1;
+  }
+  while (origins.length < value.length) {
+    origins.push(origins[origins.length - 1] ?? contentStart);
+  }
+  return origins;
 }
 
 /** The source of a JSX tag's name, `ScrollView` or `Animated.ScrollView` alike. */
@@ -748,12 +852,16 @@ function isClassConstant(node) {
  * element, so a card fill and a card radius split across them are still one
  * hand-built card. A `cn()` call outside those props is a surface of its own,
  * and one nested inside another surface is already part of it.
+ *
+ * A surface's chunks are selected from the file's one collection by position,
+ * the same way `classTokens` reads an element's attribute, so the walk here
+ * finds the surfaces and nothing re-reads a chunk the tree already yielded.
  */
-function layoutGroups(program, text) {
+function layoutGroups(program, chunks) {
   const groups = [];
   const covered = new Set();
-  const add = (start, chunks) => {
-    const fresh = chunks.filter(chunk => !covered.has(chunk.start));
+  const add = (start, surfaceChunks) => {
+    const fresh = surfaceChunks.filter(chunk => !covered.has(chunk.start));
     if (fresh.length === 0) {
       return;
     }
@@ -762,7 +870,7 @@ function layoutGroups(program, text) {
     }
     groups.push({ start, chunks: fresh });
   };
-  const argumentChunks = node => node.arguments.flatMap(argument => stringChunks(argument, text));
+  const argumentChunks = node => node.arguments.flatMap(argument => chunksWithin(chunks, argument));
 
   walk(program, node => {
     if (
@@ -771,13 +879,13 @@ function layoutGroups(program, text) {
       CLASS_ATTRIBUTES.has(node.name.name) &&
       node.value !== null
     ) {
-      add(node.start, stringChunks(node.value, text));
+      add(node.start, chunksWithin(chunks, node.value));
     } else if (
       node.type === 'VariableDeclarator' &&
       isClassConstant(node.id) &&
       node.init !== null
     ) {
-      add(node.start, stringChunks(node.init, text));
+      add(node.start, chunksWithin(chunks, node.init));
     }
   });
   walk(program, node => {
@@ -1259,11 +1367,11 @@ function detectStateActionButtons({ program, text, lineOf }) {
 
 /** Whether a file is one the layout contract exempts. */
 function layoutExempt(path) {
-  if (!path.startsWith('apps/mobile/src/')) {
+  if (!path.startsWith(`${APP_SRC_RELATIVE}/`)) {
     return true;
   }
-  // The allowlist is written relative to `apps/mobile`, so it reads `src/…`.
-  const appPath = path.slice('apps/mobile/'.length);
+  // The allowlist is written relative to `APP_RELATIVE`, so it reads `src/…`.
+  const appPath = path.slice(APP_RELATIVE.length + 1);
   if (LAYOUT_EXEMPT_TREES.some(tree => appPath.startsWith(tree))) {
     return true;
   }
@@ -1286,13 +1394,13 @@ export function checkLayout(relative, program, chunks, text, lineOf) {
   // Each chunk belongs to exactly one group: `layoutGroups` filters every
   // candidate through its `covered` set and records what it hands out, so this
   // dispatch reads each chunk once without a second guard of its own.
-  for (const group of layoutGroups(program, text)) {
+  for (const group of layoutGroups(program, chunks)) {
     for (const chunk of group.chunks) {
       for (const rule of LAYOUT_RULES) {
         for (const pattern of rule.patterns ?? []) {
           for (const match of chunk.value.matchAll(pattern)) {
             problems.push(
-              layoutFinding(relative, lineOf(chunk.start + match.index), rule, match[0])
+              layoutFinding(relative, lineOf(chunk.offsetOf(match.index)), rule, match[0])
             );
           }
         }
@@ -1554,8 +1662,9 @@ function fileFacts(program, text) {
  * for lines once. A file the parser refused is reported here, once: its tree is
  * empty, so leaving it out would report the file as clean.
  *
- * The four syntax rules read the facts one traversal gathered; only the layout
- * rules still walk the tree themselves.
+ * The four syntax rules read the facts one traversal gathered; the layout rules
+ * walk the tree for their surfaces and select each surface's chunks from that
+ * same collection.
  */
 export function checkParsedFile({ file, path, text, program, lineOf, problems }) {
   const { chunks, elements, imports, calls } = fileFacts(program, text);

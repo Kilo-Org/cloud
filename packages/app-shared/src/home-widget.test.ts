@@ -591,6 +591,21 @@ describe('native Home presentation timeline', () => {
     expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(1);
   });
 
+  it('publishes one wake and its strictly later retry, never a duplicate instant', () => {
+    // The retry is the wake plus the scheduler floor, so it cannot equal the
+    // wake. Publish both and assert the ordering the timeline relies on
+    // instead of a dedupe comparison that could never be false.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T10:05:00Z' }],
+    });
+    const at = buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at);
+    const [wake, retry] = [at[1], at[2]] as [number, number];
+    expect(wake).toBe(now + 5 * 60 * 1000);
+    expect(retry).toBe(wake + 15 * 60 * 1000);
+    expect(new Set(at).size).toBe(at.length);
+  });
+
   it('keeps every built timeline inside the response schema the client parses', () => {
     // The published timeline is capped, and a cap below the longest policy
     // output would make the app silently drop a whole response.

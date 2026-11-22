@@ -10,6 +10,7 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -121,7 +122,7 @@ vi.mock('@/lib/font-scale/system-font-scale-context', async importOriginal => ({
 vi.mock('@/lib/narrow-layout', () => ({ isNarrowLayout: () => false }));
 
 const SWITCH = 'Switch' as ElementType;
-const ICON_BUTTON = 'IconButton' as ElementType;
+const PRESSABLE = 'Pressable' as ElementType;
 const TEXT = 'Text' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
@@ -148,12 +149,19 @@ describe('TriggersListScreen rows', () => {
     expect(shown).toContain('https://Inbound.example/trigger-a');
     expect(shown).not.toContain('https://Inbound.example/trigger-b');
 
-    const copyButtons = root.findAll(node => Object.is(node.type, ICON_BUTTON));
+    const copyButtons = root.findAll(
+      node =>
+        Object.is(node.type, PRESSABLE) &&
+        node.props.accessibilityLabel === i18n.t('common.copyLink') &&
+        typeof node.props.onPress === 'function'
+    );
     expect(copyButtons).toHaveLength(1);
     const [copyButton] = copyButtons;
     if (!copyButton) {
       throw new Error('missing copy control');
     }
+    // The control is the shared compact box: a full-size icon target in a
+    // text-height row overran the row above it.
     act(() => {
       (copyButton.props.onPress as () => void)();
     });

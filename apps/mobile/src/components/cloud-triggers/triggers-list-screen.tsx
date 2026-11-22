@@ -10,7 +10,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -25,11 +25,13 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { type CloudTriggerListRow } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerCreateHref, triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -90,20 +92,28 @@ function TriggerRow({
       />
       {showsInboundUrl ? (
         // The inbound URL is a value of its own rather than the row's subtitle:
-        // it is copied, and a subtitle truncates it past the first line.
+        // it is copied, and a subtitle truncates it past the first line. The
+        // copy control is the shared compact box: a 32dp node below the row's
+        // 28dp floor, whose own height sets this line instead of a full-size
+        // 48dp icon target pulled back with a negative margin. That target
+        // reached 6.5dp into the row above and competed with its press; the
+        // compact box's `hitSlop` carries the reach to 48dp without adding a
+        // frame the neighbour can collide with.
         <View className="flex-row items-center gap-2 px-4 pb-3">
           <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
             {trigger.inboundUrl}
           </Text>
-          <IconButton
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel={t('common.copyLink')}
             onPress={() => {
               void copyWebhookUrl(trigger.inboundUrl);
             }}
-            className="-my-2"
+            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+            className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
           >
             <Copy size={16} color={colors.mutedForeground} />
-          </IconButton>
+          </Pressable>
         </View>
       ) : null}
     </View>

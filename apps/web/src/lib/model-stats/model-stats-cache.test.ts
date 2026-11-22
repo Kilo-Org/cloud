@@ -223,6 +223,22 @@ describe('model stats snapshot cache', () => {
     );
   });
 
+  it('keeps the report per read client when two clients reject with the same error', async () => {
+    // The only shape that tells a per-client marker from a module-wide one: two clients rejecting
+    // with the *same* error object. Per client, the second client has no marker yet, so it reports;
+    // with one shared marker it would stay silent and the count would be 1. Both calls are cold, so
+    // the cooldown cannot return a cache before the catch runs.
+    const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
+    const outage = new Error('unavailable');
+    mockReplicaOrderBy.mockRejectedValue(outage);
+    mockOrderBy.mockRejectedValue(outage);
+
+    await expect(cache.getModelStatsSnapshot({ fromDb: readDb })).rejects.toThrow('unavailable');
+    await expect(cache.getModelStatsSnapshot()).rejects.toThrow('unavailable');
+
+    expect(mockWarn).toHaveBeenCalledTimes(2);
+  });
+
   it('selects only each row verification alongside nested stats in one ordered left join', async () => {
     await cache.getModelStatsSnapshot();
     const { modelStats, enkrypt_sync_state } = await import('@kilocode/db/schema');

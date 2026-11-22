@@ -76,8 +76,10 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
   /** The record as this worker knows it: every write replaces it whole. */
   const state: HoldState = {};
   /**
-   * Sessions this worker closed. A closed session stays closed for this worker's life: an agent gets a new handle from
-   * `session.open` each time, so a handle this set holds is never a session a caller may use again.
+   * Sessions whose downloads have ended in this worker: `session.close`, or a caller dispose, which leaves the
+   * session's group and registry row live so a later call of that session is still admitted. Either way the record
+   * keeps nothing for the session from here on. A handle that reopens is a fresh one from `session.open`, so a handle
+   * this set holds never becomes live again.
    */
   const closed = new Set<string>();
   /** Tabs this worker forgot before its record was read: restoring one would re-register a page that is gone. */

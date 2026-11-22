@@ -14,9 +14,10 @@ import { describe, expect, it } from 'vitest';
  *
  * The safe shapes are `useStackSafeReplace()` (push, then retire the source on
  * that push's own transition end) and `useSettledReplace()` (one replace
- * dispatched only once the navigator has settled). Either way the file imports
- * the hook, so the check is: a file with a literal `router.replace(` must also
- * import one of them, unless it is allowlisted below with its reason.
+ * dispatched only once the navigator has settled). Either way the file binds
+ * one of the hooks, so the check is: a file that dispatches `replace` on a
+ * navigator must also bind one of them, unless it is allowlisted below with its
+ * reason.
  *
  * The hooks' own mechanics live in `stack-safe-replace.mounted.test.tsx` and
  * `settled-replace.mounted.test.tsx`.
@@ -57,9 +58,65 @@ const ALLOWED: Record<string, string> = {
 /**
  * The bindings a swapping file may use. Matching the call, not the import, is
  * what makes this a contract: a file that imports one of the hooks and then
- * still calls `router.replace` fails.
+ * still swaps with a navigator fails.
  */
 const SAFE_BINDINGS = ['= useStackSafeReplace(', '= useSettledReplace('];
+
+/** A navigator object bound from `useRouter()` or `useNavigation()`. */
+const NAVIGATOR_BINDING =
+  /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:useRouter|useNavigation)\s*\(/g;
+
+/** A `replace` member taken straight off one of those calls. */
+const NAVIGATOR_DESTRUCTURE = /\{([^}]*)\}\s*=\s*(?:useRouter|useNavigation)\s*\(/g;
+
+function escapeIdentifier(name: string): string {
+  return name.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
+/**
+ * The swap shapes in one file. An empty list means the file never dispatches a
+ * navigator `replace`. Each entry names the shape so a failure says why.
+ */
+function swapShapes(source: string): string[] {
+  const shapes: string[] = [];
+
+  for (const match of source.matchAll(NAVIGATOR_BINDING)) {
+    const name = match[1];
+    // The lookbehind keeps a name that only appears as a property access out.
+    if (name && new RegExp(`(?<![\\w$])${escapeIdentifier(name)}\\.replace\\(`).test(source)) {
+      shapes.push(`\`${name}.replace(\``);
+    }
+  }
+
+  for (const match of source.matchAll(NAVIGATOR_DESTRUCTURE)) {
+    for (const member of (match[1] ?? '').split(',')) {
+      const binding = /^replace(?:\s*:\s*([A-Za-z_$][\w$]*))?$/.exec(member.trim());
+      if (binding) {
+        const name = binding[1] ?? 'replace';
+        // The lookbehind keeps `someOtherRouter.replace(` and a string's own
+        // `.replace(` out: only a bare call of the destructured name counts.
+        if (new RegExp(`(?<![.\\w$])${escapeIdentifier(name)}\\s*\\(`).test(source)) {
+          shapes.push(`bare \`${name}(\` from a destructure`);
+        }
+      }
+    }
+  }
+
+  if (source.includes('router.replace(') && !shapes.includes('`router.replace(`')) {
+    shapes.push('`router.replace(`');
+  }
+
+  return shapes;
+}
+
+function findOffenders(): { path: string; shapes: string[] }[] {
+  return sourceFiles()
+    .filter(path => !(path in ALLOWED))
+    .map(path => ({ path, source: readFileSync(join(APP_ROOT, path), 'utf8') }))
+    .filter(({ source }) => !SAFE_BINDINGS.some(binding => source.includes(binding)))
+    .map(({ path, source }) => ({ path, shapes: swapShapes(source) }))
+    .filter(({ shapes }) => shapes.length > 0);
+}
 
 function sourceFiles(): string[] {
   return readdirSync(join(APP_ROOT, 'src'), { recursive: true, encoding: 'utf8' })
@@ -69,17 +126,25 @@ function sourceFiles(): string[] {
 }
 
 describe('navigation swap contract', () => {
-  it('no file swaps the focused screen with a literal router.replace', () => {
-    const offenders = sourceFiles()
-      .filter(path => !(path in ALLOWED))
-      .filter(path => {
-        const source = readFileSync(join(APP_ROOT, path), 'utf8');
-        if (!source.includes('router.replace(')) {
-          return false;
-        }
-        return !SAFE_BINDINGS.some(binding => source.includes(binding));
-      });
+  it('no file swaps the focused screen with a navigator replace', () => {
+    const offenders = findOffenders().map(({ path, shapes }) => `${path} (${shapes.join(', ')})`);
     expect(offenders).toEqual([]);
+  });
+
+  it('the swap check reads every binding shape', () => {
+    expect(swapShapes("const { replace } = useRouter();\nreplace('/x');")).toEqual([
+      'bare `replace(` from a destructure',
+    ]);
+    expect(swapShapes("const navigation = useNavigation();\nnavigation.replace('/x');")).toEqual([
+      '`navigation.replace(`',
+    ]);
+    expect(swapShapes("const { back, replace: swap } = useNavigation();\nswap('/x');")).toEqual([
+      'bare `swap(` from a destructure',
+    ]);
+    expect(swapShapes("const router = useRouter();\nrouter.replace('/x');")).toEqual([
+      '`router.replace(`',
+    ]);
+    expect(swapShapes('stackSafeRouter.replace(href);\nhref.replace(a, b);')).toEqual([]);
   });
 
   it('every allowlisted file still exists and records its reason', () => {

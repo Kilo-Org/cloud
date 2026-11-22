@@ -16,9 +16,9 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
  *
  * This route renders directly under the root `Slot`, which is a plain router
  * navigator: it emits no transition event, so a push-then-retire could never
- * remove this route and Back from the app root would return to it. Both exits
- * therefore use the plain router's one-commit replace, which leaves nothing
- * beneath.
+ * remove this route and Back from the app root would return to it. The in-app
+ * exit replaces at this stack position, which needs no retire; the hardware
+ * exit uses the plain router's one-commit replace. Both leave nothing beneath.
  */
 export default function NotFound() {
   const router = useRouter();
@@ -37,5 +37,5 @@ export default function NotFound() {
     };
   }, [router]);
 
-  return <InvalidRouteState backTo="/" replace={router.replace} />;
+  return <InvalidRouteState backTo="/" />;
 }

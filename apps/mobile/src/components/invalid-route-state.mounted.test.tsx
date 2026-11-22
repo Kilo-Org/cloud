@@ -29,11 +29,12 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('expo-router', () => ({ useRouter: () => router }));
-// The Back hand-off goes through the push-then-retire hook (a literal
-// `router.replace` crashes Android Fabric); the assertions below
-// pin the destination it is handed.
-vi.mock('@/lib/navigation/stack-safe-replace', () => ({
-  useStackSafeReplace: () => ({ replace: router.replace }),
+// The Back hand-off goes through the settled-replace hook: it dispatches one
+// replace once the navigator settles, at this route's own stack position (a
+// literal `router.replace` during a transition crashes Android Fabric); the
+// assertions below pin the destination it is handed.
+vi.mock('@/lib/navigation/settled-replace', () => ({
+  useSettledReplace: () => ({ replace: router.replace }),
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalArrowLeft: 'DirectionalArrowLeft',

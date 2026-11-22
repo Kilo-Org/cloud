@@ -69,16 +69,16 @@ afterEach(() => {
 });
 
 describe('not-found exits', () => {
-  it('gives the in-app exit the plain router, since the root Slot emits no transition', () => {
+  it('gives the in-app exit the app root, with no plain-router override', () => {
     router.canGoBack.mockReturnValue(false);
     const tree = mount();
 
-    // The route renders under the root Slot, so `InvalidRouteState` must not use
-    // the push-then-retire hook here: nothing would retire this route, and Back
-    // from the app root would return to it.
+    // `InvalidRouteState` dispatches one settled replace at this route's own
+    // stack position, so it needs no override here even though the root Slot
+    // emits no transition: its bounded fallback covers that navigator.
     const state = tree.root.findByType('InvalidRouteState' as never);
     expect(state.props.backTo).toBe('/');
-    expect(state.props.replace).toBe(router.replace);
+    expect(state.props.replace).toBeUndefined();
   });
 });
 

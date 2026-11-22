@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
 import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { ModelDenyList, ProviderAllowList } from '@/components/organization/model-access-lists';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
@@ -104,9 +105,14 @@ export function ModelAccessForm({
   const { t } = useTranslation();
   // The pinned footer rides the keyboard: the lift around the body and the bar
   // is the keyboard's own measured height, less the bottom inset the footer
-  // already pads, so the actions sit just above the IME.
+  // already pads, so the actions sit just above the IME. The pad is clamped by
+  // the room the form measured, because an unclamped pad on a short window
+  // fills the frame: the list then renders nothing and the bar lands under the
+  // IME (`@/lib/body-viewport`). The clamp keeps the body's viewport and gives
+  // up the band's last points instead.
   const { bottom } = useSafeAreaInsets();
   const keyboardHeight = useKeyboardState(state => state.height);
+  const keyboardLift = useKeyboardLiftPad(Math.max(0, keyboardHeight - bottom));
   // The screen resolves the reader's role once and hands it down: this form
   // renders no billing step beside the failure line, so a money role reads the
   // sentence that names the destination instead of one that claims an owner
@@ -308,13 +314,13 @@ export function ModelAccessForm({
   const denyRows = denyListModels({ catalog, available: models, denyList: draft.modelDenyList });
 
   return (
-    <View className="flex-1">
+    <View className="flex-1" onLayout={keyboardLift.handleLayout}>
       {/* The keyboard lifts the whole surface, not just the bar: the body shrinks
           and the pinned footer rises with it. The lift is the keyboard's own
           measured height less the bottom inset the footer already pads, and it
           follows the keyboard instead of depending on a frame the platform
           reports late — the same reasoning as the new-session form. */}
-      <KeyboardLiftView className="flex-1" height={Math.max(0, keyboardHeight - bottom)}>
+      <KeyboardLiftView className="flex-1" height={keyboardLift.pad}>
         <View className="gap-3 px-4 pt-3">
           {/* The warning tile marks missing data; the message takes the body
               ink, because the muted neutral fails body-text contrast on it. */}
@@ -402,9 +408,11 @@ export function ModelAccessForm({
         {/* The commit actions are the screen's one pinned footer, outside the
             body above, because both lists save together: a save that settles
             must never move the rows it just wrote. The Gateways tab saves each
-            control as it changes, so it has nothing to commit and no footer. */}
+            control as it changes, so it has nothing to commit and no footer.
+            The bar pins itself to the bottom edge, because the Providers tab
+            renders no `flex-1` list while its rows are missing. */}
         {tab === 'gateways' ? null : (
-          <ScreenFooter keyboard="host">
+          <ScreenFooter keyboard="host" className="mt-auto">
             <View className="gap-3">
               {/* The status line keeps its place while the draft is clean, so a
                   save that settles never moves the bar: the reservation sits

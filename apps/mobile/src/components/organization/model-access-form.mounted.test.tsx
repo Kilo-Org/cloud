@@ -66,7 +66,12 @@ vi.mock('@/lib/persist/drafts', () => ({
 // role, because this suite's subject is the refusal copy a billing role reads
 // and no billing step is rendered here.
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  // The keyboard lift clamps its pad against the window it measured in; this
+  // suite drives the save contract, so it reports the setup file's frame.
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
+}));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', async () => {
   const { createElement: h } = await import('react');
@@ -381,20 +386,17 @@ describe('ModelAccessForm save', () => {
     if (footer === undefined) {
       throw new Error('footer missing');
     }
-    const footerButtons = footer.findAllByType('Button' as never);
-    const save = footerButtons.find(node =>
-      node
-        .findAllByType('Text' as never)
-        .some(child => child.props.children === i18n.t('common.save'))
-    );
-    const cancel = footerButtons.find(node =>
-      node
-        .findAllByType('Text' as never)
-        .some(child => child.props.children === i18n.t('common.cancel'))
-    );
-    // Save is the filled primary (the Button default), Cancel the outlined one.
-    expect(save?.props.variant ?? 'default').toBe('default');
-    expect(cancel?.props.variant).toBe('outline');
+    // The helper throws when the label is missing, so a footer that lost an
+    // action fails here instead of passing on a default.
+    const save = buttonWithLabel(footer, i18n.t('common.save'));
+    const cancel = buttonWithLabel(footer, i18n.t('common.cancel'));
+    // Save is the filled primary, which is the Button component's own default:
+    // this suite stubs the Button, so the absent prop is the default variant.
+    expect(save.props.variant ?? 'default').toBe('default');
+    expect(cancel.props.variant).toBe('outline');
+    // The pair shares the bar's width evenly.
+    expect(save.props.className).toContain('flex-1');
+    expect(cancel.props.className).toContain('flex-1');
 
     // The Gateways tab commits each control as it changes, so it has no footer.
     selectTab(root, 'gateways');

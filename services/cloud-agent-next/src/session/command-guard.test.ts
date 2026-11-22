@@ -570,6 +570,10 @@ describe('security-remediation push command guard policy', () => {
       'git -c core.pager=less branch -c a b',
       'git -C . -c core.x=1 switch -c y',
       'git --no-pager -c core.pager=cat log',
+      // The separator run after the inline flag may be a tab or a mixed run.
+      'git -c\tcore.x=1 switch -c y',
+      'git -c\tcore.hooksPath=/tmp/evil branch -c a b',
+      'git  -c\tcore.x=1 switch -c y',
       // A word split by two escapes reaches the matcher as two slashes.
       'git p\\u\\sh --force',
       'git p\\u\\sh origin +main',
@@ -584,9 +588,6 @@ describe('security-remediation push command guard policy', () => {
       'echo "[alias] p = push --force" >> .git/"config"',
       'echo "mirror = true" >> "config"',
       'echo "mirror = true" >> ~/.gitcon"fig"',
-      // A branch name that carries a dot, behind a global option, is refused
-      // too, because a rule cannot tell that argument from a key.
-      'git -C . switch -c release/1.2',
       // The directory spelling of the configuration target, with a repeated or
       // a dot separator. The shell resolves both to the same file.
       'echo "[alias]" >> .git//config',
@@ -647,6 +648,8 @@ describe('security-remediation push command guard policy', () => {
       'git -C . branch -c a b',
       'git --no-pager switch -c x',
       'git switch -c release/1.2',
+      'git -C . switch -c release/1.2',
+      'git --no-pager branch -c a b',
       'sed -i "s/^x/y/" src/app.ts',
       'cp "src/a b.ts" dst.ts',
       'cp config.example.json config.test.json',

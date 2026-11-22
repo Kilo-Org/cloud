@@ -587,15 +587,14 @@ const SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED = [
 
 // The branch-creation rules above take a `*` before the subcommand, so that `*`
 // can absorb a global option and the inline setting it carries. These rules are
-// installed after those allows, so an inline setting that carries a dotted key
-// or a `=` value decides the command again. A branch name that carries a dot,
-// written behind a global option, is refused too, because a rule cannot tell
-// that argument from a key.
+// installed after those allows, so a command that carries an inline setting and
+// then a branch-creation form takes the setting's decision again. Each rule takes
+// a `*` wherever a separator run can sit, so a setting written with a tab or a
+// mixed run is included. A command whose argument text places `-c` before the
+// subcommand is refused too, because a rule cannot tell that text from a setting.
 const SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED = [
-  'git -c ?*.*',
-  'git -c ?*=*',
-  'git -?* -c ?*.*',
-  'git -?* -c ?*=*',
+  'git*-c*switch*',
+  'git*-c*branch*',
 ];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [

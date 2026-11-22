@@ -196,18 +196,71 @@ describe('auditEntryDetail', () => {
   });
 
   it('states the allowed origins a browser-control save carried', async () => {
+    const policy = i18n.t('organization.auditLog.detail.browserPolicyAllow');
     const withOrigins = await renderIn('en', {
       id: 'setting.browserControl',
       policy: 'allow',
       origins: ['https://a.example', 'https://b.example'],
     });
-    expect(withOrigins).toContain('https://a.example');
-    expect(withOrigins).toContain('https://b.example');
-    expect(withOrigins).toContain(i18n.t('organization.auditLog.detail.browserPolicyAllow'));
+    // The sentence names the policy the row stored, then the list it saved.
+    expect(withOrigins).toBe(
+      i18n.t('organization.auditLog.detail.settingBrowserControlOrigins', {
+        policy,
+        origins: formatList(
+          ['https://a.example', 'https://b.example'].map(value => isolateBidiText(value)),
+          'en'
+        ),
+      })
+    );
+
+    // A save under another policy says that policy, not the English `allow`
+    // wording the old template hard-coded.
+    const otherPolicy = await renderIn('en', {
+      id: 'setting.browserControl',
+      policy: 'playwright_only',
+      origins: ['https://a.example'],
+    });
+    expect(otherPolicy).toContain(
+      i18n.t('organization.auditLog.detail.browserPolicyPlaywrightOnly')
+    );
+    expect(otherPolicy).not.toContain(policy);
+
+    // A save that cleared the list is a change too: it says the list is empty,
+    // through its own sentence rather than the policy alone.
+    const cleared = await renderIn('en', {
+      id: 'setting.browserControl',
+      policy: 'allow',
+      origins: [],
+    });
+    expect(cleared).toBe(
+      i18n.t('organization.auditLog.detail.settingBrowserControlOriginsCleared', { policy })
+    );
+    expect(cleared).not.toBe(policy);
 
     // A row that carried no origins names the policy alone, as before.
     const policyOnly = await renderIn('en', { id: 'setting.browserControl', policy: 'allow' });
-    expect(policyOnly).toBe(i18n.t('organization.auditLog.detail.browserPolicyAllow'));
+    expect(policyOnly).toBe(policy);
+  });
+
+  it('names the balance alert’s recipients, or its threshold alone', async () => {
+    const withRecipients = await renderIn('en', {
+      id: 'setting.minimumBalanceAlert',
+      enabled: true,
+      threshold: 10,
+      emails: ['ada@example.com', 'bo@example.com'],
+    });
+    expect(withRecipients).toContain(formatPrefixedMoney(10, 'en'));
+    expect(withRecipients).toContain('ada@example.com');
+    expect(withRecipients).toContain('bo@example.com');
+
+    // The scrub removes a deleted address and drops an emptied key, so the row
+    // states the threshold and never a dangling `to`.
+    const thresholdOnly = await renderIn('en', {
+      id: 'setting.minimumBalanceAlert',
+      enabled: true,
+      threshold: 10,
+    });
+    expect(thresholdOnly).toBe(formatPrefixedMoney(10, 'en'));
   });
 
   it('reads a group member count through the groups screen plural family', async () => {

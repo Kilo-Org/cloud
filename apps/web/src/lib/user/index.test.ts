@@ -5453,13 +5453,32 @@ describe('User', () => {
         },
       });
 
+      // A second alert row names the deleted address alone, so scrubbing it
+      // empties the list. The key is dropped there rather than written as `[]`,
+      // because the row's sentence names the recipients and an empty list would
+      // leave it dangling.
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.settings.change',
+        actor_id: otherUser.id,
+        actor_email: otherUser.google_user_email,
+        actor_name: otherUser.google_user_name,
+        message: 'Minimum balance alert enabled for one recipient',
+        details: {
+          id: 'setting.minimumBalanceAlert',
+          enabled: true,
+          threshold: 25,
+          emails: [user.google_user_email],
+        },
+      });
+
       await softDeleteUser(user.id);
 
       const logs = await db
         .select()
         .from(organization_audit_logs)
         .where(eq(organization_audit_logs.organization_id, orgId));
-      expect(logs).toHaveLength(3);
+      expect(logs).toHaveLength(4);
       for (const log of logs.filter(entry => entry.actor_id === user.id)) {
         expect(log.actor_email).toBeNull();
         expect(log.actor_name).toBeNull();
@@ -5478,15 +5497,25 @@ describe('User', () => {
         role: 'member',
       });
       // The array field is scrubbed too, and every other detail key survives.
-      const [alert] = logs.filter(
-        log => log.action === 'organization.settings.change' && log.actor_id === otherUser.id
+      // `toEqual` is exact, so the second row's missing `emails` key is what
+      // proves the emptied list was dropped rather than written as `[]`.
+      const alerts = logs.filter(log => log.action === 'organization.settings.change');
+      expect(alerts).toHaveLength(2);
+      expect(alerts.map(entry => entry.details)).toEqual(
+        expect.arrayContaining([
+          {
+            id: 'setting.minimumBalanceAlert',
+            enabled: true,
+            threshold: 10,
+            emails: [otherUser.google_user_email],
+          },
+          {
+            id: 'setting.minimumBalanceAlert',
+            enabled: true,
+            threshold: 25,
+          },
+        ])
       );
-      expect(alert.details).toEqual({
-        id: 'setting.minimumBalanceAlert',
-        enabled: true,
-        threshold: 10,
-        emails: [otherUser.google_user_email],
-      });
     });
 
     it('should clear organization group attribution fields', async () => {

@@ -381,6 +381,10 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'organization.auditLog.detail.settingDefaultBehavior.specific',
   'organization.auditLog.detail.settingDefaultModelSet',
   'organization.auditLog.detail.settingDefaultModelRemoved',
+  // The threshold on its own, for a balance-alert row whose recipient list was
+  // emptied. It is the money value the row already formats, so `{{threshold}}`
+  // reads the same in every language.
+  'organization.auditLog.detail.settingMinimumBalanceThreshold',
 ]);
 
 /**

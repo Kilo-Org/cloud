@@ -448,36 +448,53 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
       key: 'organization.auditLog.detail.settingProjectsUi',
       values: { state: state(d.enabled) },
     }),
-    'setting.minimumBalanceAlert': d =>
-      d.enabled
+    // The sentence names the recipients, so it needs them. A row whose list is
+    // absent or was emptied — the account-deletion scrub drops a deleted
+    // address and the key with it — states the threshold alone rather than
+    // dangling a `to` with nothing after it.
+    'setting.minimumBalanceAlert': d => {
+      if (!d.enabled) {
+        return undefined;
+      }
+      const threshold = usd(d.threshold ?? 0, locale);
+      return d.emails === undefined || d.emails.length === 0
         ? {
+            key: 'organization.auditLog.detail.settingMinimumBalanceThreshold',
+            values: { threshold },
+          }
+        : {
             key: 'organization.auditLog.detail.settingMinimumBalanceOn',
             values: {
-              threshold: usd(d.threshold ?? 0, locale),
-              emails: list((d.emails ?? []).map(value => isolated(value))),
+              threshold,
+              emails: list(d.emails.map(value => isolated(value))),
             },
-          }
-        : undefined,
+          };
+    },
     'setting.recommendationsDigest': d => ({
       key: 'organization.auditLog.detail.settingRecommendationsDigest',
       values: { state: state(d.enabled) },
     }),
     // A save can move the allowed origins while leaving the policy alone, so a
     // row that carries origins states them; naming only the policy would hide
-    // the change. A row without origins keeps the policy alone.
-    'setting.browserControl': d =>
-      d.origins !== undefined && d.origins.length > 0
-        ? {
-            key: 'organization.auditLog.detail.settingBrowserControlOrigins',
-            values: {
-              policy: t(BROWSER_POLICY_KEYS[d.policy]),
-              origins: list(d.origins.map(value => isolated(value))),
-            },
-          }
-        : {
-            key: 'organization.auditLog.detail.settingBrowserControl',
-            values: { policy: t(BROWSER_POLICY_KEYS[d.policy]) },
-          },
+    // the change. A save that clears the list carries an empty one, which is
+    // also a change, so it says the list is now empty. A row without origins
+    // keeps the policy alone.
+    'setting.browserControl': d => {
+      const policy = t(BROWSER_POLICY_KEYS[d.policy]);
+      if (d.origins === undefined) {
+        return { key: 'organization.auditLog.detail.settingBrowserControl', values: { policy } };
+      }
+      if (d.origins.length === 0) {
+        return {
+          key: 'organization.auditLog.detail.settingBrowserControlOriginsCleared',
+          values: { policy },
+        };
+      }
+      return {
+        key: 'organization.auditLog.detail.settingBrowserControlOrigins',
+        values: { policy, origins: list(d.origins.map(value => isolated(value))) },
+      };
+    },
     // The event name above the row already says what these three carry.
     'setting.accessLists': () => undefined,
     'setting.name': d => ({

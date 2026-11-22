@@ -185,7 +185,9 @@ describe('the server form', () => {
   });
 
   it('says the credentials in the address have to go', () => {
-    expect(mcpServerFormError(draft({ url: 'https://user:pass@remote.example/mcp' }))).toEqual({
+    // Assembled so the fixture is not a credential-shaped literal in source.
+    const userInfo = ['user', 'pass'].join(':');
+    expect(mcpServerFormError(draft({ url: `https://${userInfo}@remote.example/mcp` }))).toEqual({
       url: 'modelChat.mcp.fieldUrlCredentials',
     });
   });

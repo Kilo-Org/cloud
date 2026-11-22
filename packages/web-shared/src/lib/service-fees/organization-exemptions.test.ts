@@ -148,7 +148,7 @@ describe('organization service fee exemptions', () => {
 
     expect(first.current.isExempt).toBe(true);
     expect(first.current.reason).toBe('initial grant');
-    expect(second.current.id).toBe(second.history.id);
+    expect(second.current.id).toBe(second.created.id);
     expect(second.current.createdAt).toBe('2026-09-02T00:00:00.001Z');
     expect(view.history.map(row => row.reason)).toEqual([
       'renewed with new documentation',

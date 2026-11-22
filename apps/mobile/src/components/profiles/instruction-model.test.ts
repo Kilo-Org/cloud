@@ -70,6 +70,11 @@ describe('cleanInstructionName', () => {
     expect(cleanInstructionName('Café Notes')).toBe('cafe-notes');
   });
 
+  it('folds compatibility forms into the letters they stand for', () => {
+    expect(cleanInstructionName('Ｒｅｌｅａｓｅ Ｎｏｔｅｓ')).toBe('release-notes');
+    expect(instructionNamePreview('ｒｕｌｅｓ')).toBe('rules');
+  });
+
   it('leaves nothing for a name written in another script', () => {
     expect(cleanInstructionName('規則')).toBe('');
   });

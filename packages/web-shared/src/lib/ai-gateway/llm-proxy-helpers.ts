@@ -621,12 +621,12 @@ export function chatGptReconnectResponse(message: string) {
 /**
  * Returned when the owner's Claude billing connection cannot bill. The request
  * was refused before any upstream call, and it must not be served on another
- * payer's allowance. The owner is told what happened and what an admin can do.
+ * payer's allowance. Each caller-supplied message owns its complete text,
+ * including any manage-connection pointer.
  */
 export function claudeBillingUnavailableResponse(message: string, retryable = false) {
-  const error = `${message} Manage the connection at ${APP_URL}/byok.`;
   return NextResponse.json(
-    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { error: message, error_type: ProxyErrorType.byok_error, message },
     { status: retryable ? 503 : 400, headers: retryable ? { 'Retry-After': '1' } : undefined }
   );
 }

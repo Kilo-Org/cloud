@@ -599,6 +599,19 @@ describe('exchangeLegacyToken', () => {
     expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
   });
 
+  it('keeps the old token and sets no marker when the exchange is rate limited', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json({ error: 'RATE_LIMITED' }, { status: 429 })
+    );
+
+    const result = await exchangeLegacyToken();
+    expect(result).toBeNull();
+    // Rate limiting is transient: keep the old token and retry on next launch.
+    expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
+    expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+  });
+
   it('drops the stored attest key when the exchange is refused admission', async () => {
     store.set(AUTH_TOKEN_KEY, 'old-token');
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(

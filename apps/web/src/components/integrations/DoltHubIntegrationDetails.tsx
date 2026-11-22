@@ -39,7 +39,7 @@ export function DoltHubIntegrationDetails({
   organizationId,
   success,
   error,
-  canManage = true,
+  canManage = false,
 }: DoltHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

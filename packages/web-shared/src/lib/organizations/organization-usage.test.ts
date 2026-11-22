@@ -484,6 +484,112 @@ describe('Organization Usage Functions', () => {
       expect(usageRows).toEqual([]);
     });
 
+    test('charges a soft-deleted organization without recording per-user usage', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Soft Deleted Org', user.id, 50_000);
+      const usage = await createOrganizationUsage(5_000, user.id, organization.id);
+
+      await markOrganizationAsDeleted(organization.id);
+
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      expect(result).toMatchObject({
+        crossedMinimumBalance: false,
+        minimumBalanceMicrodollars: null,
+      });
+
+      const [organizationRow] = await db
+        .select({
+          microdollars_used: organizations.microdollars_used,
+          microdollars_balance: organizations.microdollars_balance,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+
+      expect(organizationRow).toEqual({
+        microdollars_used: 5_000,
+        microdollars_balance: 45_000,
+      });
+
+      const usageRows = await db
+        .select({ id: organization_user_usage.id })
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+
+      expect(usageRows).toEqual([]);
+    });
+
+    test('charges an organization for a non-member without recording per-user usage', async () => {
+      const owner = await insertTestUser();
+      const nonMember = await insertTestUser();
+      const organization = await createTestOrganization('Non-member Charge Org', owner.id, 50_000);
+      const usage = await createOrganizationUsage(5_000, nonMember.id, organization.id);
+
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      expect(result).toMatchObject({
+        crossedMinimumBalance: false,
+        minimumBalanceMicrodollars: null,
+      });
+
+      const [organizationRow] = await db
+        .select({
+          microdollars_used: organizations.microdollars_used,
+          microdollars_balance: organizations.microdollars_balance,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+
+      expect(organizationRow).toEqual({
+        microdollars_used: 5_000,
+        microdollars_balance: 45_000,
+      });
+
+      const usageRows = await db
+        .select({ id: organization_user_usage.id })
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+
+      expect(usageRows).toEqual([]);
+    });
+
+    test('returns an independent empty result for each call', async () => {
+      const kiloUserId = '00000000-0000-0000-0000-000000000000';
+      const createdAt = new Date().toISOString();
+
+      const first = await db.transaction(tx =>
+        mutateOrganizationUsage(tx, {
+          kilo_user_id: kiloUserId,
+          organization_id: null,
+          cost: 5_000,
+          created_at: createdAt,
+        })
+      );
+      const second = await db.transaction(tx =>
+        mutateOrganizationUsage(tx, {
+          kilo_user_id: kiloUserId,
+          organization_id: null,
+          cost: 5_000,
+          created_at: createdAt,
+        })
+      );
+
+      expect(first).not.toBe(second);
+      expect(first).toEqual({
+        crossedMinimumBalance: false,
+        recipients: [],
+        minimumBalanceMicrodollars: null,
+      });
+
+      first.recipients.push('billing@example.com');
+
+      expect(second).toEqual({
+        crossedMinimumBalance: false,
+        recipients: [],
+        minimumBalanceMicrodollars: null,
+      });
+    });
+
     test('increments organization user usage for same daily bucket', async () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('User Usage Org', user.id, 50_000);

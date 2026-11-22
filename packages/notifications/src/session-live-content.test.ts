@@ -64,3 +64,26 @@ describe('sessionLiveActivityContentStateSchema timestamps', () => {
     ).toBe(false);
   });
 });
+
+const APPROVAL_KEY = 'a'.repeat(64);
+
+describe('sessionLiveActivityContentStateSchema approval coupling', () => {
+  it.each([
+    ['a permission wait carrying its key', true, APPROVAL_KEY],
+    ['no permission wait and no key', false, null],
+  ])('parses %s', (_label, awaitingPermission, approvalKey) => {
+    const state = validState({ awaitingPermission, approvalKey });
+    expect(sessionLiveActivityContentStateSchema.safeParse(state).success).toBe(true);
+  });
+
+  it.each([
+    ['awaiting a permission with no key to answer', true, null],
+    ['carrying a key without awaiting a permission', false, APPROVAL_KEY],
+  ])('rejects %s', (_label, awaitingPermission, approvalKey) => {
+    const state = validState({ awaitingPermission, approvalKey });
+    const parsed = sessionLiveActivityContentStateSchema.safeParse(state);
+    expect(parsed.success).toBe(false);
+    // The issue names the key, so a producer that logged it reads which field to fix.
+    expect(parsed.error?.issues.map(issue => issue.path)).toContainEqual(['approvalKey']);
+  });
+});

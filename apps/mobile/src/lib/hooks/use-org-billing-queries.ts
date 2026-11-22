@@ -107,7 +107,10 @@ export function useOrgRequestLogs(
   return useQuery(
     trpc.organizations.requestLogs.list.queryOptions(
       { organizationId: organizationId ?? '', startTime },
-      { enabled: enabled && organizationId != null }
+      // A paused first read leaves the window skeleton with no retry: the read
+      // neither answers nor fails while the online manager holds the device
+      // offline. It settles instead, and the reconnect refetch comes with it.
+      { enabled: enabled && organizationId != null, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }

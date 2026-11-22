@@ -170,9 +170,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     secondaryForeground: '#333333',
   }),
 }));
-vi.mock('@/lib/format', () => ({
-  formatDate: () => 'Jan 1, 2026',
-}));
+// The panel folds the typed code through the real helper: a keyboard in
+// another script types the same code in its own digits, so re-implementing the
+// fold here would let a suite pass on a behaviour the app does not have. Only
+// the date is stubbed, so a row's added line is stable.
+vi.mock('@/lib/format', async importOriginal => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, formatDate: () => 'Jan 1, 2026' };
+});
 vi.mock('@/components/screen-header', () => ({
   // The header renders its trailing slot, so the suite can read and press the
   // screen's one create control.

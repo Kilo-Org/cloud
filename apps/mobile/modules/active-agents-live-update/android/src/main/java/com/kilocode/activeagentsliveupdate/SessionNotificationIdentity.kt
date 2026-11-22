@@ -15,6 +15,11 @@ package com.kilocode.activeagentsliveupdate
  * are retired together: `SessionNotifications.cancel` reads the stored card,
  * then names each of its records through these values and cancels it.
  *
+ * The Approve record is the one action whose answer depends on which request
+ * the card shows, so it is named by the session and the ask ([askData]) rather
+ * than by the session alone: a newer ask is a different record, and posting it
+ * cannot rewrite the record of the ask a card still in the shade shows.
+ *
  * [legacyNotificationId] and [legacyRequestCode] name the record identity that
  * an earlier app version used, so an update retires the card that version
  * posted together with its own action records, not only the card.
@@ -48,6 +53,9 @@ internal object SessionNotificationIdentity {
   private const val TAG_PREFIX = "followed-session:"
   private const val DATA_BASE = "kiloapp://active-agents/session/"
 
+  /** The path segment that separates a session's ask from the session itself. */
+  private const val ASK_SEGMENT = "/ask/"
+
   private const val HEX = "0123456789ABCDEF"
 
   /** The notification tag of one session: the session id, prefixed. */
@@ -55,6 +63,15 @@ internal object SessionNotificationIdentity {
 
   /** The data URI that names one session on its action intents. */
   fun sessionData(sessionId: String): String = DATA_BASE + encode(sessionId)
+
+  /**
+   * The data URI that names one request of one session on its Approve intent.
+   * Two asks of one session answer different requests, so they must not share a
+   * record: the ask is part of the identity, so a card still in the shade keeps
+   * the record of the request it shows even after a newer ask was built.
+   */
+  fun askData(sessionId: String, approvalKey: String): String =
+    sessionData(sessionId) + ASK_SEGMENT + encode(approvalKey)
 
   /** The notification id the earlier app version gave a session card. */
   fun legacyNotificationId(sessionId: String): Int =

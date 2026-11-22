@@ -3,8 +3,6 @@ import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-servi
 import { DEFAULT_BACKEND_URL } from './constants.js';
 import { logger } from './logger.js';
 import type { Env } from './types.js';
-import type { PersistenceEnv } from './persistence/types.js';
-import { fetchSessionMetadata } from './session/metadata.js';
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import {
   issueRuntimeProxyAttestation,
@@ -17,14 +15,23 @@ const MIN_BALANCE_DOLLARS = 1;
 /**
  * Result of balance validation - either success or failure with HTTP status.
  * Used when auth has already been validated by middleware.
+ *
+ * Failure statuses:
+ * - 402: the payer has insufficient credits.
+ * - 404: the resolved payer scope is not accessible to the caller.
+ * - 500: the balance read failed.
+ * - 503: the payer scope could not be read, and the caller can retry.
  */
 export type BalanceOnlyResult =
   | { success: true }
-  | { success: false; status: 402 | 500; message: string };
+  | { success: false; status: 402 | 404 | 500 | 503; message: string };
 
 /**
  * Validates balance only, skipping JWT validation.
  * Use this when auth has already been validated by middleware.
+ *
+ * This function returns 402, 500, or success. Its callers can also return 404
+ * or 503 when they cannot resolve the payer scope.
  *
  * @param token - The already-validated JWT token
  * @param orgId - Optional organization ID for org-specific balance check
@@ -304,31 +311,6 @@ export function extractOrgIdFromUrl(url: URL): string | undefined {
   }
 
   return undefined;
-}
-
-/**
- * Fetches the orgId for a session from the Durable Object metadata.
- * Used by sendMessageV2 to get the org context for balance validation.
- *
- * @param env - Worker environment with DO bindings
- * @param userId - User ID from auth
- * @param sessionId - Session ID from URL input
- * @returns The orgId if found, undefined otherwise
- */
-export async function fetchOrgIdForSession(
-  env: PersistenceEnv,
-  userId: string,
-  sessionId: string
-): Promise<string | undefined> {
-  try {
-    const metadata = await fetchSessionMetadata(env, userId, sessionId);
-    return metadata?.identity.orgId;
-  } catch (error) {
-    logger
-      .withFields({ error: error instanceof Error ? error.message : String(error), sessionId })
-      .warn('Failed to fetch session metadata for balance validation');
-    return undefined;
-  }
 }
 
 /**

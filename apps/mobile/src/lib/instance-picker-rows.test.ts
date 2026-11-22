@@ -243,6 +243,27 @@ describe('dedupeInstanceLabels', () => {
     expect(result.map(row => row.displayFacts)).toEqual(['', '']);
     expect(result.map(row => row.dedupSuffix)).toEqual(['000061', '000062']);
   });
+
+  it('prints the decoded branch the session row paints', () => {
+    const result = dedupeInstanceLabels([
+      instance({ connectionId: 'a', gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8' }),
+    ]);
+
+    expect(result.map(row => row.displayFacts)).toEqual(['fix/請求書']);
+    expect(result.map(row => row.dedupSuffix)).toEqual([null]);
+  });
+
+  it('shortens the decoded branch instead of counting escape characters', () => {
+    const result = dedupeInstanceLabels([
+      instance({
+        connectionId: 'a',
+        gitBranch: 'feature/%E8%AB%8B%E6%B1%82%E6%9B%B8-abcdefghijklmnop',
+      }),
+    ]);
+
+    expect(result.map(row => row.displayFacts)).toEqual(['feature/請求書-abcdefgh…']);
+    expect(result.map(row => row.dedupSuffix)).toEqual([null]);
+  });
 });
 
 describe('resolveInstancePickerViewState', () => {

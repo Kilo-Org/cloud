@@ -27,9 +27,10 @@ function getServerToolType(tool: unknown): string | null {
   return tool.type === 'function' || tool.type === 'custom' ? null : tool.type;
 }
 
-// A nested array flattens one level, so the predicate and the mutator inspect the same elements.
+// An array is used as is and a single value is wrapped, so the predicate and the mutator always
+// inspect the same list.
 function toPluginArray(value: unknown): unknown[] {
-  return value === undefined || value === null ? [] : [value].flat();
+  return value === undefined || value === null ? [] : Array.isArray(value) ? value : [value];
 }
 
 /** Whether the request asks for a plugin or server tool that a gateway bills separately. */

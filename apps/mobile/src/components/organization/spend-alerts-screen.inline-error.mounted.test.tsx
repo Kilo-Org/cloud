@@ -4,7 +4,7 @@
 // leaves it unmocked and requires the message to reach the input's composed
 // accessibility label, which the reserved copy never populates.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -68,7 +68,19 @@ vi.mock('@/components/organization/permission-denied', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+// The settings-search wrappers belong to the search surface; this suite drives
+// the field's own rule, so they pass their content through.
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: ({
+    settingsTarget,
+    children,
+  }: {
+    settingsTarget?: string;
+    children?: ReactNode;
+  }) => createElement('SettingsSearchScrollView', { settingsTarget }, children),
+  SettingsTarget: ({ item, children }: { item: { id: string }; children?: ReactNode }) =>
+    createElement('SettingsTarget', { item }, children),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',

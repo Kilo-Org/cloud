@@ -60,8 +60,14 @@ let missingCloneFor: string | undefined = undefined;
 let failCloneFor: string | undefined = undefined;
 /** A session id whose next clone fails, whatever it is cloned onto, once. */
 let failCloneOnce: string | undefined = undefined;
-/** A session id whose history read fails, so the half-open path can be exercised. */
+/** A session whose history read fails, so the half-open path can be exercised. */
 let failHistoryFor: string | undefined = undefined;
+/**
+ * A session whose scope refuses to close, the way a database that is full or
+ * already shut does: the store writes the conversation as the scope closes, and
+ * that write is what can fail.
+ */
+let refuseCloseFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
 let failForgetFor: string | undefined = undefined;
 let failAnswerFor: string | undefined = undefined;
@@ -109,6 +115,8 @@ const routedTotals = new Map<string, ReadonlyMap<string, ModelUsage>>();
 const recorded = vi.hoisted(() => new Map<string, unknown>());
 /** Makes the next usage write throw, the way a closed database does. */
 const recordFailure = vi.hoisted(() => ({ next: false }));
+/** Makes the next record read throw, the way a closed database does. */
+const recordReadFailure = vi.hoisted(() => ({ next: false }));
 /** The names a stored session was opened with, which must resolve for it to continue. */
 let continuesWith: readonly string[] = [];
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
@@ -247,6 +255,9 @@ const openInScope = (id: string) =>
     Effect.promise(async () => {
       await closing;
       released.push(id);
+      if (refuseCloseFor === id) {
+        throw new Error('the conversation could not be written down');
+      }
     })
   );
 
@@ -265,7 +276,7 @@ vi.mock('@kilocode/harness-sdk', () => {
     zeroUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
     openSession: (options: { readonly tools?: readonly string[] }) => {
       openedWith = options;
-      return Effect.succeed(handleFor('s1'));
+      return openInScope('s1');
     },
     continueSession: (id: string) => {
       continued.push(id);
@@ -302,8 +313,7 @@ vi.mock('@kilocode/harness-sdk', () => {
       const sessionId = `s${clonesMade + 1}`;
       return Effect.promise(async () => {
         await cloning;
-        return handleFor(sessionId);
-      });
+      }).pipe(Effect.andThen(openInScope(sessionId)));
     },
   };
 });
@@ -394,6 +404,12 @@ vi.mock('./kilo-mcp', () => ({
     }
     mcp.enabled.set(to, held);
   },
+  forgetMcpEnabled: (sessionIds: readonly string[]) => {
+    for (const sessionId of sessionIds) {
+      mcp.enabled.delete(sessionId);
+    }
+    return Promise.resolve();
+  },
   kiloMcpTools: () => mcp.tools,
   kiloMcpToolNames: () => mcp.tools.map(tool => tool.definition.name),
 }));
@@ -407,6 +423,13 @@ const choiceWrites = vi.hoisted(() => ({
   gate: undefined as Promise<void> | undefined,
   refuse: 0,
 }));
+/**
+ * Refuses the next web-search choice write once the source key is already gone,
+ * which is a move refused halfway rather than a write refused outright.
+ */
+const moveChoiceFailure = vi.hoisted(() => ({ next: false }));
+/** Every session whose rows were deleted, so a copy left under no row is told. */
+const deletedSessions = vi.hoisted(() => [] as string[]);
 vi.mock('@/lib/persist/encrypted-kv', () => {
   const setItem = async (
     scope: string,
@@ -421,6 +444,10 @@ vi.mock('@/lib/persist/encrypted-kv', () => {
       if (choiceWrites.refuse > 0) {
         choiceWrites.refuse -= 1;
         throw new Error('the choice could not be written');
+      }
+      if (moveChoiceFailure.next) {
+        moveChoiceFailure.next = false;
+        throw new Error('the choice could not be moved');
       }
     }
     if (signal?.aborted) {
@@ -451,6 +478,14 @@ vi.mock('@/lib/persist/encrypted-kv', () => {
       }
       storedQuestions.delete(`${scope}:${key}`);
     },
+    removeItemIfValue: async (scope: string, key: string, value: string) => {
+      await Promise.resolve();
+      if (storedQuestions.get(`${scope}:${key}`) !== value) {
+        return false;
+      }
+      storedQuestions.delete(`${scope}:${key}`);
+      return true;
+    },
   };
 });
 /**
@@ -472,6 +507,9 @@ const scopes = vi.hoisted(() => {
       if (scope !== undefined) {
         held.set(to, scope);
       }
+    },
+    forget: (sessionId: string) => {
+      held.delete(sessionId);
     },
     clear: () => {
       held.clear();
@@ -516,16 +554,27 @@ vi.mock('./store', () => ({
     scopes.record(chat.sessionId, chat.scope);
   },
   scopeOfChat: (_database: unknown, sessionId: string) => scopes.of(sessionId),
+  deleteChat: (_database: unknown, sessionId: string) => {
+    deletedSessions.push(sessionId);
+    scopes.forget(sessionId);
+    recorded.delete(sessionId);
+  },
   touchChat: () => undefined,
   toolsOfSession: () => storedTools,
   NO_RECORD: { createdAt: null, updatedAt: null, usage: {}, prompted: 0, effort: null },
-  recordOfChat: (_database: unknown, sessionId: string) => ({
-    createdAt: 1,
-    updatedAt: 1,
-    usage: recorded.get(sessionId) ?? {},
-    prompted: 0,
-    effort: null,
-  }),
+  recordOfChat: (_database: unknown, sessionId: string) => {
+    if (recordReadFailure.next) {
+      recordReadFailure.next = false;
+      throw new Error('database closed');
+    }
+    return {
+      createdAt: 1,
+      updatedAt: 1,
+      usage: recorded.get(sessionId) ?? {},
+      prompted: 0,
+      effort: null,
+    };
+  },
   recordUsage: (_database: unknown, sessionId: string, usage: unknown) => {
     if (recordFailure.next) {
       recordFailure.next = false;
@@ -616,6 +665,7 @@ beforeEach(async () => {
   missingCloneFor = undefined;
   failCloneOnce = undefined;
   failHistoryFor = undefined;
+  refuseCloseFor = undefined;
   failCloneFor = undefined;
   failForgetFor = undefined;
   failAnswerFor = undefined;
@@ -623,6 +673,8 @@ beforeEach(async () => {
   storedQuestions.clear();
   choiceWrites.gate = undefined;
   choiceWrites.refuse = 0;
+  moveChoiceFailure.next = false;
+  deletedSessions.length = 0;
   clonedWith = undefined;
   clonesMade = 0;
   releasedRounds.owners.length = 0;
@@ -633,6 +685,7 @@ beforeEach(async () => {
   scopes.clear();
   continued = [];
   recordFailure.next = false;
+  recordReadFailure.next = false;
   settingsSwitch.enabled = true;
   mcp.tools.length = 0;
   mcp.enabled.clear();
@@ -2351,6 +2404,63 @@ describe('a chat that moved', () => {
   });
 });
 
+describe('a chat that could not be started', () => {
+  it('gives back the session it opened when the setting cannot be written', async () => {
+    /* The session opens before there is a row, and only the live map reaches a
+       close: a refusal between the open and the install would leave a running
+       session no screen can end, and a row for a chat nothing can open. */
+    await releaseChat(opened);
+    released.length = 0;
+    mcp.refuseNextWrite = true;
+
+    await expect(startChat(place, { model: 'kilo/one', effort: null }, false)).rejects.toThrow(
+      'the choice could not be written'
+    );
+    await settled();
+
+    /* Opened in a scope of its own, and closing that scope is the only thing
+       that releases the handle. */
+    expect(released).toEqual(['s1']);
+    /* Nothing was installed either: releasing the id finds no live chat to
+       close, so the session was given back rather than kept. */
+    await releaseChat('s1');
+    expect(released).toEqual(['s1']);
+    expect(snapshotOf('s1').status).toBe('opening');
+  });
+
+  it('installs nothing when the record cannot be read, so no dead session stays live', async () => {
+    /* The record is a database read, and a refused one happening after the
+       install would leave a closed scope in the live map: releasing that chat
+       would close it twice and the map would answer with a dead session. It is
+       read before the install, so the rollback only ever runs when nothing was
+       installed. */
+    await releaseChat(opened);
+    released.length = 0;
+    recordReadFailure.next = true;
+
+    await expect(startChat(place, { model: 'kilo/one', effort: null })).rejects.toThrow(
+      'database closed'
+    );
+    await settled();
+
+    expect(released).toEqual(['s1']);
+    /* The row was written before the record read, so this is the rollback
+       deleting it: a row with no live chat is a list entry nothing can open. */
+    expect(scopes.of('s1')).toBeNull();
+    /* Releasing it finds no live chat, so the session was given back once. */
+    await releaseChat('s1');
+    expect(released).toEqual(['s1']);
+
+    /* And entering it opens the stored chat again rather than finding live. */
+    continued = [];
+    storedChat('s1', place);
+    await enterChat(place, 's1');
+
+    expect(continued).toEqual(['s1']);
+    expect(snapshotOf('s1')).toMatchObject({ status: 'idle', turns: [TURN] });
+  });
+});
+
 describe('a chat that could not be opened', () => {
   it('settles idle with the reason instead of staying on opening', async () => {
     failOpenFor = 'missing';
@@ -2702,7 +2812,11 @@ describe('account teardown preserving non-flag work', () => {
     choiceWrites.gate = gate.promise;
     const sending = say(opened, { text: 'moved', images: [] }, { model: 'kilo/two', effort: null });
     await settled();
-    expect(scopes.of('s2')).toBe(place.chatScope);
+    /* The copy is made and its choice is already being carried across, while
+       the row still names the session the chat moved off: the row is the last
+       durable step of a move, so nothing between the copy and the install can
+       leave it naming a session the map does not hold. */
+    expect(clonesMade).toBe(1);
     expect(storedQuestions.get(`${choiceWrites.scope}:${opened}`)).toBeUndefined();
     let finished = false;
     const releasing = (async () => {
@@ -2881,6 +2995,48 @@ describe('releasing a chat with queued operations', () => {
 
     expect(storedQuestions.get(`${choiceWrites.scope}:unopened`)).toBeUndefined();
     expect(snapshotOf('unopened').webSearch.kind).toBe('reading');
+  });
+});
+
+describe('signing out when a chat refuses to close', () => {
+  it('ends the chats after it and still resolves, so the wipe runs', async () => {
+    /* The conversation is written as the scope closes, and a database that is
+       full or already shut refuses. Sign-out runs the wipe straight after this,
+       so one refusal must not leave every later chat live, the runtimes
+       undisposed, or reach the caller as a failed sign-out that never wipes. */
+    await releaseChat(opened);
+    storedChat('other', place);
+    await enterChat(place, 'other');
+    await enterChat(place, opened);
+    released.length = 0;
+    const warnings: string[] = [];
+    const warned = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+      warnings.push(args.join(' '));
+    });
+    refuseCloseFor = 'other';
+    try {
+      await releaseEveryChat();
+    } finally {
+      refuseCloseFor = undefined;
+      warned.mockRestore();
+    }
+
+    /* The refusing chat was attempted, and the one after it was closed. */
+    expect(released).toEqual(['other', opened]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('could not be closed');
+    /* Both were retired even though one close failed: a queue or a state left
+       behind would strand the chat, which nothing can close a second time. */
+    expect(snapshotOf('other').status).toBe('opening');
+    expect(snapshotOf(opened).status).toBe('opening');
+
+    continued = [];
+    await enterChat(place, 'other');
+
+    expect(continued).toEqual(['other']);
+    expect(snapshotOf('other')).toMatchObject({ status: 'idle', turns: [TURN] });
+
+    await releaseChat('other');
   });
 });
 
@@ -3295,6 +3451,71 @@ describe('custom backend question targets', () => {
     expect(await askedIn('s2')).toBeNull();
   });
 
+  it('keeps the chat on the session it moved off when the copy has no history', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'same-model');
+    /* The person's own choice on the session the chat is on, written as the
+       switch writes it so it can be read back under the id it belongs to. */
+    storedQuestions.set('chat-web-search:s1', 'off');
+    mcp.enabled.set('s1', false);
+    failHistoryFor = 's2';
+
+    await say(opened, { text: 'custom question', images: [] }, { model: target, effort: null });
+    await settled();
+
+    /* Nothing durable moved, because the copy was read before the first write:
+       the row still names the old session and the copy is released rather than
+       left running with nothing holding it. */
+    expect(released).toContain('s2');
+    expect(scopes.of('s1')).toBe(place.chatScope);
+    expect(scopes.of('s2')).toBeNull();
+    expect(storedQuestions.get('chat-web-search:s1')).toBe('off');
+    expect(storedQuestions.get('chat-web-search:s2')).toBeUndefined();
+    expect(mcp.enabled.get('s1')).toBe(false);
+    expect(mcp.enabled.has('s2')).toBe(false);
+    expect(snapshotOf('s1').failed).toContain('history unreadable');
+  });
+
+  it('removes the copy the store wrote when the history cannot be read', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'same-model');
+    /* The person's own choices on the session the chat is on, so a cleanup that
+       took them would be told from one that left them alone. */
+    storedQuestions.set('chat-web-search:s1', 'off');
+    mcp.enabled.set('s1', false);
+    failHistoryFor = 's2';
+
+    await say(opened, { text: 'custom question', images: [] }, { model: target, effort: null });
+    await settled();
+
+    /* The clone writes the copy's `sessions`, `turns` and `parts` rows eagerly,
+       and no `chats` row names the copy, so nothing else ever reaches them: a
+       sign-out wiping the list would leave a copy of the conversation behind. */
+    expect(deletedSessions).toContain('s2');
+    expect(storedQuestions.get('chat-web-search:s1')).toBe('off');
+    expect(mcp.enabled.get('s1')).toBe(false);
+    expect(snapshotOf('s1').failed).toContain('history unreadable');
+  });
+
+  it('restores the source choice when the preference move fails halfway', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'same-model');
+    storedQuestions.set('chat-web-search:s1', 'off');
+    /* Refused once the source key is already gone, which is the half-applied
+       step the reverse move could not repair. */
+    moveChoiceFailure.next = true;
+
+    await say(opened, { text: 'custom question', images: [] }, { model: target, effort: null });
+    await settled();
+
+    /* The chat stays on the session it moved off, and its explicit choice is
+       still there for the next tap and the next open to read. */
+    expect(snapshotOf('s1').sessionId).toBe('s1');
+    expect(snapshotOf('s1').failed).toBe('the choice could not be moved');
+    expect(storedQuestions.get('chat-web-search:s1')).toBe('off');
+    expect(storedQuestions.get('chat-web-search:s2')).toBeUndefined();
+  });
+
   it('retains the target when the custom request fails after a successful move', async () => {
     backendState.profiles = [backend];
     const target = backendTargetId(backend, 'same-model');
@@ -3409,8 +3630,13 @@ describe('custom backend question targets', () => {
     await retryChat(opened);
     await settled();
 
+    /* A record with no target is not one this version wrote, so it is not
+       restored as a Kilo question and nothing is sent for it. It is also not a
+       reason to refuse the open: the unreadable record reads as absent and is
+       dropped, so the chat opens rather than failing on every entry. */
     expect(snapshotOf(opened)).toMatchObject({ status: 'idle', asked: null, askedModel: null });
-    expect(snapshotOf(opened).failed).not.toBeNull();
+    expect(snapshotOf(opened).failed).toBeNull();
+    expect(storedQuestions.has(`chat-asked-target:${opened}`)).toBe(false);
     expect(asked).toEqual([]);
   });
 

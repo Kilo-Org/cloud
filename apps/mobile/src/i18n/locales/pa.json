@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "ਇਹ ਦਸਤਾਵੇਜ਼ ਸਿਰਫ਼ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਉਪਲਬਧ ਹੈ।",
     "organizationTrialEndedBilling": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਤੁਸੀਂ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "organizationTrialEndedBillingAtKiloAi": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਤੁਸੀਂ kilo.ai 'ਤੇ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-    "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ"
+    "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ਬੁਲੇਟ ਪੁਆਇੰਟ",
+        "nestedBulletPoint": "ਨੈਸਟਿਡ ਬੁਲੇਟ ਪੁਆਇੰਟ",
+        "orderedItem": "ਸੂਚੀ ਆਈਟਮ {n}",
+        "nestedOrderedItem": "ਨੈਸਟਿਡ ਸੂਚੀ ਆਈਟਮ {n}"
+      },
+      "blockquote": {
+        "quote": "ਹਵਾਲਾ",
+        "nestedQuote": "ਨੈਸਟਿਡ ਹਵਾਲਾ"
+      },
+      "table": {
+        "row": "ਕਤਾਰ {n}: {content}"
+      },
+      "math": {
+        "equation": "ਗਣਿਤ: {latex}"
+      },
+      "rotor": {
+        "headings": "ਸਿਰਲੇਖ",
+        "links": "ਲਿੰਕ",
+        "images": "ਤਸਵੀਰਾਂ"
+      }
+    }
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -428,6 +451,17 @@
       "location": "Vertex ਟਿਕਾਣਾ",
       "clientEmail": "ਸੇਵਾ ਖਾਤਾ ਈਮੇਲ",
       "privateKey": "ਸੇਵਾ ਖਾਤੇ ਦੀ ਨਿੱਜੀ ਕੁੰਜੀ",
+      "privateKeyBlockRequired": "ਪੂਰਾ ਕੁੰਜੀ ਬਲਾਕ ਪੇਸਟ ਕਰੋ, BEGIN ਲਾਈਨ ਤੋਂ END ਲਾਈਨ ਤੱਕ।",
+      "privateKeyEncrypted": "ਇਹ ਕੁੰਜੀ ਬਲਾਕ ਪਾਸਫ਼ਰੇਜ਼ ਨਾਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਸੇਵਾ ਖਾਤੇ ਦੀ ਅਜਿਹੀ ਕੁੰਜੀ ਪੇਸਟ ਕਰੋ ਜਿਸ ਵਿੱਚ ਕੋਈ ਪਾਸਫ਼ਰੇਜ਼ ਨਹੀਂ ਹੈ।",
+      "names": {
+        "codestral": "ਸਿਰਫ਼ ਪੁਰਾਣਾ Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ)",
+        "xiaomi": "Xiaomi (ਵਰਤੋਂ ਅਨੁਸਾਰ ਭੁਗਤਾਨ)",
+        "zai": "Z.ai (ਵਰਤੋਂ ਅਨੁਸਾਰ ਭੁਗਤਾਨ)",
+        "bedrockByok": "Amazon Bedrock (ਸਿੱਧਾ)",
+        "vertexByok": "Google Vertex AI (ਸਿੱਧਾ)"
+      },
       "modelMappings": "ਮਾਡਲ ਮੈਪਿੰਗਾਂ",
       "modelMappingsDescription": "ਗੇਟਵੇ ਮਾਡਲ ਨੂੰ ਕਸਟਮ ਡਿਪਲੌਇਮੈਂਟ ਨਾਮ ਤੇ ਭੇਜੋ।",
       "mappingTitle": "ਮੈਪਿੰਗ {{number}}",
@@ -507,6 +541,14 @@
       "nextStepFinal": "ਅਪੀਲ ਦਾ ਫ਼ੈਸਲਾ ਅੰਤਿਮ ਹੈ। ਹੋਰ ਅਪੀਲ ਦਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
       "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
     },
+    "reportReceipts": {
+      "title": "ਰਿਪੋਰਟਾਂ",
+      "rowSubtitle": "ਤੁਹਾਡੀਆਂ ਦਰਜ ਕੀਤੀਆਂ ਰਿਪੋਰਟਾਂ ਅਤੇ ਉਨ੍ਹਾਂ ਦੇ ਨਤੀਜੇ",
+      "emptyTitle": "ਹਾਲੇ ਕੋਈ ਰਿਪੋਰਟ ਨਹੀਂ",
+      "emptyDescription": "ਕਿਸੇ ਟਿੱਪਣੀ ਜਾਂ AI ਜਵਾਬ ਤੋਂ ਤੁਸੀਂ ਜੋ ਰਿਪੋਰਟਾਂ ਦਰਜ ਕਰਦੇ ਹੋ, ਉਹ ਇੱਥੇ ਦਿਖਦੀਆਂ ਹਨ।",
+      "couldNotLoad": "ਤੁਹਾਡੀਆਂ ਰਿਪੋਰਟਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
+      "capped": "ਤੁਹਾਡੀਆਂ ਸਭ ਤੋਂ ਹਾਲੀਆ ਰਿਪੋਰਟਾਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।"
+    },
     "changelog": "ਕੀ ਨਵਾਂ ਹੈ",
     "changelogVersionPending": "{{version}} ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।",
     "changelogGroupNew": "ਨਵਾਂ",
@@ -514,7 +556,10 @@
     "changelogFixesPolish": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
     "changelogAreas": {
       "signIn": "ਸਾਈਨ ਇਨ",
-      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਤੇ ਸੰਸਥਾਵਾਂ"
+      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਤੇ ਸੰਸਥਾਵਾਂ",
+      "chat": "ਚੈਟ",
+      "notifications": "ਸੂਚਨਾਵਾਂ",
+      "integrations": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "ਤਾਜ਼ਾ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲ ਸਕੀ।",
       "byline": "#{{number}} — {{author}} ਦੁਆਰਾ",
       "noFindings": "ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
-      "findingsUnavailable": "ਇਹ ਸਮੀਖਿਆ ਅਸਫਲ ਹੋਣ ਕਾਰਨ ਨਤੀਜੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
+      "findingsUnavailable": "ਨਤੀਜੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
       "findingsInProgress": "ਇਹ ਸਮੀਖਿਆ ਹਾਲੇ ਚੱਲ ਰਹੀ ਹੈ। ਪੂਰੀ ਹੋਣ 'ਤੇ ਸਮੱਸਿਆਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "findingsEndedWithoutResults": "ਇਹ ਸਮੀਖਿਆ ਸਮੇਂ ਤੋਂ ਪਹਿਲਾਂ ਖ਼ਤਮ ਹੋ ਗਈ — ਇਸ ਨੇ ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
       "serviceUnavailable": "ਕੋਡ ਸਮੀਖਿਆ ਸੇਵਾ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਸੇਵਾ ਉਪਲਬਧ ਹੋਣ 'ਤੇ ਸਮੀਖਿਆ ਦੁਬਾਰਾ ਕਰੋ।",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਬਿਲਿੰਗ ਸੈਟਿੰਗਾਂ",
       "changePlan": "ਪਲਾਨ ਬਦਲੋ",
       "buySeats": "ਸੀਟਾਂ ਖਰੀਦੋ",
-      "managedOnWeb": "ਪਲਾਨ, ਸੀਟਾਂ ਅਤੇ ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ ਵੈੱਬ ਉੱਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "managedOnWeb": "ਪਲਾਨ, ਸੀਟਾਂ ਅਤੇ ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ kilo.ai 'ਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
       "setupAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਸੈੱਟ ਕਰੋ",
       "manageAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਪ੍ਰਬੰਧ ਕਰੋ",
       "opensOnWeb": "ਵੈੱਬ 'ਤੇ ਖੁੱਲ੍ਹਦਾ ਹੈ"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "ਪਛਾਣਕਰਤਾ",
       "identifierRequired": "ਪਛਾਣਕਰਤਾ ਦਰਜ ਕਰੋ।",
       "identifierTaken": "ਕੋਈ ਹੋਰ ਮੋਡ ਪਹਿਲਾਂ ਹੀ ਇਹ ਪਛਾਣਕਰਤਾ ਵਰਤ ਰਿਹਾ ਹੈ।",
+      "identifierTooLong": "ਪਛਾਣਕਰਤਾ ਨੂੰ {{max}} ਅੱਖਰ ਜਾਂ ਇਸ ਤੋਂ ਘੱਟ ਤੱਕ ਰੱਖੋ।",
       "nameLabel": "ਮੋਡ ਦਾ ਨਾਮ",
       "nameRequired": "ਮੋਡ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।",
       "notFound": "ਇਹ ਮੋਡ ਹੁਣ ਮੌਜੂਦ ਨਹੀਂ ਹੈ।",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "ਇਸ ਵੇਲੇ ਈਮੇਲ ਭੇਜਣ ਦੀ ਸਹੂਲਤ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "admissionRequired": "ਤੁਹਾਡੀ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕਦੀ। ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ 'ਤੇ ਜਾਂ ਵੈੱਬ ਰਾਹੀਂ ਸਾਈਨ-ਇਨ ਕਰਨ ਲਈ '$t(login.moreSignInOptions)' ਵਰਤੋ।",
     "default": "ਕੋਈ ਗੜਬੜ ਹੋ ਗਈ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-    "retryableAdmission": "ਅਸੀਂ ਇਸ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਕਰ ਸਕੇ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "retryableAdmission": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "startSignInFailed": "ਸਾਈਨ-ਇਨ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "couldNotOpenBrowser": "ਬ੍ਰਾਊਜ਼ਰ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "signInTimedOut": "ਸਾਈਨ-ਇਨ ਲਈ ਦਿੱਤਾ ਸਮਾਂ ਲੰਘ ਗਿਆ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "ਅਗਲਾ ਨਿਰਧਾਰਿਤ",
     "answerNeeded": "ਜਵਾਬ ਚਾਹੀਦਾ ਹੈ",
     "waitingToRetry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਦੀ ਉਡੀਕ",
+    "countNoun": {
+      "needsInput_one": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "needsInput_other": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "running_one": "ਕੰਮ ਜਾਰੀ",
+      "running_other": "ਕੰਮ ਜਾਰੀ",
+      "scheduled_one": "ਨਿਰਧਾਰਿਤ",
+      "scheduled_other": "ਨਿਰਧਾਰਿਤ",
+      "idle_one": "ਵਿਹਲਾ",
+      "idle_other": "ਵਿਹਲਾ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "needsInput_other": "{{displayCount}} ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "running_one": "{{displayCount}} ਕੰਮ ਜਾਰੀ",
+      "running_other": "{{displayCount}} ਕੰਮ ਜਾਰੀ",
+      "scheduled_one": "{{displayCount}} ਨਿਰਧਾਰਿਤ",
+      "scheduled_other": "{{displayCount}} ਨਿਰਧਾਰਿਤ",
+      "idle_one": "{{displayCount}} ਵਿਹਲਾ",
+      "idle_other": "{{displayCount}} ਵਿਹਲਾ"
+    },
+    "footer": {
+      "checked": "ਜਾਂਚ ਕੀਤੀ {{time}}",
+      "lastKnown": "ਆਖਰੀ ਜਾਣੀ ਸਥਿਤੀ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ਅਗਲੀ ਵਾਰ ਚੱਲੇਗਾ {{time}}",
+      "wasDue": "ਉਮੀਦ ਸੀ {{time}}"
+    },
     "step": {
       "editing": "ਸੰਪਾਦਨ ਕਰ ਰਿਹਾ",
       "reading": "ਪੜ੍ਹ ਰਿਹਾ",
@@ -3999,7 +4073,8 @@
         "space": "ਇਸ ਮਾਡਲ ਲਈ ਲੋੜੀਂਦੀ ਖਾਲੀ ਸਟੋਰੇਜ ਨਹੀਂ ਹੈ। ਥਾਂ ਖਾਲੀ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
         "network": "ਡਾਊਨਲੋਡ ਪੂਰਾ ਨਹੀਂ ਹੋਇਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
         "invalidFile": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਅਜਿਹਾ ਮਾਡਲ ਨਹੀਂ ਹੈ ਜੋ ਇਹ ਐਪ ਚਲਾ ਸਕੇ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ।",
-        "checksum": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਆਪਣੇ ਪ੍ਰਕਾਸ਼ਿਤ ਚੈੱਕਸਮ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।"
+        "checksum": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਆਪਣੇ ਪ੍ਰਕਾਸ਼ਿਤ ਚੈੱਕਸਮ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।",
+        "writeFailed": "ਇਹ ਡਿਵਾਈਸ ਮਾਡਲ ਨੂੰ ਸੰਭਾਲ ਨਹੀਂ ਸਕੀ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।"
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "ਜਦੋਂ ਕਿਸੇ ਰਿਪੋਜ਼ਟਰੀ ਵਿੱਚ ਪਿੰਨ ਕੀਤਾ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ ਹੁੰਦਾ ਹੈ ਤਾਂ ਆਟੋ-ਲੋਡ ਹੁੰਦਾ ਹੈ।",
     "organizationDefaultDescription": "ਉਹਨਾਂ ਮੈਂਬਰਾਂ ਲਈ ਸਵੈ-ਲੋਡ ਕੀਤਾ ਗਿਆ ਜਿਨ੍ਹਾਂ ਕੋਲ ਕੋਈ ਨਿੱਜੀ ਡਿਫੌਲਟ ਨਹੀਂ ਹੈ।",
     "setAsDefault": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਵਜੋਂ ਸੈੱਟ ਕਰੋ",
-    "saveFailed": "ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "saveFailed": "ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "organizationRoleRequired": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ ਸੰਸਥਾ ਦੀਆਂ ਪ੍ਰੋਫਾਈਲਾਂ ਬਦਲ ਸਕਦੇ ਹਨ।",
     "deleteTitle": "ਪ੍ਰੋਫਾਈਲ ਮਿਟਾਓ",
     "deleteMessage": "ਇਹ ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਇਸਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨੂੰ ਸਥਾਈ ਤੌਰ 'ਤੇ ਹਟਾਉਂਦਾ ਹੈ। ਇਸ ਨੂੰ ਅਣਕੀਤਾ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "ਕ੍ਰੈਡਿਟ ਕਟੌਤੀ",
       "emptyDescription": "ਕ੍ਰੈਡਿਟ ਖਰੀਦਾਂ, ਰਸੀਦਾਂ ਅਤੇ ਵਰਤੋਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "emptyTitle": "ਕੋਈ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਨਹੀਂ",
+      "expiredGrant": "ਮਿਆਦ ਪੁੱਗ ਗਈ: {{description}}",
       "googlePlayReceipt": "Google Play ਤੋਂ ਰਸੀਦ",
       "kind": {
         "adjustment": "ਸਮਾਯੋਜਨ",
         "balanceNeutral": "ਬਕਾਇਆ ਅਪਰਿਵਰਤਿਤ",
         "deduction": "ਕਟੌਤੀ",
         "grant": "ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "promotionalCredits": "ਪ੍ਰੋਮੋਸ਼ਨਲ ਕ੍ਰੈਡਿਟ",
+        "welcomeCredits": "ਸੁਆਗਤ ਕ੍ਰੈਡਿਟ",
         "purchase": "ਖਰੀਦ"
+      },
+      "program": {
+        "adminBulkGrant": "ਐਡਮਿਨ ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "contributorChampion": "ਯੋਗਦਾਨੀ ਚੈਂਪੀਅਨ ਕ੍ਰੈਡਿਟ",
+        "feedback": "ਫੀਡਬੈਕ ਕ੍ਰੈਡਿਟ",
+        "influencer": "ਇਨਫਲੂਐਂਸਰ ਕ੍ਰੈਡਿਟ",
+        "ossMonthlyReset": "ਓਪਨ ਸੋਰਸ ਸਪਾਂਸਰਸ਼ਿਪ ਦਾ ਮਹੀਨਾਵਾਰ ਰੀਸੈਟ",
+        "ossSponsorship": "ਓਪਨ ਸੋਰਸ ਸਪਾਂਸਰਸ਼ਿਪ ਕ੍ਰੈਡਿਟ",
+        "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਕ੍ਰੈਡਿਟ",
+        "usageIssue": "ਵਰਤੋਂ ਸਮੱਸਿਆ ਕ੍ਰੈਡਿਟ",
+        "vibeDay": "Vibe day ਕ੍ਰੈਡਿਟ"
       },
       "purchaseFallback": "ਕ੍ਰੈਡਿਟ ਖਰੀਦ",
       "receipt": "ਰਸੀਦ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ਲਈ ਰਸੀਦ ਖੋਲ੍ਹੋ",
       "receiptUnavailable": "ਇਸ ਖਰੀਦ ਲਈ ਕੋਈ ਰਸੀਦ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
-      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।"
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।",
+      "voidedGrant": "ਰੱਦ ਕੀਤਾ: {{description}}"
     },
     "title": "ਕ੍ਰੈਡਿਟ ਖਰੀਦੋ",
     "description": "ਕ੍ਰੈਡਿਟ ਇੱਕ-ਵਾਰ ਦੀ ਖਰੀਦ ਹੈ ਜੋ Kilo ਐਪ ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਵਿੱਚ ਜੋੜੀ ਜਾਂਦੀ ਹੈ। ਸਟੋਰ ਤੁਹਾਡੇ ਖਾਤੇ ਤੋਂ ਚਾਰਜ ਲੈਂਦਾ ਹੈ ਅਤੇ ਸਟੋਰ ਵੱਲੋਂ ਭੁਗਤਾਨ ਦੀ ਪੁਸ਼ਟੀ ਕਰਨ ਤੋਂ ਬਾਅਦ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",
@@ -4696,6 +4786,8 @@
     "connectedTo": "{{account}} ਨਾਲ ਕਨੈਕਟ ਹੈ",
     "disconnected": "{{provider}} ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ",
     "disconnectFailed": "{{provider}} ਨੂੰ ਡਿਸਕਨੈਕਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "disconnectRetry": "Slack ਡਿਸਕਨੈਕਟ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਕਰ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "disconnectNeedsSupport": "Kilo ਇਸ ਕਨੈਕਸ਼ਨ ਲਈ ਸੰਭਾਲਿਆ ਗਿਆ Slack ਪਹੁੰਚ ਪੜ੍ਹ ਨਹੀਂ ਸਕਿਆ। ਡਿਸਕਨੈਕਟ ਪੂਰਾ ਕਰਨ ਲਈ ਸਹਾਇਤਾ ਟੀਮ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।",
     "couldNotLoad": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "permissionDenied": "ਤੁਹਾਡੇ ਕੋਲ ਇਹਨਾਂ ਇੰਟੀਗ੍ਰੇਸ਼ਨਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "managedByOwner": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਨੂੰ ਕਹੋ।",
@@ -5025,6 +5117,20 @@
       "eu": "ਯੂਰਪੀ ਸੰਘ",
       "au": "ਆਸਟ੍ਰੇਲੀਆ",
       "jp": "ਜਾਪਾਨ"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ਤਰਜੀਹਾਂ ਦੀ ਖੋਜ",
+    "noMatches": "ਕੋਈ ਮੇਲ ਖਾਂਦੀ ਤਰਜੀਹ ਨਹੀਂ",
+    "emptyDescription": "ਕਿਸੇ ਹੋਰ ਤਰਜੀਹ ਦੇ ਨਾਮ ਜਾਂ ਮੁੱਖ ਸ਼ਬਦ ਨਾਲ ਖੋਜੋ।",
+    "resultsStatus": "ਮਿਲੀਆਂ ਤਰਜੀਹਾਂ: {{resultCount}}",
+    "keywords": {
+      "signOut": "ਸਾਈਨ ਆਊਟ|ਬਾਹਰ ਨਿਕਲੋ",
+      "appearance": "ਦਿੱਖ|ਥੀਮ|ਰੰਗ",
+      "appUnlock": "ਬਾਇਓਮੈਟ੍ਰਿਕਸ|ਚਿਹਰਾ|ਉਂਗਲ ਦੀ ਛਾਪ",
+      "language": "ਭਾਸ਼ਾ|ਅਨੁਵਾਦ",
+      "notifications": "ਸੂਚਨਾਵਾਂ|ਚੇਤਾਵਨੀਆਂ",
+      "privacy": "ਵਿਸ਼ਲੇਸ਼ਣ|ਨਿਗਰਾਨੀ|ਗੋਪਨੀਯਤਾ"
     }
   }
 }

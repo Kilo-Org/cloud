@@ -4,6 +4,7 @@ import { type SessionLiveOutcomeKind } from '@kilocode/notifications/schemas';
 import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
 import { SESSION_CARD_FIXTURES } from './session-fixture-catalog';
 import { type GlanceableActionFeedback } from './surface-extras';
+import { TITLE_FIXTURES } from './title-fixture-catalog';
 
 /**
  * Dev-only named visual states for the glanceable surfaces. A fixture is tray
@@ -153,20 +154,16 @@ export const GLANCEABLE_FIXTURES = {
       ...many({ status: 'idle', count: 999, ago: 60 }),
     ],
   },
-  'long-title': {
-    description: 'Mixed counts with a very long newest-session title.',
+  'plural-counts': {
+    description:
+      'Count inflections: 1 needs input, 2 working, 5 idle, so every family shows its singular and plural form.',
     rows: () => [
-      { status: 'permission', ago: 17, title: 'Migrate the billing webhooks' },
-      {
-        status: 'busy',
-        ago: 1,
-        title:
-          'Refactor the authentication middleware so expired refresh tokens rotate before the websocket reconnects on flaky networks',
-      },
-      { status: 'busy', ago: 9, title: 'Write the release notes' },
-      { status: 'idle', ago: 33, title: 'Triage new issues' },
+      ...many({ status: 'permission', count: 1, ago: 12 }),
+      ...many({ status: 'busy', count: 2, ago: 4 }),
+      ...many({ status: 'idle', count: 5, ago: 40 }),
     ],
   },
+  ...TITLE_FIXTURES,
   approving: {
     description: 'Needs approval while the in-place Approve runs: the Approving line.',
     rows: APPROVAL_ROWS,

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "हा दस्तऐवज फक्त इंग्रजीत उपलब्ध आहे.",
     "organizationTrialEndedBilling": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
     "organizationTrialEndedBillingAtKiloAi": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही kilo.ai वर बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
-    "viewOnGitHub": "GitHub वर PR पहा"
+    "viewOnGitHub": "GitHub वर PR पहा",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "बुलेट पॉइंट",
+        "nestedBulletPoint": "नेस्टेड बुलेट पॉइंट",
+        "orderedItem": "यादी आयटम {n}",
+        "nestedOrderedItem": "नेस्टेड यादी आयटम {n}"
+      },
+      "blockquote": {
+        "quote": "अवतरण",
+        "nestedQuote": "नेस्टेड अवतरण"
+      },
+      "table": {
+        "row": "ओळ {n}: {content}"
+      },
+      "math": {
+        "equation": "गणित: {latex}"
+      },
+      "rotor": {
+        "headings": "शीर्षके",
+        "links": "लिंक",
+        "images": "प्रतिमा"
+      }
+    }
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -428,6 +451,17 @@
       "location": "Vertex स्थान",
       "clientEmail": "सेवा खात्याचा ईमेल",
       "privateKey": "सेवा खात्याची खाजगी की",
+      "privateKeyBlockRequired": "BEGIN ओळीपासून END ओळीपर्यंत संपूर्ण की ब्लॉक पेस्ट करा.",
+      "privateKeyEncrypted": "हा की ब्लॉक पासफ्रेजद्वारे संरक्षित आहे. पासफ्रेज नसलेली सेवा खात्याची की पेस्ट करा.",
+      "names": {
+        "codestral": "फक्त जुने Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT वापरून साइन इन करा)",
+        "xiaomi": "Xiaomi (वापरानुसार पैसे द्या)",
+        "zai": "Z.ai (वापरानुसार पैसे द्या)",
+        "bedrockByok": "Amazon Bedrock (थेट)",
+        "vertexByok": "Google Vertex AI (थेट)"
+      },
       "modelMappings": "मॉडेल मॅपिंग",
       "modelMappingsDescription": "गेटवे मॉडेल कस्टम डिप्लॉयमेंट नावाकडे पाठवा.",
       "mappingTitle": "मॅपिंग {{number}}",
@@ -507,6 +541,14 @@
       "nextStepFinal": "अपीलचा निर्णय अंतिम आहे. आता पुढील अपील दाखल करता येणार नाही.",
       "viewReceipt": "पावती पहा"
     },
+    "reportReceipts": {
+      "title": "तक्रारी",
+      "rowSubtitle": "तुम्ही दाखल केलेल्या तक्रारी आणि त्यांचे निर्णय",
+      "emptyTitle": "अद्याप तक्रारी नाहीत",
+      "emptyDescription": "तुम्ही कमेंट किंवा AI उत्तरावरून दाखल करता त्या तक्रारी येथे दिसतील.",
+      "couldNotLoad": "तुमच्या तक्रारी लोड करता आल्या नाहीत",
+      "capped": "तुमच्या सर्वात अलीकडील तक्रारी दाखवत आहे."
+    },
     "changelog": "नवीन बदल",
     "changelogVersionPending": "{{version}} आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील.",
     "changelogGroupNew": "नवीन",
@@ -514,7 +556,10 @@
     "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल व संस्था"
+      "profileOrganizations": "प्रोफाइल व संस्था",
+      "chat": "चॅट",
+      "notifications": "सूचना",
+      "integrations": "इंटिग्रेशन्स"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "सध्याची माहिती मिळवता आली नाही.",
       "byline": "#{{number}} — {{author}} यांनी तयार केलेली",
       "noFindings": "कोणतेही निष्कर्ष आढळले नाहीत.",
-      "findingsUnavailable": "हे पुनरावलोकन अयशस्वी झाल्यामुळे परिणाम उपलब्ध नाहीत.",
+      "findingsUnavailable": "परिणाम उपलब्ध नाहीत.",
       "findingsInProgress": "हे पुनरावलोकन अजून सुरू आहे. ते पूर्ण झाल्यावर निष्कर्ष येथे दिसतील.",
       "findingsEndedWithoutResults": "हे पुनरावलोकन कोणतेही निष्कर्ष निर्माण होण्यापूर्वीच संपले.",
       "serviceUnavailable": "कोड पुनरावलोकन सेवेशी संपर्क साधता आला नाही. सेवा उपलब्ध झाल्यावर पुनरावलोकन पुन्हा करा.",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "वेबवरील बिलिंग सेटिंग्ज",
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
-      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप वेबवर व्यवस्थापित केले जातात.",
+      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप kilo.ai वर व्यवस्थापित केले जातात.",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
       "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "opensOnWeb": "वेबवर उघडते"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "ओळखकर्ता",
       "identifierRequired": "ओळखकर्ता प्रविष्ट करा.",
       "identifierTaken": "हा ओळखकर्ता दुसरा मोड आधीच वापरत आहे.",
+      "identifierTooLong": "ओळखकर्ता {{max}} वर्णांपर्यंत किंवा त्यापेक्षा कमी ठेवा.",
       "nameLabel": "मोडचे नाव",
       "nameRequired": "मोडचे नाव प्रविष्ट करा.",
       "notFound": "हा मोड आता अस्तित्वात नाही.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "सध्या ईमेल पाठवता येत नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
     "admissionRequired": "तुमच्या डिव्हाइसची पडताळणी करता येत नाही. दुसऱ्या डिव्हाइसवर किंवा वेबवर साइन इन करण्यासाठी '$t(login.moreSignInOptions)' वापरा.",
     "default": "काहीतरी चूक झाली. कृपया पुन्हा प्रयत्न करा.",
-    "retryableAdmission": "या डिव्हाइसची पडताळणी करता आली नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+    "retryableAdmission": "या डिव्हाइसची पडताळणी करता आली नाही. पुन्हा प्रयत्न करा.",
     "startSignInFailed": "साइन-इन प्रक्रिया सुरू करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
     "couldNotOpenBrowser": "ब्राउझर उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
     "signInTimedOut": "साइन इन करण्याची वेळमर्यादा संपली. कृपया पुन्हा प्रयत्न करा.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "पुढील नियोजित",
     "answerNeeded": "उत्तर आवश्यक",
     "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा",
+    "countNoun": {
+      "needsInput_one": "प्रतिसाद आवश्यक",
+      "needsInput_other": "प्रतिसाद आवश्यक",
+      "running_one": "काम सुरू आहे",
+      "running_other": "काम सुरू आहे",
+      "scheduled_one": "नियोजित",
+      "scheduled_other": "नियोजित",
+      "idle_one": "निष्क्रिय",
+      "idle_other": "निष्क्रिय"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} प्रतिसाद आवश्यक",
+      "needsInput_other": "{{displayCount}} प्रतिसाद आवश्यक",
+      "running_one": "{{displayCount}} काम सुरू आहे",
+      "running_other": "{{displayCount}} काम सुरू आहे",
+      "scheduled_one": "{{displayCount}} नियोजित",
+      "scheduled_other": "{{displayCount}} नियोजित",
+      "idle_one": "{{displayCount}} निष्क्रिय",
+      "idle_other": "{{displayCount}} निष्क्रिय"
+    },
+    "footer": {
+      "checked": "तपासले {{time}}",
+      "lastKnown": "शेवटची ज्ञात स्थिती · {{time}}"
+    },
+    "wake": {
+      "nextRun": "पुढील कार्यारंभ {{time}}",
+      "wasDue": "अपेक्षित होते {{time}}"
+    },
     "step": {
       "editing": "संपादन",
       "reading": "वाचन",
@@ -3999,7 +4073,8 @@
         "space": "या मॉडेलसाठी पुरेशी मोकळी जागा नाही. जागा मोकळी करा आणि पुन्हा प्रयत्न करा.",
         "network": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
         "invalidFile": "डाउनलोड केलेली फाइल हे अ‍ॅप चालवू शकते असे मॉडेल नाही, म्हणून ती हटवली गेली.",
-        "checksum": "डाउनलोड केलेली फाइल तिच्या प्रकाशित चेकसमशी जुळत नाही, म्हणून ती हटवली गेली. पुन्हा डाउनलोड करून पहा."
+        "checksum": "डाउनलोड केलेली फाइल तिच्या प्रकाशित चेकसमशी जुळत नाही, म्हणून ती हटवली गेली. पुन्हा डाउनलोड करून पहा.",
+        "writeFailed": "हे डिव्हाइस मॉडेल जतन करू शकले नाही. पुन्हा डाउनलोड करून पहा."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "कोणत्याही रेपॉजिटरीमध्ये पिन केलेले प्रोफाइल नसताना स्वयं-लोड होते.",
     "organizationDefaultDescription": "वैयक्तिक डीफॉल्ट नसलेल्या सदस्यांसाठी स्वयं-लोड.",
     "setAsDefault": "डीफॉल्ट म्हणून सेट करा",
-    "saveFailed": "प्रोफाइल सेव्ह करता आले नाही",
+    "saveFailed": "प्रोफाइल सेव्ह करता आले नाही. पुन्हा प्रयत्न करा.",
     "organizationRoleRequired": "केवळ संस्थेचे मालक आणि प्रशासक संस्थेचे प्रोफाइल बदलू शकतात.",
     "deleteTitle": "प्रोफाइल हटवा",
     "deleteMessage": "हे प्रोफाइल आणि त्याची सेटिंग्ज कायमची काढून टाकते. हे पूर्ववत केले जाऊ शकत नाही.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "क्रेडिट वजावट",
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",
+      "expiredGrant": "कालबाह्य: {{description}}",
       "googlePlayReceipt": "Google Play कडून पावती",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "शिलकीवर परिणाम नाही",
         "deduction": "वजावट",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रोमोशनल क्रेडिट",
+        "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरेदी"
+      },
+      "program": {
+        "adminBulkGrant": "प्रशासकाकडून क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता चॅम्पियन क्रेडिट",
+        "feedback": "अभिप्रायासाठी क्रेडिट",
+        "influencer": "इन्फ्लुएन्सर क्रेडिट",
+        "ossMonthlyReset": "OSS प्रायोजकत्वाचा मासिक रीसेट",
+        "ossSponsorship": "OSS प्रायोजकत्व क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्टसाठी क्रेडिट",
+        "usageIssue": "वापर समस्येसाठी क्रेडिट",
+        "vibeDay": "Vibe दिवस क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरेदी",
       "receipt": "पावती",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
       "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही.",
-      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे."
+      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे.",
+      "voidedGrant": "रद्द केले: {{description}}"
     },
     "title": "क्रेडिट्स खरेदी करा",
     "description": "क्रेडिट्स ही Kilo App मध्ये AI कोडिंग सत्रे चालवण्यासाठी तुमच्या Kilo शिल्लकीत जोडली जाणारी एक-वेळची खरेदी आहे. स्टोअर तुमच्या खात्यातून शुल्क घेते आणि स्टोअर पेमेंटची पुष्टी केल्यानंतर क्रेडिट्स जोडली जातात.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "{{account}} शी कनेक्ट केलेले",
     "disconnected": "{{provider}} डिस्कनेक्ट झाले",
     "disconnectFailed": "{{provider}} डिस्कनेक्ट करता आले नाही",
+    "disconnectRetry": "Slack डिस्कनेक्ट झाल्याची पुष्टी करू शकले नाही. पुन्हा प्रयत्न करा.",
+    "disconnectNeedsSupport": "Kilo या कनेक्शनसाठी जतन केलेला Slack प्रवेश वाचू शकले नाही. डिस्कनेक्ट पूर्ण करण्यासाठी मदत पथकाशी संपर्क साधा.",
     "couldNotLoad": "इंटिग्रेशन्स लोड करता आली नाहीत",
     "permissionDenied": "तुम्हाला ही इंटिग्रेशन्स व्यवस्थापित करण्याची परवानगी नाही.",
     "managedByOwner": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी संस्थेच्या मालकाला विचारा.",
@@ -5025,6 +5117,20 @@
       "eu": "युरोपीय संघ",
       "au": "ऑस्ट्रेलिया",
       "jp": "जपान"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "प्राधान्यांचा शोध",
+    "noMatches": "जुळणारी प्राधान्ये नाहीत",
+    "emptyDescription": "प्राधान्याचे वेगळे नाव किंवा शोधशब्द वापरून पाहा.",
+    "resultsStatus": "सापडलेली प्राधान्ये: {{resultCount}}",
+    "keywords": {
+      "signOut": "बाहेर पडा|सत्र समाप्ती",
+      "appearance": "स्वरूप|रंगसंगती|गडद मोड",
+      "appUnlock": "बायोमेट्रिक्स|चेहरा|बोटाचा ठसा",
+      "language": "भाषा|भाषांतर",
+      "notifications": "सूचना|इशारे",
+      "privacy": "विश्लेषण|मागोवा"
     }
   }
 }

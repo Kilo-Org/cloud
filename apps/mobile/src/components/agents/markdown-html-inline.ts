@@ -174,22 +174,39 @@ function delimiterFits(before: string | undefined, core: string, after: string |
  */
 function joinInline(pieces: readonly InlinePiece[], options: InlineOptions): string | null {
   let joined = '';
+  // The last character `joined` holds, kept beside it: reading one back from the
+  // string flattens the growing result on every part, so joining would cost a
+  // pass over the output per piece instead of one pass in total. Set inside
+  // `append`, which flow analysis does not follow, hence the cast.
+  let last = undefined as string | undefined;
   // Set inside `append`, which flow analysis does not follow.
   let backticksTouch = false as boolean;
   // Collapsing across piece edges, as HTML collapses whitespace across tags.
   const append = (part: string) => {
     backticksTouch ||=
-      part.startsWith('`') && (joined === '' ? options.before === '`' : joined.endsWith('`'));
-    joined += joined.endsWith(' ') && part.startsWith(' ') ? part.slice(1) : part;
+      part.startsWith('`') && (joined === '' ? options.before === '`' : last === '`');
+    const written = last === ' ' && part.startsWith(' ') ? part.slice(1) : part;
+    joined += written;
+    if (written !== '') {
+      last = written.at(-1);
+    }
   };
+  // For each piece, the first character it contributes or, when every field is
+  // empty, the first one any later piece does; filled backwards so an emphasis
+  // run can see what follows it without rebuilding the pieces after it.
+  const ownFrom: (string | undefined)[] = Array.from(
+    { length: pieces.length + 1 },
+    (): string | undefined => undefined
+  );
+  for (let index = pieces.length - 1; index >= 0; index -= 1) {
+    const piece = pieces.at(index);
+    ownFrom[index] = piece?.lead[0] ?? piece?.delimiter[0] ?? piece?.core[0] ?? ownFrom[index + 1];
+  }
   for (const [index, piece] of pieces.entries()) {
     append(piece.lead);
     if (piece.delimiter !== '') {
-      let next = piece.trail[0];
-      for (const following of pieces.slice(index + 1)) {
-        next ??= (following.lead + following.delimiter + following.core)[0];
-      }
-      const previous = joined.length > 0 ? joined.at(-1) : options.before;
+      const next = piece.trail[0] ?? ownFrom[index + 1];
+      const previous = last ?? options.before;
       if (!delimiterFits(previous, piece.core, next ?? options.after)) {
         return null;
       }
@@ -197,7 +214,7 @@ function joinInline(pieces: readonly InlinePiece[], options: InlineOptions): str
     append(piece.delimiter + piece.core + piece.delimiter);
     append(piece.trail);
   }
-  return backticksTouch || (joined.endsWith('`') && options.after === '`') ? null : joined;
+  return backticksTouch || (last === '`' && options.after === '`') ? null : joined;
 }
 
 function linkDestination(href: string): string | null {

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
     "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen på kilo.ai og derefter prøve igen.",
-    "viewOnGitHub": "Vis PR på GitHub"
+    "viewOnGitHub": "Vis PR på GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkttegn",
+        "nestedBulletPoint": "Indlejret punkttegn",
+        "orderedItem": "Listeelement {n}",
+        "nestedOrderedItem": "Indlejret listeelement {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Indlejret citat"
+      },
+      "table": {
+        "row": "Række {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Overskrifter",
+        "links": "Weblinks",
+        "images": "Billeder"
+      }
+    }
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -428,6 +451,17 @@
       "location": "Vertex-placering",
       "clientEmail": "Tjenestekontoens e-mailadresse",
       "privateKey": "Tjenestekontoens private nøgle",
+      "privateKeyBlockRequired": "Indsæt hele nøgleblokken, fra BEGIN-linjen til END-linjen.",
+      "privateKeyEncrypted": "Denne nøgleblok er beskyttet med en adgangssætning. Indsæt en tjenestekontonøgle uden adgangssætning.",
+      "names": {
+        "codestral": "Kun ældre Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Log ind med ChatGPT)",
+        "xiaomi": "Xiaomi (betal efter forbrug)",
+        "zai": "Z.ai (betal efter forbrug)",
+        "bedrockByok": "Amazon Bedrock (direkte)",
+        "vertexByok": "Google Vertex AI (direkte)"
+      },
       "modelMappings": "Modeltilknytninger",
       "modelMappingsDescription": "Send en gateway-model til et brugerdefineret deployment-navn.",
       "mappingTitle": "Tilknytning {{number}}",
@@ -507,14 +541,25 @@
       "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
       "viewReceipt": "Se kvittering"
     },
+    "reportReceipts": {
+      "title": "Anmeldelser",
+      "rowSubtitle": "Dine indsendte anmeldelser og deres resultater",
+      "emptyTitle": "Ingen anmeldelser endnu",
+      "emptyDescription": "Anmeldelser, du indsender fra en kommentar eller et AI-svar, vises her.",
+      "couldNotLoad": "Kunne ikke indlæse dine anmeldelser",
+      "capped": "Viser dine seneste anmeldelser."
+    },
     "changelog": "Nyheder",
     "changelogVersionPending": "Noterne til version {{version}} kommer med næste appopdatering.",
     "changelogGroupNew": "Nyt",
     "changelogFixesIn": "Rettelser og forbedringer i {{areas}}.",
     "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
     "changelogAreas": {
-      "signIn": "Log-ind",
-      "profileOrganizations": "Profil & organisationer"
+      "signIn": "log-ind",
+      "profileOrganizations": "profil & organisationer",
+      "chat": "samtale",
+      "notifications": "notifikationer",
+      "integrations": "integrationer"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "De seneste oplysninger kunne ikke hentes.",
       "byline": "#{{number}} af {{author}}",
       "noFindings": "Der er ingen fund.",
-      "findingsUnavailable": "Resultaterne er ikke tilgængelige, fordi denne gennemgang mislykkedes.",
+      "findingsUnavailable": "Resultaterne er ikke tilgængelige.",
       "findingsInProgress": "Denne gennemgang er stadig i gang. Fund vises her, når den er færdig.",
       "findingsEndedWithoutResults": "Denne gennemgang sluttede, før den gav nogen fund.",
       "serviceUnavailable": "Kunne ikke oprette forbindelse til tjenesten til kodegennemgang. Prøv gennemgangen igen, når tjenesten er tilgængelig.",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "Faktureringsindstillinger på nettet",
       "changePlan": "Skift plan",
       "buySeats": "Køb pladser",
-      "managedOnWeb": "Planen, pladserne og automatisk optankning administreres på nettet.",
+      "managedOnWeb": "Planen, pladserne og automatisk optankning administreres på kilo.ai.",
       "setupAutoTopUp": "Konfigurer automatisk optankning",
       "manageAutoTopUp": "Administrer automatisk optankning",
       "opensOnWeb": "Åbner på nettet"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Angiv en identifikator.",
       "identifierTaken": "En anden tilstand bruger allerede denne identifikator.",
+      "identifierTooLong": "Hold identifikatoren på {{max}} tegn eller færre.",
       "nameLabel": "Tilstandens navn",
       "nameRequired": "Angiv et tilstandsnavn.",
       "notFound": "Denne tilstand findes ikke længere.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "Vi kan ikke sende e-mail i øjeblikket. Prøv igen senere.",
     "admissionRequired": "Din enhed kan ikke bekræftes. Brug '$t(login.moreSignInOptions)' til at logge ind på en anden enhed eller i browseren.",
     "default": "Noget gik galt. Prøv igen.",
-    "retryableAdmission": "Vi kunne ikke bekræfte denne enhed. Tjek din forbindelse, og prøv igen.",
+    "retryableAdmission": "Kunne ikke bekræfte denne enhed. Prøv igen.",
     "startSignInFailed": "Kunne ikke starte login. Prøv igen.",
     "couldNotOpenBrowser": "Kunne ikke åbne browseren. Prøv igen.",
     "signInTimedOut": "Tiden til at logge ind er udløbet. Prøv igen.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "Næste planlagte",
     "answerNeeded": "Afventer svar",
     "waitingToRetry": "Afventer nyt forsøg",
+    "countNoun": {
+      "needsInput_one": "Afventer svar",
+      "needsInput_other": "Afventer svar",
+      "running_one": "I gang",
+      "running_other": "I gang",
+      "scheduled_one": "Planlagt",
+      "scheduled_other": "Planlagte",
+      "idle_one": "Inaktiv",
+      "idle_other": "Inaktive"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Afventer svar",
+      "needsInput_other": "{{displayCount}} Afventer svar",
+      "running_one": "{{displayCount}} I gang",
+      "running_other": "{{displayCount}} I gang",
+      "scheduled_one": "{{displayCount}} Planlagt",
+      "scheduled_other": "{{displayCount}} Planlagte",
+      "idle_one": "{{displayCount}} Inaktiv",
+      "idle_other": "{{displayCount}} Inaktive"
+    },
+    "footer": {
+      "checked": "Kontrolleret {{time}}",
+      "lastKnown": "Sidst kendt · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Næste kørsel {{time}}",
+      "wasDue": "Forventedes {{time}}"
+    },
     "step": {
       "editing": "Redigerer",
       "reading": "Læser",
@@ -3999,7 +4073,8 @@
         "space": "Der er ikke nok ledig lagerplads til denne model. Frigør plads, og prøv igen.",
         "network": "Downloadet blev ikke færdigt. Tjek din forbindelse, og prøv igen.",
         "invalidFile": "Den downloadede fil er ikke en model, som denne app kan køre, så den blev fjernet.",
-        "checksum": "Den downloadede fil matcher ikke sin offentliggjorte kontrolsum, så den blev fjernet. Prøv at downloade igen."
+        "checksum": "Den downloadede fil matcher ikke sin offentliggjorte kontrolsum, så den blev fjernet. Prøv at downloade igen.",
+        "writeFailed": "Denne enhed kunne ikke gemme modellen. Prøv at downloade igen."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "Automatisk indlæst, når intet lager har en fastgjort profil.",
     "organizationDefaultDescription": "Automatisk indlæst for medlemmer, der ikke har nogen personlig standard.",
     "setAsDefault": "Indstil som standard",
-    "saveFailed": "Profilen kunne ikke gemmes",
+    "saveFailed": "Profilen kunne ikke gemmes. Prøv igen.",
     "organizationRoleRequired": "Kun organisationsejere og administratorer kan ændre organisationens profiler.",
     "deleteTitle": "Slet profil",
     "deleteMessage": "Dette fjerner permanent profilen og dens indstillinger. Dette kan ikke fortrydes.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "Kreditfradrag",
       "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
       "emptyTitle": "Ingen kredithistorik",
+      "expiredGrant": "Udløbet: {{description}}",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Fradrag",
         "grant": "Tildelt kredit",
+        "promotionalCredits": "Kampagnekreditter",
+        "welcomeCredits": "Velkomstkredit",
         "purchase": "Køb"
+      },
+      "program": {
+        "adminBulkGrant": "Administratorkredittildeling",
+        "contributorChampion": "Topbidragsyderkredit",
+        "feedback": "Feedbackkredit",
+        "influencer": "Influencerkredit",
+        "ossMonthlyReset": "Nulstilling af sponsorat af åben kildekode",
+        "ossSponsorship": "Kredit for sponsorat af åben kildekode",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Kredit for forbrugsproblem",
+        "vibeDay": "Vibe day-kredit"
       },
       "purchaseFallback": "Kreditkøb",
       "receipt": "Kvittering",
       "receiptA11y": "Åbn kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Der er ingen kvittering for dette køb.",
-      "retentionLimit": "Viser den seneste kredithistorik."
+      "retentionLimit": "Viser den seneste kredithistorik.",
+      "voidedGrant": "Annulleret: {{description}}"
     },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "Forbundet med {{account}}",
     "disconnected": "Forbindelsen til {{provider}} er afbrudt",
     "disconnectFailed": "Forbindelsen til {{provider}} kunne ikke afbrydes",
+    "disconnectRetry": "Slack kunne ikke bekræfte afbrydelsen. Prøv igen.",
+    "disconnectNeedsSupport": "Kilo kunne ikke læse den gemte Slack-adgang for denne forbindelse. Kontakt support for at afslutte afbrydelsen.",
     "couldNotLoad": "Integrationerne kunne ikke indlæses",
     "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
     "managedByOwner": "Bed en ejer i organisationen om at ændre en forbindelse, du ikke kan ændre.",
@@ -5025,6 +5117,20 @@
       "eu": "Den Europæiske Union",
       "au": "Australien",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Søg efter indstillinger",
+    "noMatches": "Ingen matchende indstillinger",
+    "emptyDescription": "Prøv et andet indstillingsnavn eller søgeord.",
+    "resultsStatus": "Indstillinger fundet: {{resultCount}}",
+    "keywords": {
+      "signOut": "log ud|log af",
+      "appearance": "tema|farveskema",
+      "appUnlock": "biometri|ansigtsgenkendelse|fingeraftryk",
+      "language": "sprog|oversættelse",
+      "notifications": "notifikationer|advarsler|pushbeskeder",
+      "privacy": "analyse|sporing"
     }
   }
 }

@@ -55,11 +55,22 @@ function withSkillEnabled(
 }
 
 /**
+ * How a caller wants this hook's failures surfaced.
+ *
+ * `quietCreateErrorToast` silences the error toast of `create` alone, for a
+ * caller that already renders the refusal on its own failure surface (the
+ * Save-as-profile sheet states the server's sentence inline). Every other
+ * mutation, and `create` without this option, keeps the toast.
+ */
+export type AgentProfileMutationOptions = Readonly<{ quietCreateErrorToast?: boolean }>;
+
+/**
  * Every mutation the profile-management screens call for the profile itself, its
  * variables, setup commands, and skills. Each mutation carries the hook's
  * organization context, toasts a failed server call exactly once, and
  * invalidates the `agentProfiles` namespace so the list and detail queries
- * reconcile with server truth.
+ * reconcile with server truth. `options` moves only `create`'s error toast, for
+ * a screen that shows the refusal itself.
  *
  * The section editors (MCP servers, agents, kilo commands) have their own hook
  * in `use-agent-profile-section-mutations`.
@@ -68,7 +79,10 @@ function withSkillEnabled(
  * snapshot the affected cache in `onMutate`, roll back in `onError` (latest
  * generation only), and invalidate again in `onSettled` to reconcile.
  */
-export function useAgentProfileMutations(organizationId?: string) {
+export function useAgentProfileMutations(
+  organizationId?: string,
+  options: AgentProfileMutationOptions = {}
+) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -97,6 +111,13 @@ export function useAgentProfileMutations(organizationId?: string) {
     onError: (error: { message: string }) => {
       toastError(error);
     },
+  };
+  // The quiet create keeps the same settling and the same invalidation, and
+  // drops only the toast: the caller states the refusal on its own surface, so
+  // the same failure must not appear twice.
+  const quietCreateCallbacks = {
+    networkMode: callbacks.networkMode,
+    onSuccess: callbacks.onSuccess,
   };
 
   const applyDefault = (profileId: string, setDefault: boolean) => {
@@ -176,7 +197,12 @@ export function useAgentProfileMutations(organizationId?: string) {
     ].some(read => matchQuery(read.queryFilter({ profileId, organizationId }), query));
 
   const create = useMutation(
-    withOrganization(trpc.agentProfiles.create.mutationOptions(callbacks), organizationId)
+    withOrganization(
+      trpc.agentProfiles.create.mutationOptions(
+        options.quietCreateErrorToast ? quietCreateCallbacks : callbacks
+      ),
+      organizationId
+    )
   );
   const update = useMutation(
     withOrganization(trpc.agentProfiles.update.mutationOptions(callbacks), organizationId)

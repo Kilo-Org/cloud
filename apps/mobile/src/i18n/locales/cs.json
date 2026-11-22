@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
     "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu.",
     "organizationTrialEndedBillingAtKiloAi": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat na kilo.ai a poté to zkuste znovu.",
-    "viewOnGitHub": "Zobrazit PR na GitHubu"
+    "viewOnGitHub": "Zobrazit PR na GitHubu",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Odrážka",
+        "nestedBulletPoint": "Vnořená odrážka",
+        "orderedItem": "Položka seznamu {n}",
+        "nestedOrderedItem": "Vnořená položka seznamu {n}"
+      },
+      "blockquote": {
+        "quote": "Citace",
+        "nestedQuote": "Vnořená citace"
+      },
+      "table": {
+        "row": "Řádek {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Nadpisy",
+        "links": "Odkazy",
+        "images": "Obrázky"
+      }
+    }
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -430,6 +453,17 @@
       "location": "Umístění Vertex",
       "clientEmail": "E-mail účtu služby",
       "privateKey": "Soukromý klíč účtu služby",
+      "privateKeyBlockRequired": "Vložte celý blok klíče, od řádku BEGIN po řádek END.",
+      "privateKeyEncrypted": "Tento blok klíče je chráněný přístupovou frází. Vložte klíč účtu služby, který nemá přístupovou frázi.",
+      "names": {
+        "codestral": "Pouze starší Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Přihlásit se přes ChatGPT)",
+        "xiaomi": "Xiaomi (platba podle spotřeby)",
+        "zai": "Z.ai (platba podle spotřeby)",
+        "bedrockByok": "Amazon Bedrock (přímé účtování)",
+        "vertexByok": "Google Vertex AI (přímé účtování)"
+      },
       "modelMappings": "Mapování modelů",
       "modelMappingsDescription": "Přesměrujte model brány na vlastní název nasazení.",
       "mappingTitle": "Mapování {{number}}",
@@ -509,14 +543,25 @@
       "nextStepFinal": "Rozhodnutí o odvolání je konečné. Další odvolání již nelze podat.",
       "viewReceipt": "Zobrazit potvrzení"
     },
+    "reportReceipts": {
+      "title": "Nahlášení",
+      "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
+      "emptyTitle": "Zatím žádná nahlášení",
+      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
+      "capped": "Zobrazují se vaše nejnovější nahlášení."
+    },
     "changelog": "Co je nového",
     "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
     "changelogGroupNew": "Novinky",
     "changelogFixesIn": "Opravy a vylepšení v oblastech: {{areas}}.",
     "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
     "changelogAreas": {
-      "signIn": "Přihlášení",
-      "profileOrganizations": "Profil i organizace"
+      "signIn": "přihlášení",
+      "profileOrganizations": "profil i organizace",
+      "chat": "konverzace",
+      "notifications": "oznámení",
+      "integrations": "integrace"
     }
   },
   "preferences": {
@@ -1332,7 +1377,7 @@
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
       "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Kontrola neodhalila žádné nálezy.",
-      "findingsUnavailable": "Výsledky nejsou k dispozici, protože tato kontrola selhala.",
+      "findingsUnavailable": "Výsledky nejsou k dispozici.",
       "findingsInProgress": "Tato kontrola stále probíhá. Nálezy se zde zobrazí po jejím dokončení.",
       "findingsEndedWithoutResults": "Tato kontrola skončila dříve, než mohla vyprodukovat jakékoli nálezy.",
       "serviceUnavailable": "Nepodařilo se připojit ke službě kontroly kódu. Zopakujte kontrolu, až bude služba dostupná.",
@@ -3534,7 +3579,7 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
-      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na webu.",
+      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na kilo.ai.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"
@@ -3716,6 +3761,7 @@
       "identifierLabel": "Identifikátor",
       "identifierRequired": "Zadejte identifikátor.",
       "identifierTaken": "Tento identifikátor už používá jiný režim.",
+      "identifierTooLong": "Ponechte identifikátor na {{max}} znacích nebo méně.",
       "nameLabel": "Název režimu",
       "nameRequired": "Zadejte název režimu.",
       "notFound": "Tento režim už neexistuje.",
@@ -3810,7 +3856,7 @@
     "emailDeliveryFailed": "E-maily teď nelze doručovat. Zkus to později.",
     "admissionRequired": "Tvé zařízení nelze ověřit. Vyber „$t(login.moreSignInOptions)“ a přihlas se na jiném zařízení nebo přes web.",
     "default": "Něco se pokazilo. Zkus to prosím znovu.",
-    "retryableAdmission": "Toto zařízení se nepodařilo ověřit. Zkontroluj připojení a zkus to znovu.",
+    "retryableAdmission": "Toto zařízení se nepodařilo ověřit. Zkus to znovu.",
     "startSignInFailed": "Přihlášení se nepodařilo zahájit. Zkus to znovu.",
     "couldNotOpenBrowser": "Prohlížeč se nepodařilo otevřít. Zkus to znovu.",
     "signInTimedOut": "Vypršel časový limit pro přihlášení. Zkus to znovu.",
@@ -3882,6 +3928,50 @@
     "nextScheduled": "Další naplánované",
     "answerNeeded": "Čeká na odpověď",
     "waitingToRetry": "Čeká na další pokus",
+    "countNoun": {
+      "needsInput_one": "Čeká na reakci",
+      "needsInput_other": "Čeká na reakci",
+      "needsInput_few": "Čeká na reakci",
+      "needsInput_many": "Čeká na reakci",
+      "running_one": "Pracuje",
+      "running_other": "Pracuje",
+      "running_few": "Pracuje",
+      "running_many": "Pracuje",
+      "scheduled_one": "Naplánováno",
+      "scheduled_other": "Naplánováno",
+      "scheduled_few": "Naplánováno",
+      "scheduled_many": "Naplánováno",
+      "idle_one": "Nečinný",
+      "idle_other": "Nečinného",
+      "idle_few": "Nečinní",
+      "idle_many": "Nečinných"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čeká na reakci",
+      "needsInput_other": "{{displayCount}} Čeká na reakci",
+      "needsInput_few": "{{displayCount}} Čeká na reakci",
+      "needsInput_many": "{{displayCount}} Čeká na reakci",
+      "running_one": "{{displayCount}} Pracuje",
+      "running_other": "{{displayCount}} Pracuje",
+      "running_few": "{{displayCount}} Pracuje",
+      "running_many": "{{displayCount}} Pracuje",
+      "scheduled_one": "{{displayCount}} Naplánováno",
+      "scheduled_other": "{{displayCount}} Naplánováno",
+      "scheduled_few": "{{displayCount}} Naplánováno",
+      "scheduled_many": "{{displayCount}} Naplánováno",
+      "idle_one": "{{displayCount}} Nečinný",
+      "idle_other": "{{displayCount}} Nečinného",
+      "idle_few": "{{displayCount}} Nečinní",
+      "idle_many": "{{displayCount}} Nečinných"
+    },
+    "footer": {
+      "checked": "Ověřeno {{time}}",
+      "lastKnown": "Poslední známý stav · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Příští spuštění {{time}}",
+      "wasDue": "Očekáváno {{time}}"
+    },
     "step": {
       "editing": "Úpravy",
       "reading": "Čtení",
@@ -4129,7 +4219,8 @@
         "space": "Pro tento model není dostatek volného úložiště. Uvolněte místo a zkuste to znovu.",
         "network": "Stahování se nedokončilo. Zkontrolujte připojení a zkuste to znovu.",
         "invalidFile": "Stažený soubor není model, který by tato aplikace mohla spustit, proto byl odstraněn.",
-        "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu."
+        "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu.",
+        "writeFailed": "Toto zařízení nemohlo model uložit. Zkuste jej stáhnout znovu."
       }
     },
     "catalog": {
@@ -4317,7 +4408,7 @@
     "personalDefaultDescription": "Automaticky načteno, když žádné úložiště nemá připnutý profil.",
     "organizationDefaultDescription": "Automaticky načteno pro členy, kteří nemají žádné osobní výchozí nastavení.",
     "setAsDefault": "Nastavit jako výchozí",
-    "saveFailed": "Profil se nepodařilo uložit",
+    "saveFailed": "Profil se nepodařilo uložit. Zkuste to znovu.",
     "organizationRoleRequired": "Profily organizace mohou měnit pouze vlastníci organizace a správci.",
     "deleteTitle": "Smazat profil",
     "deleteMessage": "Tím se profil a jeho nastavení trvale odstraní. Toto nelze vrátit zpět.",
@@ -4577,19 +4668,34 @@
       "deductionFallback": "Odečtení kreditů",
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
+      "expiredGrant": "Platnost vypršela: {{description}}",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
         "balanceNeutral": "Bez vlivu na zůstatek",
         "deduction": "Odečtení",
         "grant": "Přidělení kreditů",
+        "promotionalCredits": "Propagační kredity",
+        "welcomeCredits": "Uvítací kredity",
         "purchase": "Nákup"
+      },
+      "program": {
+        "adminBulkGrant": "Přidělení kreditů správcem",
+        "contributorChampion": "Kredit pro šampiona přispěvatelů",
+        "feedback": "Kredit za zpětnou vazbu",
+        "influencer": "Kredit pro influencery",
+        "ossMonthlyReset": "Měsíční obnovení kreditů OSS",
+        "ossSponsorship": "Kredit za sponzorství OSS",
+        "pullRequest": "Kredit za PR",
+        "usageIssue": "Kredit za problém s využitím",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
       "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
-      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů.",
+      "voidedGrant": "Stornováno: {{description}}"
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
@@ -4854,6 +4960,8 @@
     "connectedTo": "Připojeno k účtu {{account}}",
     "disconnected": "{{provider}} byl odpojen",
     "disconnectFailed": "{{provider}} se nepodařilo odpojit",
+    "disconnectRetry": "Slack nemohl odpojení potvrdit. Zkuste to znovu.",
+    "disconnectNeedsSupport": "Kilo nemohl přečíst uložený přístup k Slacku pro toto připojení. Požádejte podporu o dokončení odpojení.",
     "couldNotLoad": "Integrace se nepodařilo načíst",
     "permissionDenied": "Nemáte oprávnění spravovat tyto integrace.",
     "managedByOwner": "Požádejte vlastníka organizace o změnu připojení, které nemůžete změnit.",
@@ -5183,6 +5291,20 @@
       "eu": "Evropská unie",
       "au": "Austrálie",
       "jp": "Japonsko"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hledat předvolby",
+    "noMatches": "Žádné odpovídající předvolby",
+    "emptyDescription": "Zkuste jiný název předvolby nebo klíčové slovo.",
+    "resultsStatus": "Nalezené předvolby: {{resultCount}}",
+    "keywords": {
+      "signOut": "odhlášení|odhlásit se",
+      "appearance": "motiv|barevné schéma|tmavý režim",
+      "appUnlock": "biometrie|obličej|otisk prstu",
+      "language": "jazyk|překlad",
+      "notifications": "upozornění|oznámení",
+      "privacy": "analytika|sledování"
     }
   }
 }

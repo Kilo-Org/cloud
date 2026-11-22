@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
     "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli.",
     "organizationTrialEndedBillingAtKiloAi": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing sa kilo.ai, pagkatapos ay subukan muli.",
-    "viewOnGitHub": "Tingnan ang PR sa GitHub"
+    "viewOnGitHub": "Tingnan ang PR sa GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Puntong listahan",
+        "nestedBulletPoint": "Nakapasok na puntong listahan",
+        "orderedItem": "Item sa listahan {n}",
+        "nestedOrderedItem": "Nakapasok na item sa listahan {n}"
+      },
+      "blockquote": {
+        "quote": "Sipi",
+        "nestedQuote": "Nakapasok na sipi"
+      },
+      "table": {
+        "row": "Hanay {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Mga pamagat",
+        "links": "Mga link",
+        "images": "Mga larawan"
+      }
+    }
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -428,6 +451,17 @@
       "location": "Lokasyon ng Vertex",
       "clientEmail": "Email ng service account",
       "privateKey": "Private key ng service account",
+      "privateKeyBlockRequired": "I-paste ang buong key block, mula sa linyang BEGIN hanggang sa linyang END.",
+      "privateKeyEncrypted": "Protektado ng passphrase ang key block na ito. I-paste ang service account key na walang passphrase.",
+      "names": {
+        "codestral": "Codestral na luma lamang",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Mag-sign in gamit ang ChatGPT)",
+        "xiaomi": "Xiaomi (bayad sa bawat paggamit)",
+        "zai": "Z.ai (bayad sa bawat paggamit)",
+        "bedrockByok": "Amazon Bedrock (direkta)",
+        "vertexByok": "Google Vertex AI (direkta)"
+      },
       "modelMappings": "Mga model mapping",
       "modelMappingsDescription": "Ipadala ang isang gateway model sa isang custom na deployment name.",
       "mappingTitle": "Mapping {{number}}",
@@ -507,14 +541,25 @@
       "nextStepFinal": "Pinal na ang desisyon sa apela. Hindi na maaaring magsumite ng panibagong apela.",
       "viewReceipt": "Tingnan ang resibo"
     },
+    "reportReceipts": {
+      "title": "Mga ulat",
+      "rowSubtitle": "Mga ulat na isinumite mo at ang mga resulta nito",
+      "emptyTitle": "Wala pang ulat",
+      "emptyDescription": "Lalabas dito ang mga ulat na isusumite mo mula sa isang komento o tugon ng AI.",
+      "couldNotLoad": "Hindi ma-load ang mga ulat mo",
+      "capped": "Ipinapakita ang mga pinakabago mong ulat."
+    },
     "changelog": "Mga bago",
     "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong {{version}}.",
     "changelogGroupNew": "Bago",
     "changelogFixesIn": "Mga pag-aayos at pagpapahusay sa {{areas}}.",
     "changelogFixesPolish": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
     "changelogAreas": {
-      "signIn": "Pagpasok",
-      "profileOrganizations": "Propayl pati mga organisasyon"
+      "signIn": "pagpasok",
+      "profileOrganizations": "propayl pati mga organisasyon",
+      "chat": "usapan",
+      "notifications": "mga abiso",
+      "integrations": "mga integration"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",
       "byline": "#{{number}} ni {{author}}",
       "noFindings": "Walang natukoy na isyu.",
-      "findingsUnavailable": "Hindi available ang mga resulta dahil nabigo ang pagsusuring ito.",
+      "findingsUnavailable": "Hindi available ang mga resulta.",
       "findingsInProgress": "Nagpapatuloy pa ang pagsusuri. Lalabas dito ang mga resulta kapag natapos na ito.",
       "findingsEndedWithoutResults": "Natapos ang pagsusuri nang hindi nakalikha ng anumang resulta.",
       "serviceUnavailable": "Hindi makakonekta sa serbisyo ng pagsusuri ng code. Subukang muli ang pagsusuri kapag available na ang serbisyo.",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "Mga setting ng pagsingil sa web",
       "changePlan": "Palitan ang plano",
       "buySeats": "Bumili ng mga puwesto",
-      "managedOnWeb": "Ang plano, ang mga puwesto at ang auto top-up ay pinamamahalaan sa web.",
+      "managedOnWeb": "Ang plano, ang mga puwesto at ang auto top-up ay pinamamahalaan sa kilo.ai.",
       "setupAutoTopUp": "I-set up ang auto top-up",
       "manageAutoTopUp": "Pamahalaan ang auto top-up",
       "opensOnWeb": "Bubuksan sa web"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "Identifier",
       "identifierRequired": "Maglagay ng identifier.",
       "identifierTaken": "Ginagamit na ng ibang modo ang identifier na ito.",
+      "identifierTooLong": "Panatilihin ang identifier sa {{max}} character o mas kaunti.",
       "nameLabel": "Pangalan ng modo",
       "nameRequired": "Maglagay ng pangalan ng modo.",
       "notFound": "Wala na ang modong ito.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "Pansamantalang hindi makapagpadala ng email. Pakisubukan muli mamaya.",
     "admissionRequired": "Hindi ma-verify ang iyong device. Gamitin ang '$t(login.moreSignInOptions)' para mag-sign in sa ibang device o sa pamamagitan ng web.",
     "default": "Nagkaroon ng problema. Pakisubukan muli.",
-    "retryableAdmission": "Hindi namin ma-verify ang device na ito. Suriin ang iyong koneksyon at subukan muli.",
+    "retryableAdmission": "Hindi mapatunayan ang device na ito. Subukan muli.",
     "startSignInFailed": "Hindi masimulan ang pag-sign in. Pakisubukan muli.",
     "couldNotOpenBrowser": "Hindi mabuksan ang browser. Pakisubukan muli.",
     "signInTimedOut": "Naubos ang oras para sa pag-sign in. Pakisubukan muli.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "Susunod na naka-iskedyul",
     "answerNeeded": "Kailangan ng sagot",
     "waitingToRetry": "Naghihintay ng muling pagsubok",
+    "countNoun": {
+      "needsInput_one": "Naghihintay ng sagot",
+      "needsInput_other": "Naghihintay ng sagot",
+      "running_one": "Nagtatrabaho",
+      "running_other": "Nagtatrabaho",
+      "scheduled_one": "Naka-iskedyul",
+      "scheduled_other": "Naka-iskedyul",
+      "idle_one": "Walang ginagawa",
+      "idle_other": "Walang ginagawa"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Naghihintay ng sagot",
+      "needsInput_other": "{{displayCount}} Naghihintay ng sagot",
+      "running_one": "{{displayCount}} Nagtatrabaho",
+      "running_other": "{{displayCount}} Nagtatrabaho",
+      "scheduled_one": "{{displayCount}} Naka-iskedyul",
+      "scheduled_other": "{{displayCount}} Naka-iskedyul",
+      "idle_one": "{{displayCount}} Walang ginagawa",
+      "idle_other": "{{displayCount}} Walang ginagawa"
+    },
+    "footer": {
+      "checked": "Nakumpirma {{time}}",
+      "lastKnown": "Huling nalaman · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Susunod na pagpapatakbo {{time}}",
+      "wasDue": "Inasahan {{time}}"
+    },
     "step": {
       "editing": "Nag-e-edit",
       "reading": "Nagbabasa",
@@ -3999,7 +4073,8 @@
         "space": "Walang sapat na libreng storage para sa modelong ito. Magbakante ng espasyo at subukan muli.",
         "network": "Hindi natapos ang pag-download. Suriin ang iyong koneksyon at subukan muli.",
         "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito.",
-        "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli."
+        "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli.",
+        "writeFailed": "Hindi na-save ng device na ito ang modelo. Subukang i-download itong muli."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "Awtomatikong na-load kapag walang repository na may naka-pin na profile.",
     "organizationDefaultDescription": "Awtomatikong na-load para sa mga miyembrong walang personal na default.",
     "setAsDefault": "Itakda bilang default",
-    "saveFailed": "Hindi ma-save ang profile",
+    "saveFailed": "Hindi ma-save ang profile. Subukang muli.",
     "organizationRoleRequired": "Mga may-ari ng organisasyon at admin lang ang maaaring baguhin ang profile ng organisasyon.",
     "deleteTitle": "Tanggalin ang profile",
     "deleteMessage": "Permanente nitong inaalis ang profile at mga setting nito. Hindi na ito maaaring bawiin.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "Bawas sa credit",
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",
+      "expiredGrant": "Nag-expire: {{description}}",
       "googlePlayReceipt": "Resibo mula sa Google Play",
       "kind": {
         "adjustment": "Adjustment",
         "balanceNeutral": "Walang epekto sa balanse",
         "deduction": "Bawas",
         "grant": "Libreng credit",
+        "promotionalCredits": "Promosyonal na kredito",
+        "welcomeCredits": "Panimulang credit",
         "purchase": "Pagbili"
+      },
+      "program": {
+        "adminBulkGrant": "Kredito mula sa admin",
+        "contributorChampion": "Kredito ng contributor champion",
+        "feedback": "Kredito para sa puna",
+        "influencer": "Kredito ng influencer",
+        "ossMonthlyReset": "Buwanang pag-reset ng pagtangkilik sa OSS",
+        "ossSponsorship": "Kredito sa pagtangkilik sa OSS",
+        "pullRequest": "Kredito para sa PR",
+        "usageIssue": "Kredito para sa isyu sa paggamit",
+        "vibeDay": "Kredito ng Vibe day"
       },
       "purchaseFallback": "Pagbili ng credit",
       "receipt": "Resibo",
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
-      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit."
+      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit.",
+      "voidedGrant": "Kinansela: {{description}}"
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "Nakakonekta sa {{account}}",
     "disconnected": "Nadiskonekta ang {{provider}}",
     "disconnectFailed": "Hindi ma-diskonekta ang {{provider}}",
+    "disconnectRetry": "Hindi makumpirma ng Slack ang pagdiskonekta. Subukan muli.",
+    "disconnectNeedsSupport": "Hindi mabasa ng Kilo ang naka-save na access sa Slack para sa koneksyong ito. Makipag-ugnayan sa suporta para tapusin ang pagdiskonekta.",
     "couldNotLoad": "Hindi ma-load ang mga integration",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
     "managedByOwner": "Hilingin sa isang may-ari ng organisasyon na baguhin ang isang koneksyong hindi mo mababago.",
@@ -5025,6 +5117,20 @@
       "eu": "European Union",
       "au": "Australia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Maghanap sa mga kagustuhan",
+    "noMatches": "Walang tumutugmang kagustuhan",
+    "emptyDescription": "Subukan ang ibang pangalan ng kagustuhan o susing salita.",
+    "resultsStatus": "Mga nahanap na kagustuhan: {{resultCount}}",
+    "keywords": {
+      "signOut": "lumabas|tapusin ang sesyon",
+      "appearance": "tema|kulay",
+      "appUnlock": "biometriko|mukha|bakas ng daliri",
+      "language": "wika|pagsasalin",
+      "notifications": "abiso|paalala",
+      "privacy": "pagsusuri|pagsubaybay"
     }
   }
 }

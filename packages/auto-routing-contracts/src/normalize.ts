@@ -40,9 +40,10 @@ export const PROMPT_WALK_MAX_DEPTH = 64;
 // to be larger than any single block the cleaning passes strip, because a block
 // whose closer falls outside the gathered text is kept as ordinary text: real
 // agent prompts carry environment_details and file blocks of hundreds of
-// kilobytes, and 1 MiB covers them while still bounding one message's cleaning
-// to a few tens of milliseconds. One mebibyte is the documented limit for a
-// single block; past it the prefix is the block's own opening text.
+// kilobytes, and a window of 1,024,000 characters (1000 * 1024) covers them
+// while still bounding one message's cleaning to a few tens of milliseconds. A
+// block larger than the window keeps its opening text: the gathered prefix ends
+// before the block's closer, so the closer is never stripped.
 const PROMPT_TEXT_MAX_LENGTH = TEXT_PREFIX_MAX_LENGTH * 1024;
 // Credential keys are matched on token boundaries: key names split at
 // separators, digits, and camelCase humps into tokens, and a credential token
@@ -102,11 +103,23 @@ const MAX_QUALIFIER_LENGTH = Math.max(...SENSITIVE_KEY_QUALIFIERS.map(q => q.len
 // These words also begin common English words, so they count only as an exact
 // token or a qualified occurrence, not at any token start.
 const TOKEN_START_EXCLUDED_WORDS: Record<string, true> = { pass: true };
-const REDUNDANT_CONTENT_TYPES = new Set([
+// Content-part `type` values that carry a tool/function result rather than text.
+const TOOL_RESULT_CONTENT_TYPES: ReadonlySet<string> = new Set([
   'function_call_output',
   'tool_call_output',
   'tool_result',
 ]);
+// The subset whose result text lives under `output`; the rest use `content`.
+const OUTPUT_KEYED_RESULT_TYPES: ReadonlySet<string> = new Set([
+  'function_call_output',
+  'tool_call_output',
+]);
+function isToolResultContentType(type: string): boolean {
+  return TOOL_RESULT_CONTENT_TYPES.has(type);
+}
+function isOutputKeyedResultType(type: string): boolean {
+  return OUTPUT_KEYED_RESULT_TYPES.has(type);
+}
 
 export type ClassifierApiKind = NormalizedClassifierInput['apiKind'];
 
@@ -199,19 +212,30 @@ export function normalizeClassifierInput(
     };
   }
 
-  const parsed = messagesBodySchema.safeParse(body);
-  if (!parsed.success) return null;
+  if (apiKind === 'messages') {
+    const parsed = messagesBodySchema.safeParse(body);
+    if (!parsed.success) return null;
 
-  const userPrompts = firstAndLatestPromptPrefix(parsed.data.messages, 'user');
-  return {
-    apiKind,
-    systemPromptPrefix:
-      textPrefix(parsed.data.system) ?? firstPromptPrefix(parsed.data.messages, 'system'),
-    userPromptPrefix: userPrompts.first,
-    latestUserPromptPrefix: userPrompts.latest,
-    messageCount: parsed.data.messages.length,
-    ...commonFields(parsed.data, overrides),
-  };
+    const userPrompts = firstAndLatestPromptPrefix(parsed.data.messages, 'user');
+    return {
+      apiKind,
+      systemPromptPrefix:
+        textPrefix(parsed.data.system) ?? firstPromptPrefix(parsed.data.messages, 'system'),
+      userPromptPrefix: userPrompts.first,
+      latestUserPromptPrefix: userPrompts.latest,
+      messageCount: parsed.data.messages.length,
+      ...commonFields(parsed.data, overrides),
+    };
+  }
+
+  return unhandledApiKind(apiKind);
+}
+
+// Exhaustive dispatch: a new ClassifierApiKind without a branch above is a type
+// error at this call, instead of being parsed as `messages` and returned with a
+// kind the body does not match.
+function unhandledApiKind(_apiKind: never): null {
+  return null;
 }
 
 function commonFields(data: CommonBody, overrides: NormalizeOverrides | undefined) {
@@ -474,7 +498,7 @@ function textFromValue(value: unknown): string {
       continue;
     }
 
-    if (typeof node.type === 'string' && REDUNDANT_CONTENT_TYPES.has(node.type)) {
+    if (typeof node.type === 'string' && isToolResultContentType(node.type)) {
       results.push('');
       continue;
     }
@@ -612,6 +636,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 // ---------- Capability-aware routing helpers ----------
 
+export type MediaPartModality = 'image' | 'file';
+
 // Walks OpenAI chat completions, OpenAI Responses, and Anthropic Messages
 // bodies looking for multimodal content parts. Returns the deduped, sorted
 // set of capability tokens the request demands. This is independent of
@@ -619,8 +645,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // before the request is mutated, and (b) it does not care about text —
 // only which modalities a model must support. Malformed/unknown shapes
 // are silently ignored; the caller treats an empty result as "text only".
-export function detectRequiredInputModalities(body: unknown): string[] {
-  const found = new Set<string>();
+export function detectRequiredInputModalities(body: unknown): MediaPartModality[] {
+  const found = new Set<MediaPartModality>();
   collectModalities(body, found, 0, 'body');
 
   if (found.size === 0) {
@@ -640,8 +666,6 @@ const MODALITY_CHILD_ROLES: Record<ModalityRole, Record<string, ModalityRole>> =
   message: { content: 'part', parts: 'part' },
   part: { parts: 'part' },
 };
-
-type MediaPartModality = 'image' | 'file';
 
 // Content-part `type` values that carry media rather than text, and the input
 // modality each one requires. The modality walk and the routing token
@@ -665,7 +689,7 @@ const MEDIA_PART_MODALITY: Record<string, MediaPartModality | undefined> = {
 // documented "malformed shapes are ignored" result.
 function collectModalities(
   value: unknown,
-  out: Set<string>,
+  out: Set<MediaPartModality>,
   depth: number,
   role: ModalityRole
 ): void {
@@ -864,11 +888,8 @@ function sumContentPartTextChars(part: unknown, depth: number): number {
     // Tool/function result content strings.
     // Anthropic/Chat Completions tool results use `content`; OpenAI Responses
     // `function_call_output` and `tool_call_output` items use `output`.
-    if (type === 'tool_result' || type === 'function_call_output' || type === 'tool_call_output') {
-      const text =
-        type === 'function_call_output' || type === 'tool_call_output'
-          ? (part.output ?? part.content)
-          : part.content;
+    if (isToolResultContentType(type)) {
+      const text = isOutputKeyedResultType(type) ? (part.output ?? part.content) : part.content;
       if (typeof text === 'string') return text.length;
       if (Array.isArray(text)) {
         return text.reduce(
@@ -906,10 +927,7 @@ function sumResponsesInputChars(input: unknown, depth: number): number {
       } else if (isRecord(item)) {
         const type = item.type;
         // Responses API typed parts
-        if (
-          typeof type === 'string' &&
-          (type === 'function_call_output' || type === 'tool_call_output')
-        ) {
+        if (typeof type === 'string' && isOutputKeyedResultType(type)) {
           total += sumContentPartTextChars(item, depth + 1);
         } else if (typeof type === 'string' && type === 'function_call') {
           // Responses API function_call: count arguments string

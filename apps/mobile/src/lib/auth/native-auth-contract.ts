@@ -21,7 +21,27 @@ const errorResponseSchema = z.object({
   // Parsed on their own below: a malformed method list or link offer must not hide the error code.
   methods: z.unknown().optional(),
   pendingLink: z.unknown().optional(),
+  // Parsed on its own below: an unknown hint must be dropped, not hidden, and
+  // must never turn a refusal into a recovery.
+  recovery: z.unknown().optional(),
 });
+
+/**
+ * The one refused-admission recovery the client may run itself: this device
+ * asserted with a key id the server has never stored, so dropping the stored id
+ * and attesting a new key repairs it.
+ *
+ * The server sets this only on a 403 `ADMISSION_REQUIRED` that it answered
+ * before any provider call, OTP reservation, ticket consumption, or settlement.
+ * Any other value is ignored, so a new server-side hint cannot silently turn on
+ * a client behavior that does not exist yet.
+ */
+export const ADMISSION_RECOVERY_UNKNOWN_KEY = 'IOS_ASSERTION_UNKNOWN_KEY';
+
+const admissionRecoveryHintSchema = z.literal(ADMISSION_RECOVERY_UNKNOWN_KEY);
+
+export type AdmissionRecoveryHint = typeof ADMISSION_RECOVERY_UNKNOWN_KEY;
+
 const signupMethodsSchema = z.array(z.string());
 
 const pendingLinkOfferSchema = z.object({
@@ -230,6 +250,7 @@ export function parseAuthError(value: unknown):
       ssoOrganizationId?: string;
       signupMethods?: string[];
       pendingLink?: PendingLinkOffer;
+      recovery?: AdmissionRecoveryHint;
     }
   | undefined {
   const result = errorResponseSchema.safeParse(value);
@@ -238,11 +259,13 @@ export function parseAuthError(value: unknown):
   }
   const methods = signupMethodsSchema.safeParse(result.data.methods);
   const pendingLink = parsePendingLinkOffer(result.data.pendingLink);
+  const recovery = admissionRecoveryHintSchema.safeParse(result.data.recovery);
   return {
     code: result.data.error,
     ssoOrganizationId: result.data.ssoOrganizationId,
     signupMethods: methods.success ? methods.data : undefined,
     ...(pendingLink ? { pendingLink } : {}),
+    ...(recovery.success ? { recovery: recovery.data } : {}),
   };
 }
 

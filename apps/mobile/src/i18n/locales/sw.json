@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
     "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
     "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena.",
-    "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena."
+    "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Nukta ya orodha",
+        "nestedBulletPoint": "Nukta ya orodha ya ndani",
+        "orderedItem": "Kipengee cha orodha {n}",
+        "nestedOrderedItem": "Kipengee cha orodha ya ndani {n}"
+      },
+      "blockquote": {
+        "quote": "Nukuu",
+        "nestedQuote": "Nukuu ya ndani"
+      },
+      "table": {
+        "row": "Safu {n}: {content}"
+      },
+      "math": {
+        "equation": "Hesabu: {latex}"
+      },
+      "rotor": {
+        "headings": "Vichwa",
+        "links": "Viungo",
+        "images": "Picha"
+      }
+    }
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -428,6 +451,17 @@
       "location": "Eneo la Vertex",
       "clientEmail": "Barua pepe ya akaunti ya huduma",
       "privateKey": "Ufunguo binafsi wa akaunti ya huduma",
+      "privateKeyBlockRequired": "Bandika kizuizi kizima cha ufunguo, kutoka mstari wa BEGIN hadi mstari wa END.",
+      "privateKeyEncrypted": "Kizuizi hiki cha ufunguo kinalindwa kwa kaulisiri. Bandika ufunguo wa akaunti ya huduma ambao hauna kaulisiri.",
+      "names": {
+        "codestral": "Codestral ya zamani pekee",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Ingia na ChatGPT)",
+        "xiaomi": "Xiaomi (malipo kwa matumizi)",
+        "zai": "Z.ai (malipo kwa matumizi)",
+        "bedrockByok": "Amazon Bedrock (moja kwa moja)",
+        "vertexByok": "Google Vertex AI (moja kwa moja)"
+      },
       "modelMappings": "Ulinganishaji wa modeli",
       "modelMappingsDescription": "Elekeza modeli ya gateway kwenye jina maalum la deployment.",
       "mappingTitle": "Ulinganishaji {{number}}",
@@ -507,14 +541,25 @@
       "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
       "viewReceipt": "Angalia risiti"
     },
+    "reportReceipts": {
+      "title": "Ripoti",
+      "rowSubtitle": "Ripoti ulizowasilisha na matokeo yake",
+      "emptyTitle": "Hakuna ripoti bado",
+      "emptyDescription": "Ripoti unazowasilisha kutoka kwa maoni au jibu la AI zinaonekana hapa.",
+      "couldNotLoad": "Imeshindwa kupakia ripoti zako",
+      "capped": "Inaonyesha ripoti zako za hivi karibuni."
+    },
     "changelog": "Mapya",
     "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
     "changelogGroupNew": "Mpya",
     "changelogFixesIn": "Marekebisho na maboresho katika {{areas}}.",
     "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
     "changelogAreas": {
-      "signIn": "Kuingia",
-      "profileOrganizations": "Wasifu & mashirika"
+      "signIn": "kuingia",
+      "profileOrganizations": "wasifu & mashirika",
+      "chat": "mazungumzo",
+      "notifications": "arifa",
+      "integrations": "miunganisho"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "Imeshindikana kupata taarifa za hivi karibuni.",
       "byline": "#{{number}} na {{author}}",
       "noFindings": "Hakuna matatizo yaliyopatikana.",
-      "findingsUnavailable": "Matokeo hayapatikani kwa sababu ukaguzi huu umeshindikana.",
+      "findingsUnavailable": "Matokeo hayapatikani.",
       "findingsInProgress": "Ukaguzi huu bado unaendelea. Matokeo yataonekana hapa ukaguzi ukikamilika.",
       "findingsEndedWithoutResults": "Ukaguzi huu uliisha kabla ya kutoa matokeo yoyote.",
       "serviceUnavailable": "Imeshindikana kuunganishwa na huduma ya ukaguzi wa msimbo. Jaribu ukaguzi tena huduma itakapopatikana.",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "Mipangilio ya malipo kwenye wavuti",
       "changePlan": "Badilisha mpango",
       "buySeats": "Nunua nafasi",
-      "managedOnWeb": "Mpango, nafasi na kuongeza salio kiotomatiki vinasimamiwa kwenye wavuti.",
+      "managedOnWeb": "Mpango, nafasi na kuongeza salio kiotomatiki vinasimamiwa kwenye kilo.ai.",
       "setupAutoTopUp": "Weka uongezaji salio kiotomatiki",
       "manageAutoTopUp": "Dhibiti uongezaji salio kiotomatiki",
       "opensOnWeb": "Hufunguka kwenye wavuti"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "Kitambulisho",
       "identifierRequired": "Weka kitambulisho.",
       "identifierTaken": "Hali nyingine tayari inatumia kitambulisho hiki.",
+      "identifierTooLong": "Weka kitambulisho kuwa herufi {{max}} au chache.",
       "nameLabel": "Jina la hali",
       "nameRequired": "Weka jina la hali.",
       "notFound": "Hali hii haipo tena.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "Huduma ya kutuma barua pepe haipatikani kwa muda. Tafadhali jaribu tena baadaye.",
     "admissionRequired": "Kifaa chako hakiwezi kuthibitishwa. Tumia '$t(login.moreSignInOptions)' ili uingie kwenye kifaa kingine au kupitia wavuti.",
     "default": "Hitilafu imetokea. Tafadhali jaribu tena.",
-    "retryableAdmission": "Hatukuweza kuthibitisha kifaa hiki. Angalia muunganisho wako kisha ujaribu tena.",
+    "retryableAdmission": "Imeshindikana kuthibitisha kifaa hiki. Jaribu tena.",
     "startSignInFailed": "Imeshindikana kuanzisha mchakato wa kuingia. Tafadhali jaribu tena.",
     "couldNotOpenBrowser": "Imeshindikana kufungua kivinjari. Tafadhali jaribu tena.",
     "signInTimedOut": "Muda wa kusubiri kuingia umeisha. Tafadhali jaribu tena.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "Zilizopangwa zinazofuata",
     "answerNeeded": "Inasubiri jibu",
     "waitingToRetry": "Inasubiri kujaribu tena",
+    "countNoun": {
+      "needsInput_one": "Inasubiri jibu",
+      "needsInput_other": "Inasubiri jibu",
+      "running_one": "Inafanya kazi",
+      "running_other": "Inafanya kazi",
+      "scheduled_one": "Imepangwa",
+      "scheduled_other": "Imepangwa",
+      "idle_one": "Bila kazi",
+      "idle_other": "Bila kazi"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Inasubiri jibu",
+      "needsInput_other": "{{displayCount}} Inasubiri jibu",
+      "running_one": "{{displayCount}} Inafanya kazi",
+      "running_other": "{{displayCount}} Inafanya kazi",
+      "scheduled_one": "{{displayCount}} Imepangwa",
+      "scheduled_other": "{{displayCount}} Imepangwa",
+      "idle_one": "{{displayCount}} Bila kazi",
+      "idle_other": "{{displayCount}} Bila kazi"
+    },
+    "footer": {
+      "checked": "Imethibitishwa {{time}}",
+      "lastKnown": "Hali ya mwisho iliyojulikana · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Utekelezaji unaofuata {{time}}",
+      "wasDue": "Ilitarajiwa {{time}}"
+    },
     "step": {
       "editing": "Kuhariri",
       "reading": "Kusoma",
@@ -3999,7 +4073,8 @@
         "space": "Hakuna nafasi ya kutosha ya kuhifadhi kwa modeli hii. Toa nafasi na ujaribu tena.",
         "network": "Upakuaji haukukamilika. Angalia muunganisho wako na ujaribu tena.",
         "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa.",
-        "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena."
+        "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena.",
+        "writeFailed": "Kifaa hiki hakikuweza kuhifadhi modeli. Jaribu kupakua tena."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "Imepakia kiotomatiki wakati hakuna hazina iliyo na wasifu uliobandikwa.",
     "organizationDefaultDescription": "Imepakiwa kiotomatiki kwa wanachama ambao hawana chaguo-msingi la kibinafsi.",
     "setAsDefault": "Weka kama chaguomsingi",
-    "saveFailed": "Haikuweza kuhifadhi wasifu",
+    "saveFailed": "Haikuweza kuhifadhi wasifu. Jaribu tena.",
     "organizationRoleRequired": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha wasifu wa shirika.",
     "deleteTitle": "Futa wasifu",
     "deleteMessage": "Hii huondoa kabisa wasifu na mipangilio yake. Hili haliwezi kutenduliwa.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "Makato ya salio",
       "emptyDescription": "Ununuzi wa salio, risiti na matumizi vitaonekana hapa.",
       "emptyTitle": "Hakuna historia ya salio",
+      "expiredGrant": "Muda wake umeisha: {{description}}",
       "googlePlayReceipt": "Risiti kutoka Google Play",
       "kind": {
         "adjustment": "Marekebisho",
         "balanceNeutral": "Haibadilishi salio",
         "deduction": "Makato",
         "grant": "Salio la bure",
+        "promotionalCredits": "Salio la promosheni",
+        "welcomeCredits": "Salio la kukaribisha",
         "purchase": "Ununuzi"
+      },
+      "program": {
+        "adminBulkGrant": "Salio la bure kutoka kwa msimamizi",
+        "contributorChampion": "Salio la bingwa wa wachangiaji",
+        "feedback": "Salio la maoni",
+        "influencer": "Salio la mshawishi",
+        "ossMonthlyReset": "Uwekaji upya wa kila mwezi wa OSS",
+        "ossSponsorship": "Salio la udhamini wa OSS",
+        "pullRequest": "Salio la ombi la kuunganisha",
+        "usageIssue": "Salio la tatizo la matumizi",
+        "vibeDay": "Salio la Vibe Day"
       },
       "purchaseFallback": "Ununuzi wa salio",
       "receipt": "Risiti",
       "receiptA11y": "Fungua risiti ya {{description}}, {{amount}}, kutoka {{date}}",
       "receiptUnavailable": "Hakuna risiti ya ununuzi huu.",
-      "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni."
+      "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni.",
+      "voidedGrant": "Imebatilishwa: {{description}}"
     },
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "Imeunganishwa na {{account}}",
     "disconnected": "{{provider}} imetenganishwa",
     "disconnectFailed": "Imeshindwa kutenganisha {{provider}}",
+    "disconnectRetry": "Slack haikuweza kuthibitisha kutenganisha. Jaribu tena.",
+    "disconnectNeedsSupport": "Kilo haikuweza kusoma ufikiaji wa Slack uliohifadhiwa kwa muunganisho huu. Wasiliana na timu ya usaidizi ili kukamilisha kutenganisha.",
     "couldNotLoad": "Imeshindwa kupakia miunganisho",
     "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
     "managedByOwner": "Mwombe mmiliki wa shirika abadilishe muunganisho ambao huwezi kubadilisha.",
@@ -5025,6 +5117,20 @@
       "eu": "Umoja wa Ulaya",
       "au": "Australia",
       "jp": "Japani"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Utafutaji wa mapendeleo",
+    "noMatches": "Hakuna mapendeleo yanayolingana",
+    "emptyDescription": "Jaribu jina jingine la pendeleo au neno kuu.",
+    "resultsStatus": "Mapendeleo yaliyopatikana: {{resultCount}}",
+    "keywords": {
+      "signOut": "toka|ondoka",
+      "appearance": "mandhari|rangi",
+      "appUnlock": "bayometriki|utambuzi wa uso|alama ya kidole",
+      "language": "lugha|tafsiri",
+      "notifications": "arifa|tahadhari",
+      "privacy": "uchanganuzi|ufuatiliaji"
     }
   }
 }

@@ -345,6 +345,10 @@ describe('safe turn runner workflow wiring', () => {
     expect(vi.mocked(executeKiloBrowserToolCall).mock.calls[0]![0].name).toBe(
       'kilo_browser_take_screenshot'
     );
+    // Safe mode's read-only set cannot answer a dialog, so the message says so.
+    expect(vi.mocked(executeKiloBrowserToolCall).mock.calls[0]![1]).toMatchObject({
+      safeMode: true,
+    });
   });
 
   it('converts a read-only kilo_browser_* gateway call to a browser tool-call event', async () => {

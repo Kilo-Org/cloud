@@ -43,6 +43,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect', () => 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ENKRYPT_API_KEY: 'test-enkrypt-key',
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter', () => ({
+  countEnkryptCalls: () => ({
+    fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
+    flush: async () => {},
+  }),
+}));
 
 const mockedAfter = jest.mocked(after);
 const mockedRecordUsage = jest.mocked(recordEnkryptUsage);

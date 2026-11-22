@@ -7,6 +7,7 @@ import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/cla
 import {
   ReasoningDetailsTransform,
   type CustomLlmAwsBedrockCredentials,
+  type DirectByokModel,
   type ReasoningDetailsTransform as ReasoningDetailsTransformType,
 } from '@kilocode/db/schema-types';
 
@@ -38,6 +39,11 @@ export type BYOKResult = {
 export type TransformRequestContext = {
   provider: Provider;
   model: string;
+  /**
+   * The direct BYOK model the route serves, with the endpoint metadata its definition declares.
+   * Only a direct BYOK route sets it.
+   */
+  directByokModel?: Readonly<Pick<DirectByokModel, 'id' | 'endpoint'>>;
   request: GatewayRequest;
   originalHeaders: FraudDetectionHeaders;
   extraHeaders: Record<string, string>;

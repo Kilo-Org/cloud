@@ -221,6 +221,32 @@ describe('createCachedFetch', () => {
     expect(reported).toHaveLength(1);
   });
 
+  test('keeps reporting the last-known-good value when a second failure repeats after its window', async () => {
+    const clock = createClock(0);
+    const reported: RefreshFailureInfo[] = [];
+    const fetcher = jest
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce('good')
+      .mockRejectedValue(new Error('database down'));
+    const get = createCachedFetch(fetcher, 1_000, 'default', {
+      name: 'test-cache',
+      now: clock.now,
+      onRefreshFailure: info => {
+        reported.push(info);
+      },
+    });
+
+    expect(await get()).toBe('good');
+
+    clock.set(1_000);
+    expect(await get()).toBe('good');
+
+    clock.set(1_000 + FAILURE_BACKOFF_MS);
+    expect(await get()).toBe('good');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(reported.map(info => info.served)).toEqual(['last-known-good', 'last-known-good']);
+  });
+
   test('serves the default value for the default backoff window when nothing is cached', async () => {
     const clock = createClock(0);
     const reported: RefreshFailureInfo[] = [];

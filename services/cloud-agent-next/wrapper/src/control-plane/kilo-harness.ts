@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { createKiloClient } from '@kilocode/sdk';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
@@ -5,6 +6,7 @@ import { summarizeWithTimeout } from '../condense-on-complete.js';
 import {
   createWrapperKiloClient,
   isKiloServerUnreachableError,
+  sameDirectory,
   type WrapperKiloClient,
 } from '../kilo-api.js';
 import { fetchKiloServer, kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
@@ -34,6 +36,12 @@ export type KiloHarnessOptions = {
   log?: (message: string) => void;
 };
 
+/**
+ * The fields a session read returns that a reuse decision depends on. Only `id`
+ * is required: `directory` is compared when the record carries it.
+ */
+const sessionProbeSchema = z.object({ id: z.string(), directory: z.unknown().optional() });
+
 async function sessionExists(
   client: WrapperKiloClient,
   sessionId: string,
@@ -45,11 +53,16 @@ async function sessionExists(
   const response = await fetchKiloServer(client.server, url, { signal });
   if (response.status === 404) return false;
   if (!response.ok) throw new Error('Kilo session probe failed');
-  const data: unknown = await response.json();
-  if (typeof data !== 'object' || data === null || !('id' in data) || data.id !== sessionId) {
+  const parsed = sessionProbeSchema.safeParse(await response.json());
+  if (!parsed.success || parsed.data.id !== sessionId) {
     throw new Error('Kilo session probe returned an invalid session');
   }
-  return true;
+  // A session is reused only when the record is stored under this route's
+  // directory. Otherwise the caller restores or creates its own session, as
+  // the v2 opener does.
+  const recorded = parsed.data.directory;
+  if (typeof recorded !== 'string') return false;
+  return sameDirectory(recorded, directory);
 }
 
 export function createKiloHarness(options: KiloHarnessOptions): Harness {
@@ -69,6 +82,10 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
         input.env,
         signal
       );
+      // Every prepare passes through here, whether it reuses the record or
+      // restores history: settle a ruleset that a committed record still owes
+      // before the route can accept work.
+      await client.settleOutstandingRuleset(input.sessionId, input.directory, signal);
       if (
         await (options.sessionExists ?? sessionExists)(
           client,
@@ -110,6 +127,9 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
             log,
           }).catch(() => undefined);
         }
+        // The restore re-imported the record, so a marker kept past the probe
+        // is applied here; with no marker this is one fast absent read.
+        await client.settleOutstandingRuleset(input.sessionId, input.directory, signal);
         return true;
       }
       if (restored.code !== 404 && !restored.emptySnapshot) {

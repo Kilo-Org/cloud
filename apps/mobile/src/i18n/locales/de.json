@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
     "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
     "organizationTrialEndedBillingAtKiloAi": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
-    "viewOnGitHub": "PR auf GitHub ansehen"
+    "viewOnGitHub": "PR auf GitHub ansehen",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Aufzählungspunkt",
+        "nestedBulletPoint": "Verschachtelter Aufzählungspunkt",
+        "orderedItem": "Listeneintrag {n}",
+        "nestedOrderedItem": "Verschachtelter Listeneintrag {n}"
+      },
+      "blockquote": {
+        "quote": "Zitatblock",
+        "nestedQuote": "Verschachtelter Zitatblock"
+      },
+      "table": {
+        "row": "Zeile {n}: {content}"
+      },
+      "math": {
+        "equation": "Mathematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Überschriften",
+        "links": "Links",
+        "images": "Bilder"
+      }
+    }
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -428,6 +451,17 @@
       "location": "Vertex-Standort",
       "clientEmail": "E-Mail-Adresse des Dienstkontos",
       "privateKey": "Privater Schlüssel des Dienstkontos",
+      "privateKeyBlockRequired": "Füge den gesamten Schlüsselblock ein, von der BEGIN-Zeile bis zur END-Zeile.",
+      "privateKeyEncrypted": "Dieser Schlüsselblock ist mit einer Passphrase geschützt. Füge einen Schlüssel des Dienstkontos ein, der keine Passphrase hat.",
+      "names": {
+        "codestral": "Nur veraltetes Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Mit ChatGPT anmelden)",
+        "xiaomi": "Xiaomi (Nutzungsbasierte Abrechnung)",
+        "zai": "Z.ai (Nutzungsbasierte Abrechnung)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Modellzuordnungen",
       "modelMappingsDescription": "Leite ein Gateway-Modell an einen benutzerdefinierten Deployment-Namen weiter.",
       "mappingTitle": "Zuordnung {{number}}",
@@ -507,6 +541,14 @@
       "nextStepFinal": "Die Entscheidung über den Einspruch ist endgültig. Ein weiterer Einspruch ist nicht möglich.",
       "viewReceipt": "Bestätigung anzeigen"
     },
+    "reportReceipts": {
+      "title": "Meldungen",
+      "rowSubtitle": "Eingereichte Meldungen und ihre Ergebnisse",
+      "emptyTitle": "Noch keine Meldungen",
+      "emptyDescription": "Meldungen, die du zu einem Kommentar oder einer KI-Antwort einreichst, erscheinen hier.",
+      "couldNotLoad": "Deine Meldungen konnten nicht geladen werden",
+      "capped": "Deine neuesten Meldungen werden angezeigt."
+    },
     "changelog": "Neuigkeiten",
     "changelogVersionPending": "Neuigkeiten zu Version {{version}} folgen im nächsten Update.",
     "changelogGroupNew": "Neu",
@@ -514,7 +556,10 @@
     "changelogFixesPolish": "Fehlerbehebungen und Verbesserungen in der gesamten App.",
     "changelogAreas": {
       "signIn": "Anmeldung",
-      "profileOrganizations": "Profil & Organisationen"
+      "profileOrganizations": "Profil & Organisationen",
+      "chat": "Unterhaltung",
+      "notifications": "Benachrichtigungen",
+      "integrations": "Integrationen"
     }
   },
   "preferences": {
@@ -775,7 +820,7 @@
       "gateHidden": "Ausgeblendet",
       "gateNone": "Ohne",
       "noFindings": "Es liegen keine Befunde vor.",
-      "findingsUnavailable": "Die Ergebnisse sind nicht verfügbar, weil dieses Review fehlgeschlagen ist.",
+      "findingsUnavailable": "Die Ergebnisse sind nicht verfügbar.",
       "findingsInProgress": "Dieses Review läuft noch. Befunde erscheinen hier, sobald es abgeschlossen ist.",
       "findingsEndedWithoutResults": "Dieses Review wurde beendet, bevor Befunde entstanden sind.",
       "serviceUnavailable": "Der Code-Review-Dienst konnte nicht erreicht werden. Führe das Review erneut aus, wenn der Dienst verfügbar ist.",
@@ -3402,7 +3447,7 @@
       "manageOnWeb": "Abrechnungseinstellungen im Web",
       "changePlan": "Plan ändern",
       "buySeats": "Nutzerplätze kaufen",
-      "managedOnWeb": "Plan, Nutzerplätze und automatische Aufladung werden im Web verwaltet.",
+      "managedOnWeb": "Plan, Nutzerplätze und automatische Aufladung werden unter kilo.ai verwaltet.",
       "setupAutoTopUp": "Automatische Aufladung einrichten",
       "manageAutoTopUp": "Automatische Aufladung verwalten",
       "opensOnWeb": "Wird im Web geöffnet"
@@ -3596,6 +3641,7 @@
       "identifierLabel": "Bezeichner",
       "identifierRequired": "Bezeichner eingeben.",
       "identifierTaken": "Ein anderer Modus verwendet diesen Bezeichner bereits.",
+      "identifierTooLong": "Bezeichner auf {{max}} Zeichen oder weniger beschränken.",
       "nameLabel": "Modusname",
       "nameRequired": "Modusnamen eingeben.",
       "notFound": "Dieser Modus existiert nicht mehr.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "Die E-Mail-Zustellung ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
     "admissionRequired": "Dein Gerät kann nicht verifiziert werden. Wähle „$t(login.moreSignInOptions)“, um dich auf einem anderen Gerät oder im Browser anzumelden.",
     "default": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Prüfe deine Verbindung und versuche es erneut.",
+    "retryableAdmission": "Dieses Gerät konnte nicht bestätigt werden. Versuche es erneut.",
     "startSignInFailed": "Die Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
     "couldNotOpenBrowser": "Der Browser konnte nicht geöffnet werden. Bitte versuche es erneut.",
     "signInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen. Bitte versuche es erneut.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "Als Nächstes geplant",
     "answerNeeded": "Antwort erforderlich",
     "waitingToRetry": "Wartet auf erneuten Versuch",
+    "countNoun": {
+      "needsInput_one": "Eingabe erforderlich",
+      "needsInput_other": "Eingabe erforderlich",
+      "running_one": "In Bearbeitung",
+      "running_other": "In Bearbeitung",
+      "scheduled_one": "Geplant",
+      "scheduled_other": "Geplant",
+      "idle_one": "Inaktiv",
+      "idle_other": "Inaktiv"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Eingabe erforderlich",
+      "needsInput_other": "{{displayCount}} Eingabe erforderlich",
+      "running_one": "{{displayCount}} In Bearbeitung",
+      "running_other": "{{displayCount}} In Bearbeitung",
+      "scheduled_one": "{{displayCount}} Geplant",
+      "scheduled_other": "{{displayCount}} Geplant",
+      "idle_one": "{{displayCount}} Inaktiv",
+      "idle_other": "{{displayCount}} Inaktiv"
+    },
+    "footer": {
+      "checked": "Geprüft {{time}}",
+      "lastKnown": "Zuletzt bekannt · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Nächste Ausführung {{time}}",
+      "wasDue": "War fällig {{time}}"
+    },
     "step": {
       "editing": "Bearbeiten",
       "reading": "Lesen",
@@ -3999,7 +4073,8 @@
         "space": "Es ist nicht genügend freier Speicherplatz für dieses Modell vorhanden. Gib Speicherplatz frei und versuche es erneut.",
         "network": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und versuche es erneut.",
         "invalidFile": "Die heruntergeladene Datei ist kein Modell, das diese App ausführen kann, und wurde daher entfernt.",
-        "checksum": "Die heruntergeladene Datei stimmt nicht mit ihrer veröffentlichten Prüfsumme überein und wurde daher entfernt. Versuche den Download erneut."
+        "checksum": "Die heruntergeladene Datei stimmt nicht mit ihrer veröffentlichten Prüfsumme überein und wurde daher entfernt. Versuche den Download erneut.",
+        "writeFailed": "Dieses Gerät konnte das Modell nicht speichern. Versuche den Download erneut."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "Wird automatisch geladen, wenn kein Repository über ein angeheftetes Profil verfügt.",
     "organizationDefaultDescription": "Wird automatisch für Mitglieder geladen, die keinen persönlichen Standard haben.",
     "setAsDefault": "Als Standard festlegen",
-    "saveFailed": "Profil konnte nicht gespeichert werden",
+    "saveFailed": "Profil konnte nicht gespeichert werden. Versuche es erneut.",
     "organizationRoleRequired": "Nur Organisationsinhaber und Admins können Organisationsprofile ändern.",
     "deleteTitle": "Profil löschen",
     "deleteMessage": "Dadurch werden das Profil und seine Einstellungen dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "Credit-Abzug",
       "emptyDescription": "Credit-Käufe, Belege und Nutzung werden hier angezeigt.",
       "emptyTitle": "Kein Credit-Verlauf",
+      "expiredGrant": "Abgelaufen: {{description}}",
       "googlePlayReceipt": "Beleg bei Google Play",
       "kind": {
         "adjustment": "Anpassung",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Abzug",
         "grant": "Credit-Gutschrift",
+        "promotionalCredits": "Aktions-Credits",
+        "welcomeCredits": "Willkommens-Credits",
         "purchase": "Kauf"
+      },
+      "program": {
+        "adminBulkGrant": "Admin-Credit-Gutschrift",
+        "contributorChampion": "Credits für Beitrags-Champions",
+        "feedback": "Feedback-Credits",
+        "influencer": "Influencer-Credits",
+        "ossMonthlyReset": "Monatliches Zurücksetzen des Open-Source-Guthabens",
+        "ossSponsorship": "Credits für Open-Source-Förderung",
+        "pullRequest": "Pull-Request-Credits",
+        "usageIssue": "Credits für Nutzungsprobleme",
+        "vibeDay": "Vibe-Day-Credits"
       },
       "purchaseFallback": "Credit-Kauf",
       "receipt": "Beleg",
       "receiptA11y": "Beleg für {{description}}, {{amount}}, vom {{date}} öffnen",
       "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar.",
-      "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt."
+      "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt.",
+      "voidedGrant": "Storniert: {{description}}"
     },
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "Verbunden mit {{account}}",
     "disconnected": "{{provider}} getrennt",
     "disconnectFailed": "{{provider}} konnte nicht getrennt werden",
+    "disconnectRetry": "Slack konnte das Trennen nicht bestätigen. Versuche es erneut.",
+    "disconnectNeedsSupport": "Kilo konnte den gespeicherten Slack-Zugang für diese Verbindung nicht lesen. Wende dich an den Support, um das Trennen abzuschließen.",
     "couldNotLoad": "Integrationen konnten nicht geladen werden",
     "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
     "managedByOwner": "Bitte einen Inhaber der Organisation, eine Verbindung zu ändern, die du nicht ändern kannst.",
@@ -5025,6 +5117,20 @@
       "eu": "Europäische Union",
       "au": "Australien",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Einstellungen suchen",
+    "noMatches": "Keine passenden Einstellungen",
+    "emptyDescription": "Versuche es mit einem anderen Einstellungsnamen oder Suchbegriff.",
+    "resultsStatus": "Gefundene Einstellungen: {{resultCount}}",
+    "keywords": {
+      "signOut": "abmelden|ausloggen|Abmeldung",
+      "appearance": "Farbschema|Dunkelmodus|Darstellung",
+      "appUnlock": "Biometrie|Gesichtserkennung|Fingerabdruck",
+      "language": "Sprache|Übersetzung|App-Sprache",
+      "notifications": "Mitteilungen|Hinweise|Push-Benachrichtigungen",
+      "privacy": "Nutzungsanalyse|Nachverfolgung|Datenschutz"
     }
   }
 }

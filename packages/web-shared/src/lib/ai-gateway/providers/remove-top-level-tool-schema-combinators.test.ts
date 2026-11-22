@@ -1,9 +1,35 @@
 import { describe, expect, it } from '@jest/globals';
+
+import {
+  CLIENT_SCHEMA_MAX_DEPTH,
+  CLIENT_SCHEMA_NODE_BUDGET,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/client-schema-budget';
 import {
   removeTopLevelSchemaCombinators,
   removeTopLevelToolSchemaCombinators,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+
+type ObjectSchema = Record<string, unknown> & { type: 'object' };
+
+function overDeepSchema(): ObjectSchema {
+  const root: ObjectSchema = { type: 'object', anyOf: [{ required: ['a'] }] };
+  let node = root;
+  for (let level = 0; level <= CLIENT_SCHEMA_MAX_DEPTH + 5; level++) {
+    const child: ObjectSchema = { type: 'object' };
+    node.properties = { child };
+    node = child;
+  }
+  return root;
+}
+
+function overWideSchema(): ObjectSchema {
+  return {
+    type: 'object',
+    required: ['a'],
+    anyOf: Array.from({ length: CLIENT_SCHEMA_NODE_BUDGET + 1 }, () => true),
+  };
+}
 
 const nteractCreateCellSchema = () => ({
   type: 'object',
@@ -188,6 +214,51 @@ describe('removeTopLevelSchemaCombinators', () => {
   it.each([null, 'string', 42, []])('ignores non-object schema %p', schema => {
     expect(removeTopLevelSchemaCombinators(schema)).toBeUndefined();
   });
+
+  it('leaves an anyOf root deeper than the depth budget unchanged', () => {
+    const schema = overDeepSchema();
+    const expected = structuredClone(schema);
+
+    const constraints = removeTopLevelSchemaCombinators(schema);
+
+    expect(constraints).toBeUndefined();
+    expect(schema).toEqual(expected);
+    expect(schema.anyOf).toBeDefined();
+  });
+
+  it('leaves an anyOf root wider than the node budget unchanged', () => {
+    const schema = overWideSchema();
+    const expected = structuredClone(schema);
+
+    const constraints = removeTopLevelSchemaCombinators(schema);
+
+    expect(constraints).toBeUndefined();
+    expect(schema).toEqual(expected);
+    expect(schema.anyOf).toBeDefined();
+  });
+
+  it('keeps only the required names every anyOf branch lists, in first-branch order', () => {
+    const sharedNames = Array.from({ length: 2_000 }, (_, index) => `shared_${index}`);
+    const firstNames = [
+      ...sharedNames,
+      ...Array.from({ length: 17_999 }, (_, index) => `only_first_${index}`),
+      'shared_1',
+    ];
+    const secondNames = [
+      ...sharedNames,
+      ...Array.from({ length: 18_000 }, (_, index) => `only_second_${index}`),
+    ];
+    const anyOf = [{ required: firstNames }, { required: secondNames }];
+    const schema: Record<string, unknown> = { type: 'object', anyOf };
+
+    const constraints = removeTopLevelSchemaCombinators(schema);
+
+    // A shared name the first branch repeats still appears once: addRequired dedupes.
+    expect(schema.required).toEqual(sharedNames);
+    expect(constraints).toBe(
+      `The input must also match at least one of these JSON schemas: ${JSON.stringify(anyOf)}`
+    );
+  });
 });
 
 describe('removeTopLevelToolSchemaCombinators', () => {
@@ -303,6 +374,26 @@ describe('removeTopLevelToolSchemaCombinators', () => {
     expect(request.body.tools?.[0]).toStrictEqual({
       name: 'f',
       input_schema: { type: 'object', properties: {} },
+    });
+  });
+
+  it('appends no constraint text for a tool schema over the depth budget', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-opus-5.5',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [{ name: 'f', description: 'Does f.', input_schema: overDeepSchema() }],
+      },
+    };
+
+    removeTopLevelToolSchemaCombinators(request);
+
+    expect(request.body.tools?.[0]).toStrictEqual({
+      name: 'f',
+      description: 'Does f.',
+      input_schema: overDeepSchema(),
     });
   });
 });

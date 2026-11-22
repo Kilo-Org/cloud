@@ -56,6 +56,13 @@ describe('verifyAppleJwtWithJwks', () => {
     // a fresh dynamic import gives each case its own cache and cooldown.
     return import('./apple-jwks');
   };
+  // Arbitrary 200 bodies (malformed envelopes, unusable entries) do not fit
+  // the JWK-typed helper above.
+  const rawJwksResponse = (body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
 
   it('classifies JWT verification failures as client errors', async () => {
     const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
@@ -313,5 +320,144 @@ describe('verifyAppleJwtWithJwks', () => {
     await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
     expect(fetchMock).toHaveBeenCalledTimes(5);
     expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the healthy key set when a refresh returns a malformed body', async () => {
+    const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
+    const captureException = jest.requireMock<{ captureException: jest.Mock }>(
+      '@sentry/nextjs'
+    ).captureException;
+    let now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('current-key')]))
+      .mockResolvedValueOnce(rawJwksResponse({ keys: 'nope' }))
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('rotated-key')]));
+
+    await expect(
+      verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-1' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'user-1' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // An unknown kid triggers the refresh. A body that is not a key-set
+    // envelope must count as a failed refresh: a server error, not a raw
+    // TypeError raised while searching an unchecked body.
+    now += 31_000;
+    const rotatedToken = signToken('rotated-key', { sub: 'user-2' });
+    const error = await verifyAppleJwtWithJwks(rotatedToken, 'com.kilocode.kiloapp').catch(
+      (reason: unknown) => reason
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(TypeError);
+    expect(error).not.toBeInstanceOf(AppleJwtClientError);
+    expect(error).toHaveProperty(
+      'message',
+      'Malformed Apple JWKS response: expected an object with a keys array'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The failure propagates, so the receiving route reports it, not the module.
+    expect(captureException).not.toHaveBeenCalled();
+
+    // The malformed body did not replace the healthy cache, so the cached set
+    // still verifies its own kid.
+    await expect(
+      verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-3' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'user-3' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // After the cooldown a healthy body is fetched and the rotated kid verifies.
+    now += 31_000;
+    await expect(
+      verifyAppleJwtWithJwks(rotatedToken, 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'user-2' });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('treats a key set whose only entry has unusable key material as a failed refresh', async () => {
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
+    let now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        rawJwksResponse({ keys: [{ ...publicJwk, kid: 'broken-key', n: '!!!' }] })
+      )
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('rotated-key')]));
+
+    const brokenToken = signToken('broken-key', { sub: 'user-1' });
+    const error = await verifyAppleJwtWithJwks(brokenToken, 'com.kilocode.kiloapp').catch(
+      (reason: unknown) => reason
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(TypeError);
+    expect(error).toHaveProperty('message', 'Malformed Apple JWKS response: no usable RSA key');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Inside the cooldown the recorded failure is rethrown, without a fetch.
+    await expect(
+      verifyAppleJwtWithJwks(brokenToken, 'com.kilocode.kiloapp')
+    ).rejects.toHaveProperty('message', 'Malformed Apple JWKS response: no usable RSA key');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // A later healthy body after the cooldown serves.
+    now += 31_000;
+    await expect(
+      verifyAppleJwtWithJwks(signToken('rotated-key', { sub: 'user-2' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'user-2' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops entries of another key type or missing members and keeps the usable key', async () => {
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+      rawJwksResponse({
+        keys: [
+          { kty: 'EC', kid: 'ec-key', crv: 'P-256', x: 'x', y: 'y' },
+          { kty: 'RSA', kid: 'missing-modulus-key', e: 'AQAB' },
+          jwkForKey('usable-key'),
+        ],
+      })
+    );
+
+    await expect(
+      verifyAppleJwtWithJwks(signToken('usable-key', { sub: 'user-1' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'user-1' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an empty or non-array key set as a failed refresh', async () => {
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
+    let now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('current-key')]))
+      .mockResolvedValueOnce(rawJwksResponse({ keys: [] }))
+      .mockResolvedValueOnce(rawJwksResponse({ keys: 'nope' }));
+
+    await expect(
+      verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-1' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'user-1' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now += 31_000;
+    await expect(
+      verifyAppleJwtWithJwks(signToken('unknown-key'), 'com.kilocode.kiloapp')
+    ).rejects.toThrow('Malformed Apple JWKS response: no usable RSA key');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(
+      verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-2' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'user-2' });
+
+    now += 31_000;
+    await expect(
+      verifyAppleJwtWithJwks(signToken('unknown-key'), 'com.kilocode.kiloapp')
+    ).rejects.toThrow('Malformed Apple JWKS response: expected an object with a keys array');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    await expect(
+      verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-3' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'user-3' });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

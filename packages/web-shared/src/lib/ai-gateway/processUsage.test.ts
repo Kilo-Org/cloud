@@ -2512,7 +2512,13 @@ describe('logMicrodollarUsage', () => {
     });
 
     const result = await processTokenData(
-      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 300, cacheDiscount_mUsd: 50 },
+      {
+        ...BASE_USAGE_STATS,
+        messageId: null,
+        cost_mUsd: 300,
+        cacheDiscount_mUsd: 50,
+        is_byok: null,
+      },
       {
         ...createBaseUsageContext(user),
         provider: 'custom',
@@ -2542,7 +2548,12 @@ describe('logMicrodollarUsage', () => {
     const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
       where: eq(microdollar_usage_metadata.id, result.usageId),
     });
-    expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 300 });
+    expect(metadataRecord).toMatchObject({
+      is_free: false,
+      is_byok: true,
+      is_user_byok: false,
+      market_cost: 300,
+    });
     expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
   });
 
@@ -2560,6 +2571,7 @@ describe('logMicrodollarUsage', () => {
         messageId: null,
         cost_mUsd: 300,
         cacheDiscount_mUsd: 50,
+        is_byok: null,
       },
       {
         ...createBaseUsageContext(user),
@@ -2592,6 +2604,10 @@ describe('logMicrodollarUsage', () => {
       requested_model: 'moonshotai/kimi-k2.6',
       cost: pricedCost,
     });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({ is_byok: true, is_user_byok: false });
     expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
   });
 
@@ -2634,7 +2650,7 @@ describe('logMicrodollarUsage', () => {
         expect(await isCustomLlm(modelId)).toBe(false);
 
         const result = await processTokenData(
-          { ...BASE_USAGE_STATS, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+          { ...BASE_USAGE_STATS, cost_mUsd: 700, cacheDiscount_mUsd: 50, is_byok: false },
           usageContext
         );
         assert(result);
@@ -2651,7 +2667,12 @@ describe('logMicrodollarUsage', () => {
         const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
           where: eq(microdollar_usage_metadata.id, result.usageId),
         });
-        expect(metadataRecord).toMatchObject({ is_free: true, market_cost: 700 });
+        expect(metadataRecord).toMatchObject({
+          is_free: true,
+          is_byok: true,
+          is_user_byok: false,
+          market_cost: 700,
+        });
         expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
         const updatedOrganization = await db.query.organizations.findFirst({
           where: eq(organizations.id, organization.id),

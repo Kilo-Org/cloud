@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, පුද්ගලික කේත ගබඩාව",
     "legalDocumentEnglishOnly": "මෙම ලේඛනය ඉංග්‍රීසි භාෂාවෙන් පමණක් ලබා ගත හැක.",
     "organizationTrialEndedBilling": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
-    "organizationTrialEndedBillingAtKiloAi": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක."
+    "organizationTrialEndedBillingAtKiloAi": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "බුලට් ලක්ෂ්‍යය",
+        "nestedBulletPoint": "කැදැලි බුලට් ලක්ෂ්‍යය",
+        "orderedItem": "ලැයිස්තු අයිතමය {n}",
+        "nestedOrderedItem": "කැදැලි ලැයිස්තු අයිතමය {n}"
+      },
+      "blockquote": {
+        "quote": "උද්ධෘතය",
+        "nestedQuote": "කැදැලි උද්ධෘතය"
+      },
+      "table": {
+        "row": "පේළිය {n}: {content}"
+      },
+      "math": {
+        "equation": "ගණිතය: {latex}"
+      },
+      "rotor": {
+        "headings": "ශීර්ෂ",
+        "links": "සබැඳි",
+        "images": "රූප"
+      }
+    }
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -428,6 +451,17 @@
       "location": "Vertex ස්ථානය",
       "clientEmail": "සේවා ගිණුමේ ඊමේල් ලිපිනය",
       "privateKey": "සේවා ගිණුමේ පුද්ගලික යතුර",
+      "privateKeyBlockRequired": "BEGIN පේළියේ සිට END පේළිය දක්වා සම්පූර්ණ යතුරු කොටස අලවන්න.",
+      "privateKeyEncrypted": "මෙම යතුරු කොටස මුරපද වැකියකින් ආරක්ෂා කර ඇත. මුරපද වැකියක් නොමැති සේවා ගිණුමේ යතුරක් අලවන්න.",
+      "names": {
+        "codestral": "පැරණි Codestral පමණක්",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT හරහා පිවිසෙන්න)",
+        "xiaomi": "Xiaomi (භාවිතය අනුව ගෙවන්න)",
+        "zai": "Z.ai (භාවිතය අනුව ගෙවන්න)",
+        "bedrockByok": "Amazon Bedrock (සෘජු)",
+        "vertexByok": "Google Vertex AI (සෘජු)"
+      },
       "modelMappings": "මාදිලි සිතියම්ගත කිරීම්",
       "modelMappingsDescription": "Gateway මාදිලියක් අභිරුචි deployment නාමයකට යවන්න.",
       "mappingTitle": "සිතියම්ගත කිරීම {{number}}",
@@ -507,6 +541,14 @@
       "nextStepFinal": "අභියාචන තීරණය අවසාන ය. තවදුරටත් අභියාචනයක් ඉදිරිපත් කළ නොහැක.",
       "viewReceipt": "රිසිට්පත බලන්න"
     },
+    "reportReceipts": {
+      "title": "වාර්තා",
+      "rowSubtitle": "ඔබ ඉදිරිපත් කළ වාර්තා සහ ඒවායේ ප්‍රතිඵල",
+      "emptyTitle": "තවම වාර්තා නැත",
+      "emptyDescription": "ඔබ අදහසකින් හෝ AI ප්‍රතිචාරයකින් ඉදිරිපත් කරන වාර්තා මෙහි දිස්වේ.",
+      "couldNotLoad": "ඔබේ වාර්තා පූරණය කළ නොහැකි විය",
+      "capped": "ඔබේ නවතම වාර්තා පෙන්වමින් පවතී."
+    },
     "changelog": "අලුත් දේ",
     "changelogVersionPending": "{{version}} අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ.",
     "changelogGroupNew": "නව",
@@ -514,7 +556,10 @@
     "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogAreas": {
       "signIn": "පුරනය වීම",
-      "profileOrganizations": "පැතිකඩ හා සංවිධාන"
+      "profileOrganizations": "පැතිකඩ හා සංවිධාන",
+      "chat": "කතාබස්",
+      "notifications": "දැනුම්දීම්",
+      "integrations": "ඒකාබද්ධ කිරීම්"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "නවතම තොරතුරු ලබාගත නොහැකි විය.",
       "byline": "#{{number}} {{author}} විසින්",
       "noFindings": "සොයාගැනීම් නැත.",
-      "findingsUnavailable": "මෙම සමාලෝචනය අසාර්ථක වූ නිසා ප්‍රතිඵල ලබා ගත නොහැක.",
+      "findingsUnavailable": "ප්‍රතිඵල ලබා ගත නොහැක.",
       "findingsInProgress": "මෙම සමාලෝචනය තවමත් සිදු වෙමින් පවතී. එය අවසන් වන විට සොයාගැනීම් මෙහි දිස් වේ.",
       "findingsEndedWithoutResults": "මෙම සමාලෝචනය කිසිදු සොයාගැනීමක් නිපදවීමට පෙර අවසන් විය.",
       "serviceUnavailable": "කේත සමාලෝචන සේවාවට සම්බන්ධ විය නොහැකි විය. සේවාව ලබා ගත හැකි වූ විට සමාලෝචනය කිරීමට නැවත උත්සාහ කරන්න.",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "වෙබයේ බිල්පත් සැකසීම්",
       "changePlan": "සැලැස්ම වෙනස් කරන්න",
       "buySeats": "සාමාජික ස්ථාන මිලදී ගන්න",
-      "managedOnWeb": "සැලැස්ම, සාමාජික ස්ථාන සහ ස්වයංක්‍රීය ටොප්-අප් වෙබයේ කළමනාකරණය කෙරේ.",
+      "managedOnWeb": "සැලැස්ම, සාමාජික ස්ථාන සහ ස්වයංක්‍රීය ටොප්-අප් kilo.ai හි කළමනාකරණය කෙරේ.",
       "setupAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් සකසන්න",
       "manageAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් කළමනාකරණය කරන්න",
       "opensOnWeb": "වෙබයේ විවෘත වේ"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "හඳුන්වනය",
       "identifierRequired": "හඳුන්වනයක් ඇතුළත් කරන්න.",
       "identifierTaken": "තවත් ප්‍රකාරයක් දැනටමත් මෙම හඳුන්වනය භාවිතා කරයි.",
+      "identifierTooLong": "හඳුන්වනය {{max}} අකුරු හෝ ඊට අඩුවෙන් තබන්න.",
       "nameLabel": "ප්‍රකාරයේ නම",
       "nameRequired": "ප්‍රකාරයේ නමක් ඇතුළත් කරන්න.",
       "notFound": "මෙම ප්‍රකාරය තවදුරටත් නොපවතී.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "ඊමේල් පණිවිඩ යැවීම තාවකාලිකව අක්‍රීයයි. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
     "admissionRequired": "ඔබේ උපාංගය තහවුරු කළ නොහැක. වෙනත් උපාංගයකින් හෝ වෙබ් අඩවිය හරහා පිවිසීමට '$t(login.moreSignInOptions)' භාවිතා කරන්න.",
     "default": "දෝෂයක් ඇති විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-    "retryableAdmission": "මෙම උපාංගය තහවුරු කළ නොහැකි විය. ඔබේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "retryableAdmission": "මෙම උපාංගය සත්‍යාපනය කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "startSignInFailed": "පිවිසීම ආරම්භ කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
     "couldNotOpenBrowser": "බ්‍රවුසරය විවෘත කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
     "signInTimedOut": "පිවිසීමට නියමිත කාලය ඉකුත් විය. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "ඊළඟ නියමිත කාර්යයන්",
     "answerNeeded": "පිළිතුරක් අවශ්‍යයි",
     "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී",
+    "countNoun": {
+      "needsInput_one": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+      "needsInput_other": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+      "running_one": "ක්‍රියාත්මකයි",
+      "running_other": "ක්‍රියාත්මකයි",
+      "scheduled_one": "නියමිතයි",
+      "scheduled_other": "නියමිතයි",
+      "idle_one": "නිෂ්ක්‍රීයයි",
+      "idle_other": "නිෂ්ක්‍රීයයි"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+      "needsInput_other": "{{displayCount}} ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+      "running_one": "{{displayCount}} ක්‍රියාත්මකයි",
+      "running_other": "{{displayCount}} ක්‍රියාත්මකයි",
+      "scheduled_one": "{{displayCount}} නියමිතයි",
+      "scheduled_other": "{{displayCount}} නියමිතයි",
+      "idle_one": "{{displayCount}} නිෂ්ක්‍රීයයි",
+      "idle_other": "{{displayCount}} නිෂ්ක්‍රීයයි"
+    },
+    "footer": {
+      "checked": "තහවුරු කළේ {{time}}",
+      "lastKnown": "අවසන් වරට දන්නා තත්ත්වය · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ඊළඟ ක්‍රියාත්මක වීම {{time}}",
+      "wasDue": "අපේක්ෂිත විය {{time}}"
+    },
     "step": {
       "editing": "සංස්කරණය",
       "reading": "කියවීම",
@@ -3999,7 +4073,8 @@
         "space": "මෙම ආකෘතිය සඳහා ප්‍රමාණවත් නිදහස් ගබඩා ඉඩක් නොමැත. ඉඩ නිදහස් කර නැවත උත්සාහ කරන්න.",
         "network": "බාගැනීම අවසන් නොවීය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
         "invalidFile": "බාගත කළ ගොනුව මෙම යෙදුමට ක්‍රියාත්මක කළ හැකි ආකෘතියක් නොවේ, එබැවින් එය ඉවත් කරන ලදී.",
-        "checksum": "බාගත කළ ගොනුව එහි ප්‍රකාශිත චෙක්සම් අගයට නොගැළපේ, එබැවින් එය ඉවත් කරන ලදී. නැවත බාගත කිරීමට උත්සාහ කරන්න."
+        "checksum": "බාගත කළ ගොනුව එහි ප්‍රකාශිත චෙක්සම් අගයට නොගැළපේ, එබැවින් එය ඉවත් කරන ලදී. නැවත බාගත කිරීමට උත්සාහ කරන්න.",
+        "writeFailed": "මෙම උපාංගයට ආකෘතිය සුරැකීමට නොහැකි විය. නැවත බාගත කිරීමට උත්සාහ කරන්න."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "කිසිදු ගබඩාවක පින් කළ පැතිකඩක් නොමැති විට ස්වයංක්‍රීයව පටවනු ලැබේ.",
     "organizationDefaultDescription": "පුද්ගලික පෙරනිමියක් නොමැති සාමාජිකයින් සඳහා ස්වයංක්‍රීයව පටවනු ලැබේ.",
     "setAsDefault": "පෙරනිමිය ලෙස සකසන්න",
-    "saveFailed": "පැතිකඩ සුරැකීමට නොහැකි විය",
+    "saveFailed": "පැතිකඩ සුරැකීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "organizationRoleRequired": "සංවිධාන පැතිකඩ වෙනස් කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකවරුන්ට පමණි.",
     "deleteTitle": "පැතිකඩ මකන්න",
     "deleteMessage": "මෙය පැතිකඩ සහ එහි සැකසුම් ස්ථිරවම ඉවත් කරයි. මෙය ආපසු හැරවිය නොහැක.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
       "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
+      "expiredGrant": "කල් ඉකුත් වී ඇත: {{description}}",
       "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
       "kind": {
         "adjustment": "ගැලපීම",
         "balanceNeutral": "ශේෂයට බලපෑමක් නැත",
         "deduction": "අඩු කිරීම",
         "grant": "ක්‍රෙඩිට් ප්‍රදානය",
+        "promotionalCredits": "ප්‍රවර්ධන ක්‍රෙඩිට්",
+        "welcomeCredits": "පිළිගැනීමේ ක්‍රෙඩිට්",
         "purchase": "මිලදී ගැනීම"
+      },
+      "program": {
+        "adminBulkGrant": "පරිපාලක ක්‍රෙඩිට් ප්‍රදානය",
+        "contributorChampion": "දායක ශූර ක්‍රෙඩිට්",
+        "feedback": "ප්‍රතිපෝෂණ ක්‍රෙඩිට්",
+        "influencer": "ඉන්ෆ්ලුවෙන්සර් ක්‍රෙඩිට්",
+        "ossMonthlyReset": "OSS අනුග්‍රහය යළි සැකසීම",
+        "ossSponsorship": "OSS අනුග්‍රහ ක්‍රෙඩිට්",
+        "pullRequest": "පුල් ඉල්ලීම් ක්‍රෙඩිට්",
+        "usageIssue": "භාවිත ගැටලු ක්‍රෙඩිට්",
+        "vibeDay": "Vibe day ක්‍රෙඩිට්"
       },
       "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
       "receipt": "රිසිට්පත",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
       "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
-      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි."
+      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි.",
+      "voidedGrant": "අවලංගු කර ඇත: {{description}}"
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "{{account}} වෙත සම්බන්ධිතයි",
     "disconnected": "{{provider}} විසන්ධි කරන ලදී",
     "disconnectFailed": "{{provider}} විසන්ධි කළ නොහැකි විය",
+    "disconnectRetry": "Slack විසින් විසන්ධි කිරීම තහවුරු කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
+    "disconnectNeedsSupport": "මෙම සම්බන්ධතාව සඳහා සුරකින ලද Slack ප්‍රවේශය Kilo විසින් කියවීමට නොහැකි විය. විසන්ධි කිරීම සම්පූර්ණ කිරීමට සහාය කණ්ඩායම අමතන්න.",
     "couldNotLoad": "ඒකාබද්ධ කිරීම් පූරණය කළ නොහැකි විය",
     "permissionDenied": "මෙම ඒකාබද්ධ කිරීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
     "managedByOwner": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
@@ -5025,6 +5117,20 @@
       "eu": "යුරෝපීය සංගමය",
       "au": "ඕස්ට්‍රේලියාව",
       "jp": "ජපානය"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "මනාප සොයන්න",
+    "noMatches": "ගැළපෙන මනාප නැත",
+    "emptyDescription": "වෙනත් මනාපයක නමක් හෝ මූලපදයක් යොදා බලන්න.",
+    "resultsStatus": "හමු වූ මනාප: {{resultCount}}",
+    "keywords": {
+      "signOut": "පිටවන්න|ගිණුමෙන් පිටවීම",
+      "appearance": "තේමාව|වර්ණ පටිපාටිය",
+      "appUnlock": "ජෛවමිතික|මුහුණ|ඇඟිලි සලකුණ",
+      "language": "භාෂාව|පරිවර්තනය",
+      "notifications": "ඇඟවීම්|දැනුම්දීම්",
+      "privacy": "විශ්ලේෂණ|ලුහුබැඳීම"
     }
   }
 }

@@ -10,14 +10,31 @@ import { attachDatabasePool } from '@vercel/functions';
 import { parseIPv6 } from '@kilocode/web-shared/lib/cloudflare-ip';
 import { firstForwardedHop } from '@kilocode/web-shared/lib/http/forwarded-hop';
 export const { Client, Pool } = pg;
-const { DEBUG_QUERY_LOGGING, VERCEL_REGION, NODE_ENV } = process.env;
+const { VERCEL_REGION, NODE_ENV } = process.env;
 
-// Environment validation. A missing variable fails at module load through requireEnv, so every
-// required-variable failure in this module has one throw type and one message shape.
-const POSTGRES_CONNECT_TIMEOUT = requireEnv(
+// Environment validation. A missing required variable fails at module load through
+// `requireEnv`, and a malformed one fails through `requireIntegerEnv`, so every
+// required-variable failure in this module happens at load with one `Error` and an
+// explicit message naming the variable.
+const POSTGRES_CONNECT_TIMEOUT = requireIntegerEnv(
   'POSTGRES_CONNECT_TIMEOUT',
   process.env.POSTGRES_CONNECT_TIMEOUT
 );
+
+// Query logging is opt-in: only the literal `true` enables it, so an unset variable and any
+// other value, including the string `false`, leave it off.
+const DEBUG_QUERY_LOGGING = process.env.DEBUG_QUERY_LOGGING === 'true';
+
+/** A required environment variable parsed once into the integer the module uses. */
+export function requireIntegerEnv(name: string, value: string | undefined): number {
+  const trimmed = requireEnv(name, value).trim();
+  if (!/^[0-9]+$/.test(trimmed) || !Number.isSafeInteger(Number(trimmed))) {
+    throw new Error(
+      `Invalid required environment variable ${name}: expected a non-negative integer number of milliseconds, received ${JSON.stringify(value)}`
+    );
+  }
+  return Number(trimmed);
+}
 
 // Base url + test worker suffix (shared). It selects POSTGRES_URL_PRODUCTION or
 // POSTGRES_URL for the current mode and throws when that variable is unset, so
@@ -195,7 +212,7 @@ const idleTimeoutMillis = 5_000;
 
 const sharedPoolConfig: Partial<pg.PoolConfig> = {
   max,
-  connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT),
+  connectionTimeoutMillis: POSTGRES_CONNECT_TIMEOUT,
   idleTimeoutMillis,
 };
 
@@ -203,9 +220,24 @@ const sharedPoolConfig: Partial<pg.PoolConfig> = {
 const primary = createDrizzleClient({
   connectionString: postgresUrl,
   poolConfig: { ...sharedPoolConfig, application_name: appName },
-  logger: !!DEBUG_QUERY_LOGGING,
+  logger: DEBUG_QUERY_LOGGING,
 });
 export const pool = primary.pool;
+
+// pg pools open connections on demand. Queued Enkrypt and Exa share two dedicated
+// connections per runtime, preserving their existing combined two-write ceiling.
+// Co-location raises the primary connection envelope from 10 to 12 (plus replicas);
+// N runtimes may add up to 2N connections. This does not isolate PostgreSQL row locks.
+const taggedWriter = createDrizzleClient({
+  connectionString: postgresUrl,
+  poolConfig: { ...sharedPoolConfig, max: 2, application_name: `${appName}-tagged-writer` },
+  logger: DEBUG_QUERY_LOGGING,
+});
+export const taggedWriterPool = taggedWriter.pool;
+export const taggedWriterDb = taggedWriter.db;
+taggedWriterPool.on('error', (error: Error) => {
+  console.error('Unexpected error on idle client (tagged writer)', { error_name: error.name });
+});
 
 // Replica pools - US replica in US regions; in EU regions one pool per configured
 // EU replica, with the primary only as fallback. Each pool keeps the full `max`,
@@ -219,7 +251,7 @@ const replicas = usesSeparateReplica
       createDrizzleClient({
         connectionString,
         poolConfig: { ...sharedPoolConfig, application_name: `${appName}-replica` },
-        logger: !!DEBUG_QUERY_LOGGING,
+        logger: DEBUG_QUERY_LOGGING,
       })
     )
   : [primary];
@@ -229,6 +261,7 @@ const replicaPools = usesSeparateReplica ? replicas.map(replica => replica.pool)
 // Skip in test environment as it interferes with Jest's cleanup
 if (process.env.NODE_ENV !== 'test') {
   attachDatabasePool(pool);
+  attachDatabasePool(taggedWriterPool);
   for (const replicaPool of replicaPools) {
     attachDatabasePool(replicaPool);
   }
@@ -372,6 +405,7 @@ export const auto_deleted_at = { deleted_at: drizzleSql`now()` };
  */
 export async function closeAllDrizzleConnections(): Promise<void> {
   await pool.end();
+  await taggedWriterPool.end();
   for (const replicaPool of replicaPools) {
     await replicaPool.end();
   }

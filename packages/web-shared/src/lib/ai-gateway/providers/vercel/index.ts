@@ -20,9 +20,10 @@ import type {
   VercelProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
-  getVercelModelIdOverrides,
   mapModelIdToVercel,
   mapVercelModelIdToOpenRouter,
+  resolveVercelModelId,
+  type VercelModelIdOverrides,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   getCachedVercelInferenceProviderIdsForModel,
@@ -35,12 +36,18 @@ import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 
-export function hasCompatibleVercelInferenceProvider(
+/**
+ * Whether Vercel serves any of `openRouterInferenceProviders`. Tri-state because Vercel's
+ * inference-provider data can be missing: `undefined` means the data is unavailable and the answer
+ * is unknown, which callers treat differently from a known `false` (an `ignore` list fails closed,
+ * an `only` list fails open).
+ */
+export function hasVercelInferenceProviderFor(
   openRouterInferenceProviders: string[],
   vercelInferenceProviders: string[] | null
-) {
+): boolean | undefined {
+  if (!vercelInferenceProviders) return undefined;
   return (
-    !vercelInferenceProviders ||
     getVercelInferenceProvidersExcludingIgnored(
       [],
       openRouterInferenceProviders,
@@ -224,12 +231,26 @@ export async function isVercelRoutingEnabledForModel(requestedModel: string) {
   return true;
 }
 
+/**
+ * The single derivation of whether Vercel serves `requestedModel`: the Vercel language model ids,
+ * the model's Vercel id and the admin overrides that mapped it, read together so the three
+ * predicates cannot disagree about the same request.
+ */
+async function resolveVercelModel(requestedModel: string): Promise<{
+  vercelModels: ReadonlySet<string>;
+  vercelModelId: string;
+  overrides: VercelModelIdOverrides;
+}> {
+  const [vercelModels, { vercelModelId, overrides }] = await Promise.all([
+    getVercelLanguageModelIdsFromDatabase(),
+    resolveVercelModelId(requestedModel),
+  ]);
+  return { vercelModels, vercelModelId, overrides };
+}
+
 /** Whether Vercel serves the model, regardless of the request's routing settings. */
 export async function isVercelModel(requestedModel: string) {
-  const [vercelModels, vercelModelId] = await Promise.all([
-    getVercelLanguageModelIdsFromDatabase(),
-    mapModelIdToVercel(requestedModel),
-  ]);
+  const { vercelModels, vercelModelId } = await resolveVercelModel(requestedModel);
   return vercelModels.has(vercelModelId);
 }
 
@@ -242,11 +263,7 @@ export async function isVercelModel(requestedModel: string) {
  * outage.
  */
 export async function isValidVercelModelId(requestedModel: string) {
-  const [vercelModels, overrides, vercelModelId] = await Promise.all([
-    getVercelLanguageModelIdsFromDatabase(),
-    getVercelModelIdOverrides(),
-    mapModelIdToVercel(requestedModel),
-  ]);
+  const { vercelModels, vercelModelId, overrides } = await resolveVercelModel(requestedModel);
   if (vercelModels.size === 0) return true;
   if (!vercelModels.has(vercelModelId)) return false;
 
@@ -259,14 +276,15 @@ export async function isValidVercelModelId(requestedModel: string) {
 /**
  * Whether Vercel serves the model and can honor the provider routing settings.
  * Returns false when provider ignore lists cannot be checked because Vercel's
- * inference provider data is unavailable.
+ * inference provider data is unavailable. `ignore` lists fail closed in that case,
+ * while `only` lists fail open: the requested providers are still forwarded to
+ * Vercel as `only`.
  */
 export async function canRouteToVercel(
   requestedModel: string,
   provider: OpenRouterProviderConfig | undefined
 ) {
-  const vercelModels = await getVercelLanguageModelIdsFromDatabase();
-  const vercelModelId = await mapModelIdToVercel(requestedModel);
+  const { vercelModels, vercelModelId } = await resolveVercelModel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
@@ -296,7 +314,7 @@ export async function canRouteToVercel(
         );
         return false;
       }
-    } else if (only && !hasCompatibleVercelInferenceProvider(only, vercelInferenceProviders)) {
+    } else if (only && hasVercelInferenceProviderFor(only, vercelInferenceProviders) === false) {
       console.debug(
         '[shouldRouteToVercel] none of the requested inference providers are available on Vercel'
       );
@@ -379,6 +397,19 @@ function getByokProvidersExcludingIgnored(
 }
 
 /**
+ * The BYOK half of a Vercel gateway config. `only` and `byok` are produced from one call so they
+ * always name the same providers: a request that dropped a key from `byok` but kept its provider in
+ * `only`, or the reverse, would lose the BYOK pinning this pair exists to keep.
+ */
+function byokGatewayOptions(
+  userByok: readonly BYOKResult[],
+  ignoredProviders: ReadonlySet<string>
+): { only: string[]; byok: Record<string, VercelInferenceProviderConfig[]> } {
+  const byok = getByokProvidersExcludingIgnored(userByok, ignoredProviders);
+  return { only: Object.keys(byok), byok };
+}
+
+/**
  * The request-level fields both routing paths forward: the caller's sort
  * preference, data-handling choices and session affinity.
  *
@@ -448,13 +479,12 @@ export async function getNonChatGatewayOptions(params: {
   const dataHandling = getDataHandlingOptions(provider);
   const providerKeys = userByok?.filter(byok => !isGatewayUserByokProviderId(byok.providerId));
   if (providerKeys && providerKeys.length > 0) {
-    const byokProviders = getByokProvidersExcludingIgnored(
-      providerKeys,
-      getRequestIgnoredVercelProviderIds(provider)
-    );
     return {
       kind: 'routable',
-      gateway: { only: Object.keys(byokProviders), byok: byokProviders, ...dataHandling },
+      gateway: {
+        ...byokGatewayOptions(providerKeys, getRequestIgnoredVercelProviderIds(provider)),
+        ...dataHandling,
+      },
     };
   }
   const vercelInferenceProviders =
@@ -466,7 +496,7 @@ export async function getNonChatGatewayOptions(params: {
   const only =
     provider?.only &&
     !provider.ignore?.length &&
-    !hasCompatibleVercelInferenceProvider(provider.only, vercelInferenceProviders)
+    hasVercelInferenceProviderFor(provider.only, vercelInferenceProviders) === false
       ? []
       : effectiveVercelOnlyProviders(provider, vercelInferenceProviders);
   if (only?.length === 0) {
@@ -529,13 +559,16 @@ export function getVercelInferenceProviderConfigForUserByok(
   const list = new Array<VercelInferenceProviderConfig>();
 
   if (key === VercelUserByokInferenceProviderIdSchema.enum.zai) {
-    // Z.ai Coding Plan support
-    // ideally we remove this and have people use the explicit Z.ai Coding Plan option,
-    // but that's a breaking change
+    // A zai key sends two credentials, in this order: the Z.ai Coding Plan endpoint first, then the
+    // plain credential. The plain entry stays so the same key also works against the standard Z.ai
+    // endpoint. The Coding Plan entry exists for older keys, because requiring them to move to the
+    // explicit Z.ai Coding Plan option would be a breaking change.
     list.push({
       apiKey: provider.decryptedAPIKey,
       baseURL: 'https://api.z.ai/api/coding/paas/v4',
     });
+    list.push({ apiKey: provider.decryptedAPIKey });
+    return [key, list];
   }
 
   if (key === VercelUserByokInferenceProviderIdSchema.enum.azure) {
@@ -568,7 +601,7 @@ export async function applyVercelSettings(
     // `isVercelUserByokProviderAllowed`). Filtering by `provider.only` again
     // would also drop keys whose provider has no OpenRouter slug, which the
     // allow-list cannot name.
-    const byokProviders = getByokProvidersExcludingIgnored(
+    const byokGateway = byokGatewayOptions(
       userByok,
       getRequestIgnoredVercelProviderIds(requestToMutate.body.provider)
     );
@@ -581,11 +614,7 @@ export async function applyVercelSettings(
     // so upstream providers receive the caller's retention and training choices consistently.
     // `order` and `serviceTier` apply to the managed path only.
     requestToMutate.body.providerOptions = {
-      gateway: {
-        only: Object.keys(byokProviders),
-        byok: byokProviders,
-        ...getSharedGatewayOptions(requestToMutate),
-      },
+      gateway: { ...byokGateway, ...getSharedGatewayOptions(requestToMutate) },
     };
   } else {
     const vercelInferenceProviders =

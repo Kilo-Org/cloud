@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'bun:test';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { Harness } from './harness.js';
 import { createKiloHarness, type KiloHarnessOptions } from './kilo-harness.js';
@@ -6,6 +9,11 @@ import { createKiloHarness, type KiloHarnessOptions } from './kilo-harness.js';
 const sessionId = 'ses_harness';
 const directory = '/workspace/harness';
 const server = { url: 'http://127.0.0.1:1', authorization: 'Basic harness-test' };
+
+/** A real directory so the probe's `realpath` resolves, as it does for a route. */
+async function temporaryDirectory(): Promise<string> {
+  return fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-harness-probe-'));
+}
 
 function fixture(options: Partial<KiloHarnessOptions> = {}) {
   const prompts: unknown[] = [];
@@ -33,6 +41,7 @@ function fixture(options: Partial<KiloHarnessOptions> = {}) {
     ensureSession: async (id: string) => {
       ensured.push(id);
     },
+    settleOutstandingRuleset: async () => undefined,
     answerPermission: async (...input: unknown[]) => {
       answers.push(input);
       return true;
@@ -396,7 +405,7 @@ describe('Kilo harness', () => {
         const url = new URL(request.url);
         expect(url.searchParams.get('directory')).toBe(directory);
         requests.push(url.pathname);
-        return Response.json(url.pathname === '/pty' ? [] : { id: sessionId });
+        return Response.json(url.pathname === '/pty' ? [] : { id: sessionId, directory });
       },
     });
     try {
@@ -421,6 +430,301 @@ describe('Kilo harness', () => {
       expect('server' in harness).toBe(false);
     } finally {
       await native.stop(true);
+    }
+  });
+
+  it('reuses a native session recorded under the same directory', async () => {
+    const tempDir = await temporaryDirectory();
+    const requests: Array<{ pathname: string; directory: string | null }> = [];
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url);
+        requests.push({ pathname: url.pathname, directory: url.searchParams.get('directory') });
+        return Response.json({ id: sessionId, directory: tempDir });
+      },
+    });
+    let restored = false;
+    try {
+      const harness = createKiloHarness({
+        server: { url: native.url.toString() },
+        directory: tempDir,
+        seedRegistration: async () => undefined,
+        restore: async () => {
+          restored = true;
+          throw new Error('unexpected restore');
+        },
+      });
+      expect(
+        await harness.open({
+          sessionId,
+          directory: tempDir,
+          env: {},
+          restoreFiles: true,
+          onRestore() {
+            throw new Error('unexpected restore');
+          },
+        })
+      ).toBe(true);
+      expect(restored).toBe(false);
+      expect(requests).toEqual([{ pathname: `/session/${sessionId}`, directory: tempDir }]);
+    } finally {
+      await native.stop(true);
+      await fsp.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('opens the route session when the native record names a different directory', async () => {
+    const tempDir = await temporaryDirectory();
+    const otherDir = await temporaryDirectory();
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({ id: sessionId, directory: otherDir });
+      },
+    });
+    const calls: string[] = [];
+    const ensured: string[] = [];
+    try {
+      const harness = createKiloHarness({
+        server: { url: native.url.toString() },
+        directory: tempDir,
+        seedRegistration: async () => undefined,
+        restore: async () => {
+          calls.push('restore');
+          return { ok: false, code: 404, error: 'not found', step: 'download' };
+        },
+        client: {
+          server: { url: native.url.toString() },
+          serverUrl: native.url.toString(),
+          ensureSession: async (id: string) => void ensured.push(id),
+          settleOutstandingRuleset: async () => undefined,
+        } as unknown as WrapperKiloClient,
+      });
+      expect(
+        await harness.open({
+          sessionId,
+          directory: tempDir,
+          env: {},
+          restoreFiles: true,
+          onRestore() {
+            calls.push('progress');
+          },
+        })
+      ).toBe(true);
+      expect(calls).toEqual(['progress', 'restore']);
+      expect(ensured).toEqual([sessionId]);
+    } finally {
+      await native.stop(true);
+      await fsp.rm(tempDir, { recursive: true, force: true });
+      await fsp.rm(otherDir, { recursive: true, force: true });
+    }
+  });
+
+  it('reuses a native session when a symlinked route resolves to its directory', async () => {
+    const tempDir = await temporaryDirectory();
+    const linkPath = path.join(await temporaryDirectory(), 'route-link');
+    await fsp.symlink(tempDir, linkPath);
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({ id: sessionId, directory: tempDir });
+      },
+    });
+    try {
+      const harness = createKiloHarness({
+        server: { url: native.url.toString() },
+        directory: linkPath,
+        seedRegistration: async () => undefined,
+        restore: async () => {
+          throw new Error('unexpected restore');
+        },
+      });
+      expect(
+        await harness.open({
+          sessionId,
+          directory: linkPath,
+          env: {},
+          restoreFiles: true,
+          onRestore() {
+            throw new Error('unexpected restore');
+          },
+        })
+      ).toBe(true);
+    } finally {
+      await native.stop(true);
+      await fsp.rm(linkPath, { force: true });
+      await fsp.rm(path.dirname(linkPath), { recursive: true, force: true });
+      await fsp.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('settles an owed ruleset before the restore path returns', async () => {
+    const tempDir = await temporaryDirectory();
+    const settled: string[] = [];
+    try {
+      const harness = createKiloHarness({
+        server: { url: 'http://127.0.0.1:1' },
+        directory: tempDir,
+        seedRegistration: async () => undefined,
+        client: {
+          settleOutstandingRuleset: async (sessionId: string) => void settled.push(sessionId),
+        } as unknown as WrapperKiloClient,
+        sessionExists: async () => false,
+        restore: async () => ({
+          ok: true,
+          downloaded: true,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      });
+      const opened = await harness.open({
+        sessionId,
+        directory: tempDir,
+        env: {},
+        restoreFiles: false,
+        onRestore() {},
+      });
+      // The restore reports success, so the opener returns without the create
+      // path; the settle runs before the probe and again after the restore,
+      // which re-imported the record a kept marker's ruleset belongs to.
+      expect(opened).toBe(true);
+      expect(settled).toEqual([sessionId, sessionId]);
+    } finally {
+      await fsp.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('opens the route session when the native session probe omits its directory', async () => {
+    const tempDir = await temporaryDirectory();
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({ id: sessionId });
+      },
+    });
+    const calls: string[] = [];
+    const ensured: string[] = [];
+    const settled: string[] = [];
+    try {
+      const harness = createKiloHarness({
+        server: { url: native.url.toString() },
+        directory: tempDir,
+        seedRegistration: async () => undefined,
+        restore: async () => {
+          calls.push('restore');
+          return { ok: false, code: 404, error: 'not found', step: 'download' };
+        },
+        client: {
+          server: { url: native.url.toString() },
+          serverUrl: native.url.toString(),
+          ensureSession: async (id: string) => void ensured.push(id),
+          settleOutstandingRuleset: async (id: string) => void settled.push(id),
+        } as unknown as WrapperKiloClient,
+      });
+      expect(
+        await harness.open({
+          sessionId,
+          directory: tempDir,
+          env: {},
+          restoreFiles: true,
+          onRestore() {
+            calls.push('progress');
+          },
+        })
+      ).toBe(true);
+      expect(calls).toEqual(['progress', 'restore']);
+      expect(ensured).toEqual([sessionId]);
+      // The restore failed, so the create path consumes the marker and the
+      // settle runs only before the probe.
+      expect(settled).toEqual([sessionId]);
+    } finally {
+      await native.stop(true);
+      await fsp.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('opens the route session when the native session probe carries a non-string directory', async () => {
+    const tempDir = await temporaryDirectory();
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({ id: sessionId, directory: 42 });
+      },
+    });
+    const calls: string[] = [];
+    const ensured: string[] = [];
+    try {
+      const harness = createKiloHarness({
+        server: { url: native.url.toString() },
+        directory: tempDir,
+        seedRegistration: async () => undefined,
+        restore: async () => {
+          calls.push('restore');
+          return { ok: false, code: 404, error: 'not found', step: 'download' };
+        },
+        client: {
+          server: { url: native.url.toString() },
+          serverUrl: native.url.toString(),
+          ensureSession: async (id: string) => void ensured.push(id),
+          settleOutstandingRuleset: async () => undefined,
+        } as unknown as WrapperKiloClient,
+      });
+      expect(
+        await harness.open({
+          sessionId,
+          directory: tempDir,
+          env: {},
+          restoreFiles: true,
+          onRestore() {
+            calls.push('progress');
+          },
+        })
+      ).toBe(true);
+      expect(calls).toEqual(['progress', 'restore']);
+      expect(ensured).toEqual([sessionId]);
+    } finally {
+      await native.stop(true);
+      await fsp.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a native session probe that names a different session', async () => {
+    const tempDir = await temporaryDirectory();
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({ id: 'ses_other', directory: tempDir });
+      },
+    });
+    try {
+      const harness = createKiloHarness({
+        server: { url: native.url.toString() },
+        directory: tempDir,
+        seedRegistration: async () => undefined,
+      });
+      const error = await harness
+        .open({
+          sessionId,
+          directory: tempDir,
+          env: {},
+          restoreFiles: true,
+          onRestore() {
+            throw new Error('unexpected restore');
+          },
+        })
+        .catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('Kilo session probe returned an invalid session');
+    } finally {
+      await native.stop(true);
+      await fsp.rm(tempDir, { recursive: true, force: true });
     }
   });
 

@@ -7,8 +7,10 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'edenai';
+
 export default {
-  id: 'edenai',
+  id,
   models_dev_id: 'edenai',
   ...apiKeyUpstream({
     apiUrl: 'https://api.edenai.run/v3',
@@ -19,7 +21,7 @@ export default {
   transformRequest(context) {
     replaceReasoningObjectWithReasoningEffort(context.request, { disableWithNoneEffort: true });
   },
-  models: cachedDirectByokModelList('edenai'),
+  models: cachedDirectByokModelList(id),
   provider_listing: {
     dataPolicy: {
       training: true,

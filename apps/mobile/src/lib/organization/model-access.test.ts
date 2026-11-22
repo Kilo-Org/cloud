@@ -236,69 +236,74 @@ describe('usableModelIds', () => {
 describe('modelAccessSave', () => {
   const everyModelDenied = MODELS.map(entry => normalizeModelId(entry.id)).sort();
   const everyProvider = ['amazon-bedrock', 'anthropic', 'azure', 'openai'];
+  type SaveParams = Parameters<typeof modelAccessSave>[0];
+  /** A save with the catalog loaded, the list untouched and every model known. */
+  const save = (params: Partial<SaveParams> & Pick<SaveParams, 'baseline' | 'draft'>) =>
+    modelAccessSave({
+      savedAllowList: undefined,
+      providerCatalogLoaded: true,
+      providerListEdited: false,
+      models: MODELS,
+      ...params,
+    });
 
   it('keeps an already empty saved list writable, since the list itself did not change', () => {
     expect(
-      modelAccessSave({
+      save({
         savedAllowList: [],
         baseline: { providerAllowList: [], modelDenyList: [] },
         draft: { providerAllowList: [], modelDenyList: ['openai/gpt'] },
-        providerCatalogLoaded: true,
-        models: MODELS,
       })
     ).toEqual({ kind: 'ready', providerAllowList: [], modelDenyList: ['openai/gpt'] });
   });
 
   it('refuses a deny list that would leave no model any member could use', () => {
     expect(
-      modelAccessSave({
-        savedAllowList: undefined,
+      save({
         baseline: { providerAllowList: everyProvider, modelDenyList: [] },
         draft: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
-        providerCatalogLoaded: true,
-        models: MODELS,
       })
     ).toEqual({ kind: 'empty-model-list' });
   });
 
   it('keeps a policy that already denied every model writable, since the draft does not empty it', () => {
     expect(
-      modelAccessSave({
-        savedAllowList: undefined,
+      save({
         baseline: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
         draft: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
-        providerCatalogLoaded: true,
-        models: MODELS,
       })
     ).toEqual({ kind: 'ready', providerAllowList: undefined, modelDenyList: everyModelDenied });
   });
 
   it('leaves the model guard inert while the catalog is unavailable', () => {
     expect(
-      modelAccessSave({
-        savedAllowList: undefined,
+      save({
         baseline: { providerAllowList: ['anthropic'], modelDenyList: [] },
-        draft: { providerAllowList: ['anthropic'], modelDenyList: ['anthropic/claude'] },
-        providerCatalogLoaded: true,
+        draft: { providerAllowList: ['anthropic'], modelDenyList: ['meta/llama'] },
         models: [],
       })
-    ).toEqual({
-      kind: 'ready',
-      providerAllowList: undefined,
-      modelDenyList: ['anthropic/claude'],
-    });
+    ).toEqual({ kind: 'ready', providerAllowList: undefined, modelDenyList: ['meta/llama'] });
   });
 
-  it('leaves the provider list alone while the catalog is unavailable, even after a provider change', () => {
+  it('leaves the provider list alone while the catalog is unavailable and the list did not move', () => {
     expect(
-      modelAccessSave({
-        savedAllowList: undefined,
+      save({
+        baseline: { providerAllowList: ['anthropic'], modelDenyList: [] },
+        draft: { providerAllowList: ['anthropic'], modelDenyList: ['openai/gpt'] },
+        providerCatalogLoaded: false,
+      })
+    ).toEqual({ kind: 'ready', providerAllowList: undefined, modelDenyList: ['openai/gpt'] });
+  });
+
+  it('refuses a moved provider list while the catalog is unavailable', () => {
+    expect(
+      save({
         baseline: { providerAllowList: ['anthropic'], modelDenyList: [] },
         draft: { providerAllowList: ['openai'], modelDenyList: [] },
         providerCatalogLoaded: false,
-        models: MODELS,
+        providerListEdited: true,
       })
-    ).toEqual({ kind: 'ready', providerAllowList: undefined, modelDenyList: [] });
+    ).toEqual({ kind: 'provider-catalog-unavailable' });
   });
 });
 

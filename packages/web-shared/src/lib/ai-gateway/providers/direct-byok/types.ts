@@ -62,12 +62,21 @@ export type DirectByokAiSdkProviderChoice = {
   aiSdkProvider: DirectByokAiSdkProvider | undefined;
 };
 
+/**
+ * What a direct BYOK transform receives: the request context, plus the served model with the
+ * endpoint metadata its definition declares. The route that resolves the credential is the one
+ * place that knows the model, so it always passes it.
+ */
+export type DirectByokTransformRequestContext = TransformRequestContext & {
+  directByokModel: Readonly<Pick<DirectByokModel, 'id' | 'endpoint'>>;
+};
+
 type DirectByokProviderBase = {
   id: DirectByokProviderMetaId;
   /** models.dev provider key; omitted for providers models.dev does not list. */
   models_dev_id?: string;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
-  transformRequest(context: TransformRequestContext): void;
+  transformRequest(context: DirectByokTransformRequestContext): void;
   /**
    * Builds the upstream for a request from the stored credential. Most providers
    * use `apiKeyUpstream`; cloud providers can derive regions or signed requests.

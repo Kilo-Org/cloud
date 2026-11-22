@@ -6849,6 +6849,39 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     });
   }
 
+  it('replays a matching hosted checkout manifest and rejects changes without registering again', async () => {
+    const integrationId = '22222222-2222-4222-8222-222222222222';
+    const request: SessionCreateRequest = {
+      ...originalRequest(),
+      repository: { type: 'github', repo: 'acme/repo', githubIntegrationId: integrationId },
+      hostedGitHubRepositories: {
+        integrationId,
+        primary: { id: 123, fullName: 'acme/repo' },
+        additional: [{ id: 456, fullName: 'acme/other' }],
+      },
+    };
+    const row = await completedRowFor(request);
+    admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+    const stub = makeDoStub();
+    await expect(runCreate(makeContext(stub), request)).resolves.toMatchObject({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    const { hostedGitHubRepositories, ...withoutSelection } = request;
+    await expectRejectedWithoutEffects(withoutSelection);
+    await expectRejectedWithoutEffects({
+      ...request,
+      hostedGitHubRepositories: {
+        ...hostedGitHubRepositories,
+        primary: { id: 123, fullName: 'acme/repo' },
+        integrationId,
+        additional: [{ id: 789, fullName: 'acme/different' }],
+      },
+    });
+  });
+
   /** Asserts the request is rejected with the typed error and no effect runs. */
   async function expectRejectedWithoutEffects(
     request: SessionCreateRequest,

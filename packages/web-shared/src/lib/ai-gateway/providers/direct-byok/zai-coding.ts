@@ -6,8 +6,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 
+const id = 'zai-coding';
+
 export default {
-  id: 'zai-coding',
+  id,
   openrouter_inference_provider_id: 'z-ai',
   models_dev_id: 'zai-coding-plan',
   ...apiKeyUpstream({
@@ -18,5 +20,5 @@ export default {
   transformRequest(context) {
     applyThinkingToggleAndReasoningEffort(context.request);
   },
-  models: cachedDirectByokModelList('zai-coding'),
+  models: cachedDirectByokModelList(id),
 } satisfies DirectByokProvider;

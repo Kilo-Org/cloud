@@ -45,6 +45,9 @@ const boundary = vi.hoisted(() => ({
   override: undefined as string | undefined,
   isResolving: false,
   isTrialExpiredForEnforcement: false,
+  /** The trial readout `organizations.list` carries; null for a subscribed org. */
+  trialStatus: null as string | null,
+  trialEndsAt: null as string | null,
 }));
 
 /** The id each billing read was keyed on. */
@@ -75,6 +78,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
         seatCount: boundary.seatCount,
         requireSeats: boundary.requireSeats,
         isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
+        trialStatus: boundary.trialStatus,
+        trialEndsAt: boundary.trialEndsAt,
         parentOrganizationId: null,
       },
       isResolving: boundary.isResolving,
@@ -237,6 +242,12 @@ export function bannerAction(renderer: ReactTestRenderer): { label?: string } | 
   return action as { label?: string } | undefined;
 }
 
+/** The subscription state row's rendered value, as the screen hands it to `KvRow`. */
+export function stateReadout(renderer: ReactTestRenderer): unknown {
+  const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'State');
+  return row?.props.value;
+}
+
 export function resetBillingQueries() {
   for (const query of Object.values(queries)) {
     query.isPending = false;
@@ -250,6 +261,8 @@ export function resetBillingQueries() {
   boundary.override = undefined;
   boundary.isResolving = false;
   boundary.isTrialExpiredForEnforcement = false;
+  boundary.trialStatus = null;
+  boundary.trialEndsAt = null;
   reads.subscription = undefined;
   reads.seats = undefined;
   platform.linkAllowed = true;

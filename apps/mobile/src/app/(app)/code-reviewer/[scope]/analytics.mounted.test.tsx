@@ -95,6 +95,9 @@ vi.mock('@tanstack/react-query', () => ({
     options.queryKey[0] === 'organizations' ? queries.organizations : queries.dashboard,
 }));
 
+// The reviewer permission hook now observes the shared memberships read, whose
+// owner gates it on the auth token; this suite exercises the analytics screen.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ scope: 'org-drain' }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),

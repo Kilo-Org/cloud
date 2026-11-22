@@ -318,8 +318,8 @@ export function deleteWorktree(
   config: DriverConfig,
   input: { worktreeId: string; kilocodeOrganizationId?: string; onlyIfSoleSessionId?: string },
   signal?: AbortSignal
-): Promise<{ success: true; deletedSessionIds: string[] }> {
-  return trpcCall<{ success: true; deletedSessionIds: string[] }>(config, 'deleteWorktree', input, {
+): Promise<{ success: true; deletedSessionIds: string[]; cleanup?: 'complete' | 'pending' }> {
+  return trpcCall(config, 'deleteWorktree', input, {
     internalApiSecret: config.internalApiSecret,
     ...(signal ? { signal } : {}),
   });
@@ -633,7 +633,7 @@ export type HostedWorkspaceCreateResult = HostedWorkspaceCreateResponse & {
 export type EmptyHostedWorkspaceCreateResult = HostedWorkspaceCreateResponse;
 
 export type HostedWorkspaceRepository =
-  | { type: 'github'; repo: string }
+  | { type: 'github'; repo: string; githubIntegrationId?: string }
   | { type: 'git'; url: string };
 
 export type HostedWorkspaceCreateInput = {
@@ -641,6 +641,7 @@ export type HostedWorkspaceCreateInput = {
   profileId: string;
   prompt?: string;
   repository?: HostedWorkspaceRepository;
+  additionalRepositoryIds?: number[];
 };
 
 /**
@@ -677,6 +678,9 @@ export async function createHostedWorkspace(
         (config.githubRepo
           ? { type: 'github', repo: config.githubRepo }
           : { type: 'git', url: config.gitUrl }),
+      ...(input.additionalRepositoryIds === undefined
+        ? {}
+        : { additionalRepositoryIds: input.additionalRepositoryIds }),
       profile: { id: input.profileId },
       ...(input.prompt === undefined ? {} : { message: { prompt: input.prompt } }),
       agent: { mode: 'code', model: config.model },

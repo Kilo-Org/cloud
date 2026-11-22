@@ -51,7 +51,13 @@ vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
 vi.mock('@/lib/glanceable/approve-ask', () => ({ runGlanceableApprove: vi.fn() }));
 vi.mock('@/glanceable-android/count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
+}));
+// Both platforms draw counts through the shared formatter, so the fixture
+// labels and card text keep their plain digits here.
+vi.mock('@/lib/glanceable/count-format', () => ({
   formatGlanceableCount: String,
+  glanceableDigits: () => '',
+  glanceableGroupSeparator: () => ',',
 }));
 
 // The Home widget's native refresh store and the persisted snapshot.

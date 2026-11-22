@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type ArtifactMirrorSyncDeps,
+  MAX_ARTIFACT_ATTEMPTS,
   MAX_SESSIONS_PER_RUN,
   MIRROR_BYTE_BUDGET,
   MIRROR_SESSION_LIMIT,
@@ -12,9 +13,11 @@ import {
   resetArtifactMirrorSyncState,
   syncArtifactMirror,
 } from '@/lib/artifacts/artifact-mirror-sync';
+import { MAX_ARTIFACT_BYTES } from '@/lib/artifacts/artifact-crawl';
 import { type ArtifactMirrorManifest } from '@/lib/artifacts/artifact-mirror-manifest';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
+import { readCacheScope } from '@/lib/persist/cache-scope';
 
 // Real-entry-shaped stand-in for expo-file-system: an entry is a File (the
 // mirror sets `size`, promotes with `moveSync` and calls `delete`) and a
@@ -269,6 +272,35 @@ function sessionFiles(manifest: ArtifactMirrorManifest, sessionId: string): stri
 
 function sessionIds(manifest: ArtifactMirrorManifest): string[] {
   return manifest.sessions.map(session => session.id);
+}
+
+type StoredSessionState = {
+  attempts: Record<string, number>;
+  cursor: string | null;
+  done: boolean;
+  files: { id: string }[];
+  lastAdvancedAt: number | null;
+  terminal: Record<string, string>;
+  updatedAt: string;
+};
+
+/** The key the sync engine reads and writes its state under for `USER_ID`. */
+const SYNC_STATE_KEY = `${readCacheScope(USER_ID)}/artifact-mirror:${USER_ID}`;
+
+/** The crawl state one session has in the persisted row, read as the run wrote it. */
+function storedSession(store: Map<string, string>, sessionId: string): StoredSessionState {
+  const raw = store.get(SYNC_STATE_KEY);
+  if (raw === undefined) {
+    throw new Error('no state was persisted');
+  }
+  // The row is the engine's own JSON round trip, so this reads it back at the
+  // shape the engine wrote instead of re-deriving it here.
+  const row = JSON.parse(raw) as { sessions: Record<string, StoredSessionState> };
+  const state = row.sessions[sessionId];
+  if (state === undefined) {
+    throw new Error(`no state was persisted for ${sessionId}`);
+  }
+  return state;
 }
 
 beforeEach(() => {
@@ -788,5 +820,212 @@ describe('syncArtifactMirror crawling', () => {
     // The teardown clears the mirror, so the run stops before telling an open
     // browser to re-query a location that no longer holds anything.
     expect(h.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncArtifactMirror terminal outcomes', () => {
+  const SANDBOX_URL =
+    'file:///tmp/attachments/s1/user-1/2f5f0f4e-1f1a-4f0b-9d4f-3b1e5c7a9d21/shot.png';
+
+  it('records a permanently missing artifact so the cursor advances and it is never fetched again', async () => {
+    // The tRPC client carries the server's code on `data.code`; NOT_FOUND is the
+    // backend saying the attachment is gone, the same fact a 404 reports.
+    const presignAttachmentDownload = vi.fn(async () => {
+      throw Object.assign(new Error('the attachment is gone'), {
+        data: { code: 'NOT_FOUND' },
+      });
+    });
+    const h = harness({ presignAttachmentDownload });
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    h.pages.set('s1', {
+      messages: [
+        {
+          parts: [
+            { id: 'f1', mime: 'image/png', type: 'file', url: SANDBOX_URL },
+            { id: 'f2', mime: 'text/plain', type: 'file', url: `${STORAGE_ORIGIN}/f2` },
+          ],
+        },
+      ],
+      nextCursor: null,
+    });
+    registerDownloads(h, [{ id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` }]);
+
+    // Run one: f1 cannot be materialized ever, f2 lands, and the page is
+    // finished rather than held for a retry that can never succeed.
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 1,
+      files: 1,
+    });
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f2']);
+    expect(h.downloadFile).toHaveBeenCalledTimes(1);
+    const state = storedSession(h.store, 's1');
+    expect(state.terminal).toEqual({ f1: 'missing' });
+    expect(JSON.stringify(state)).not.toContain('"url"');
+
+    // Run two: the session is done, so it is not even re-read, and f1 is never
+    // probed or downloaded again.
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      files: 0,
+    });
+    expect(
+      h.getSessionMessagesPage.mock.calls.filter(([input]) => input.session_id === 's1')
+    ).toHaveLength(1);
+    expect(h.downloadFile).toHaveBeenCalledTimes(1);
+    expect(presignAttachmentDownload).toHaveBeenCalledTimes(1);
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f2']);
+  });
+
+  it('probes an over-cap artifact once and never again, even after the session restarts', async () => {
+    const probeContentLength = vi.fn(async () => MAX_ARTIFACT_BYTES + 1);
+    const h = harness({ probeContentLength });
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 1,
+      files: 0,
+    });
+    expect(probeContentLength).toHaveBeenCalledTimes(1);
+    expect(h.downloadFile).not.toHaveBeenCalled();
+    expect(storedSession(h.store, 's1').terminal).toEqual({ f1: 'too-large' });
+
+    // The session changes: the crawl restarts from page one. The size is a fact
+    // about the artifact, not about the revision, so it is not re-probed.
+    h.sessions[0] = { id: 's1', updatedAt: T2 };
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      files: 0,
+    });
+    expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(2);
+    expect(probeContentLength).toHaveBeenCalledTimes(1);
+    expect(h.downloadFile).not.toHaveBeenCalled();
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual([]);
+    expect(storedSession(h.store, 's1').terminal).toEqual({ f1: 'too-large' });
+  });
+
+  it('holds the cursor for a temporary failure until the attempt budget is spent, then advances', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    h.pages.set('s1', { messages: [messageOf(['f3'])], nextCursor: null });
+    h.downloads.set(`${STORAGE_ORIGIN}/f3`, async () => {
+      throw new Error('offline');
+    });
+
+    // Every attempt before the last one leaves the cursor where it was, so the
+    // same page is re-read and the same artifact retried.
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 1,
+      files: 0,
+    });
+    expect(h.downloadFile).toHaveBeenCalledTimes(1);
+    expect(storedSession(h.store, 's1')).toMatchObject({ cursor: null, done: false });
+    expect(storedSession(h.store, 's1')).toMatchObject({ attempts: { f3: 1 }, terminal: {} });
+
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 1,
+      files: 0,
+    });
+    expect(h.downloadFile).toHaveBeenCalledTimes(2);
+    expect(storedSession(h.store, 's1')).toMatchObject({ cursor: null, done: false });
+    expect(storedSession(h.store, 's1')).toMatchObject({ attempts: { f3: 2 }, terminal: {} });
+
+    // The last attempt spends the budget: the artifact is written off for this
+    // revision and the page finishes instead of starving the sessions behind it.
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 1,
+      files: 0,
+    });
+    expect(h.downloadFile).toHaveBeenCalledTimes(MAX_ARTIFACT_ATTEMPTS);
+    expect(storedSession(h.store, 's1')).toMatchObject({ cursor: null, done: true });
+    expect(storedSession(h.store, 's1').terminal).toEqual({ f3: 'attempts-exhausted' });
+
+    // The written-off artifact is not attempted a fourth time.
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      files: 0,
+    });
+    expect(h.downloadFile).toHaveBeenCalledTimes(MAX_ARTIFACT_ATTEMPTS);
+    expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(MAX_ARTIFACT_ATTEMPTS);
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual([]);
+  });
+
+  it('gives the run budget to the sessions that waited longest', async () => {
+    const h = harness();
+    h.sessions.push(
+      { id: 's1', updatedAt: T1 },
+      { id: 's2', updatedAt: T1 },
+      { id: 's3', updatedAt: T1 },
+      { id: 's4', updatedAt: T1 }
+    );
+    for (const session of h.sessions) {
+      setFiles(h, session.id, [
+        { id: `${session.id}-f1`, size: 10, url: `${STORAGE_ORIGIN}/${session.id}-f1` },
+      ]);
+    }
+    // s1 keeps failing temporarily, so it stays a candidate forever and would
+    // hold the first slot on every run if the walk were in list order.
+    h.downloads.set(`${STORAGE_ORIGIN}/s1-f1`, async () => {
+      throw new Error('offline');
+    });
+
+    const advancedPerRun: string[][] = [];
+    const forceRun = async (index: number): Promise<void> => {
+      const before = h.getSessionMessagesPage.mock.calls.length;
+      h.setNow(NOW + index * MIRROR_SYNC_MIN_INTERVAL_MS);
+      await syncArtifactMirror({ force: true, deps: h.deps });
+      advancedPerRun.push(
+        h.getSessionMessagesPage.mock.calls.slice(before).map(([input]) => input.session_id)
+      );
+    };
+
+    // Nothing has been advanced yet, so the first run breaks ties by list order.
+    await forceRun(0);
+    expect(advancedPerRun[0]).toEqual(['s1', 's2', 's3']);
+    // s4 waited longest (never advanced), so it goes first this time even
+    // though s1 sits at the front of the list and is still a candidate.
+    await forceRun(1);
+    expect(advancedPerRun[1]).toEqual(['s4', 's1']);
+    await forceRun(2);
+    expect(advancedPerRun[2]).toEqual(['s1']);
+
+    const manifest = h.lastManifest();
+    expect(sessionFiles(manifest, 's2')).toEqual(['s2-f1']);
+    expect(sessionFiles(manifest, 's3')).toEqual(['s3-f1']);
+    expect(sessionFiles(manifest, 's4')).toEqual(['s4-f1']);
+    expect(sessionFiles(manifest, 's1')).toEqual([]);
+  });
+
+  it('parses a stored row written before the terminal and attempt fields existed', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+    // A row from the previous schema: no `terminal`, `attempts` or
+    // `lastAdvancedAt` at all.
+    h.store.set(
+      SYNC_STATE_KEY,
+      JSON.stringify({
+        lastRunAt: NOW - MIRROR_SYNC_MIN_INTERVAL_MS,
+        sessions: { s1: { cursor: null, done: false, files: [], updatedAt: T1 } },
+      })
+    );
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      files: 1,
+    });
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
+    expect(storedSession(h.store, 's1')).toMatchObject({
+      attempts: {},
+      done: true,
+      lastAdvancedAt: NOW,
+      terminal: {},
+      updatedAt: T1,
+    });
   });
 });

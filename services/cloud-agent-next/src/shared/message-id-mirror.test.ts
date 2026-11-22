@@ -4,6 +4,7 @@ import {
   MESSAGE_ID_FORMAT_DESCRIPTION as CANONICAL_MESSAGE_ID_FORMAT_DESCRIPTION,
   MESSAGE_ID_LENGTH as CANONICAL_MESSAGE_ID_LENGTH,
   MESSAGE_ID_PATTERN as CANONICAL_MESSAGE_ID_PATTERN,
+  MESSAGE_ID_PREFIX as CANONICAL_MESSAGE_ID_PREFIX,
 } from '@kilocode/session-ingest-contracts/message-id';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -12,10 +13,12 @@ import {
   MESSAGE_ID_FORMAT_DESCRIPTION,
   MESSAGE_ID_LENGTH,
   MESSAGE_ID_PATTERN,
+  MESSAGE_ID_PREFIX,
 } from './message-id.js';
 
 describe('message-id mirror', () => {
   it('mirrors the session-ingest-contracts constants', () => {
+    expect(MESSAGE_ID_PREFIX).toBe(CANONICAL_MESSAGE_ID_PREFIX);
     expect(MESSAGE_ID_LENGTH).toBe(CANONICAL_MESSAGE_ID_LENGTH);
     expect(MESSAGE_ID_FORMAT_DESCRIPTION).toBe(CANONICAL_MESSAGE_ID_FORMAT_DESCRIPTION);
     expect(MESSAGE_ID_PATTERN.source).toBe(CANONICAL_MESSAGE_ID_PATTERN.source);

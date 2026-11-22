@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   mkdirSync,
@@ -153,6 +153,41 @@ function cli(root) {
   });
   assert.ifError(result.error);
   return result;
+}
+
+/** A streamed read has no built-in deadline, so the helper sets one. */
+const CHILD_TIMEOUT_MS = 60_000;
+
+/**
+ * The command with its stderr read while it runs, as a pipeline consumer reads
+ * it. `spawnSync` drains every write as it blocks, so only this shape shows a
+ * report that the command abandons when it exits: the pipe holds one buffer.
+ * The reader owns the wait, so the child needs its own limit: a command that
+ * never exits would otherwise hold the test run open forever.
+ */
+function cliStreamed(root, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [join(root, 'tools/i18n/check-catalogs.mjs')], {
+      cwd: root,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...options,
+    });
+    let stderr = '';
+    child.stdout.resume();
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+    });
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`the command did not exit within ${CHILD_TIMEOUT_MS} ms`));
+    }, CHILD_TIMEOUT_MS);
+    child.on('error', reject);
+    child.on('close', status => {
+      clearTimeout(timer);
+      resolve({ status, stderr });
+    });
+  });
 }
 
 for (const callee of ['t', 'i18n.t']) {
@@ -2262,6 +2297,27 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
 });
 
+test('writes the whole report before it sets the failing exit status', async () => {
+  // The report must survive the pipe: the reader here takes the output while
+  // the command runs, so a forced exit abandons everything past one pipe
+  // buffer and the tail of a long report never arrives. Every generated key is
+  // missing from the Russian catalog and used by no source.
+  const english = { ...ENGLISH };
+  for (let index = 0; index < 10_000; index += 1) {
+    english[`problem${index}`] = `Unused copy ${index}`;
+  }
+  const root = cliFixture(standardFiles({ english }));
+  const result = await cliStreamed(root, {
+    env: { ...process.env, I18N_CHECK_LIMIT: '100000' },
+  });
+  assert.equal(result.status, 1);
+  // The floor asks for several pipe buffers, not for this fixture's exact size:
+  // the case is about the tail of a report that no single buffer can hold.
+  assert.ok(result.stderr.length > 256 * 1024, `stderr was ${result.stderr.length} bytes`);
+  assert.match(result.stderr, /mobile\/ru: missing key "problem9999"/);
+  assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)\n$/);
+});
+
 test('reports a directory named like a catalog through the command and skips it', () => {
   // `catalogTags` counts only regular files, and the membership rule names the
   // directory itself, so the run prints one line and exits 1 instead of
@@ -3087,24 +3143,28 @@ test('rejects the English source label that carries "and"', () => {
   );
 });
 
-// The sentence also joins the areas that render from shared keys, so those
-// labels obey the same rule: a notification or chat name that carries the
+// The sentence names every area from its own `profile.changelogAreas` key, so
+// each of those labels obeys the same rule: a name that carries the
 // conjunction splits one area into two.
 const CHANGELOG_SHARED_AREAS = {
-  common: { chat: 'Chat', notifications: 'Notifications' },
-  integrations: { title: 'Integrations' },
   profile: {
     changelogFixesIn: 'Fixes and improvements in {{areas}}.',
-    changelogAreas: { signIn: 'Sign-in', profileOrganizations: 'Profile & organizations' },
+    changelogAreas: {
+      signIn: 'sign-in',
+      profileOrganizations: 'profile & organizations',
+      chat: 'chat',
+      notifications: 'notifications',
+      integrations: 'integrations',
+    },
   },
 };
 const CHANGELOG_SHARED_SOURCE = [
   "t('profile.changelogFixesIn', { areas });",
-  "t('common.chat');",
-  "t('common.notifications');",
-  "t('integrations.title');",
   "t('profile.changelogAreas.signIn');",
   "t('profile.changelogAreas.profileOrganizations');",
+  "t('profile.changelogAreas.chat');",
+  "t('profile.changelogAreas.notifications');",
+  "t('profile.changelogAreas.integrations');",
 ].join('\n');
 
 test('rejects a shared area label that carries the list conjunction', () => {
@@ -3112,18 +3172,22 @@ test('rejects a shared area label that carries the list conjunction', () => {
     language: 'fr',
     english: CHANGELOG_SHARED_AREAS,
     translated: {
-      common: { chat: 'Discussion', notifications: 'Alertes et notifications' },
-      integrations: { title: 'Intégrations' },
       profile: {
         changelogFixesIn: 'Corrections et améliorations dans {{areas}}.',
-        changelogAreas: { signIn: 'Connexion', profileOrganizations: 'Profil & organisations' },
+        changelogAreas: {
+          signIn: 'Connexion',
+          profileOrganizations: 'Profil & organisations',
+          chat: 'Discussion et conversation',
+          notifications: 'Notifications',
+          integrations: 'Intégrations',
+        },
       },
     },
     source: CHANGELOG_SHARED_SOURCE,
   });
   assert.match(
     found.join('\n'),
-    /^mobile\/fr: "common\.notifications" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
+    /^mobile\/fr: "profile\.changelogAreas\.chat" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
   );
 });
 
@@ -3135,11 +3199,15 @@ test('reads the Serbian conjunction from the Latin script the app formats with',
     language: 'sr',
     english: CHANGELOG_SHARED_AREAS,
     translated: {
-      common: { chat: 'Ćaskanje', notifications: 'Obaveštenja' },
-      integrations: { title: 'Integracije' },
       profile: {
         changelogFixesIn: 'Ispravke i poboljšanja u {{areas}}.',
-        changelogAreas: { signIn: 'Prijavljivanje', profileOrganizations: 'Profil i organizacije' },
+        changelogAreas: {
+          signIn: 'Prijavljivanje',
+          profileOrganizations: 'Profil & organizacije',
+          chat: 'Ćaskanje i razgovor',
+          notifications: 'Obaveštenja',
+          integrations: 'Integracije',
+        },
       },
     },
     source: CHANGELOG_SHARED_SOURCE,
@@ -3147,7 +3215,7 @@ test('reads the Serbian conjunction from the Latin script the app formats with',
   const text = found.join('\n');
   assert.match(
     text,
-    /^mobile\/sr: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "i"/m
+    /^mobile\/sr: "profile\.changelogAreas\.chat" contains the list conjunction "i"/m
   );
   // The Cyrillic conjunction is not what this catalog renders, so a label that
   // happens to contain it is no finding.

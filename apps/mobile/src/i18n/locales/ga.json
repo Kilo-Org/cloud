@@ -189,7 +189,30 @@
     "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin.",
     "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís.",
     "organizationTrialEndedBillingAtKiloAi": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
-    "viewOnGitHub": "Féach ar an PR ar GitHub"
+    "viewOnGitHub": "Féach ar an PR ar GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Urphointe",
+        "nestedBulletPoint": "Urphointe neadaithe",
+        "orderedItem": "Mír liosta {n}",
+        "nestedOrderedItem": "Mír liosta neadaithe {n}"
+      },
+      "blockquote": {
+        "quote": "Lua",
+        "nestedQuote": "Lua neadaithe"
+      },
+      "table": {
+        "row": "Ró {n}: {content}"
+      },
+      "math": {
+        "equation": "Matamaitic: {latex}"
+      },
+      "rotor": {
+        "headings": "Ceannteidil",
+        "links": "Naisc",
+        "images": "Íomhánna"
+      }
+    }
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -431,6 +454,17 @@
       "location": "Suíomh Vertex",
       "clientEmail": "Ríomhphost an chuntais seirbhíse",
       "privateKey": "Eochair phríobháideach an chuntais seirbhíse",
+      "privateKeyBlockRequired": "Greamaigh an bloc eochrach iomlán, ón líne BEGIN go dtí an líne END.",
+      "privateKeyEncrypted": "Tá an bloc eochrach seo cosanta ag pasfhrása. Greamaigh eochair chuntais seirbhíse nach bhfuil pasfhrása uirthi.",
+      "names": {
+        "codestral": "Codestral oidhreachta amháin",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Sínigh isteach le ChatGPT)",
+        "xiaomi": "Xiaomi (íoc de réir úsáide)",
+        "zai": "Z.ai (íoc de réir úsáide)",
+        "bedrockByok": "Amazon Bedrock (díreach)",
+        "vertexByok": "Google Vertex AI (díreach)"
+      },
       "modelMappings": "Mapálacha samhlacha",
       "modelMappingsDescription": "Seol samhail ón ngeata chuig ainm imscartha saincheaptha.",
       "mappingTitle": "Mapáil {{number}}",
@@ -510,14 +544,25 @@
       "nextStepFinal": "Tá cinneadh an achomhairc críochnaitheach. Ní féidir aon achomharc breise a chur isteach.",
       "viewReceipt": "Féach ar an admháil"
     },
+    "reportReceipts": {
+      "title": "Tuairiscí",
+      "rowSubtitle": "Na tuairiscí a chuir tú isteach agus a dtorthaí",
+      "emptyTitle": "Níl aon tuairiscí ann fós",
+      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht nó ó fhreagra AI.",
+      "couldNotLoad": "Níorbh fhéidir do chuid tuairiscí a lódáil",
+      "capped": "Ag taispeáint do chuid tuairiscí is déanaí."
+    },
     "changelog": "Na rudaí nua",
     "changelogVersionPending": "Beidh nótaí an leagain {{version}} sa chéad nuashonrú eile den aip.",
     "changelogGroupNew": "Nua",
     "changelogFixesIn": "Ceartúcháin agus feabhsuithe sna réimsí seo: {{areas}}.",
     "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
     "changelogAreas": {
-      "signIn": "Síniú isteach",
-      "profileOrganizations": "Próifíl & eagraíochtaí"
+      "signIn": "síniú isteach",
+      "profileOrganizations": "próifíl & eagraíochtaí",
+      "chat": "comhrá",
+      "notifications": "fógraí",
+      "integrations": "comhtháthuithe"
     }
   },
   "preferences": {
@@ -1359,7 +1404,7 @@
       "couldNotGetLatest": "Níorbh fhéidir na sonraí is déanaí a fháil.",
       "byline": "#{{number}} le {{author}}",
       "noFindings": "Níor aimsíodh aon toradh.",
-      "findingsUnavailable": "Níl na torthaí ar fáil mar gur theip ar an athbhreithniú seo.",
+      "findingsUnavailable": "Níl na torthaí ar fáil.",
       "findingsInProgress": "Tá an athbhreithniú seo ar siúl fós. Tiocfaidh na torthaí le feiceáil anseo nuair a bheidh sé críochnaithe.",
       "findingsEndedWithoutResults": "Críochnaíodh an athbhreithniú seo sular ndearnadh aon torthaí.",
       "serviceUnavailable": "Níorbh fhéidir ceangal leis an tseirbhís athbhreithnithe cóid. Bain triail as an athbhreithniú arís nuair a bheidh an tseirbhís ar fáil.",
@@ -3596,7 +3641,7 @@
       "manageOnWeb": "Socruithe billeála ar an ngréasán",
       "changePlan": "Athraigh an plean",
       "buySeats": "Ceannaigh suíocháin",
-      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ar an ngréasán.",
+      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ag kilo.ai.",
       "setupAutoTopUp": "Socraigh breisiú uathoibríoch",
       "manageAutoTopUp": "Bainistigh breisiú uathoibríoch",
       "opensOnWeb": "Osclaítear ar an ngréasán"
@@ -3778,6 +3823,7 @@
       "identifierLabel": "Aitheantóir",
       "identifierRequired": "Cuir isteach aitheantóir.",
       "identifierTaken": "Tá an t-aitheantóir seo in úsáid ag mód eile cheana féin.",
+      "identifierTooLong": "Coinnigh an t-aitheantóir ag {{max}} carachtar nó níos lú.",
       "nameLabel": "Ainm an mhóid",
       "nameRequired": "Cuir isteach ainm móid.",
       "notFound": "Níl an mód seo ann a thuilleadh.",
@@ -3874,7 +3920,7 @@
     "emailDeliveryFailed": "Níl seachadadh ríomhphoist ar fáil go sealadach. Bain triail as arís níos déanaí le do thoil.",
     "admissionRequired": "Ní féidir do ghléas a fhíorú. Úsáid '$t(login.moreSignInOptions)' chun síniú isteach ar ghléas eile nó ar an ngréasán.",
     "default": "Tharla earráid. Bain triail eile as.",
-    "retryableAdmission": "Níorbh fhéidir linn an gléas seo a fhíorú. Seiceáil do nasc agus bain triail as arís.",
+    "retryableAdmission": "Níorbh fhéidir an gléas seo a fhíorú. Bain triail eile as.",
     "startSignInFailed": "Theip ar an síniú isteach a thosú. Bain triail as arís le do thoil.",
     "couldNotOpenBrowser": "Níorbh fhéidir an brabhsálaí a oscailt. Bain triail as arís le do thoil.",
     "signInTimedOut": "Chuaigh an síniú isteach thar am. Bain triail as arís le do thoil.",
@@ -3946,6 +3992,58 @@
     "nextScheduled": "Sceidealaithe amach romhainn",
     "answerNeeded": "Freagra de dhíth",
     "waitingToRetry": "Ag fanacht le hatriail",
+    "countNoun": {
+      "needsInput_one": "Ionchur de dhíth",
+      "needsInput_two": "Ionchur de dhíth",
+      "needsInput_few": "Ionchur de dhíth",
+      "needsInput_many": "Ionchur de dhíth",
+      "needsInput_other": "Ionchur de dhíth",
+      "running_one": "Ag obair",
+      "running_two": "Ag obair",
+      "running_few": "Ag obair",
+      "running_many": "Ag obair",
+      "running_other": "Ag obair",
+      "scheduled_one": "Sceidealaithe",
+      "scheduled_two": "Sceidealaithe",
+      "scheduled_few": "Sceidealaithe",
+      "scheduled_many": "Sceidealaithe",
+      "scheduled_other": "Sceidealaithe",
+      "idle_one": "Díomhaoin",
+      "idle_two": "Díomhaoin",
+      "idle_few": "Díomhaoin",
+      "idle_many": "Díomhaoin",
+      "idle_other": "Díomhaoin"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Ionchur de dhíth",
+      "needsInput_two": "{{displayCount}} Ionchur de dhíth",
+      "needsInput_few": "{{displayCount}} Ionchur de dhíth",
+      "needsInput_many": "{{displayCount}} Ionchur de dhíth",
+      "needsInput_other": "{{displayCount}} Ionchur de dhíth",
+      "running_one": "{{displayCount}} Ag obair",
+      "running_two": "{{displayCount}} Ag obair",
+      "running_few": "{{displayCount}} Ag obair",
+      "running_many": "{{displayCount}} Ag obair",
+      "running_other": "{{displayCount}} Ag obair",
+      "scheduled_one": "{{displayCount}} Sceidealaithe",
+      "scheduled_two": "{{displayCount}} Sceidealaithe",
+      "scheduled_few": "{{displayCount}} Sceidealaithe",
+      "scheduled_many": "{{displayCount}} Sceidealaithe",
+      "scheduled_other": "{{displayCount}} Sceidealaithe",
+      "idle_one": "{{displayCount}} Díomhaoin",
+      "idle_two": "{{displayCount}} Díomhaoin",
+      "idle_few": "{{displayCount}} Díomhaoin",
+      "idle_many": "{{displayCount}} Díomhaoin",
+      "idle_other": "{{displayCount}} Díomhaoin"
+    },
+    "footer": {
+      "checked": "Seiceáilte {{time}}",
+      "lastKnown": "Stádas deireanach ar eolas · {{time}}"
+    },
+    "wake": {
+      "nextRun": "An chéad rith eile {{time}}",
+      "wasDue": "Bhí dlite {{time}}"
+    },
     "step": {
       "editing": "Eagarthóireacht",
       "reading": "Léamh",
@@ -4194,7 +4292,8 @@
         "space": "Níl go leor stórála saor don tsamhail seo. Saor roinnt spáis agus triail arís.",
         "network": "Níor críochnaíodh an íoslódáil. Seiceáil do cheangal agus triail arís.",
         "invalidFile": "Ní samhail é an comhad íoslódáilte ar féidir leis an aip seo a rith, mar sin baineadh é.",
-        "checksum": "Ní mheaitseálann an comhad íoslódáilte a shuim seiceála foilsithe, mar sin baineadh é. Bain triail as an íoslódáil arís."
+        "checksum": "Ní mheaitseálann an comhad íoslódáilte a shuim seiceála foilsithe, mar sin baineadh é. Bain triail as an íoslódáil arís.",
+        "writeFailed": "Níorbh fhéidir leis an ngléas seo an tsamhail a shábháil. Bain triail as an íoslódáil arís."
       }
     },
     "catalog": {
@@ -4387,7 +4486,7 @@
     "personalDefaultDescription": "Uathlódáilte nuair nach bhfuil próifíl phionnáilte ag stór ar bith.",
     "organizationDefaultDescription": "Uathluchtaithe do bhaill nach bhfuil réamhshocrú pearsanta acu.",
     "setAsDefault": "Socraigh mar réamhshocrú",
-    "saveFailed": "Níorbh fhéidir an phróifíl a shábháil",
+    "saveFailed": "Níorbh fhéidir an phróifíl a shábháil. Bain triail eile as.",
     "organizationRoleRequired": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta próifíl eagraíochta a athrú.",
     "deleteTitle": "Scrios próifíl",
     "deleteMessage": "Baineann sé seo an phróifíl agus a socruithe amach go buan. Ní féidir é seo a chealú.",
@@ -4648,19 +4747,34 @@
       "deductionFallback": "Asbhaint chreidmheasa",
       "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",
       "emptyTitle": "Gan stair chreidmheasa",
+      "expiredGrant": "Imithe in éag: {{description}}",
       "googlePlayReceipt": "Admháil ó Google Play",
       "kind": {
         "adjustment": "Coigeartú",
         "balanceNeutral": "Neodrach don iarmhéid",
         "deduction": "Asbhaint",
         "grant": "Deontas creidmheasa",
+        "promotionalCredits": "Creidmheasanna poiblíochta",
+        "welcomeCredits": "Creidmheas fáilte",
         "purchase": "Ceannach"
+      },
+      "program": {
+        "adminBulkGrant": "Deontas creidmheasa ó riarthóir",
+        "contributorChampion": "Creidmheas curadh na rannpháirtithe",
+        "feedback": "Creidmheas aiseolais",
+        "influencer": "Creidmheas tionchaire",
+        "ossMonthlyReset": "Athshocrú míosúil OSS",
+        "ossSponsorship": "Creidmheas urraíochta OSS",
+        "pullRequest": "Creidmheas iarratais tarraingthe",
+        "usageIssue": "Creidmheas fadhb úsáide",
+        "vibeDay": "Creidmheas Vibe day"
       },
       "purchaseFallback": "Ceannach creidmheasa",
       "receipt": "Admháil",
       "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
       "receiptUnavailable": "Níl admháil ar fáil don cheannach seo.",
-      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí."
+      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí.",
+      "voidedGrant": "Cealaithe: {{description}}"
     },
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
@@ -4933,6 +5047,8 @@
     "connectedTo": "Ceangailte le {{account}}",
     "disconnected": "Dícheanglaíodh {{provider}}",
     "disconnectFailed": "Níorbh fhéidir {{provider}} a dhícheangal",
+    "disconnectRetry": "Níorbh fhéidir le Slack an dícheangal a dhearbhú. Bain triail as arís.",
+    "disconnectNeedsSupport": "Níorbh fhéidir le Kilo an rochtain Slack a sábháladh don cheangal seo a léamh. Déan teagmháil leis an bhfoireann tacaíochta chun an dícheangal a chríochnú.",
     "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
     "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
     "managedByOwner": "Iarr ar úinéir eagraíochta ceangal nach féidir leat a athrú.",
@@ -5262,6 +5378,20 @@
       "eu": "An tAontas Eorpach",
       "au": "An Astráil",
       "jp": "An tSeapáin"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cuardach roghanna",
+    "noMatches": "Níl aon roghanna ag teacht leis an gcuardach",
+    "emptyDescription": "Bain triail as ainm rogha eile nó eochairfhocal eile.",
+    "resultsStatus": "Roghanna aimsithe: {{resultCount}}",
+    "keywords": {
+      "signOut": "sínigh amach|logáil amach",
+      "appearance": "téama|scéim dathanna",
+      "appUnlock": "bithmhéadracht|aghaidh|méarlorg",
+      "language": "teanga|aistriúchán",
+      "notifications": "foláirimh|fógraí",
+      "privacy": "anailísíocht|rianú"
     }
   }
 }

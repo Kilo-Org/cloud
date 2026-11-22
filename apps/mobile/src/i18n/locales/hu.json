@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el.",
     "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra.",
     "organizationTrialEndedBillingAtKiloAi": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
-    "viewOnGitHub": "PR megtekintése a GitHubon"
+    "viewOnGitHub": "PR megtekintése a GitHubon",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Felsorolásjel",
+        "nestedBulletPoint": "Beágyazott felsorolásjel",
+        "orderedItem": "Listaelem {n}",
+        "nestedOrderedItem": "Beágyazott listaelem {n}"
+      },
+      "blockquote": {
+        "quote": "Idézet",
+        "nestedQuote": "Beágyazott idézet"
+      },
+      "table": {
+        "row": "Sor {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Címsorok",
+        "links": "Hivatkozások",
+        "images": "Képek"
+      }
+    }
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -428,6 +451,17 @@
       "location": "Vertex-helyszín",
       "clientEmail": "Szolgáltatásfiók e-mail-címe",
       "privateKey": "Szolgáltatásfiók privát kulcsa",
+      "privateKeyBlockRequired": "Illeszd be a teljes kulcsblokkot, a BEGIN sortól az END sorig.",
+      "privateKeyEncrypted": "Ez a kulcsblokk jelmondattal védett. Illessz be egy jelmondat nélküli szolgáltatásfiók-kulcsot.",
+      "names": {
+        "codestral": "Csak a régi Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Bejelentkezés ChatGPT-fiókkal)",
+        "xiaomi": "Xiaomi (használat alapú fizetés)",
+        "zai": "Z.ai (használat alapú fizetés)",
+        "bedrockByok": "Amazon Bedrock (közvetlen)",
+        "vertexByok": "Google Vertex AI (közvetlen)"
+      },
       "modelMappings": "Modell-megfeleltetések",
       "modelMappingsDescription": "Gateway-modell átirányítása egyéni deployment névre.",
       "mappingTitle": "{{number}}. megfeleltetés",
@@ -507,14 +541,25 @@
       "nextStepFinal": "A fellebbezési döntés végleges. További fellebbezés nem nyújtható be.",
       "viewReceipt": "Visszaigazolás megtekintése"
     },
+    "reportReceipts": {
+      "title": "Bejelentések",
+      "rowSubtitle": "A benyújtott bejelentéseid és eredményeik",
+      "emptyTitle": "Még nincsenek bejelentések",
+      "emptyDescription": "A hozzászólásból vagy AI-válaszból benyújtott bejelentések itt jelennek meg.",
+      "couldNotLoad": "Nem sikerült betölteni a bejelentéseidet",
+      "capped": "A legutóbbi bejelentéseid láthatók."
+    },
     "changelog": "Újdonságok",
     "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
     "changelogGroupNew": "Új",
     "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
     "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
-      "signIn": "Bejelentkezés",
-      "profileOrganizations": "Profil & szervezetek"
+      "signIn": "bejelentkezés",
+      "profileOrganizations": "profil & szervezetek",
+      "chat": "csevegés",
+      "notifications": "értesítések",
+      "integrations": "integrációk"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
       "byline": "#{{number}}, szerző: {{author}}",
       "noFindings": "Nincsenek találatok.",
-      "findingsUnavailable": "Az eredmények nem érhetők el, mert ez a kódellenőrzés sikertelen volt.",
+      "findingsUnavailable": "Az eredmények nem érhetők el.",
       "findingsInProgress": "A kódellenőrzés még folyamatban van. A találatok a befejezése után jelennek meg itt.",
       "findingsEndedWithoutResults": "A kódellenőrzés véget ért, mielőtt bármilyen találat elkészült volna.",
       "serviceUnavailable": "Nem sikerült csatlakozni a kódellenőrzési szolgáltatáshoz. Próbáld újra a kódellenőrzést, amikor a szolgáltatás elérhető.",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "Számlázási beállítások a weben",
       "changePlan": "Csomag módosítása",
       "buySeats": "Férőhelyek vásárlása",
-      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a weben történik.",
+      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a kilo.ai oldalon történik.",
       "setupAutoTopUp": "Automatikus feltöltés beállítása",
       "manageAutoTopUp": "Automatikus feltöltés kezelése",
       "opensOnWeb": "A weben nyílik meg"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "Azonosító",
       "identifierRequired": "Adjon meg egy azonosítót.",
       "identifierTaken": "Egy másik mód már használja ezt az azonosítót.",
+      "identifierTooLong": "Legfeljebb {{max}} karakter hosszú legyen az azonosító.",
       "nameLabel": "Mód neve",
       "nameRequired": "Adjon meg egy módnevet.",
       "notFound": "Ez a mód már nem létezik.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "Az e-mailek kézbesítése átmenetileg nem érhető el. Próbáld újra később.",
     "admissionRequired": "Az eszközöd nem ellenőrizhető. Válaszd ezt a lehetőséget a másik eszközön vagy a weben való bejelentkezéshez: „$t(login.moreSignInOptions)”.",
     "default": "Hiba történt. Próbáld újra.",
-    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Próbáld újra.",
     "startSignInFailed": "Nem sikerült elindítani a bejelentkezést. Próbáld újra.",
     "couldNotOpenBrowser": "Nem sikerült megnyitni a böngészőt. Próbáld újra.",
     "signInTimedOut": "A bejelentkezés időtúllépés miatt megszakadt. Próbáld újra.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "Következő ütemezések",
     "answerNeeded": "Válaszra vár",
     "waitingToRetry": "Újrapróbálkozásra vár",
+    "countNoun": {
+      "needsInput_one": "Válaszra vár",
+      "needsInput_other": "Válaszra vár",
+      "running_one": "Dolgozik",
+      "running_other": "Dolgozik",
+      "scheduled_one": "Ütemezve",
+      "scheduled_other": "Ütemezve",
+      "idle_one": "Tétlen",
+      "idle_other": "Tétlen"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Válaszra vár",
+      "needsInput_other": "{{displayCount}} Válaszra vár",
+      "running_one": "{{displayCount}} Dolgozik",
+      "running_other": "{{displayCount}} Dolgozik",
+      "scheduled_one": "{{displayCount}} Ütemezve",
+      "scheduled_other": "{{displayCount}} Ütemezve",
+      "idle_one": "{{displayCount}} Tétlen",
+      "idle_other": "{{displayCount}} Tétlen"
+    },
+    "footer": {
+      "checked": "Ellenőrizve {{time}}",
+      "lastKnown": "Utolsó ismert · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Következő futás {{time}}",
+      "wasDue": "Esedékes volt {{time}}"
+    },
     "step": {
       "editing": "Szerkesztés",
       "reading": "Olvasás",
@@ -3999,7 +4073,8 @@
         "space": "Nincs elég szabad tárhely ehhez a modellhez. Szabadítson fel tárhelyet, és próbálja újra.",
         "network": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot, és próbálja újra.",
         "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk.",
-        "checksum": "A letöltött fájl nem egyezik a közzétett ellenőrzőösszegével, ezért eltávolítottuk. Próbálja meg újra a letöltést."
+        "checksum": "A letöltött fájl nem egyezik a közzétett ellenőrzőösszegével, ezért eltávolítottuk. Próbálja meg újra a letöltést.",
+        "writeFailed": "Ez az eszköz nem tudta elmenteni a modellt. Próbálja meg újra a letöltést."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "Automatikusan betöltődik, ha egyetlen lerakat sem rendelkezik rögzített profillal.",
     "organizationDefaultDescription": "Automatikusan betöltve azon tagok számára, akiknek nincs személyes alapértelmezésük.",
     "setAsDefault": "Beállítás alapértelmezettként",
-    "saveFailed": "Nem sikerült menteni a profilt",
+    "saveFailed": "Nem sikerült menteni a profilt. Próbáld újra.",
     "organizationRoleRequired": "Csak a szervezet tulajdonosai és adminisztrátorai módosíthatják a szervezeti profilokat.",
     "deleteTitle": "Profil törlése",
     "deleteMessage": "Ezzel véglegesen eltávolítja a profilt és beállításait. Ezt nem lehet visszavonni.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
+      "expiredGrant": "Lejárt: {{description}}",
       "googlePlayReceipt": "A nyugta a Google Playen érhető el",
       "kind": {
         "adjustment": "Korrekció",
         "balanceNeutral": "Egyenlegsemleges",
         "deduction": "Levonás",
         "grant": "Kreditjuttatás",
+        "promotionalCredits": "Promóciós kreditek",
+        "welcomeCredits": "Üdvözlő kreditek",
         "purchase": "Vásárlás"
+      },
+      "program": {
+        "adminBulkGrant": "Adminisztrátori kreditjuttatás",
+        "contributorChampion": "Közreműködői bajnok kredit",
+        "feedback": "Visszajelzéskredit",
+        "influencer": "Influenszerkredit",
+        "ossMonthlyReset": "Nyílt forráskódú támogatás visszaállítása",
+        "ossSponsorship": "Nyílt forráskódú támogatási kredit",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Használati problémáért járó kredit",
+        "vibeDay": "Vibe day kredit"
       },
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
-      "retentionLimit": "A legutóbbi kreditelőzmények láthatók."
+      "retentionLimit": "A legutóbbi kreditelőzmények láthatók.",
+      "voidedGrant": "Érvénytelenítve: {{description}}"
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "Csatlakoztatva: {{account}}",
     "disconnected": "{{provider}} leválasztva",
     "disconnectFailed": "Nem sikerült leválasztani: {{provider}}",
+    "disconnectRetry": "A Slack nem tudta megerősíteni a leválasztást. Próbáld újra.",
+    "disconnectNeedsSupport": "A Kilo nem tudta beolvasni a kapcsolathoz mentett Slack-hozzáférést. A leválasztás befejezéséhez vedd fel a kapcsolatot az ügyfélszolgálattal.",
     "couldNotLoad": "Nem sikerült betölteni az integrációkat",
     "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
     "managedByOwner": "Kérd meg a szervezet egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
@@ -5025,6 +5117,20 @@
       "eu": "Európai Unió",
       "au": "Ausztrália",
       "jp": "Japán"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Beállítások keresése",
+    "noMatches": "Nincs megfelelő beállítás",
+    "emptyDescription": "Próbálj másik beállításnévre vagy kulcsszóra keresni.",
+    "resultsStatus": "Talált beállítások: {{resultCount}}",
+    "keywords": {
+      "signOut": "kijelentkezés|kilépés",
+      "appearance": "téma|színséma",
+      "appUnlock": "biometria|arcfelismerés|ujjlenyomat",
+      "language": "nyelv|fordítás",
+      "notifications": "értesítések|riasztások",
+      "privacy": "analitika|követés|adatvédelem"
     }
   }
 }

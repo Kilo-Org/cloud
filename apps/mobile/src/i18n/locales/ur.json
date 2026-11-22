@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
     "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
-    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
+    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "فہرست نقطہ",
+        "nestedBulletPoint": "نیسٹڈ فہرست نقطہ",
+        "orderedItem": "فہرست آئٹم {n}",
+        "nestedOrderedItem": "نیسٹڈ فہرست آئٹم {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "نیسٹڈ اقتباس"
+      },
+      "table": {
+        "row": "قطار {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "سرخیاں",
+        "links": "لنک",
+        "images": "تصاویر"
+      }
+    }
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -428,6 +451,17 @@
       "location": "Vertex مقام",
       "clientEmail": "سروس اکاؤنٹ ای میل",
       "privateKey": "سروس اکاؤنٹ کی نجی کلید",
+      "privateKeyBlockRequired": "پورا کلید بلاک پیسٹ کریں، BEGIN لائن سے END لائن تک۔",
+      "privateKeyEncrypted": "یہ کلید بلاک پاس فریز سے محفوظ ہے۔ ایسی سروس اکاؤنٹ کلید پیسٹ کریں جس میں کوئی پاس فریز نہ ہو۔",
+      "names": {
+        "codestral": "صرف پرانا Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT سے سائن ان کریں)",
+        "xiaomi": "Xiaomi (استعمال کے مطابق ادائیگی)",
+        "zai": "Z.ai (استعمال کے مطابق ادائیگی)",
+        "bedrockByok": "Amazon Bedrock (براہ راست)",
+        "vertexByok": "Google Vertex AI (براہ راست)"
+      },
       "modelMappings": "ماڈل میپنگز",
       "modelMappingsDescription": "گیٹ وے ماڈل کو حسب ضرورت ڈیپلائمنٹ نام پر بھیجیں۔",
       "mappingTitle": "میپنگ {{number}}",
@@ -507,6 +541,14 @@
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
       "viewReceipt": "رسید دیکھیں"
     },
+    "reportReceipts": {
+      "title": "رپورٹس",
+      "rowSubtitle": "آپ کی جمع کرائی گئی رپورٹس اور ان کے نتائج",
+      "emptyTitle": "ابھی کوئی رپورٹ نہیں",
+      "emptyDescription": "تبصرے یا AI جواب سے آپ کی جمع کرائی گئی رپورٹس یہاں نظر آئیں گی۔",
+      "couldNotLoad": "آپ کی رپورٹس لوڈ نہیں ہو سکیں",
+      "capped": "آپ کی حالیہ ترین رپورٹس دکھائی جا رہی ہیں۔"
+    },
     "changelog": "نیا کیا ہے",
     "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
     "changelogGroupNew": "نیا",
@@ -514,7 +556,10 @@
     "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
     "changelogAreas": {
       "signIn": "سائن ان",
-      "profileOrganizations": "پروفائل و تنظیمیں"
+      "profileOrganizations": "پروفائل و تنظیمیں",
+      "chat": "چیٹ",
+      "notifications": "اطلاعات",
+      "integrations": "انٹیگریشنز"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "تازہ ترین معلومات حاصل نہیں ہو سکیں۔",
       "byline": "#{{number}}، مصنف: {{author}}",
       "noFindings": "کوئی مسئلہ نہیں ملا۔",
-      "findingsUnavailable": "اس جائزے کی ناکامی کی وجہ سے نتائج دستیاب نہیں ہیں۔",
+      "findingsUnavailable": "نتائج دستیاب نہیں ہیں۔",
       "findingsInProgress": "یہ جائزہ ابھی جاری ہے۔ مکمل ہونے پر مسائل یہاں نظر آئیں گے۔",
       "findingsEndedWithoutResults": "یہ جائزہ کوئی مسئلہ سامنے لانے سے پہلے ہی ختم ہو گیا۔",
       "serviceUnavailable": "کوڈ کے جائزے کی سروس سے رابطہ نہیں ہو سکا۔ سروس دستیاب ہونے پر جائزے کی دوبارہ کوشش کریں۔",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "ویب پر بلنگ سیٹنگز",
       "changePlan": "پلان تبدیل کریں",
       "buySeats": "سیٹیں خریدیں",
-      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ ویب پر منظم کیے جاتے ہیں۔",
+      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ kilo.ai پر منظم کیے جاتے ہیں۔",
       "setupAutoTopUp": "خودکار ٹاپ اپ سیٹ اپ کریں",
       "manageAutoTopUp": "خودکار ٹاپ اپ کا انتظام کریں",
       "opensOnWeb": "ویب پر کھلتا ہے"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "شناخت کنندہ",
       "identifierRequired": "شناخت کنندہ درج کریں۔",
       "identifierTaken": "ایک اور موڈ پہلے ہی یہ شناخت کنندہ استعمال کرتا ہے۔",
+      "identifierTooLong": "شناخت کنندہ کو {{max}} حروف یا اس سے کم تک رکھیں۔",
       "nameLabel": "موڈ کا نام",
       "nameRequired": "موڈ کا نام درج کریں۔",
       "notFound": "یہ موڈ اب موجود نہیں ہے۔",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "ای میل کی ترسیل فی الحال دستیاب نہیں ہے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "admissionRequired": "آپ کی ڈیوائس کی تصدیق نہیں ہو سکتی۔ کسی دوسری ڈیوائس پر یا ویب کے ذریعے سائن ان کرنے کے لیے '$t(login.moreSignInOptions)' استعمال کریں۔",
     "default": "کوئی خرابی پیش آ گئی۔ دوبارہ کوشش کریں۔",
-    "retryableAdmission": "ہم اس ڈیوائس کی تصدیق نہیں کر سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+    "retryableAdmission": "اس ڈیوائس کی تصدیق نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
     "startSignInFailed": "سائن ان شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "couldNotOpenBrowser": "براؤزر نہیں کھل سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "signInTimedOut": "سائن ان کا وقت ختم ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
     "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "countNoun": {
+      "needsInput_one": "ان پٹ درکار",
+      "needsInput_other": "ان پٹ درکار",
+      "running_one": "کام جاری ہے",
+      "running_other": "کام جاری ہے",
+      "scheduled_one": "شیڈول شدہ",
+      "scheduled_other": "شیڈول شدہ",
+      "idle_one": "فارغ",
+      "idle_other": "فارغ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ان پٹ درکار",
+      "needsInput_other": "{{displayCount}} ان پٹ درکار",
+      "running_one": "{{displayCount}} کام جاری ہے",
+      "running_other": "{{displayCount}} کام جاری ہے",
+      "scheduled_one": "{{displayCount}} شیڈول شدہ",
+      "scheduled_other": "{{displayCount}} شیڈول شدہ",
+      "idle_one": "{{displayCount}} فارغ",
+      "idle_other": "{{displayCount}} فارغ"
+    },
+    "footer": {
+      "checked": "آخری تصدیق {{time}}",
+      "lastKnown": "آخری معلوم حالت · {{time}}"
+    },
+    "wake": {
+      "nextRun": "اگلا اجرا {{time}}",
+      "wasDue": "متوقع تھا {{time}}"
+    },
     "step": {
       "editing": "ترمیم",
       "reading": "پڑھ رہا ہے",
@@ -3999,7 +4073,8 @@
         "space": "اس ماڈل کے لیے کافی خالی اسٹوریج نہیں ہے۔ جگہ خالی کریں اور دوبارہ کوشش کریں۔",
         "network": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
         "invalidFile": "ڈاؤن لوڈ شدہ فائل ایسا ماڈل نہیں ہے جو یہ ایپ چلا سکے، اس لیے اسے ہٹا دیا گیا۔",
-        "checksum": "ڈاؤن لوڈ شدہ فائل اپنے شائع شدہ چیک سم سے مطابقت نہیں رکھتی، اس لیے اسے ہٹا دیا گیا۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔"
+        "checksum": "ڈاؤن لوڈ شدہ فائل اپنے شائع شدہ چیک سم سے مطابقت نہیں رکھتی، اس لیے اسے ہٹا دیا گیا۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔",
+        "writeFailed": "یہ ڈیوائس ماڈل محفوظ نہیں کر سکی۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔"
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "جب کسی ریپوزٹری میں پن شدہ پروفائل نہ ہو تو خودکار طور پر لوڈ ہوتا ہے۔",
     "organizationDefaultDescription": "ان اراکین کے لیے خودکار طور پر لوڈ کیا گیا جن کا کوئی ذاتی ڈیفالٹ نہیں ہے۔",
     "setAsDefault": "بطور ڈیفالٹ سیٹ کریں۔",
-    "saveFailed": "پروفائل محفوظ نہیں ہو سکا",
+    "saveFailed": "پروفائل کو محفوظ نہیں کیا جا سکا۔ دوبارہ کوشش کریں۔",
     "organizationRoleRequired": "صرف تنظیم کے مالک اور منتظم تنظیم کی پروفائل بدل سکتے ہیں۔",
     "deleteTitle": "پروفائل حذف کریں۔",
     "deleteMessage": "یہ پروفائل اور اس کی ترتیبات کو مستقل طور پر ہٹا دیتا ہے۔ اسے کالعدم نہیں کیا جا سکتا۔",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "کریڈٹ کی کٹوتی",
       "emptyDescription": "کریڈٹ کی خریداریاں، رسیدیں اور استعمال یہاں نظر آئیں گے۔",
       "emptyTitle": "کریڈٹ کی کوئی تاریخچہ نہیں",
+      "expiredGrant": "میعاد ختم ہو گئی: {{description}}",
       "googlePlayReceipt": "Google Play کی رسید",
       "kind": {
         "adjustment": "ترمیم",
         "balanceNeutral": "بیلنس پر اثر نہیں",
         "deduction": "کٹوتی",
         "grant": "مفت کریڈٹ",
+        "promotionalCredits": "پروموشنل کریڈٹس",
+        "welcomeCredits": "خوش آمدید کریڈٹ",
         "purchase": "خریداری"
+      },
+      "program": {
+        "adminBulkGrant": "منتظم کا کریڈٹ عطیہ",
+        "contributorChampion": "شراکت دار چیمپئن کریڈٹ",
+        "feedback": "رائے کا کریڈٹ",
+        "influencer": "انفلوئنسر کریڈٹ",
+        "ossMonthlyReset": "اوپن سورس کریڈٹس کا ماہانہ ری سیٹ",
+        "ossSponsorship": "اوپن سورس کفالت کا کریڈٹ",
+        "pullRequest": "پل ریکویسٹ کریڈٹ",
+        "usageIssue": "استعمال کے مسئلے کا کریڈٹ",
+        "vibeDay": "Vibe Day کریڈٹ"
       },
       "purchaseFallback": "کریڈٹ کی خریداری",
       "receipt": "رسید",
       "receiptA11y": "{{description}}، {{amount}}، {{date}} کی رسید کھولیں",
       "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔",
-      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔"
+      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔",
+      "voidedGrant": "منسوخ: {{description}}"
     },
     "title": "کریڈٹس خریدیں",
     "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",
@@ -4696,6 +4786,8 @@
     "connectedTo": "{{account}} سے منسلک",
     "disconnected": "{{provider}} منقطع ہو گیا",
     "disconnectFailed": "{{provider}} کو منقطع نہیں کیا جا سکا",
+    "disconnectRetry": "Slack منقطع ہونے کی تصدیق نہیں کر سکا۔ دوبارہ کوشش کریں۔",
+    "disconnectNeedsSupport": "Kilo اس کنکشن کے لیے محفوظ Slack رسائی نہیں پڑھ سکا۔ منقطع کرنے کا عمل مکمل کرنے کے لیے معاونت کی ٹیم سے رابطہ کریں۔",
     "couldNotLoad": "انٹیگریشنز لوڈ نہیں ہو سکیں",
     "permissionDenied": "آپ کو ان انٹیگریشنز کا انتظام کرنے کی اجازت نہیں ہے۔",
     "managedByOwner": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے تنظیم کے کسی مالک سے کہیں۔",
@@ -5025,6 +5117,20 @@
       "eu": "یورپی یونین",
       "au": "آسٹریلیا",
       "jp": "جاپان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ترجیحات کی تلاش",
+    "noMatches": "مماثل ترجیحات نہیں ملیں",
+    "emptyDescription": "کسی اور ترجیح کے نام یا کلیدی لفظ سے تلاش کریں۔",
+    "resultsStatus": "ملنے والی ترجیحات: {{resultCount}}",
+    "keywords": {
+      "signOut": "سائن آؤٹ|لاگ آؤٹ",
+      "appearance": "تھیم|رنگ|ظاہری شکل",
+      "appUnlock": "بایومیٹرکس|چہرے کی شناخت|انگلی کا نشان",
+      "language": "زبان|ترجمہ",
+      "notifications": "اطلاعات|الرٹس|نوٹیفکیشن",
+      "privacy": "تجزیات|ٹریکنگ|رازداری"
     }
   }
 }

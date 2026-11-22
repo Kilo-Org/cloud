@@ -139,15 +139,7 @@ Do not treat a dry run that stops after recorded actions as a broken workflow, a
 - For prompt, streaming, conversation event, auth, and tool-shaping changes, add or update focused Vitest coverage under `src/shared` or `entrypoints/sidepanel`.
 - For browser behavior, add the smallest E2E that proves the user-visible flow.
 - Mirror important Chrome E2E behavior in `tests/e2e/firefox-selenium-e2e.ts` when Firefox can support the same workflow.
-- The common extension gate is:
-
-```bash
-pnpm --filter kilo-extension verify
-pnpm --filter kilo-extension build
-pnpm --filter kilo-extension build:firefox
-pnpm --filter kilo-extension e2e:chrome
-pnpm --filter kilo-extension e2e:firefox
-```
+- For the common gate, run `verify`, `build`, `build:firefox`, `e2e:chrome`, and `e2e:firefox` with the package filter shown in [Commands](#commands).
 
 Use a narrower subset only when the change is clearly isolated, and say what was skipped.
 

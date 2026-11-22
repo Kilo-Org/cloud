@@ -7,6 +7,7 @@ import {
   userTarget,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 import {
   type getIntegrationForOwner,
   updateRepositoriesForIntegration,
@@ -1131,10 +1132,24 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             });
           } catch (error) {
             console.error('Failed to submit existing findings for remediation', error);
-            await markApplyAutoRemediationCommandAdmissionFailed(
-              existingRemediationCommandId,
-              'Settings saved, but existing exploitable findings could not be queued.'
-            );
+            // The marking write is best effort: the config and the command row
+            // are already committed, so its failure must not replace the save's
+            // success receipt.
+            try {
+              await markApplyAutoRemediationCommandAdmissionFailed(
+                existingRemediationCommandId,
+                'Settings saved, but existing exploitable findings could not be queued.'
+              );
+            } catch (markError) {
+              console.error('Failed to mark the remediation command admission as failed', {
+                command_id: existingRemediationCommandId,
+                error: markError instanceof Error ? markError.message : String(markError),
+              });
+              captureException(markError, {
+                tags: { operation: 'security_agent.mark_remediation_admission_failed' },
+                extra: { command_id: existingRemediationCommandId },
+              });
+            }
           }
         }
 

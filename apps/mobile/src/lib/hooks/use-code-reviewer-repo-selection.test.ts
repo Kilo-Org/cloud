@@ -126,6 +126,10 @@ vi.mock('@/lib/trial-refusal', () => ({
 // use-code-reviewer.ts re-exports from use-reviewer-permission, which imports
 // useRouter from expo-router. Loading the real module in node blows up on the
 // expo-router source map, so stub the surface the re-export reaches.
+// The reviewer permission hook now observes the shared memberships read, whose
+// owner gates it on the auth token; this suite exercises repo selection, not
+// the role read.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));

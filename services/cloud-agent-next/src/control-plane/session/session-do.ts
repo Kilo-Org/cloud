@@ -4,6 +4,7 @@ import {
   type WorkspaceSnapshotIdentity,
 } from '../sandbox/workspace-snapshot.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -1590,13 +1591,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       });
     } catch (error) {
       const fenceOutcome = classifyRuntimeProxyFenceError(error);
-      // A stale accepted handle is a 401 denial; never serve the scope view or
-      // fall back. A fence transport failure rethrows the retryable 503.
+      // A stale accepted handle denies. A fence transport failure, and every
+      // other outcome, rethrows so the facade answers its retryable 503.
       if (fenceOutcome === 'deny') return null;
       if (fenceOutcome === 'retry') throw error;
-      // A revoked/expired authorization threw. Fall through to scope resolution
-      // so a surviving member can still serve; if none can, the original outcome
-      // (a 503) is preserved below.
+      // A revoked or expired local runtime authorization is the one outcome
+      // that scope resolution serves, through a surviving member.
       localError = error;
     }
     if (local)
@@ -1835,6 +1835,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameHostedGitHubRepositories(
+        existing.hostedGitHubRepositories,
+        metadata.hostedGitHubRepositories
+      ) &&
+      (existing.hostedGitHubRepositories === undefined ||
+        existing.workspace?.generatedBranchName === metadata.workspace?.generatedBranchName) &&
       sameSandboxProviderBinding(
         getSandboxProviderBinding(existing),
         getSandboxProviderBinding(metadata)

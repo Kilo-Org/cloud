@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ.",
     "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ.",
     "organizationTrialEndedBillingAtKiloAi": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
-    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub"
+    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ຈຸດລາຍການ",
+        "nestedBulletPoint": "ຈຸດລາຍການຊ້ອນ",
+        "orderedItem": "ຂໍ້ລາຍການ {n}",
+        "nestedOrderedItem": "ຂໍ້ລາຍການຊ້ອນ {n}"
+      },
+      "blockquote": {
+        "quote": "ຄຳອ້າງອີງ",
+        "nestedQuote": "ຄຳອ້າງອີງຊ້ອນ"
+      },
+      "table": {
+        "row": "ແຖວ {n}: {content}"
+      },
+      "math": {
+        "equation": "ຄະນິດສາດ: {latex}"
+      },
+      "rotor": {
+        "headings": "ຫົວຂໍ້",
+        "links": "ລິ້ງ",
+        "images": "ຮູບພາບ"
+      }
+    }
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -428,6 +451,17 @@
       "location": "ສະຖານທີ່ Vertex",
       "clientEmail": "ອີເມວບັນຊີບໍລິການ",
       "privateKey": "ຄີສ່ວນຕົວຂອງບັນຊີບໍລິການ",
+      "privateKeyBlockRequired": "ວາງບລັອກຄີທັງໝົດ, ຕັ້ງແຕ່ແຖວ BEGIN ຈົນເຖິງແຖວ END.",
+      "privateKeyEncrypted": "ບລັອກຄີນີ້ຖືກປ້ອງກັນດ້ວຍປະໂຫຍກລະຫັດ. ວາງຄີບັນຊີບໍລິການທີ່ບໍ່ມີປະໂຫຍກລະຫັດ.",
+      "names": {
+        "codestral": "ສະເພາະ Codestral ສະບັບເກົ່າ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ເຂົ້າສູ່ລະບົບດ້ວຍ ChatGPT)",
+        "xiaomi": "Xiaomi (ຈ່າຍຕາມການໃຊ້ງານ)",
+        "zai": "Z.ai (ຈ່າຍຕາມການໃຊ້ງານ)",
+        "bedrockByok": "Amazon Bedrock (ໂດຍກົງ)",
+        "vertexByok": "Google Vertex AI (ໂດຍກົງ)"
+      },
       "modelMappings": "ການຈັບຄູ່ໂມເດວ",
       "modelMappingsDescription": "ສົ່ງໂມເດວ gateway ໄປຫາຊື່ deployment ທີ່ກຳນົດເອງ.",
       "mappingTitle": "ການຈັບຄູ່ {{number}}",
@@ -507,6 +541,14 @@
       "nextStepFinal": "ຄຳຕັດສິນການອຸທອນເປັນຂັ້ນສຸດທ້າຍ. ບໍ່ສາມາດຍື່ນອຸທອນໄດ້ອີກ.",
       "viewReceipt": "ເບິ່ງໃບຮັບ"
     },
+    "reportReceipts": {
+      "title": "ການລາຍງານ",
+      "rowSubtitle": "ການລາຍງານທີ່ທ່ານໄດ້ຍື່ນ ແລະ ຜົນຂອງມັນ",
+      "emptyTitle": "ຍັງບໍ່ມີການລາຍງານ",
+      "emptyDescription": "ການລາຍງານທີ່ທ່ານຍື່ນຈາກຄຳເຫັນ ຫຼື ຄຳຕອບຂອງ AI ຈະສະແດງຢູ່ນີ້.",
+      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການລາຍງານຂອງທ່ານໄດ້",
+      "capped": "ກຳລັງສະແດງການລາຍງານລ່າສຸດຂອງທ່ານ."
+    },
     "changelog": "ມີຫຍັງໃໝ່",
     "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນ {{version}} ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ",
     "changelogGroupNew": "ໃໝ່",
@@ -514,7 +556,10 @@
     "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
     "changelogAreas": {
       "signIn": "ການເຂົ້າສູ່ລະບົບ",
-      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ"
+      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ",
+      "chat": "ສົນທະນາ",
+      "notifications": "ການແຈ້ງເຕືອນ",
+      "integrations": "ການເຊື່ອມໂຍງ"
     }
   },
   "preferences": {
@@ -1278,7 +1323,7 @@
       "couldNotGetLatest": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນລ່າສຸດໄດ້.",
       "byline": "#{{number}} ໂດຍ {{author}}",
       "noFindings": "ບໍ່ພົບບັນຫາ.",
-      "findingsUnavailable": "ບໍ່ມີຜົນລັບໃຫ້ເບິ່ງ ເພາະການກວດທານນີ້ລົ້ມເຫຼວ.",
+      "findingsUnavailable": "ບໍ່ສາມາດເຂົ້າເຖິງຜົນລັບໄດ້.",
       "findingsInProgress": "ການກວດທານນີ້ຍັງກຳລັງດຳເນີນການຢູ່. ຜົນລັບຈະປະກົດຂຶ້ນຢູ່ບ່ອນນີ້ເມື່ອມັນແລ້ວເສັດ.",
       "findingsEndedWithoutResults": "ການກວດທານນີ້ໄດ້ສິ້ນສຸດລົງກ່ອນທີ່ຈະມີຜົນລັບໃດໆ.",
       "serviceUnavailable": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບບໍລິການກວດທານໂຄດໄດ້. ລອງກວດທານໃໝ່ເມື່ອບໍລິການພ້ອມໃຊ້ງານ.",
@@ -3410,7 +3455,7 @@
       "manageOnWeb": "ການຕັ້ງຄ່າການຮຽກເກັບເງິນໃນເວັບ",
       "changePlan": "ປ່ຽນແຜນ",
       "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
-      "managedOnWeb": "ແຜນ, ສິດຜູ້ໃຊ້ ແລະ ການເຕີມເງິນອັດຕະໂນມັດຖືກຈັດການຢູ່ໃນເວັບ.",
+      "managedOnWeb": "ແຜນ, ສິດຜູ້ໃຊ້ ແລະ ການເຕີມເງິນອັດຕະໂນມັດຖືກຈັດການທີ່ kilo.ai.",
       "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
       "manageAutoTopUp": "ຈັດການການເຕີມເງິນອັດຕະໂນມັດ",
       "opensOnWeb": "ເປີດໃນເວັບ"
@@ -3592,6 +3637,7 @@
       "identifierLabel": "ຕົວລະບຸ",
       "identifierRequired": "ປ້ອນຕົວລະບຸ.",
       "identifierTaken": "ໂໝດອື່ນໃຊ້ຕົວລະບຸນີ້ແລ້ວ.",
+      "identifierTooLong": "ໃຫ້ຕົວລະບຸມີບໍ່ເກີນ {{max}} ຕົວອັກສອນ.",
       "nameLabel": "ຊື່ໂໝດ",
       "nameRequired": "ປ້ອນຊື່ໂໝດ.",
       "notFound": "ບໍ່ມີໂໝດນີ້ອີກແລ້ວ.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "ລະບົບສົ່ງອີເມວໃຊ້ງານບໍ່ໄດ້ຊົ່ວຄາວ. ກະລຸນາລອງອີກຄັ້ງພາຍຫຼັງ.",
     "admissionRequired": "ບໍ່ສາມາດຢືນຢັນອຸປະກອນຂອງທ່ານໄດ້. ໃຊ້ '$t(login.moreSignInOptions)' ເພື່ອເຂົ້າສູ່ລະບົບໃນອຸປະກອນອື່ນ ຫຼື ຜ່ານເວັບ.",
     "default": "ເກີດຂໍ້ຜິດພາດ. ກະລຸນາລອງໃໝ່.",
-    "retryableAdmission": "ພວກເຮົາບໍ່ສາມາດຢືນຢັນອຸປະກອນນີ້ໄດ້. ກວດສອບການເຊື່ອມຕໍ່ຂອງທ່ານແລ້ວລອງອີກຄັ້ງ.",
+    "retryableAdmission": "ບໍ່ສາມາດຢືນຢັນອຸປະກອນນີ້ໄດ້. ລອງອີກຄັ້ງ.",
     "startSignInFailed": "ບໍ່ສາມາດເລີ່ມເຂົ້າສູ່ລະບົບໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
     "couldNotOpenBrowser": "ບໍ່ສາມາດເປີດບຣາວເຊີໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
     "signInTimedOut": "ໝົດເວລາເຂົ້າສູ່ລະບົບແລ້ວ. ກະລຸນາລອງອີກຄັ້ງ.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
     "answerNeeded": "ລໍຄຳຕອບ",
     "waitingToRetry": "ລໍລອງໃໝ່",
+    "countNoun": {
+      "needsInput_one": "ລໍຂໍ້ມູນຈາກທ່ານ",
+      "needsInput_other": "ລໍຂໍ້ມູນຈາກທ່ານ",
+      "running_one": "ກຳລັງເຮັດວຽກ",
+      "running_other": "ກຳລັງເຮັດວຽກ",
+      "scheduled_one": "ກຳນົດເວລາ",
+      "scheduled_other": "ກຳນົດເວລາ",
+      "idle_one": "ວ່າງ",
+      "idle_other": "ວ່າງ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ລໍຂໍ້ມູນຈາກທ່ານ",
+      "needsInput_other": "{{displayCount}} ລໍຂໍ້ມູນຈາກທ່ານ",
+      "running_one": "{{displayCount}} ກຳລັງເຮັດວຽກ",
+      "running_other": "{{displayCount}} ກຳລັງເຮັດວຽກ",
+      "scheduled_one": "{{displayCount}} ກຳນົດເວລາ",
+      "scheduled_other": "{{displayCount}} ກຳນົດເວລາ",
+      "idle_one": "{{displayCount}} ວ່າງ",
+      "idle_other": "{{displayCount}} ວ່າງ"
+    },
+    "footer": {
+      "checked": "ກວດສອບແລ້ວ {{time}}",
+      "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ເຮັດວຽກຄັ້ງຕໍ່ໄປ {{time}}",
+      "wasDue": "ຄາດໄວ້ {{time}}"
+    },
     "step": {
       "editing": "ກຳລັງແກ້ໄຂ",
       "reading": "ກຳລັງອ່ານ",
@@ -3999,7 +4073,8 @@
         "space": "ບໍ່ມີພື້ນທີ່ຫວ່າງພຽງພໍສຳລັບໂມເດວນີ້. ປົດພື້ນທີ່ ແລະ ລອງໃໝ່ອີກຄັ້ງ.",
         "network": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ລອງໃໝ່ອີກຄັ້ງ.",
         "invalidFile": "ໄຟລ໌ທີ່ດາວໂຫຼດບໍ່ແມ່ນໂມເດວທີ່ແອັບນີ້ເຮັດວຽກໄດ້, ດັ່ງນັ້ນຈຶ່ງຖືກລຶບອອກ.",
-        "checksum": "ໄຟລ໌ທີ່ດາວໂຫຼດບໍ່ກົງກັບຄ່າກວດສອບທີ່ເຜີຍແຜ່ໄວ້, ດັ່ງນັ້ນຈຶ່ງຖືກລຶບອອກ. ກະລຸນາລອງດາວໂຫຼດອີກຄັ້ງ."
+        "checksum": "ໄຟລ໌ທີ່ດາວໂຫຼດບໍ່ກົງກັບຄ່າກວດສອບທີ່ເຜີຍແຜ່ໄວ້, ດັ່ງນັ້ນຈຶ່ງຖືກລຶບອອກ. ກະລຸນາລອງດາວໂຫຼດອີກຄັ້ງ.",
+        "writeFailed": "ອຸປະກອນນີ້ບໍ່ສາມາດບັນທຶກໂມເດວໄດ້. ກະລຸນາລອງດາວໂຫຼດອີກຄັ້ງ."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "ໂຫຼດອັດຕະໂນມັດເມື່ອບໍ່ມີບ່ອນເກັບຂໍ້ມູນມີໂປຣໄຟລ໌ທີ່ປັກໝຸດໄວ້.",
     "organizationDefaultDescription": "ໂຫຼດອັດຕະໂນມັດສຳລັບສະມາຊິກທີ່ບໍ່ມີຄ່າເລີ່ມຕົ້ນສ່ວນຕົວ.",
     "setAsDefault": "ຕັ້ງເປັນຄ່າເລີ່ມຕົ້ນ",
-    "saveFailed": "ບໍ່ສາມາດບັນທຶກໂປຣໄຟລ໌ໄດ້",
+    "saveFailed": "ບໍ່ສາມາດບັນທຶກໂປຣໄຟລ໌ໄດ້. ລອງອີກຄັ້ງ.",
     "organizationRoleRequired": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ດູແລລະບົບທີ່ສາມາດປ່ຽນໂປຣໄຟລ໌ອົງກອນໄດ້.",
     "deleteTitle": "ລຶບໂປຣໄຟລ໌",
     "deleteMessage": "ນີ້ຈະເປັນການລຶບໂປຣໄຟລ໌ ແລະການຕັ້ງຄ່າຂອງມັນອອກຢ່າງຖາວອນ. ອັນນີ້ບໍ່ສາມາດຍົກເລີກໄດ້.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "ການຫັກເຄຣດິດ",
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
+      "expiredGrant": "ໝົດອາຍຸແລ້ວ: {{description}}",
       "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
       "kind": {
         "adjustment": "ການປັບປຸງ",
         "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
         "deduction": "ການຫັກ",
         "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "promotionalCredits": "ເຄຣດິດໂປຣໂມຊັນ",
+        "welcomeCredits": "ເຄຣດິດຕ້ອນຮັບ",
         "purchase": "ການຊື້"
+      },
+      "program": {
+        "adminBulkGrant": "ການມອບເຄຣດິດໂດຍຜູ້ດູແລລະບົບ",
+        "contributorChampion": "ເຄຣດິດຜູ້ສະໜັບສະໜູນດີເດັ່ນ",
+        "feedback": "ເຄຣດິດຄຳຕິຊົມ",
+        "influencer": "ເຄຣດິດອິນຟລູເອນເຊີ",
+        "ossMonthlyReset": "ການຕັ້ງຍອດການສະໜັບສະໜູນ OSS ໃໝ່",
+        "ossSponsorship": "ເຄຣດິດການສະໜັບສະໜູນ OSS",
+        "pullRequest": "ເຄຣດິດຈາກຄຳຂໍລວມໂຄ້ດ",
+        "usageIssue": "ເຄຣດິດບັນຫາການນຳໃຊ້",
+        "vibeDay": "ເຄຣດິດວັນ Vibe"
       },
       "purchaseFallback": "ການຊື້ເຄຣດິດ",
       "receipt": "ໃບຮັບເງິນ",
       "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
       "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້.",
-      "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ."
+      "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ.",
+      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}"
     },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "ເຊື່ອມຕໍ່ກັບ {{account}} ແລ້ວ",
     "disconnected": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ແລ້ວ",
     "disconnectFailed": "ບໍ່ສາມາດຕັດການເຊື່ອມຕໍ່ {{provider}} ໄດ້",
+    "disconnectRetry": "Slack ບໍ່ສາມາດຢືນຢັນການຕັດການເຊື່ອມຕໍ່ໄດ້. ລອງໃໝ່.",
+    "disconnectNeedsSupport": "Kilo ບໍ່ສາມາດອ່ານການເຂົ້າເຖິງ Slack ທີ່ບັນທຶກໄວ້ສຳລັບການເຊື່ອມຕໍ່ນີ້ໄດ້. ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນເພື່ອໃຫ້ການຕັດການເຊື່ອມຕໍ່ສຳເລັດ.",
     "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການເຊື່ອມໂຍງໄດ້",
     "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການເຊື່ອມໂຍງເຫຼົ່ານີ້.",
     "managedByOwner": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງອົງກອນປ່ຽນການເຊື່ອມຕໍ່ທີ່ທ່ານບໍ່ສາມາດປ່ຽນໄດ້.",
@@ -5025,6 +5117,20 @@
       "eu": "ສະຫະພາບເອີຣົບ",
       "au": "ອອສເຕຣເລຍ",
       "jp": "ຍີ່ປຸ່ນ"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ຄົ້ນຫາການຕັ້ງຄ່າສ່ວນຕົວ",
+    "noMatches": "ບໍ່ພົບການຕັ້ງຄ່າທີ່ກົງກັນ",
+    "emptyDescription": "ລອງໃຊ້ຊື່ການຕັ້ງຄ່າ ຫຼື ຄຳຄົ້ນອື່ນ.",
+    "resultsStatus": "ພົບການຕັ້ງຄ່າ: {{resultCount}}",
+    "keywords": {
+      "signOut": "ອອກຈາກລະບົບ|ອອກຈາກບັນຊີ",
+      "appearance": "ຮູບແບບ|ສີ|ໂໝດມືດ",
+      "appUnlock": "ຊີວະມິຕິ|ໃບໜ້າ|ລາຍນິ້ວມື",
+      "language": "ພາສາ|ການແປ",
+      "notifications": "ແຈ້ງເຕືອນ|ຂໍ້ຄວາມແຈ້ງເຕືອນ",
+      "privacy": "ການວິເຄາະ|ການຕິດຕາມ"
     }
   }
 }

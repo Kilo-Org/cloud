@@ -8,7 +8,10 @@ import {
   isDefinitiveSecurityWorkerRejection,
   postSecurityWorkerJson,
 } from './security-worker-request';
-import { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/security-agent';
+import {
+  SECURITY_ANALYSIS_REJECTED_MESSAGE,
+  SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+} from '@kilocode/app-shared/security-agent';
 import type { SecurityReviewOwner } from '../core/types';
 
 type ManualAnalysisStartParams = {
@@ -38,6 +41,50 @@ type ManualAnalysisResponse = {
  * rejection rather than ambiguous transport.
  */
 const DISABLED_ROUTING_ERROR = 'Manual analysis Worker routing is disabled';
+
+/**
+ * Logs a definitive Worker rejection before it becomes the stable client
+ * error: the status is what separates an internal-secret mismatch (401) or a
+ * request-schema drift (400) from a policy rejection (409) once the body is no
+ * longer echoed. The Worker's `error` body is notes-only and length-capped.
+ *
+ * Rejection classes at the throw sites: an auth/config rejection (401/403)
+ * means the deployment is misconfigured, so the client gets the
+ * service-not-configured sentence (`SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE`).
+ * Any other rejection keeps the analysis-rejection sentence. Both go out as
+ * `PRECONDITION_FAILED`; the sentences are shared with the mobile ledger
+ * (stable-error-messages).
+ */
+function logDefinitiveRejection(route: string, status: number, body: unknown): void {
+  let notes: string | null = null;
+  if (body !== null && typeof body === 'object' && 'error' in body) {
+    const raw = body.error;
+    if (typeof raw === 'string') {
+      notes = raw.slice(0, 200);
+    }
+  }
+  console.error('Security analysis Worker rejected the request', {
+    route,
+    status,
+    ...(notes !== null ? { notes } : {}),
+  });
+}
+
+/**
+ * The stable error for a definitive Worker rejection: a 401/403 is the Worker
+ * refusing the server's own credentials, i.e. the same misconfiguration as an
+ * unset URL or secret, so it reuses the not-configured sentence. Every other
+ * rejection keeps the analysis-rejection sentence.
+ */
+function definitiveRejectionError(status: number): TRPCError {
+  const authRejection = status === 401 || status === 403;
+  return new TRPCError({
+    code: 'PRECONDITION_FAILED',
+    message: authRejection
+      ? SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE
+      : SECURITY_ANALYSIS_REJECTED_MESSAGE,
+  });
+}
 
 export async function submitManualAnalysisStart(
   params: ManualAnalysisStartParams
@@ -87,7 +134,11 @@ export async function submitManualAnalysisStart(
     if (!definitive) {
       throw new TRPCError({ code: 'BAD_GATEWAY', message: `${failed}. Try again.` });
     }
-    throw new Error(workerBody?.error ?? failed);
+    // A definitive rejection is terminal, so it is a stable non-retryable code
+    // with a shared sentence (never the Worker's body) that the mobile ledger
+    // maps by exact match; the body survives only in the server log.
+    logDefinitiveRejection('analysis/manual-analysis-start', response.status, workerBody);
+    throw definitiveRejectionError(response.status);
   }
 
   if (

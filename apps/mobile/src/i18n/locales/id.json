@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
     "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
     "organizationTrialEndedBillingAtKiloAi": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
-    "viewOnGitHub": "Lihat PR di GitHub"
+    "viewOnGitHub": "Lihat PR di GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Poin butir",
+        "nestedBulletPoint": "Poin butir bersarang",
+        "orderedItem": "Item daftar {n}",
+        "nestedOrderedItem": "Item daftar bersarang {n}"
+      },
+      "blockquote": {
+        "quote": "Kutipan",
+        "nestedQuote": "Kutipan bersarang"
+      },
+      "table": {
+        "row": "Baris {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Judul",
+        "links": "Tautan",
+        "images": "Gambar"
+      }
+    }
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -428,6 +451,17 @@
       "location": "Lokasi Vertex",
       "clientEmail": "Email akun layanan",
       "privateKey": "Kunci pribadi akun layanan",
+      "privateKeyBlockRequired": "Tempel seluruh blok kunci, dari baris BEGIN sampai baris END.",
+      "privateKeyEncrypted": "Blok kunci ini dilindungi frasa sandi. Tempel kunci akun layanan yang tidak memiliki frasa sandi.",
+      "names": {
+        "codestral": "Hanya Codestral lama",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Masuk dengan ChatGPT)",
+        "xiaomi": "Xiaomi (bayar sesuai pemakaian)",
+        "zai": "Z.ai (bayar sesuai pemakaian)",
+        "bedrockByok": "Amazon Bedrock (langsung)",
+        "vertexByok": "Google Vertex AI (langsung)"
+      },
       "modelMappings": "Pemetaan model",
       "modelMappingsDescription": "Arahkan model gateway ke nama deployment kustom.",
       "mappingTitle": "Pemetaan {{number}}",
@@ -507,14 +541,25 @@
       "nextStepFinal": "Keputusan banding bersifat final. Banding lebih lanjut tidak dapat diajukan.",
       "viewReceipt": "Lihat tanda terima"
     },
+    "reportReceipts": {
+      "title": "Laporan",
+      "rowSubtitle": "Laporan yang Anda ajukan dan hasilnya",
+      "emptyTitle": "Belum ada laporan",
+      "emptyDescription": "Laporan yang Anda ajukan dari komentar atau respons AI akan muncul di sini.",
+      "couldNotLoad": "Tidak dapat memuat laporan Anda",
+      "capped": "Menampilkan laporan terbaru Anda."
+    },
     "changelog": "Yang baru",
     "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
     "changelogGroupNew": "Baru",
     "changelogFixesIn": "Perbaikan dan peningkatan pada {{areas}}.",
     "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
     "changelogAreas": {
-      "signIn": "Masuk",
-      "profileOrganizations": "Profil & organisasi"
+      "signIn": "masuk",
+      "profileOrganizations": "profil & organisasi",
+      "chat": "obrolan",
+      "notifications": "notifikasi",
+      "integrations": "integrasi"
     }
   },
   "preferences": {
@@ -775,7 +820,7 @@
       "gateHidden": "Tersembunyi",
       "gateNone": "Tidak ada",
       "noFindings": "Tidak ada temuan.",
-      "findingsUnavailable": "Hasil tidak tersedia karena tinjauan ini gagal.",
+      "findingsUnavailable": "Hasil tidak tersedia.",
       "findingsInProgress": "Tinjauan ini masih berlangsung. Temuan akan muncul di sini setelah selesai.",
       "findingsEndedWithoutResults": "Tinjauan ini berakhir sebelum menghasilkan temuan apa pun.",
       "serviceUnavailable": "Tidak dapat terhubung ke layanan tinjauan kode. Coba tinjauan lagi saat layanan tersedia.",
@@ -3402,7 +3447,7 @@
       "manageOnWeb": "Pengaturan penagihan di web",
       "changePlan": "Ubah paket",
       "buySeats": "Beli lisensi",
-      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di web.",
+      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di kilo.ai.",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
       "opensOnWeb": "Dibuka di web"
@@ -3596,6 +3641,7 @@
       "identifierLabel": "Pengenal",
       "identifierRequired": "Masukkan pengenal.",
       "identifierTaken": "Mode lain sudah menggunakan pengenal ini.",
+      "identifierTooLong": "Jaga pengenal tetap {{max}} karakter atau kurang.",
       "nameLabel": "Nama mode",
       "nameRequired": "Masukkan nama mode.",
       "notFound": "Mode ini sudah tidak ada.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "Email belum dapat dikirim untuk sementara waktu. Coba lagi nanti.",
     "admissionRequired": "Perangkatmu tidak dapat diverifikasi. Gunakan '$t(login.moreSignInOptions)' untuk masuk di perangkat lain atau melalui web.",
     "default": "Terjadi kesalahan. Coba lagi.",
-    "retryableAdmission": "Kami tidak dapat memverifikasi perangkat ini. Periksa koneksimu dan coba lagi.",
+    "retryableAdmission": "Tidak dapat memverifikasi perangkat ini. Coba lagi.",
     "startSignInFailed": "Gagal memulai proses masuk. Silakan coba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka peramban. Coba lagi.",
     "signInTimedOut": "Waktu untuk masuk telah habis. Coba lagi.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "Jadwal berikutnya",
     "answerNeeded": "Perlu jawaban",
     "waitingToRetry": "Menunggu percobaan ulang",
+    "countNoun": {
+      "needsInput_one": "Perlu masukan",
+      "needsInput_other": "Perlu masukan",
+      "running_one": "Bekerja",
+      "running_other": "Bekerja",
+      "scheduled_one": "Terjadwal",
+      "scheduled_other": "Terjadwal",
+      "idle_one": "Siaga",
+      "idle_other": "Siaga"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Perlu masukan",
+      "needsInput_other": "{{displayCount}} Perlu masukan",
+      "running_one": "{{displayCount}} Bekerja",
+      "running_other": "{{displayCount}} Bekerja",
+      "scheduled_one": "{{displayCount}} Terjadwal",
+      "scheduled_other": "{{displayCount}} Terjadwal",
+      "idle_one": "{{displayCount}} Siaga",
+      "idle_other": "{{displayCount}} Siaga"
+    },
+    "footer": {
+      "checked": "Diperiksa {{time}}",
+      "lastKnown": "Terakhir diketahui · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Eksekusi berikutnya {{time}}",
+      "wasDue": "Seharusnya {{time}}"
+    },
     "step": {
       "editing": "Mengedit",
       "reading": "Membaca",
@@ -3999,7 +4073,8 @@
         "space": "Ruang penyimpanan tidak cukup untuk model ini. Kosongkan ruang dan coba lagi.",
         "network": "Unduhan tidak selesai. Periksa koneksi Anda dan coba lagi.",
         "invalidFile": "File yang diunduh bukan model yang dapat dijalankan aplikasi ini, sehingga file tersebut dihapus.",
-        "checksum": "File yang diunduh tidak cocok dengan checksum yang dipublikasikan, sehingga file tersebut dihapus. Coba unduh lagi."
+        "checksum": "File yang diunduh tidak cocok dengan checksum yang dipublikasikan, sehingga file tersebut dihapus. Coba unduh lagi.",
+        "writeFailed": "Perangkat ini tidak dapat menyimpan model. Coba unduh lagi."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "Dimuat secara otomatis ketika tidak ada repositori yang memiliki profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat otomatis untuk anggota yang tidak memiliki default pribadi.",
     "setAsDefault": "Tetapkan sebagai bawaan",
-    "saveFailed": "Tidak dapat menyimpan profil",
+    "saveFailed": "Tidak dapat menyimpan profil. Coba lagi.",
     "organizationRoleRequired": "Hanya pemilik organisasi dan admin yang dapat mengubah profil organisasi.",
     "deleteTitle": "Hapus profil",
     "deleteMessage": "Tindakan ini akan menghapus profil dan pengaturannya secara permanen. Hal ini tidak dapat dibatalkan.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "Pengurangan kredit",
       "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
       "emptyTitle": "Tidak ada riwayat kredit",
+      "expiredGrant": "Kedaluwarsa: {{description}}",
       "googlePlayReceipt": "Tanda terima dari Google Play",
       "kind": {
         "adjustment": "Penyesuaian",
         "balanceNeutral": "Saldo tetap",
         "deduction": "Pengurangan",
         "grant": "Kredit gratis",
+        "promotionalCredits": "Kredit promosi",
+        "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
+      },
+      "program": {
+        "adminBulkGrant": "Pemberian kredit admin",
+        "contributorChampion": "Kredit juara kontributor",
+        "feedback": "Kredit masukan",
+        "influencer": "Kredit influencer",
+        "ossMonthlyReset": "Pengaturan ulang sponsor sumber terbuka bulanan",
+        "ossSponsorship": "Kredit sponsor sumber terbuka",
+        "pullRequest": "Kredit PR",
+        "usageIssue": "Kredit masalah penggunaan",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
-      "retentionLimit": "Menampilkan riwayat kredit terbaru."
+      "retentionLimit": "Menampilkan riwayat kredit terbaru.",
+      "voidedGrant": "Dibatalkan: {{description}}"
     },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "Terhubung ke {{account}}",
     "disconnected": "{{provider}} telah diputuskan",
     "disconnectFailed": "Tidak dapat memutuskan {{provider}}",
+    "disconnectRetry": "Slack tidak dapat mengonfirmasi pemutusan. Coba lagi.",
+    "disconnectNeedsSupport": "Kilo tidak dapat membaca akses Slack yang disimpan untuk koneksi ini. Hubungi tim dukungan untuk menyelesaikan pemutusan.",
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
@@ -5025,6 +5117,20 @@
       "eu": "Uni Eropa",
       "au": "Australia",
       "jp": "Jepang"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cari preferensi",
+    "noMatches": "Tidak ada preferensi yang cocok",
+    "emptyDescription": "Coba nama preferensi atau kata kunci lain.",
+    "resultsStatus": "Preferensi ditemukan: {{resultCount}}",
+    "keywords": {
+      "signOut": "keluar|keluar akun",
+      "appearance": "tema|skema warna",
+      "appUnlock": "biometrik|wajah|sidik jari",
+      "language": "bahasa|terjemahan",
+      "notifications": "peringatan|pemberitahuan",
+      "privacy": "analitik|pelacakan"
     }
   }
 }

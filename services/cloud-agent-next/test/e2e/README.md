@@ -220,6 +220,69 @@ the concrete cause; there is no skip or production fallback.
 
 ## Running
 
+### Hosted multi-repository staging proof
+
+This is an opt-in HTTP scenario, not part of the local or deployed matrix. It
+requires an operator-approved staging Cloud Agent Worker with the E2E allocation
+inspector, a staging backend for control tokens and stream tickets, the matching
+staged Git token broker, and a fake LLM running the `file-read-pair` directive.
+The standard deployed E2E stack shares production resources; do not use it or
+any live fixture for this check. The scenario does not provision or deploy
+anything, read project env files, or substitute a default endpoint or repo.
+
+Provide a dedicated funded staging organization member, an authorized profile,
+and one GitHub App workflow installation with a primary and additional repo. Add
+a distinct single-line non-secret marker to each repo's default branch. Markers
+are 8-128 characters from `A-Z`, `a-z`, `0-9`, `_`, `-`; use repos with different
+leaf names. The read tool resolves `markerPath` under each repository's checkout
+directory, relative to the workspace root. A fixture configuration looks like:
+
+```json
+{
+  "target": "staging",
+  "workerUrl": "https://stage-worker.example.invalid",
+  "backendUrl": "https://stage-backend.example.invalid",
+  "organizationId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "integrationId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  "profileId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  "primary": { "fullName": "fixture-org/primary", "markerPath": "marker.txt", "marker": "fixture-primary" },
+  "additional": { "id": 12345, "fullName": "fixture-org/additional", "markerPath": "marker.txt", "marker": "fixture-additional" },
+  "verifySibling": true,
+  "verifyIdle": true
+}
+```
+
+Use a separate mode-600 auth JSON file with `token` (the fixture member's
+ordinary personal Kilo API token) and `e2eInternalApiSecret` (the staging
+inspector secret, not a production secret). Invoke from the repository root:
+
+```sh
+E2E_HOSTED_MULTI_REPO_FIXTURE=/path/to/staging-fixture.json \
+E2E_HOSTED_MULTI_REPO_AUTH_FILE=/path/to/staging-auth.json \
+pnpm --filter cloud-agent-next exec tsx test/e2e/hosted-multi-repository.ts
+```
+
+The driver probes catalog version `1` and the selected ID/name, replays the
+same promptless create, checks that no turn, physical allocation or billing
+interval appeared, then proves both marker contents in a single first turn.
+`verifySibling` defaults to true and checks the same files and physical
+allocation through a second root. Set it false only if the staged provider does
+not support siblings. `verifyIdle` defaults to false; enable it on a stage with a
+predictable idle deadline to verify passive stop and a new physical allocation
+for the same workspace and session. The runtime inspector reads persisted
+allocation state, not provider liveness. The driver deletes run-created
+workspaces with `deleteWorktree`; if a create response is lost, use the printed
+operation key to correlate and reclaim its staging workspace.
+
+To document the result, retain the run output and record the actual Cloud Agent,
+Git token broker, backend, fake LLM, and runtime revisions. Correlate the
+printed catalog window and workspace IDs with staging traces to confirm there
+were no provider creates or billing starts during catalog lookup and promptless
+registration/replay. For idle evidence, confirm the provider stop was due to
+idleness. Record any explicitly skipped checks as not verified. A local test
+pass, a worker name without isolated staging bindings, or a staged fixture
+description alone is not staged evidence.
+
 ### Saved profiles on Kilo v2
 
 With this worktree's Kilo v2 stack running, execute:

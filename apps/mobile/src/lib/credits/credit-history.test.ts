@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildCreditHistoryItems,
   type CreditDeduction,
+  type CreditGrant,
   creditGrantKind,
   creditPurchaseChannel,
   type CreditPurchaseEntry,
@@ -27,7 +28,19 @@ function deduction(overrides: Partial<CreditDeduction>): CreditDeduction {
     description: 'Usage',
     amount_mUsd: -1_000_000,
     kind: 'deduction',
+    expiry: null,
     purchase: null,
+    ...overrides,
+  };
+}
+
+function creditGrant(overrides: Partial<CreditGrant>): CreditGrant {
+  return {
+    id: 'grant-1',
+    date: '2026-02-03T00:00:00.000Z',
+    amount_mUsd: 5_000_000,
+    kind: 'welcome',
+    expiryDate: null,
     ...overrides,
   };
 }
@@ -65,7 +78,8 @@ describe('buildCreditHistoryItems', () => {
   it('merges purchases and ledger rows newest first', () => {
     const items = buildCreditHistoryItems(
       [purchase({ id: 'p1', date: '2026-01-10T00:00:00.000Z' })],
-      [deduction({ id: 'd1', date: '2026-02-10T00:00:00.000Z' })]
+      [deduction({ id: 'd1', date: '2026-02-10T00:00:00.000Z' })],
+      []
     );
 
     expect(items.map(item => item.key)).toEqual(['ledger:d1', 'purchase:p1']);
@@ -86,9 +100,11 @@ describe('buildCreditHistoryItems', () => {
             amount_mUsd: 20_000_000,
             is_free: false,
             credit_source: 'stripe',
+            kind: 'promotional',
           },
         }),
-      ]
+      ],
+      []
     );
 
     expect(items.map(item => item.key)).toEqual(['purchase:p2', 'ledger:expiry']);
@@ -97,14 +113,15 @@ describe('buildCreditHistoryItems', () => {
   it('keeps a stable order for two rows on the same timestamp', () => {
     const items = buildCreditHistoryItems(
       [purchase({ id: 'b', date: '2026-01-01T00:00:00.000Z' })],
-      [deduction({ id: 'a', date: '2026-01-01T00:00:00.000Z' })]
+      [deduction({ id: 'a', date: '2026-01-01T00:00:00.000Z' })],
+      []
     );
 
     expect(items.map(item => item.key)).toEqual(['ledger:a', 'purchase:b']);
   });
 
   it('returns nothing for an account with no history', () => {
-    expect(buildCreditHistoryItems([], [])).toEqual([]);
+    expect(buildCreditHistoryItems([], [], [])).toEqual([]);
   });
 
   it('ranks the ledger by the PostgreSQL time the device cannot parse', () => {
@@ -114,7 +131,8 @@ describe('buildCreditHistoryItems', () => {
     try {
       const items = buildCreditHistoryItems(
         [purchase({ id: 'p1', date: '2026-03-16T15:40:00.000Z' })],
-        [deduction({ id: 'd1', date: '2026-03-16 15:21:40.957+00' })]
+        [deduction({ id: 'd1', date: '2026-03-16 15:21:40.957+00' })],
+        []
       );
 
       expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:d1']);
@@ -129,7 +147,8 @@ describe('buildCreditHistoryItems', () => {
       [
         deduction({ id: 'broken', date: 'not a time' }),
         deduction({ id: 'dated', date: '2026-02-02 00:00:00+00' }),
-      ]
+      ],
+      []
     );
 
     expect(items.map(item => item.key)).toEqual(['ledger:dated', 'ledger:broken']);
@@ -150,9 +169,11 @@ describe('buildCreditHistoryItems', () => {
             amount_mUsd: 20_000_000,
             is_free: false,
             credit_source: 'stripe',
+            kind: 'promotional',
           },
         }),
-      ]
+      ],
+      []
     );
 
     const ledger = items.find(item => item.key === 'ledger:expiry');
@@ -174,12 +195,62 @@ describe('buildCreditHistoryItems', () => {
             amount_mUsd: 20_000_000,
             is_free: false,
             credit_source: 'stripe',
+            kind: 'promotional',
           },
         }),
-      ]
+      ],
+      []
     );
 
     const ledger = items.find(item => item.key === 'ledger:expiry');
     expect(ledger).toMatchObject({ kind: 'ledger', grantListed: false });
+  });
+
+  it('lists the grant that funds a balance with no purchases', () => {
+    const items = buildCreditHistoryItems([], [], [creditGrant({ id: 'welcome' })]);
+
+    expect(items).toEqual([
+      {
+        kind: 'grant',
+        key: 'grant:welcome',
+        grant: creditGrant({ id: 'welcome' }),
+        sortDate: '2026-02-03T00:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('does not list a grant a loaded deduction already prints', () => {
+    const items = buildCreditHistoryItems(
+      [],
+      [
+        deduction({
+          id: 'expiry',
+          date: '2026-06-01T00:00:00.000Z',
+          kind: 'adjustment',
+          purchase: {
+            id: 'welcome',
+            date: '2026-02-03T00:00:00.000Z',
+            description: 'Welcome credits',
+            amount_mUsd: 5_000_000,
+            is_free: true,
+            credit_source: null,
+            kind: 'welcome',
+          },
+        }),
+      ],
+      [creditGrant({ id: 'welcome' })]
+    );
+
+    expect(items.map(item => item.key)).toEqual(['ledger:expiry']);
+  });
+
+  it('interleaves purchases, grants, and deductions newest first', () => {
+    const items = buildCreditHistoryItems(
+      [purchase({ id: 'p1', date: '2026-01-10T00:00:00.000Z' })],
+      [deduction({ id: 'd1', date: '2026-04-10T00:00:00.000Z' })],
+      [creditGrant({ id: 'g1', date: '2026-03-10T00:00:00.000Z' })]
+    );
+
+    expect(items.map(item => item.key)).toEqual(['ledger:d1', 'grant:g1', 'purchase:p1']);
   });
 });

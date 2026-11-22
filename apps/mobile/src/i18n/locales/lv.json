@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
     "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
     "organizationTrialEndedBillingAtKiloAi": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
-    "viewOnGitHub": "Skatīt PR GitHub"
+    "viewOnGitHub": "Skatīt PR GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Saraksta punkts",
+        "nestedBulletPoint": "Iekļautais saraksta punkts",
+        "orderedItem": "Saraksta vienums {n}",
+        "nestedOrderedItem": "Iekļautais saraksta vienums {n}"
+      },
+      "blockquote": {
+        "quote": "Citāts",
+        "nestedQuote": "Iekļautais citāts"
+      },
+      "table": {
+        "row": "Rinda {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemātika: {latex}"
+      },
+      "rotor": {
+        "headings": "Virsraksti",
+        "links": "Saites",
+        "images": "Attēli"
+      }
+    }
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -429,6 +452,17 @@
       "location": "Vertex atrašanās vieta",
       "clientEmail": "Pakalpojuma konta e-pasts",
       "privateKey": "Pakalpojuma konta privātā atslēga",
+      "privateKeyBlockRequired": "Ielīmē visu atslēgas bloku, no BEGIN rindas līdz END rindai.",
+      "privateKeyEncrypted": "Šis atslēgas bloks ir aizsargāts ar atslēgfrāzi. Ielīmē pakalpojuma konta atslēgu, kurai nav atslēgfrāzes.",
+      "names": {
+        "codestral": "Mantotais tikai Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Pierakstīties ar ChatGPT)",
+        "xiaomi": "Xiaomi (maksa pēc patēriņa)",
+        "zai": "Z.ai (maksa pēc patēriņa)",
+        "bedrockByok": "Amazon Bedrock (tieši)",
+        "vertexByok": "Google Vertex AI (tieši)"
+      },
       "modelMappings": "Modeļu kartējumi",
       "modelMappingsDescription": "Novirzi vārtejas modeli uz pielāgotu izvietojuma nosaukumu.",
       "mappingTitle": "Kartējums {{number}}",
@@ -508,14 +542,25 @@
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
       "viewReceipt": "Skatīt apstiprinājumu"
     },
+    "reportReceipts": {
+      "title": "Ziņojumi",
+      "rowSubtitle": "Jūsu iesniegtie ziņojumi un to rezultāti",
+      "emptyTitle": "Vēl nav ziņojumu",
+      "emptyDescription": "Šeit parādīsies ziņojumi, kurus iesniedzat no komentāra vai AI atbildes.",
+      "couldNotLoad": "Neizdevās ielādēt jūsu ziņojumus",
+      "capped": "Tiek rādīti jūsu jaunākie ziņojumi."
+    },
     "changelog": "Kas jauns",
     "changelogVersionPending": "Versijas {{version}} piezīmes pienāks ar nākamo atjauninājumu.",
     "changelogGroupNew": "Jaunumi",
     "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
     "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
     "changelogAreas": {
-      "signIn": "Pierakstīšanās",
-      "profileOrganizations": "Profils & organizācijas"
+      "signIn": "pierakstīšanās",
+      "profileOrganizations": "profils & organizācijas",
+      "chat": "tērzēšana",
+      "notifications": "paziņojumi",
+      "integrations": "integrācijas"
     }
   },
   "preferences": {
@@ -1305,7 +1350,7 @@
       "couldNotGetLatest": "Neizdevās iegūt jaunākos datus.",
       "byline": "#{{number}} autors: {{author}}",
       "noFindings": "Nav konstatējumu.",
-      "findingsUnavailable": "Rezultāti nav pieejami, jo šī koda pārskatīšana neizdevās.",
+      "findingsUnavailable": "Rezultāti nav pieejami.",
       "findingsInProgress": "Šī pārskatīšana vēl notiek. Konstatējumi šeit parādīsies, kad tā tiks pabeigta.",
       "findingsEndedWithoutResults": "Šī pārskatīšana tika pārtraukta, pirms tika iegūti kādi konstatējumi.",
       "serviceUnavailable": "Neizdevās izveidot savienojumu ar koda pārskatīšanas pakalpojumu. Atkārtojiet koda pārskatīšanu, kad pakalpojums būs pieejams.",
@@ -3472,7 +3517,7 @@
       "manageOnWeb": "Norēķinu iestatījumi tīmeklī",
       "changePlan": "Mainīt plānu",
       "buySeats": "Pirkt vietas",
-      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti tīmeklī.",
+      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti vietnē kilo.ai.",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
       "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
       "opensOnWeb": "Tiek atvērts tīmeklī"
@@ -3654,6 +3699,7 @@
       "identifierLabel": "Identifikators",
       "identifierRequired": "Ievadiet identifikatoru.",
       "identifierTaken": "Cits režīms jau izmanto šo identifikatoru.",
+      "identifierTooLong": "Identifikators nedrīkst būt garāks par {{max}} rakstzīmēm.",
       "nameLabel": "Režīma nosaukums",
       "nameRequired": "Ievadiet režīma nosaukumu.",
       "notFound": "Šis režīms vairs neeksistē.",
@@ -3746,7 +3792,7 @@
     "emailDeliveryFailed": "E-pasta nosūtīšana īslaicīgi nav pieejama. Mēģini vēlreiz vēlāk.",
     "admissionRequired": "Tavu ierīci nevar pārbaudīt. Izvēlies “$t(login.moreSignInOptions)”, lai pierakstītos citā ierīcē vai tīmeklī.",
     "default": "Radās kļūda. Lūdzu, mēģini vēlreiz.",
-    "retryableAdmission": "Neizdevās pārbaudīt šo ierīci. Pārbaudi savienojumu un mēģini vēlreiz.",
+    "retryableAdmission": "Neizdevās pārbaudīt šo ierīci. Mēģini vēlreiz.",
     "startSignInFailed": "Neizdevās sākt pierakstīšanos. Mēģini vēlreiz.",
     "couldNotOpenBrowser": "Neizdevās atvērt pārlūku. Mēģini vēlreiz.",
     "signInTimedOut": "Pierakstīšanās laiks ir beidzies. Mēģini vēlreiz.",
@@ -3818,6 +3864,42 @@
     "nextScheduled": "Nākamie ieplānotie",
     "answerNeeded": "Nepieciešama atbilde",
     "waitingToRetry": "Gaida atkārtotu mēģinājumu",
+    "countNoun": {
+      "needsInput_one": "Gaida ievadi",
+      "needsInput_other": "Gaida ievadi",
+      "needsInput_zero": "Gaida ievadi",
+      "running_one": "Strādā",
+      "running_other": "Strādā",
+      "running_zero": "Strādā",
+      "scheduled_one": "Ieplānota",
+      "scheduled_other": "Ieplānotas",
+      "scheduled_zero": "Ieplānotu",
+      "idle_one": "Dīkstāvē",
+      "idle_other": "Dīkstāvē",
+      "idle_zero": "Dīkstāvē"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Gaida ievadi",
+      "needsInput_other": "{{displayCount}} Gaida ievadi",
+      "needsInput_zero": "{{displayCount}} Gaida ievadi",
+      "running_one": "{{displayCount}} Strādā",
+      "running_other": "{{displayCount}} Strādā",
+      "running_zero": "{{displayCount}} Strādā",
+      "scheduled_one": "{{displayCount}} Ieplānota",
+      "scheduled_other": "{{displayCount}} Ieplānotas",
+      "scheduled_zero": "{{displayCount}} Ieplānotu",
+      "idle_one": "{{displayCount}} Dīkstāvē",
+      "idle_other": "{{displayCount}} Dīkstāvē",
+      "idle_zero": "{{displayCount}} Dīkstāvē"
+    },
+    "footer": {
+      "checked": "Pārbaudīts {{time}}",
+      "lastKnown": "Pēdējais zināmais · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Nākamā palaišana {{time}}",
+      "wasDue": "Bija jābūt {{time}}"
+    },
     "step": {
       "editing": "Rediģēšana",
       "reading": "Lasīšana",
@@ -4064,7 +4146,8 @@
         "space": "Šim modelim nav pietiekami daudz brīvas krātuves vietas. Atbrīvojiet vietu un mēģiniet vēlreiz.",
         "network": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
         "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts.",
-        "checksum": "Lejupielādētais fails neatbilst publicētajai kontrolsummai, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz."
+        "checksum": "Lejupielādētais fails neatbilst publicētajai kontrolsummai, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz.",
+        "writeFailed": "Šī ierīce nevarēja saglabāt modeli. Mēģiniet lejupielādēt vēlreiz."
       }
     },
     "catalog": {
@@ -4247,7 +4330,7 @@
     "personalDefaultDescription": "Automātiski ielādēts, ja nevienai krātuvei nav piesprausta profila.",
     "organizationDefaultDescription": "Automātiski ielādēts dalībniekiem, kuriem nav personisku noklusējuma.",
     "setAsDefault": "Iestatīt kā noklusējumu",
-    "saveFailed": "Nevarēja saglabāt profilu",
+    "saveFailed": "Nevarēja saglabāt profilu. Mēģiniet vēlreiz.",
     "organizationRoleRequired": "Organizācijas profilus var mainīt tikai organizācijas īpašnieki un administratori.",
     "deleteTitle": "Dzēst profilu",
     "deleteMessage": "Tādējādi profils un tā iestatījumi tiek neatgriezeniski noņemti. Šo darbību nevar atsaukt.",
@@ -4506,19 +4589,34 @@
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
+      "expiredGrant": "Termiņš beidzies: {{description}}",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Neietekmē atlikumu",
         "deduction": "Norakstīšana",
         "grant": "Kredītu piešķīrums",
+        "promotionalCredits": "Promocijas kredīti",
+        "welcomeCredits": "Sveiciena kredīti",
         "purchase": "Pirkums"
+      },
+      "program": {
+        "adminBulkGrant": "Administratora kredītu piešķīrums",
+        "contributorChampion": "Līdzstrādnieku čempiona kredīts",
+        "feedback": "Kredīts par atsauksmi",
+        "influencer": "Influenceru kredīts",
+        "ossMonthlyReset": "OSS sponsorēšanas ikmēneša atiestatīšana",
+        "ossSponsorship": "OSS sponsorēšanas kredīts",
+        "pullRequest": "Kredīts par izmaiņu pieprasījumu",
+        "usageIssue": "Kredīts par lietojuma problēmu",
+        "vibeDay": "Vibe dienas kredīts"
       },
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
-      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture."
+      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture.",
+      "voidedGrant": "Anulēts: {{description}}"
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
@@ -4775,6 +4873,8 @@
     "connectedTo": "Savienots ar {{account}}",
     "disconnected": "Pakalpojums {{provider}} atvienots",
     "disconnectFailed": "Neizdevās atvienot {{provider}}",
+    "disconnectRetry": "Slack neizdevās apstiprināt atvienošanu. Mēģini vēlreiz.",
+    "disconnectNeedsSupport": "Kilo neizdevās nolasīt šim savienojumam saglabāto Slack piekļuvi. Lai pabeigtu atvienošanu, sazinies ar atbalsta dienestu.",
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
     "managedByOwner": "Lūdziet organizācijas īpašniekam mainīt savienojumu, kuru nevarat mainīt.",
@@ -5104,6 +5204,20 @@
       "eu": "Eiropas Savienība",
       "au": "Austrālija",
       "jp": "Japāna"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Iestatījumu meklēšana",
+    "noMatches": "Nav atbilstošu iestatījumu",
+    "emptyDescription": "Mēģiniet citu iestatījuma nosaukumu vai atslēgvārdu.",
+    "resultsStatus": "Atrastie iestatījumi: {{resultCount}}",
+    "keywords": {
+      "signOut": "izrakstīties|iziet|beigt sesiju",
+      "appearance": "tēma|krāsu shēma",
+      "appUnlock": "biometrija|sejas atpazīšana|pirksta nospiedums",
+      "language": "valoda|tulkojums",
+      "notifications": "brīdinājumi|paziņojumi",
+      "privacy": "analītika|izsekošana"
     }
   }
 }

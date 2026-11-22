@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels.",
     "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen.",
     "organizationTrialEndedBillingAtKiloAi": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
-    "viewOnGitHub": "PR op GitHub bekijken"
+    "viewOnGitHub": "PR op GitHub bekijken",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Opsommingsteken",
+        "nestedBulletPoint": "Genest opsommingsteken",
+        "orderedItem": "Lijstitem {n}",
+        "nestedOrderedItem": "Genest lijstitem {n}"
+      },
+      "blockquote": {
+        "quote": "Citaat",
+        "nestedQuote": "Genest citaat"
+      },
+      "table": {
+        "row": "Rij {n}: {content}"
+      },
+      "math": {
+        "equation": "Wiskunde: {latex}"
+      },
+      "rotor": {
+        "headings": "Koppen",
+        "links": "Koppelingen",
+        "images": "Afbeeldingen"
+      }
+    }
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -428,6 +451,17 @@
       "location": "Vertex-locatie",
       "clientEmail": "E-mailadres van serviceaccount",
       "privateKey": "Privésleutel van serviceaccount",
+      "privateKeyBlockRequired": "Plak het hele sleutelblok, van de BEGIN-regel tot de END-regel.",
+      "privateKeyEncrypted": "Dit sleutelblok is met een wachtwoordzin beveiligd. Plak een serviceaccountsleutel zonder wachtwoordzin.",
+      "names": {
+        "codestral": "Alleen verouderde Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Aanmelden met ChatGPT)",
+        "xiaomi": "Xiaomi (betalen naar gebruik)",
+        "zai": "Z.ai (betalen naar gebruik)",
+        "bedrockByok": "Amazon Bedrock (rechtstreeks)",
+        "vertexByok": "Google Vertex AI (rechtstreeks)"
+      },
       "modelMappings": "Modelkoppelingen",
       "modelMappingsDescription": "Stuur een gatewaymodel door naar een aangepaste deploymentnaam.",
       "mappingTitle": "Koppeling {{number}}",
@@ -507,14 +541,25 @@
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
+    "reportReceipts": {
+      "title": "Meldingen",
+      "rowSubtitle": "Meldingen die je hebt ingediend en hun uitkomsten",
+      "emptyTitle": "Nog geen meldingen",
+      "emptyDescription": "Meldingen die je vanuit een reactie of een AI-antwoord indient, verschijnen hier.",
+      "couldNotLoad": "Kon je meldingen niet laden",
+      "capped": "Je ziet je meest recente meldingen."
+    },
     "changelog": "Nieuw in deze versie",
     "changelogVersionPending": "De notities voor {{version}} komen met de volgende app-update.",
     "changelogGroupNew": "Nieuw",
     "changelogFixesIn": "Oplossingen en verbeteringen in {{areas}}.",
     "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
     "changelogAreas": {
-      "signIn": "Inloggen",
-      "profileOrganizations": "Profiel & organisaties"
+      "signIn": "inloggen",
+      "profileOrganizations": "profiel & organisaties",
+      "chat": "gesprek",
+      "notifications": "meldingen",
+      "integrations": "integraties"
     }
   },
   "preferences": {
@@ -775,7 +820,7 @@
       "gateHidden": "Verborgen",
       "gateNone": "Geen",
       "noFindings": "Er zijn geen bevindingen.",
-      "findingsUnavailable": "De resultaten zijn niet beschikbaar omdat deze review is mislukt.",
+      "findingsUnavailable": "De resultaten zijn niet beschikbaar.",
       "findingsInProgress": "Deze review is nog niet afgerond. De bevindingen verschijnen hier zodra hij klaar is.",
       "findingsEndedWithoutResults": "Deze review is beëindigd voordat er bevindingen waren.",
       "serviceUnavailable": "De codereviewservice kon niet worden bereikt. Probeer de review opnieuw wanneer de service beschikbaar is.",
@@ -3402,7 +3447,7 @@
       "manageOnWeb": "Factureringsinstellingen op het web",
       "changePlan": "Plan wijzigen",
       "buySeats": "Licenties kopen",
-      "managedOnWeb": "Het plan, de licenties en automatisch opwaarderen worden op het web beheerd.",
+      "managedOnWeb": "Het plan, de licenties en automatisch opwaarderen worden op kilo.ai beheerd.",
       "setupAutoTopUp": "Automatisch opwaarderen instellen",
       "manageAutoTopUp": "Automatisch opwaarderen beheren",
       "opensOnWeb": "Opent op het web"
@@ -3596,6 +3641,7 @@
       "identifierLabel": "Identificatie",
       "identifierRequired": "Voer een identificatie in.",
       "identifierTaken": "Een andere modus gebruikt deze identificatie al.",
+      "identifierTooLong": "Houd de identificatie op {{max}} tekens of minder.",
       "nameLabel": "Modusnaam",
       "nameRequired": "Voer een modusnaam in.",
       "notFound": "Deze modus bestaat niet meer.",
@@ -3682,7 +3728,7 @@
     "emailDeliveryFailed": "We kunnen tijdelijk geen e-mails versturen. Probeer het later opnieuw.",
     "admissionRequired": "Je apparaat kan niet worden geverifieerd. Gebruik '$t(login.moreSignInOptions)' om je op een ander apparaat of via de website aan te melden.",
     "default": "Er is iets misgegaan. Probeer het opnieuw.",
-    "retryableAdmission": "We konden dit apparaat niet verifiëren. Controleer je verbinding en probeer het opnieuw.",
+    "retryableAdmission": "Dit apparaat kon niet worden geverifieerd. Probeer het opnieuw.",
     "startSignInFailed": "Het aanmelden kon niet worden gestart. Probeer het opnieuw.",
     "couldNotOpenBrowser": "De browser kon niet worden geopend. Probeer het opnieuw.",
     "signInTimedOut": "Het aanmelden duurde te lang. Probeer het opnieuw.",
@@ -3754,6 +3800,34 @@
     "nextScheduled": "Hierna gepland",
     "answerNeeded": "Antwoord nodig",
     "waitingToRetry": "Wacht op nieuwe poging",
+    "countNoun": {
+      "needsInput_one": "Invoer nodig",
+      "needsInput_other": "Invoer nodig",
+      "running_one": "Bezig",
+      "running_other": "Bezig",
+      "scheduled_one": "Gepland",
+      "scheduled_other": "Gepland",
+      "idle_one": "Inactief",
+      "idle_other": "Inactief"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Invoer nodig",
+      "needsInput_other": "{{displayCount}} Invoer nodig",
+      "running_one": "{{displayCount}} Bezig",
+      "running_other": "{{displayCount}} Bezig",
+      "scheduled_one": "{{displayCount}} Gepland",
+      "scheduled_other": "{{displayCount}} Gepland",
+      "idle_one": "{{displayCount}} Inactief",
+      "idle_other": "{{displayCount}} Inactief"
+    },
+    "footer": {
+      "checked": "Gecontroleerd {{time}}",
+      "lastKnown": "Laatst bekend · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Volgende uitvoering {{time}}",
+      "wasDue": "Was verwacht {{time}}"
+    },
     "step": {
       "editing": "Bewerken",
       "reading": "Lezen",
@@ -3999,7 +4073,8 @@
         "space": "Er is niet genoeg vrije opslagruimte voor dit model. Maak ruimte vrij en probeer het opnieuw.",
         "network": "De download is niet voltooid. Controleer je verbinding en probeer het opnieuw.",
         "invalidFile": "Het gedownloade bestand is geen model dat deze app kan uitvoeren, dus het is verwijderd.",
-        "checksum": "Het gedownloade bestand komt niet overeen met de gepubliceerde controlesom, dus het is verwijderd. Probeer het opnieuw te downloaden."
+        "checksum": "Het gedownloade bestand komt niet overeen met de gepubliceerde controlesom, dus het is verwijderd. Probeer het opnieuw te downloaden.",
+        "writeFailed": "Dit apparaat kon het model niet opslaan. Probeer het opnieuw te downloaden."
       }
     },
     "catalog": {
@@ -4177,7 +4252,7 @@
     "personalDefaultDescription": "Automatisch geladen wanneer geen enkele repository een vastgezet profiel heeft.",
     "organizationDefaultDescription": "Automatisch geladen voor leden die geen persoonlijke standaard hebben.",
     "setAsDefault": "Als standaard instellen",
-    "saveFailed": "Kan profiel niet opslaan",
+    "saveFailed": "Kan profiel niet opslaan. Probeer het opnieuw.",
     "organizationRoleRequired": "Alleen organisatie-eigenaren en beheerders kunnen organisatieprofielen wijzigen.",
     "deleteTitle": "Profiel verwijderen",
     "deleteMessage": "Hierdoor worden het profiel en de instellingen ervan permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
@@ -4435,19 +4510,34 @@
       "deductionFallback": "Tegoedafschrijving",
       "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
       "emptyTitle": "Geen tegoedgeschiedenis",
+      "expiredGrant": "Verlopen: {{description}}",
       "googlePlayReceipt": "Bon in Google Play",
       "kind": {
         "adjustment": "Correctie",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Afschrijving",
         "grant": "Tegoedtoekenning",
+        "promotionalCredits": "Promotietegoed",
+        "welcomeCredits": "Welkomsttegoed",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Tegoedtoekenning door beheerder",
+        "contributorChampion": "Tegoed voor bijdragerskampioen",
+        "feedback": "Feedbacktegoed",
+        "influencer": "Influencertegoed",
+        "ossMonthlyReset": "Maandelijkse herinstelling van opensource-sponsoring",
+        "ossSponsorship": "Tegoed voor opensource-sponsoring",
+        "pullRequest": "PR-tegoed",
+        "usageIssue": "Tegoed voor gebruiksprobleem",
+        "vibeDay": "Vibe-dagtegoed"
       },
       "purchaseFallback": "Tegoedaankoop",
       "receipt": "Bon",
       "receiptA11y": "Open de bon voor {{description}}, {{amount}}, van {{date}}",
       "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop.",
-      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven."
+      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven.",
+      "voidedGrant": "Geannuleerd: {{description}}"
     },
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
@@ -4696,6 +4786,8 @@
     "connectedTo": "Gekoppeld aan {{account}}",
     "disconnected": "{{provider}} ontkoppeld",
     "disconnectFailed": "Kan {{provider}} niet ontkoppelen",
+    "disconnectRetry": "Slack kon de ontkoppeling niet bevestigen. Probeer het opnieuw.",
+    "disconnectNeedsSupport": "Kilo kon de opgeslagen Slack-toegang voor deze koppeling niet lezen. Neem contact op met de helpdesk om de ontkoppeling af te ronden.",
     "couldNotLoad": "Kan integraties niet laden",
     "permissionDenied": "Je hebt geen toestemming om deze integraties te beheren.",
     "managedByOwner": "Vraag een eigenaar van de organisatie om een koppeling te wijzigen die je zelf niet kunt wijzigen.",
@@ -5025,6 +5117,20 @@
       "eu": "Europese Unie",
       "au": "Australië",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Voorkeuren zoeken",
+    "noMatches": "Geen overeenkomende voorkeuren",
+    "emptyDescription": "Probeer een andere naam of een ander trefwoord.",
+    "resultsStatus": "Gevonden voorkeuren: {{resultCount}}",
+    "keywords": {
+      "signOut": "afmelden|uitloggen",
+      "appearance": "thema|kleurenschema|donkere modus",
+      "appUnlock": "biometrie|gezichtsherkenning|vingerafdruk",
+      "language": "taal|vertaling",
+      "notifications": "waarschuwingen|pushmeldingen",
+      "privacy": "analyse|volgen|gegevens"
     }
   }
 }

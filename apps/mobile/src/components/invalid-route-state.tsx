@@ -19,9 +19,27 @@ import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
  * It never pops: a cold deep link renders on top of the tab anchor, so
  * `canGoBack()` is true even though the user has no history here, and popping
  * would leave for Home instead of the surface the link was about.
+ *
+ * The swap goes through `useStackSafeReplace`, which pushes and retires this
+ * route once that push's transition ends. A caller whose navigator emits no
+ * transition event — the root `Slot` route, where the retire could never run
+ * and the dead route would stay beneath the destination — passes the plain
+ * router instead.
  */
-export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
+export function InvalidRouteState({
+  backTo,
+  replace,
+}: Readonly<{
+  backTo: Href;
+  /**
+   * The swap to use instead of the stack-safe one, for a caller whose navigator
+   * emits no transition event. `+not-found` runs under the root `Slot`, which
+   * never retires a source.
+   */
+  replace?: (href: Href) => void;
+}>) {
   const stackSafeRouter = useStackSafeReplace();
+  const leave = replace ?? stackSafeRouter.replace;
   const { t } = useTranslation();
 
   return (
@@ -37,7 +55,7 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
           onPress={() => {
             // Swapping this terminal route for its parent in one commit crashes
             // Android Fabric, so it pushes then retires.
-            stackSafeRouter.replace(backTo);
+            leave(backTo);
           }}
         />
       }

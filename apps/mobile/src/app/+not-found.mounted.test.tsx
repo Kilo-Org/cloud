@@ -68,6 +68,20 @@ afterEach(() => {
   mounted = undefined;
 });
 
+describe('not-found exits', () => {
+  it('gives the in-app exit the plain router, since the root Slot emits no transition', () => {
+    router.canGoBack.mockReturnValue(false);
+    const tree = mount();
+
+    // The route renders under the root Slot, so `InvalidRouteState` must not use
+    // the push-then-retire hook here: nothing would retire this route, and Back
+    // from the app root would return to it.
+    const state = tree.root.findByType('InvalidRouteState' as never);
+    expect(state.props.backTo).toBe('/');
+    expect(state.props.replace).toBe(router.replace);
+  });
+});
+
 describe('not-found hardware back', () => {
   it('replaces the dead route with the app root when there is no history', () => {
     router.canGoBack.mockReturnValue(false);

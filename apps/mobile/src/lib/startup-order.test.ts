@@ -52,13 +52,23 @@ describe('root layout startup order (text contract)', () => {
   it('excludes the held restore-error surface from bootstrap loading', () => {
     // A successful retry clears restoreFailed before the hidden gate settles.
     // The held error screen still owns feedback, including its inline spinner.
-    const excludesHeldError =
-      /\{showBootstrapLoading\s*&&\s*!showRestoreError\s*\?\s*<BootstrapLoadingSurface\s*\/>\s*:\s*null\}/.test(
-        stripComments(layoutSource)
+    // The decision is the exported predicate (its cases live in
+    // bootstrap-decision.test.ts), so this guard pins that the layout mounts
+    // the wait surface through it instead of an inline conjunction: the blocked
+    // overlay has to exclude the surface for the same reason.
+    const codeSource = stripComments(layoutSource);
+    const mountsThroughPredicate =
+      /\{shouldShowBootstrapLoadingSurface\(\{[\s\S]*?\}\)\s*\?\s*\(\s*<BootstrapLoadingSurface\s*\/>\s*\)\s*:\s*null\}/.test(
+        codeSource
       );
-    expect(excludesHeldError, 'the held restore error must exclude BootstrapLoadingSurface').toBe(
-      true
-    );
+    expect(
+      mountsThroughPredicate,
+      'the held restore error must exclude BootstrapLoadingSurface'
+    ).toBe(true);
+    expect(
+      /showBootstrapLoading\s*&&\s*!showRestoreError/.test(codeSource),
+      'the loading-surface decision must live in shouldShowBootstrapLoadingSurface'
+    ).toBe(false);
   });
 
   // The persisted deep-link record is account-bound. Auth bootstrap publishes

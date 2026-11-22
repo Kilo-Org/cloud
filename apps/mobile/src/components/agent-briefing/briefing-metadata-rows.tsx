@@ -4,11 +4,13 @@ import { type TFunction } from 'i18next';
 import { Text } from '@/components/ui/text';
 import { formatNumber } from '@/lib/format';
 
-/** The failure wording of each payload kind. */
+/**
+ * The failure wording of each payload kind that reports a failure. A cancelled
+ * kind is a stopped turn, not a failure, so it names itself instead.
+ */
 const FAILURE_KIND_KEYS = {
   provider: 'agentBriefing.metadataFailureProvider',
   tool: 'agentBriefing.metadataFailureTool',
-  cancelled: 'agentBriefing.metadataFailureCancelled',
   other: 'agentBriefing.metadataFailureOther',
 } as const;
 
@@ -52,7 +54,11 @@ export function briefingMetadataTexts(
     );
   }
   if (failure) {
-    texts.push(t('agentBriefing.metadataFailure', { kind: t(FAILURE_KIND_KEYS[failure.kind]) }));
+    texts.push(
+      failure.kind === 'cancelled'
+        ? t('agentBriefing.metadataStopped')
+        : t('agentBriefing.metadataFailure', { kind: t(FAILURE_KIND_KEYS[failure.kind]) })
+    );
   }
   return texts;
 }

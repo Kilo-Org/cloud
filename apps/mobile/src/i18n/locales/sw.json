@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} vikao",
       "sectionAccessibility": "{{title}}: {{displayCount}} vikao",
       "live": "MOJA KWA MOJA",
-      "updating": "Inasasisha"
+      "updating": "Inasasisha",
+      "retentionLimit": "Inaonyesha vikao vyako vya hivi karibuni."
     },
     "sessionRow": {
       "deleteTitle": "Ungependa kufuta kikao?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
       "emptyReadOnlyTitle": "Hakuna ujumbe katika kikao hiki",
-      "renameAccessibility": "Badilisha jina la kikao: {{title}}",
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
       "historyTooLarge": "Andiko la kikao hiki ni kikubwa mno kupakia.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Jaribu tena kupakia akaunti",
     "retryLoadingPrivacy": "Jaribu tena kupakia chaguo za faragha"
   },
+  "accountBlocked": {
+    "title": "Akaunti imezuiwa",
+    "description": "Kilo imezuia akaunti hii, na kuingia tena hakutazuia zuio hilo. Timu ya usaidizi inaweza kukagua zuio hilo ikiombwa.",
+    "domainDescription": "Kilo imezuia akaunti zinazotumia kikoa hiki cha barua pepe, na kuingia tena hakutabadilisha hilo. Timu ya usaidizi inaweza kukagua kikoa hiki ikiombwa.",
+    "contactSupport": "Wasiliana na timu ya usaidizi"
+  },
   "addCredits": {
     "cta": "Ongeza salio",
     "billingPage": "ukurasa wa malipo"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Ombi limeisha muda kabla ya kutimizwa. Tafadhali jaribu tena."
   },
   "screenHeader": {
-    "openMenu": "Fungua menyu",
-    "openMenuFor": "Fungua menyu ya {{title}}"
+    "openMenu": "Fungua menyu"
   },
   "picker": {
     "optionsExpired": "Muda wa chaguo umeisha",
@@ -4701,6 +4706,7 @@
     "contextAll": "Miktadha yote",
     "dismiss": "Puuza ripoti",
     "dismissFailed": "Ripoti hii bado haiwezi kupuuzwa. Inajaribu tena katika usuli.",
+    "readMarkFailed": "Imeshindwa kuweka ripoti hii kama imesomwa. Itajaribu tena ripoti inapopakiwa upya.",
     "offline": "Nje ya mtandao · ripoti iliyohifadhiwa",
     "cached": "Ripoti iliyohifadhiwa · haiwezi kuonyeshwa upya",
     "summary": "Muhtasari wa AI",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Ripoti inapatikana hadi",
     "timeHint": "Kadi ya Mwanzo hurejesha hali ya sasa wakati kipindi cha ripoti kinapoisha, hata nje ya mtandao.",
     "invalidSchedule": "Chagua saa za eneo sahihi na kipindi cha ripoti kisichokuwa tupu.",
+    "scheduleEmptyNight": "Kipindi cha ripoti ni tupu. Chagua saa ya tayari baadaye kuliko mwanzo wa kipindi.",
+    "scheduleEmptyMorning": "Saa ya tayari na saa ya mwisho wa upatikanaji zinalingana. Chagua muda ambao ripoti inabaki inapatikana.",
+    "scheduleFullDay": "Vipindi viwili vinajumuisha siku nzima. Acha sehemu ya siku nje ya ripoti.",
     "notificationsHint": "Arifa moja ya jumla kwa kila ripoti iliyoratibiwa. Haitegemei muhtasari wa AI wa kulipia.",
     "notificationPermission": "Washa arifa za push ili kupokea ripoti yako.",
     "defaultModel": "Tumia modeli chaguomsingi ya Kilo",
@@ -4729,7 +4738,9 @@
     "estimate": "Makadirio {{estimate}} · kiwango cha juu {{maximum}}",
     "estimateUnavailable": "Muhtasari wenye malipo haupatikani kwa mipangilio hii. Badilisha modeli au mipaka, au ujaribu tena baadaye.",
     "confirmPaid": "Washa muhtasari wa kulipia kwa {{context}}?",
+    "paidDisclosure_one": "Makadirio {{estimate}}, hadi {{maximum}}, na kikomo cha dakika {{minutes}}. Malipo yanatozwa hata utengenezaji ukishindwa.",
     "paidDisclosure": "Makadirio {{estimate}}, hadi {{maximum}}, na kikomo cha dakika {{minutes}}. Malipo yanatozwa hata utengenezaji ukishindwa.",
+    "paidDisclosure_other": "Makadirio {{estimate}}, hadi {{maximum}}, na kikomo cha dakika {{minutes}}. Malipo yanatozwa hata utengenezaji ukishindwa.",
     "enable": "Washa muhtasari wa kulipia",
     "allContexts": "Ripoti za binafsi na za shirika hubaki tofauti.",
     "emptyHistory": "Hakuna ripoti zilizohifadhiwa",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Shughuli isiyo na jina",
     "metadataFailureProvider": "hitilafu ya mtoa huduma",
     "metadataFailureTool": "hitilafu ya zana",
-    "metadataFailureCancelled": "Imeghairiwa",
+    "metadataStopped": "Zamu ya mwisho ilisimamishwa",
     "metadataFailureOther": "hitilafu isiyojulikana"
   },
   "systemSearch": {

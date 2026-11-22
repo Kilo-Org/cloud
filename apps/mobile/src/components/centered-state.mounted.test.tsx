@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
+import { REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT } from '@/components/ui/refresh-progress';
 
 import { CenteredState } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
@@ -88,6 +89,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn<() => void>() }) }));
+
+// The reduced-motion policy a mounted state reads, and the one `RefreshProgress`
+// reads: both come from one provider on a device, so one mock serves both.
+const motion = vi.hoisted(() => ({ reducedMotion: false }));
+
+vi.mock('@/lib/a11y/motion-context', () => ({
+  useProvidedMotionPolicy: () => ({
+    reducedMotion: motion.reducedMotion,
+    scrollAnimated: !motion.reducedMotion,
+  }),
+}));
 
 const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },
@@ -195,6 +207,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  motion.reducedMotion = false;
 });
 
 describe('Shared state placement', () => {
@@ -751,5 +764,61 @@ describe('CenteredState first-frame paint', () => {
     };
     expect(placedLate.paddingTop).toBeCloseTo(304, 5);
     heldLate.unmount();
+  });
+});
+
+describe('CenteredState reduced-motion refresh reserve', () => {
+  // `RefreshProgress` is the first in-flow child of the measured content box, so
+  // under reduced motion it adds its 31.5dp `h-9` box above the visible stack.
+  // The placement must centre the stack, not the box that carries it.
+  const refreshControl = createElement('RefreshControl', { refreshing: false });
+  const RESERVE = REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT;
+
+  it('centres the visible stack above the reserve instead of the box', async () => {
+    motion.reducedMotion = true;
+    const reduced = await mount({ refreshControl });
+    reduced.scrollLayout();
+    reduced.settle(80, 820);
+    const reducedStyle = reduced.scroll().contentContainerStyle as {
+      minHeight: number;
+      paddingTop: number;
+      paddingBottom: number;
+    };
+    reduced.unmount();
+
+    motion.reducedMotion = false;
+    const plain = await mount({ refreshControl });
+    plain.scrollLayout();
+    plain.settle(80, 820);
+    const plainStyle = plain.scroll().contentContainerStyle as {
+      minHeight: number;
+      paddingTop: number;
+      paddingBottom: number;
+    };
+    plain.unmount();
+
+    // The reserve is subtracted before centring, so the box that carries it
+    // starts half the reserve higher: 15.75dp, reported as 15.5 because the
+    // harness rounds every padding to half a pixel.
+    expect(plainStyle.paddingTop - reducedStyle.paddingTop).toBe(15.5);
+
+    // The band is the scroller's 80..900, its centre 490. The visible stack
+    // starts one reserve below the box and is [contentHeight - reserve] tall,
+    // so its centre lands on the band's centre rather than 15.75 below it.
+    const stackTop = reducedStyle.paddingTop + 80 + RESERVE;
+    expect(stackTop + (700 - RESERVE) / 2).toBeCloseTo(490, 0);
+
+    // No refresh control reserves nothing: the placement is what it always was.
+    motion.reducedMotion = true;
+    const plainWithoutRefresh = await mount();
+    plainWithoutRefresh.scrollLayout();
+    plainWithoutRefresh.settle(80, 820);
+    expect(plainWithoutRefresh.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 820,
+      paddingTop: 60,
+      paddingBottom: 60,
+    });
+    plainWithoutRefresh.unmount();
   });
 });

@@ -13,7 +13,11 @@ import {
   type StoredMcpSecretValue,
 } from './profile-mcp-service';
 import { getSkillsForSession, type SkillForSession } from './profile-skills-service';
-import { getAgentsForSession, type AgentForSession } from './profile-agents-service';
+import {
+  getAgentsForSession,
+  type AgentForSession,
+  type SessionAgents,
+} from './profile-agents-service';
 import {
   getKiloCommandsForSession,
   type KiloCommandForSession,
@@ -118,6 +122,11 @@ export type MergeProfileConfigurationResult = {
   mcpServers?: McpServerForSession[];
   skills?: MergedSkillForSession[];
   agents?: MergedAgentForSession[];
+  /**
+   * Stored profile agents left out because their id belongs to the CLI, so the
+   * caller can record which stored rows stopped applying.
+   */
+  skippedAgentSlugs?: string[];
   kiloCommands?: KiloCommandForSession[];
   /**
    * The profile that claimed the active layer: the explicit pick or effective
@@ -184,7 +193,7 @@ type ProfileLayerData = {
   commands: string[];
   mcpServers: McpServerForSession[];
   skills: SkillForSession[];
-  agents: AgentForSession[];
+  agents: SessionAgents;
   kiloCommands: KiloCommandForSession[];
   instructions: InstructionForSession[];
 };
@@ -213,7 +222,7 @@ function profileToLayer(data: ProfileLayerData): Layer {
     commands: [...data.commands],
     mcpServers: [...data.mcpServers],
     skills: [...data.skills],
-    agents: [...data.agents],
+    agents: [...data.agents.agents],
     kiloCommands: [...data.kiloCommands],
     instructions: [...data.instructions],
   };
@@ -483,11 +492,13 @@ export async function mergeProfileConfiguration(
   const startCommands = args.environment?.startCommands ?? [];
   const environmentSetupCommandCount =
     args.environment === undefined ? undefined : (args.environment.setupCommands?.length ?? 0);
+  const skippedAgentSlugs = profileData.flatMap(data => data.agents.skippedSlugs);
   return {
     ...mergeLayers(layers),
     ...(startCommands.length > 0 ? { startCommands: [...startCommands] } : {}),
     ...(environmentSetupCommandCount === undefined ? {} : { environmentSetupCommandCount }),
     ...(resolvedProfileId ? { resolvedProfileId } : {}),
+    ...(skippedAgentSlugs.length > 0 ? { skippedAgentSlugs } : {}),
   };
 }
 

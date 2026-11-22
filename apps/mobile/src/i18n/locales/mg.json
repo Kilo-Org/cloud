@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} fotoam-piasana",
       "sectionAccessibility": "{{title}}: {{displayCount}} fotoam-piasana",
       "live": "MIVANTANA",
-      "updating": "Manavao"
+      "updating": "Manavao",
+      "retentionLimit": "Aseho ny fotoam-piasana farany indrindra."
     },
     "sessionRow": {
       "deleteTitle": "Hofafana ve ny fotoam-piasana?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Mikorisa hatrany ambany",
       "emptyTitle": "Mbola tsy misy hafatra",
       "emptyReadOnlyTitle": "Tsy misy hafatra ao amin'ity fotoam-piasana ity",
-      "renameAccessibility": "Ovao ny anaran'ny fotoam-piasana: {{title}}",
       "cloningSession": "Mamorona dika mitovy amin'ny fotoam-piasana",
       "couldNotLoadThisSession": "Tsy voaray ity fotoam-piasana ity.",
       "historyTooLarge": "Lava loatra ny firaketan'ity fotoam-piasana ity havoaka.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Andramo ampidirina indray ny kaonty",
     "retryLoadingPrivacy": "Andramo ampidirina indray ny safidy momba ny fiainana manokana"
   },
+  "accountBlocked": {
+    "title": "Kaonty voasakana",
+    "description": "Nosakanan'ny Kilo ity kaonty ity, ary ny hiditra indray dia tsy hanala izany. Afaka mandinika ny fanakanana ny mpanohana raha angatahina.",
+    "domainDescription": "Sakanan'ny Kilo ny kaonty amin'ity sehatra mailaka ity, ary ny hiditra indray dia tsy hanova izany. Afaka mandinika ny sehatra ny mpanohana raha angatahina.",
+    "contactSupport": "Mifandraisa amin'ny mpanohana"
+  },
   "addCredits": {
     "cta": "Ampio kireditra",
     "billingPage": "pejy fandoavana"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Nitsahatra ny fangatahana alohan'ny hahavita azy. Andramo indray azafady."
   },
   "screenHeader": {
-    "openMenu": "Sokafy ny menio",
-    "openMenuFor": "Sokafy ny menio ho an'ny {{title}}"
+    "openMenu": "Sokafy ny menio"
   },
   "picker": {
     "optionsExpired": "Lany daty ny safidy",
@@ -4701,6 +4706,7 @@
     "contextAll": "Sehatra rehetra",
     "dismiss": "Esory ny tatitra",
     "dismissFailed": "Mbola tsy azo esorina ity tatitra ity. Haverina any ambadika izany.",
+    "readMarkFailed": "Mbola tsy azo asiana marika ho efa vakiana ity tatitra ity. Hiezaka indray izany rehefa miverina ny tatitra.",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
     "summary": "Famintinana AI",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Tatitra azo hatramin'ny",
     "timeHint": "Averin'ny karatra Fandraisana ny sata ankehitriny rehefa tapitra ny fe-potoana tatitra, na tsy misy tambajotra aza.",
     "invalidSchedule": "Misafidiana faritra ora marina sy fe-potoana tatitra tsy foana.",
+    "scheduleEmptyNight": "Foana ny fe-potoana tatitra. Misafidiana fotoana vonona aoriana noho ny fanombohan'ny fe-potoana tatitra.",
+    "scheduleEmptyMorning": "Mitovy ny fotoana vonona sy ny fotoana azo hatramin'ny. Misafidiana ny faharetana mbola azo ny tatitra.",
+    "scheduleFullDay": "Mandrakotra andro feno ny fe-potoana roa. Avelao ivelan'ny tatitra ny ampahany amin'ny andro.",
     "notificationsHint": "Fampandrenesana tsotra iray isaky ny tatitra voalahatra. Tsy miankina amin'ny famintinana AI andoavana.",
     "notificationPermission": "Alefaso ny fampandrenesana push mba handraisana ny tatitrao.",
     "defaultModel": "Ampiasao ny modely default an'i Kilo",
@@ -4729,7 +4738,9 @@
     "estimate": "Vinavina {{estimate}} · ambony indrindra {{maximum}}",
     "estimateUnavailable": "Tsy misy famintinana andoavam-bola ho an'ireto fandrindrana ireto. Ovay ny maodely na ny fetra, na andramo indray any aoriana.",
     "confirmPaid": "Alefa ve ny famintinana andoavana ho an'i {{context}}?",
+    "paidDisclosure_one": "Tombana {{estimate}}, hatramin'ny {{maximum}}, miaraka amin'ny fetra {{minutes}} minitra. Misy sarany na dia tsy mahomby aza ny famoronana.",
     "paidDisclosure": "Tombana {{estimate}}, hatramin'ny {{maximum}}, miaraka amin'ny fetra {{minutes}} minitra. Misy sarany na dia tsy mahomby aza ny famoronana.",
+    "paidDisclosure_other": "Tombana {{estimate}}, hatramin'ny {{maximum}}, miaraka amin'ny fetra {{minutes}} minitra. Misy sarany na dia tsy mahomby aza ny famoronana.",
     "enable": "Alefaso ny famintinana andoavana",
     "allContexts": "Misaraka ny tatitra manokana sy ny an'ny fikambanana.",
     "emptyHistory": "Tsy misy tatitra voatahiry",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Hetsika tsy misy lohateny",
     "metadataFailureProvider": "fahadisoan'ny mpanome tolotra",
     "metadataFailureTool": "fahadisoan'ny fitaovana",
-    "metadataFailureCancelled": "Nofoanana",
+    "metadataStopped": "Natsahatra ny fihodinana farany",
     "metadataFailureOther": "fahadisoana tsy voafaritra"
   },
   "systemSearch": {

@@ -2223,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesija",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesija",
       "live": "UŽIVO",
-      "updating": "Ažuriranje"
+      "updating": "Ažuriranje",
+      "retentionLimit": "Prikazuju se najnovije sesije."
     },
     "sessionRow": {
       "deleteTitle": "Obrisati sesiju?",
@@ -2295,7 +2296,6 @@
       "scrollToBottom": "Pomeri se na dno",
       "emptyTitle": "Još nema poruka",
       "emptyReadOnlyTitle": "U ovoj sesiji nema poruka",
-      "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Učitavanje ove sesije nije uspelo.",
       "historyTooLarge": "Pepis ove sesije je prevelik za učitavanje.",
@@ -3156,6 +3156,12 @@
     "retryLoadingAccount": "Ponovo pokušaj da učitaš nalog",
     "retryLoadingPrivacy": "Ponovo pokušaj da učitaš podešavanja privatnosti"
   },
+  "accountBlocked": {
+    "title": "Nalog je blokiran",
+    "description": "Kilo je blokirao ovaj nalog i ponovna prijava to neće ukloniti. Podrška može na zahtev pregledati blokadu.",
+    "domainDescription": "Kilo blokira naloge na ovom imejl domenu i ponovna prijava to neće promeniti. Podrška može na zahtev pregledati domen.",
+    "contactSupport": "Kontaktiraj podršku"
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stranica za naplatu"
@@ -3228,8 +3234,7 @@
     "timeoutDescription": "Zahtev nije završen na vreme. Pokušaj ponovo."
   },
   "screenHeader": {
-    "openMenu": "Otvori meni",
-    "openMenuFor": "Otvori meni za {{title}}"
+    "openMenu": "Otvori meni"
   },
   "picker": {
     "optionsExpired": "Opcije više ne važe",
@@ -4785,6 +4790,7 @@
     "contextAll": "Svi konteksti",
     "dismiss": "Odbaci izveštaj",
     "dismissFailed": "Odbacivanje izveštaja za sada nije uspelo. Pokušaće se ponovo u pozadini.",
+    "readMarkFailed": "Nije bilo moguće označiti ovaj izveštaj kao pročitan. Pokušaće se ponovo kada se izveštaj ponovo učita.",
     "offline": "Van mreže · sačuvan izveštaj",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
     "summary": "AI rezime",
@@ -4804,6 +4810,9 @@
     "morningEnd": "Izveštaj dostupan do",
     "timeHint": "Kartica na početnom ekranu vraća status uživo kada se period izveštaja završi, čak i van mreže.",
     "invalidSchedule": "Izaberite važeću vremensku zonu i neprazan period izveštaja.",
+    "scheduleEmptyNight": "Period izveštaja je prazan. Izaberite vreme kada je izveštaj spreman kasnije od početka perioda.",
+    "scheduleEmptyMorning": "Vreme kada je izveštaj spreman i vreme do kada je dostupan se poklapaju. Izaberite koliko dugo izveštaj ostaje dostupan.",
+    "scheduleFullDay": "Dva perioda pokrivaju ceo dan. Ostavite deo dana van perioda izveštaja.",
     "notificationsHint": "Jedno opšte obaveštenje po zakazanom izveštaju. Nezavisno od plaćenih AI rezimea.",
     "notificationPermission": "Uključite push obaveštenja da biste primili izveštaj.",
     "defaultModel": "Koristi Kilo podrazumevani model",
@@ -4813,7 +4822,10 @@
     "estimate": "Procena {{estimate}} · najviše {{maximum}}",
     "estimateUnavailable": "Plaćeni rezime nije dostupan za ova podešavanja. Promenite model ili ograničenja, ili pokušajte ponovo kasnije.",
     "confirmPaid": "Omogućiti plaćene rezimee za {{context}}?",
-    "paidDisclosure": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata važi i ako generisanje ne uspe.",
+    "paidDisclosure_one": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minut. Naplata važi i ako generisanje ne uspe.",
+    "paidDisclosure_few": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minuta. Naplata važi i ako generisanje ne uspe.",
+    "paidDisclosure": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minuta. Naplata važi i ako generisanje ne uspe.",
+    "paidDisclosure_other": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minuta. Naplata važi i ako generisanje ne uspe.",
     "enable": "Omogući plaćene rezimee",
     "allContexts": "Lični i organizacioni izveštaji ostaju odvojeni.",
     "emptyHistory": "Nema sačuvanih izveštaja",
@@ -4860,7 +4872,7 @@
     "sourceActivity": "Aktivnost bez naslova",
     "metadataFailureProvider": "greška provajdera",
     "metadataFailureTool": "greška alata",
-    "metadataFailureCancelled": "otkazano",
+    "metadataStopped": "Poslednji potez je zaustavljen",
     "metadataFailureOther": "neodređena greška"
   },
   "systemSearch": {

@@ -1,6 +1,12 @@
+/* eslint-disable max-lines -- the routing decision and the three surfaces it gates are one contract; their cases stay in one file so a change to either is checked against the other. */
 import { describe, expect, it } from 'vitest';
 
-import { resolveBootstrapDecision, shouldShowBootstrapLoading } from './bootstrap-decision';
+import {
+  resolveBootstrapDecision,
+  shouldAnnounceContentReady,
+  shouldShowBootstrapLoading,
+  shouldShowBootstrapLoadingSurface,
+} from './bootstrap-decision';
 
 // The settled, signed-in, consent-granted, app-ready state: every guard passes
 // and the decision falls through to `settle-app`.
@@ -314,5 +320,109 @@ describe('shouldShowBootstrapLoading', () => {
         signingOut: false,
       })
     ).toBe(true);
+  });
+});
+
+describe('shouldShowBootstrapLoadingSurface', () => {
+  it('mounts the wait surface when no opaque surface owns the screen', () => {
+    expect(
+      shouldShowBootstrapLoadingSurface({
+        showBootstrapLoading: true,
+        showRestoreError: false,
+        showBlockedAccountError: false,
+      })
+    ).toBe(true);
+  });
+
+  it('stays off when the wait surface was not requested', () => {
+    expect(
+      shouldShowBootstrapLoadingSurface({
+        showBootstrapLoading: false,
+        showRestoreError: false,
+        showBlockedAccountError: false,
+      })
+    ).toBe(false);
+  });
+
+  it('stays off under the held restore surface', () => {
+    expect(
+      shouldShowBootstrapLoadingSurface({
+        showBootstrapLoading: true,
+        showRestoreError: true,
+        showBlockedAccountError: false,
+      })
+    ).toBe(false);
+  });
+
+  // The refresh-path refusal clears the token while the tree is still hidden,
+  // so the wait surface is requested at the same moment the blocked overlay
+  // owns the screen: only the overlay may paint.
+  it('stays off under the blocked-account overlay', () => {
+    expect(
+      shouldShowBootstrapLoadingSurface({
+        showBootstrapLoading: true,
+        showRestoreError: false,
+        showBlockedAccountError: true,
+      })
+    ).toBe(false);
+  });
+});
+
+describe('shouldAnnounceContentReady', () => {
+  it('announces the revealed tree after a hidden window', () => {
+    expect(
+      shouldAnnounceContentReady({
+        wasHidden: true,
+        wrapperObscured: false,
+        hasBootstrapError: false,
+        showBlockedAccountError: false,
+      })
+    ).toBe(true);
+  });
+
+  it('stays off when the tree was not hidden', () => {
+    expect(
+      shouldAnnounceContentReady({
+        wasHidden: false,
+        wrapperObscured: false,
+        hasBootstrapError: false,
+        showBlockedAccountError: false,
+      })
+    ).toBe(false);
+  });
+
+  it('stays off while the wrapper is still obscured', () => {
+    expect(
+      shouldAnnounceContentReady({
+        wasHidden: true,
+        wrapperObscured: true,
+        hasBootstrapError: false,
+        showBlockedAccountError: false,
+      })
+    ).toBe(false);
+  });
+
+  it('stays off while a bootstrap error replaces the wrapper', () => {
+    expect(
+      shouldAnnounceContentReady({
+        wasHidden: true,
+        wrapperObscured: false,
+        hasBootstrapError: true,
+        showBlockedAccountError: false,
+      })
+    ).toBe(false);
+  });
+
+  // The blocked overlay owns the screen while the wrapper stays out of both
+  // accessibility trees, so announcing it would announce an unreachable tree.
+  it('stays off while the blocked-account overlay owns the screen', () => {
+    expect(
+      shouldAnnounceContentReady({
+        wasHidden: true,
+        wrapperObscured: false,
+        hasBootstrapError: false,
+        showBlockedAccountError: true,
+      })
+    ).toBe(false);
   });
 });

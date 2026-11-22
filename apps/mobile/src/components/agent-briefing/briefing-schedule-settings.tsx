@@ -17,6 +17,7 @@ import {
   briefingPickerDate,
   briefingPickerTime,
   briefingScheduleProblems,
+  type BriefingTimeRefusal,
 } from '@/lib/agent-briefing-schedule';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -25,9 +26,6 @@ import { dateTimeFormat } from '@/lib/intl-cache';
 import { assertSurfaceFailureHandled, type SurfaceFeedback } from '@/lib/surface-feedback';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-
-/** The schedule field a refusal names, in the order the card lists them. */
-type BriefingScheduleField = 'timezone' | 'times';
 
 /** The save's refusal: the server answered no, and nothing was stored. */
 type BriefingScheduleFailure = { readonly kind: 'refused' };
@@ -58,6 +56,18 @@ type StoredSchedule = Pick<
   'timezone' | 'nightStart' | 'morningStart' | 'morningEnd'
 >;
 
+/**
+ * The message each time refusal shows. An empty window names the window the
+ * person has to change; a malformed clock borrows the time zone field's wording,
+ * because the same save reported it.
+ */
+const TIME_REFUSAL_KEYS = {
+  format: 'agentBriefing.invalidSchedule',
+  emptyNight: 'agentBriefing.scheduleEmptyNight',
+  emptyMorning: 'agentBriefing.scheduleEmptyMorning',
+  fullDay: 'agentBriefing.scheduleFullDay',
+} as const satisfies Record<BriefingTimeRefusal, string>;
+
 export function ScheduleSettings({ preferences }: { readonly preferences: StoredSchedule }) {
   const trpc = useTRPC();
   const client = useQueryClient();
@@ -75,7 +85,8 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
     morningEnd: preferences.morningEnd,
   });
   const [activeTime, setActiveTime] = useState<keyof typeof times | null>(null);
-  const [problems, setProblems] = useState<readonly BriefingScheduleField[]>([]);
+  const [timezoneInvalid, setTimezoneInvalid] = useState(false);
+  const [timeRefusal, setTimeRefusal] = useState<BriefingTimeRefusal | null>(null);
   const [timezoneInputKey, setTimezoneInputKey] = useState(0);
   // The save's own phase, in the shared primitive: a stale refusal cannot paint
   // over a newer attempt, and a second Save cannot start while one is pending.
@@ -116,23 +127,16 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
   ] as const;
   const save = () => {
     const next = draft.current;
-    const refused = briefingScheduleProblems(next);
-    const failing: BriefingScheduleField[] = [];
-    if (refused.timezone) {
-      failing.push('timezone');
-    }
-    if (refused.times) {
-      failing.push('times');
-    }
-    setProblems(failing);
-    if (failing.length > 0) {
+    const problems = briefingScheduleProblems(next);
+    setTimezoneInvalid(problems.timezone);
+    setTimeRefusal(problems.times);
+    if (problems.timezone || problems.times) {
       return;
     }
     const attempt = saveFeedback.begin();
     if (attempt === null) {
       return;
     }
-    setProblems([]);
     update.mutate(
       { ...next, language: i18n.resolvedLanguage ?? i18n.language },
       {
@@ -162,7 +166,8 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
     });
     // The timezone field is uncontrolled, so it rewrites only on a new key.
     setTimezoneInputKey(key => key + 1);
-    setProblems([]);
+    setTimezoneInvalid(false);
+    setTimeRefusal(null);
     saveFeedback.clearWhere(() => true);
   };
   return (
@@ -172,12 +177,12 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
           key={timezoneInputKey}
           label={t('agentBriefing.timezone')}
           defaultValue={draft.current.timezone}
-          error={problems.includes('timezone') ? t('agentBriefing.invalidSchedule') : undefined}
+          error={timezoneInvalid ? t('agentBriefing.invalidSchedule') : undefined}
           autoCapitalize="none"
           autoCorrect={false}
           onChangeText={value => {
             draft.current.timezone = value.trim();
-            setProblems(current => current.filter(field => field !== 'timezone'));
+            setTimezoneInvalid(false);
           }}
         />
         <Text variant="caption">{t('agentBriefing.timezoneHint')}</Text>
@@ -188,7 +193,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
           disabled={offline || update.isPending}
           onPress={() => {
             draft.current.timezone = dateTimeFormat(undefined, {}).resolvedOptions().timeZone;
-            setProblems(current => current.filter(field => field !== 'timezone'));
+            setTimezoneInvalid(false);
             setTimezoneInputKey(key => key + 1);
           }}
         >
@@ -235,7 +240,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
                     const next = briefingPickerTime(date);
                     draft.current[field.key] = next;
                     setTimes(current => ({ ...current, [field.key]: next }));
-                    setProblems(current => current.filter(item => item !== 'times'));
+                    setTimeRefusal(null);
                     if (Platform.OS === 'android') {
                       setActiveTime(null);
                     }
@@ -257,7 +262,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
         );
       })}
       <AccessibleStatus
-        message={problems.includes('times') ? t('agentBriefing.invalidSchedule') : null}
+        message={timeRefusal === null ? null : t(TIME_REFUSAL_KEYS[timeRefusal])}
         className="text-sm"
       />
       <Text variant="caption">{t('agentBriefing.timeHint')}</Text>

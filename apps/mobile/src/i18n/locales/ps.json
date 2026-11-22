@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ناستې",
       "sectionAccessibility": "{{title}}: {{displayCount}} ناستې",
       "live": "ژوندی",
-      "updating": "تازه کېږي"
+      "updating": "تازه کېږي",
+      "retentionLimit": "ستاسو تر ټولو وروستي ناستې ښودل کېږي."
     },
     "sessionRow": {
       "deleteTitle": "ناسته ړنګه شي؟",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",
       "emptyReadOnlyTitle": "په دې ناسته کې پیغامونه نشته",
-      "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
       "historyTooLarge": "د دې ناستې لیکن د بارولو لپاره ډېره لویه ده.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "د حساب د بارولو بیا هڅه وکړئ",
     "retryLoadingPrivacy": "د محرمیت د غوراویو د بارولو بیا هڅه وکړئ"
   },
+  "accountBlocked": {
+    "title": "حساب بند شوی دی",
+    "description": "Kilo دا حساب بند کړی دی، او بیا ننوتل به بندیز لرې نه کړي. ملاتړ کولای شي په غوښتنه بندیز وڅیړي.",
+    "domainDescription": "Kilo په دې برېښنالیک ډومېن کې حسابونه نه مني، او بیا ننوتل به یې نه بدلوي. ملاتړ کولای شي په غوښتنه ډومېن وڅیړي.",
+    "contactSupport": "له ملاتړ سره اړیکه ونیسئ"
+  },
   "addCredits": {
     "cta": "کریډیټ زیات کړئ",
     "billingPage": "د بلونو پاڼه"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "غوښتنه له بشپړېدو دمخه ودرېده. مهرباني وکړئ بیا هڅه وکړئ."
   },
   "screenHeader": {
-    "openMenu": "مینو پرانیزئ",
-    "openMenuFor": "د {{title}} مینو پرانیزئ"
+    "openMenu": "مینو پرانیزئ"
   },
   "picker": {
     "optionsExpired": "د غوراویو موده پای ته رسېدلې",
@@ -4701,6 +4706,7 @@
     "contextAll": "ټول چوکاټونه",
     "dismiss": "راپور له پامه وغورځوئ",
     "dismissFailed": "دا راپور لا تر اوسه له پامه نه دی غورځول شوی. په شالید کې بیا هڅه کیږي.",
+    "readMarkFailed": "دا راپور د لوستل شوي په توګه نښه کول شونی نه وو. کله چې راپور بیا بار شي، بیا به هڅه وکړي.",
     "offline": "آفلاین · خوندي شوی راپور",
     "cached": "خوندي شوی راپور · تازه کول شونی نه دی",
     "summary": "د AI لنډیز",
@@ -4720,6 +4726,9 @@
     "morningEnd": "د راپور د شتون د پای وخت",
     "timeHint": "کله چې د راپور مهال پای ته رسېږي، د کور کارت ژوندی حالت بېرته راولي، حتی آفلاین.",
     "invalidSchedule": "یوه سمه وخت سیمه او د راپور یو نه خالي مهال وټاکئ.",
+    "scheduleEmptyNight": "د راپور مهال خالي دی. د مهال له پیل څخه وروسته د چمتو کېدو وخت وټاکئ.",
+    "scheduleEmptyMorning": "د چمتو کېدو وخت او د شتون د پای وخت سره برابر دي. د راپور د شتون موده وټاکئ.",
+    "scheduleFullDay": "دواړه مهالونه یوه بشپړه ورځ پوښي. د ورځې یوه برخه د راپور څخه بهر پرېږدئ.",
     "notificationsHint": "د هر مهالویش شوي راپور لپاره یوه عمومي خبرتیا. له تادیه شویو AI لنډیزونو خپلواکه.",
     "notificationPermission": "د خپل راپور د ترلاسه کولو لپاره پوش خبرتیاوې فعالې کړئ.",
     "defaultModel": "د Kilo ډیفالټ ماډل وکاروئ",
@@ -4729,7 +4738,9 @@
     "estimate": "اټکل {{estimate}} · تر ټولو زیات {{maximum}}",
     "estimateUnavailable": "د دې ترتیباتو لپاره تادیه شوی لنډیز شتون نلري. موډل یا حدود بدل کړئ، یا وروسته بیا هڅه وکړئ.",
     "confirmPaid": "د {{context}} لپاره تادیه شوي لنډیزونه فعال کړئ؟",
-    "paidDisclosure": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقه حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
+    "paidDisclosure_one": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقې حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
+    "paidDisclosure": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقو حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
+    "paidDisclosure_other": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقو حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
     "enable": "تادیه شوي لنډیزونه فعال کړئ",
     "allContexts": "شخصي او سازماني راپورونه جلا پاتې کېږي.",
     "emptyHistory": "هېڅ خوندي شوي راپورونه نشته",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "بې سرلیکه فعالیت",
     "metadataFailureProvider": "د عرضه کوونکي تېروتنه",
     "metadataFailureTool": "د وسیلې تېروتنه",
-    "metadataFailureCancelled": "لغوه شوی",
+    "metadataStopped": "وروستی ځل ودرول شو",
     "metadataFailureOther": "نامعلومه تېروتنه"
   },
   "systemSearch": {

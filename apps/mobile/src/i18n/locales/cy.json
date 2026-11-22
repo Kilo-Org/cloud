@@ -2364,7 +2364,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesiwn",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesiwn",
       "live": "BYW",
-      "updating": "Yn diweddaru"
+      "updating": "Yn diweddaru",
+      "retentionLimit": "Yn dangos eich sesiynau diweddaraf."
     },
     "sessionRow": {
       "deleteTitle": "Dileu sesiwn?",
@@ -2442,7 +2443,6 @@
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
       "emptyReadOnlyTitle": "Dim negeseuon yn y sesiwn hon",
-      "renameAccessibility": "Ailenwi sesiwn: {{title}}",
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "historyTooLarge": "Mae trawsgrifiad y sesiwn hon yn rhy fawr i'w llwytho.",
@@ -3339,6 +3339,12 @@
     "retryLoadingAccount": "Rhoi cynnig eto ar lwytho'r cyfrif",
     "retryLoadingPrivacy": "Rhoi cynnig eto ar lwytho'r dewisiadau preifatrwydd"
   },
+  "accountBlocked": {
+    "title": "Cyfrif wedi'i rwystro",
+    "description": "Mae Kilo wedi rhwystro'r cyfrif hwn, ac ni fydd mewngofnodi eto yn ei glirio. Gall y tîm cymorth adolygu'r rhwystr ar gais.",
+    "domainDescription": "Nid yw Kilo yn caniatáu cyfrifon ar y parth e-bost hwn, ac ni fydd mewngofnodi eto yn ei newid. Gall y tîm cymorth adolygu'r parth ar gais.",
+    "contactSupport": "Cysylltu â'r tîm cymorth"
+  },
   "addCredits": {
     "cta": "Ychwanegu credydau",
     "billingPage": "tudalen filio"
@@ -3411,8 +3417,7 @@
     "timeoutDescription": "Daeth amser y cais i ben cyn iddo orffen. Ceisiwch eto."
   },
   "screenHeader": {
-    "openMenu": "Agor y ddewislen",
-    "openMenuFor": "Agor y ddewislen ar gyfer {{title}}"
+    "openMenu": "Agor y ddewislen"
   },
   "picker": {
     "optionsExpired": "Daeth yr opsiynau i ben",
@@ -5037,6 +5042,7 @@
     "contextAll": "Pob cyd-destun",
     "dismiss": "Diystyru'r briff",
     "dismissFailed": "Methwyd â diystyru'r briff hwn am y tro. Bydd yn rhoi cynnig arall yn y cefndir.",
+    "readMarkFailed": "Methwyd â marcio'r briff hwn fel wedi'i ddarllen. Bydd yn rhoi cynnig arall pan fydd y briff yn ail-lwytho.",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Briff wedi'i gadw · methu adnewyddu",
     "summary": "Crynodeb AI",
@@ -5056,6 +5062,9 @@
     "morningEnd": "Y briff ar gael tan",
     "timeHint": "Mae'r cerdyn Cartref yn adfer statws byw pan fydd y cyfnod briff yn gorffen, hyd yn oed all-lein.",
     "invalidSchedule": "Dewiswch gylchfa amser ddilys a chyfnod briff nad yw'n wag.",
+    "scheduleEmptyNight": "Mae'r cyfnod briff yn wag. Dewiswch amser parod sy'n hwyrach na dechrau'r cyfnod briff.",
+    "scheduleEmptyMorning": "Mae'r amser parod a'r amser ar gael tan yn cyfateb. Dewiswch pa mor hir y bydd y briff ar gael.",
+    "scheduleFullDay": "Mae'r ddau gyfnod briff yn cwmpasu diwrnod cyfan. Gadewch ran o'r diwrnod y tu allan i'r briff.",
     "notificationsHint": "Un hysbysiad cyffredinol fesul briff a drefnwyd. Ar wahân i grynodebau AI taledig.",
     "notificationPermission": "Trowch hysbysiadau gwthio ymlaen i dderbyn eich briff.",
     "defaultModel": "Defnyddio model diofyn Kilo",
@@ -5069,6 +5078,12 @@
     "estimateModelNotAllowed": "Nid yw'r model hwn yn cael ei ganiatáu yn y cyd-destun hwn. Dewiswch fodel arall.",
     "estimateSpendLimitTooLow": "Cynyddwch y terfyn gwariant i ganiatáu'r crynodeb hwn.",
     "confirmPaid": "Galluogi crynodebau taledig ar gyfer {{context}}?",
+    "paidDisclosure_zero": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} mun. Codir tâl hyd yn oed os bydd y creu'n methu.",
+    "paidDisclosure_one": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} mun. Codir tâl hyd yn oed os bydd y creu'n methu.",
+    "paidDisclosure_two": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} mun. Codir tâl hyd yn oed os bydd y creu'n methu.",
+    "paidDisclosure_few": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} mun. Codir tâl hyd yn oed os bydd y creu'n methu.",
+    "paidDisclosure_many": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} mun. Codir tâl hyd yn oed os bydd y creu'n methu.",
+    "paidDisclosure_other": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} mun. Codir tâl hyd yn oed os bydd y creu'n methu.",
     "paidDisclosure": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} mun. Codir tâl hyd yn oed os bydd y creu'n methu.",
     "enable": "Galluogi crynodebau taledig",
     "allContexts": "Mae briffiau personol a sefydliad yn cael eu cadw ar wahân.",
@@ -5124,7 +5139,7 @@
     "sourceActivity": "Gweithgaredd di-deitl",
     "metadataFailureProvider": "gwall darparwr",
     "metadataFailureTool": "gwall offeryn",
-    "metadataFailureCancelled": "Wedi'i ganslo",
+    "metadataStopped": "Stopiwyd y tro diwethaf",
     "metadataFailureOther": "gwall heb ei nodi"
   },
   "systemSearch": {

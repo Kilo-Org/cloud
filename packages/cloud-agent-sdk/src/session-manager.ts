@@ -41,7 +41,7 @@ import {
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
 import { removePendingRequest, upsertByRequestId } from './pending-requests';
-import { replayStoredMessages } from './snapshot-page';
+import { replayStoredMessages, sessionSnapshotFailureMessage } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { SessionStorage } from './storage/types';
@@ -1997,8 +1997,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   /**
    * Fetch one child-session page through the active session's source: the
    * Cloud Agent paged endpoint when the root is a cloud session, else the
-   * root `fetchSnapshotPage`. Throws the Cloud Agent requirement/mismatch
-   * errors so each caller classifies them with its own try/catch.
+   * root `fetchSnapshotPage`. A page the transcript contract cannot describe —
+   * a schema failure or another child's page — comes back as the terminal
+   * `invalid_data` outcome; only a transport failure throws, so each caller's
+   * try/catch retries it.
    */
   async function fetchChildPage(args: {
     childSessionId: KiloSessionId;
@@ -2010,16 +2012,27 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (!config.fetchCloudSnapshotPage) {
         throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
       }
-      const page = cloudSessionMessagesPageSchema.parse(
-        await config.fetchCloudSnapshotPage(
-          cloudSessionId,
-          cursor === undefined
-            ? { kiloSessionId: childSessionId }
-            : { kiloSessionId: childSessionId, cursor }
-        )
+      const cloudPage = await config.fetchCloudSnapshotPage(
+        cloudSessionId,
+        cursor === undefined
+          ? { kiloSessionId: childSessionId }
+          : { kiloSessionId: childSessionId, cursor }
       );
+      // A page the transcript contract cannot describe is terminal for this
+      // child, matching the root transcript's older-page read: retrying
+      // re-reads the same persisted page. The schema's transform can also
+      // throw (a session-identity mismatch), and safeParse does not convert a
+      // transform throw into a failure.
+      let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
+      try {
+        parsed = cloudSessionMessagesPageSchema.safeParse(cloudPage);
+      } catch {
+        parsed = { success: false };
+      }
+      if (!parsed.success) return { kind: 'invalid_data' };
+      const page = parsed.data;
       if (page?.kind === 'success' && page.info.id !== childSessionId) {
-        throw new Error('Cloud Agent child session mismatch');
+        return { kind: 'invalid_data' };
       }
       return page;
     }
@@ -2069,7 +2082,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             return;
           }
           if (page.kind !== 'success') {
-            storeChildHydrationFailure(storage, childSessionId, formatError(page));
+            // A retryable read keeps the generic retry copy the apps already
+            // classify as transient. The terminal kinds store the history copy
+            // instead of a connection error, so a surface that classifies the
+            // message (the mobile child sheet) neither offers nor claims a
+            // retry; a surface that always draws a retry still shows honest
+            // copy for a page a retry re-reads unchanged.
+            storeChildHydrationFailure(
+              storage,
+              childSessionId,
+              page.kind === 'retryable_failure'
+                ? formatError(page)
+                : sessionSnapshotFailureMessage(page.kind).message
+            );
             return;
           }
 

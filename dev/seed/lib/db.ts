@@ -1,15 +1,9 @@
 import '../../../apps/web/src/lib/load-env';
 
 import { computeDatabaseUrl, createDrizzleClient, type DrizzleClient } from '@kilocode/db';
+import { isLoopbackHostname } from '../../../packages/web-shared/src/lib/loopback-host';
 
 process.env.IS_SCRIPT = 'true';
-
-const LOOPBACK_DATABASE_HOSTS: Record<string, true> = {
-  localhost: true,
-  '127.0.0.1': true,
-  '::1': true,
-  '[::1]': true,
-};
 
 /**
  * Refuses a topic that writes unless the database `getSeedDb()` connects to is
@@ -25,7 +19,7 @@ export function assertLocalSeedDatabase(fixture: string): string {
     throw new Error(`${fixture} refuses to run with USE_PRODUCTION_DB=true.`);
   }
   const hostname = new URL(computeDatabaseUrl()).hostname;
-  if (!Object.hasOwn(LOOPBACK_DATABASE_HOSTS, hostname)) {
+  if (!isLoopbackHostname(hostname)) {
     throw new Error(`${fixture} requires a loopback database host; received ${hostname}.`);
   }
   return hostname;

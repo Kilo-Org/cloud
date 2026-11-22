@@ -154,7 +154,7 @@ Resets do not restore assignments that an earlier reset removed.
 | `pnpm typecheck` | Run TypeScript type checking |
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Auto-format all supported files with oxfmt |
-| `pnpm validate` | Run the root typecheck, lint, and test scripts |
+| `pnpm validate` | Run the shared chain: typecheck, lint, test, and the dependency cycle check |
 | `pnpm drizzle migrate` | Apply pending database migrations |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 

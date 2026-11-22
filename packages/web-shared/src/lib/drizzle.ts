@@ -51,6 +51,15 @@ if (IS_SCRIPT) {
 const appName = IS_SCRIPT ? 'kilocode-script' : 'kilocode-web';
 
 /**
+ * The host the pools below connect to: the `POSTGRES_SCRIPT_URL` host when `IS_SCRIPT` is set,
+ * the app's host otherwise. A caller that has to name the target, without handling the URL or its
+ * credentials, reads it here so it cannot disagree with the connection that is actually used.
+ */
+export function primaryDatabaseHost(): string {
+  return new URL(postgresUrl).hostname;
+}
+
+/**
  * Whether a region is on the US side. The root AGENTS.md section "Vercel Function Regions" is
  * the source of truth: functions run only in `fra1` and `sfo1`, and any other observed region is
  * a proxy or edge hop rather than the function, so only the SFO prefix can match.

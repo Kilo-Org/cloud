@@ -140,16 +140,16 @@ function outcomeKind(
  * - `prOpened: false` is a stated fact, not an absent one: it reports that no
  *   pull request is open, so it does not carry the remembered outcome forward.
  *   Only a row that omits `prOpened` entirely keeps it.
- * - `failure` is the one exception to that policy. A finished row with a
+ * - `failure` is one exception to that policy. A finished row with a
  *   failure reads as the `failed` kind, which the layout draws as a stopped
  *   turn. A row that carries `failure: null` reports no failure and clears the
  *   remembered one; a row with no `failure` key at all cannot report it either
  *   way, so the remembered failure survives, which is what keeps a
  *   push-delivered `failed` card through a tray rebuild.
- * - `permissionCommand` names the request `approvalKey` names, so it follows
- *   that key rather than the absence policy: the remembered command carries
- *   only while the key is the same one it was recorded under, and a new key
- *   keeps only the command its own row states.
+ * - `permissionCommand` is the other exception: it names the request
+ *   `approvalKey` names, so the remembered command carries only while the key
+ *   is the same one it was recorded under, and a new key keeps only the
+ *   command its own row states.
  * - Every text field is read through the shared display rule before it reaches
  *   the card, so a value from any producer draws as the line it stands for.
  */

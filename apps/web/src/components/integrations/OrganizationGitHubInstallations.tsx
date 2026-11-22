@@ -25,6 +25,7 @@ import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { GitHubConnectionAttemptState } from './GitHubConnectionAttemptState';
+import { INSTALLATION_LISTING_TOO_LARGE_MESSAGE } from './github-app-outcome';
 
 type OrganizationGitHubInstallationsProps = {
   organizationId: string;
@@ -255,7 +256,9 @@ export function OrganizationGitHubInstallations({
                   ? 'This GitHub installation is already connected to another Kilo account or organization.'
                   : connectionError === 'authorization_revoked'
                     ? 'GitHub ownership or Kilo administration could not be verified. Start again to reconnect.'
-                    : 'The GitHub connection could not be completed. Start again or install the App on GitHub.'}
+                    : connectionError === 'installation_listing_too_large'
+                      ? INSTALLATION_LISTING_TOO_LARGE_MESSAGE
+                      : 'The GitHub connection could not be completed. Start again or install the App on GitHub.'}
           </p>
         )}
         {connectionAttemptId && (

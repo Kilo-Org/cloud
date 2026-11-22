@@ -7,6 +7,8 @@ import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   DiscordGuildAlreadyConnectedError,
   exchangeDiscordCode,
+  releasePreviousDiscordGuild,
+  type UpsertDiscordInstallationResult,
   upsertDiscordInstallation,
 } from '@/lib/integrations/discord-service';
 import { parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
@@ -178,6 +180,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     // performs the ownership check and the installation write.
     const defaultModel =
       owner.type === 'org' ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL) : undefined;
+    let installation: UpsertDiscordInstallationResult;
     try {
       const store = (database?: DrizzleTransaction) =>
         upsertDiscordInstallation(
@@ -187,11 +190,9 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
           database
         );
 
-      if (guildId) {
-        await withWorkspaceInstallationLock(PLATFORM.DISCORD, owner, guildId, store);
-      } else {
-        await store();
-      }
+      installation = guildId
+        ? await withWorkspaceInstallationLock(PLATFORM.DISCORD, owner, guildId, store)
+        : await store();
     } catch (error) {
       if (error instanceof DiscordGuildAlreadyConnectedError) {
         return NextResponse.redirect(
@@ -209,7 +210,14 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       throw error;
     }
 
-    // 9. Redirect to success page
+    // 9. The connection now names the new server, so the bot is removed from the
+    // server it replaced. This runs after the write has committed, so the release
+    // follows the connection rather than deciding it.
+    if (installation.previousGuildId) {
+      await releasePreviousDiscordGuild(installation.previousGuildId);
+    }
+
+    // 10. Redirect to success page
     const successPath = verified.returnTo
       ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=discord_installed')
       : buildIntegrationOAuthRedirectPath(PLATFORM.DISCORD, owner, 'success=installed');

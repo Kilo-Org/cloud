@@ -1,4 +1,5 @@
 import 'server-only';
+import { captureException } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
@@ -330,6 +331,16 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
   return null;
 }
 
+export type UpsertDiscordInstallationResult = {
+  integration: PlatformIntegration;
+  /**
+   * The server this write moved the connection away from, when the owner
+   * reconnected onto a different one. The caller releases it after the write has
+   * committed; see `releasePreviousDiscordGuild`.
+   */
+  previousGuildId: string | null;
+};
+
 /**
  * Persist the selected Discord installation while preserving owner configuration.
  *
@@ -337,6 +348,11 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
  * connection holds a shared bot token and model policy, so moving it to another
  * server requires `allowGuildRebind`, which callers set only after verifying the
  * organization role that controls the integration.
+ *
+ * Discord adds the bot to the selected server during the OAuth consent, so a
+ * connection that moves to another server records the new one and reports the
+ * server it replaced. The caller releases that server after this write has
+ * committed.
  */
 export async function upsertDiscordInstallation(
   owner: Owner,
@@ -346,7 +362,7 @@ export async function upsertDiscordInstallation(
     defaultModel,
   }: { allowGuildRebind?: boolean; defaultModel?: string | null } = {},
   database: typeof db | DrizzleTransaction = db
-): Promise<PlatformIntegration> {
+): Promise<UpsertDiscordInstallationResult> {
   if (!oauthResponse.guild?.id) {
     throw new Error(
       'Discord OAuth response did not include guild information. The bot must be added to a server during authorization.'
@@ -408,7 +424,10 @@ export async function upsertDiscordInstallation(
       .where(eq(platform_integrations.id, existing.id))
       .returning();
 
-    return updated;
+    return {
+      integration: updated,
+      previousGuildId: boundGuildId && boundGuildId !== guildId ? boundGuildId : null,
+    };
   }
 
   // For org integrations, use a model that respects org access policy. A null
@@ -445,7 +464,7 @@ export async function upsertDiscordInstallation(
     })
     .returning();
 
-  return created;
+  return { integration: created, previousGuildId: null };
 }
 
 /**
@@ -504,6 +523,27 @@ export async function removeBotFromGuild(guildId: string | null): Promise<Discor
   } catch {
     return { status: 'temporary_failure', reason: 'network' };
   }
+}
+
+/**
+ * Release the server a connection moved away from.
+ *
+ * The connection records the selected server, so this removal keeps the bot's
+ * memberships matching it. Call it once the write that records the new server has
+ * committed: it never throws, because a release that does not settle is reported
+ * to operators rather than reported as a failed connection.
+ */
+export async function releasePreviousDiscordGuild(previousGuildId: string): Promise<void> {
+  const removal = await removeBotFromGuild(previousGuildId);
+
+  if (removal.status === 'left' || removal.status === 'already_absent') {
+    return;
+  }
+
+  captureException(new Error(`Previous Discord server release ended as ${removal.status}`), {
+    tags: { source: 'discord_oauth', op: 'release_previous_guild' },
+    extra: { guildId: previousGuildId, status: removal.status, reason: removal.reason },
+  });
 }
 
 /**

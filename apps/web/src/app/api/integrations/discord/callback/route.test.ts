@@ -9,6 +9,7 @@ import { createOAuthState } from '@/lib/integrations/oauth-state';
 import {
   DiscordGuildAlreadyConnectedError,
   exchangeDiscordCode,
+  releasePreviousDiscordGuild,
   upsertDiscordInstallation,
 } from '@/lib/integrations/discord-service';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
@@ -27,6 +28,7 @@ jest.mock('@/lib/integrations/discord-service', () => {
   return {
     DiscordGuildAlreadyConnectedError,
     exchangeDiscordCode: jest.fn(),
+    releasePreviousDiscordGuild: jest.fn(async () => undefined),
     upsertDiscordInstallation: jest.fn(),
   };
 });
@@ -63,12 +65,14 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 const mockedExchangeDiscordCode = jest.mocked(exchangeDiscordCode);
 const mockedUpsertDiscordInstallation = jest.mocked(upsertDiscordInstallation);
+const mockedReleasePreviousDiscordGuild = jest.mocked(releasePreviousDiscordGuild);
 const mockedConsumeProviderOAuthAttempt = jest.mocked(consumeProviderOAuthAttempt);
 const mockedWithWorkspaceInstallationLock = jest.mocked(withWorkspaceInstallationLock);
 const mockedCaptureMessage = jest.mocked(captureMessage);
 const mockedCaptureException = jest.mocked(captureException);
 
 const GUILD_ID = '123456789012345678';
+const PREVIOUS_GUILD_ID = '987654321098765432';
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const ORGANIZATION_ID = '9a1f56f0-6a52-4c1f-9f5d-0b0f7f2e6ad4';
@@ -128,7 +132,10 @@ describe('handleDiscordOAuthCallback', () => {
       scope: 'bot applications.commands',
       guild: { id: GUILD_ID, name: 'Test Server', icon: null },
     });
-    mockedUpsertDiscordInstallation.mockResolvedValue(undefined as never);
+    mockedUpsertDiscordInstallation.mockResolvedValue({
+      integration: {} as never,
+      previousGuildId: null,
+    });
   });
 
   test('installs with a fresh provider-install state', async () => {
@@ -224,6 +231,38 @@ describe('handleDiscordOAuthCallback', () => {
       { allowGuildRebind: true, defaultModel: 'test/default-model' },
       expect.anything()
     );
+  });
+
+  test('releases the server a rebind moved the connection away from', async () => {
+    mockedUpsertDiscordInstallation.mockResolvedValue({
+      integration: {} as never,
+      previousGuildId: PREVIOUS_GUILD_ID,
+    });
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORGANIZATION_ID}/integrations/discord?success=installed`
+    );
+    expect(mockedReleasePreviousDiscordGuild).toHaveBeenCalledWith(PREVIOUS_GUILD_ID);
+    expect(mockedReleasePreviousDiscordGuild).toHaveBeenCalledTimes(1);
+  });
+
+  test('releases no server when the write replaced none', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(response, '/integrations/discord?success=installed');
+    expect(mockedReleasePreviousDiscordGuild).not.toHaveBeenCalled();
   });
 
   test('reports a server connected to another account without a second install', async () => {

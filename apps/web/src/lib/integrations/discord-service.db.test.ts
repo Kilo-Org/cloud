@@ -95,7 +95,7 @@ describe('Discord installation lifecycle', () => {
       .set({
         metadata: { model_slug: 'configured-model', custom_setting: true },
       })
-      .where(eq(platform_integrations.id, created.id));
+      .where(eq(platform_integrations.id, created.integration.id));
 
     const updated = await upsertDiscordInstallation(
       owner,
@@ -106,16 +106,17 @@ describe('Discord installation lifecycle', () => {
       { allowGuildRebind: owner.type === 'org' }
     );
 
-    expect(updated.id).toBe(created.id);
-    expect(updated.platform_installation_id).toBe(selectedGuild);
-    expect(updated.platform_account_id).toBe(selectedGuild);
-    expect(updated.metadata).toEqual({
+    expect(updated.integration.id).toBe(created.integration.id);
+    expect(updated.previousGuildId).toBe(firstGuild);
+    expect(updated.integration.platform_installation_id).toBe(selectedGuild);
+    expect(updated.integration.platform_account_id).toBe(selectedGuild);
+    expect(updated.integration.metadata).toEqual({
       model_slug: 'configured-model',
       custom_setting: true,
       guild_icon: 'test-icon',
     });
     const installation = await getInstallationByGuildId(selectedGuild);
-    expect(installation?.id).toBe(created.id);
+    expect(installation?.id).toBe(created.integration.id);
     expect(installation && getOwnerFromInstallation(installation)).toEqual(owner);
     expect(await getInstallationByGuildId(firstGuild)).toBeNull();
   });
@@ -142,7 +143,7 @@ describe('Discord installation lifecycle', () => {
     const [stored] = await db
       .select()
       .from(platform_integrations)
-      .where(eq(platform_integrations.id, created.id));
+      .where(eq(platform_integrations.id, created.integration.id));
     expect(stored.platform_installation_id).toBe('345678901234567890');
     expect(stored.platform_account_login).toBe('Bound Server');
   });
@@ -172,7 +173,7 @@ describe('Discord installation lifecycle', () => {
       const [stored] = await db
         .select()
         .from(platform_integrations)
-        .where(eq(platform_integrations.id, bound.id));
+        .where(eq(platform_integrations.id, bound.integration.id));
       expect(stored.owned_by_organization_id).toBe(otherOrgId);
       expect(stored.platform_installation_id).toBe(guild.id);
       const rows = await db
@@ -266,12 +267,12 @@ describe('Discord installation lifecycle', () => {
       await insertDiscordRow({ type: 'org', id: otherOrgId }, guild, { installationId: null });
 
       const installation = await getInstallationByGuildId(guild.id);
-      expect(installation?.id).toBe(canonical.id);
+      expect(installation?.id).toBe(canonical.integration.id);
 
       const updated = await upsertDiscordInstallation({ type: 'org', id: orgId }, response, {
         allowGuildRebind: true,
       });
-      expect(updated.id).toBe(canonical.id);
+      expect(updated.integration.id).toBe(canonical.integration.id);
     } finally {
       await db
         .delete(platform_integrations)
@@ -300,8 +301,8 @@ describe('Discord installation lifecycle', () => {
 
     const updated = await upsertDiscordInstallation(owner, response, { allowGuildRebind: true });
 
-    expect(updated.id).toBe(canonicalId);
-    expect(updated.platform_installation_id).toBe(guild.id);
+    expect(updated.integration.id).toBe(canonicalId);
+    expect(updated.integration.platform_installation_id).toBe(guild.id);
     const rows = await db
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
@@ -333,8 +334,10 @@ describe('Discord installation lifecycle', () => {
         { allowGuildRebind: true }
       );
 
-      expect(created.platform_installation_id).toBe('122345678901234567');
-      expect((await getInstallationByGuildId('122345678901234567'))?.id).toBe(created.id);
+      expect(created.integration.platform_installation_id).toBe('122345678901234567');
+      expect((await getInstallationByGuildId('122345678901234567'))?.id).toBe(
+        created.integration.id
+      );
     } finally {
       await db
         .delete(platform_integrations)
@@ -432,7 +435,7 @@ describe('Discord re-authorization of a recorded association', () => {
         suspended_at: '2026-11-20T00:00:00.000Z',
         suspended_by: 'integration-operator',
       })
-      .where(eq(platform_integrations.id, created.id));
+      .where(eq(platform_integrations.id, created.integration.id));
 
     const reauthorized = await upsertDiscordInstallation(owner, {
       access_token: 'test-access-2',
@@ -443,10 +446,11 @@ describe('Discord re-authorization of a recorded association', () => {
       guild: { ...guild, name: 'Renamed Server' },
     });
 
-    expect(reauthorized.id).toBe(created.id);
-    expect(reauthorized.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
-    expect(reauthorized.suspended_at).toBeNull();
-    expect(reauthorized.suspended_by).toBeNull();
-    expect(isPlatformIntegrationActive(reauthorized)).toBe(true);
+    expect(reauthorized.integration.id).toBe(created.integration.id);
+    expect(reauthorized.previousGuildId).toBeNull();
+    expect(reauthorized.integration.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
+    expect(reauthorized.integration.suspended_at).toBeNull();
+    expect(reauthorized.integration.suspended_by).toBeNull();
+    expect(isPlatformIntegrationActive(reauthorized.integration)).toBe(true);
   });
 });

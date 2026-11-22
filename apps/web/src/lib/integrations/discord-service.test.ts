@@ -54,12 +54,18 @@ jest.mock('@/lib/organizations/model-restrictions', () => ({
   getEffectiveModelRestrictions: jest.fn(),
 }));
 
+const mockCaptureException = jest.fn();
+jest.mock('@sentry/nextjs', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 import type { Owner } from '@/lib/integrations/core/types';
 import {
   addDiscordReaction,
   DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
   DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
   postDiscordMessage,
+  releasePreviousDiscordGuild,
   removeBotFromGuild,
   removeDiscordReaction,
   testConnection,
@@ -250,6 +256,144 @@ describe('discord-service organization install model', () => {
     const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
     expect(inserted.metadata.model_slug).toBe('test/caller-model');
     expect(mockGetDefaultAllowedModel).not.toHaveBeenCalled();
+  });
+});
+
+describe('discord-service rebind result', () => {
+  const oauthResponse = {
+    access_token: 'access-token',
+    token_type: 'Bearer',
+    expires_in: 3600,
+    refresh_token: 'refresh-token',
+    scope: 'bot guilds',
+    guild: { id: '222222222222222222', name: 'New Server', icon: null },
+  };
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    mockLimit.mockReset();
+    mockUpdateSet.mockReset();
+    mockUpdateWhere.mockReset();
+    mockUpdateReturning.mockReset();
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateReturning.mockResolvedValue([
+      buildDiscordIntegration({
+        platform_installation_id: oauthResponse.guild.id,
+        platform_account_id: oauthResponse.guild.id,
+      }),
+    ]);
+  });
+
+  it('reports the server a re-authorization moved the connection away from', async () => {
+    mockLimit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        buildDiscordIntegration({
+          platform_installation_id: '111111111111111111',
+          platform_account_id: '111111111111111111',
+        }),
+      ]);
+
+    const result = await upsertDiscordInstallation(owner, oauthResponse);
+
+    expect(result.integration.id).toBe('integration-1');
+    expect(result.previousGuildId).toBe('111111111111111111');
+  });
+
+  it('reports the server a row records only in the account column', async () => {
+    mockLimit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        buildDiscordIntegration({
+          platform_installation_id: null,
+          platform_account_id: '111111111111111111',
+        }),
+      ]);
+
+    const result = await upsertDiscordInstallation(owner, oauthResponse);
+
+    expect(result.previousGuildId).toBe('111111111111111111');
+  });
+
+  it('reports no previous server when the owner re-authorizes the same one', async () => {
+    mockLimit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        buildDiscordIntegration({
+          platform_installation_id: oauthResponse.guild.id,
+          platform_account_id: oauthResponse.guild.id,
+        }),
+      ]);
+
+    const result = await upsertDiscordInstallation(owner, oauthResponse);
+
+    expect(result.previousGuildId).toBeNull();
+  });
+
+  it('reports no previous server for a first connection', async () => {
+    mockLimit.mockResolvedValue([]);
+    mockInsertValues.mockReturnValue({ returning: mockInsertReturning });
+    mockInsertReturning.mockResolvedValue([buildDiscordIntegration()]);
+
+    const result = await upsertDiscordInstallation(owner, oauthResponse);
+
+    expect(result.previousGuildId).toBeNull();
+    expect(result.integration.id).toBe('integration-1');
+  });
+});
+
+describe('discord-service previous guild release', () => {
+  const guildId = '111111111111111111';
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    mockCaptureException.mockReset();
+  });
+
+  it.each([204, 404])('leaves the server without reporting a %i answer', async status => {
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status }));
+
+    await expect(releasePreviousDiscordGuild(guildId)).resolves.toBeUndefined();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `https://discord.com/api/v10/users/%40me/guilds/${guildId}`,
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: { Authorization: 'Bot bot-token' },
+      })
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [500, 'response_error'],
+    [429, 'rate_limited'],
+  ] as const)('reports a %i answer without throwing', async (status, reason) => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status }));
+
+    await expect(releasePreviousDiscordGuild(guildId)).resolves.toBeUndefined();
+
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'discord_oauth', op: 'release_previous_guild' },
+      extra: { guildId, status: 'temporary_failure', reason },
+    });
+  });
+
+  it('reports an unusable bot token without throwing', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
+
+    await expect(releasePreviousDiscordGuild(guildId)).resolves.toBeUndefined();
+
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'discord_oauth', op: 'release_previous_guild' },
+      extra: { guildId, status: 'unavailable', reason: 'rejected_token' },
+    });
   });
 });
 

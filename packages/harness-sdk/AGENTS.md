@@ -2091,7 +2091,7 @@ Add a row when you turn one off, and give the reason.
 | `typescript/require-await` | The same false positive as `require-await`, on the TypeScript side. |
 | `typescript/explicit-module-boundary-types` | Off for tests only. A test's helper reads better with an inferred return. |
 | `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
-| `import/no-namespace` | Off for `src/index.test.ts` only. Asking what a barrel exports needs the namespace; there is no other way to read it. |
+| `import/no-namespace` | Off for the two barrel tests only, `src/index.test.ts` and `src/plugins/tools/index.test.ts`. Asking what a barrel exports needs the namespace; there is no other way to read it. |
 | `typescript/no-unsafe-type-assertion` | Off for `src/plugins/remote-mcp/validator.ts` only. The permissive validator hands its `unknown` input back as the SDK's generic `T`, and an assertion is how it returns the value unchanged. |
 | `import/no-nodejs-modules` | Off for the eleven files that import a Node built-in: the Node store, its four tests, `expo-fixture.ts`, the two remote-mcp fixtures, `conformance.test.ts`, `resume-fixture.ts` and `image.test.ts`. The store opens `node:sqlite` and the remote-mcp fixtures serve over `node:http`. The store is the package's own `/plugins/store/node` entry point, which a caller chooses to run on Node; the others are tests and fixtures. The root barrel reaches none of them. |
 | `unicorn/no-null` | Off for `src/plugins/remote-mcp/app.ts` only. `AppBridge` names `null` as the value of its first argument when the caller registers the handlers by hand, and this file does exactly that, so the argument is the SDK's `null` and not one this package invents. |

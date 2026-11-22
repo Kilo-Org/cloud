@@ -61,6 +61,15 @@ type FieldsProps = {
  * The form itself, mounted only once the saved links have arrived: the fields are
  * uncontrolled (a ref per field, `defaultValue` for the initial text), so they
  * cannot be filled in by a query that settles after their first render.
+ *
+ * The fields stay editable while a save is pending, and the Save button carries
+ * the whole busy state. Disabling them repaints the Android text input as
+ * `opacity-50`, and that attribute change makes Fabric publish a text state built
+ * from `defaultValue` — the link last saved — so the field would show the old
+ * link for the whole pending window and drop the typed one for good. Keeping the
+ * fields live is also the rule the other saving forms follow (the new-session
+ * prompt states it): the person can still read the link being sent, and a refused
+ * save leaves it there to retry.
  */
 function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const { t } = useTranslation();
@@ -90,6 +99,11 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   );
 
   const onSubmit = () => {
+    // One save at a time. The button's own `disabled` lands on the next commit,
+    // so this refuses a second press that arrives before that render.
+    if (update.isPending) {
+      return;
+    }
     const linkedin = submittedUrl(linkedinRef.current, linkedinUrl);
     const github = submittedUrl(githubRef.current, githubUrl);
     const nextLinkedinError = validateUrl(linkedinRef.current);
@@ -120,7 +134,6 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
         autoCorrect={false}
         validate={validateUrl}
         error={linkedinError ?? undefined}
-        disabled={update.isPending}
         onChangeText={value => {
           linkedinRef.current = value;
           setLinkedinError(null);
@@ -135,7 +148,6 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
         autoCorrect={false}
         validate={validateUrl}
         error={githubError ?? undefined}
-        disabled={update.isPending}
         onChangeText={value => {
           githubRef.current = value;
           setGithubError(null);

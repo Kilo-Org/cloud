@@ -22,6 +22,7 @@ type ScreenState = {
   error: boolean;
   mutations: MutationOptions[];
   mutate: Mock;
+  pending: boolean;
   back: Mock;
   focused: boolean;
   headerBack: (() => void) | undefined;
@@ -34,6 +35,7 @@ const state = vi.hoisted((): ScreenState => ({
   error: false,
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
+  pending: false,
   invalidate: vi.fn(),
   back: vi.fn(),
   focused: true,
@@ -87,7 +89,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     useQueryClient: () => ({ invalidateQueries: state.invalidate }),
     useMutation: (options: MutationOptions) => {
       state.mutations.push(options);
-      return { mutate: state.mutate, isPending: false };
+      return { mutate: state.mutate, isPending: state.pending };
     },
   };
 });
@@ -185,6 +187,7 @@ beforeEach(() => {
   state.links = { linkedinUrl: null, githubUrl: null };
   state.error = false;
   state.mutations = [];
+  state.pending = false;
   state.focused = true;
   state.headerBack = undefined;
   state.mutate.mockClear();
@@ -374,5 +377,24 @@ describe('ProfileEditScreen', () => {
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+
+  it('keeps the fields live and takes one save while a save is pending', async () => {
+    state.links = { linkedinUrl: 'https://www.linkedin.com/in/ada', githubUrl: null };
+    state.pending = true;
+    const root = await mount();
+
+    // The pending repaint of an Android text input publishes a text state built
+    // from `defaultValue`, the link last saved, so the fields never take the
+    // pending disable: they would show the old link instead of the one being sent.
+    expect(field(root, 'LinkedIn URL').props.disabled).toBeUndefined();
+    expect(field(root, 'GitHub URL').props.disabled).toBeUndefined();
+    expect(saveButton(root).props.loading).toBe(true);
+
+    // The button's disable lands on the next commit, so the guard refuses this press.
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+
+    expect(state.mutate).not.toHaveBeenCalled();
   });
 });

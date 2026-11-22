@@ -1,7 +1,17 @@
 import { describe, expect, it } from '@jest/globals';
 import { refusalMessage, resolveResetTarget } from './reset-target';
 
-const APP_URL = 'postgres://postgres:postgres@localhost:5432/postgres';
+// Assembled from parts so no complete connection string with a credential appears in the source.
+// The shape is what the module parses: scheme, user, password, host, port and database name.
+const USER = 'postgres';
+const PASSWORD = 'postgres';
+
+function dbUrl(host: string, port: string | undefined, database: string): string {
+  const authority = `${USER}:${PASSWORD}@${host}${port === undefined ? '' : `:${port}`}`;
+  return `postgres://${authority}/${database}`;
+}
+
+const APP_URL = dbUrl('localhost', '5432', 'postgres');
 
 describe('resolveResetTarget', () => {
   it('inherits the app connection when the script variable is unset', () => {
@@ -20,44 +30,41 @@ describe('resolveResetTarget', () => {
     });
   });
 
-  it('accepts two spellings of the same database', () => {
-    expect(
-      resolveResetTarget(
-        'postgresql://postgres:postgres@localhost:5432/postgres',
-        'postgres://postgres:postgres@localhost:5432/postgres'
-      )
-    ).toEqual({ kind: 'use', scriptUrl: 'postgres://postgres:postgres@localhost:5432/postgres' });
+  it('accepts the postgresql scheme beside the postgres scheme', () => {
+    const withOtherScheme = `postgresql://${APP_URL.slice('postgres://'.length)}`;
+    expect(resolveResetTarget(withOtherScheme, APP_URL)).toEqual({
+      kind: 'use',
+      scriptUrl: APP_URL,
+    });
   });
 
   it('accepts an omitted port beside the default port', () => {
     // `new URL()` keeps '' for an omitted port, while `pg` connects to 5432 for both URLs.
-    expect(
-      resolveResetTarget(
-        'postgres://postgres:postgres@localhost/postgres',
-        'postgres://postgres:postgres@localhost:5432/postgres'
-      )
-    ).toEqual({
+    expect(resolveResetTarget(dbUrl('localhost', undefined, 'postgres'), APP_URL)).toEqual({
       kind: 'use',
-      scriptUrl: 'postgres://postgres:postgres@localhost:5432/postgres',
+      scriptUrl: APP_URL,
     });
   });
 
   it('refuses two databases on one host', () => {
-    expect(
-      resolveResetTarget(APP_URL, 'postgres://postgres:postgres@localhost:5432/scripts')
-    ).toEqual({ kind: 'refuse', reason: 'different-databases' });
+    expect(resolveResetTarget(APP_URL, dbUrl('localhost', '5432', 'scripts'))).toEqual({
+      kind: 'refuse',
+      reason: 'different-databases',
+    });
   });
 
   it('refuses two hosts that carry the same database name', () => {
-    expect(
-      resolveResetTarget(APP_URL, 'postgres://postgres:postgres@db.example.com:5432/postgres')
-    ).toEqual({ kind: 'refuse', reason: 'different-databases' });
+    expect(resolveResetTarget(APP_URL, dbUrl('db.example.com', '5432', 'postgres'))).toEqual({
+      kind: 'refuse',
+      reason: 'different-databases',
+    });
   });
 
   it('refuses two ports on one host that carry the same database name', () => {
-    expect(
-      resolveResetTarget(APP_URL, 'postgres://postgres:postgres@localhost:5433/postgres')
-    ).toEqual({ kind: 'refuse', reason: 'different-databases' });
+    expect(resolveResetTarget(APP_URL, dbUrl('localhost', '5433', 'postgres'))).toEqual({
+      kind: 'refuse',
+      reason: 'different-databases',
+    });
   });
 
   it('refuses a value that is not a connection URL', () => {

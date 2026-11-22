@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one form surface: platform choice, URL field with its validation, instructions, model choice, and the pinned action share the scroll body */
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useHoistedOperationKey } from '@/lib/operation-key';
@@ -19,6 +19,7 @@ import { GitHubIcon } from '@/components/icons/github-icon';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -27,6 +28,7 @@ import { RemainingCharactersCounter } from '@/components/ui/remaining-characters
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { canConnectProvider, classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import {
@@ -108,7 +110,6 @@ const FORM_EDGE_GAP = 16;
 const INSTRUCTIONS_COUNTER_VISIBLE_REMAINING = 1_000;
 
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const scopeTitle = useReviewerScopeTitle(scope);
@@ -158,6 +159,14 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   // control-plane deadline while the request is still pending, releases the
   // busy button, and a late success still navigates.
   const createReview = useCreateManualReview(scope, { silent: true });
+  // The start owns this route for as long as its request runs, which is longer
+  // than the watchdog's busy button: the deadline releases the action while the
+  // request is still out, so the guard reads the mutation's own pending flag.
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: createReview.isPending });
+  // The review detail is a screen of this same Stack, so a literal `replace`
+  // would swap both screens in one native-stack commit, which the Android
+  // Fabric view host rejects; `stack-safe-replace.ts` exists for that swap.
+  const stackSafeReplace = useStackSafeReplace();
   // One operation key per draft intent: a retry of the draft this stall belongs
   // to replays the review the server already accepted, instead of creating a
   // second one for the same change.
@@ -220,7 +229,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // review, not a replay of this one.
             rotateKey();
             notificationHaptic(Haptics.NotificationFeedbackType.Success);
-            router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
+            // The review detail replaces this form, so Back must not return to a
+            // Start for a review that now exists: the guard disarms before the
+            // removal is dispatched, which keeps the retire that follows the push
+            // from being intercepted.
+            guard.leaveWithoutAsking(() => {
+              stackSafeReplace.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
+            });
           },
           onError: error => {
             // A client-deadline rejection is the stall, not a server reason:
@@ -513,6 +528,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           </Button>
         </ManualReviewActionFooter>
       </KeyboardAvoidingView>
+      {guard.dialog}
     </View>
   );
 }

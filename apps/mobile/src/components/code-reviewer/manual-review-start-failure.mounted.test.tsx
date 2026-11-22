@@ -70,8 +70,19 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('expo-router', () => ({
+  // The screen's leave guard registers here; this suite settles the start's
+  // failure copy, so the guard stays off and the replacement is unused.
+  usePreventRemove: () => undefined,
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
+}));
+// The screen leaves a settled start through the Android-safe replace
+// (`lib/navigation/stack-safe-replace.ts`); no case here navigates.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: vi.fn() }),
+}));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
 // The screen reads the reader's organization role for a trial refusal, so the
 // membership list it resolves through is driven per test.

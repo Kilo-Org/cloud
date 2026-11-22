@@ -1021,6 +1021,82 @@ test('names the line a layout class is written on, past the escape before it', (
   }
 });
 
+// Every escape the offset map walks is a branch of its own, and the tree has
+// none of them today, so each is exercised only here. Each fixture writes
+// `mt-[6px]` as the first thing on its own source line, behind the escape named
+// in its row, and the expected line is that class's own line.
+test('maps every escape branch to the line the class is written on', () => {
+  const cases = [
+    [
+      'an \\xXX and a \\uXXXX escape',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className="\\x41\\u0020\\',
+        'mt-[6px]" />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+    [
+      'an escape above the BMP',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className="\\u{1F600}\\u0020\\',
+        'mt-[6px]" />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+    [
+      'a template line continuation',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={`\\u0020\\',
+        'mt-[6px]`} />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+    [
+      'a template chunk ending its line in CRLF',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={`\\u0020',
+        'mt-[6px]`} />',
+        '  );',
+        '}',
+      ].join('\r\n'),
+    ],
+    [
+      'a template chunk holding a raw CRLF',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={`px-4',
+        'mt-[6px]`} />',
+        '  );',
+        '}',
+      ].join('\r\n'),
+    ],
+  ];
+  for (const [name, source] of cases) {
+    const found = layoutProblems(SCREEN_FILE, source);
+    assert.equal(found.length, 1, name);
+    const line = source.split(/\r\n|\n/).findIndex(text => text.startsWith('mt-')) + 1;
+    assert.equal(line, 5, `${name}: the fixture writes the class on line 5`);
+    assert.match(found[0], new RegExp(`screen\\.tsx:${line}: \\[L1\\] "mt-\\[6px\\]"`), name);
+  }
+});
+
 test('flags an arbitrary text size but not an arbitrary text colour', () => {
   assert.match(
     layoutProblems(SCREEN_FILE, screen('<Text className="text-[13px]" />')).join('\n'),

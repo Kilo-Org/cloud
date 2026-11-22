@@ -337,7 +337,7 @@ function readThemeTokens() {
   } catch (error) {
     return {
       tokens: null,
-      failure: `check-classes: cannot read the @theme inline tokens from apps/mobile/src/global.css (${firstLine(error)}) — the /opacity modifier rule cannot run without them and was skipped`,
+      failure: `check-classes: cannot read the @theme inline tokens from ${APP_SRC_RELATIVE}/global.css (${firstLine(error)}) — the /opacity modifier rule cannot run without them and was skipped`,
     };
   }
 }

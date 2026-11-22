@@ -449,11 +449,9 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       user.id
     );
     // The real transform puts the delegated token in this header.
-    jest
-      .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async ({ extraHeaders }) => {
-        extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
-      });
+    jest.mocked(applyProviderSpecificLogic).mockImplementation(async ({ extraHeaders }) => {
+      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
+    });
   });
 
   async function send(response: Response) {
@@ -547,11 +545,9 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toBeNull();
 
     // The credential the row holds now still records its own limit.
-    jest
-      .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async ({ extraHeaders }) => {
-        extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = RECONNECTED_TOKEN;
-      });
+    jest.mocked(applyProviderSpecificLogic).mockImplementation(async ({ extraHeaders }) => {
+      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = RECONNECTED_TOKEN;
+    });
     await send(usageLimitResponse());
     await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toMatchObject({
       code: 'subscription_sharing_usage_limit_exceeded',

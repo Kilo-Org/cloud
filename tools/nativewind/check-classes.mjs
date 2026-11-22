@@ -870,8 +870,7 @@ function layoutGroups(program, chunks) {
     }
     groups.push({ start, chunks: fresh });
   };
-  const argumentChunks = node =>
-    node.arguments.flatMap(argument => chunksWithin(chunks, argument));
+  const argumentChunks = node => node.arguments.flatMap(argument => chunksWithin(chunks, argument));
 
   walk(program, node => {
     if (

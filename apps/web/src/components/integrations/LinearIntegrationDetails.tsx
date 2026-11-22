@@ -22,6 +22,8 @@ type LinearIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
+  /** Organization members without management authority get a read-only view. */
+  canManage?: boolean;
   /** Overrides the OAuth start route, which the app shell serves itself. */
   connectPath?: string;
 };
@@ -47,8 +49,12 @@ export function LinearIntegrationDetails({
   organizationId,
   success,
   error,
+  canManage = false,
   connectPath,
 }: LinearIntegrationDetailsProps) {
+  // A personal connection has no organization to govern, so it keeps its own
+  // controls; an organization connection needs the role its procedures accept.
+  const mayManage = organizationId === undefined || canManage;
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -234,14 +240,25 @@ export function LinearIntegrationDetails({
               This Linear integration is suspended and will not receive Linear events. Re-install
               Linear to restore the connection.
             </p>
-            <Button
-              onClick={handleInstall}
-              disabled={isStartingLinearConnection}
-              className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {isStartingLinearConnection ? 'Loading...' : 'Re-install Linear'}
-            </Button>
+            {mayManage && (
+              <Button
+                onClick={handleInstall}
+                disabled={isStartingLinearConnection}
+                className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {isStartingLinearConnection ? 'Loading...' : 'Re-install Linear'}
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {organizationId !== undefined && !mayManage && (
+        <Alert>
+          <AlertDescription>
+            Only organization owners, admins, and billing managers can connect or change the
+            organization Linear integration.
           </AlertDescription>
         </Alert>
       )}
@@ -316,27 +333,32 @@ export function LinearIntegrationDetails({
                   onValueChange={handleModelChange}
                   isLoading={isLoadingModels}
                   placeholder="Select a model"
+                  disabled={!mayManage}
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleInstall}
-                    disabled={isStartingLinearConnection}
-                    title="Re-run the Linear OAuth flow to refresh scopes and permissions"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    {isStartingLinearConnection ? 'Loading...' : 'Re-install'}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={handleUninstall}
-                    disabled={uninstallApp.isPending}
-                  >
-                    {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect'}
-                  </Button>
+                  {mayManage && (
+                    <Button
+                      variant="outline"
+                      onClick={handleInstall}
+                      disabled={isStartingLinearConnection}
+                      title="Re-run the Linear OAuth flow to refresh scopes and permissions"
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      {isStartingLinearConnection ? 'Loading...' : 'Re-install'}
+                    </Button>
+                  )}
+                  {mayManage && (
+                    <Button
+                      variant="destructive"
+                      onClick={handleUninstall}
+                      disabled={uninstallApp.isPending}
+                    >
+                      {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect'}
+                    </Button>
+                  )}
                   {IS_DEVELOPMENT && (
                     <Button
                       variant="outline"
@@ -368,15 +390,17 @@ export function LinearIntegrationDetails({
                 </ul>
               </div>
 
-              <Button
-                onClick={handleInstall}
-                size="lg"
-                className="w-full"
-                disabled={isStartingLinearConnection}
-              >
-                <Zap className="mr-2 h-4 w-4" />
-                {isStartingLinearConnection ? 'Loading...' : 'Connect Linear'}
-              </Button>
+              {mayManage && (
+                <Button
+                  onClick={handleInstall}
+                  size="lg"
+                  className="w-full"
+                  disabled={isStartingLinearConnection}
+                >
+                  <Zap className="mr-2 h-4 w-4" />
+                  {isStartingLinearConnection ? 'Loading...' : 'Connect Linear'}
+                </Button>
+              )}
             </>
           )}
         </CardContent>

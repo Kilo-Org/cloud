@@ -16,11 +16,6 @@ import {
 
 const COMMAND_TIMEOUT_MS = 30_000;
 const GENERIC_COMMAND_ERROR_MESSAGE = 'Command failed';
-// One bound for "the connection did not open", the same wait a queued command
-// tolerates. A pre-socket token call that outlives it is abandoned so the
-// bounded retry series owns the failure, instead of a promise that never
-// settles parking every later retry and resume behind its latch.
-const INITIAL_AUTH_TIMEOUT_MS = 30_000;
 // How long a lifecycle resume joins a pre-socket token request instead of
 // starting its own. One resume can arrive from several triggers at once (a wake
 // reports both `online` and a visibility change), and superseding on each would
@@ -683,6 +678,10 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
         connectPromise = null;
       });
       initialAuthStartedAt = Date.now();
+      // One bound for "the connection did not open": the same wait a queued
+      // command tolerates. A token call that outlives it is abandoned so the
+      // bounded retry series owns the failure, instead of a promise that never
+      // settles parking every later retry and resume behind its latch.
       initialAuthTimeout = setTimeout(() => {
         initialAuthTimeout = null;
         if (destroyed || expectedGeneration !== generation) return;
@@ -695,7 +694,7 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
         started = false;
         connectPromise = null;
         failAuthAttempt(generation);
-      }, INITIAL_AUTH_TIMEOUT_MS);
+      }, COMMAND_TIMEOUT_MS);
     } catch {
       rejectAuthFailure();
     }

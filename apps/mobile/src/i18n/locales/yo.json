@@ -309,6 +309,7 @@
     "hideBalance": "Fi owó tó kù pamọ́",
     "showBalance": "Fi owó tó kù hàn",
     "balanceHidden": "Owó tó kù ti pamọ́",
+    "availableToSpendInOrganization": "Ó wà fún ìnáwó nínú àjọ yìí",
     "signOutTitle": "Jáde?",
     "signOutMessage": "O máa nílò láti tún wọlé kí o lè lo àyè iṣẹ́ rẹ.",
     "deleteAccountTitle": "Pa àkọọ́lẹ̀ rẹ́?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "Wá àwọn ibi ìpamọ́ kóòdù",
       "noMatches": "Kò sí ohun tó bá a mu",
       "noRepositories": "Kò sí ibi ìpamọ́ kóòdù tó wà",
-      "noRepositoriesDescription": "Kò sí ibi ìpamọ́ kóòdù tó sopọ̀ mọ́ àkọọ́lẹ̀ rẹ.",
+      "noRepositoriesDescription": "Láti gbé àwọn ibi ìpamọ́ kóòdù wọlé, sopọ̀ mọ́ GitHub tàbí GitLab.",
       "loading": "Ń gbé wọlé…",
       "accessibility": "Ibi ìpamọ́ kóòdù: {{label}}",
       "platformBitbucket": "Bitbucket"

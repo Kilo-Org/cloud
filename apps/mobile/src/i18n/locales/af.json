@@ -309,6 +309,7 @@
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
+    "availableToSpendInOrganization": "Beskikbaar om in hierdie organisasie te bestee",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "Soek bewaarplekke",
       "noMatches": "Geen treffers nie",
       "noRepositories": "Geen bewaarplekke beskikbaar nie",
-      "noRepositoriesDescription": "Geen bewaarplekke is aan jou rekening gekoppel nie.",
+      "noRepositoriesDescription": "Koppel GitHub of GitLab om bewaarplekke te laai.",
       "loading": "Laai…",
       "accessibility": "Bewaarplek: {{label}}",
       "platformBitbucket": "Bitbucket"

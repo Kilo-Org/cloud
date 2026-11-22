@@ -309,6 +309,7 @@
     "hideBalance": "隱藏餘額",
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
+    "availableToSpendInOrganization": "可於此組織內花費",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
     "deleteAccountTitle": "刪除帳戶？",
@@ -1999,7 +2000,7 @@
       "searchPlaceholder": "搜尋存放庫",
       "noMatches": "沒有相符項目",
       "noRepositories": "沒有可用的儲存庫",
-      "noRepositoriesDescription": "你的帳戶尚未連結任何儲存庫。",
+      "noRepositoriesDescription": "若要載入儲存庫，請連結 GitHub 或 GitLab。",
       "loading": "載入中…",
       "accessibility": "儲存庫：{{label}}",
       "platformBitbucket": "Bitbucket"

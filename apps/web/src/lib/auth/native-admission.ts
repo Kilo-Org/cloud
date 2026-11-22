@@ -311,11 +311,18 @@ export type AdmissionRefusalDetail = {
   android?: PlayIntegrityDiagnostics;
 };
 
+/** The one refusal code an admission verifier returns. */
+export const ADMISSION_REQUIRED = 'ADMISSION_REQUIRED' as const;
+
 /**
  * A refused admission proof. `recovery` is set only for the unknown-key case
  * above; every other refusal leaves it undefined so the wire response stays
  * exactly what it was. `detail` is for telemetry only and never serialized to
  * the client.
+ *
+ * `errorCode` stays `string` rather than the literal above: the route writes it
+ * straight into the response body, and a caller that branches on it must keep
+ * accepting a code this module did not name.
  */
 export type AdmissionRefusal = {
   ok: false;
@@ -379,7 +386,7 @@ export async function verifyAdmissionAsync(
   if (!consumed) {
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'challenge_unknown_or_expired',
         source: 'challenge',
@@ -443,7 +450,7 @@ async function verifyAppleAdmission(
   if (!keyId) {
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'key_id_missing',
         source: 'apple',
@@ -463,7 +470,7 @@ async function verifyAppleAdmission(
       countAdmissionCondition(`apple_attestation_failed:${result.error}`);
       return {
         ok: false,
-        errorCode: 'ADMISSION_REQUIRED',
+        errorCode: ADMISSION_REQUIRED,
         detail: {
           reason: ATTESTATION_REFUSAL_REASONS[result.error],
           source: 'apple',
@@ -499,7 +506,7 @@ async function verifyAppleAdmission(
     countAdmissionCondition('apple_assertion_unknown_key');
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
       detail: {
         reason: 'assertion_key_unknown',
@@ -523,7 +530,7 @@ async function verifyAppleAdmission(
     countAdmissionCondition(`apple_assertion_failed:${assertionResult.error}`);
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'assertion_invalid',
         source: 'apple',
@@ -556,7 +563,7 @@ async function verifyAppleAdmission(
     countAdmissionCondition('apple_assertion_stale_or_replayed');
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'assertion_stale_or_replayed',
         source: 'apple',
@@ -599,7 +606,7 @@ async function verifyAndroidAdmission(
   if (kind !== 'assertion') {
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'integrity_kind_unsupported',
         source: 'play_integrity',
@@ -618,7 +625,7 @@ async function verifyAndroidAdmission(
   if (!result.ok) {
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: INTEGRITY_REFUSAL_REASONS[result.error],
         source: 'play_integrity',

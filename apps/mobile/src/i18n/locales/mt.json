@@ -312,6 +312,7 @@
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
+    "availableToSpendInOrganization": "Disponibbli biex tonfoq f'din l-organizzazzjoni",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",
@@ -2716,7 +2717,7 @@
       "searchPlaceholder": "Tfittxija tar-repożitorji",
       "noMatches": "L-ebda riżultat",
       "noRepositories": "L-ebda repożitorju disponibbli",
-      "noRepositoriesDescription": "M'hemm l-ebda repożitorju mqabbad mal-kont tiegħek.",
+      "noRepositoriesDescription": "Biex ittella' r-repożitorji, qabbad kont GitHub jew GitLab.",
       "loading": "Qed jgħabbi…",
       "accessibility": "Repożitorju: {{label}}",
       "platformBitbucket": "Bitbucket"

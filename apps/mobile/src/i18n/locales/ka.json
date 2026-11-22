@@ -309,6 +309,7 @@
     "hideBalance": "ბალანსის დამალვა",
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
+    "availableToSpendInOrganization": "ამ ორგანიზაციაში დასახარჯად ხელმისაწვდომია",
     "signOutTitle": "ანგარიშიდან გასვლა?",
     "signOutMessage": "სამუშაო სივრცის გამოსაყენებლად ანგარიშში ხელახლა შესვლა დაგჭირდება.",
     "deleteAccountTitle": "ანგარიშის წაშლა?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "რეპოზიტორიების ძიება",
       "noMatches": "დამთხვევები არ არის",
       "noRepositories": "ხელმისაწვდომი რეპოზიტორიები არ არის",
-      "noRepositoriesDescription": "თქვენს ანგარიშთან არცერთი რეპოზიტორია არ არის დაკავშირებული.",
+      "noRepositoriesDescription": "რეპოზიტორიების ჩატვირთვისთვის დააკავშირე GitHub ან GitLab.",
       "loading": "ჩატვირთვა…",
       "accessibility": "რეპოზიტორია: {{label}}",
       "platformBitbucket": "Bitbucket"

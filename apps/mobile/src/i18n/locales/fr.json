@@ -310,6 +310,7 @@
     "hideBalance": "Masquer le solde",
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
+    "availableToSpendInOrganization": "Disponible pour vos dépenses dans cette organisation",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "deleteAccountTitle": "Supprimer le compte ?",
@@ -1905,7 +1906,7 @@
       "searchPlaceholder": "Rechercher des dépôts",
       "noMatches": "Aucun résultat",
       "noRepositories": "Aucun dépôt disponible",
-      "noRepositoriesDescription": "Aucun dépôt n'est lié à votre compte.",
+      "noRepositoriesDescription": "Connectez GitHub ou GitLab pour charger des dépôts.",
       "loading": "Chargement…",
       "accessibility": "Dépôt : {{label}}",
       "platformBitbucket": "Bitbucket"

@@ -312,6 +312,7 @@
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
+    "availableToSpendInOrganization": "Ar fáil le caitheamh san eagraíocht seo",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",
@@ -2720,7 +2721,7 @@
       "searchPlaceholder": "Cuardach stór",
       "noMatches": "Níl aon toradh ann",
       "noRepositories": "Níl aon stór ar fáil",
-      "noRepositoriesDescription": "Níl aon stór ceangailte le do chuntas.",
+      "noRepositoriesDescription": "Ceangail le GitHub nó le GitLab chun stór a lódáil.",
       "loading": "Ag lódáil…",
       "accessibility": "Stór: {{label}}",
       "platformBitbucket": "Bitbucket"

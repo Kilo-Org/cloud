@@ -311,6 +311,7 @@
     "hideBalance": "Схаваць баланс",
     "showBalance": "Паказаць баланс",
     "balanceHidden": "Баланс схаваны",
+    "availableToSpendInOrganization": "Даступна для выдаткавання ў гэтай арганізацыі",
     "signOutTitle": "Выйсці?",
     "signOutMessage": "Каб вярнуцца ў сваю працоўную прастору, трэба будзе ўвайсці зноў.",
     "deleteAccountTitle": "Выдаліць уліковы запіс?",
@@ -2664,7 +2665,7 @@
       "searchPlaceholder": "Пошук рэпазіторыяў",
       "noMatches": "Няма супадзенняў",
       "noRepositories": "Няма даступных рэпазіторыяў",
-      "noRepositoriesDescription": "Да вашага ўліковага запісу не падключаны ніводны рэпазіторый.",
+      "noRepositoriesDescription": "Каб загрузіць рэпазіторыі, падключыце GitHub або GitLab.",
       "loading": "Загрузка…",
       "accessibility": "Рэпазіторый: {{label}}",
       "platformBitbucket": "Bitbucket"

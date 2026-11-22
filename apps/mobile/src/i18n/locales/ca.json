@@ -310,6 +310,7 @@
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
+    "availableToSpendInOrganization": "Disponible per gastar en aquesta organització",
     "signOutTitle": "Vols tancar la sessió?",
     "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball.",
     "deleteAccountTitle": "Vols eliminar el compte?",
@@ -2612,7 +2613,7 @@
       "searchPlaceholder": "Cerca de repositoris",
       "noMatches": "Cap coincidència",
       "noRepositories": "Cap repositori disponible",
-      "noRepositoriesDescription": "No hi ha cap repositori connectat al teu compte.",
+      "noRepositoriesDescription": "Connecta GitHub o GitLab per carregar repositoris.",
       "loading": "Carregant…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"

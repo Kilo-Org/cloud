@@ -311,6 +311,7 @@
     "hideBalance": "Skryť zostatok",
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
+    "availableToSpendInOrganization": "Dostupné na útratu v tejto organizácii",
     "signOutTitle": "Odhlásiť sa?",
     "signOutMessage": "Na prístup do svojho pracovného priestoru sa budeš musieť znova prihlásiť.",
     "deleteAccountTitle": "Odstrániť účet?",
@@ -2664,7 +2665,7 @@
       "searchPlaceholder": "Hľadať repozitáre",
       "noMatches": "Žiadne zhody",
       "noRepositories": "Žiadne dostupné repozitáre",
-      "noRepositoriesDescription": "K tvojmu účtu nie sú pripojené žiadne repozitáre.",
+      "noRepositoriesDescription": "Ak chcete načítať repozitáre, pripojte GitHub alebo GitLab.",
       "loading": "Načítava sa…",
       "accessibility": "Repozitár: {{label}}",
       "platformBitbucket": "Bitbucket"

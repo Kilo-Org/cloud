@@ -310,6 +310,7 @@
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
+    "availableToSpendInOrganization": "Disponibil pentru cheltuieli în această organizație",
     "signOutTitle": "Te deconectezi?",
     "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul tău de lucru.",
     "deleteAccountTitle": "Ștergi contul?",
@@ -2612,7 +2613,7 @@
       "searchPlaceholder": "Căutare depozite de cod",
       "noMatches": "Niciun rezultat",
       "noRepositories": "Nu este disponibil niciun depozit",
-      "noRepositoriesDescription": "Nu este conectat niciun depozit la contul tău.",
+      "noRepositoriesDescription": "Pentru a încărca depozite, conectează un cont GitHub sau GitLab.",
       "loading": "Se încarcă…",
       "accessibility": "Depozit: {{label}}",
       "platformBitbucket": "Bitbucket"

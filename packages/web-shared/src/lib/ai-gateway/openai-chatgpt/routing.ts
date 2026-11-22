@@ -265,7 +265,7 @@ async function eligibleUpstreamModelForOwner(
   );
   if (!upstreamModel) return null;
 
-  if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
+  if (!(await isOpenAiModelServed(upstreamModel))) {
     return null;
   }
 
@@ -288,14 +288,13 @@ export async function getOpenAiChatGptByokModelIds(
 ): Promise<Set<string> | null> {
   if (!(await readServableStoredConnection(owner))) return null;
 
-  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
-  if (apiKey.trim().length === 0) return null;
+  if (getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV).trim().length === 0) return null;
 
   const tagged = await Promise.all(
     candidateModelIds.map(async modelId => {
       const upstreamModel = await resolveOpenAiChatGptUpstreamModel(modelId);
       if (!upstreamModel) return null;
-      return (await isOpenAiModelServed(apiKey, upstreamModel)) ? modelId : null;
+      return (await isOpenAiModelServed(upstreamModel)) ? modelId : null;
     })
   );
   return new Set(tagged.filter((id): id is string => id !== null));

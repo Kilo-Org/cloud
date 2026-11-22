@@ -309,6 +309,7 @@
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
+    "availableToSpendInOrganization": "برای خرج کردن در این سازمان در دسترس است",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "جست‌وجوی مخازن",
       "noMatches": "موردی پیدا نشد",
       "noRepositories": "هیچ مخزنی در دسترس نیست",
-      "noRepositoriesDescription": "هیچ مخزنی به حساب شما وصل نیست.",
+      "noRepositoriesDescription": "برای بارگذاری مخازن، GitHub یا GitLab را وصل کنید.",
       "loading": "در حال بارگذاری…",
       "accessibility": "مخزن: {{label}}",
       "platformBitbucket": "Bitbucket"

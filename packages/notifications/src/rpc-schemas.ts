@@ -341,11 +341,18 @@ export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
  * plus `delivered`, and nothing else. The builder above catches a reason
  * renamed in the tuples; this catches one dropped from or added to the union,
  * so the hand-written member list above cannot drift from that vocabulary.
+ *
+ * The check is an ambient declaration, so it compiles away: it emits no
+ * runtime value and adds nothing to the exported type. It stays module-local,
+ * so it never reaches the published schema entry, and it is still "used" for
+ * `noUnusedLocals` in the `apps/extension` program, which reaches this file
+ * through `@kilocode/trpc`'s published `.d.ts` and
+ * `@kilocode/notifications/schemas`.
  */
 type SameUnion<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type AssertTrue<T extends true> = T;
-export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
+declare const _dispatchPushOutcomeVocabularyChecked: AssertTrue<
   SameUnion<
     DispatchPushOutcome['kind'],
     | 'delivered'

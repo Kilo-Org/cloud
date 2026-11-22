@@ -309,6 +309,7 @@
     "hideBalance": "બેલેન્સ છુપાવો",
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",
+    "availableToSpendInOrganization": "આ સંસ્થામાં ખર્ચવા માટે ઉપલબ્ધ",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
     "signOutMessage": "તમારા વર્કસ્પેસનો ઉપયોગ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "deleteAccountTitle": "એકાઉન્ટ કાઢી નાખવું છે?",
@@ -2564,7 +2565,7 @@
       "searchPlaceholder": "રિપોઝિટરીઓ શોધો",
       "noMatches": "કોઈ મેળ નથી",
       "noRepositories": "કોઈ રિપોઝિટરી ઉપલબ્ધ નથી",
-      "noRepositoriesDescription": "તમારા એકાઉન્ટ સાથે કોઈ રિપોઝિટરી કનેક્ટ થયેલી નથી.",
+      "noRepositoriesDescription": "રિપોઝિટરીઓ લોડ કરવા માટે GitHub અથવા GitLab જોડો.",
       "loading": "લોડ થઈ રહ્યું છે…",
       "accessibility": "રિપોઝિટરી: {{label}}",
       "platformBitbucket": "Bitbucket"

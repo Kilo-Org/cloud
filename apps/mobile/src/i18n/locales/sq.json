@@ -309,6 +309,7 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
+    "availableToSpendInOrganization": "Në dispozicion për shpenzim në këtë organizatë",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "Kërko depo",
       "noMatches": "Asnjë përputhje",
       "noRepositories": "Asnjë depo e disponueshme",
-      "noRepositoriesDescription": "Asnjë depo nuk është e lidhur me llogarinë tënde.",
+      "noRepositoriesDescription": "Për të ngarkuar depot, lidhu me GitHub ose GitLab.",
       "loading": "Duke u ngarkuar…",
       "accessibility": "Depoja: {{label}}",
       "platformBitbucket": "Bitbucket"

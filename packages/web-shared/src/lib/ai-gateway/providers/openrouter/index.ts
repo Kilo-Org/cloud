@@ -53,11 +53,13 @@ import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/cust
 import {
   getCustomLlmsById,
   isPublicCustomLlm,
+  type CustomLlm,
+  type PublicCustomLlmDefinition,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
-  isNewModel,
+  nameMarkerFor,
   retirementDate,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import {
@@ -154,9 +156,8 @@ export function formatName(model: OpenRouterCatalogModel, preferredIndex: number
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
-  if (name.endsWith(')')) return name;
-  if (isNewModel(model, preferredIndex)) return name + ' (new)';
-  return name;
+  const marker = nameMarkerFor(model, preferredIndex);
+  return marker === 'new' ? name + ' (new)' : name;
 }
 
 /**
@@ -208,8 +209,7 @@ export function pickerExtraModel(modelId: string): OpenRouterCatalogModel | unde
   return buildAutoModels().find(model => model.id === modelId);
 }
 
-async function enhancedModelList(models: OpenRouterCatalogModel[], countryCode: string | null) {
-  const autoModels = buildAutoModels();
+async function loadModelListInputs() {
   const [
     endpointsMetadata,
     dataCollectionRequiredModelIds,
@@ -231,13 +231,42 @@ async function enhancedModelList(models: OpenRouterCatalogModel[], countryCode: 
     getVercelPricingMetadata(),
     getLatestAliasTargets(),
   ]);
+  return {
+    endpointsMetadata,
+    dataCollectionRequiredModelIds,
+    preferredModels,
+    unavailableModelIds,
+    preferredProviderOrderConfig,
+    customLlmsById,
+    customPricingConfig,
+    vercelPricingMetadata,
+    latestAliasTargets,
+  };
+}
+
+type ModelListInputs = Awaited<ReturnType<typeof loadModelListInputs>>;
+
+async function listCatalogModels(
+  models: OpenRouterCatalogModel[],
+  inputs: ModelListInputs,
+  countryCode: string | null
+) {
+  const {
+    endpointsMetadata,
+    unavailableModelIds,
+    preferredProviderOrderConfig,
+    customLlmsById,
+    customPricingConfig,
+    vercelPricingMetadata,
+    latestAliasTargets,
+  } = inputs;
+  const autoModels = buildAutoModels();
   const modelNamesById = new Map(models.map(model => [model.id, model.name]));
-  const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
-    isPublicCustomLlm(customLlm.definition) &&
-    !unavailableModelIds.has(customLlm.public_id.toLowerCase()) &&
-    !isCustomLlmDeniedInCountry(customLlm.definition, countryCode)
-      ? [{ ...customLlm, definition: customLlm.definition }]
-      : []
+  const publicCustomLlms = [...customLlmsById.values()].filter(
+    (customLlm): customLlm is CustomLlm & { definition: PublicCustomLlmDefinition } =>
+      isPublicCustomLlm(customLlm.definition) &&
+      !unavailableModelIds.has(customLlm.public_id.toLowerCase()) &&
+      !isCustomLlmDeniedInCountry(customLlm.definition, countryCode)
   );
   const publicCustomLlmProviders = new Map(
     publicCustomLlms.map(({ public_id, definition }) => [
@@ -310,31 +339,45 @@ async function enhancedModelList(models: OpenRouterCatalogModel[], countryCode: 
         }))
     )
     .concat(autoModels);
+  // Kept beside its own entry because ids may repeat; only the alias lookup below goes by id.
+  const gatewayModelsWithPricing = gatewayModels.map(model => ({
+    model,
+    priced: applyCustomPricingToModel(customPricingConfig, model),
+  }));
   const displayPricingById = new Map(
-    gatewayModels.map(model => [
-      model.id,
-      applyCustomPricingToModel(customPricingConfig, model).pricing,
-    ])
+    gatewayModelsWithPricing.map(({ priced }) => [priced.id, priced.pricing])
   );
-  const catalogModels = gatewayModels
-    .map(model => {
-      if (!model.alias_target) return applyCustomPricingToModel(customPricingConfig, model);
-      // An alias keeps its own name and shows the price its listed target shows. An alias whose
-      // target is not listed shows its own price, replaced by its target's custom pricing as
-      // billing replaces it.
-      return {
-        ...model,
-        pricing:
-          displayPricingById.get(model.alias_target) ??
-          applyCustomPricingToPricing(customPricingConfig, model.id, model.pricing),
-      };
-    })
+  // An alias keeps its own name and shows the price its listed target shows. An alias whose
+  // target is not listed shows its own price, replaced by its target's custom pricing as
+  // billing replaces it.
+  const catalogModels = gatewayModelsWithPricing
+    .map(({ model, priced }): OpenRouterCatalogModel =>
+      model.alias_target
+        ? {
+            ...model,
+            pricing:
+              displayPricingById.get(model.alias_target) ??
+              applyCustomPricingToPricing(customPricingConfig, model.id, model.pricing),
+          }
+        : priced
+    )
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);
+  return { catalogModels, publicCustomLlmProviders };
+}
+
+type CatalogListing = Awaited<ReturnType<typeof listCatalogModels>>;
+
+async function enrichCatalogModels(
+  catalogModels: OpenRouterCatalogModel[],
+  inputs: ModelListInputs,
+  publicCustomLlmProviders: CatalogListing['publicCustomLlmProviders']
+) {
+  const { dataCollectionRequiredModelIds, preferredModels } = inputs;
   const providerLookupId = (model: OpenRouterCatalogModel) => model.alias_target ?? model.id;
   const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));
-  const enhancedModels = await Promise.all(
+  return Promise.all(
     catalogModels.map(async (model: OpenRouterCatalogModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
       const providerIds =
@@ -381,7 +424,10 @@ async function enhancedModelList(models: OpenRouterCatalogModel[], countryCode: 
       };
     })
   );
-  const sortedModels = enhancedModels.sort((a, b) => {
+}
+
+function sortByPreferredOrder(models: OpenRouterCatalogModel[]) {
+  return models.sort((a, b) => {
     // Sort by preferredIndex (undefined values last)
     if (a.preferredIndex !== undefined && b.preferredIndex === undefined) return -1;
     if (a.preferredIndex === undefined && b.preferredIndex !== undefined) return 1;
@@ -393,7 +439,17 @@ async function enhancedModelList(models: OpenRouterCatalogModel[], countryCode: 
     // If neither has preferredIndex, maintain original order
     return 0;
   });
-  return sortedModels;
+}
+
+async function enhancedModelList(models: OpenRouterCatalogModel[], countryCode: string | null) {
+  const inputs = await loadModelListInputs();
+  const { catalogModels, publicCustomLlmProviders } = await listCatalogModels(
+    models,
+    inputs,
+    countryCode
+  );
+  const enhancedModels = await enrichCatalogModels(catalogModels, inputs, publicCustomLlmProviders);
+  return sortByPreferredOrder(enhancedModels);
 }
 
 function removeUpstreamEnkrypt(response: unknown): unknown {

@@ -311,6 +311,7 @@
     "hideBalance": "Приховати баланс",
     "showBalance": "Показати баланс",
     "balanceHidden": "Баланс приховано",
+    "availableToSpendInOrganization": "Доступно для витрат у цій організації",
     "signOutTitle": "Вийти?",
     "signOutMessage": "Щоб отримати доступ до робочого простору, потрібно буде ввійти знову.",
     "deleteAccountTitle": "Видалити обліковий запис?",
@@ -2051,7 +2052,7 @@
       "searchPlaceholder": "Пошук репозиторіїв",
       "noMatches": "Немає збігів",
       "noRepositories": "Немає доступних репозиторіїв",
-      "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
+      "noRepositoriesDescription": "Щоб завантажити репозиторії, підключіть GitHub або GitLab.",
       "loading": "Завантаження…",
       "accessibility": "Репозиторій: {{label}}",
       "platformBitbucket": "Bitbucket"

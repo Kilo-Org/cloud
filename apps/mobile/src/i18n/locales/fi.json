@@ -309,6 +309,7 @@
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
+    "availableToSpendInOrganization": "Kulutettavissa tässä organisaatiossa",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "Hae koodivarastoja",
       "noMatches": "Ei osumia",
       "noRepositories": "Ei koodivarastoja käytettävissä",
-      "noRepositoriesDescription": "Tiliisi ei ole yhdistetty koodivarastoja.",
+      "noRepositoriesDescription": "Yhdistä GitHub tai GitLab, jotta voit ladata koodivarastoja.",
       "loading": "Ladataan…",
       "accessibility": "Koodivarasto: {{label}}",
       "platformBitbucket": "Bitbucket"

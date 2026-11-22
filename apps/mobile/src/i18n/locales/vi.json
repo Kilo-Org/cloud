@@ -309,6 +309,7 @@
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
+    "availableToSpendInOrganization": "Có thể chi tiêu trong tổ chức này",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -1999,7 +2000,7 @@
       "searchPlaceholder": "Tìm kho mã nguồn",
       "noMatches": "Không có kết quả phù hợp",
       "noRepositories": "Không có kho mã nào để chọn",
-      "noRepositoriesDescription": "Tài khoản của bạn chưa kết nối với kho mã nào.",
+      "noRepositoriesDescription": "Để tải kho mã, hãy kết nối GitHub hoặc GitLab.",
       "loading": "Đang tải…",
       "accessibility": "Kho mã: {{label}}",
       "platformBitbucket": "Bitbucket"

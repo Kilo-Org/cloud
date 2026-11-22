@@ -309,6 +309,7 @@
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
+    "availableToSpendInOrganization": "Kuyatholakala ukusebenzisa imali kule nhlangano",
     "signOutTitle": "Uyafuna ukuphuma ngemvume?",
     "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza.",
     "deleteAccountTitle": "Uyafuna ukususa i-akhawunti?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "Sesha izinqolobane zekhodi",
       "noMatches": "Akukho okufanayo",
       "noRepositories": "Azikho izinqolobane zekhodi ezitholakalayo",
-      "noRepositoriesDescription": "Azikho izinqolobane zekhodi ezixhunywe ku-akhawunti yakho.",
+      "noRepositoriesDescription": "Ukuze ulayishe izinqolobane zekhodi, xhuma i-GitHub noma i-GitLab.",
       "loading": "Kuyalayishwa…",
       "accessibility": "Inqolobane yekhodi: {{label}}",
       "platformBitbucket": "Bitbucket"

@@ -309,6 +309,7 @@
     "hideBalance": "잔액 숨기기",
     "showBalance": "잔액 표시",
     "balanceHidden": "잔액이 숨겨짐",
+    "availableToSpendInOrganization": "이 조직에서 지출 가능",
     "signOutTitle": "로그아웃할까요?",
     "signOutMessage": "작업 영역을 이용하려면 다시 로그인해야 합니다.",
     "deleteAccountTitle": "계정을 삭제할까요?",
@@ -1999,7 +2000,7 @@
       "searchPlaceholder": "저장소 검색",
       "noMatches": "검색 결과 없음",
       "noRepositories": "사용 가능한 저장소가 없습니다",
-      "noRepositoriesDescription": "계정에 연결된 저장소가 없습니다.",
+      "noRepositoriesDescription": "저장소를 불러오려면 GitHub 또는 GitLab을 연결하세요.",
       "loading": "불러오는 중…",
       "accessibility": "저장소: {{label}}",
       "platformBitbucket": "Bitbucket"

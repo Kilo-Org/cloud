@@ -309,6 +309,7 @@
     "hideBalance": "ಉಳಿಕೆ ಮರೆಮಾಡಿ",
     "showBalance": "ಉಳಿಕೆ ತೋರಿಸಿ",
     "balanceHidden": "ಉಳಿಕೆ ಮರೆಮಾಡಲಾಗಿದೆ",
+    "availableToSpendInOrganization": "ಈ ಸಂಸ್ಥೆಯಲ್ಲಿ ಖರ್ಚು ಮಾಡಲು ಲಭ್ಯವಿದೆ",
     "signOutTitle": "ಸೈನ್ ಔಟ್ ಮಾಡಬೇಕೆ?",
     "signOutMessage": "ನಿಮ್ಮ ಕಾರ್ಯಸ್ಥಳವನ್ನು ಪ್ರವೇಶಿಸಲು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಬೇಕು.",
     "deleteAccountTitle": "ಖಾತೆಯನ್ನು ಅಳಿಸಬೇಕೆ?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "ರೆಪೊಸಿಟರಿಗಳ ಹುಡುಕಾಟ",
       "noMatches": "ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಗಳಿಲ್ಲ",
       "noRepositories": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
-      "noRepositoriesDescription": "ನಿಮ್ಮ ಖಾತೆಗೆ ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ.",
+      "noRepositoriesDescription": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು GitHub ಅಥವಾ GitLab ಸಂಪರ್ಕಿಸಿ.",
       "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "accessibility": "ರೆಪೊಸಿಟರಿ: {{label}}",
       "platformBitbucket": "Bitbucket"

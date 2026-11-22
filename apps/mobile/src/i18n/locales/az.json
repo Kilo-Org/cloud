@@ -309,6 +309,7 @@
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
+    "availableToSpendInOrganization": "Bu təşkilatda xərcləmək üçün mövcud",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "Repozitoriya axtarışı",
       "noMatches": "Uyğunluq yoxdur",
       "noRepositories": "Mövcud repozitoriya yoxdur",
-      "noRepositoriesDescription": "Hesabına qoşulmuş repozitoriya yoxdur.",
+      "noRepositoriesDescription": "Repozitoriyaları yükləmək üçün GitHub və ya GitLab-ı qoş.",
       "loading": "Yüklənir…",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket"

@@ -127,9 +127,11 @@ export function androidChannelIdForPushDataToAppVersion(
     case 'agent_briefing':
       return androidChannelIdForRegisteredClient(BRIEFING_FALLBACK_CHANNEL_ID, appVersion);
     case 'session_live_update':
-      // No released build ever created a followed-sessions channel, so there
-      // is no legacy id to redirect to. The push is data-only: the caller omits
-      // `channelId` and the client draws its own card.
+      // Only some `1.0.14` builds created `followed-sessions-lock-screen` (see
+      // `FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION`), so a lower version cannot
+      // be addressed with it, and no legacy id exists under another name to
+      // redirect to. The push is data-only: the caller omits `channelId` and the
+      // client draws its own card.
       return undefined;
     // Unreachable by construction, and named only so the switch stays total: a
     // null app version already returned at the guard above, and each of these
@@ -194,7 +196,9 @@ function isAgentPushData(data: PushData): data is AgentPushData {
 /**
  * The single needs-input rule for the counts the glanceable snapshot carries.
  * The push route and the local Android card both read it, so a snapshot with
- * work waiting on the user maps to the same kind in both places.
+ * work waiting on the user maps to the same kind in both places. The aggregate
+ * Live Activity card's relevance band reads it too, so the Lock Screen order
+ * cannot disagree with the kind.
  */
 export function agentNotificationKindForGlanceableSnapshot(snapshot: {
   needsInput: number;

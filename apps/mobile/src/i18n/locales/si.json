@@ -309,6 +309,7 @@
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
+    "availableToSpendInOrganization": "මෙම සංවිධානය තුළ වියදම් කිරීමට ලබා ගත හැක",
     "signOutTitle": "පිටවන්නද?",
     "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "deleteAccountTitle": "ගිණුම මකන්නද?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "කේත ගබඩා සොයන්න",
       "noMatches": "ගැළපීම් නැත",
       "noRepositories": "ලබාගත හැකි ගබඩා නැත",
-      "noRepositoriesDescription": "ඔබේ ගිණුමට සම්බන්ධ වූ ගබඩා නොමැත.",
+      "noRepositoriesDescription": "ගබඩා පූරණය කිරීමට GitHub හෝ GitLab සම්බන්ධ කරන්න.",
       "loading": "පූරණය වෙමින්…",
       "accessibility": "ගබඩාව: {{label}}",
       "platformBitbucket": "Bitbucket"

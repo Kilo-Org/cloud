@@ -70,8 +70,7 @@ function policyContext(defaultPolicies: unknown[] = []) {
   return {
     organization: { id: 'org-1', plan: 'enterprise', settings: {} },
     defaultPolicies,
-    groupIds: [],
-    groupPolicies: [],
+    groups: [],
     policyRevision: 1,
   };
 }

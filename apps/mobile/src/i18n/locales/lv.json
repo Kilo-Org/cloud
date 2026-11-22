@@ -310,6 +310,7 @@
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
+    "availableToSpendInOrganization": "Pieejams iztērēšanai šajā organizācijā",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",
@@ -2612,7 +2613,7 @@
       "searchPlaceholder": "Meklēt repozitorijus",
       "noMatches": "Nav atbilstību",
       "noRepositories": "Nav pieejamu repozitoriju",
-      "noRepositoriesDescription": "Tavam kontam nav pievienotu repozitoriju.",
+      "noRepositoriesDescription": "Lai ielādētu repozitorijus, pievieno GitHub vai GitLab kontu.",
       "loading": "Ielādē…",
       "accessibility": "Repozitorijs: {{label}}",
       "platformBitbucket": "Bitbucket"

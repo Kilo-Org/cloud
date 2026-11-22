@@ -309,6 +309,7 @@
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
+    "availableToSpendInOrganization": "Tersedia untuk dibelanjakan di organisasi ini",
     "signOutTitle": "Keluar?",
     "signOutMessage": "Kamu perlu masuk lagi untuk mengakses ruang kerjamu.",
     "deleteAccountTitle": "Hapus akun?",
@@ -2003,7 +2004,7 @@
       "searchPlaceholder": "Cari repositori",
       "noMatches": "Tidak ada hasil yang cocok",
       "noRepositories": "Tidak ada repositori yang tersedia",
-      "noRepositoriesDescription": "Tidak ada repositori yang terhubung ke akunmu.",
+      "noRepositoriesDescription": "Hubungkan GitHub atau GitLab untuk memuat repositori.",
       "loading": "Memuat…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"

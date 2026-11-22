@@ -310,6 +310,7 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
+    "availableToSpendInOrganization": "Dostupno za potrošnju u ovoj organizaciji",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Moraćeš ponovo da se prijaviš da bi pristupio svom radnom prostoru.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -2612,7 +2613,7 @@
       "searchPlaceholder": "Pretraga repozitorijuma",
       "noMatches": "Nema podudaranja",
       "noRepositories": "Nema dostupnih repozitorijuma",
-      "noRepositoriesDescription": "Nijedan repozitorijum nije povezan sa tvojim nalogom.",
+      "noRepositoriesDescription": "Da bi učitao repozitorijume, poveži GitHub ili GitLab.",
       "loading": "Učitavanje…",
       "accessibility": "Repozitorijum: {{label}}",
       "platformBitbucket": "Bitbucket"

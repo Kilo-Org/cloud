@@ -309,6 +309,7 @@
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
+    "availableToSpendInOrganization": "Ebben a szervezetben elkölthető",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -2564,7 +2565,7 @@
       "searchPlaceholder": "Adattárak keresése",
       "noMatches": "Nincs találat",
       "noRepositories": "Nincs elérhető adattár",
-      "noRepositoriesDescription": "Egyetlen adattár sincs a fiókodhoz kapcsolva.",
+      "noRepositoriesDescription": "Az adattárak betöltéséhez csatlakoztass GitHubot vagy GitLabot.",
       "loading": "Betöltés…",
       "accessibility": "Adattár: {{label}}",
       "platformBitbucket": "Bitbucket"

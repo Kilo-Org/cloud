@@ -331,7 +331,6 @@ export function retainPreviousEntries(
       const previousTarget = previousEntry?.alias_target?.slug;
       if (
         previousEntry !== undefined &&
-        previousEntry !== model &&
         (previousTarget === undefined || Object.hasOwn(models, previousTarget))
       ) {
         models[modelId] = previousEntry;

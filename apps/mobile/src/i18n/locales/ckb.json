@@ -309,6 +309,7 @@
     "hideBalance": "شاردنەوەی باڵانس",
     "showBalance": "پیشاندانی باڵانس",
     "balanceHidden": "باڵانس شاردراوەتەوە",
+    "availableToSpendInOrganization": "بۆ خەرجکردن لەم ڕێکخراوەدا بەردەستە",
     "signOutTitle": "دەرچوون؟",
     "signOutMessage": "بۆ دەستگەیشتن بە شوێنی کارەکەت، پێویستە دووبارە بچیتە ژوورەوە.",
     "deleteAccountTitle": "سڕینەوەی هەژمار؟",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "گەڕان لە کۆگاکان",
       "noMatches": "هیچ ئەنجامێکی گونجاو نییە",
       "noRepositories": "هیچ کۆگایەک بەردەست نییە",
-      "noRepositoriesDescription": "هیچ کۆگایەک بە هەژمارەکەتەوە نەبەستراوەتەوە.",
+      "noRepositoriesDescription": "بۆ بارکردنی کۆگاکان، GitHub یان GitLab ببەستەوە.",
       "loading": "بارکردن…",
       "accessibility": "کۆگا: {{label}}",
       "platformBitbucket": "Bitbucket"

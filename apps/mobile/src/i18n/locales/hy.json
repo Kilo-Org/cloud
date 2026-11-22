@@ -309,6 +309,7 @@
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",
+    "availableToSpendInOrganization": "Հասանելի է այս կազմակերպությունում ծախսելու համար",
     "signOutTitle": "Դո՞ւրս գալ հաշվից",
     "signOutMessage": "Աշխատանքային տարածքից օգտվելու համար պետք է նորից մուտք գործեք։",
     "deleteAccountTitle": "Ջնջե՞լ հաշիվը",
@@ -2564,7 +2565,7 @@
       "searchPlaceholder": "Որոնեք պահոցները…",
       "noMatches": "Համընկնումներ չկան",
       "noRepositories": "Հասանելի պահոցներ չկան",
-      "noRepositoriesDescription": "Ձեր հաշվին միացված պահոցներ չկան։",
+      "noRepositoriesDescription": "Պահոցները բեռնելու համար միացրու GitHub-ը կամ GitLab-ը։",
       "loading": "Բեռնվում է…",
       "accessibility": "Պահոց՝ {{label}}",
       "platformBitbucket": "Bitbucket"

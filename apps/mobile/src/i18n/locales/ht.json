@@ -309,6 +309,7 @@
     "hideBalance": "Kache balans",
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
+    "availableToSpendInOrganization": "Disponib pou depanse nan òganizasyon sa a",
     "signOutTitle": "Dekonekte?",
     "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "deleteAccountTitle": "Efase kont?",
@@ -2564,7 +2565,7 @@
       "searchPlaceholder": "Chèche depo",
       "noMatches": "Pa gen rezilta",
       "noRepositories": "Pa gen depo disponib",
-      "noRepositoriesDescription": "Pa gen depo ki konekte ak kont ou a.",
+      "noRepositoriesDescription": "Konekte GitHub oswa GitLab pou chaje depo yo.",
       "loading": "Ap chaje…",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"

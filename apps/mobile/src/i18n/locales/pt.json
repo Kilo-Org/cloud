@@ -311,6 +311,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
+    "availableToSpendInOrganization": "Disponível para gastar nesta organização",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -2664,7 +2665,7 @@
       "searchPlaceholder": "Pesquisar repositórios",
       "noMatches": "Sem resultados",
       "noRepositories": "Nenhum repositório disponível",
-      "noRepositoriesDescription": "Nenhum repositório está ligado à sua conta.",
+      "noRepositoriesDescription": "Para carregar repositórios, ligue uma conta do GitHub ou do GitLab.",
       "loading": "A carregar…",
       "accessibility": "Repositório: {{label}}",
       "platformBitbucket": "Bitbucket"

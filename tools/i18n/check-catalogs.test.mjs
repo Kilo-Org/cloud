@@ -2337,21 +2337,88 @@ test('accepts a mobile value its catalog lists as English on purpose', () => {
   assert.equal(result.stderr, '');
 });
 
-test('still reports a mobile value left in English in every locale', () => {
+test('stays silent when every catalog lists the prose value as English on purpose', () => {
+  // A reviewed entry is the decision that the value stays English in that
+  // catalog, so a key every catalog exempts is not a defect. Only the per-locale
+  // rule reads the map, which is why it, and not the every-locale rule, decides
+  // what a prose value means.
+  const english = { agents: { title: 'Your agents' } };
+  const source = "t('agents.title');";
+  const mapBody = /const MOBILE_ENGLISH_COPY_EXCEPTIONS = \{[\s\S]*?\n\};/.exec(
+    CHECKER_SOURCE
+  )?.[0];
+  assert.ok(mapBody, 'the shipped checker ships the exception map literal');
+  const filled = entries => {
+    const patched = CHECKER_SOURCE.replace(
+      mapBody,
+      ['const MOBILE_ENGLISH_COPY_EXCEPTIONS = {', ...entries, '};'].join('\n')
+    );
+    assert.notEqual(patched, CHECKER_SOURCE, 'the case must fill the exception map');
+    return patched;
+  };
+  const tree = checker =>
+    cliFixture(
+      {
+        ...standardFiles({ english, translated: english, source }),
+        ...PER_CATALOG_FRENCH_PUSH,
+        'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
+        'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(english),
+        'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(english),
+      },
+      checker
+    );
+
+  const both = cli(
+    tree(filled([`  fr: { 'Your agents': 'reviewed' },`, `  ru: { 'Your agents': 'reviewed' },`]))
+  );
+  assert.equal(both.status, 0, both.stderr);
+  assert.equal(both.stderr, '');
+
+  // One catalog without the entry still reports, so the silence above is the
+  // reviewed entry's doing and not a rule that stopped seeing the value.
+  const one = cli(tree(filled([`  fr: { 'Your agents': 'reviewed' },`])));
+  assert.equal(one.status, 1, one.stderr);
+  assert.match(
+    one.stderr,
+    /^mobile\/ru: "agents\.title" is English; translate it, or list the value for "ru" in MOBILE_ENGLISH_COPY_EXCEPTIONS$/m
+  );
+  assert.doesNotMatch(one.stderr, /^mobile\/fr: /m);
+  assert.doesNotMatch(one.stderr, /equals English in every locale/);
+});
+
+test('reports one line per locale for a prose value left in English everywhere', () => {
   const found = run({
     english: { agents: { title: 'Your agents' } },
     translated: { agents: { title: 'Your agents' } },
     source: "t('agents.title');",
   });
   assert.ok(
-    found.includes('mobile: "agents.title" equals English in every locale'),
-    found.join('\n')
-  );
-  assert.ok(
     found.includes(
       'mobile/ru: "agents.title" is English; translate it, or list the value for "ru" in MOBILE_ENGLISH_COPY_EXCEPTIONS'
     ),
     found.join('\n')
+  );
+  assert.ok(
+    !found.some(line => line.includes('equals English in every locale')),
+    `a prose value is reported per locale:\n${found.join('\n')}`
+  );
+});
+
+test('reports a value with no prose once, for every locale', () => {
+  // Nothing in a bare placeholder can be translated, so no locale can fix it:
+  // the per-locale rule says nothing and the every-locale rule names the key.
+  const found = run({
+    english: { agents: { tokenOnly: '{{name}}' } },
+    translated: { agents: { tokenOnly: '{{name}}' } },
+    source: "t('agents.tokenOnly');",
+  });
+  assert.ok(
+    found.includes('mobile: "agents.tokenOnly" equals English in every locale'),
+    found.join('\n')
+  );
+  assert.ok(
+    !found.some(line => line.includes('is English; translate it')),
+    `a value with no prose has nothing to translate per locale:\n${found.join('\n')}`
   );
 });
 
@@ -2524,83 +2591,6 @@ test('reports an unreadable catalog folder as one problem line', () => {
     .filter(line => line.startsWith('notifications: cannot audit the catalog folder:'));
   assert.equal(folderLines.length, 1, result.stderr);
 });
-
-// The descriptor policy guard keeps a misconfigured catalog from throwing: the
-// copy rules and the base-key reader are used after the catalogs' value
-// problems are collected, so a throw there would hide them. Each case patches
-// the notifications descriptor away from the checker source and leaves a mobile
-// problem in the tree, so the run must still print what it collected.
-const POLICY_PUSH_FILES = {
-  'packages/notifications/src/locales/en.json': JSON.stringify({
-    internal: { securityFindingNew: { title: 'New finding', body: 'Body' } },
-  }),
-  'packages/notifications/src/locales/ru.json': JSON.stringify({
-    internal: { securityFindingNew: { title: 'Новая находка', body: 'Текст' } },
-  }),
-  'packages/notifications/src/push-copy.ts': '',
-};
-
-// A descriptor-editing patch rewrites the notifications descriptor however the
-// upstream source words it: a rule list of one entry or two, a four-space tab,
-// or a line the merge moved. A literal replace would pass while patching
-// nothing when any of that drifts.
-const NOTIFICATIONS_DESCRIPTOR = /name: 'notifications',[\s\S]*?collectsDestructiveKeys: false,\n/;
-const editDescriptor = (source, edit) => {
-  const descriptors = source.match(new RegExp(NOTIFICATIONS_DESCRIPTOR.source, 'g')) ?? [];
-  assert.equal(
-    descriptors.length,
-    1,
-    'the notifications descriptor must be unique in the checker source'
-  );
-  const edited = edit(descriptors[0]);
-  assert.notEqual(edited, descriptors[0], 'the edit must change the descriptor');
-  return source.replace(descriptors[0], edited);
-};
-const WITHOUT_BASE_KEY_DESCRIPTOR = descriptor =>
-  descriptor.replace(/^(\s*)baseKeyOf:[^\n]*\n/m, '');
-
-for (const { label, field, patch } of [
-  {
-    label: 'without a base-key reader',
-    field: 'baseKeyOf',
-    patch: source => editDescriptor(source, WITHOUT_BASE_KEY_DESCRIPTOR),
-  },
-  {
-    label: 'with an empty copy-rule list',
-    field: 'englishCopyRules',
-    patch: source =>
-      editDescriptor(source, descriptor =>
-        descriptor.replace(/(\s*)englishCopyRules:\s*\[[^\]]*\],/, '$1englishCopyRules: [],')
-      ),
-  },
-  {
-    label: 'with a non-callable entry in its copy-rule list',
-    field: 'englishCopyRules',
-    patch: source =>
-      editDescriptor(source, descriptor =>
-        descriptor.replace(
-          /(\s*)englishCopyRules:\s*\[[^\]]*\],/,
-          "$1englishCopyRules: [checkPushEnglishCopy, 'not a rule'],"
-        )
-      ),
-  },
-]) {
-  test(`reports a descriptor ${label} through the command`, () => {
-    const patched = patch(CHECKER_SOURCE);
-    assert.notEqual(patched, CHECKER_SOURCE, 'the case must change the checker source');
-    const translated = { agents: { ...TRANSLATED.agents } };
-    delete translated.agents.title;
-    const root = cliFixture({ ...standardFiles({ translated }), ...POLICY_PUSH_FILES }, patched);
-    const result = cli(root);
-    assert.equal(result.status, 1, result.stderr);
-    assert.match(
-      result.stderr,
-      new RegExp(`notifications: the catalog descriptor declares no usable ${field}`)
-    );
-    assert.doesNotMatch(result.stderr, /TypeError/);
-    assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
-  });
-}
 
 // A confirmation's safe button falls back to the catalog's own Cancel label
 // (`cancelLabel ?? t('common.cancel')`), so a destructive label translated with

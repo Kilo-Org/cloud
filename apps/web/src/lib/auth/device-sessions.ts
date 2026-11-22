@@ -19,6 +19,8 @@ import { checkDomainSignInEligibility } from './email-signin-eligibility';
 
 const REFRESH_TOKEN_BYTES = 32;
 
+type SessionCredentialPair = { token: string; refreshToken: string; expiresIn: number };
+
 /**
  * How long a consumed refresh token can rotate again while the pair it was
  * exchanged for was never used. A mobile client loses a rotation response
@@ -283,7 +285,7 @@ async function mintSessionCredentials(
   executor: typeof db | DrizzleTransaction,
   user: User,
   deviceSessionId: string
-): Promise<{ token: string; refreshToken: string; expiresIn: number }> {
+): Promise<SessionCredentialPair> {
   const token = generateApiToken(user, { deviceSessionId }, { expiresIn: TOKEN_EXPIRY.oneHour });
   const refreshToken = generateRefreshToken();
 
@@ -302,7 +304,7 @@ async function mintSessionCredentials(
 export async function issueSessionCredentials(
   user: User,
   deviceSessionId: string
-): Promise<{ token: string; refreshToken: string; expiresIn: number }> {
+): Promise<SessionCredentialPair> {
   return mintSessionCredentials(db, user, deviceSessionId);
 }
 
@@ -315,6 +317,12 @@ export async function issueSessionCredentials(
  * for an account linked to that domain's SSO authority; a refused domain
  * revokes the session. A policy that cannot be evaluated throws without
  * revoking. An unknown or expired token is refused without revocation.
+ *
+ * A domain-policy refusal is reported as `USER_BLOCKED`, the same error a
+ * blocked account gets: the native refresh response contract allows only
+ * `INVALID_REFRESH_TOKEN`, `SESSION_REVOKED` and `USER_BLOCKED`, so the cause
+ * travels in the session's `revoked_reason` (`domain_ineligible`) and in the
+ * log line instead of the error member.
  *
  * Reuse detection: a consumed token is a replay, and the session is revoked,
  * when the session chain has advanced past it (a later token was consumed),
@@ -347,7 +355,7 @@ export async function issueSessionCredentials(
 export async function rotateRefreshToken(
   refreshToken: string
 ): Promise<
-  | { ok: true; token: string; refreshToken: string; expiresIn: number }
+  | ({ ok: true } & SessionCredentialPair)
   | { ok: false; error: 'INVALID_REFRESH_TOKEN' | 'SESSION_REVOKED' | 'USER_BLOCKED' }
 > {
   const tokenHash = hashToken(refreshToken);
@@ -558,8 +566,11 @@ export async function rotateRefreshToken(
 /**
  * Create a device session and persist the attested key in a single transaction.
  *
- * Bind key persistence and session creation atomically so that a partial failure
- * never leaves one committed without the other when supportsRefresh is true.
+ * Key persistence, the session insert and the credential mint run in one
+ * transaction, so a partial failure commits none of them and rolls all of them
+ * back. A caller that prefers a plain session without an attested-key binding
+ * chooses {@link createDeviceSessionWithCredentials} instead; this function
+ * makes no such choice itself.
  *
  * The session, the attested key and the minted credentials all name the account
  * of `params.user`, so they cannot disagree.
@@ -571,7 +582,7 @@ export async function createDeviceSessionWithAttestedKey(params: {
   userAgent?: string;
   user: User;
   verification: VerifyAdmissionOk;
-}): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
+}): Promise<SessionCredentialPair & { sessionId: string }> {
   const { credentials, evictedSessionIds } = await db.transaction(async tx => {
     await persistAttestedKey(params.user.id, params.verification, tx);
 
@@ -613,14 +624,14 @@ export async function createDeviceSessionWithCredentials(params: {
   userAgent?: string;
   user: User;
   deviceAuthRequestId?: string;
-}): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }>;
+}): Promise<SessionCredentialPair & { sessionId: string }>;
 export async function createDeviceSessionWithCredentials(params: {
   userId: string;
   userAgent?: string;
   user: User;
   deviceAuthRequestId?: string;
   claim: DeviceSessionClaim;
-}): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string } | null>;
+}): Promise<(SessionCredentialPair & { sessionId: string }) | null>;
 export async function createDeviceSessionWithCredentials(
   params: {
     userId: string;
@@ -628,15 +639,10 @@ export async function createDeviceSessionWithCredentials(
     user: User;
     deviceAuthRequestId?: string;
   } & { claim?: DeviceSessionClaim }
-): Promise<{
-  token: string;
-  refreshToken: string;
-  expiresIn: number;
-  sessionId: string;
-} | null> {
+): Promise<(SessionCredentialPair & { sessionId: string }) | null> {
   // Both locals are assigned by the transaction, whose only early exit is a
   // throw; the catch returns before the locals are read.
-  let credentials!: { token: string; refreshToken: string; expiresIn: number; sessionId: string };
+  let credentials!: SessionCredentialPair & { sessionId: string };
   let evictedSessionIds!: string[];
   try {
     ({ credentials, evictedSessionIds } = await db.transaction(async tx => {

@@ -259,19 +259,21 @@ beforeEach(async () => {
   mockAutoEnabled = false;
   mockContext = {
     organization: organization(),
-    groupIds: ['fixture-group'],
     defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
-    groupPolicies: [
-      [
-        {
-          type: 'model_access',
-          data: {
-            mode: 'selected',
-            model_allow_list: ['provider/allowed'],
-            provider_allow_list: [],
+    groups: [
+      {
+        id: 'fixture-group',
+        policies: [
+          {
+            type: 'model_access',
+            data: {
+              mode: 'selected',
+              model_allow_list: ['provider/allowed'],
+              provider_allow_list: [],
+            },
           },
-        },
-      ],
+        ],
+      },
     ],
     policyRevision: 7,
   };

@@ -309,6 +309,7 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
+    "availableToSpendInOrganization": "Tillgängligt att spendera i den här organisationen",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "Sök efter kodarkiv...",
       "noMatches": "Inga träffar",
       "noRepositories": "Inga kodarkiv tillgängliga",
-      "noRepositoriesDescription": "Inga kodarkiv är anslutna till ditt konto.",
+      "noRepositoriesDescription": "Anslut GitHub eller GitLab för att läsa in kodarkiv.",
       "loading": "Läser in…",
       "accessibility": "Kodarkiv: {{label}}",
       "platformBitbucket": "Bitbucket"

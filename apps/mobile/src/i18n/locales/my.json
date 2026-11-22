@@ -309,6 +309,7 @@
     "hideBalance": "လက်ကျန် ဖျောက်ရန်",
     "showBalance": "လက်ကျန် ပြရန်",
     "balanceHidden": "လက်ကျန် ဖျောက်ထားသည်",
+    "availableToSpendInOrganization": "ဤအဖွဲ့အစည်းတွင် သုံးစွဲရန် ရနိုင်သည်",
     "signOutTitle": "အကောင့်မှထွက်မလား။",
     "signOutMessage": "သင့်လုပ်ငန်းခွင်ကို အသုံးပြုရန် အကောင့်သို့ ပြန်ဝင်ရပါမည်။",
     "deleteAccountTitle": "အကောင့်ကို ဖျက်မလား။",
@@ -2560,7 +2561,7 @@
       "searchPlaceholder": "ကုဒ်သိုလှောင်ရာ ရှာရန်",
       "noMatches": "ကိုက်ညီမှု မရှိပါ",
       "noRepositories": "အသုံးပြုနိုင်သော ကုဒ်သိုလှောင်ခန်း မရှိပါ",
-      "noRepositoriesDescription": "သင့်အကောင့်နှင့် ချိတ်ဆက်ထားသော ကုဒ်သိုလှောင်ခန်း မရှိပါ။",
+      "noRepositoriesDescription": "ကုဒ်သိုလှောင်ခန်းများ ဖွင့်ရန် GitHub သို့မဟုတ် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
       "loading": "ဖွင့်နေသည်…",
       "accessibility": "ကုဒ်သိုလှောင်ခန်း: {{label}}",
       "platformBitbucket": "Bitbucket"

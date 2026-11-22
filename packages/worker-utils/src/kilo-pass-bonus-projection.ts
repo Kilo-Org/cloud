@@ -3,6 +3,7 @@ import {
   type KiloPassTier,
   type StripeSubscriptionStatus,
 } from '@kilocode/db/schema-types';
+import { MICRODOLLARS_PER_DOLLAR, toMicrodollars } from './microdollars';
 
 export type KiloPassBonusProjectionSubscription = {
   tier: KiloPassTier;
@@ -55,7 +56,7 @@ export function getEffectiveKiloPassThreshold(
   kiloPassThresholdMicrodollars: number | null
 ): number | null {
   if (kiloPassThresholdMicrodollars === null) return null;
-  return Math.max(0, kiloPassThresholdMicrodollars - 1_000_000);
+  return Math.max(0, kiloPassThresholdMicrodollars - MICRODOLLARS_PER_DOLLAR);
 }
 
 export function computeProjectedKiloPassMonthlyCadenceBonusPercent(params: {
@@ -89,9 +90,7 @@ export function computeProjectedKiloPassBonusMicrodollars(params: {
         })
       : KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT;
 
-  return Math.round(
-    KILO_PASS_TIER_CONFIG[subscription.tier].monthlyPriceUsd * bonusPercent * 1_000_000
-  );
+  return toMicrodollars(KILO_PASS_TIER_CONFIG[subscription.tier].monthlyPriceUsd * bonusPercent);
 }
 
 function getSubscriptionRecencyMillis(

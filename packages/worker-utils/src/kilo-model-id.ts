@@ -7,14 +7,19 @@ export function unprefixKiloGatewayModelId(model: string): string | undefined {
   return unprefixedModel.includes('/') ? unprefixedModel : undefined;
 }
 
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+function slugifyTrimmed(value: string): string {
+  return slugify(value).replace(/^-|-$/g, '');
+}
+
 export function deriveModelStatsIdentity(model: string) {
   const modelCreator = model.includes('/') ? model.split('/')[0] : 'unknown';
   return {
-    slug: model
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, ''),
+    slug: slugifyTrimmed(model),
     modelCreator,
-    creatorSlug: modelCreator.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    creatorSlug: slugify(modelCreator),
   };
 }

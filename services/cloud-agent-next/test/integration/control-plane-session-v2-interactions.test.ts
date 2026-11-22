@@ -776,6 +776,43 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     ).toBe(false);
   });
 
+  it('admits only the continuation the session currently produces', async () => {
+    const { sessionId, stub } = await registerOnlySession();
+    await stub.send(promptPayload(messageId(), 'start'));
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+    const reply = { action: 'answer' as const, questionId: 'q_1', answers: [['yes']] };
+    const continuation = await stub.answer({ sessionId, reply });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
+
+    // The stored model is the only one a continuation can carry.
+    await expect(
+      stub.admitAnswerContinuation({
+        sessionId,
+        reply,
+        intent: {
+          ...continuation.intent,
+          agent: { ...continuation.intent.agent, model: 'unvalidated/model' },
+        },
+      })
+    ).resolves.toBe('not_connected');
+    // The turn text also comes from the session.
+    await expect(
+      stub.admitAnswerContinuation({
+        sessionId,
+        reply,
+        intent: {
+          ...continuation.intent,
+          turn: { type: 'prompt', prompt: 'something else' },
+        },
+      })
+    ).resolves.toBe('not_connected');
+    const snapshot = await stub.getSession();
+    if (snapshot.type !== 'found') throw new Error('session disappeared');
+    expect(
+      snapshot.messages.some(message => message.messageId === continuation.intent.messageId)
+    ).toBe(false);
+  });
+
   it('projects questions and permissions and resolves each through getPendingInteractions', async () => {
     const { stub } = await registerOnlySession();
     await stub.onEvents({

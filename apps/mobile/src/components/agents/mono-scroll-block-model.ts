@@ -1,12 +1,22 @@
+import { graphemePrefixWithin } from '@/lib/graphemes';
+
 /**
- * Caps long mono payloads for display. Returns a sliced copy and whether the
- * cap applied — never mutates the caller's string.
+ * Caps long mono payloads for display. Returns a prefix and whether the cap
+ * applied — never mutates the caller's string.
+ *
+ * The visible text ends on a whole user-perceived character, so a cut cannot
+ * land inside a surrogate pair, a ZWJ sequence, or a base letter plus its
+ * combining mark. The budget itself is counted in UTF-16 code units: it is a
+ * display and memory bound, not a label width.
+ *
+ * @param maxLength the code-unit budget; omitted means uncapped
  */
 export function prepareMonoScrollContent(content: string, maxLength?: number) {
-  if (maxLength === undefined || content.length <= maxLength) {
+  if (maxLength === undefined) {
     return { displayText: content, isTruncated: false };
   }
-  return { displayText: content.slice(0, maxLength), isTruncated: true };
+  const displayText = graphemePrefixWithin(content, maxLength);
+  return { displayText, isTruncated: displayText.length < content.length };
 }
 
 /**

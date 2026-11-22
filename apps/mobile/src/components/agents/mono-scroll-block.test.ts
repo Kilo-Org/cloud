@@ -46,6 +46,88 @@ describe('prepareMonoScrollContent', () => {
     expect(result.displayText).toBe('hello');
     expect(result.displayText.endsWith('\u2026')).toBe(false);
   });
+
+  // A cap inside a surrogate pair drops the pair instead of emitting a lone high surrogate.
+  it('cuts a surrogate pair whole when the cap lands inside it', () => {
+    const family = '\u{1F468}\u200D\u{1F469}';
+    const result = prepareMonoScrollContent('ab' + family, 3);
+    expect(result.displayText).toBe('ab');
+    expect(result.isTruncated).toBe(true);
+  });
+
+  // A ZWJ sequence whose first code unit is over budget is dropped whole, never split.
+  it('drops a ZWJ family emoji whole when cut at its first code unit', () => {
+    const family = '\u{1F468}\u200D\u{1F469}';
+    const result = prepareMonoScrollContent(family, 1);
+    expect(result.displayText).toBe('');
+    expect(result.isTruncated).toBe(true);
+  });
+
+  // A regional-indicator flag cut between its two indicators is one cluster, so it is dropped.
+  it('drops a flag whole when the cap lands between its two indicators', () => {
+    const flag = '\u{1F1FA}\u{1F1F8}';
+    const result = prepareMonoScrollContent(flag, 2);
+    expect(result.displayText).toBe('');
+    expect(result.isTruncated).toBe(true);
+  });
+
+  // The cluster is excluded whole: the combining acute is never left behind without its base.
+  it('excludes a base letter plus combining acute as one cluster', () => {
+    const result = prepareMonoScrollContent('a' + 'e\u0301', 2);
+    expect(result.displayText).toBe('a');
+    expect(result.isTruncated).toBe(true);
+  });
+
+  // An Indic conjunct is one cluster, so a budget below its three code units excludes it whole.
+  it('excludes an Indic conjunct whole when it does not fit', () => {
+    const conjunct = '\u0915\u094D\u0937';
+    const result = prepareMonoScrollContent(conjunct, 2);
+    expect(result.displayText).toBe('');
+    expect(result.isTruncated).toBe(true);
+  });
+
+  // A cap landing exactly after a whole cluster keeps that cluster.
+  it('keeps a cluster the cap ends exactly after', () => {
+    const family = '\u{1F468}\u200D\u{1F469}';
+    const result = prepareMonoScrollContent('ab' + family, 2 + family.length);
+    expect(result.displayText).toBe('ab' + family);
+    expect(result.isTruncated).toBe(false);
+  });
+
+  // Astral characters cost two code units each; a code-unit length inside the budget is untouched.
+  it('leaves an astral string unchanged when its code-unit length fits the cap', () => {
+    const result = prepareMonoScrollContent('\u{1F600}\u{1F600}', 4);
+    expect(result.displayText).toBe('\u{1F600}\u{1F600}');
+    expect(result.isTruncated).toBe(false);
+  });
+
+  // A payload longer than cap plus the cut window still cuts inside the window:
+  // the cluster straddling the cap is dropped and the text before it stays.
+  it('cuts inside a window of a payload longer than the cap', () => {
+    const family = '\u{1F468}\u200D\u{1F469}';
+    const content = 'x'.repeat(1998) + family + 'y'.repeat(3000);
+    const result = prepareMonoScrollContent(content, 2000);
+    expect(result.displayText).toBe('x'.repeat(1998));
+    expect(result.isTruncated).toBe(true);
+  });
+
+  // A run of text is one cluster, so a cap inside it backs off to that run's end,
+  // which is the last boundary before the cap — never the cap itself.
+  it('backs off to the run boundary a cap lands inside', () => {
+    const content = 'x'.repeat(1900) + '\u{1F468}\u200D\u{1F469}' + 'y'.repeat(3000);
+    const result = prepareMonoScrollContent(content, 1902);
+    expect(result.displayText).toBe('x'.repeat(1900));
+    expect(result.isTruncated).toBe(true);
+  });
+
+  // The window starts mid-value: segmenting it must not report a boundary that
+  // only exists because the window began there, and the cut never emits half a pair.
+  it('never ends on a lone surrogate in a payload cut mid-window', () => {
+    const content = 'a' + '\u0301'.repeat(3000) + '\u{1F468}\u200D\u{1F469}'.repeat(500);
+    const result = prepareMonoScrollContent(content, 2000);
+    expect(/[\uD800-\uDBFF]$/u.test(result.displayText)).toBe(false);
+    expect(result.isTruncated).toBe(true);
+  });
 });
 
 describe('resolveMonoScrollMaxLength — a block is never unbounded', () => {

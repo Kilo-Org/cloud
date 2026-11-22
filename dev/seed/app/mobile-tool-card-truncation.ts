@@ -29,18 +29,22 @@ const FIRST_ASSISTANT_ID = 'msgTruncationAsst000001';
 const SECOND_ASSISTANT_ID = 'msgTruncationAsst000002';
 const THIRD_ASSISTANT_ID = 'msgTruncationAsst000003';
 const FOURTH_ASSISTANT_ID = 'msgTruncationAsst000004';
+// The fifth message carries the mono output cap row rather than a label cut.
+const MONO_CAP_ASSISTANT_ID = 'msgTruncationAsst000005';
 
 const PROMPT_PART = 'prtTruncationPrompt001';
 const FIRST_TEXT_PART = 'prtTruncationText00001';
 const SECOND_TEXT_PART = 'prtTruncationText00002';
 const THIRD_TEXT_PART = 'prtTruncationText00003';
 const FOURTH_TEXT_PART = 'prtTruncationText00004';
+const MONO_CAP_TEXT_PART = 'prtTruncationText00005';
 // The page stores parts in part-id order, so each tool id sorts after its
 // message's `prtTruncationText…` id: 'o' > 'e' at the 15th character.
 const FAMILY_PART = 'prtTruncationToolFamily1';
 const CONJUNCT_PART = 'prtTruncationToolConjunct';
 const WEBSEARCH_PART = 'prtTruncationToolSearch1';
 const TASK_PART = 'prtTruncationToolTask001';
+const MONO_CAP_PART = 'prtTruncationToolMonoCap1';
 const EXPECTED = [
   PROMPT_PART,
   FIRST_TEXT_PART,
@@ -51,10 +55,12 @@ const EXPECTED = [
   WEBSEARCH_PART,
   FOURTH_TEXT_PART,
   TASK_PART,
+  MONO_CAP_TEXT_PART,
+  MONO_CAP_PART,
 ];
 
 // Each message completes before the next starts, so the transcript orders the
-// four rows and never groups them into one condensed run.
+// five rows and never groups them into one condensed run.
 const T0 = 1_700_900_000_000;
 const FIRST_CREATED = T0 + 1_000;
 const FIRST_DONE = T0 + 4_000;
@@ -64,6 +70,8 @@ const THIRD_CREATED = T0 + 9_000;
 const THIRD_DONE = T0 + 13_000;
 const FOURTH_CREATED = T0 + 14_000;
 const FOURTH_DONE = T0 + 18_000;
+const FIFTH_CREATED = T0 + 19_000;
+const FIFTH_DONE = T0 + 23_000;
 
 const FIRST_START = FIRST_CREATED + 1_000;
 const FIRST_END = FIRST_CREATED + 2_500;
@@ -73,17 +81,22 @@ const THIRD_START = THIRD_CREATED + 1_000;
 const THIRD_END = THIRD_CREATED + 3_900;
 const FOURTH_START = FOURTH_CREATED + 1_000;
 const FOURTH_END = FOURTH_CREATED + 3_800;
+const FIFTH_START = FIFTH_CREATED + 1_000;
+const FIFTH_END = FIFTH_CREATED + 3_800;
 
 const PROMPT_TEXT = 'Run the release checks and show me the command lines.';
 const FIRST_TEXT = 'First I write the family photo to a temporary file.';
 const SECOND_TEXT = 'Next I probe the tenant cache keys.';
 const THIRD_TEXT = 'Now I search for the release notes.';
 const FOURTH_TEXT = 'Last I summarise the release checklist.';
+const FIFTH_TEXT = 'Finally I dump the audit log the release checks wrote.';
 
 // Each tool row truncates its label to 60 UTF-16 code units (`truncateText` in
 // tool-card-display.ts), so every label below puts one grapheme cluster exactly
 // across that cut. The ASCII prefix of each label is counted in code units, and
-// each label sits in its own assistant message, so all four rows show the cut.
+// each label sits in its own assistant message, so the first four rows show the
+// label cut; the fifth row keeps a short label and puts its cluster across the
+// 20 000-code-unit mono output cap instead.
 //
 // 1. The bash row shows `echo "family-…-241👨‍👩‍👧`: `echo "` (6) + 53 ASCII =
 //    59, so the ZWJ family emoji starts at index 59 and a 60-unit slice keeps
@@ -113,13 +126,30 @@ const PROMPT_PREFIX = 'Summarise the release checklist for the whole QA squads c
 const COMBINING_ACUTE = '\u0301';
 const TASK_PROMPT = `${PROMPT_PREFIX}e${COMBINING_ACUTE} and the rest of the sentence`;
 
+// 5. The fifth row has a short label and instead exercises the mono output cap
+//    `DEFAULT_MONO_SCROLL_MAX_LENGTH` (20 000 code units) in
+//    apps/mobile/src/components/agents/mono-scroll-block-model.ts: the bash
+//    output is 19 999 `x`, then the same ZWJ family emoji as row 1, then a
+//    repeated audit line. The emoji is 8 code units and sits at code units
+//    19 999-20 006, so the 20 000-unit cut falls inside that cluster: the base
+//    build keeps its high surrogate at 19 999 and drops the low one, which
+//    renders as the replacement glyph, while the grapheme build ends the output
+//    on the last whole `x` before the emoji because the cluster does not fit.
+const MONO_CAP_ASCII_PREFIX = 'x'.repeat(19_999);
+const MONO_CAP_TAIL_LINE = 'checked release artefact 0000 of 0250: ok\n';
+const MONO_CAP_TAIL = MONO_CAP_TAIL_LINE.repeat(100);
+const MONO_CAP_TEXT = `${MONO_CAP_ASCII_PREFIX}${FAMILY_EMOJI}${MONO_CAP_TAIL}`;
+const MONO_CAP_COMMAND = 'wc -c /var/log/release-artefacts.log';
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:mobile-tool-card-truncation ${usage}`);
   console.log('');
   console.log('Seeds one read-only session through the local cloudflare-session-ingest');
   console.log('worker whose four completed tool rows each put a grapheme cluster across the');
   console.log('60-code-unit truncation cut: a ZWJ family emoji, a Devanagari conjunct, a');
-  console.log('regional-indicator flag, and a combining acute. Resets only its own session.');
+  console.log('regional-indicator flag, and a combining acute, plus a fifth row whose mono');
+  console.log('output puts the same family emoji across the 20 000-code-unit output cap.');
+  console.log('Resets only its own session.');
   console.log('');
   console.log('Example:');
   console.log('  pnpm dev:seed app:mobile-tool-card-truncation ada@example.com');
@@ -321,6 +351,30 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       start: FOURTH_START,
       end: FOURTH_END,
     }),
+    buildAssistantMessageItem({
+      messageId: MONO_CAP_ASSISTANT_ID,
+      sessionId: SESSION_ID,
+      parentId: PROMPT_ID,
+      createdAt: FIFTH_CREATED,
+      completedAt: FIFTH_DONE,
+      cost: 0.02,
+      tokens: { total: 160, input: 100, output: 60, reasoning: 0, cache: { read: 0, write: 0 } },
+    }),
+    textPart(MONO_CAP_TEXT_PART, FIFTH_TEXT, MONO_CAP_ASSISTANT_ID),
+    buildToolPartItem({
+      partId: MONO_CAP_PART,
+      sessionId: SESSION_ID,
+      messageId: MONO_CAP_ASSISTANT_ID,
+      callId: 'callTruncationMonoCap1',
+      tool: 'bash',
+      status: 'completed',
+      input: { command: MONO_CAP_COMMAND },
+      output: MONO_CAP_TEXT,
+      title: 'bash',
+      metadata: { exitCode: 0 },
+      start: FIFTH_START,
+      end: FIFTH_END,
+    }),
   ];
 
   const ingestResponse = await fetch(`${baseUrl}/api/session/${SESSION_ID}/ingest?v=1`, {
@@ -337,10 +391,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     'This fixture represents: one read-only session whose four completed tool rows put a ZWJ family emoji, a Devanagari conjunct, a regional-indicator flag, and a combining acute across the 60-code-unit label cut.'
   );
   console.log(
-    'Note: a build that cuts at code units renders a lone surrogate, a partial conjunct, a single regional indicator, and an unaccented letter; a build that cuts at grapheme boundaries keeps each cluster whole.'
+    'The fifth row is the 20 000-code-unit mono output cap (DEFAULT_MONO_SCROLL_MAX_LENGTH in apps/mobile/src/components/agents/mono-scroll-block-model.ts): its bash output is 19 999 x, the same family emoji at code units 19 999-20 006, and a 4 200-character audit tail.'
   );
   console.log(
-    'Suggested next step: open the deep link on a signed-in dev build and read the four tool rows.'
+    'Note: a build that cuts at code units renders a lone surrogate, a partial conjunct, a single regional indicator, and an unaccented letter, and ends the fifth output on the lone high surrogate of the family emoji (the replacement glyph); a build that cuts at grapheme boundaries keeps each cluster whole and ends the fifth output on the last whole character before that emoji, because the cluster does not fit.'
+  );
+  console.log(
+    'Suggested next step: open the deep link on a signed-in dev build and read the five tool rows.'
   );
   return {
     userId: user.id,

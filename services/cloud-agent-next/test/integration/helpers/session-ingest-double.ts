@@ -11,7 +11,9 @@
  */
 import {
   decodeCloudAgentRootSessionsCursor,
+  decodeKiloSdkMessagesCursor,
   encodeCloudAgentRootSessionsCursor,
+  encodeKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import type {
   CloudAgentRootSessionSummary,
@@ -198,12 +200,34 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
         (await storage.get<Record<string, KiloSdkStoredMessage[]>>(
           TEST_SESSION_INGEST_MESSAGES_KEY
         )) ?? {};
+      const stored = messages[params.kiloSessionId];
+      if (stored === undefined)
+        return {
+          kiloSessionId: root.kiloSessionId,
+          cloudAgentSessionId: root.cloudAgentSessionId,
+          history: null,
+        };
+      const before =
+        params.before === undefined ? undefined : decodeKiloSdkMessagesCursor(params.before);
+      const remaining = [...stored]
+        .reverse()
+        .filter(
+          item =>
+            before === undefined ||
+            item.info.time.created < before.time ||
+            (item.info.time.created === before.time && item.info.id < before.id)
+        );
+      const page = params.limit ? remaining.slice(0, params.limit) : remaining;
+      const last = page.at(-1);
       return {
         kiloSessionId: root.kiloSessionId,
         cloudAgentSessionId: root.cloudAgentSessionId,
         history: {
-          messages: messages[params.kiloSessionId] ?? [],
-          nextCursor: null,
+          messages: page.reverse(),
+          nextCursor:
+            remaining.length > page.length && last !== undefined
+              ? encodeKiloSdkMessagesCursor({ id: last.info.id, time: last.info.time.created })
+              : null,
           omittedItemCount: 0,
         },
       };

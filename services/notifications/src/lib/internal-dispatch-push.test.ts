@@ -190,7 +190,7 @@ describe('dispatchInternalPushCore', () => {
         badge: null,
         push: {
           title: 'Kilo',
-          body: 'Active agents have an update',
+          body: 'Your agent brief is ready',
           data: { type: 'agent_briefing', url: '/agent-briefing' },
           sound: 'default',
           priority: 'default',

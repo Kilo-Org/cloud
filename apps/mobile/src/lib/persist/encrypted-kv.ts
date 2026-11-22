@@ -95,9 +95,11 @@ export type KVPair = {
   updatedAt: number;
 };
 
-/** One scope entry with its stored value, for a read that classifies it. */
-export type KVPairWithValue = KVPair & {
+/** One entry of {@link listEntryValues}: the key, its stored value, and its write time. */
+export type KVValuePair = {
+  k: string;
   v: string;
+  updatedAt: number;
 };
 
 // The empty check is load-bearing, not a type duplicate: an empty scope
@@ -806,6 +808,23 @@ export async function listEntries(scope: string): Promise<KVPair[]> {
     .all();
 }
 
+/**
+ * Lists one scope's entries with their values, oldest-first (by `updated_at`) —
+ * the draft eviction read path, which has to know which entries hold text
+ * before it chooses what to drop. `listEntries` stays the keys-only read for
+ * the cases that never look at a value.
+ */
+export async function listEntryValues(scope: string): Promise<KVValuePair[]> {
+  validateScope(scope);
+  const db = await openDatabase();
+  return db
+    .select({ k: kv.k, v: kv.v, updatedAt: kv.updatedAt })
+    .from(kv)
+    .where(eq(kv.scope, scope))
+    .orderBy(asc(kv.updatedAt))
+    .all();
+}
+
 /** Reads one scope's values oldest-first in one statement, for cache hydration. */
 export async function listValues(scope: string): Promise<string[]> {
   validateScope(scope);
@@ -819,18 +838,3 @@ export async function listValues(scope: string): Promise<string[]> {
     .map(row => row.v);
 }
 
-/**
- * Lists one scope's keys with their values oldest-first, in one statement: the
- * eviction path that has to classify what it read (a tombstone, a live record)
- * without one extra read per entry.
- */
-export async function listEntriesWithValues(scope: string): Promise<KVPairWithValue[]> {
-  validateScope(scope);
-  const db = await openDatabase();
-  return db
-    .select({ k: kv.k, updatedAt: kv.updatedAt, v: kv.v })
-    .from(kv)
-    .where(eq(kv.scope, scope))
-    .orderBy(asc(kv.updatedAt))
-    .all();
-}

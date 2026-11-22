@@ -243,7 +243,7 @@ export async function tombstoneOldSessions({
   max,
   keepKey,
 }: TombstoneOldSessionsInput): Promise<void> {
-  const entries = await encryptedKv.listEntriesWithValues(scope);
+  const entries = await encryptedKv.listEntryValues(scope);
   const family = entries.filter(entry => entry.k.startsWith(prefix));
   if (family.length <= max) {
     return;

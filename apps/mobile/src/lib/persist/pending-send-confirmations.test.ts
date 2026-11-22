@@ -25,7 +25,7 @@ const kvMock = vi.hoisted(() => {
     removeItem: vi.fn(async (scope: string, k: string) => {
       scopes.get(scope)?.delete(k);
     }),
-    listEntriesWithValues: vi.fn(async (scope: string) =>
+    listEntryValues: vi.fn(async (scope: string) =>
       [...(scopes.get(scope)?.entries() ?? [])]
         .map(([k, entry]) => ({ k, updatedAt: entry.updatedAt, v: entry.v }))
         .sort((a, b) => a.updatedAt - b.updatedAt)
@@ -37,7 +37,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
-  listEntriesWithValues: kvMock.listEntriesWithValues,
+  listEntryValues: kvMock.listEntryValues,
 }));
 
 // `readCacheScope` is imported from cache-scope (via read-cache's re-export
@@ -328,8 +328,8 @@ describe('pending send confirmations', () => {
       });
     }
 
-    const list = kvMock.listEntriesWithValues.getMockImplementation();
-    kvMock.listEntriesWithValues.mockImplementationOnce(async scope => {
+    const list = kvMock.listEntryValues.getMockImplementation();
+    kvMock.listEntryValues.mockImplementationOnce(async scope => {
       const entries = (await list?.(scope)) ?? [];
       // The oldest record left the family after the listing.
       return entries.slice(1);

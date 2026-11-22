@@ -1789,6 +1789,48 @@ describe('turn resubmission', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
   });
 
+  it('reports the completion gate of the root session only', async () => {
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('session.status', {
+        sessionID: childId,
+        status: { type: 'idle' },
+        gateResult: 'fail',
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    const [outcome] = outcomeFrames(h.frames);
+    expect(outcome).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
+    expect(outcome).not.toHaveProperty('gateResult');
+  });
+
+  it('reports a gate the root session itself carries', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.status', {
+        sessionID: KILO_SESSION,
+        status: { type: 'idle' },
+        gateResult: 'pass',
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'completed', lastMessageId: 'm1', gateResult: 'pass' },
+    ]);
+  });
+
   it('retains child routing across turns, but drops it on deletion or root release', async () => {
     const h = createHarness();
     const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';

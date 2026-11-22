@@ -14,6 +14,27 @@ import {
   webViewInstance,
   WebViewType,
 } from './markdown-mermaid.mounted.test-helpers';
+import { darkPieThemeVariables } from './mermaid-pie-theme';
+
+/** The theme a dark diagram is told to paint with. The fills' contrast lives in
+ * `mermaid-pie-theme.test.ts`; this suite proves the page is told about them at
+ * all, and that a light diagram is told nothing. */
+const DARK_THEME_VARIABLES = darkPieThemeVariables();
+
+/** What a dark diagram's injection carries: the theme alongside the source and
+ * the card it paints. */
+function darkInjection(source: string, background = '#101010') {
+  return { source, dark: true, background, themeVariables: DARK_THEME_VARIABLES };
+}
+
+/** The keys an injected state carried, so a case can prove a key is absent
+ * rather than merely empty. */
+function stateKeys(state: unknown): string[] {
+  if (typeof state !== 'object' || state === null) {
+    throw new Error('injected state is not an object');
+  }
+  return Object.keys(state);
+}
 
 const rnStub = vi.hoisted(() => ({
   Platform: { OS: 'android', select: (values: Record<string, unknown>) => values.android },
@@ -131,7 +152,7 @@ describe('MarkdownMermaid page rendering', () => {
 
     expect(webViewInstance(renderer.root)).toBe(before);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: true, background: '#101010' },
+      darkInjection('flowchart TD\n  a --> b'),
     ]);
 
     act(() => {
@@ -149,7 +170,7 @@ describe('MarkdownMermaid page rendering', () => {
 
     expect(webViewInstance(renderer.root)).toBe(before);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: true, background: '#101010' },
+      darkInjection('flowchart TD\n  a --> b'),
     ]);
 
     act(() => {
@@ -185,7 +206,7 @@ describe('MarkdownMermaid page rendering', () => {
 
     await loadPage(renderer);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: true, background: '#101010' },
+      darkInjection('flowchart TD\n  a --> b'),
     ]);
 
     act(() => {
@@ -206,7 +227,75 @@ describe('MarkdownMermaid page rendering', () => {
 
     await loadPage(renderer);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: true, background: '#101010' },
+      darkInjection('flowchart TD\n  a --> b'),
+    ]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('tells a dark diagram the measured pie theme', async () => {
+    const renderer = await mount('pie title Status\n  "Working" : 3\n  "Idle" : 5', otherPalette);
+    await loadPage(renderer);
+
+    const [state] = injected(webViewMock.injectJavaScript);
+    // Twelve slices, the ink the percentage is painted in, full opacity and the
+    // page-coloured stroke: mermaid's own dark theme would give a near-black
+    // first slice and its own 0.7 opacity.
+    expect(Object.keys(DARK_THEME_VARIABLES)).toEqual([
+      'pieSectionTextColor',
+      'pieOpacity',
+      'pieStrokeColor',
+      'pie1',
+      'pie2',
+      'pie3',
+      'pie4',
+      'pie5',
+      'pie6',
+      'pie7',
+      'pie8',
+      'pie9',
+      'pie10',
+      'pie11',
+      'pie12',
+    ]);
+    expect(state).toEqual(darkInjection('pie title Status\n  "Working" : 3\n  "Idle" : 5'));
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('tells a light diagram no theme at all', async () => {
+    const renderer = await mount('pie title Status\n  "Working" : 3\n  "Idle" : 5');
+    await loadPage(renderer);
+
+    const [state] = injected(webViewMock.injectJavaScript);
+    // Absent, not empty: an empty map would say a theme override was chosen.
+    expect(stateKeys(state)).toEqual(['source', 'dark', 'background']);
+    expect(state).toEqual({
+      source: 'pie title Status\n  "Working" : 3\n  "Idle" : 5',
+      dark: false,
+      background: '#f4f4f4',
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('carries the pie theme into the redraw a palette change makes', async () => {
+    const renderer = await mount('pie title Status\n  "Working" : 3\n  "Idle" : 5');
+    await loadPage(renderer);
+    const before = webViewInstance(renderer.root);
+    webViewMock.injectJavaScript.mockReset();
+
+    await rerender(renderer, 'pie title Status\n  "Working" : 3\n  "Idle" : 5', otherPalette);
+
+    expect(webViewInstance(renderer.root)).toBe(before);
+    expect(injected(webViewMock.injectJavaScript)).toEqual([
+      darkInjection('pie title Status\n  "Working" : 3\n  "Idle" : 5'),
     ]);
 
     act(() => {

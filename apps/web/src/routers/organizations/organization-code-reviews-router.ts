@@ -438,6 +438,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'reviewAgent.platform', platform: 'bitbucket' },
           message: `Manually requested Bitbucket Code Reviewer for ${input.pullRequestUrl}`,
         });
         return result;
@@ -839,6 +840,11 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'reviewAgent.config',
+            platform,
+            style: input.reviewStyle,
+          },
           message: `Updated Review Agent configuration for ${platform} (style: ${input.reviewStyle})${webhookSyncResult ? `, webhooks: ${webhookSyncResult.created} created, ${webhookSyncResult.deleted} deleted` : ''}`,
         });
 
@@ -1189,6 +1195,11 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'reviewAgent.config',
+            platform,
+            ...(merged.reviewStyle === undefined ? {} : { style: merged.reviewStyle }),
+          },
           message: `Patched Review Agent configuration for ${platform} (style: ${merged.reviewStyle ?? 'unknown'})${webhookSyncResult ? `, webhooks: ${webhookSyncResult.created} created, ${webhookSyncResult.deleted} deleted` : ''}`,
         });
 
@@ -1331,6 +1342,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             actor_id: ctx.user.id,
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
+            details: { id: 'reviewAgent.platform', platform },
             message: `${input.isEnabled ? 'Enabled' : 'Disabled'} AI Code Review Agent for ${platform}`,
           });
         }
@@ -1400,6 +1412,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'reviewAgent.secretRotated', updated: 0, errors: 0 },
           message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
         });
         await recordGitLabSecretRotation(ctx, organizationId);
@@ -1486,6 +1499,11 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         actor_id: ctx.user.id,
         actor_email: ctx.user.google_user_email,
         actor_name: ctx.user.google_user_name,
+        details: {
+          id: 'reviewAgent.secretRotated',
+          updated: webhookSyncResult.updated,
+          errors: webhookSyncResult.errors.length,
+        },
         message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
       });
 

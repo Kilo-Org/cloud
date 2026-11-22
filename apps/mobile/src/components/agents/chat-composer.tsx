@@ -229,6 +229,10 @@ type ChatComposerProps = {
   modelLocked?: boolean;
   /** Agent name shown in the locked model chip's accessibility label. */
   modelLockLabel?: string;
+  /** Whether the model catalog the toolbar lists is still loading. */
+  isLoadingModels?: boolean;
+  /** Refetches the model catalog; the model chip offers it when the catalog is empty. */
+  onRetryModels?: () => void;
   organizationId?: string;
   /** Only Cloud Agent sessions and image-capable chat models can receive attachments. */
   attachmentsEnabled?: boolean;
@@ -339,6 +343,8 @@ export function ChatComposer({
   onModelSelect,
   modelLocked = false,
   modelLockLabel,
+  isLoadingModels,
+  onRetryModels,
   organizationId,
   attachmentsEnabled = true,
   attachmentDelivery = 'upload',
@@ -1608,6 +1614,8 @@ export function ChatComposer({
                 pasteDisabled={!control.inputEditable}
                 modelLocked={modelLocked}
                 modelLockLabel={modelLockLabel}
+                isLoadingModels={isLoadingModels}
+                onRetryModels={onRetryModels}
                 className={toolbarClassName}
               />
             </Animated.View>

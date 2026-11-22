@@ -1327,7 +1327,7 @@
       "findingsInProgress": "Þessi yfirferð er enn í gangi. Frávik birtast hér þegar henni er lokið.",
       "findingsEndedWithoutResults": "Þessari yfirferð lauk áður en nein frávik komu fram.",
       "serviceUnavailable": "Ekki náðist samband við kóðayfirferðarþjónustuna. Reyndu yfirferðina aftur þegar þjónustan er tiltæk.",
-      "reviewFailed": "Yfirferðin mistókst. Vinsamlegast reyndu aftur.",
+      "reviewFailed": "Yfirferðin mistókst.",
       "showMore": "Sýna meira",
       "created": "Búin til",
       "started": "Hófst",

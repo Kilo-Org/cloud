@@ -1354,7 +1354,7 @@
       "findingsInProgress": "Ovaj pregled je još u tijeku. Nalazi će se ovdje pojaviti kada završi.",
       "findingsEndedWithoutResults": "Ovaj pregled je završio prije nego što je dao bilo kakve nalaze.",
       "serviceUnavailable": "Nije moguće povezati se s uslugom za pregled koda. Ponovi pregled kada usluga bude dostupna.",
-      "reviewFailed": "Pregled nije uspio. Molimo te, pokušaj ponovno.",
+      "reviewFailed": "Pregled nije uspio.",
       "showMore": "Prikaži više",
       "created": "Stvoreno",
       "started": "Pokrenuto",

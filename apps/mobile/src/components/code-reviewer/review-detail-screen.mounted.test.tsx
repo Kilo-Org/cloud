@@ -9,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KvRow } from '@/components/ui/kv-row';
+import type * as EmptyStateModule from '@/components/empty-state';
 import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
 import { ReviewDetailScreen } from './review-detail-screen';
@@ -33,6 +34,19 @@ const queryErrors = vi.hoisted(() => ({
 
 const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void }[],
+}));
+
+// `StateAction` is the state slot's one action, not a `Button` the screen
+// composes itself, so it is captured apart: its own props prove where the
+// recovery control lives and what it does.
+const stateActions = vi.hoisted(() => ({
+  rendered: [] as {
+    label: string;
+    onPress?: () => void;
+    loading?: boolean;
+    disabled?: boolean;
+    testID?: string;
+  }[],
 }));
 
 const screenHeaders = vi.hoisted(() => ({
@@ -108,7 +122,49 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
 }));
-vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
+vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
+  Settings: 'Settings',
+  Share: 'Share',
+}));
+// The state slot's one action renders through `Button`, but its own props are
+// what place the recovery control and say what it does, so it is captured
+// separately. The rest of the module stays real: `QueryError` in the screen's
+// tree draws `EmptyState` from it for the query states.
+vi.mock('@/components/empty-state', async importOriginal => {
+  const actual = await importOriginal<typeof EmptyStateModule>();
+  return {
+    ...actual,
+    StateAction: ({
+      label,
+      onPress,
+      loading,
+      disabled,
+      testID,
+    }: {
+      label: string;
+      onPress: () => void;
+      loading?: boolean;
+      disabled?: boolean;
+      testID?: string;
+    }) => {
+      const busy = Boolean(loading);
+      stateActions.rendered.push({
+        label,
+        onPress: () => {
+          if (busy) {
+            return;
+          }
+          onPress();
+        },
+        loading,
+        disabled: Boolean(disabled) || busy,
+        testID,
+      });
+      return createElement('Text', {}, label);
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -359,6 +415,7 @@ beforeEach(() => {
   detail.refetch.mockClear();
   queryErrors.errors = [];
   buttons.rendered = [];
+  stateActions.rendered = [];
   screenHeaders.rendered = [];
   viewRenders.list = [];
   reviewConfig.query = { isPending: false, data: undefined };
@@ -480,17 +537,140 @@ describe('ReviewDetailScreen outcome-first order', () => {
 
   it('replaces a failure dump while keeping retry mounted', () => {
     statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
     const dump = `Dispatch failed: ${'at Object.<anonymous> (worker.js:1:1234)\n'.repeat(60)}`;
     detail.data = {
       success: true,
-      review: makeReview({ status: 'failed', error_message: dump }),
+      review: makeReview({ status: 'failed', manual_config: null, error_message: dump }),
       tokenUsage: { input: 0, output: 0 },
     };
 
     const texts = renderScreen();
-    expect(texts).toContain('Retry review');
+    expect(stateActions.rendered.map(action => action.label)).toContain('Retry review');
     expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
     expect(texts.join(' ')).not.toContain('worker.js');
+  });
+
+  it('puts the retry control under the failure sentence instead of below the fold', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', manual_config: null, error_message: null }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+    const sentence = i18n.t('codeReviewer.reviewDetail.reviewFailed');
+    const retry = stateActions.rendered.findLast(action => action.label === 'Retry review');
+
+    // The recovery control is part of the conclusion: its sentence comes first,
+    // its own action follows before anything else on the screen, and the copy
+    // no longer asks for a retry the block below would have to supply.
+    expect(texts).toContain(sentence);
+    expect(retry).toBeDefined();
+    expect(retry?.testID).toBe('review-detail-retry');
+    expect(texts.indexOf(sentence)).toBeGreaterThanOrEqual(0);
+    expect(texts.indexOf(sentence)).toBeLessThan(texts.indexOf('Retry review'));
+    expect(texts.indexOf('Retry review')).toBeLessThan(texts.indexOf('Findings'));
+    expect(sentence).toBe('The review failed.');
+  });
+
+  it('sits the settings link under the copy when Code Reviewer is off', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'failed',
+        manual_config: null,
+        error_message: 'Raw diagnostic',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    // The sentence carries no next step of its own, so the card states the one
+    // the action performs, then offers it.
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'));
+    expect(stateActions.rendered.map(action => action.label)).toContain('Fix settings');
+    expect(stateActions.rendered.map(action => action.label)).not.toContain('Retry review');
+    expect(texts.indexOf('Fix settings')).toBeLessThan(texts.indexOf('Findings'));
+    // One recovery control on the screen: the actions block below no longer
+    // repeats it.
+    expect(texts.filter(text => text === 'Fix settings')).toHaveLength(1);
+  });
+
+  it('offers only the settings action when the sentence already states the next step', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'failed',
+        manual_config: null,
+        terminal_reason: 'github_installation_required',
+        error_message: 'Raw diagnostic',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain(
+      i18n.t('codeReviewer.actionRequired.githubInstallationRequired.description')
+    );
+    expect(stateActions.rendered.map(action => action.label)).toContain('Fix settings');
+    // The description ends with its own instruction, so a second sentence
+    // under it would repeat it.
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'));
+  });
+
+  it('offers the recovery control once, in the card, not again in the actions block', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', manual_config: null, error_message: null }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts.filter(text => text === 'Retry review')).toHaveLength(1);
+    // The actions block keeps the pull request, the transcript and Cancel
+    // review, in that order, and composes no second way out of the failure.
+    expect(texts).toContain('Open pull request');
+    expect(texts).toContain('Session transcript');
+    expect(
+      buttons.rendered.filter(
+        button => buttonText(button) === 'Retry review' || buttonText(button) === 'Fix settings'
+      )
+    ).toEqual([]);
+  });
+
+  it('offers no recovery control for a review a newer commit replaced', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        manual_config: null,
+        terminal_reason: 'superseded',
+        error_message: 'Superseded by new push',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.cancelReasonSuperseded'));
+    expect(stateActions.rendered).toEqual([]);
+    expect(texts).not.toContain('Retry review');
+    expect(texts).not.toContain('Fix settings');
   });
 
   it('shows generic failure copy when a failed review has no persisted message', () => {
@@ -1306,7 +1486,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     renderScreen();
 
     expect(buttons.rendered.some(button => buttonText(button) === 'Cancel review')).toBe(true);
-    expect(buttons.rendered.some(button => buttonText(button) === 'Retry review')).toBe(true);
+    expect(stateActions.rendered.some(action => action.label === 'Retry review')).toBe(true);
   });
 
   it('shows waiting copy for a running review without a session', () => {
@@ -1733,7 +1913,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
       tokenUsage: { input: 0, output: 0 },
     };
     renderScreen();
-    return buttons.rendered.map(button => buttonText(button));
+    return stateActions.rendered.map(action => action.label);
   }
 
   it('links to the settings instead of Retry when Code Reviewer is off', () => {
@@ -1742,13 +1922,13 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     const labels = renderFailedReview();
 
     expect(labels).not.toContain('Retry review');
-    expect(labels).toContain('Fix settings');
+    expect(labels).toEqual(['Fix settings']);
     expect(reviewConfig.calls.at(-1)).toEqual({
       scope: 'personal',
       platform: 'github',
       enabled: true,
     });
-    const fixSettings = buttons.rendered.findLast(button => buttonText(button) === 'Fix settings');
+    const fixSettings = stateActions.rendered.findLast(action => action.label === 'Fix settings');
     act(() => {
       fixSettings?.onPress?.();
     });
@@ -1764,7 +1944,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     const labels = renderFailedReview();
 
     expect(labels).not.toContain('Retry review');
-    expect(labels).toContain('Fix settings');
+    expect(labels).toEqual(['Fix settings']);
   });
 
   it('keeps Retry when Code Reviewer is on', () => {
@@ -1772,8 +1952,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
 
     const labels = renderFailedReview();
 
-    expect(labels).toContain('Retry review');
-    expect(labels).not.toContain('Fix settings');
+    expect(labels).toEqual(['Retry review']);
   });
 
   it('offers no Retry for a review a newer commit replaced', () => {
@@ -1787,7 +1966,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
       terminal_reason: 'superseded',
     });
 
-    expect(labels).not.toContain('Retry review');
+    expect(labels).toEqual([]);
   });
 
   it('keeps Retry for a cancelled review the user stopped', () => {
@@ -1799,7 +1978,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
       terminal_reason: 'user_cancelled',
     });
 
-    expect(labels).toContain('Retry review');
+    expect(labels).toEqual(['Retry review']);
   });
 
   it('shows neither control while the config loads', () => {
@@ -1807,8 +1986,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
 
     const labels = renderFailedReview();
 
-    expect(labels).not.toContain('Retry review');
-    expect(labels).not.toContain('Fix settings');
+    expect(labels).toEqual([]);
   });
 
   it('keeps Retry for a manual review and does not read the config', () => {
@@ -1848,11 +2026,11 @@ describe('ReviewDetailScreen retry confirmation', () => {
       tokenUsage: { input: 0, output: 0 },
     };
     renderScreen();
-    const button = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
-    if (!button?.onPress) {
-      throw new Error('Retry button was not rendered');
+    const action = stateActions.rendered.findLast(entry => entry.label === 'Retry review');
+    if (!action?.onPress) {
+      throw new Error('Retry action was not rendered');
     }
-    return button;
+    return action;
   }
 
   type AlertAction = { text?: string; onPress?: () => void };
@@ -1880,14 +2058,14 @@ describe('ReviewDetailScreen retry confirmation', () => {
     expect(retrigger.mutate).toHaveBeenCalledWith({ reviewId: 'rev-1' }, expect.any(Object));
   });
 
-  it('shows the button busy and opens no second confirmation while the request runs', () => {
+  it('shows the action busy and opens no second confirmation while the request runs', () => {
     const button = renderRetryableReview();
     act(() => button.onPress?.());
     act(() => confirmAction().onPress?.());
 
     retrigger.isPending = true;
     renderScreen();
-    const busy = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+    const busy = stateActions.rendered.findLast(entry => entry.label === 'Retry review');
 
     expect(busy).toMatchObject({ loading: true, disabled: true });
     act(() => busy?.onPress?.());
@@ -1902,7 +2080,7 @@ describe('ReviewDetailScreen retry confirmation', () => {
     const options = retrigger.mutate.mock.calls[0]?.[1] as { onSettled?: () => void } | undefined;
     act(() => options?.onSettled?.());
 
-    const again = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+    const again = stateActions.rendered.findLast(entry => entry.label === 'Retry review');
     act(() => again?.onPress?.());
     act(() => confirmAction().onPress?.());
 

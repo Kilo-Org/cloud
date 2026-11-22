@@ -1327,7 +1327,7 @@
       "findingsInProgress": "A kódellenőrzés még folyamatban van. A találatok a befejezése után jelennek meg itt.",
       "findingsEndedWithoutResults": "A kódellenőrzés véget ért, mielőtt bármilyen találat elkészült volna.",
       "serviceUnavailable": "Nem sikerült csatlakozni a kódellenőrzési szolgáltatáshoz. Próbáld újra a kódellenőrzést, amikor a szolgáltatás elérhető.",
-      "reviewFailed": "A kódellenőrzés sikertelen volt. Kérjük, próbáld újra.",
+      "reviewFailed": "A kódellenőrzés sikertelen volt.",
       "showMore": "Továbbiak megjelenítése",
       "created": "Létrehozva",
       "started": "Elindítva",

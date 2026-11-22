@@ -1381,7 +1381,7 @@
       "findingsInProgress": "Esta revisão ainda está em curso. As ocorrências aparecem aqui quando terminar.",
       "findingsEndedWithoutResults": "Esta revisão terminou antes de produzir ocorrências.",
       "serviceUnavailable": "Não foi possível estabelecer ligação ao serviço de revisão de código. Repita a revisão quando o serviço estiver disponível.",
-      "reviewFailed": "A revisão falhou. Tente novamente.",
+      "reviewFailed": "A revisão falhou.",
       "showMore": "Mostrar mais",
       "created": "Criada",
       "started": "Iniciada",

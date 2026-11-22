@@ -1327,7 +1327,7 @@
       "findingsInProgress": "Tämä katselmointi on vielä kesken. Havainnot näkyvät tässä, kun se valmistuu.",
       "findingsEndedWithoutResults": "Tämä katselmointi päättyi ennen kuin se tuotti havaintoja.",
       "serviceUnavailable": "Koodin katselmointipalveluun ei saatu yhteyttä. Yritä katselmointia uudelleen, kun palvelu on käytettävissä.",
-      "reviewFailed": "Katselmointi epäonnistui. Yritä uudelleen.",
+      "reviewFailed": "Katselmointi epäonnistui.",
       "showMore": "Näytä lisää",
       "created": "Luotu",
       "started": "Aloitettu",

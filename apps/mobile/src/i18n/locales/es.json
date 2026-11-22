@@ -825,7 +825,7 @@
       "findingsInProgress": "Esta revisión aún está en curso. Los hallazgos aparecerán aquí cuando termine.",
       "findingsEndedWithoutResults": "Esta revisión terminó antes de generar hallazgos.",
       "serviceUnavailable": "No se pudo conectar con el servicio de revisión de código. Vuelve a intentar la revisión cuando el servicio esté disponible.",
-      "reviewFailed": "La revisión falló. Vuelve a intentarlo.",
+      "reviewFailed": "La revisión falló.",
       "retryMessage": "Se volverá a ejecutar la revisión de código.",
       "retryReview": "Reintentar revisión",
       "retryNeedsSettings": "El Revisor de código está desactivado o su configuración requiere atención. Corrige la configuración y luego reintenta esta revisión.",

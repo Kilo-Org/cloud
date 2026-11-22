@@ -31,11 +31,25 @@ export function findingsEmptyCopyKey(status: string): string {
   return 'codeReviewer.reviewDetail.noFindings';
 }
 
-export function reviewFailureLabel(
+export type ReviewFailureCopy = {
+  message: string;
+  /** The sentence already ends with its own next step. */
+  namesRecovery: boolean;
+};
+
+// The conclusion sentence for a failed review, and whether that sentence already
+// carries its next step. Four of the five paths end with their own instruction —
+// an action-required description says what to fix and then to enable Code
+// Reviewer again, and the service-unavailable copy names the moment to retry —
+// so the caller must not print a second instruction under them. Only the generic
+// failure statement has no next step of its own, and it does not promise one
+// either: the caller renders the recovery control and this copy never asks for a
+// retry the screen may not be able to offer.
+export function reviewFailureCopy(
   t: typeof i18n.t,
   errorMessage: string | null,
   terminalReason?: string | null
-): string {
+): ReviewFailureCopy {
   if (
     terminalReason === 'github_installation_required' ||
     terminalReason === 'github_ip_allow_list' ||
@@ -44,16 +58,16 @@ export function reviewFailureLabel(
     terminalReason === 'selected_model_unavailable' ||
     terminalReason === 'repeated_repository_clone_timeout'
   ) {
-    return t(ACTION_REQUIRED_KEYS[terminalReason].description);
+    return { message: t(ACTION_REQUIRED_KEYS[terminalReason].description), namesRecovery: true };
   }
   if (
     errorMessage ===
     'Dispatch failed: could not reach the code review service. ' +
       'It may be offline — retry the review once it is running.'
   ) {
-    return t('codeReviewer.reviewDetail.serviceUnavailable');
+    return { message: t('codeReviewer.reviewDetail.serviceUnavailable'), namesRecovery: true };
   }
-  return t('codeReviewer.reviewDetail.reviewFailed');
+  return { message: t('codeReviewer.reviewDetail.reviewFailed'), namesRecovery: false };
 }
 
 // The copy of a finding severity badge. Only these four labels need a key of

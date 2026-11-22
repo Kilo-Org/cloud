@@ -8,7 +8,7 @@ import {
   flattenCouncilFindings,
   gateThresholdLabel,
   reviewCancellationLabel,
-  reviewFailureLabel,
+  reviewFailureCopy,
   selectRetryAction,
   severityLabelKey,
 } from './review-detail-helpers';
@@ -72,7 +72,7 @@ describe('councilVoteLabel', () => {
   });
 });
 
-describe('reviewFailureLabel', () => {
+describe('reviewFailureCopy', () => {
   it.each([
     ['github_installation_required', 'githubInstallationRequired'],
     ['github_ip_allow_list', 'githubIpAllowList'],
@@ -81,29 +81,45 @@ describe('reviewFailureLabel', () => {
     ['selected_model_unavailable', 'selectedModelUnavailable'],
     ['repeated_repository_clone_timeout', 'repeatedRepositoryCloneTimeout'],
   ] as const)('uses localized action-required copy for %s', (reason, copyKey) => {
-    expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
-      i18n.t(`codeReviewer.actionRequired.${copyKey}.description`)
-    );
+    // The action-required description ends with its own instruction, so the
+    // caller must not print a second one under it.
+    expect(reviewFailureCopy(i18n.t, 'Internal diagnostic', reason)).toEqual({
+      message: i18n.t(`codeReviewer.actionRequired.${copyKey}.description`),
+      namesRecovery: true,
+    });
   });
 
   it.each([null, 'upstream_error', 'future-reason'])(
     'does not expose unknown diagnostics for %s',
     reason => {
-      expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
-        i18n.t('codeReviewer.reviewDetail.reviewFailed')
-      );
+      // The generic failure statement promises nothing, so the caller owns the
+      // recovery control and this copy never asks for a retry.
+      expect(reviewFailureCopy(i18n.t, 'Internal diagnostic', reason)).toEqual({
+        message: i18n.t('codeReviewer.reviewDetail.reviewFailed'),
+        namesRecovery: false,
+      });
     }
   );
 
+  it('reports the generic failure copy for a review with no persisted message', () => {
+    expect(reviewFailureCopy(i18n.t, null, null)).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.reviewFailed'),
+      namesRecovery: false,
+    });
+  });
+
   it('localizes the known service-unreachable dispatch message', () => {
     expect(
-      reviewFailureLabel(
+      reviewFailureCopy(
         i18n.t,
         'Dispatch failed: could not reach the code review service. ' +
           'It may be offline — retry the review once it is running.',
         'upstream_error'
       )
-    ).toBe(i18n.t('codeReviewer.reviewDetail.serviceUnavailable'));
+    ).toEqual({
+      message: i18n.t('codeReviewer.reviewDetail.serviceUnavailable'),
+      namesRecovery: true,
+    });
   });
 });
 

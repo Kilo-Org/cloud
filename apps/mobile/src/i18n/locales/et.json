@@ -1327,7 +1327,7 @@
       "findingsInProgress": "See ülevaatus on veel käimas. Leiud ilmuvad siia, kui see lõpeb.",
       "findingsEndedWithoutResults": "See ülevaatus lõppes, ilma et ühtegi leidu oleks ilmnenud.",
       "serviceUnavailable": "Koodi ülevaatuse teenusega ei õnnestunud ühendust luua. Proovi ülevaatust uuesti, kui teenus on saadaval.",
-      "reviewFailed": "Ülevaatus ebaõnnestus. Palun proovi uuesti.",
+      "reviewFailed": "Ülevaatus ebaõnnestus.",
       "showMore": "Kuva rohkem",
       "created": "Loodud",
       "started": "Alustatud",

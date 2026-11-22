@@ -1327,7 +1327,7 @@
       "findingsInProgress": "Ukaguzi huu bado unaendelea. Matokeo yataonekana hapa ukaguzi ukikamilika.",
       "findingsEndedWithoutResults": "Ukaguzi huu uliisha kabla ya kutoa matokeo yoyote.",
       "serviceUnavailable": "Imeshindikana kuunganishwa na huduma ya ukaguzi wa msimbo. Jaribu ukaguzi tena huduma itakapopatikana.",
-      "reviewFailed": "Ukaguzi umeshindikana. Tafadhali jaribu tena.",
+      "reviewFailed": "Ukaguzi umeshindikana.",
       "showMore": "Onyesha zaidi",
       "created": "Uliundwa",
       "started": "Ulianza",

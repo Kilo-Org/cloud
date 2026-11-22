@@ -1408,7 +1408,7 @@
       "findingsInProgress": "Din ir-reviżjoni għadha għaddejja. Is-sejbiet jidhru hawn meta tispiċċa.",
       "findingsEndedWithoutResults": "Din ir-reviżjoni spiċċat qabel ma pproduċiet l-ebda sejbiet.",
       "serviceUnavailable": "Ma setax isir kuntatt mas-servizz tar-reviżjoni tal-kodiċi. Erġa' pprova r-reviżjoni meta s-servizz ikun disponibbli.",
-      "reviewFailed": "Ir-reviżjoni falliet. Jekk jogħġbok, erġa' pprova.",
+      "reviewFailed": "Ir-reviżjoni falliet.",
       "showMore": "Uri aktar",
       "created": "Maħluqa",
       "started": "Bdiet",

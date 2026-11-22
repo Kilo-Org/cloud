@@ -16,7 +16,7 @@ import {
   findingsEmptyCopyKey,
   flattenCouncilFindings,
   reviewCancellationLabel,
-  reviewFailureLabel,
+  reviewFailureCopy,
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
@@ -27,11 +27,13 @@ import {
   FindingCard,
   GateSection,
 } from '@/components/code-reviewer/review-detail-sections';
+import { StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
+import { RotateCcw, Settings } from '@/components/ui/icons';
 import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
@@ -246,12 +248,17 @@ export function ReviewDetailScreen({
     platformLabel: reviewerPlatformLabel(review.platform),
   });
   // The single message the conclusion block renders: the cancellation sentence,
-  // the failure copy, or a diagnostic we have no copy for.
-  const reviewMessage =
-    cancellationLabel ??
-    (review.status === 'failed'
-      ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
-      : review.error_message);
+  // the failure copy, or a diagnostic we have no copy for. `namesRecovery` says
+  // whether that sentence already ends with its own next step, so the card never
+  // prints a second instruction under it. A cancellation keeps its own sentence,
+  // which already states what happens next; a raw diagnostic and a missing
+  // sentence name nothing, so they get the caller's own line.
+  const failureCopy =
+    review.status === 'failed'
+      ? reviewFailureCopy(t, review.error_message, review.terminal_reason)
+      : undefined;
+  const reviewMessage = cancellationLabel ?? failureCopy?.message ?? review.error_message;
+  const messageNamesRecovery = cancellationLabel != null || failureCopy?.namesRecovery === true;
 
   return (
     <View className="flex-1 bg-background">
@@ -287,18 +294,72 @@ export function ReviewDetailScreen({
               own block at the body's section gap it floated equidistant from
               the PR title above it and FINDINGS below. The outcome word rides
               the header's badge, so this block carries only the reason. */}
-          {reviewMessage ? (
+          {reviewMessage || retryAction ? (
             // A failure keeps the danger tile under it: the red ink alone on
             // the card surface read as ordinary copy, and the tint is the
-            // palette's own danger token, not a hand-built card fill.
-            <Card className={cn('mt-2', cancellationLabel ? undefined : 'bg-danger-tile-bg')}>
-              <Text
-                variant={cancellationLabel ? 'muted' : undefined}
-                className={cn('text-xs', !cancellationLabel && 'text-destructive')}
-                numberOfLines={4}
-              >
-                {reviewMessage}
-              </Text>
+            // palette's own danger token, not a hand-built card fill. The tint
+            // belongs to that sentence, so a card that carries only a recovery
+            // control (a terminal review with no stored explanation) stays
+            // neutral instead of dressing a way out as a failure.
+            //
+            // The sentence and its way out are one block: nothing below the
+            // fold is the only exit. A failed review's recovery control sits
+            // under its own explanation, at the card's gap-3, so the person
+            // reads why it failed and what they can do without leaving the
+            // conclusion. A retry opens the same confirmation as before; the
+            // other way out is the settings link when the server would refuse a
+            // retry. `namesRecovery` raises the settings line only when the
+            // sentence above does not already say it.
+            <Card
+              className={cn('mt-2', reviewMessage && !cancellationLabel && 'bg-danger-tile-bg')}
+            >
+              {reviewMessage ? (
+                <Text
+                  variant={cancellationLabel ? 'muted' : undefined}
+                  className={cn('text-xs', !cancellationLabel && 'text-destructive')}
+                  numberOfLines={4}
+                >
+                  {reviewMessage}
+                </Text>
+              ) : null}
+              {retryAction === 'retry' ? (
+                <View className="self-start">
+                  <StateAction
+                    testID="review-detail-retry"
+                    label={t('codeReviewer.reviewDetail.retryReview')}
+                    icon={RotateCcw}
+                    loading={retriggerReview.isPending}
+                    onPress={() => {
+                      if (retriggerReview.isPending) {
+                        return;
+                      }
+                      confirmRetry(requestRetry);
+                    }}
+                  />
+                </View>
+              ) : null}
+              {retryAction === 'fix-settings' ? (
+                <>
+                  {messageNamesRecovery ? null : (
+                    <Text variant="muted" className="text-xs">
+                      {t('codeReviewer.reviewDetail.retryNeedsSettings')}
+                    </Text>
+                  )}
+                  <View className="self-start">
+                    <StateAction
+                      testID="review-detail-fix-settings"
+                      label={t('codeReviewer.reviewDetail.fixSettings')}
+                      icon={Settings}
+                      onPress={() => {
+                        pushOnce(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
+                      }}
+                    />
+                  </View>
+                </>
+              ) : null}
+              {/* A superseded review has no head to re-review and a review still
+                  loading its config is not known to be retryable, so both get no
+                  control here: the sentence above makes no promise to keep. */}
             </Card>
           ) : null}
         </Animated.View>
@@ -458,39 +519,8 @@ export function ReviewDetailScreen({
               <Text>{t('codeReviewer.reviewDetail.cancelReview')}</Text>
             </Button>
           ) : null}
-
-          {retryAction === 'retry' ? (
-            <Button
-              testID="review-detail-retry"
-              variant="secondary"
-              loading={retriggerReview.isPending}
-              disabled={retriggerReview.isPending}
-              onPress={() => {
-                if (retriggerReview.isPending) {
-                  return;
-                }
-                confirmRetry(requestRetry);
-              }}
-            >
-              <Text>{t('codeReviewer.reviewDetail.retryReview')}</Text>
-            </Button>
-          ) : null}
-
-          {retryAction === 'fix-settings' ? (
-            <View className="gap-2">
-              <Text variant="muted" className="text-xs">
-                {t('codeReviewer.reviewDetail.retryNeedsSettings')}
-              </Text>
-              <Button
-                variant="secondary"
-                onPress={() => {
-                  pushOnce(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
-                }}
-              >
-                <Text>{t('codeReviewer.reviewDetail.fixSettings')}</Text>
-              </Button>
-            </View>
-          ) : null}
+          {/* The retry and settings links live in the conclusion card above, so
+              this block keeps only the actions that are not a failure's way out. */}
         </View>
       </TabScreenScrollView>
       {dialog}

@@ -1419,7 +1419,7 @@
       "findingsInProgress": "This review is still in progress. Findings appear here when it finishes.",
       "findingsEndedWithoutResults": "This review ended before it produced any findings.",
       "serviceUnavailable": "Could not reach the code review service. Retry the review when the service is available.",
-      "reviewFailed": "The review failed. Please try again.",
+      "reviewFailed": "The review failed.",
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",

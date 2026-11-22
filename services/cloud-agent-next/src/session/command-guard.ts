@@ -325,7 +325,9 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 // may lead the arguments, so it keeps a rule of its own. A short `-f` also rides
 // in a bundle, and git accepts the bundles that these leading options form, so
 // each leading letter keeps a rule too. The denies are installed after the
-// `git push` allow, and the last matching rule decides.
+// `git push` allow, and the last matching rule decides. A ref deletion
+// (`--delete`, or an empty source in the refspec) removes a remote branch rather
+// than rewriting one, so these rules do not cover it.
 const SECURITY_REMEDIATION_PUSH_HEADS = ['git push', 'git * push'];
 
 const SECURITY_REMEDIATION_PUSH_DENIED_SUFFIXES = [

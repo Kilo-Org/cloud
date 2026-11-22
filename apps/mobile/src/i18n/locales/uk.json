@@ -2052,7 +2052,7 @@
       "searchPlaceholder": "Пошук репозиторіїв",
       "noMatches": "Немає збігів",
       "noRepositories": "Немає доступних репозиторіїв",
-      "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
+      "noRepositoriesDescription": "Щоб завантажити репозиторії, підключіть GitHub або GitLab.",
       "loading": "Завантаження…",
       "accessibility": "Репозиторій: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4559,6 +4559,7 @@
       "promptPlaceholder": "Ви…",
       "tools": "Інструменти",
       "wholeToolRule": "Цей агент застосовує одне правило до кожного інструмента одночасно: {{rule}}. Ці перемикачі доступні лише для читання.",
+      "toolRule": "Збережене правило: {{rule}}",
       "visibility": "Видимість",
       "visibilityPrimary": "Основний — відображається в панелі вибору",
       "visibilitySubagent": "Субагент — тільки для виклику від інших",

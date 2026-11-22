@@ -2665,7 +2665,7 @@
       "searchPlaceholder": "Пошук рэпазіторыяў",
       "noMatches": "Няма супадзенняў",
       "noRepositories": "Няма даступных рэпазіторыяў",
-      "noRepositoriesDescription": "Да вашага ўліковага запісу не падключаны ніводны рэпазіторый.",
+      "noRepositoriesDescription": "Каб загрузіць рэпазіторыі, падключыце GitHub або GitLab.",
       "loading": "Загрузка…",
       "accessibility": "Рэпазіторый: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4559,6 +4559,7 @@
       "promptPlaceholder": "Вы…",
       "tools": "інструменты",
       "wholeToolRule": "Гэты агент прымяняе адно правіла да ўсіх інструментаў адначасова: {{rule}}. Гэтыя перамыкачы даступныя толькі для чытання.",
+      "toolRule": "Захаванае правіла: {{rule}}",
       "visibility": "Бачнасць",
       "visibilityPrimary": "Асноўны — паказваецца ў выбары",
       "visibilitySubagent": "Субагент — можна выклікаць толькі ад іншых",

@@ -29,12 +29,12 @@ beforeEach(() => {
 });
 
 /**
- * The settings registry reads this store with no React tree, so the store has to
- * start its disk read at module scope. These tests import the module fresh to
- * observe the preload the import itself performs.
+ * The settings registry reads this store with no React tree, so the store starts
+ * its disk read when the module is evaluated. These tests import the module
+ * fresh to observe that read.
  */
 describe('persisted agent model store', () => {
-  it('preloads the stored map so a non-React read sees every context', async () => {
+  it('reads the stored map so a non-React read sees every context', async () => {
     secureStore.getItemAsync.mockResolvedValue(
       JSON.stringify({ org_other: { model: 'openai/gpt', variant: '' } })
     );

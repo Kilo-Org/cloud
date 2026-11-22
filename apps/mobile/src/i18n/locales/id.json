@@ -2004,7 +2004,7 @@
       "searchPlaceholder": "Cari repositori",
       "noMatches": "Tidak ada hasil yang cocok",
       "noRepositories": "Tidak ada repositori yang tersedia",
-      "noRepositoriesDescription": "Tidak ada repositori yang terhubung ke akunmu.",
+      "noRepositoriesDescription": "Hubungkan GitHub atau GitLab untuk memuat repositori.",
       "loading": "Memuat…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Anda adalah …",
       "tools": "Peralatan",
       "wholeToolRule": "Agen ini menerapkan satu aturan ke setiap Peralatan sekaligus: {{rule}}. Sakelar ini bersifat hanya-baca.",
+      "toolRule": "Aturan tersimpan: {{rule}}",
       "visibility": "Visibilitas",
       "visibilityPrimary": "Utama — ditampilkan di alat pilih",
       "visibilitySubagent": "Subagen — hanya dapat dihubungi dari orang lain",

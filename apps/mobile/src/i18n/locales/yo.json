@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Wá àwọn ibi ìpamọ́ kóòdù",
       "noMatches": "Kò sí ohun tó bá a mu",
       "noRepositories": "Kò sí ibi ìpamọ́ kóòdù tó wà",
-      "noRepositoriesDescription": "Kò sí ibi ìpamọ́ kóòdù tó sopọ̀ mọ́ àkọọ́lẹ̀ rẹ.",
+      "noRepositoriesDescription": "Láti gbé àwọn ibi ìpamọ́ kóòdù wọlé, sopọ̀ mọ́ GitHub tàbí GitLab.",
       "loading": "Ń gbé wọlé…",
       "accessibility": "Ibi ìpamọ́ kóòdù: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Iwọ jẹ …",
       "tools": "Awọn irinṣẹ",
       "wholeToolRule": "Aṣojú yìí ń lo òfin kan sí gbogbo irinṣẹ lẹ́ẹ̀kan náà: {{rule}}. Àwọn swíṣì wọ̀nyí kìkì fún kíkà nìkan.",
+      "toolRule": "Òfin tí a ti fipamọ́: {{rule}}",
       "visibility": "Hihan",
       "visibilityPrimary": "Alakoko — ti o han ni oluka",
       "visibilitySubagent": "Subagent — nikan callable lati elomiran",

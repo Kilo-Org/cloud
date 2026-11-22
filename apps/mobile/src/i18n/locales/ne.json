@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "रिपोजिटरीको खोजी",
       "noMatches": "मिल्ने नतिजा छैन",
       "noRepositories": "कुनै रिपोजिटरी उपलब्ध छैन",
-      "noRepositoriesDescription": "तपाईंको खातामा कुनै रिपोजिटरी जडान भएको छैन।",
+      "noRepositoriesDescription": "रिपोजिटरीहरू लोड गर्न GitHub वा GitLab खाता जडान गर्नुहोस्।",
       "loading": "लोड गर्दै…",
       "accessibility": "रिपोजिटरी: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "तिमी एक…",
       "tools": "उपकरणहरू",
       "wholeToolRule": "यो एजेन्टले एकैचोटि हरेक उपकरणमा एउटै नियम लागू गर्छ: {{rule}}। यी स्विचहरू पढ्नका लागि मात्र हुन्।",
+      "toolRule": "सङ्ग्रहित नियम: {{rule}}",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकरमा देखाइएको छ",
       "visibilitySubagent": "Subagent — अरूबाट मात्र कल गर्न मिल्ने",

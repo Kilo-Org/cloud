@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { ENKRYPT_REVIEWED_CASES } from '@/tests/fixtures/enkrypt-scores';
 import { insertTestModelStats } from '@/tests/helpers/model-stats.helper';
 import { modelStats } from '@kilocode/db/schema';
@@ -23,7 +23,7 @@ const benchmarks: ModelStatsBenchmarks = {
   enkrypt: { ...score, ingestedAt: '2026-01-01T00:00:00.000Z', evaluatedAt: null },
 };
 
-function catalogModel(id = additionalId): OpenRouterModel {
+function catalogModel(id = additionalId): OpenRouterCatalogModel {
   return {
     id,
     name: 'Synthetic catalog model',

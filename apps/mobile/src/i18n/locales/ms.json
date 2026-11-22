@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Cari repositori",
       "noMatches": "Tiada padanan",
       "noRepositories": "Tiada repositori tersedia",
-      "noRepositoriesDescription": "Tiada repositori disambungkan ke akaun anda.",
+      "noRepositoriesDescription": "Untuk memuatkan repositori, sambungkan akaun GitHub atau GitLab.",
       "loading": "Memuatkan…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Anda seorang…",
       "tools": "Alatan",
       "wholeToolRule": "Ejen ini menggunakan satu peraturan pada setiap alat sekali gus: {{rule}}. Suis ini adalah baca sahaja.",
+      "toolRule": "Peraturan tersimpan: {{rule}}",
       "visibility": "Keterlihatan",
       "visibilityPrimary": "Utama — ditunjukkan dalam pemilih",
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",

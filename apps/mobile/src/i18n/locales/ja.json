@@ -2000,7 +2000,7 @@
       "searchPlaceholder": "リポジトリを検索",
       "noMatches": "一致する項目はありません",
       "noRepositories": "利用可能なリポジトリはありません",
-      "noRepositoriesDescription": "このアカウントにはリポジトリが連携されていません。",
+      "noRepositoriesDescription": "リポジトリを読み込むには、GitHubまたはGitLabを連携してください。",
       "loading": "読み込み中…",
       "accessibility": "リポジトリ：{{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "あなたは…",
       "tools": "ツール",
       "wholeToolRule": "このエージェントは、すべてのツールに一度に1つのルールを適用します：{{rule}}。これらのスイッチは読み取り専用です。",
+      "toolRule": "保存されたルール：{{rule}}",
       "visibility": "可視性",
       "visibilityPrimary": "プライマリ — ピッカーに表示されます",
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",

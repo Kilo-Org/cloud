@@ -2665,7 +2665,7 @@
       "searchPlaceholder": "Ieškoti saugyklų",
       "noMatches": "Atitikčių nėra",
       "noRepositories": "Nėra prieinamų saugyklų",
-      "noRepositoriesDescription": "Prie jūsų paskyros neprijungta jokių saugyklų.",
+      "noRepositoriesDescription": "Kad įkeltum saugyklas, prijunk GitHub arba GitLab.",
       "loading": "Įkeliama…",
       "accessibility": "Saugykla: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4559,6 +4559,7 @@
       "promptPlaceholder": "Tu esi…",
       "tools": "Įrankiai",
       "wholeToolRule": "Šis agentas vienu metu taiko vieną taisyklę visiems įrankiams: {{rule}}. Šie jungikliai yra tik skaitomi.",
+      "toolRule": "Išsaugota taisyklė: {{rule}}",
       "visibility": "Matomumas",
       "visibilityPrimary": "Pagrindinis — rodomas rinkiklyje",
       "visibilitySubagent": "Subagentas — kviečiamas tik iš kitų",

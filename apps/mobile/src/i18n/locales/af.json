@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Soek bewaarplekke",
       "noMatches": "Geen treffers nie",
       "noRepositories": "Geen bewaarplekke beskikbaar nie",
-      "noRepositoriesDescription": "Geen bewaarplekke is aan jou rekening gekoppel nie.",
+      "noRepositoriesDescription": "Koppel GitHub of GitLab om bewaarplekke te laai.",
       "loading": "Laai…",
       "accessibility": "Bewaarplek: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Jy is 'n…",
       "tools": "Gereedskap",
       "wholeToolRule": "Hierdie agent pas een reël gelyktydig op alle gereedskap toe: {{rule}}. Hierdie skakelaars is slegs-lees.",
+      "toolRule": "Gestoor reël: {{rule}}",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
       "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",

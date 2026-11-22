@@ -25,9 +25,9 @@ vi.mock('@sentry/react-native', () => ({ captureException }));
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
 
-// The store is a module-level singleton that latches its one disk read, so a
-// fresh module graph gives a truly cold store whose preload-then-read can be
-// exercised end to end. Awaiting the import settles module evaluation, which
+// The store is a module-level singleton that starts one disk read when it is
+// constructed, so a fresh module graph gives a truly cold store whose read can
+// be exercised end to end. Awaiting the import settles module evaluation, which
 // starts the read but does not wait for it.
 function freshStore(): Promise<typeof RemoteMcpStoreModule> {
   vi.resetModules();

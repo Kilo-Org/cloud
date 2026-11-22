@@ -1,7 +1,9 @@
 /* eslint-disable max-lines -- one store, one harness: the write-pending suites stay beside the write suites they mirror */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { chainSave } from '@/lib/hooks/save-chain';
 import { createSecureStorePreference } from './secure-store-preference';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   setBreadcrumbSink,
   setTelemetrySink,
@@ -37,7 +39,7 @@ function flushMicrotasks(): Promise<void> {
   });
 }
 
-// eslint-disable-next-line no-empty-function -- listener body is irrelevant, only subscribe()'s side effect (starting the load) is under test
+// eslint-disable-next-line no-empty-function -- the listener body is irrelevant: cases read the store directly
 function noopListener(): void {}
 
 describe('createSecureStorePreference', () => {
@@ -54,19 +56,21 @@ describe('createSecureStorePreference', () => {
     // read path reports the failure once. The store must not add a record of
     // its own for the same rejection.
     getItemAsync.mockRejectedValue(new Error('disk error'));
-    const store = createSecureStorePreference<boolean>({
-      key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
-    });
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => {
       events.push(event);
     });
 
+    // Tracking the timers before construction: the store starts its read as it
+    // is built, so the retry backoff only exists once fake timers are on.
     vi.useFakeTimers();
     try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
       // Fake timers stay on, so the backoff must still fire. The wait is on the
       // store's own completion signal, not on a copied delay budget.
       const loading = store.whenLoaded();
@@ -88,12 +92,6 @@ describe('createSecureStorePreference', () => {
     // iOS rejects every read with this message until unlock; the store keeps
     // its default and the refusal leaves a breadcrumb instead of an event.
     getItemAsync.mockRejectedValue(new Error('User interaction is not allowed'));
-    const store = createSecureStorePreference<boolean>({
-      key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
-    });
     const events: TelemetryEvent[] = [];
     const breadcrumbs: TelemetryBreadcrumb[] = [];
     setTelemetrySink(event => {
@@ -103,8 +101,16 @@ describe('createSecureStorePreference', () => {
       breadcrumbs.push(breadcrumb);
     });
 
+    // Tracking the timers before construction: the store starts its read as it
+    // is built, so the retry backoff only exists once fake timers are on.
     vi.useFakeTimers();
     try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
       const loading = store.whenLoaded();
       await vi.runAllTimersAsync();
       await loading;
@@ -123,19 +129,198 @@ describe('createSecureStorePreference', () => {
     }
   });
 
+  it('waits for the keychain to unlock instead of latching the default', async () => {
+    // The read starts at construction, which a background push or a resumed
+    // timer can reach while iOS still holds the keychain locked. The store must
+    // not read in that state, and must not report the default as loaded: it
+    // waits for unlock, then reads the persisted value.
+    getItemAsync.mockResolvedValue('true');
+    setProtectedDataAvailable(false);
+    try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
+      await flushMicrotasks();
+
+      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(store.getHasLoaded()).toBe(false);
+      expect(store.getRequested()).toBe(false);
+
+      setProtectedDataAvailable(true);
+      await store.whenLoaded();
+
+      expect(getItemAsync).toHaveBeenCalledTimes(1);
+      expect(store.getRequested()).toBe(true);
+      expect(store.getHasLoaded()).toBe(true);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+  });
+
+  it('settles whenLoaded() while the lock outlasts the wait and reads once at unlock', async () => {
+    // A headless press handler cannot wait for an unlock that may not come. The
+    // bounded wait ends with the value unknown rather than absent, so
+    // whenLoaded() settles with nothing claimed and no read against the locked
+    // keychain, and the first read after the unlock applies what the disk holds.
+    getItemAsync.mockResolvedValue('true');
+    setProtectedDataAvailable(false);
+
+    // Tracking the timers before construction: the store starts its bounded
+    // wait as it is built.
+    vi.useFakeTimers();
+    try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
+
+      // The bound runs out with the device still locked.
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      await expect(store.whenLoaded()).resolves.toBeUndefined();
+      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(store.getHasLoaded()).toBe(false);
+      expect(store.getRequested()).toBe(false);
+
+      // The unlock is the store's one re-read, and it applies the value.
+      setProtectedDataAvailable(true);
+      await vi.waitFor(() => {
+        expect(store.getRequested()).toBe(true);
+      });
+      expect(getItemAsync).toHaveBeenCalledTimes(1);
+      expect(store.getHasLoaded()).toBe(true);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for the unlock re-read instead of resolving with the default', async () => {
+    // A caller that asks whenLoaded() during the unlock re-read must wait for
+    // that read: the value is still unknown, so resolving here would hand the
+    // language apply and the widget task the default as if it were stored.
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(read.promise);
+    setProtectedDataAvailable(false);
+
+    // Tracking the timers before construction: the store starts its bounded
+    // wait as it is built.
+    vi.useFakeTimers();
+    try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await store.whenLoaded();
+
+      // The bounded wait ended with the value unknown: nothing may claim it
+      // loaded, and the locked keychain was never read.
+      expect(store.getHasLoaded()).toBe(false);
+      expect(getItemAsync).not.toHaveBeenCalled();
+
+      // The unlock starts the re-read, and the caller that asks now waits for
+      // it instead of being handed the default.
+      setProtectedDataAvailable(true);
+      let settled = false;
+      const waiting = (async () => {
+        await store.whenLoaded();
+        settled = true;
+      })();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(false);
+      expect(store.getHasLoaded()).toBe(false);
+
+      read.resolve('true');
+      await waiting;
+      expect(settled).toBe(true);
+      expect(store.getRequested()).toBe(true);
+      expect(store.getHasLoaded()).toBe(true);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-reads after a clear() that lands during the locked window', async () => {
+    // A sign-out during the locked window must not strand the store. The clear
+    // bumps the epoch of the read that is already waiting, so the read that then
+    // gives up carries an older epoch: an epoch-fenced retry would drop it and
+    // leave the value unknown forever. The retry has to survive the clear and
+    // re-read what the clear left, which `load()` fences by the epoch it began
+    // under.
+    getItemAsync.mockResolvedValue('true');
+    setProtectedDataAvailable(false);
+
+    // A save for the same key is on its way, so the clear's delete queues behind
+    // it and runs after the unlock instead of being refused while locked.
+    const barrier = Promise.withResolvers<undefined>();
+    const chained = chainSave('k', async () => {
+      await barrier.promise;
+    });
+
+    // Tracking the timers before construction: the store starts its bounded
+    // wait as it is built.
+    vi.useFakeTimers();
+    try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
+
+      // The sign-out lands inside the locked window, before the bounded wait
+      // expires and the read gives up.
+      store.clear();
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await store.whenLoaded();
+      expect(store.getHasLoaded()).toBe(false);
+
+      setProtectedDataAvailable(true);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The re-read is waiting for the delete the clear queued.
+      barrier.resolve(undefined);
+      await chained;
+
+      await vi.waitFor(() => {
+        expect(store.getHasLoaded()).toBe(true);
+      });
+      expect(store.get()).toBe(false);
+      expect(getItemAsync).toHaveBeenCalled();
+      expect(deleteItemAsync).toHaveBeenCalled();
+    } finally {
+      barrier.resolve(undefined);
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
   it('retries a rejected read and applies the value from the retry', async () => {
     getItemAsync
       .mockRejectedValueOnce(new Error('keychain unavailable'))
       .mockResolvedValueOnce('true');
-    const store = createSecureStorePreference<boolean>({
-      key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
-    });
 
+    // Tracking the timers before construction: the store starts its read as it
+    // is built, so the retry backoff only exists once fake timers are on.
     vi.useFakeTimers();
     try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
       // The first read rejects; the retry timer must fire before the second
       // attempt can apply the stored value.
       const loading = store.whenLoaded();
@@ -480,10 +665,9 @@ describe('createSecureStorePreference', () => {
       mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
     });
 
-    // The read starts, then the clear resets the store and a new choice
-    // follows it. The snapshot the read returns describes the state the clear
-    // removed, so it must not reach the value or the disk.
-    store.preload();
+    // The read starts at construction, then the clear resets the store and a
+    // new choice follows it. The snapshot the read returns describes the state
+    // the clear removed, so it must not reach the value or the disk.
     store.clear();
     store.set(['new']);
     pendingRead.resolve('["old"]');
@@ -497,7 +681,7 @@ describe('createSecureStorePreference', () => {
     expect(setItemAsync).toHaveBeenLastCalledWith('k', '["new"]');
   });
 
-  it('reads no disk value when the delete a clear() queued failed', async () => {
+  it('shows no disk value when the delete a clear() queued failed', async () => {
     deleteItemAsync.mockRejectedValue(new Error('keychain refused'));
     getItemAsync.mockResolvedValue('true');
     const store = createSecureStorePreference<boolean>({
@@ -507,10 +691,10 @@ describe('createSecureStorePreference', () => {
       serialize: value => (value ? 'true' : 'false'),
     });
 
-    /* The clear runs before any read starts and its delete spends the whole
-       retry budget without landing, so the disk still holds the snapshot the
-       clear removed. A read of that snapshot would bring the removed value
-       back, so the store must not start one. */
+    /* The read starts at construction, before the clear. Its result is the
+       snapshot the clear removed, so the clear fence must discard it: the
+       delete spends the whole retry budget without landing, and the store still
+       never reports the removed value. */
     vi.useFakeTimers();
     try {
       store.clear();
@@ -520,7 +704,7 @@ describe('createSecureStorePreference', () => {
       await loading;
 
       expect(deleteItemAsync).toHaveBeenCalledTimes(4);
-      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(getItemAsync).toHaveBeenCalledTimes(1);
       expect(store.get()).toBe(false);
       expect(store.getRequested()).not.toBe(true);
       unsubscribe();
@@ -542,8 +726,8 @@ describe('createSecureStorePreference', () => {
     });
 
     /* One transient refusal must not pin the removed value: the retry lands
-       the delete, so the read that follows may start and the store reads the
-       default. */
+       the delete, so the clear's reset stands — the eager read's result is
+       fenced off and the store keeps the default. */
     vi.useFakeTimers();
     try {
       store.clear();
@@ -560,13 +744,8 @@ describe('createSecureStorePreference', () => {
     }
   });
 
-  it('preload() starts the disk read once and a following subscribe() does not start a second read', async () => {
-    const pendingReads: ((raw: string | null) => void)[] = [];
-    getItemAsync.mockReturnValue(
-      new Promise<string | null>(resolve => {
-        pendingReads.push(resolve);
-      })
-    );
+  it('reads the stored value for a getter with no subscriber', async () => {
+    getItemAsync.mockResolvedValue('true');
     const store = createSecureStorePreference<boolean>({
       key: 'k',
       defaultValue: false,
@@ -574,16 +753,36 @@ describe('createSecureStorePreference', () => {
       serialize: value => (value ? 'true' : 'false'),
     });
 
-    store.preload();
-    // preload() alone must start the read; otherwise this fails and the
-    // subscribe() below would be the only thing starting it.
+    // Construction starts the read: the settings registry's synchronous getter
+    // runs with no React tree, so no subscribe() and no preload may be needed
+    // for it to see the persisted value.
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    expect(store.getRequested()).toBe(false);
+
+    await store.whenLoaded();
+
+    expect(store.getRequested()).toBe(true);
+    expect(store.get()).toBe(true);
+  });
+
+  it('construction starts the disk read once and a following subscribe() does not start a second read', async () => {
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(read.promise);
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    // Construction alone starts the read; nothing has subscribed yet.
     expect(getItemAsync).toHaveBeenCalledTimes(1);
 
     const unsubscribe = store.subscribe(noopListener);
-    // subscribe() must not start a second read.
+    // subscribe() only adds the listener, so it must not start a second read.
     expect(getItemAsync).toHaveBeenCalledTimes(1);
 
-    pendingReads[0]?.('true');
+    read.resolve('true');
     await flushMicrotasks();
 
     expect(store.get()).toBe(true);

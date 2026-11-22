@@ -5,6 +5,7 @@ import {
   isProtectedDataAvailable,
   ProtectedDataUnavailableError,
   setProtectedDataAvailable,
+  subscribeToProtectedDataAvailable,
   whenProtectedDataAvailable,
   whenProtectedDataAvailableWithin,
 } from '@/lib/protected-data';
@@ -52,6 +53,32 @@ describe('protected data gate', () => {
     setProtectedDataAvailable(true);
     await Promise.all([first, second]);
     expect(released).toEqual([1, 2]);
+  });
+
+  it('notifies a subscriber once per transition to available and stops after unsubscribe', () => {
+    const heard: string[] = [];
+    const unsubscribe = subscribeToProtectedDataAvailable(() => {
+      heard.push('available');
+    });
+
+    setProtectedDataAvailable(false);
+    expect(heard).toEqual([]);
+
+    setProtectedDataAvailable(true);
+    expect(heard).toEqual(['available']);
+
+    // A repeated available report is not a transition, so it says nothing.
+    setProtectedDataAvailable(true);
+    expect(heard).toEqual(['available']);
+
+    setProtectedDataAvailable(false);
+    setProtectedDataAvailable(true);
+    expect(heard).toEqual(['available', 'available']);
+
+    unsubscribe();
+    setProtectedDataAvailable(false);
+    setProtectedDataAvailable(true);
+    expect(heard).toEqual(['available', 'available']);
   });
 
   it('resolves a bounded wait on unlock before its deadline and leaves no timer', async () => {

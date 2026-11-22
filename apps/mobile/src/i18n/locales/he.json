@@ -2030,7 +2030,7 @@
       "searchPlaceholder": "חיפוש מאגרים",
       "noMatches": "אין התאמות",
       "noRepositories": "אין מאגרים זמינים",
-      "noRepositoriesDescription": "אין מאגרים שמחוברים לחשבון שלך.",
+      "noRepositoriesDescription": "כדי לטעון מאגרים, יש לחבר את GitHub או GitLab.",
       "loading": "טוען…",
       "accessibility": "מאגר: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4480,6 +4480,7 @@
       "promptPlaceholder": "אתה…",
       "tools": "כְּלֵי עֲבוֹדָה",
       "wholeToolRule": "סוֹכֵן זֶה מְיַשֵּׂם כְּלָל אֶחָד עַל כָּל כְּלִי עֲבוֹדָה בְּבַת אַחַת: {{rule}}. הַמְּתָגִים הָאֵלֶּה לִקְרִיאָה בִּלְבַד.",
+      "toolRule": "כְּלָל שָׁמוּר: {{rule}}",
       "visibility": "רְאוּת",
       "visibilityPrimary": "ראשי — מוצג בבוחר",
       "visibilitySubagent": "סוכן משנה — ניתן להתקשרות מאחרים בלבד",

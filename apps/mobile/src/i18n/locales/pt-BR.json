@@ -2019,7 +2019,7 @@
       "searchPlaceholder": "Pesquisar repositórios",
       "noMatches": "Nenhum resultado",
       "noRepositories": "Nenhum repositório disponível",
-      "noRepositoriesDescription": "Nenhum repositório está conectado à sua conta.",
+      "noRepositoriesDescription": "Para carregar repositórios, conecte uma conta do GitHub ou do GitLab.",
       "loading": "Carregando…",
       "accessibility": "Repositório: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4559,6 +4559,7 @@
       "promptPlaceholder": "Você é um…",
       "tools": "Ferramentas",
       "wholeToolRule": "Este agente aplica uma regra a todas as ferramentas de uma vez: {{rule}}. Esses interruptores são somente leitura.",
+      "toolRule": "Regra armazenada: {{rule}}",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primário — mostrado no seletor",
       "visibilitySubagent": "Subagente — só pode ser chamado por outros",

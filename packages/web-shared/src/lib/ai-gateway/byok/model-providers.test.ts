@@ -4,7 +4,7 @@ import {
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { canRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   getVercelLanguageModelIdsFromDatabase,
   getVercelModelsMetadataFromDatabase,
@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 
 describe('addUserByokAvailability', () => {
-  const sonnet = { id: SONNET } as OpenRouterModel;
+  const sonnet = { id: SONNET } as OpenRouterCatalogModel;
 
   test('marks a Vercel AI Gateway key available only when Vercel honors the allowed providers', async () => {
     jest.mocked(canRouteToVercel).mockResolvedValue(false);

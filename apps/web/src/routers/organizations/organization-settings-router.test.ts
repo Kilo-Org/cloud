@@ -8,7 +8,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import type {
-  OpenRouterModel,
+  OpenRouterCatalogModel,
   OpenRouterModelsResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
@@ -75,7 +75,7 @@ import {
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 
-function makeTestOpenRouterModel(id: string): OpenRouterModel {
+function makeTestOpenRouterModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,
@@ -360,7 +360,7 @@ describe('organizations settings trpc router', () => {
   });
 
   describe('listAvailableModels procedure', () => {
-    function makeOpenRouterModel(id: string): OpenRouterModel {
+    function makeOpenRouterModel(id: string): OpenRouterCatalogModel {
       return {
         id,
         name: id,

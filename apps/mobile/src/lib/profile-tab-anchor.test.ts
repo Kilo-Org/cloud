@@ -51,26 +51,36 @@ describe('findingDetailBackTarget', () => {
 describe('finding detail back control wiring', () => {
   // Source-read fallback: the pure project cannot mount the screen, so pin the
   // forced back control by reading the source. The loaded state renders its own
-  // `ScreenHeader`; the loading, failure and not-found states share one, because
-  // neither a failure nor a not-found can be known before the first paint — that
-  // first frame is the loading one. The mounted finding-detail suite pins that
-  // this header keeps its subtitle line reserved. This fails if a state stops
-  // rendering a header, or if its back control is removed.
-  const screenPath = fileURLToPath(
-    new URL('../components/security-agent/finding-detail-screen.tsx', import.meta.url)
+  // `ScreenHeader`; the undelivered faces (not-found, failed, paused and
+  // loading) share one, because none of them can be known before the first
+  // paint — that first frame is the loading one. The mounted finding-detail
+  // suite pins that this header keeps its subtitle line reserved. This fails if
+  // a state stops rendering a header, or if its back control is removed.
+  const screenSource = readFileSync(
+    fileURLToPath(
+      new URL('../components/security-agent/finding-detail-screen.tsx', import.meta.url)
+    ),
+    'utf8'
   );
-  const source = readFileSync(screenPath, 'utf8');
-  const screenHeaderCount = (source.match(/<ScreenHeader\b/g) ?? []).length;
-  const showBackButtonCount = (source.match(/\bshowBackButton\b/g) ?? []).length;
-  const pendingHeaderCount = (source.match(/\{pendingHeader\}/g) ?? []).length;
+  const undeliveredSource = readFileSync(
+    fileURLToPath(
+      new URL('../components/security-agent/finding-detail-undelivered-body.tsx', import.meta.url)
+    ),
+    'utf8'
+  );
+  // Five call sites read the same two files: one counter keeps them in lockstep.
+  const count = (source: string, pattern: RegExp) => (source.match(pattern) ?? []).length;
 
-  it('renders the loaded state and the single pending state through a header', () => {
-    expect(screenHeaderCount).toBe(2);
-    expect(pendingHeaderCount).toBe(3);
+  it('renders the loaded state and the shared undelivered state through a header', () => {
+    expect(count(screenSource, /<ScreenHeader\b/g)).toBe(1);
+    // One header renders the four faces: not-found, failed, paused and loading.
+    expect(count(undeliveredSource, /<ScreenHeader\b/g)).toBe(1);
+    expect(count(undeliveredSource, /kind === '(?:not-found|loading|paused)'/g)).toBe(3);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {
-    expect(showBackButtonCount).toBe(screenHeaderCount);
+    expect(count(screenSource, /\bshowBackButton\b/g)).toBe(1);
+    expect(count(undeliveredSource, /\bshowBackButton\b/g)).toBe(1);
   });
 });
 

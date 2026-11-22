@@ -2,16 +2,13 @@ import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
 import { kilo_pass_pause_events } from '@kilocode/db/schema';
-import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import {
   getPreviousIssueMonth,
   parseIssueMonth,
   shiftIssueMonth,
 } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
-
-type Db = typeof defaultDb;
-type DbOrTx = Db | DrizzleTransaction;
 
 /** The predicate that identifies the open pause event of one subscription. */
 function openPauseEventWhere(kiloPassSubscriptionId: string) {
@@ -26,7 +23,7 @@ function openPauseEventWhere(kiloPassSubscriptionId: string) {
  * updates resumes_at (idempotent). Otherwise inserts a new row.
  */
 export async function openPauseEvent(
-  dbOrTx: DbOrTx,
+  dbOrTx: DrizzleConnection,
   params: {
     kiloPassSubscriptionId: string;
     pausedAt: string;
@@ -60,7 +57,7 @@ export async function openPauseEvent(
  * No-op if no open event exists (idempotent).
  */
 export async function closePauseEvent(
-  dbOrTx: DbOrTx,
+  dbOrTx: DrizzleConnection,
   params: {
     kiloPassSubscriptionId: string;
     resumedAt: string;
@@ -78,7 +75,7 @@ export async function closePauseEvent(
  * Returns the open pause event (where resumed_at IS NULL) or null.
  */
 export async function getOpenPauseEvent(
-  dbOrTx: DbOrTx,
+  dbOrTx: DrizzleConnection,
   params: {
     kiloPassSubscriptionId: string;
   }
@@ -102,7 +99,7 @@ export async function getOpenPauseEvent(
  * Walks backwards from fromIssueMonth for maxMonthsBack months.
  */
 export async function getPausedMonthSet(
-  dbOrTx: DbOrTx,
+  dbOrTx: DrizzleConnection,
   params: {
     kiloPassSubscriptionId: string;
     fromIssueMonth: string;

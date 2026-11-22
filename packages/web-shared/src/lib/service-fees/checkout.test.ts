@@ -1162,4 +1162,47 @@ describe('paid-credit settlement terms', () => {
     });
     expect(result.principalMinor).toBe(5000);
   });
+
+  test('unusable paid_at and created record the grant at the settlement clock', async () => {
+    const store = createMemoryAssessmentStore();
+    const prepared = await prepareAutoTopUpInvoiceFee({
+      flow: 'personal_auto_top_up',
+      invoiceId: 'in_no_paid_at',
+      principalMinor: 5_000,
+      kiloUserId: 'user_1',
+      stripeCustomerId: 'cus_1',
+      deps: deps(store, { resolveTaxInput: async () => approvedTax() }),
+    });
+    await attachPreparedAutoTopUpInvoiceFee({
+      prepared,
+      deps: deps(store, { createInvoiceItem: async () => ({ id: 'ii_no_paid_at' }) }),
+    });
+
+    const result = await settleTrustedAutoTopUpInvoice({
+      invoice: {
+        id: 'in_no_paid_at',
+        customer: 'cus_1',
+        amount_paid: 5_250,
+        created: 0,
+        status_transitions: {
+          paid_at: 0,
+          finalized_at: null,
+          marked_uncollectible_at: null,
+          voided_at: null,
+        },
+        metadata: {
+          type: 'auto-topup',
+          serviceFeeAssessmentKey: prepared.assessmentKey,
+          serviceFeePrincipalMinor: '5000',
+        },
+      },
+      chargeId: 'ch_no_paid_at',
+      kiloUserId: 'user_1',
+      flow: 'personal_auto_top_up',
+      deps: deps(store),
+    });
+
+    expect(result.paidCredit.purchasedAt).toEqual(ACTIVATION);
+    expect(result.assessment?.settledAt).toBe(ACTIVATION.toISOString());
+  });
 });

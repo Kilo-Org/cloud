@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "რეპოზიტორიების ძიება",
       "noMatches": "დამთხვევები არ არის",
       "noRepositories": "ხელმისაწვდომი რეპოზიტორიები არ არის",
-      "noRepositoriesDescription": "თქვენს ანგარიშთან არცერთი რეპოზიტორია არ არის დაკავშირებული.",
+      "noRepositoriesDescription": "რეპოზიტორიების ჩატვირთვისთვის დააკავშირე GitHub ან GitLab.",
       "loading": "ჩატვირთვა…",
       "accessibility": "რეპოზიტორია: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "შენ ხარ…",
       "tools": "ხელსაწყოები",
       "wholeToolRule": "ეს აგენტი ერთდროულად ყველა ხელსაწყოზე ერთ წესს იყენებს: {{rule}}. ეს გადამრთველები მხოლოდ წაკითხვადია.",
+      "toolRule": "შენახული წესი: {{rule}}",
       "visibility": "ხილვადობა",
       "visibilityPrimary": "პირველადი — ნაჩვენებია ამომრჩეველში",
       "visibilitySubagent": "სუბაგენტი — გამოძახება შესაძლებელია მხოლოდ სხვებისგან",

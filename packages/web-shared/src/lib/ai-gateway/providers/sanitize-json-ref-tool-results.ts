@@ -14,12 +14,8 @@ function renameJsonRefProperties(value: unknown): boolean {
   const pending: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }];
   const refOwners: Array<Record<string, unknown>> = [];
   let visited = 0;
-  while (pending.length > 0) {
+  for (let frame = pending.pop(); frame !== undefined; frame = pending.pop()) {
     if (visited >= CLIENT_SCHEMA_NODE_BUDGET) {
-      return false;
-    }
-    const frame = pending.pop();
-    if (frame === undefined) {
       return false;
     }
     visited += 1;

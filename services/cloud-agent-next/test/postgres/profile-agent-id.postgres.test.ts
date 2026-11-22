@@ -9,7 +9,7 @@ import {
 } from '@kilocode/db/schema';
 import { getAgentsForSession, listAgentsForProfile } from '@kilocode/cloud-agent-profile';
 
-it('materializes only the profile agents that carry an id of their own'), async () => {
+it('materializes only the profile agents that carry an id of their own', async () => {
   const connectionString = process.env.POSTGRES_URL;
   if (
     !connectionString ||

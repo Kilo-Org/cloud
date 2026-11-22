@@ -10,7 +10,7 @@ function agent(slug: string) {
   return { slug, name: slug, config: { prompt: `You are ${slug}` } };
 }
 
-describe('RuntimeAgentSchema CLI-owned ids'), () => {
+describe('RuntimeAgentSchema CLI-owned ids', () => {
   it.each(['general', 'explore', 'compaction', 'title', 'summary'])(
     'rejects an id that belongs to the CLI: %j',
     slug => {
@@ -26,7 +26,7 @@ describe('RuntimeAgentSchema CLI-owned ids'), () => {
 });
 
 describe('PersistedRuntimeAgentsSchema', () => {
-  it('drops an entry with a CLI-owned id and keeps the rest verbatim'), () => {
+  it('drops an entry with a CLI-owned id and keeps the rest verbatim', () => {
     const reviewer = agent('reviewer');
 
     expect(PersistedRuntimeAgentsSchema.parse([reviewer, agent('explore')])).toEqual([reviewer]);

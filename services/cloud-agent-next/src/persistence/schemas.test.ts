@@ -433,13 +433,13 @@ describe('MetadataSchema', () => {
     }
   );
 
-  it('rejects an agent with a CLI-owned id supplied on the wire'), () => {
+  it('rejects an agent with a CLI-owned id supplied on the wire', () => {
     expect(
       RuntimeAgentsSchema.safeParse([{ slug: 'code', name: 'Code override', config: {} }]).success
     ).toBe(false);
   });
 
-  it('loads a stored bundle written under an earlier slug rule'), () => {
+  it('loads a stored bundle written under an earlier slug rule', () => {
     const parsed = SessionProfileBundleSchema.parse({
       runtimeAgents: [
         { slug: 'explore', name: 'Explore', config: {} },

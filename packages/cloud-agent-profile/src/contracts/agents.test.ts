@@ -3,7 +3,7 @@ import { isReservedAgentSlug, RESERVED_AGENT_SLUGS } from '@kilocode/app-shared/
 import { agentCreateInputSchema, agentUpdateInputSchema, BUILTIN_AGENT_SLUGS } from './agents';
 
 describe('agentCreateInputSchema slug', () => {
-  test.each([...RESERVED_AGENT_SLUGS])('refuses an id that belongs to the CLI: %j'), slug => {
+  test.each([...RESERVED_AGENT_SLUGS])('refuses an id that belongs to the CLI: %j', slug => {
     expect(agentCreateInputSchema.safeParse({ slug, name: 'X', config: {} }).success).toBe(false);
   });
 
@@ -23,7 +23,7 @@ describe('agentCreateInputSchema slug', () => {
 });
 
 describe('agentUpdateInputSchema slug', () => {
-  test.each([...RESERVED_AGENT_SLUGS])('refuses an id that belongs to the CLI: %j'), slug => {
+  test.each([...RESERVED_AGENT_SLUGS])('refuses an id that belongs to the CLI: %j', slug => {
     expect(agentUpdateInputSchema.safeParse({ slug }).success).toBe(false);
   });
 
@@ -33,7 +33,7 @@ describe('agentUpdateInputSchema slug', () => {
 });
 
 describe('BUILTIN_AGENT_SLUGS', () => {
-  test('holds exactly the CLI-owned ids'), () => {
+  test('holds exactly the CLI-owned ids', () => {
     expect([...BUILTIN_AGENT_SLUGS].sort()).toEqual([...RESERVED_AGENT_SLUGS].sort());
   });
 
@@ -54,12 +54,12 @@ describe('BUILTIN_AGENT_SLUGS', () => {
     'compaction',
     'title',
     'summary',
-  ])('keeps %j owned by the CLI'), slug => {
+  ])('keeps %j owned by the CLI', slug => {
     expect(isReservedAgentSlug(slug)).toBe(true);
     expect(BUILTIN_AGENT_SLUGS.has(slug)).toBe(true);
   });
 
-  test('leaves a profile id that belongs to no CLI agent alone'), () => {
+  test('leaves a profile id that belongs to no CLI agent alone', () => {
     expect(isReservedAgentSlug('reviewer')).toBe(false);
     expect(BUILTIN_AGENT_SLUGS.has('reviewer')).toBe(false);
   });

@@ -538,6 +538,8 @@ describe('security-remediation push command guard policy', () => {
       'cp /tmp/evil .git/co?fig',
       'mv /tmp/evil .git/co*f',
       'git -c\tremote.origin.mirror push',
+      'find .git -name config -exec cp /tmp/evil {} +',
+      'find . -execdir mv /tmp/evil config ;',
       // The subcommand word split by a continuation.
       'git pu\\sh --force',
       // A shell hands a line continuation to git inside one command; the

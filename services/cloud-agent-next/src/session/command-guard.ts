@@ -397,9 +397,10 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
 // glob spelling a shell would resolve to the same directory.
 const SECURITY_REMEDIATION_GIT_DIR_SPELLINGS = ['.git', '.g?t', '.g*t'];
 
-// The allowed programs that name the file they write. Any other program is not
-// in the allow list, so a command that starts with it resolves to no rule and
-// the session rejects the prompt; only these need a rule of their own.
+// The allowed programs that take the file they write as an argument. The
+// general-purpose programs this policy also admits are handled separately: the
+// search options that run another program or write a named file are refused
+// below, and a program run from inside one of them stays outside a text rule.
 const SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS = ['cp', 'mv', 'sed'];
 
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
@@ -474,6 +475,14 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   ]),
   'git config *include*',
   'git -?* config *include*',
+  // The allowed search programs run another program or write a named file
+  // through these options, so each is refused, as the review policy already does.
+  'find *-exec*',
+  'find *-execdir*',
+  'find *-ok*',
+  'find *-delete*',
+  'find *-fprint*',
+  'find *-fls*',
   // A tab is one separator, so the inline-setting rules name it as the space
   // rules do.
   'git*-c\t?*.*',

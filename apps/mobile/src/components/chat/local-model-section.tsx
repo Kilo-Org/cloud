@@ -83,7 +83,9 @@ function LocalModelRow({
           testID={`local-model-unusable-${status.provider}`}
           className="text-sm text-muted-foreground"
         >
-          {t('modelChat.localModels.cannotUse', { items: toolUse.unusable.join(', ') })}
+          {t('modelChat.localModels.cannotUse', {
+            items: toolUse.unusable.join(t('common.listJoiner')),
+          })}
         </Text>
       )}
       <ModelDownloadControl status={status} />

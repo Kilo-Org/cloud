@@ -23,7 +23,10 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, values?: { items?: string }) => [key, values?.items ?? ''],
+    // A distinctive joiner, so the expectation proves the row joins with the
+    // catalog's separator rather than a literal comma.
+    t: (key: string, values?: { items?: string }) =>
+      key === 'common.listJoiner' ? ' + ' : [key, values?.items ?? ''],
   }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }));
@@ -78,12 +81,12 @@ afterEach(() => {
 });
 
 describe('the on-device model row', () => {
-  it('names the enabled tools the model cannot run', () => {
+  it('names the enabled tools the model cannot run, joined by the catalog', () => {
     const notes = rows([
       appleStatus({ kind: 'some', unusable: ['settings_set', 'lookup.filter'] }),
     ]);
     expect(notes.map(node => node.props.children)).toEqual([
-      ['modelChat.localModels.cannotUse', 'settings_set, lookup.filter'],
+      ['modelChat.localModels.cannotUse', 'settings_set + lookup.filter'],
     ]);
   });
 

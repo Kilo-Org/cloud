@@ -11,7 +11,12 @@ import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { SelectableText } from '@/components/ui/selectable-text';
-import { codeFieldTextStyle, hasRtlScript, withoutMonoFamily } from '@/lib/rtl-text';
+import {
+  codeFieldTextStyle,
+  containsJoinedScript,
+  hasRtlScript,
+  withoutMonoFamily,
+} from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 type SetupCommandFieldProps = Readonly<{
@@ -104,14 +109,15 @@ export function SetupCommandField({
   const showsCounter = !disabled && remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
   const showsBound = !disabled && remaining <= 0;
   // A shell command is code: mono, on its own left edge, whatever the interface
-  // direction. The mono family ships no right-to-left glyphs, so only the empty
-  // field's localized placeholder in that script keeps the interface font (the
-  // rule `Text` uses). A field holding a command keeps mono: the value is Latin
-  // code either way, and dropping the family for good left the command in the
-  // proportional face after the first keystroke.
+  // direction. The mono family draws neither the right-to-left blocks nor the
+  // joined scripts, so only the empty field's localized placeholder in either
+  // set keeps the interface font (the rule `Text` uses). A field holding a
+  // command keeps mono: the value is Latin code either way, and dropping the
+  // family for good left the command in the proportional face after the first
+  // keystroke.
   const placeholder = t('profiles.commandPlaceholder');
   const monoClass =
-    command.length === 0 && hasRtlScript(placeholder)
+    command.length === 0 && (hasRtlScript(placeholder) || containsJoinedScript(placeholder))
       ? withoutMonoFamily('font-mono')
       : 'font-mono';
 

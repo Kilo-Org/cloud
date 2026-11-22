@@ -1,9 +1,10 @@
 // Setup command field: the value is code, so the field keeps the mono family
 // whenever it holds a command. Only an empty field whose localized placeholder
-// is written in a right-to-left script keeps the interface font, because the
-// mono family ships no glyph of either script and drew that placeholder one
-// character at a time. The value is also pinned left to right with the family's
-// ligatures off, so a flag like `--frozen-lockfile` renders as two hyphens.
+// is written in a script the mono family cannot draw — a right-to-left block or
+// a joined script — keeps the interface font, because a fallback drew that
+// placeholder glyph by glyph. The value is also pinned left to right with the
+// family's ligatures off, so a flag like `--frozen-lockfile` renders as two
+// hyphens.
 import { act, type ElementType, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -81,6 +82,23 @@ describe('<SetupCommandField>', () => {
     const field = fieldFor('');
 
     expect(String(field.props.className)).not.toContain('font-mono');
+  });
+
+  it('uses the interface font for an empty field whose joined-script placeholder needs its glyphs', () => {
+    // A joined script that is not right to left reaches the same rule: the mono
+    // family draws none of its clusters, so the empty field keeps the
+    // interface font.
+    copy.placeholder = 'उदा. pnpm install';
+    const field = fieldFor('');
+
+    expect(String(field.props.className)).not.toContain('font-mono');
+  });
+
+  it('keeps mono on a field holding a command beside a joined-script placeholder', () => {
+    copy.placeholder = 'उदा. pnpm install';
+    const field = fieldFor('pnpm install --frozen-lockfile');
+
+    expect(String(field.props.className)).toContain('font-mono');
   });
 
   it('pins the value left to right with the ligatures off', () => {

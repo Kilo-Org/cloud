@@ -112,7 +112,7 @@ beforeEach(() => {
  * The effect starts at once, and `answers` resolves with every attempt's result.
  */
 function askQuestion(calls: number) {
-  const spent = { used: 0 };
+  const spent = { used: 0, attempts: 0 };
   const tool = webSearchTool();
   const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
   const answers = Effect.runPromise(
@@ -300,6 +300,55 @@ describe('a web search', () => {
       expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
       expect(reasonOf(answer)).toContain('took too long');
       expect(spent.used).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds a failing loop at fifteen attempts and spends no allowance', async () => {
+    world.transportFailures = 20;
+
+    const { spent, answers } = askQuestion(20);
+    const outcome = await answers;
+
+    expect(world.requests).toHaveLength(15);
+    expect(outcome.slice(0, 15).every(answer => Result.isFailure(answer))).toBe(true);
+    expect(reasonOf(outcome[15])).toContain('15 times');
+    expect(spent.used).toBe(0);
+    expect(spent.attempts).toBe(15);
+  });
+
+  it('does not reach the attempt cap while a question still gets answered searches', async () => {
+    const { spent, answers } = askQuestion(6);
+    const outcome = await answers;
+
+    expect(outcome.map(answer => Result.isSuccess(answer))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
+    // The five-search limit stops the sixth, so attempts never reach fifteen.
+    expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
+    expect(world.requests).toHaveLength(5);
+    expect(spent.attempts).toBe(5);
+  });
+
+  it('counts a timed-out search as one attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      world.hang = true;
+
+      const { spent, answers } = askQuestion(1);
+      await vi.advanceTimersByTimeAsync(15_000);
+      await answers;
+      // A fiber that ran under the timeout must not leak past the test.
+      await vi.runAllTimersAsync();
+
+      expect(spent.used).toBe(0);
+      expect(spent.attempts).toBe(1);
     } finally {
       vi.useRealTimers();
     }

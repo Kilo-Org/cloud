@@ -10,6 +10,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 import { chatFetch } from './fetch';
 import {
+  MAX_ATTEMPTS_PER_QUESTION,
   MAX_SEARCHES_PER_QUESTION,
   type QuestionSearches,
   questionSearches,
@@ -44,6 +45,9 @@ const TIMED_OUT = 'Web search took too long and was stopped. Tell the person it 
 const OVER_BUDGET =
   `This question already used ${String(MAX_SEARCHES_PER_QUESTION)} web searches, the limit. ` +
   'Do not search again: answer with what you have.';
+const OVER_ATTEMPTS =
+  `Web search has failed ${String(MAX_ATTEMPTS_PER_QUESTION)} times for this question. ` +
+  'Do not search again: answer with what you have, and say the search did not work.';
 const ALLOWANCE_EXHAUSTED =
   "The account's free web searches for this month are used up and it has no credit balance. " +
   'Tell the person they can add credits in Kilo to search again.';
@@ -150,12 +154,20 @@ async function search(argumentsText: string, context: SearchContext): Promise<Se
   if (spent !== undefined && spent.used >= MAX_SEARCHES_PER_QUESTION) {
     return failed(OVER_BUDGET);
   }
+  if (spent !== undefined && spent.attempts >= MAX_ATTEMPTS_PER_QUESTION) {
+    return failed(OVER_ATTEMPTS);
+  }
   if (!onlineManager.isOnline()) {
     return failed(OFFLINE);
   }
   const token = await getAuthTokenForRequest();
   if (token === null) {
     return failed(SIGNED_OUT);
+  }
+  /* An attempt that reaches the proxy counts even when it fails or the timeout
+     stops it; the answered-search charge below is separate. */
+  if (spent !== undefined) {
+    spent.attempts += 1;
   }
   const response = await postSearch({ query: args.query, token, organizationId, signal });
   if (response === undefined) {

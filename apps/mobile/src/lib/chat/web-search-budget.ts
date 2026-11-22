@@ -9,16 +9,29 @@ import { Context } from 'effect';
  */
 export const MAX_SEARCHES_PER_QUESTION = 5;
 
-export type QuestionSearches = { used: number };
+/**
+ * How many web searches one question may send, answered or not. A model whose
+ * searches keep failing would otherwise retry until the chat loop's round
+ * ceiling, and every attempt costs a round trip. A failed attempt spends a
+ * fraction here but nothing of the answered-search allowance.
+ */
+export const MAX_ATTEMPTS_PER_QUESTION = 15;
+
+export type QuestionSearches = {
+  /** Searches Kilo answered, which draw on the account's allowance. */
+  used: number;
+  /** Searches sent, answered or not. */
+  attempts: number;
+};
 
 /**
- * The searches Kilo answered for the question being answered.
+ * The searches spent on the question being answered.
  *
  * Tools are shared by every chat and are told nothing about the session that
  * calls them, but a tool runs inside the fiber that reads the answer. The
- * registry sets a fresh counter on that fiber for each question, so a new
- * question and a retry both start from zero. Outside an answer there is none,
- * and nothing is counted.
+ * registry sets a fresh counter on that fiber for each question, so a retry and
+ * a new question both start from zero. Outside an answer there is none, and
+ * nothing is counted.
  */
 export const questionSearches = Context.Reference<QuestionSearches | undefined>(
   'kilo/questionSearches',

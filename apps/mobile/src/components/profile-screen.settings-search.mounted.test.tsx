@@ -176,6 +176,21 @@ describe('ProfileScreen settings search', () => {
     ).toBe(true);
   });
 
+  it('takes a theme search to the Appearance control first', async () => {
+    const { renderer } = await mountProfile();
+    query(renderer.root, 'theme');
+    const [first] = results(renderer.root);
+    if (!first) {
+      throw new Error('no result for theme');
+    }
+    expect(first.entry.label).toBe(i18n.t('preferences.appearance'));
+    selectResult(renderer.root, first);
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/preferences',
+      params: { settingsTarget: 'appearance' },
+    });
+  });
+
   it('opens the privacy analytics setting on the consent review screen', async () => {
     const view = await mountProfile();
     const root = view.renderer.root;

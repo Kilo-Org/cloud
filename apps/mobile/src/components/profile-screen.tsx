@@ -162,7 +162,7 @@ const PROFILE_SETTING_SECTIONS = {
     context: ['profile.app'],
     settings: {
       nativeRemote: defineSetting('profile.nativeRemote', 'nativeRemote.title'),
-      preferences: defineSetting('profile.preferences', 'common.preferences', 'appearance'),
+      preferences: defineSetting('profile.preferences', 'common.preferences'),
       agentBriefing: defineSetting('profile.agentBriefing', 'agentBriefing.title'),
       tutorial: defineSetting('profile.tutorial', 'tour.tutorialLabel'),
       changelog: defineSetting('profile.changelog', 'profile.changelog'),

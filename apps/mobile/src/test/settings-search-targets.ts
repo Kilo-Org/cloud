@@ -5,11 +5,7 @@ import { type ReactTestRenderer } from '@/test/renderer';
 
 type SettingsTargetProps = { item: { id: string } };
 
-/**
- * A screen's search targets must be exactly the rows its index source publishes,
- * in screen order: a row added without a target, or a target whose definition
- * differs from the published one, fails here.
- */
+/** Rendered targets and the screen's index must agree, in screen order. */
 export function expectRenderedSettingsTargets(renderer: ReactTestRenderer, path: string): void {
   const source = PREFERENCE_SETTINGS_SOURCES.find(candidate => candidate.path === path);
   if (!source) {

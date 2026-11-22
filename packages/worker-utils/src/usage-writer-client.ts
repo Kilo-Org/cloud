@@ -211,7 +211,7 @@ export function recordLlmUsage(
         if (!parsed.success) return 'invalid';
         if (parsed.data.status === 'not_recorded') return 'not_recorded';
         const result = parsed.data.result;
-        if (!result || result.usageId !== payload.core.id) return 'invalid';
+        if (result.usageId !== payload.core.id) return 'invalid';
         return { kind: parsed.data.status, result };
       },
     },

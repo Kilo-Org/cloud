@@ -19,23 +19,43 @@ export const SERVICE_FEE_FLOWS = [
 
 export type ServiceFeeFlow = (typeof SERVICE_FEE_FLOWS)[number];
 
-export const PERSONAL_SERVICE_FEE_FLOWS = [
-  'personal_top_up',
-  'personal_auto_top_up_setup',
-  'personal_auto_top_up',
-  'personal_kilo_pass',
-] as const satisfies readonly ServiceFeeFlow[];
+export const SERVICE_FEE_OWNER_KINDS = ['personal', 'organization'] as const;
 
-export type PersonalServiceFeeFlow = (typeof PERSONAL_SERVICE_FEE_FLOWS)[number];
+export type ServiceFeeOwnerKind = (typeof SERVICE_FEE_OWNER_KINDS)[number];
 
-export const ORGANIZATION_SERVICE_FEE_FLOWS = [
-  'organization_top_up',
-  'organization_auto_top_up_setup',
-  'organization_auto_top_up',
-  'organization_kilo_pass',
-] as const satisfies readonly ServiceFeeFlow[];
+export const SERVICE_FEE_FLOW_OWNER_KIND = {
+  personal_top_up: 'personal',
+  organization_top_up: 'organization',
+  personal_auto_top_up_setup: 'personal',
+  organization_auto_top_up_setup: 'organization',
+  personal_auto_top_up: 'personal',
+  organization_auto_top_up: 'organization',
+  personal_kilo_pass: 'personal',
+  organization_kilo_pass: 'organization',
+} as const satisfies Record<ServiceFeeFlow, ServiceFeeOwnerKind>;
 
-export type OrganizationServiceFeeFlow = (typeof ORGANIZATION_SERVICE_FEE_FLOWS)[number];
+export type PersonalServiceFeeFlow = {
+  [Flow in ServiceFeeFlow]: (typeof SERVICE_FEE_FLOW_OWNER_KIND)[Flow] extends 'personal'
+    ? Flow
+    : never;
+}[ServiceFeeFlow];
+
+export type OrganizationServiceFeeFlow = {
+  [Flow in ServiceFeeFlow]: (typeof SERVICE_FEE_FLOW_OWNER_KIND)[Flow] extends 'organization'
+    ? Flow
+    : never;
+}[ServiceFeeFlow];
+
+export const PERSONAL_SERVICE_FEE_FLOWS: readonly PersonalServiceFeeFlow[] =
+  SERVICE_FEE_FLOWS.filter(
+    (flow): flow is PersonalServiceFeeFlow => SERVICE_FEE_FLOW_OWNER_KIND[flow] === 'personal'
+  );
+
+export const ORGANIZATION_SERVICE_FEE_FLOWS: readonly OrganizationServiceFeeFlow[] =
+  SERVICE_FEE_FLOWS.filter(
+    (flow): flow is OrganizationServiceFeeFlow =>
+      SERVICE_FEE_FLOW_OWNER_KIND[flow] === 'organization'
+  );
 
 export const SERVICE_FEE_OUTCOMES = [
   'pending',
@@ -48,10 +68,6 @@ export const SERVICE_FEE_OUTCOMES = [
 ] as const;
 
 export type ServiceFeeOutcome = (typeof SERVICE_FEE_OUTCOMES)[number];
-
-export const SERVICE_FEE_OWNER_KINDS = ['personal', 'organization'] as const;
-
-export type ServiceFeeOwnerKind = (typeof SERVICE_FEE_OWNER_KINDS)[number];
 
 export type ServiceFeePersonalOwner = {
   kind: 'personal';
@@ -112,9 +128,6 @@ export type CalculateCumulativeFeeRefundInput = {
   cumulativeProductRefundMinor: number;
 };
 
-const PERSONAL_SERVICE_FEE_FLOW_SET = new Set<string>(PERSONAL_SERVICE_FEE_FLOWS);
-const ORGANIZATION_SERVICE_FEE_FLOW_SET = new Set<string>(ORGANIZATION_SERVICE_FEE_FLOWS);
-
 export function isServiceFeeFlow(value: string): value is ServiceFeeFlow {
   return (SERVICE_FEE_FLOWS as readonly string[]).includes(value);
 }
@@ -124,13 +137,13 @@ export function isServiceFeeOutcome(value: string): value is ServiceFeeOutcome {
 }
 
 export function isPersonalServiceFeeFlow(flow: ServiceFeeFlow): flow is PersonalServiceFeeFlow {
-  return PERSONAL_SERVICE_FEE_FLOW_SET.has(flow);
+  return SERVICE_FEE_FLOW_OWNER_KIND[flow] === 'personal';
 }
 
 export function isOrganizationServiceFeeFlow(
   flow: ServiceFeeFlow
 ): flow is OrganizationServiceFeeFlow {
-  return ORGANIZATION_SERVICE_FEE_FLOW_SET.has(flow);
+  return SERVICE_FEE_FLOW_OWNER_KIND[flow] === 'organization';
 }
 
 export function isSupportedServiceFeeCurrency(
@@ -140,7 +153,7 @@ export function isSupportedServiceFeeCurrency(
 }
 
 export function getServiceFeeOwnerKind(flow: ServiceFeeFlow): ServiceFeeOwnerKind {
-  return isOrganizationServiceFeeFlow(flow) ? 'organization' : 'personal';
+  return SERVICE_FEE_FLOW_OWNER_KIND[flow];
 }
 
 export function getServiceFeeOwner(

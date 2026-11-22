@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "კრიტიკული",
+      "high": "მაღალი",
+      "medium": "საშუალო",
+      "low": "დაბალი"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA გაფრთხილება"
     },

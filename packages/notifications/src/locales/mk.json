@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Ново безбедносно наоѓање ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Критично",
+      "high": "Високо",
+      "medium": "Средно",
+      "low": "Ниско"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA предупредување"
     },

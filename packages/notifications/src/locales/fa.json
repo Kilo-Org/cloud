@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "یافته امنیتی جدید ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "بحرانی",
+      "high": "بالا",
+      "medium": "متوسط",
+      "low": "کم"
+    },
     "securityFindingSlaWarning": {
       "title": "هشدار SLA"
     },

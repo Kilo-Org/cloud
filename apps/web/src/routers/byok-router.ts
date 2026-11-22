@@ -77,11 +77,7 @@ import {
   getVercelModelIdOverrides,
   mapModelIdToVercel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import {
-  findVercelOnlyModels,
-  getVendorNamesByModelPrefix,
-  getVercelOnlyModelName,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
+import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import type { NonChatVercelModelType } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
 import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
@@ -365,7 +361,6 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     await addGatewayModel(openRouterModel);
   }
 
-  const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
   const vercelOnlyModels = findVercelOnlyModels({
     openRouterModelIds: Object.keys(openRouterModelMetadata),
     openRouterModels,
@@ -373,10 +368,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     overrides: await getVercelModelIdOverrides(),
   });
   for (const vercelOnlyModel of vercelOnlyModels) {
-    await addGatewayModel({
-      id: vercelOnlyModel.id,
-      name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
-    });
+    await addGatewayModel({ id: vercelOnlyModel.id, name: vercelOnlyModel.name });
   }
 
   // Embeddings and System One use the OpenRouter key, the Vercel AI Gateway key, and provider keys

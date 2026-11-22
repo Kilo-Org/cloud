@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Temuan keamanan baru ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritis",
+      "high": "Tinggi",
+      "medium": "Sedang",
+      "low": "Rendah"
+    },
     "securityFindingSlaWarning": {
       "title": "Peringatan SLA"
     },

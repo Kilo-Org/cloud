@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Новый результат безопасности ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Критический уровень",
+      "high": "Высокий уровень",
+      "medium": "Средний уровень",
+      "low": "Низкий уровень"
+    },
     "securityFindingSlaWarning": {
       "title": "Предупреждение SLA"
     },

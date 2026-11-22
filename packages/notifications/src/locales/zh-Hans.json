@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "新的安全发现 ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "严重",
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA 警告"
     },

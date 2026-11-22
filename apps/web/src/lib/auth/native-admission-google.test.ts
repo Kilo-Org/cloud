@@ -26,7 +26,6 @@ import {
 // Values are read lazily (via getters) so tests can vary the configuration.
 const mockConfig = {
   GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME: 'com.kilocode.kiloapp',
-  GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER: '123456789',
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: '',
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS: 'test-cert-digest',
 };
@@ -34,9 +33,6 @@ const mockConfig = {
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME() {
     return mockConfig.GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME;
-  },
-  get GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER() {
-    return mockConfig.GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
   },
   get GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY() {
     return mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;

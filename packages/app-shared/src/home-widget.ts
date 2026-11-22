@@ -282,9 +282,10 @@ export function buildHomeWidgetData(
 }
 
 /**
- * Decide four linked presentation facts once: terminal, primaryKind,
- * checkedAt, and staleAt. The presentation's `stale` flag and the timeline
- * boundary both read `staleAt`, so native aging cannot disagree with the flag.
+ * Decide the linked presentation facts once: terminal, primaryKind, checkedAt,
+ * staleAt, and the cadence they age by. The presentation's `stale` flag and the
+ * timeline boundary both read `staleAt`, so native aging cannot disagree with
+ * the flag.
  */
 function staleness(data: HomeWidgetData): {
   /**
@@ -296,6 +297,8 @@ function staleness(data: HomeWidgetData): {
   primaryKind: GlanceableStatusKind | null;
   checkedAt: string | null;
   staleAt: number | null;
+  /** The cadence the snapshot ages by, so a caller needs no second `refreshInterval` read. */
+  refreshMs: number;
 } {
   const { snapshot } = data;
   const terminal = terminalStatusOf(snapshot.status);
@@ -305,11 +308,13 @@ function staleness(data: HomeWidgetData): {
       ? null
       : snapshot.updatedAt;
   const confirmedAt = timestampMs(checkedAt);
+  const refreshMs = refreshInterval(snapshot);
   return {
     terminal,
     primaryKind,
     checkedAt,
-    staleAt: confirmedAt === null ? null : confirmedAt + refreshInterval(snapshot),
+    staleAt: confirmedAt === null ? null : confirmedAt + refreshMs,
+    refreshMs,
   };
 }
 
@@ -411,8 +416,8 @@ export function buildHomeWidgetPresentation(
  */
 export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
-  const { terminal } = staleness(data);
-  const next = now + refreshInterval(snapshot);
+  const { terminal, refreshMs } = staleness(data);
+  const next = now + refreshMs;
   const wake = scheduledWake(snapshot, terminal);
   // Both instants come from the snapshot, so a passed wake cannot create a busy refresh loop.
   const requested =

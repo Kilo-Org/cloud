@@ -253,7 +253,7 @@ describe('Switch', () => {
     expect(on.thumbColor).toBe(off.thumbColor);
   });
 
-  it('never paints a disabled on switch the pair a live off row shows', () => {
+  it('never paints a disabled on switch the grip a live row shows', () => {
     native.os = 'android';
     for (const [scheme, colors] of [
       ['light', lightColors],
@@ -264,16 +264,12 @@ describe('Switch', () => {
       const liveOff = nativeProps(renderSwitch({ value: false }).root);
       const grip = scheme === 'dark' ? colors.mutedForeground : colors.ink2;
       expect(disabledOn.thumbColor, `disabled grip (${scheme})`).toBe(grip);
-      // The disabled row differs from its live counterpart by the grip; each
-      // half also keeps a hue the live track never paints.
+      // The grip is what marks the row unavailable: a disabled half keeps its
+      // position's live hue at reduced opacity, so the distance is measured in
+      // `use-theme-colors.contrast.test.ts`, and here only the grip must not be
+      // a live one.
       expect(disabledOn.thumbColor, `grip vs live off grip (${scheme})`).not.toBe(
         liveOff.thumbColor
-      );
-      expect(disabledOn.trackColor?.true, `on track vs live on track (${scheme})`).not.toBe(
-        liveOff.trackColor?.true
-      );
-      expect(disabledOn.trackColor?.false, `off track vs live off track (${scheme})`).not.toBe(
-        liveOff.trackColor?.false
       );
     }
   });

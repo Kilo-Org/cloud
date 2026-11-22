@@ -4,7 +4,6 @@ import {
   RUNTIME_PROXY_ORIGIN_HEADER,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { resolveSecret, type SecretBinding } from './auth.js';
-import { logger } from './logger.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
 
 /**
@@ -18,16 +17,6 @@ export { RUNTIME_PROXY_ORIGIN_HEADER };
 
 const PROOF_CONTEXT = 'kilo-runtime-proxy-origin:v1:';
 const encoder = new TextEncoder();
-/** A proof is an unpadded base64url HMAC-SHA256 (32 bytes). */
-const PROOF_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-
-/**
- * Reads a received proof. A value that is not exactly one well-formed proof,
- * such as a duplicated header joined as `a, b`, counts as absent.
- */
-export function parseRuntimeProxyOriginProof(value: unknown): string | undefined {
-  return typeof value === 'string' && PROOF_PATTERN.test(value) ? value : undefined;
-}
 
 type OriginEnv = { NEXTAUTH_SECRET?: SecretBinding };
 
@@ -41,14 +30,7 @@ export async function runtimeProxyOriginProof(
   outboundId: string
 ): Promise<string | null> {
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
-  if (!secret) {
-    // Egress then sends no proof; make that visible before readers require it.
-    const reason = env.NEXTAUTH_SECRET ? 'secret_unavailable' : 'secret_not_configured';
-    logger
-      .withFields({ logTag: 'runtime_proxy_origin_proof_unavailable', reason })
-      .warn('Runtime proxy origin proof unavailable');
-    return null;
-  }
+  if (!secret) return null;
   const key = await crypto.subtle.importKey(
     'raw',
     encoder.encode(secret),

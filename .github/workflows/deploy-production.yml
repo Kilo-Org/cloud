@@ -182,6 +182,7 @@ jobs:
     with:
       worker_matrix: ${{ needs.detect-workers.outputs.matrix }}
       deploy_cloud_agent_after_session_ingest: ${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}
+      deploy_cloud_agent_after_session_sync: ${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-sync }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 

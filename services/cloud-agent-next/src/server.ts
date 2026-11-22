@@ -60,10 +60,7 @@ import {
   type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
-import {
-  parseRuntimeProxyOriginProof,
-  RUNTIME_PROXY_ORIGIN_HEADER,
-} from './runtime-credential-proxy-origin.js';
+import { RUNTIME_PROXY_ORIGIN_HEADER } from './runtime-credential-proxy-origin.js';
 import {
   logRuntimeProxyRequestFailed,
   readUpstreamFailureEvidence,
@@ -625,7 +622,7 @@ async function forwardRuntimeCredentialProxy(
       session =>
         session.resolveRuntimeCredentialProxyGrant(
           handle,
-          parseRuntimeProxyOriginProof(c.req.header(RUNTIME_PROXY_ORIGIN_HEADER))
+          c.req.header(RUNTIME_PROXY_ORIGIN_HEADER) ?? undefined
         ),
       'resolveRuntimeCredentialProxyGrant'
     );

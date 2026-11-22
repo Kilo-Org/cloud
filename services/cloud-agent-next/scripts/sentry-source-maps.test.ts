@@ -382,6 +382,6 @@ console.log(JSON.stringify(events));
     expect(
       workflow.match(/dist\/worker\/index\.js --no-bundle --upload-source-maps/g)
     ).toHaveLength(6);
-    expect(workflow.match(/name: Deploy to Cloudflare Workers \(retry\)/g)).toHaveLength(3);
+    expect(workflow.match(/name: Deploy to Cloudflare Workers \(retry\)/g)).toHaveLength(4);
   });
 });

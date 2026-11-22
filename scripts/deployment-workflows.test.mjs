@@ -23,7 +23,7 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
   for (const [job, selector] of [
     ['deploy-manual', 'inputs.worker'],
     ['deploy-changed', 'matrix.worker'],
-    ['deploy-cloud-agent-after-session-ingest', undefined],
+    ['deploy-cloud-agent-after-dependencies', undefined],
   ]) {
     const steps = workers.jobs[job].steps;
     const deploy = steps.find(step => step.id === (selector ? 'deploy' : 'deploy-cloud-agent'));
@@ -107,11 +107,7 @@ test('both Worker deployment paths prepare usage queues before direct consumer d
 });
 
 test('both upload attempts preserve prepared commands and append artifacts only for Cloud Agent', () => {
-  for (const job of [
-    'deploy-manual',
-    'deploy-changed',
-    'deploy-cloud-agent-after-session-ingest',
-  ]) {
+  for (const job of ['deploy-manual', 'deploy-changed', 'deploy-cloud-agent-after-dependencies']) {
     const uploads = workers.jobs[job].steps.filter(step =>
       step.uses?.startsWith('cloudflare/wrangler-action@')
     );
@@ -119,7 +115,7 @@ test('both upload attempts preserve prepared commands and append artifacts only 
     for (const step of uploads) {
       const expression = step.with.command.match(/^\$\{\{ (.*?) \}\}/)[1];
       const selectedWorkers =
-        job === 'deploy-cloud-agent-after-session-ingest'
+        job === 'deploy-cloud-agent-after-dependencies'
           ? ['services/cloud-agent-next']
           : ['services/cloud-agent-next', 'services/usage-ingest', 'services/other-worker'];
       for (const worker of selectedWorkers) {
@@ -805,13 +801,14 @@ test('every Worker deploy job retries a failed dependency install at most three 
       'deploy-manual',
       'deploy-changed',
       'deploy-session-ingest',
-      'deploy-cloud-agent-after-session-ingest',
+      'deploy-session-sync',
+      'deploy-cloud-agent-after-dependencies',
     ]) {
       installRuns.push(
         ...workers.jobs[job].steps.filter(step => (step.run ?? '').includes('pnpm install'))
       );
     }
-    assert.equal(installRuns.length, 4);
+    assert.equal(installRuns.length, 5);
 
     for (const { run } of installRuns) {
       for (const [failures, status, calls, sleeps] of [
@@ -853,7 +850,7 @@ test('every Worker deploy job installs only the Worker closure and the root proj
     ['deploy-manual', '${{ inputs.worker }}'],
     ['deploy-changed', '${{ matrix.worker }}'],
     ['deploy-session-ingest', 'services/session-ingest'],
-    ['deploy-cloud-agent-after-session-ingest', 'services/cloud-agent-next'],
+    ['deploy-cloud-agent-after-dependencies', 'services/cloud-agent-next'],
   ]) {
     const installs = workers.jobs[job].steps.filter(step =>
       (step.run ?? '').includes('pnpm install')
@@ -977,6 +974,10 @@ test('Worker detection and deploy run beside the Vercel chain in both pipelines'
       );
     }
     const deploy = deployment.jobs['deploy-workers'];
+    assert.equal(
+      deploy.with.deploy_cloud_agent_after_session_sync,
+      '${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-sync }}'
+    );
     assert.ok([deploy.needs].flat().includes('detect-workers'), `${name} deploy needs the matrix`);
     assert.equal(deploy.with.worker_matrix, '${{ needs.detect-workers.outputs.matrix }}');
     assert.equal(
@@ -1334,7 +1335,8 @@ test('every Worker deployment path retries a deploy once', () => {
     ['deploy-manual', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-changed', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-session-ingest', 'Deploy to Cloudflare Workers', 'deploy'],
-    ['deploy-cloud-agent-after-session-ingest', 'Deploy cloud-agent-next', 'deploy-cloud-agent'],
+    ['deploy-session-sync', 'Deploy to Cloudflare Workers', 'deploy'],
+    ['deploy-cloud-agent-after-dependencies', 'Deploy cloud-agent-next', 'deploy-cloud-agent'],
   ]) {
     const steps = workers.jobs[name].steps;
     const first = steps.findIndex(step => step.name === deployName);
@@ -1374,8 +1376,8 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   assert.equal(ingest.environment, '${{ inputs.target_environment }}');
   assert.equal(ingest['timeout-minutes'], 25);
 
-  const ordered = workers.jobs['deploy-cloud-agent-after-session-ingest'];
-  assert.deepEqual([ordered.needs].flat(), ['deploy-session-ingest']);
+  const ordered = workers.jobs['deploy-cloud-agent-after-dependencies'];
+  assert.deepEqual([ordered.needs].flat(), ['deploy-session-ingest', 'deploy-session-sync']);
   assert.match(ordered.if, /deploy_cloud_agent_after_session_ingest == 'true'/);
   assert.match(ordered.if, /needs\.deploy-session-ingest\.result == 'success'/);
   assert.equal(ordered.environment, '${{ inputs.target_environment }}');
@@ -1409,7 +1411,7 @@ test('the ordered production path takes both workers out of the parallel matrix'
   assert.ok(start >= 0 && end > start, 'the matrix filter must exist');
   const loop = script.slice(start, end + reassignment.length);
 
-  const filter = (changed, ordered) =>
+  const filter = (changed, ordered, sync = 'false') =>
     execFileSync(
       'bash',
       [
@@ -1420,6 +1422,7 @@ test('the ordered production path takes both workers out of the parallel matrix'
         '-c',
         [
           `DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=${ordered}`,
+          `DEPLOY_CLOUD_AGENT_AFTER_SESSION_SYNC=${sync}`,
           `CHANGED=(${changed.map(dir => `'${dir}'`).join(' ')})`,
           loop,
           'printf "%s\\n" "${CHANGED[@]}"',
@@ -1432,6 +1435,27 @@ test('the ordered production path takes both workers out of the parallel matrix'
       .filter(Boolean);
 
   assert.deepEqual(filter(['services/session-ingest', 'services/cloud-agent-next'], 'true'), []);
+  assert.deepEqual(
+    filter(['services/session-sync', 'services/cloud-agent-next'], 'false', 'true'),
+    []
+  );
+  assert.deepEqual(filter(['services/session-sync', 'services/cloud-agent-next'], 'false'), [
+    'services/session-sync',
+    'services/cloud-agent-next',
+  ]);
+  assert.deepEqual(
+    filter(
+      [
+        'services/session-ingest',
+        'services/session-sync',
+        'services/cloud-agent-next',
+        'services/scim-sync',
+      ],
+      'true',
+      'true'
+    ),
+    ['services/scim-sync']
+  );
   assert.deepEqual(
     filter(['services/session-ingest', 'services/cloud-agent-next', 'services/scim-sync'], 'true'),
     ['services/scim-sync']
@@ -1531,4 +1555,86 @@ test('a Pages pin move deploys the output shell beside Pages', t => {
   git('checkout', '-q', '-b', 'docs', base);
   commit({ 'services/pages/README.md': 'Pages, again' }, 'docs');
   assert.deepEqual(detected('docs'), ['services/pages'], 'another Pages change leaves the shell');
+});
+
+test('Session Sync ordering follows the selected matrix, including broad detection', () => {
+  const detect = workers.jobs['detect-changes'];
+  assert.equal(
+    detect.outputs['deploy-cloud-agent-after-session-sync'],
+    '${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-sync }}'
+  );
+  assert.equal(
+    workers.on.workflow_call.outputs['deploy-cloud-agent-after-session-sync'].value,
+    '${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-sync }}'
+  );
+  const script = detect.steps.find(step => step.id === 'set-matrix').run;
+  const start = script.indexOf('DEPLOY_CLOUD_AGENT_AFTER_SESSION_SYNC=false');
+  const end = script.indexOf('FILTERED=()', start);
+  assert.ok(start >= 0 && end > start);
+  const selection = script.slice(start, end);
+  for (const [changed, expected] of [
+    [['services/session-sync', 'services/cloud-agent-next'], 'true'],
+    [['services/session-sync'], 'false'],
+    [['services/cloud-agent-next'], 'false'],
+    [[], 'false'],
+  ]) {
+    const result = execFileSync(
+      'bash',
+      [
+        '-eo',
+        'pipefail',
+        '-c',
+        [
+          `CHANGED=(${changed.map(dir => `'${dir}'`).join(' ')})`,
+          'GITHUB_OUTPUT=/dev/null',
+          selection,
+          'printf "%s" "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_SYNC"',
+        ].join('\n'),
+      ],
+      { encoding: 'utf8' }
+    );
+    assert.equal(result, expected);
+  }
+});
+
+test('Cloud Agent deploy requires every selected prerequisite to succeed', () => {
+  const sync = workers.jobs['deploy-session-sync'];
+  assert.equal(
+    sync.if,
+    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_sync == 'true'"
+  );
+  assert.equal(sync.environment, '${{ inputs.target_environment }}');
+  const deploy = sync.steps.find(step => step.id === 'deploy');
+  assert.equal(deploy.with.workingDirectory, 'services/session-sync');
+  assert.equal(
+    sync.steps.find(step => step.name === 'Checkout code').with.ref,
+    '${{ inputs.source_sha || github.sha }}'
+  );
+  const job = workers.jobs['deploy-cloud-agent-after-dependencies'];
+  const condition = job.if
+    .replaceAll('needs.deploy-session-ingest', "needs['deploy-session-ingest']")
+    .replaceAll('needs.deploy-session-sync', "needs['deploy-session-sync']");
+  const runs = (ingest, sync, ingestResult, syncResult) =>
+    runInNewContext(condition, {
+      cancelled: () => false,
+      github: { repository: 'Kilo-Org/cloud' },
+      inputs: {
+        deploy_cloud_agent_after_session_ingest: ingest,
+        deploy_cloud_agent_after_session_sync: sync,
+      },
+      needs: {
+        'deploy-session-ingest': { result: ingestResult },
+        'deploy-session-sync': { result: syncResult },
+      },
+    });
+  assert.equal(runs('false', 'true', 'skipped', 'success'), true);
+  assert.equal(runs('true', 'false', 'success', 'skipped'), true);
+  assert.equal(runs('true', 'true', 'success', 'success'), true);
+  assert.equal(runs('false', 'false', 'skipped', 'skipped'), false);
+  for (const failed of ['failure', 'skipped', 'cancelled']) {
+    assert.equal(runs('false', 'true', 'skipped', failed), false);
+    assert.equal(runs('true', 'false', failed, 'skipped'), false);
+    assert.equal(runs('true', 'true', 'success', failed), false);
+    assert.equal(runs('true', 'true', failed, 'success'), false);
+  }
 });

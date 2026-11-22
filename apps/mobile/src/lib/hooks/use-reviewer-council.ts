@@ -56,34 +56,63 @@ function useCouncilEntitlement(scope: string, enabled: boolean) {
  */
 export type CouncilRefusalReason = 'flagUnavailable' | 'entitlementErrored' | 'refused';
 
+/** What the council gate answers a screen: the decision and the refusal's own state. */
+export type CouncilGate = {
+  /** The organization is entitled, behind the rollout flag: the editor may paint. */
+  allowed: boolean;
+  /** The first entitlement read has not settled, so the surface stays blank. */
+  pending: boolean;
+  /** The settled refusal, or null while the gate still allows the editor. */
+  refusalReason: CouncilRefusalReason | null;
+  /** Re-runs the one entitlement read the failed-check refusal offers. */
+  retryEntitlement: () => void;
+  /** That read is in flight, so its Retry reports its own wait. */
+  entitlementFetching: boolean;
+};
+
 /**
  * The council config gate, identical to the web page's: an entitled
  * organization behind the rollout flag. A personal scope can never show it, and
  * neither can a build that predates the flag (its registry minimum applies in
  * `useFeatureFlag`).
  *
- * `pending` separates "the entitlement read is still in flight" from "this
- * organization is not entitled": only the latter may tell a reader the surface
- * is unavailable, or an entitled org would read that on every cold open.
+ * `pending` separates "the entitlement read has never settled" from "this
+ * organization is not entitled": only a first read may hold the surface blank,
+ * or an entitled org would read "unavailable" on every cold open. A re-read
+ * started by the refusal's own Retry must not turn back into that blank
+ * surface, and the query cannot be asked directly: re-running with no answer
+ * yet clears its own error and reports `pending` again, which is exactly what a
+ * first read reports. So the gate asks whether the read ever landed an outcome
+ * (`isFetched`), which survives the re-read, and that one answer decides all
+ * three of the blank surface, the failed-check refusal and the plan refusal.
  * `retryEntitlement` re-runs that one read, which is the whole step the
  * `entitlementErrored` refusal offers, and `entitlementFetching` is the same
- * read's busy state, so the retry cannot report itself idle while it re-runs.
+ * read's busy state, so the retry reports its own wait instead of vanishing.
  */
-export function useCouncilGate(scope: string) {
+export function useCouncilGate(scope: string): CouncilGate {
   const flagEnabled = useFeatureFlag(CODE_REVIEW_COUNCIL_FLAG);
   const qualified = flagEnabled && !isPersonal(scope);
   const entitlement = useCouncilEntitlement(scope, flagEnabled);
+  // A query that re-runs with no answer yet clears its own error and reports
+  // `pending` again, so neither `isError` nor `isPending` says whether this read
+  // ever settled. `isFetched` counts the answers it has landed and survives the
+  // re-read, which is what separates a first read from the refusal's own Retry.
+  const settled = entitlement.isFetched;
+  const hasAnswer = entitlement.data !== undefined;
   let refusalReason: CouncilRefusalReason | null = null;
   if (!qualified) {
     refusalReason = 'flagUnavailable';
-  } else if (entitlement.isError) {
+  } else if (settled && !hasAnswer) {
+    // Settled without an answer: the plan check itself failed.
     refusalReason = 'entitlementErrored';
-  } else if (entitlement.data?.entitled !== true) {
+  } else if (hasAnswer && entitlement.data?.entitled !== true) {
     refusalReason = 'refused';
   }
   return {
     allowed: qualified && (entitlement.data?.entitled ?? false),
-    pending: qualified && entitlement.isPending,
+    // Only a read that has never answered holds the surface blank, so the
+    // refusal and its busy Retry stay painted while that Retry runs.
+    pending: qualified && !settled,
     refusalReason,
     retryEntitlement: () => void entitlement.refetch(),
     entitlementFetching: entitlement.isFetching,

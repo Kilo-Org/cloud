@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- a mounted case per card state: every option shape, the custom answer's selection, the keyboard and geometry rules, and the remembered answer the notification hands over */
 import { createElement } from 'react';
 import { MockTextInput } from '@/test/native-input.test-helpers';
 import { act, TestRenderer } from '@/test/renderer';

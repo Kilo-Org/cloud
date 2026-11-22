@@ -10,9 +10,10 @@ export const BRIEFING_MAX_SESSIONS = 32;
 export const BRIEFING_MAX_SOURCES = 256;
 export const BRIEFING_MAX_SOURCES_PER_SESSION = 32;
 export const BRIEFING_MAX_TITLE_LENGTH = 160;
-// The title's UTF-8 byte budget for screening. It carries the same number as the schema's
-// character bound on purpose: for text outside ASCII the byte cut is the stricter of the two.
-export const BRIEFING_MAX_TITLE_BYTES = 160;
+// The title's UTF-8 byte budget for screening. It derives from the schema's character
+// bound: a screened title is later validated against that bound, so the byte cut must
+// never be the looser of the two.
+export const BRIEFING_MAX_TITLE_BYTES = BRIEFING_MAX_TITLE_LENGTH;
 export const BRIEFING_MAX_URL_LENGTH = 2048;
 export const BRIEFING_MAX_EXCERPT_BYTES = 1024;
 export const BRIEFING_MAX_SNAPSHOT_BYTES = 48 * 1024;

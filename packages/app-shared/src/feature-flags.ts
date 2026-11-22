@@ -14,6 +14,10 @@
  * The only literal source of the cross-app flag keys. The constants below
  * alias its members, and `FeatureFlagKey` derives from it, so a key added here
  * is present in both without a second edit.
+ *
+ * Add a new cross-app key as a member of this object, never as a standalone
+ * `export const`: a bare constant beside the aliases would compile, and
+ * `FeatureFlagKey` would not know it.
  */
 export const CROSS_APP_FEATURE_FLAG_KEYS = {
   codeReviewMdConversion: 'code-review-md-conversion',

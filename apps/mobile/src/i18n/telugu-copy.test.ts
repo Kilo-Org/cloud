@@ -154,7 +154,7 @@ describe('Telugu restart and session history copy', () => {
 
 describe('Telugu repository search placeholder', () => {
   it('prompts a repository search', () => {
-    expect(i18n.t('agentChat.repoPicker.searchPlaceholder')).toBe('రిపోజిటరీలను శోధించండి...');
+    expect(i18n.t('agentChat.repoPicker.searchPlaceholder')).toBe('రిపోజిటరీలను శోధించండి…');
   });
 });
 

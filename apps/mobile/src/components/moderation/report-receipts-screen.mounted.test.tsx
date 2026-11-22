@@ -479,6 +479,10 @@ describe('ReportReceiptsScreen', () => {
       'the skeleton scroller'
     ).props.contentContainerStyle as Record<string, number>;
 
+    // `mount` keeps only the last tree for `afterEach` to unmount, so the
+    // skeleton stays mounted with its own client unless this case drops it.
+    unload();
+
     state.isPending = false;
     state.pages = [pageOf(1, false)];
     const settledRoot = await mount();

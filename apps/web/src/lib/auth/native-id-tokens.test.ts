@@ -806,13 +806,16 @@ describe('exchangeNativeGoogleAuthCode', () => {
     jest.clearAllMocks();
     mockConfig.GOOGLE_CLIENT_SECRET = 'web-client-secret';
     jest.mocked(redisClient.set).mockResolvedValue('OK');
+    // Every exchange fetches the certificates before it redeems the code, so
+    // each case starts with a served set. A case that exercises the fault
+    // overrides this with its own rejection.
+    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
   });
 
   it('exchanges a serverAuthCode and returns verified Google user data', async () => {
     mockGetToken.mockResolvedValue({
       tokens: { id_token: 'exchanged-id-token' },
     });
-    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
     mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
       getPayload: () => ({
         sub: 'google-sub-1',
@@ -844,7 +847,6 @@ describe('exchangeNativeGoogleAuthCode', () => {
 
   it('records the ID token the exchange returned', async () => {
     mockGetToken.mockResolvedValue({ tokens: { id_token: 'exchanged-id-token' } });
-    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
     mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
       getPayload: () => ({
         sub: 'google-sub-1',
@@ -895,7 +897,6 @@ describe('exchangeNativeGoogleAuthCode', () => {
 
   it('throws NativeIdTokenError when email_verified is false', async () => {
     mockGetToken.mockResolvedValue({ tokens: { id_token: 'exchanged-id-token' } });
-    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
     mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
       getPayload: () => ({
         sub: 'google-sub-1',
@@ -909,7 +910,6 @@ describe('exchangeNativeGoogleAuthCode', () => {
 
   it('throws NativeIdTokenError when verifySignedJwtWithCertsAsync rejects (invalid token)', async () => {
     mockGetToken.mockResolvedValue({ tokens: { id_token: 'exchanged-id-token' } });
-    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
     // google-auth-library throws a plain Error (no .response) for JWT verify failures.
     mockVerifySignedJwtWithCertsAsync.mockRejectedValue(new Error('Wrong number of segments'));
 
@@ -920,7 +920,6 @@ describe('exchangeNativeGoogleAuthCode', () => {
   });
 
   it('propagates cert-fetch failures as 5xx (outside the token-verify try block)', async () => {
-    mockGetToken.mockResolvedValue({ tokens: { id_token: 'exchanged-id-token' } });
     const certError = new Error('Failed to retrieve verification certificates: network');
     mockGetFederatedSignonCertsAsync.mockRejectedValue(certError);
 
@@ -931,7 +930,6 @@ describe('exchangeNativeGoogleAuthCode', () => {
   it('leaves the code unspent so a retry after the certificate fault succeeds', async () => {
     const certError = new Error('Failed to retrieve verification certificates: network');
     mockGetFederatedSignonCertsAsync.mockRejectedValueOnce(certError);
-    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
     mockGetToken.mockResolvedValue({ tokens: { id_token: 'exchanged-id-token' } });
     mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
       getPayload: () => ({

@@ -3727,6 +3727,8 @@ describe('agent browser calls', () => {
       readonly plain?: boolean;
       /** Extra grants for a case about an origin the step may already open or read. */
       readonly extraGrants?: readonly BrowserGrant[];
+      /** The url the opened tab reports, when a case's navigation lands somewhere other than the step's destination. */
+      readonly tabUrl?: () => string;
       /** The Downloads permission is gone by the time the guard is armed: revoked after the pre-open check. */
       readonly revokeAfterOpen?: boolean;
       /** The opened tab reports an empty url, as Chrome does without the `tabs` permission. */
@@ -3784,9 +3786,16 @@ describe('agent browser calls', () => {
         }
 
         // A tab Chrome will not describe without the `tabs` permission: the url is empty, not `about:blank`.
-        return options.unreadableTabUrl === true
-          ? { id: newTab, title: '', url: '' }
-          : { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt` };
+        if (options.unreadableTabUrl === true) {
+          return { id: newTab, title: '', url: '' };
+        }
+
+        // A case whose navigation lands elsewhere: the tab reports the url it really committed, once that has happened.
+        return {
+          id: newTab,
+          title: '',
+          url: options.tabUrl?.() ?? `${MAIN_ORIGIN}/report.txt`,
+        };
       },
       onCreated: {
         addListener: (
@@ -4583,23 +4592,36 @@ describe('agent browser calls', () => {
   });
 
   it('completes a tabs-new redirect that lands on an origin the step may already read', async () => {
+    const landing = 'https://accounts.example.org';
+    // The tab reports the landing url only once its navigation has committed it, as a browser does.
+    let committed = `${MAIN_ORIGIN}/report.txt`;
     const fixture = await tabsNewFixture({
-      extraGrants: [{ class: 'read', origin: 'https://accounts.example.org' }],
+      extraGrants: [{ class: 'read', origin: landing }],
+      // The step loads a page, so no file exists for the guard to claim from the browser's history.
+      noSeededFile: true,
       plain: true,
+      tabUrl: () => committed,
     });
 
-    fixture.cdp.setFrameUrl('https://accounts.example.org/login');
+    fixture.cdp.setHandlers({
+      'Page.navigate': () => {
+        committed = `${landing}/login`;
+        fixture.cdp.setFrameUrl(committed);
+
+        return { frameId: 'main' };
+      },
+    });
 
     const outcome = await fixture.run(agent());
 
     // `postAgentNavigate` is the only judge: a landing origin the session may read is the redirect's answer, and the
-    // Tab the step opened is what the caller gets back.
+    // Tab the step opened is what the caller gets back, at the url it really committed.
     expect(outcome.kind).toBe('result');
     expect(expectResult(outcome).result.value).toStrictEqual({
       selected: true,
       tabId: fixture.newTab,
       title: '',
-      url: `${MAIN_ORIGIN}/report.txt`,
+      url: `${landing}/login`,
     });
   });
 

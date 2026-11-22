@@ -547,17 +547,15 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     }
     let reopened: KVDatabase | undefined = undefined;
     try {
-      // The marker is written before the delete, because a crash between the
-      // two must still explain the loss: a cleared file with no marker reads
-      // as an ordinary empty store. It is cleared only when the delete itself
-      // fails, where nothing was removed and no notice may claim otherwise.
+      // The delete is the step that removes the data, and only what it
+      // actually removed may be reported: the marker is written after it
+      // resolves, so a refused or failed delete can never strand a notice
+      // claiming a loss that did not happen. The window this leaves is the
+      // opposite one — a crash between the delete and the write reports
+      // nothing — which loses an explanation in a rare process death instead of
+      // inventing one the person never suffered.
+      await SQLite.deleteDatabaseAsync(DATABASE_NAME);
       await writeStoredValueSafe(PERSIST_RESET_NOTICE_KEY, '1');
-      try {
-        await SQLite.deleteDatabaseAsync(DATABASE_NAME);
-      } catch (deleteError) {
-        await deleteStoredValueSafe(PERSIST_RESET_NOTICE_KEY);
-        throw deleteError;
-      }
       const freshKey = await generateAndStoreKey();
       reopened = await openWithKey(freshKey);
       probeSchema(reopened);

@@ -869,13 +869,13 @@ describe('reset notice marker', () => {
     await expect(readPersistedResetNotice()).resolves.toBe(false);
   });
 
-  it('a refused delete clears the marker and still rejects the open', async () => {
+  it('a refused delete leaves no marker and still rejects the open', async () => {
     failNextProbe = true;
     failNextDelete = true;
 
     await expect(setItem('s', 'a', 'x')).rejects.toThrow('delete failed');
 
-    // Nothing was removed, so no notice may claim a loss.
+    // The file was never removed, so no notice may claim a loss.
     expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBeUndefined();
     expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
       level: 'error',

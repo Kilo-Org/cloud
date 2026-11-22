@@ -2637,10 +2637,8 @@ function checkMobileEnglishIdentical({ catalogName, english, localeValues }) {
   const problems = [];
   // A mobile key whose value equals English in every non-English locale was
   // never translated. Allowlist the proper nouns and format-only strings that
-  // are legitimately identical. A value with prose of its own is left to the
-  // per-locale rule below, which names each locale that kept it in English; this
-  // rule only reports a value nothing could translate. Only a catalog that was
-  // read can say a key was never translated, so an unreadable one is left out.
+  // are legitimately identical. Only a catalog that was read can say a key was
+  // never translated, so an unreadable one is left out.
   if (localeValues.size === 0) {
     return problems;
   }

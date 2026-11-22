@@ -91,9 +91,10 @@ export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstima
       // The sentence now shows on the safeguard field at fault, so the line keeps
       // no visible copy. It still announces: the wait this line owned is over,
       // and that is what changed for a reader who cannot see the field's error.
-      // Same hidden technique as `estimating`, with no line to reserve.
+      // The reserved box is the line's own height, so moving the sentence to the
+      // field changes no measurement in the card.
       return (
-        <View className="relative">
+        <View className="relative h-4">
           <AccessibleStatus
             message={t('agentBriefing.invalidSafeguards')}
             className="absolute size-px overflow-hidden"

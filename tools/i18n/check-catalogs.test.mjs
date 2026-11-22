@@ -2098,6 +2098,90 @@ test('still rejects that push value in a language the exceptions do not list', (
   );
 });
 
+// The push title and the app's finding rows show one severity level, so both
+// catalogs must spell it the same way. These fixtures carry just the four pairs
+// the parity rule compares, with the English words equal on both sides.
+const SEVERITY_PARITY_MOBILE_ENGLISH = {
+  common: { critical: 'Critical' },
+  securityAgent: { sla: { high: 'High', medium: 'Medium', low: 'Low' } },
+};
+const SEVERITY_PARITY_SOURCE = [
+  "t('common.critical');",
+  "t('securityAgent.sla.high');",
+  "t('securityAgent.sla.medium');",
+  "t('securityAgent.sla.low');",
+].join('\n');
+const SEVERITY_PARITY_PUSH_ENGLISH = {
+  internal: {
+    securityFindingSeverity: {
+      critical: 'Critical',
+      high: 'High',
+      medium: 'Medium',
+      low: 'Low',
+    },
+  },
+};
+// The severity keys are string literals in the real producer, so the fixture
+// names them the same way and the usage check finds every one.
+const SEVERITY_PARITY_PUSH_SOURCE = [
+  'const SEVERITY_KEYS = [',
+  "  'internal.securityFindingSeverity.critical',",
+  "  'internal.securityFindingSeverity.high',",
+  "  'internal.securityFindingSeverity.medium',",
+  "  'internal.securityFindingSeverity.low',",
+  '];',
+].join('\n');
+
+test('accepts a severity the push catalog and the mobile catalog spell the same way', () => {
+  const found = run({
+    english: SEVERITY_PARITY_MOBILE_ENGLISH,
+    translated: {
+      common: { critical: 'Критично' },
+      securityAgent: { sla: { high: 'Высоко', medium: 'Средне', low: 'Низко' } },
+    },
+    source: SEVERITY_PARITY_SOURCE,
+    pushEnglish: SEVERITY_PARITY_PUSH_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingSeverity: {
+          critical: 'Критично',
+          high: 'Высоко',
+          medium: 'Средне',
+          low: 'Низко',
+        },
+      },
+    },
+    pushSource: SEVERITY_PARITY_PUSH_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a severity the push catalog and the mobile catalog spell two ways', () => {
+  const found = run({
+    english: SEVERITY_PARITY_MOBILE_ENGLISH,
+    translated: {
+      common: { critical: 'Критично' },
+      securityAgent: { sla: { high: 'Высоко', medium: 'Средне', low: 'Низко' } },
+    },
+    source: SEVERITY_PARITY_SOURCE,
+    pushEnglish: SEVERITY_PARITY_PUSH_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingSeverity: {
+          critical: 'Критично',
+          high: 'Высокий',
+          medium: 'Средне',
+          low: 'Низко',
+        },
+      },
+    },
+    pushSource: SEVERITY_PARITY_PUSH_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'notifications/ru: "internal.securityFindingSeverity.high" reads "Высокий" but mobile "securityAgent.sla.high" reads "Высоко"',
+  ]);
+});
+
 // Two non-English catalogs let a case leave one of them in English while the
 // other translates the same key. The every-locale rule then stays silent (the
 // value is not identical everywhere), so only the per-catalog rule can see the

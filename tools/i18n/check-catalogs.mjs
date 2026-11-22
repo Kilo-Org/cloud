@@ -2729,6 +2729,62 @@ function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFami
 }
 
 /**
+ * The four severity levels, as the two catalogs name them: the key the push
+ * title reads, then the key the app's finding rows read. The push titles and
+ * the app show the same level, so one language must spell it the same way in
+ * both places.
+ */
+const SEVERITY_WORDING_PAIRS = [
+  ['internal.securityFindingSeverity.critical', 'common.critical'],
+  ['internal.securityFindingSeverity.high', 'securityAgent.sla.high'],
+  ['internal.securityFindingSeverity.medium', 'securityAgent.sla.medium'],
+  ['internal.securityFindingSeverity.low', 'securityAgent.sla.low'],
+];
+
+/**
+ * One severity level, one word, in both catalogs.
+ *
+ * The push title renders a level through the push catalog, and the app's
+ * finding rows render the same level through the mobile catalog. A language
+ * that spells a level two ways shows one reader two words for one finding, so
+ * every pair in `SEVERITY_WORDING_PAIRS` must read the same. English is
+ * compared first, then every tag both catalogs carry; a tag only one of them
+ * has holds nothing to compare.
+ *
+ * A pair either side does not define is skipped: a fixture tree carries partial
+ * catalogs, and the missing-key rules already report a real gap. A problem line
+ * names both keys and both values, so the developer can fix either side.
+ */
+function checkSeverityWordingParity(parsedCatalogs) {
+  const problems = [];
+  const mobile = parsedCatalogs.get('mobile');
+  const notifications = parsedCatalogs.get('notifications');
+  if (mobile === undefined || notifications === undefined) {
+    return problems;
+  }
+  const views = [['en', notifications.english, mobile.english]];
+  for (const [tag, pushValues] of notifications.localeValues) {
+    const mobileValues = mobile.localeValues.get(tag);
+    if (mobileValues !== undefined) {
+      views.push([tag, pushValues, mobileValues]);
+    }
+  }
+  for (const [tag, pushValues, mobileValues] of views) {
+    for (const [pushKey, mobileKey] of SEVERITY_WORDING_PAIRS) {
+      const pushWord = pushValues.get(pushKey);
+      const mobileWord = mobileValues.get(mobileKey);
+      if (pushWord === undefined || mobileWord === undefined || pushWord === mobileWord) {
+        continue;
+      }
+      problems.push(
+        `notifications/${tag}: "${pushKey}" reads "${pushWord}" but mobile "${mobileKey}" reads "${mobileWord}"`
+      );
+    }
+  }
+  return problems;
+}
+
+/**
  * The English strings each catalog may render more than one way, and the
  * problem that stopped the audit from reading them. A file that is missing,
  * does not parse, or does not map each tag to a list of strings reports the
@@ -2787,6 +2843,11 @@ export function checkCatalogs(root = ROOT) {
   const supported = tags === null ? null : new Set(tags);
 
   const catalogs = catalogsOf(root);
+  // The parsed English map and locale values of each catalog a scan read, keyed
+  // by catalog name. A rule that compares the two catalogs reads them here; a
+  // catalog whose English parse failed stays out, so the rule cannot compare
+  // against a catalog the audit already reported as unreadable.
+  const parsedCatalogs = new Map();
   const unscannable = new Set();
   for (const catalog of catalogs) {
     const policyProblems = checkScanPolicy(catalog);
@@ -2889,6 +2950,7 @@ export function checkCatalogs(root = ROOT) {
     });
     problems.push(...locales.problems);
     const { localeValues } = locales;
+    parsedCatalogs.set(catalogName, { english, localeValues });
 
     for (const rule of catalog.englishCopyRules) {
       problems.push(...rule({ catalogName, english, localeValues }));
@@ -2898,6 +2960,10 @@ export function checkCatalogs(root = ROOT) {
       ...checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies })
     );
   }
+
+  // Placed after the per-catalog loop, because the rule compares the two
+  // catalogs and needs both of their parsed maps.
+  problems.push(...checkSeverityWordingParity(parsedCatalogs));
 
   return { problems, languages: tags === null ? null : tags.length };
 }

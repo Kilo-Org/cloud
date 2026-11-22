@@ -29,17 +29,43 @@ function isSecurityFindingSeverity(value: string | undefined): value is Security
 }
 
 /**
+ * The catalog word for one security-finding severity in `locale`.
+ *
+ * The finding producer stores the severity as the raw enum value, and the push
+ * title interpolates its params verbatim. Both readers that show the level call
+ * this one lookup, so the lock screen and the history row cannot spell the same
+ * level two ways.
+ *
+ * The English label is the fallback, so a catalog that lost this entry shows the
+ * level rather than a raw key. A severity this build does not know is returned
+ * unchanged: a level added after this build must still reach the lock screen,
+ * raw rather than dropped.
+ */
+export function securityFindingSeverityLabel(
+  locale: string | null | undefined,
+  severity: string
+): string {
+  if (!isSecurityFindingSeverity(severity)) {
+    return severity;
+  }
+  return translatePush(
+    locale,
+    SECURITY_FINDING_SEVERITY_KEYS[severity],
+    undefined,
+    en.internal.securityFindingSeverity[severity]
+  );
+}
+
+/**
  * The push params with a security finding's severity translated into `locale`.
  *
- * The finding producer stores the severity as the raw enum value, and the title
- * template interpolates its params verbatim, so every other language would
- * render `(high)`. This is the one param that is a fixed set of words rather
- * than the user's own text — a finding title, a repo name, and an organization
- * name pass through untouched.
+ * The title template interpolates its params verbatim, so every other language
+ * would render `(high)`. The severity is the one param that is a fixed set of
+ * words rather than the user's own text — a finding title, a repo name, and an
+ * organization name pass through untouched.
  *
  * Params are returned as given for every other push kind, for params without a
- * severity, and for a severity this build does not know: a level added after
- * this build must still reach the lock screen, raw rather than dropped.
+ * severity, and for a severity this build does not know, which stays raw.
  */
 export function localizedPushParams(
   locale: string | null | undefined,
@@ -53,15 +79,5 @@ export function localizedPushParams(
   if (!SECURITY_FINDING_PUSH_TITLE_KEY_SET.has(i18nKey) || !isSecurityFindingSeverity(severity)) {
     return params;
   }
-  return {
-    ...params,
-    // The English label is the fallback, so a catalog that lost this entry shows
-    // the level rather than a raw key.
-    severity: translatePush(
-      locale,
-      SECURITY_FINDING_SEVERITY_KEYS[severity],
-      undefined,
-      en.internal.securityFindingSeverity[severity]
-    ),
-  };
+  return { ...params, severity: securityFindingSeverityLabel(locale, severity) };
 }

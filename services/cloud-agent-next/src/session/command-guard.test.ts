@@ -492,8 +492,6 @@ describe('security-remediation push command guard policy', () => {
       'git push origin feature/force-fix',
       'git push origin a+b',
       'git push origin :old',
-      'git commit -m "reject push --force"',
-      'git commit -m "push -uvf docs"',
       'git status',
       'git diff --stat',
       'git log --oneline -5',
@@ -501,6 +499,7 @@ describe('security-remediation push command guard policy', () => {
       'git config user.email',
       'git -C . config user.email',
       'git switch -c fix/thing',
+      'git commit -m "tidy the retry path"',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
     }

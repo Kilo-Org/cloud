@@ -324,15 +324,13 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 // argument token. So the requirement is stated as one rule per position: a push
 // that carries an option, and a push that carries a `+` refspec.
 //
-// A shell hands git the command after its own word splitting, so a run of
-// spaces or a tab is one separator. Each run of one to three separators keeps a
-// rule, which is where a rule can accept more than one character, and the
-// separator is written literally so a rule never reads one character of an
-// argument as a separator.
-//
-// A global option before the subcommand is spelled `git -…`. A subcommand
-// cannot start with a dash, so that head names a global option and cannot reach
-// an argument.
+// A shell hands git the command after its own word splitting, so any run of
+// spaces or tabs is one separator. A rule cannot bound a run, so the head takes
+// a `*` in place of the separator run; the matcher's `.` matches a tab under its
+// single-line flag, so that run may mix spaces and tabs. The same `*` covers a
+// global option before the subcommand. It also reads one argument as a
+// separator, so a command whose own text names a push option is refused too; the
+// reachable push forms are the plain ones below.
 //
 // git can also take the refspec and the force flag from its own configuration,
 // where a rule that reads only the command text cannot see them. A configuration
@@ -345,22 +343,17 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 // rule decides. A ref that is deleted by name, with `--delete` or with an empty
 // source in the refspec, is not a rewrite; the plain empty-source form carries
 // no option, so these rules keep it.
-const SECURITY_REMEDIATION_PUSH_SEPARATORS = [' ', '  ', '   ', '\t'];
+const SECURITY_REMEDIATION_PUSH_HEAD = 'git*push';
 
-const SECURITY_REMEDIATION_PUSH_HEADS = SECURITY_REMEDIATION_PUSH_SEPARATORS.flatMap(separator => [
-  `git${separator}push`,
-  `git -?*${separator}push`,
-  `git${separator}-?* push`,
-]);
-
-const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = SECURITY_REMEDIATION_PUSH_HEADS.flatMap(head => [
-  ...SECURITY_REMEDIATION_PUSH_SEPARATORS.flatMap(separator => [
-    `${head}${separator}-*`,
-    `${head} *${separator}-*`,
-  ]),
-  `${head} +*`,
-  `${head} * +*`,
-]);
+// Each form pins the separator directly before the option and the `+`, and lets
+// the `*` absorb any run before it, so a run of any length and any mix of
+// spaces and tabs is covered.
+const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
+  `${SECURITY_REMEDIATION_PUSH_HEAD}* -*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*\t-*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}* +*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*\t+*`,
+];
 
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git config *push*',

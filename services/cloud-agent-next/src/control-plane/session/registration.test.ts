@@ -420,7 +420,7 @@ describe('migrated origin permissions', () => {
           ? {
               'git push': 'allow',
               'gh pr create': 'allow',
-              'git push -*': 'deny',
+              'git*push* -*': 'deny',
               curl: 'deny',
             }
           : {

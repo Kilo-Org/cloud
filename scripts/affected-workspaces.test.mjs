@@ -113,27 +113,33 @@ test('the shared tool helpers are attributed to the app that runs them', () => {
 
 test('the dev scripts the web typecheck reads select the web workspace', () => {
   // `dev/tsconfig.json` is one of the programs the web typecheck group runs, so a
-  // change to a file it includes selects that group. The shared fixture's readers
-  // widen `dirs`, as they do for the `scripts/web-env` entry, so the attribution
-  // itself is checked against the web workspace alone.
-  const attributed = selectAffected({
-    items: [workspace('web', 'apps/web')],
-    changedFiles: ['dev/discord-gateway-cron.ts'],
-    dependencyDirs: [],
-    references: [],
-  });
-  assert.deepEqual(attributed.dirs, ['apps/web']);
-  const selection = select(['dev/discord-gateway-cron.ts']);
-  assert.deepEqual(
-    selectGroups({
-      full_checks: selection.full_checks,
-      dirs: selection.dirs,
-      packages: selection.packages,
-    }),
-    { typecheck_groups: ['web'], lint_groups: ['rest'] }
-  );
-  // No program covers the `dev/` subtrees or a file that is not TypeScript.
-  for (const file of ['dev/local/infra-env.ts', 'dev/grafana/a.json']) {
+  // change to the program or to a file it includes selects that group. The shared
+  // fixture's readers widen `dirs`, as they do for the `scripts/web-env` entry, so
+  // the attribution itself is checked against the web workspace alone.
+  const attributed = file =>
+    selectAffected({
+      items: [workspace('web', 'apps/web')],
+      changedFiles: [file],
+      dependencyDirs: [],
+      references: [],
+    });
+  for (const file of ['dev/discord-gateway-cron.ts', 'dev/tsconfig.json']) {
+    const selection = attributed(file);
+    assert.deepEqual(selection.dirs, ['apps/web'], file);
+    assert.deepEqual(
+      selectGroups({
+        full_checks: selection.full_checks,
+        dirs: selection.dirs,
+        packages: selection.packages,
+      }),
+      { typecheck_groups: ['web'], lint_groups: ['rest'] },
+      file
+    );
+  }
+  assert.deepEqual(selectGroups(select(['dev/discord-gateway-cron.ts'])).typecheck_groups, ['web']);
+  // No program covers the `dev/` subtrees, a file that is not TypeScript, or a
+  // second tsconfig beside the program.
+  for (const file of ['dev/local/infra-env.ts', 'dev/grafana/a.json', 'dev/tsconfig.probe.json']) {
     assert.deepEqual(select([file]).dirs, [], file);
   }
 });

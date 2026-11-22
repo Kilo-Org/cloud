@@ -79,10 +79,10 @@ const CHECK_INPUTS = [
 // pattern also covers it.
 const OWNED = [
   [/^scripts\/web-env\//, 'apps/web'],
-  // `dev/tsconfig.json` is one of the programs the web typecheck group runs, so
-  // a change to a file that program includes selects the group that checks it.
-  // The subdirectories stay neutral: no program covers them.
-  [/^dev\/[^/]+\.ts$/, 'apps/web'],
+  // `dev/tsconfig.json` is one of the programs the web typecheck group runs, and
+  // a change to the program or to a file it includes selects the group that
+  // checks it. The subdirectories stay neutral: no program covers them.
+  [/^dev\/([^/]+\.ts|tsconfig\.json)$/, 'apps/web'],
   [/^tools\/(i18n|nativewind)\//, 'apps/mobile'],
   // The shared source walk, syntax tree and catalog helpers every tool above
   // reads: a change there is read by the app's own catalog and class checks,

@@ -23,7 +23,7 @@ import {
   Users,
   Workflow,
 } from '@/components/ui/icons';
-import { type LayoutChangeEvent, Keyboard, type ScrollViewInstance, View } from 'react-native';
+import { Keyboard, type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -38,13 +38,15 @@ import { ScreenHeader } from '@/components/screen-header';
 import {
   SettingsSearchField,
   SettingsSearchResults,
-  type SettingsSearchResult,
-  useSettingsSearch,
 } from '@/components/settings-search/settings-search';
 import {
   SettingsSearchScrollView,
   SettingsTarget,
 } from '@/components/settings-search/settings-target';
+import {
+  type SettingsSearchResult,
+  useSettingsSearch,
+} from '@/components/settings-search/use-settings-search';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -307,9 +309,9 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
       },
     ];
     if (showOrganizationSection && !organizationsError) {
-      const organizationSettings: SettingDefinition[] = [
-        ...Object.values(sections.organization.settings),
-      ];
+      const organizationSettings: SettingDefinition[] = Object.values(
+        sections.organization.settings
+      );
       if (showOrganizationRow) {
         // The chosen scope's row shares the section's one rendered control.
         organizationSettings.unshift(organizationRowSetting);
@@ -328,9 +330,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
     });
     sources.push({ settings: Object.values(sections.actions.settings) });
     sources.push(PRIVACY_SETTINGS_SOURCE);
-    if (integrationSettingsSource) {
-      sources.push(integrationSettingsSource);
-    }
+    sources.push(integrationSettingsSource);
     sources.push(...PREFERENCE_SETTINGS_SOURCES, ...NOTIFICATION_SETTINGS_SOURCES);
     return sources;
   }, [
@@ -479,7 +479,9 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
       />
       <SettingsSearchField
         query={settingsSearch.query}
-        onChangeText={settingsSearch.setQuery}
+        onChangeText={text => {
+          settingsSearch.setQuery(text);
+        }}
         inputRef={settingsSearch.inputRef}
       />
       <SettingsSearchScrollView

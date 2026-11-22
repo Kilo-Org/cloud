@@ -1,19 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { type Href } from 'expo-router';
 import { useMemo } from 'react';
 
 import { type IntegrationSetupStatus } from '@/lib/integrations/integration-rows';
 import {
   INTEGRATION_PROVIDERS,
   type IntegrationProvider,
-  providerLabelKey,
   visibleIntegrationProviders,
 } from '@/lib/integrations/provider-catalog';
-import {
-  defineSetting,
-  type SettingDefinition,
-  type SettingsSearchSource,
-} from '@/lib/settings-search/definitions';
+import { type SettingsPath, type SettingsSearchSource } from '@/lib/settings-search/definitions';
+import { INTEGRATION_PROVIDER_SETTINGS } from '@/lib/settings-search/integration-provider-settings';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -31,20 +26,10 @@ import { useTRPC } from '@/lib/trpc';
  */
 
 /** The personal integrations hub in the Profile tab. */
-const INTEGRATION_SETTINGS_PATH: Extract<Href, string> = '/(app)/(tabs)/(3_profile)/integrations';
+const INTEGRATION_SETTINGS_PATH: SettingsPath = '/(app)/(tabs)/(3_profile)/integrations';
 
 /** The hub's own name as the breadcrumb of every result below it. */
 const INTEGRATION_SETTINGS_CONTEXT = 'integrations.title';
-
-/** One definition per catalog provider, in the catalog's order. */
-export const INTEGRATION_PROVIDER_SETTINGS = {
-  github: defineSetting('integrations.github', providerLabelKey('github')),
-  slack: defineSetting('integrations.slack', providerLabelKey('slack')),
-  gitlab: defineSetting('integrations.gitlab', providerLabelKey('gitlab')),
-  discord: defineSetting('integrations.discord', providerLabelKey('discord')),
-  linear: defineSetting('integrations.linear', providerLabelKey('linear')),
-  bitbucket: defineSetting('integrations.bitbucket', providerLabelKey('bitbucket')),
-} satisfies Record<IntegrationProvider, SettingDefinition>;
 
 /** Whether a setup-status platform is one the mobile catalog can render. */
 function isIntegrationProvider(platform: string): platform is IntegrationProvider {
@@ -56,16 +41,14 @@ function isIntegrationProvider(platform: string): platform is IntegrationProvide
  * the providers mobile lists. A provider the read omitted was never installed
  * for the owner, which is what `visibleIntegrationProviders` expects.
  */
-function installedIntegrationProviders(
-  statuses?: readonly IntegrationSetupStatus[]
-): Partial<Record<IntegrationProvider, boolean>> {
-  const installed: Partial<Record<IntegrationProvider, boolean>> = {};
+function installedIntegrationProviders(statuses?: readonly IntegrationSetupStatus[]) {
+  const installed: [IntegrationProvider, boolean][] = [];
   for (const status of statuses ?? []) {
     if (isIntegrationProvider(status.platform)) {
-      installed[status.platform] = status.installed === true;
+      installed.push([status.platform, status.installed]);
     }
   }
-  return installed;
+  return Object.fromEntries(installed);
 }
 
 /**

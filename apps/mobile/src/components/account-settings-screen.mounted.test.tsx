@@ -124,6 +124,11 @@ function settingsTargetAncestors(node: ReactTestInstance): ReactTestInstance[] {
   }
   return ancestors;
 }
+
+// The test renderer types host props as `unknown`; this names the one shape the
+// mocked wrapper receives.
+type SettingsTargetProps = { item: { id: string } };
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.resetAllMocks();
@@ -320,7 +325,8 @@ describe('AccountSettingsScreen', () => {
     expect(signOutWeb).not.toHaveBeenCalled();
     const signOutRow = findConfigureRow(renderer, i18n.t('profile.signOutWeb.title'));
     const [target] = settingsTargetAncestors(signOutRow);
-    expect(target?.props.item.id).toBe('account.browser-sign-out');
+    const targetProps = target?.props as SettingsTargetProps | undefined;
+    expect(targetProps?.item.id).toBe('account.browser-sign-out');
     expect(target?.props.onPress).toBeUndefined();
   });
 });

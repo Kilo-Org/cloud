@@ -1006,7 +1006,7 @@ describe('SpendAlertsScreen settings search', () => {
   );
   const INDEXED_IDS = SPEND_SOURCES.flatMap(source => source.settings.map(item => item.id));
   const INDEXED_LABELS = new Set<string>(
-    SPEND_SOURCES.flatMap(source => source.settings.map(item => item.label))
+    SPEND_SOURCES.flatMap(source => source.settings.map(item => i18n.t(item.label)))
   );
 
   // The test renderer types host props as `unknown`; these name the props the
@@ -1083,11 +1083,9 @@ describe('SpendAlertsScreen settings search', () => {
     }
   });
 
-  it('keeps a rule target exact while its card is on screen', async () => {
-    for (const setting of [
-      SPEND_ALERT_THRESHOLD_SETTINGS.limit,
-      SPEND_ALERT_ANOMALY_SETTINGS.multiplier,
-    ]) {
+  it.each([SPEND_ALERT_THRESHOLD_SETTINGS.limit, SPEND_ALERT_ANOMALY_SETTINGS.multiplier])(
+    'keeps the $id rule target exact while its card is on screen',
+    async setting => {
       getQueryFn.mockResolvedValue(settingsFixture());
       const view = await renderWithProviders(
         createElement(SpendAlertsScreen, { settingsTarget: setting.id })
@@ -1097,7 +1095,7 @@ describe('SpendAlertsScreen settings search', () => {
       expect(scrollTarget(view.renderer)).toBe(setting.id);
       expect(targetIds(view.renderer)).toContain(setting.id);
     }
-  });
+  );
 
   it('reveals the master switch for a hidden rule target, without switching it on', async () => {
     getQueryFn.mockResolvedValue(settingsFixture({ enabled: false }));

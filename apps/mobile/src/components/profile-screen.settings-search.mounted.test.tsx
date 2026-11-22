@@ -10,8 +10,8 @@ import {
   routerPush,
   signOutFn,
 } from '@/components/profile-screen.test-helpers';
-import { type SettingsSearchResult } from '@/components/settings-search/settings-search';
 import { SettingsTarget } from '@/components/settings-search/settings-target';
+import { type SettingsSearchResult } from '@/components/settings-search/use-settings-search';
 import { i18n } from '@/i18n';
 import { type SettingDefinition } from '@/lib/settings-search/definitions';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -29,8 +29,9 @@ function query(root: ReactTestInstance, text: string) {
   if (!node) {
     throw new Error('search field is not rendered');
   }
+  const { onChangeText } = node.props as { onChangeText: (next: string) => void };
   act(() => {
-    node.props.onChangeText(text);
+    onChangeText(text);
   });
 }
 
@@ -51,10 +52,21 @@ function resultNode(root: ReactTestInstance): ReactTestInstance {
   return node;
 }
 
+/** Choose one result through the results body's own callback. */
+function selectResult(root: ReactTestInstance, result: SettingsSearchResult) {
+  const { onSelect } = resultNode(root).props as {
+    onSelect: (entry: SettingsSearchResult['entry']) => void;
+  };
+  act(() => {
+    onSelect(result.entry);
+  });
+}
+
 /** The stationary highlight each active target paints over its row. */
 function targetHighlights(root: ReactTestInstance): ReactTestInstance[] {
   return root.findAll(
-    node => node.type === 'View' && String(node.props.className ?? '').includes('border-primary')
+    node =>
+      String(node.type) === 'View' && String(node.props.className ?? '').includes('border-primary')
   );
 }
 
@@ -124,9 +136,7 @@ describe('ProfileScreen settings search', () => {
     if (!entry) {
       throw new Error('the sign-out row is not found by its logout alias');
     }
-    act(() => {
-      resultNode(root).props.onSelect(entry.entry);
-    });
+    selectResult(root, entry);
 
     expect(signOutFn).not.toHaveBeenCalled();
     expect(confirmFn).not.toHaveBeenCalled();
@@ -142,7 +152,7 @@ describe('ProfileScreen settings search', () => {
     }
     expect(
       highlightBox.findAll(
-        node => node.type === 'ConfigureRow' && node.props.title === signOutLabel
+        node => String(node.type) === 'ConfigureRow' && node.props.title === signOutLabel
       )
     ).toHaveLength(1);
 
@@ -178,9 +188,7 @@ describe('ProfileScreen settings search', () => {
       throw new Error('the privacy analytics setting is not indexed');
     }
     expect(entry.entry.path).toBe('/(app)/consent');
-    act(() => {
-      resultNode(root).props.onSelect(entry.entry);
-    });
+    selectResult(root, entry);
 
     expect(routerPush).toHaveBeenCalledWith({
       pathname: '/(app)/consent',

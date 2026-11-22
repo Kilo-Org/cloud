@@ -218,12 +218,12 @@ const PROVIDER_LABEL_KEYS = {
   discord: 'profile.providerDiscord',
   linear: 'agentChat.sessionFilter.platformLinear',
   bitbucket: 'agentChat.repoPicker.platformBitbucket',
-} as const satisfies Record<IntegrationProvider, ParseKeys<'translation'>>;
+} as const satisfies Record<IntegrationProvider, ParseKeys>;
 
 /**
  * The catalog key naming a provider, typed through the catalog so a search
  * definition can hold it as a label without a cast.
  */
-export function providerLabelKey(provider: IntegrationProvider): ParseKeys<'translation'> {
+export function providerLabelKey(provider: IntegrationProvider): ParseKeys {
   return PROVIDER_LABEL_KEYS[provider];
 }

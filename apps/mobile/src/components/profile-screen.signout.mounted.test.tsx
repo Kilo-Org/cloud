@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfileScreen } from '@/components/profile-screen';
-import type * as SettingsSearch from '@/components/settings-search/settings-search';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
@@ -173,16 +172,16 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 // The search field belongs to the settings-search surface; this suite renders it
 // as a marker so its minimal react-native stub (no TextInput) keeps working.
-vi.mock('@/components/settings-search/settings-search', async importOriginal => ({
-  ...(await importOriginal<typeof SettingsSearch>()),
+vi.mock('@/components/settings-search/settings-search', () => ({
   SettingsSearchField: 'SettingsSearchField',
   SettingsSearchResults: 'SettingsSearchResults',
 }));
 // The integration index reads a cached tRPC setup-status query this harness does
 // not model; an empty source keeps the suite on the sign-out rows.
-vi.mock('@/lib/settings-search/integration-source', () => ({
-  useIntegrationSearchSource: () => undefined,
-}));
+vi.mock('@/lib/settings-search/integration-source', () => {
+  const source = { settings: [] };
+  return { useIntegrationSearchSource: () => source };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));

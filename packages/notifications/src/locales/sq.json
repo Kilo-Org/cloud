@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Gjetje e re sigurie ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritike",
+      "high": "E lartë",
+      "medium": "E mesme",
+      "low": "E ulët"
+    },
     "securityFindingSlaWarning": {
       "title": "Paralajmërim SLA"
     },

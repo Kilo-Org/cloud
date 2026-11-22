@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "አዲስ የደህንነት ግኝት ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "እጅግ ከፍተኛ",
+      "high": "ከፍተኛ",
+      "medium": "መካከለኛ",
+      "low": "ዝቅተኛ"
+    },
     "securityFindingSlaWarning": {
       "title": "የSLA ማስጠንቀቂያ"
     },

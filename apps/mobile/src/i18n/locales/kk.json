@@ -309,6 +309,7 @@
     "hideBalance": "Теңгерімді жасыру",
     "showBalance": "Теңгерімді көрсету",
     "balanceHidden": "Теңгерім жасырылған",
+    "availableToSpendInOrganization": "Осы ұйымда жұмсауға қолжетімді",
     "signOutTitle": "Шығу керек пе?",
     "signOutMessage": "Жұмыс кеңістігіңізді пайдалану үшін аккаунтыңызға қайта кіру қажет болады.",
     "deleteAccountTitle": "Тіркелгіні жою керек пе?",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Келесі бөлімдердегі түзетулер мен жақсартулар: {{areas}}.",
     "changelogFixesPolish": "Бүкіл қолданбадағы түзетулер мен жақсартулар.",
     "changelogAreas": {
-      "signIn": "Кіру",
-      "profileOrganizations": "Профиль мен ұйымдар"
+      "signIn": "кіру",
+      "profileOrganizations": "профиль мен ұйымдар",
+      "chat": "чат",
+      "notifications": "хабарландырулар",
+      "integrations": "интеграциялар"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "Репозиторийлерді іздеу",
       "noMatches": "Сәйкестіктер жоқ",
       "noRepositories": "Қолжетімді репозиторийлер жоқ",
-      "noRepositoriesDescription": "Тіркелгіңізге қосылған репозиторийлер жоқ.",
+      "noRepositoriesDescription": "Репозиторийлерді жүктеу үшін GitHub немесе GitLab қосыңыз.",
       "loading": "Жүктелуде…",
       "accessibility": "Репозиторий: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Вебтегі төлемдер параметрлері",
       "changePlan": "Жоспарды өзгерту",
       "buySeats": "Орын сатып алу",
-      "managedOnWeb": "Жоспар, орындар және автотолықтыру вебте басқарылады.",
+      "managedOnWeb": "Жоспар, орындар және автотолықтыру kilo.ai сайтында басқарылады.",
       "setupAutoTopUp": "Автотолықтыруды баптау",
       "manageAutoTopUp": "Автотолықтыруды басқару",
       "opensOnWeb": "Вебте ашылады"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "Кредит шегерімі",
       "emptyDescription": "Кредит сатып алулары, түбіртектер және пайдалану осында көрсетіледі.",
       "emptyTitle": "Кредиттер тарихы жоқ",
+      "expiredGrant": "Мерзімі өтті: {{description}}",
       "googlePlayReceipt": "Google Play түбіртегі",
       "kind": {
         "adjustment": "Түзету",
         "balanceNeutral": "Балансқа әсер етпейді",
         "deduction": "Шегерім",
         "grant": "Берілген кредит",
+        "promotionalCredits": "Промоциялық кредиттер",
         "welcomeCredits": "Қош келу кредиттері",
         "purchase": "Сатып алу"
+      },
+      "program": {
+        "adminBulkGrant": "Әкімшіден берілген кредит",
+        "contributorChampion": "Үздік үлес қосушы кредиті",
+        "feedback": "Пікір үшін кредит",
+        "influencer": "Инфлюенсер кредиті",
+        "ossMonthlyReset": "Ашық кодты жобалар демеушілігінің ай сайынғы жаңаруы",
+        "ossSponsorship": "Ашық кодты жобаларға демеушілік кредиті",
+        "pullRequest": "Біріктіру сұрауы үшін кредит",
+        "usageIssue": "Пайдалану мәселесі үшін кредит",
+        "vibeDay": "Vibe күні кредиті"
       },
       "purchaseFallback": "Кредит сатып алу",
       "receipt": "Түбіртек",
       "receiptA11y": "Түбіртекті ашу: {{description}}, {{amount}}, {{date}} күні",
       "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес.",
-      "retentionLimit": "Кредиттердің ең соңғы тарихы көрсетілуде."
+      "retentionLimit": "Кредиттердің ең соңғы тарихы көрсетілуде.",
+      "voidedGrant": "Күші жойылды: {{description}}"
     },
     "title": "Кредит сатып алу",
     "description": "Кредиттер — Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына қосылатын бір реттік сатып алу. Дүкен шотыңыздан ақша алады және дүкен төлемді растағаннан кейін кредиттер қосылады.",
@@ -5099,6 +5117,20 @@
       "eu": "Еуропалық Одақ",
       "au": "Австралия",
       "jp": "Жапония"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Параметрлерді іздеу",
+    "noMatches": "Сәйкес параметрлер табылмады",
+    "emptyDescription": "Басқа параметр атауын немесе кілт сөзді қолданып көріңіз.",
+    "resultsStatus": "Табылған параметрлер: {{resultCount}}",
+    "keywords": {
+      "signOut": "шығу|есептік жазбадан шығу",
+      "appearance": "тақырып|түс схемасы|қараңғы режим",
+      "appUnlock": "биометрия|бетті тану|саусақ ізі",
+      "language": "тіл|аударма",
+      "notifications": "ескертулер|хабарландырулар",
+      "privacy": "талдау|қадағалау"
     }
   }
 }

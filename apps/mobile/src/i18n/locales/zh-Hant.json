@@ -309,6 +309,7 @@
     "hideBalance": "隱藏餘額",
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
+    "availableToSpendInOrganization": "可於此組織內花費",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
     "deleteAccountTitle": "刪除帳戶？",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "整個應用程式的修正與改進。",
     "changelogAreas": {
       "signIn": "登入",
-      "profileOrganizations": "個人資料與組織"
+      "profileOrganizations": "個人資料與組織",
+      "chat": "聊天",
+      "notifications": "通知",
+      "integrations": "整合"
     }
   },
   "preferences": {
@@ -1996,7 +2000,7 @@
       "searchPlaceholder": "搜尋存放庫",
       "noMatches": "沒有相符項目",
       "noRepositories": "沒有可用的儲存庫",
-      "noRepositoriesDescription": "你的帳戶尚未連結任何儲存庫。",
+      "noRepositoriesDescription": "若要載入儲存庫，請連結 GitHub 或 GitLab。",
       "loading": "載入中…",
       "accessibility": "儲存庫：{{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3443,7 +3447,7 @@
       "manageOnWeb": "網頁版帳單設定",
       "changePlan": "變更套餐",
       "buySeats": "購買席次",
-      "managedOnWeb": "套餐、席次和自動儲值是在網頁版上管理。",
+      "managedOnWeb": "套餐、席次和自動儲值是在 kilo.ai 上管理。",
       "setupAutoTopUp": "設定自動儲值",
       "manageAutoTopUp": "管理自動儲值",
       "opensOnWeb": "在網頁上開啟"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "點數扣除",
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",
+      "expiredGrant": "已過期：{{description}}",
       "googlePlayReceipt": "Google Play 收據",
       "kind": {
         "adjustment": "調整",
         "balanceNeutral": "餘額不變",
         "deduction": "扣除",
         "grant": "贈送點數",
+        "promotionalCredits": "推廣點數",
         "welcomeCredits": "歡迎點數",
         "purchase": "購買"
+      },
+      "program": {
+        "adminBulkGrant": "管理員點數發放",
+        "contributorChampion": "貢獻者冠軍點數",
+        "feedback": "意見回饋點數",
+        "influencer": "網紅點數",
+        "ossMonthlyReset": "開源贊助重設",
+        "ossSponsorship": "開源贊助點數",
+        "pullRequest": "提取要求點數",
+        "usageIssue": "用量問題點數",
+        "vibeDay": "Vibe day 點數"
       },
       "purchaseFallback": "點數購買",
       "receipt": "收據",
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。",
-      "retentionLimit": "顯示最近的點數紀錄。"
+      "retentionLimit": "顯示最近的點數紀錄。",
+      "voidedGrant": "已作廢：{{description}}"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
@@ -5099,6 +5117,20 @@
       "eu": "歐盟",
       "au": "澳洲",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "搜尋偏好設定",
+    "noMatches": "找不到符合的偏好設定",
+    "emptyDescription": "試試其他設定名稱或關鍵字。",
+    "resultsStatus": "已找到 {{resultCount}} 項偏好設定",
+    "keywords": {
+      "signOut": "登出|退出帳號",
+      "appearance": "主題|配色|深色模式",
+      "appUnlock": "生物辨識|臉部辨識|指紋",
+      "language": "語言|翻譯",
+      "notifications": "提醒|推播|通知",
+      "privacy": "分析|追蹤|隱私"
     }
   }
 }

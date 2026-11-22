@@ -1,3 +1,4 @@
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
@@ -9,12 +10,11 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
-import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
+import { CreditsNoteSlot } from '@/components/credits/credits-note-slot';
 import { PersonalCreditsLinks } from '@/components/credits/credits-links';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SectionHeader } from '@/components/ui/section-header';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
@@ -37,9 +37,24 @@ import { useTRPC } from '@/lib/trpc';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
 
+/**
+ * The memberships the Profile screen's `organizations.list` read stands in.
+ * The card needs them for one thing: a money role's own balance. That cannot
+ * come from `getContextBalance`, which answers `$0.00` for a
+ * `billing_manager`, so an `undefined` list would paint a money role's
+ * organization as empty. Keeping "not answered yet" and "could not load" apart
+ * lets the card hold its skeleton and its retry surface apart too. The failed
+ * arm carries the read's own error so the failure kind can name the cause: a
+ * refusal of the list is a refusal of the balance, not a transient failure.
+ */
+export type CreditsCardOrgList =
+  | { status: 'loading' }
+  | { status: 'error'; error: unknown; retry: () => void }
+  | { status: 'ready'; orgs: OrgListEntry[] };
+
 type CreditsCardProps = {
   readonly enabled: boolean;
-  orgs: OrgListEntry[] | undefined;
+  readonly orgList: CreditsCardOrgList;
 };
 
 /**
@@ -48,19 +63,6 @@ type CreditsCardProps = {
  * front of the number instead of moving behind it.
  */
 const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
-
-/**
- * One `caption` line at font scale 1. `text-xs` lays out at 14.1 dp on the
- * standard Android cell (measured on the Profile gate target), and the card's
- * nearest spacing class is `h-4` (14 dp).
- */
-const CAPTION_LINE_DP = 14.1;
-/**
- * The funded note's line count at font scale 1: the sentence wraps to two
- * `caption` lines in this card's column (gate-measured at 28.19 dp), one line
- * for the empty message and one for the loading bar.
- */
-const FUNDED_NOTE_LINES = 2;
 
 /**
  * The sentence each failure kind paints: the connection's own wording, the
@@ -77,7 +79,16 @@ const BALANCE_FAILURE_COPY = {
   retryable: 'profile.balanceLoadFailed',
 } as const;
 
-export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
+/**
+ * The Profile credits card. The amount follows the selected context:
+ * `getContextBalance` answers for Personal and for an organization where the
+ * viewer is not a money role (a member's own spend balance, which the server
+ * caps at the organization's balance), while `owner`, `admin` and
+ * `billing_manager` paint the organization's own balance from
+ * `organizations.list` — the same figure the Organization hub shows. A member's
+ * amount carries a caption naming that scope.
+ */
+export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
@@ -112,6 +123,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const measuredWidth = availableWidth ?? bodyWidth;
   const stackBalance = measuredWidth / fontScale < 370;
   const { t, i18n } = useTranslation();
+  // The picker no longer lives here: only a settled read can name an account
+  // and carry a role, so this local feeds the balance lookup alone.
+  const orgs = orgList.status === 'ready' ? orgList.orgs : undefined;
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
@@ -175,21 +189,64 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares
   // the balance error surface. Retry re-resolves the owner and re-fetches.
-  const balanceFailed = balanceQueryError || userIdError;
+  const balanceReadFailed = balanceQueryError || userIdError;
+
+  // The credit reads are gated on `hasUserId`, so with a failed identity read
+  // they can never answer. A money role's amount still paints — it comes from
+  // the membership row — so the note slot carries that branch's exit instead.
+  const identityReadBlocked = userIdError && !hasUserId;
+
+  // A failed membership list is this surface's own failure for an organization
+  // context, and only a fresh list can tell the card which balance that context
+  // is owed, so the retry re-reads it too. The note slot's identity exit reads
+  // the same control, so it is defined before that slot is built.
+  const retryBalance = () => {
+    if (orgList.status === 'error') {
+      orgList.retry();
+    }
+    refetchUserId();
+    void refetchBalance();
+  };
+
+  // Where the painted amount comes from. A money role (owner/admin/
+  // billing_manager) manages the organization's money, so the card shows the
+  // organization's own balance from `organizations.list` — the figure the
+  // Organization hub paints. `getContextBalance` is the viewer's member spend
+  // balance instead: for a plain member with a daily limit it is the remaining
+  // allowance, which the server caps at the organization's balance, and for a
+  // billing manager it answers `$0.00`, which is the defect this split fixes.
+  const selectedEntry = orgs?.find(entry => entry.organizationId === selectedOrgId);
+  const paintsOrgListBalance = selectedEntry !== undefined && isMoneyRole(selectedEntry.role);
+
+  // The list is this context's own read: while it has not answered there is no
+  // role to choose a source by, so the slot stays on its skeleton rather than
+  // painting the member balance a money role cannot spend. A failed list read
+  // owns the failure surface, because without it the card cannot know which
+  // balance the context is entitled to.
+  const orgListLoading = selectedOrgId != null && orgList.status === 'loading';
+  const orgListError = selectedOrgId != null && orgList.status === 'error';
+  // The list's own error, so the failure kind below names the list's cause too:
+  // a refused or terminal list read is not a transient failure, and offering
+  // Retry for one could never succeed. Only an organization context reads its
+  // balance from the list, so a Personal context never lets the membership
+  // read's error rewrite the personal balance failure's kind.
+  const orgListFailure =
+    selectedOrgId != null && orgList.status === 'error' ? orgList.error : undefined;
+
+  const balanceFailed =
+    orgListError || (!orgListLoading && !paintsOrgListBalance && balanceReadFailed);
 
   // The kind of the failure decides the copy and the action: a refusal is not a
   // transient failure, and a terminal one is the answer. Only a retryable or
   // offline failure offers Retry, because only those can succeed on a second
-  // attempt. The read itself settles regardless of the online manager
+  // attempt. The list read stands for the balance an organization context is
+  // owed, so its own error joins the classification beside the balance and
+  // identity reads. The read itself settles regardless of the online manager
   // (`SETTLE_WHILE_OFFLINE`), so an unreachable one names the connection by
   // having no server answer at all — no separate probe is needed here.
-  const balanceFailureErrors: unknown[] = [];
-  if (balanceError) {
-    balanceFailureErrors.push(balanceError);
-  }
-  if (userIdFailure) {
-    balanceFailureErrors.push(userIdFailure);
-  }
+  const balanceFailureErrors = [balanceError, userIdFailure, orgListFailure].filter(
+    failure => failure != null
+  );
   const balanceFailureKind = classifyReadFailureKind({
     errors: balanceFailureErrors,
     isPaused: false,
@@ -202,7 +259,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const creditsPending =
     creditData === undefined || (Boolean(selectedOrgId) && orgCreditsPlaceholder);
 
-  const balanceDollars = balance?.balance ?? 0;
+  // Microdollars for a money role's organization, dollars from the member read
+  // everywhere else.
+  const balanceDollars = paintsOrgListBalance
+    ? fromMicrodollars(selectedEntry.balance)
+    : (balance?.balance ?? 0);
   // One amount for the painted value and its spoken label: a label that stops
   // being passed keeps its old native value, so the shown amount would
   // otherwise still be announced as the hidden one.
@@ -222,63 +283,63 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // Treat "no data yet" as loading so the card shows a skeleton instead of `$0`
   // on a cold launch. The read itself settles regardless of the online manager,
   // and an unreachable one lands on `balanceFailed` instead of this branch.
-  const balancePending = balance === undefined && !balanceFailed;
+  const balancePending = balance === undefined && !balanceReadFailed;
   // `keepPreviousData` keeps the last account's amount on screen while the next
   // account's read runs, which would paint the previous account's balance under
   // the newly selected account's name with no cue at all. The skeleton owns that
   // window too, so a context switch never shows an amount that belongs to
   // another account; the read either answers or lands on `balanceFailed`.
+  //
+  // A money role's amount needs no read of its own: the list that answered the
+  // role carries the balance with it, so that branch waits only for the mask
+  // preference to load.
   const showBalanceSkeleton =
-    (balanceLoading || balancePending || balancePlaceholder || !hideBalanceLoaded) &&
-    !balanceFailed;
+    !balanceFailed &&
+    (orgListLoading ||
+      (!paintsOrgListBalance && (balanceLoading || balancePending || balancePlaceholder)) ||
+      !hideBalanceLoaded);
 
-  // Personal credits are a consumable bought in-app, so the personal row is
-  // shown on every platform and at any balance — a funded user must still be
-  // able to top up. Org billing stays a web flow and only members who can
-  // manage billing see the external CTA, matching the money-role gate on the
-  // organization hub screen.
-  const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
-  const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
+  // The member amount's scope: `getContextBalance` is the viewer's own spend
+  // balance — a plain member's daily allowance, capped by the organization's
+  // balance — not the organization's balance, so the row says which figure it
+  // paints. It waits for the settled membership entry, because until the role
+  // is known the caption would claim a scope the amount may not paint.
+  //
+  // The caption describes the amount it sits under, so it never paints over the
+  // block's own failure or over its skeleton: either window names a figure that
+  // is not on screen. Both keep the row, invisible to the eye and to a screen
+  // reader, so the card holds the height it has while the amount paints.
+  const scopeNoteHidden = balanceFailed || showBalanceSkeleton;
+  const organizationScopeNote =
+    selectedEntry !== undefined && !isMoneyRole(selectedEntry.role) ? (
+      <Text
+        className={cn('text-xs text-muted-foreground', scopeNoteHidden && 'opacity-0')}
+        {...(scopeNoteHidden
+          ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+          : {})}
+      >
+        {t('profile.availableToSpendInOrganization')}
+      </Text>
+    ) : null;
 
-  // The expiry note's slot: under the amount. No entrance fade — the caption
-  // holds a row of this block, so a fade that paints it late leaves it empty.
-  //
-  // The slot is a fixed box in every state: a funded account's sentence ("… in
-  // credits expires … Credits with the earliest expiry are used first.") wraps
-  // to two `caption` lines at this card's width and scale 1, the empty message
-  // is one line and the loading bar is one. A one-line slot grew the card by
-  // about 14 dp when funded credits landed and moved every row below it
-  // (Profile held-loading gate target, 2026-11-20).
-  //
-  // Both the line's height and the sentence's line count grow with the font
-  // scale, and the count grows faster than the scale: the column keeps its
-  // width in dp while every glyph widens, so a sentence that takes two lines at
-  // scale 1 takes about four at Android's largest scale. Reserving only
-  // `2 × scale` lines left the box one line short from about scale 1.5 and grew
-  // the card when a funded note landed — the shift this slot exists to prevent.
-  const noteLines = Math.ceil(FUNDED_NOTE_LINES * fontScale);
-  const expirySlot = (
-    <View
-      testID="credits-expiry-slot"
-      style={{ minHeight: CAPTION_LINE_DP * fontScale * noteLines }}
-    >
-      {creditsFailed && (
-        <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
-      )}
-      {!creditsFailed && creditsPending && (
-        // The bar stands in for one `caption` line (14.1pt tall), so it takes
-        // that line's height: a shorter bar lifted the value column, and the
-        // row's centering moved the amount itself when the note landed.
-        <Skeleton className="h-4 w-40 max-w-full rounded bg-muted-soft" />
-      )}
-      {!creditsFailed && !creditsPending && (
-        <CreditExpiryNote
-          creditBlocks={creditData.creditBlocks}
-          hiddenAmount={hideBalance || !hideBalanceLoaded ? HIDDEN_BALANCE : undefined}
-          emptyMessage={t('credits.noExpiringCredits')}
-        />
-      )}
-    </View>
+  // A failing identity read joins the note: its credits can never load, and a
+  // money role's amount still paints from the membership row, so its exit lives
+  // in this slot instead of over the amount. Only the painting branch carries
+  // that exit: everywhere else the identity failure owns the whole block, whose
+  // own retry already re-reads it.
+  const creditsNoteShown = !creditsFailed && !identityReadBlocked && !creditsPending;
+  const noteSlot = (
+    <CreditsNoteSlot
+      scope={organizationScopeNote}
+      failed={creditsFailed || identityReadBlocked}
+      retryable={identityReadBlocked && paintsOrgListBalance}
+      pending={creditsPending}
+      creditBlocks={creditsNoteShown ? creditData.creditBlocks : undefined}
+      hiddenAmount={hideBalance || !hideBalanceLoaded ? HIDDEN_BALANCE : undefined}
+      emptyMessage={t('credits.noExpiringCredits')}
+      onRetry={retryBalance}
+      fontScale={fontScale}
+    />
   );
 
   // `shrink-0 grow-0` keeps the amount at its text height: a horizontal
@@ -319,11 +380,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   // One purchase entry for the section, whichever scope is selected: the
   // personal one is the in-app purchase, and an organization's is its billing
-  // page, which only a storefront that may link to it can offer. It lives in the
-  // Credits header, so it never wraps to a row of its own in a narrow card and
-  // never reads as a muted label with nothing to press.
+  // page, which only a money role on a storefront that may link to it can
+  // offer — the same gate as the amount's own source. It lives in the Credits
+  // header, so it never wraps to a row of its own in a narrow card and never
+  // reads as a muted label with nothing to press.
   const orgBillingUrl =
-    selectedOrgId != null && canManageOrgBilling ? organizationBillingUrl(selectedOrgId) : null;
+    selectedOrgId != null && paintsOrgListBalance ? organizationBillingUrl(selectedOrgId) : null;
   let purchase: Readonly<{ label: string; onPress: () => void }> | null = null;
   if (selectedOrgId == null) {
     purchase = {
@@ -340,11 +402,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       },
     };
   }
-
-  const retryBalance = () => {
-    refetchUserId();
-    void refetchBalance();
-  };
 
   // The failure's own sentence: the variant names the cause, so a refusal is
   // not described as a transient failure and an unreachable read is not
@@ -412,7 +469,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         stacked={stackBalance}
         amount={amountLine}
         toggle={visibilityToggle}
-        note={expirySlot}
+        note={noteSlot}
       />
       {/* The person's own history and invoices sit under their balance; an
           organization's balance has no personal rows, so only the personal

@@ -309,6 +309,7 @@
     "hideBalance": "ਬੈਲੰਸ ਲੁਕਾਓ",
     "showBalance": "ਬੈਲੰਸ ਵਿਖਾਓ",
     "balanceHidden": "ਬੈਲੰਸ ਲੁਕਾਇਆ ਗਿਆ",
+    "availableToSpendInOrganization": "ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਖਰਚ ਕਰਨ ਲਈ ਉਪਲਬਧ",
     "signOutTitle": "ਕੀ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
     "signOutMessage": "ਆਪਣਾ ਵਰਕਸਪੇਸ ਵਰਤਣ ਲਈ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨਾ ਪਵੇਗਾ।",
     "deleteAccountTitle": "ਕੀ ਖਾਤਾ ਮਿਟਾਉਣਾ ਹੈ?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
     "changelogAreas": {
       "signIn": "ਸਾਈਨ ਇਨ",
-      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਤੇ ਸੰਸਥਾਵਾਂ"
+      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਤੇ ਸੰਸਥਾਵਾਂ",
+      "chat": "ਚੈਟ",
+      "notifications": "ਸੂਚਨਾਵਾਂ",
+      "integrations": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਖੋਜੋ",
       "noMatches": "ਕੋਈ ਮੇਲ ਨਹੀਂ",
       "noRepositories": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਉਪਲਬਧ ਨਹੀਂ",
-      "noRepositoriesDescription": "ਤੁਹਾਡੇ ਖਾਤੇ ਨਾਲ ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਨਹੀਂ ਹੈ।",
+      "noRepositoriesDescription": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਕਰਨ ਲਈ GitHub ਜਾਂ GitLab ਖਾਤਾ ਜੋੜੋ।",
       "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
       "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਬਿਲਿੰਗ ਸੈਟਿੰਗਾਂ",
       "changePlan": "ਪਲਾਨ ਬਦਲੋ",
       "buySeats": "ਸੀਟਾਂ ਖਰੀਦੋ",
-      "managedOnWeb": "ਪਲਾਨ, ਸੀਟਾਂ ਅਤੇ ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ ਵੈੱਬ ਉੱਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "managedOnWeb": "ਪਲਾਨ, ਸੀਟਾਂ ਅਤੇ ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ kilo.ai 'ਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
       "setupAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਸੈੱਟ ਕਰੋ",
       "manageAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਪ੍ਰਬੰਧ ਕਰੋ",
       "opensOnWeb": "ਵੈੱਬ 'ਤੇ ਖੁੱਲ੍ਹਦਾ ਹੈ"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "ਕ੍ਰੈਡਿਟ ਕਟੌਤੀ",
       "emptyDescription": "ਕ੍ਰੈਡਿਟ ਖਰੀਦਾਂ, ਰਸੀਦਾਂ ਅਤੇ ਵਰਤੋਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "emptyTitle": "ਕੋਈ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਨਹੀਂ",
+      "expiredGrant": "ਮਿਆਦ ਪੁੱਗ ਗਈ: {{description}}",
       "googlePlayReceipt": "Google Play ਤੋਂ ਰਸੀਦ",
       "kind": {
         "adjustment": "ਸਮਾਯੋਜਨ",
         "balanceNeutral": "ਬਕਾਇਆ ਅਪਰਿਵਰਤਿਤ",
         "deduction": "ਕਟੌਤੀ",
         "grant": "ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "promotionalCredits": "ਪ੍ਰੋਮੋਸ਼ਨਲ ਕ੍ਰੈਡਿਟ",
         "welcomeCredits": "ਸੁਆਗਤ ਕ੍ਰੈਡਿਟ",
         "purchase": "ਖਰੀਦ"
+      },
+      "program": {
+        "adminBulkGrant": "ਐਡਮਿਨ ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "contributorChampion": "ਯੋਗਦਾਨੀ ਚੈਂਪੀਅਨ ਕ੍ਰੈਡਿਟ",
+        "feedback": "ਫੀਡਬੈਕ ਕ੍ਰੈਡਿਟ",
+        "influencer": "ਇਨਫਲੂਐਂਸਰ ਕ੍ਰੈਡਿਟ",
+        "ossMonthlyReset": "ਓਪਨ ਸੋਰਸ ਸਪਾਂਸਰਸ਼ਿਪ ਦਾ ਮਹੀਨਾਵਾਰ ਰੀਸੈਟ",
+        "ossSponsorship": "ਓਪਨ ਸੋਰਸ ਸਪਾਂਸਰਸ਼ਿਪ ਕ੍ਰੈਡਿਟ",
+        "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਕ੍ਰੈਡਿਟ",
+        "usageIssue": "ਵਰਤੋਂ ਸਮੱਸਿਆ ਕ੍ਰੈਡਿਟ",
+        "vibeDay": "Vibe day ਕ੍ਰੈਡਿਟ"
       },
       "purchaseFallback": "ਕ੍ਰੈਡਿਟ ਖਰੀਦ",
       "receipt": "ਰਸੀਦ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ਲਈ ਰਸੀਦ ਖੋਲ੍ਹੋ",
       "receiptUnavailable": "ਇਸ ਖਰੀਦ ਲਈ ਕੋਈ ਰਸੀਦ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
-      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।"
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।",
+      "voidedGrant": "ਰੱਦ ਕੀਤਾ: {{description}}"
     },
     "title": "ਕ੍ਰੈਡਿਟ ਖਰੀਦੋ",
     "description": "ਕ੍ਰੈਡਿਟ ਇੱਕ-ਵਾਰ ਦੀ ਖਰੀਦ ਹੈ ਜੋ Kilo ਐਪ ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਵਿੱਚ ਜੋੜੀ ਜਾਂਦੀ ਹੈ। ਸਟੋਰ ਤੁਹਾਡੇ ਖਾਤੇ ਤੋਂ ਚਾਰਜ ਲੈਂਦਾ ਹੈ ਅਤੇ ਸਟੋਰ ਵੱਲੋਂ ਭੁਗਤਾਨ ਦੀ ਪੁਸ਼ਟੀ ਕਰਨ ਤੋਂ ਬਾਅਦ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",
@@ -5099,6 +5117,20 @@
       "eu": "ਯੂਰਪੀ ਸੰਘ",
       "au": "ਆਸਟ੍ਰੇਲੀਆ",
       "jp": "ਜਾਪਾਨ"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ਤਰਜੀਹਾਂ ਦੀ ਖੋਜ",
+    "noMatches": "ਕੋਈ ਮੇਲ ਖਾਂਦੀ ਤਰਜੀਹ ਨਹੀਂ",
+    "emptyDescription": "ਕਿਸੇ ਹੋਰ ਤਰਜੀਹ ਦੇ ਨਾਮ ਜਾਂ ਮੁੱਖ ਸ਼ਬਦ ਨਾਲ ਖੋਜੋ।",
+    "resultsStatus": "ਮਿਲੀਆਂ ਤਰਜੀਹਾਂ: {{resultCount}}",
+    "keywords": {
+      "signOut": "ਸਾਈਨ ਆਊਟ|ਬਾਹਰ ਨਿਕਲੋ",
+      "appearance": "ਦਿੱਖ|ਥੀਮ|ਰੰਗ",
+      "appUnlock": "ਬਾਇਓਮੈਟ੍ਰਿਕਸ|ਚਿਹਰਾ|ਉਂਗਲ ਦੀ ਛਾਪ",
+      "language": "ਭਾਸ਼ਾ|ਅਨੁਵਾਦ",
+      "notifications": "ਸੂਚਨਾਵਾਂ|ਚੇਤਾਵਨੀਆਂ",
+      "privacy": "ਵਿਸ਼ਲੇਸ਼ਣ|ਨਿਗਰਾਨੀ|ਗੋਪਨੀਯਤਾ"
     }
   }
 }

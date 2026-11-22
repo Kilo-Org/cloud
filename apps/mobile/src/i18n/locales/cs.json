@@ -311,6 +311,7 @@
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
+    "availableToSpendInOrganization": "Dostupné k utracení v této organizaci",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",
@@ -556,8 +557,11 @@
     "changelogFixesIn": "Opravy a vylepšení v oblastech: {{areas}}.",
     "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
     "changelogAreas": {
-      "signIn": "Přihlášení",
-      "profileOrganizations": "Profil i organizace"
+      "signIn": "přihlášení",
+      "profileOrganizations": "profil i organizace",
+      "chat": "konverzace",
+      "notifications": "oznámení",
+      "integrations": "integrace"
     }
   },
   "preferences": {
@@ -2661,7 +2665,7 @@
       "searchPlaceholder": "Hledat repozitáře",
       "noMatches": "Žádné shody",
       "noRepositories": "Žádné repozitáře nejsou k dispozici",
-      "noRepositoriesDescription": "K vašemu účtu nejsou připojeny žádné repozitáře.",
+      "noRepositoriesDescription": "Chcete-li načíst repozitáře, připojte GitHub nebo GitLab.",
       "loading": "Načítání…",
       "accessibility": "Repozitář: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3575,7 +3579,7 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
-      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na webu.",
+      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na kilo.ai.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"
@@ -4664,20 +4668,34 @@
       "deductionFallback": "Odečtení kreditů",
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
+      "expiredGrant": "Platnost vypršela: {{description}}",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
         "balanceNeutral": "Bez vlivu na zůstatek",
         "deduction": "Odečtení",
         "grant": "Přidělení kreditů",
+        "promotionalCredits": "Propagační kredity",
         "welcomeCredits": "Uvítací kredity",
         "purchase": "Nákup"
+      },
+      "program": {
+        "adminBulkGrant": "Přidělení kreditů správcem",
+        "contributorChampion": "Kredit pro šampiona přispěvatelů",
+        "feedback": "Kredit za zpětnou vazbu",
+        "influencer": "Kredit pro influencery",
+        "ossMonthlyReset": "Měsíční obnovení kreditů OSS",
+        "ossSponsorship": "Kredit za sponzorství OSS",
+        "pullRequest": "Kredit za PR",
+        "usageIssue": "Kredit za problém s využitím",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
       "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
-      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů.",
+      "voidedGrant": "Stornováno: {{description}}"
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
@@ -5273,6 +5291,20 @@
       "eu": "Evropská unie",
       "au": "Austrálie",
       "jp": "Japonsko"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hledat předvolby",
+    "noMatches": "Žádné odpovídající předvolby",
+    "emptyDescription": "Zkuste jiný název předvolby nebo klíčové slovo.",
+    "resultsStatus": "Nalezené předvolby: {{resultCount}}",
+    "keywords": {
+      "signOut": "odhlášení|odhlásit se",
+      "appearance": "motiv|barevné schéma|tmavý režim",
+      "appUnlock": "biometrie|obličej|otisk prstu",
+      "language": "jazyk|překlad",
+      "notifications": "upozornění|oznámení",
+      "privacy": "analytika|sledování"
     }
   }
 }

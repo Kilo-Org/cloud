@@ -35,20 +35,20 @@ async function applyToVercel(
   request: GatewayRequest,
   userByok: { decryptedAPIKey: string; providerId: 'anthropic' }[] | null
 ) {
-  await applyProviderSpecificLogic(
-    VERCEL_AI_GATEWAY,
-    'anthropic/claude-sonnet-4.5',
-    request,
-    {},
+  await applyProviderSpecificLogic({
+    provider: VERCEL_AI_GATEWAY,
+    requestedModel: 'anthropic/claude-sonnet-4.5',
+    requestToMutate: request,
+    extraHeaders: {},
     userByok,
-    EmptyFraudDetectionHeaders,
-    'user-1',
-    null,
-    null,
-    null,
-    false,
-    null
-  );
+    originalHeaders: EmptyFraudDetectionHeaders,
+    userId: 'user-1',
+    organizationId: null,
+    sessionId: null,
+    taskId: null,
+    isNonTrialEnterprise: false,
+    dataRegion: null,
+  });
   return request.body.providerOptions?.gateway;
 }
 

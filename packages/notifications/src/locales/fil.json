@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Bagong security finding ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritikal",
+      "high": "Mataas",
+      "medium": "Katamtaman",
+      "low": "Mababa"
+    },
     "securityFindingSlaWarning": {
       "title": "Babala sa SLA"
     },

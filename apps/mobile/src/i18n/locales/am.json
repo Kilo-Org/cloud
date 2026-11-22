@@ -309,6 +309,7 @@
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
+    "availableToSpendInOrganization": "በዚህ ድርጅት ውስጥ ለወጪ የሚገኝ",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
     "changelogAreas": {
       "signIn": "መግቢያ",
-      "profileOrganizations": "መገለጫና ድርጅቶች"
+      "profileOrganizations": "መገለጫና ድርጅቶች",
+      "chat": "ውይይት",
+      "notifications": "ማሳወቂያዎች",
+      "integrations": "ውህደቶች"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "የማከማቻ ፍለጋ",
       "noMatches": "ምንም ተዛማጆች የሉም",
       "noRepositories": "ምንም ማከማቻዎች አይገኙም",
-      "noRepositoriesDescription": "ከመለያዎ ጋር ምንም ማከማቻዎች አልተገናኙም።",
+      "noRepositoriesDescription": "ማከማቻዎችን ለመጫን GitHub ወይም GitLabን አገናኝ።",
       "loading": "በመጫን ላይ…",
       "accessibility": "ማከማቻ፦ {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "የክፍያ ቅንብሮች በድር ላይ",
       "changePlan": "ዕቅድ ይቀይሩ",
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
-      "managedOnWeb": "ዕቅዱ፣ የተጠቃሚ ፈቃዶች እና ራስ-ሰር መሙላት የሚተዳደሩት በድር ላይ ነው።",
+      "managedOnWeb": "ዕቅዱ፣ የተጠቃሚ ፈቃዶች እና ራስ-ሰር መሙላት የሚተዳደሩት በkilo.ai ላይ ነው።",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
       "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
       "opensOnWeb": "በድር ላይ ይከፈታል"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "የክሬዲት ቅነሳ",
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
       "emptyTitle": "የክሬዲት ታሪክ የለም",
+      "expiredGrant": "ጊዜው አልፏል፦ {{description}}",
       "googlePlayReceipt": "ደረሰኝ ከGoogle Play",
       "kind": {
         "adjustment": "ማስተካከያ",
         "balanceNeutral": "ቀሪ ሂሳብን የማይቀይር",
         "deduction": "ቅነሳ",
         "grant": "የክሬዲት ስጦታ",
+        "promotionalCredits": "የማስተዋወቂያ ክሬዲት",
         "welcomeCredits": "የእንኳን ደህና መጡ ክሬዲት",
         "purchase": "ግዢ"
+      },
+      "program": {
+        "adminBulkGrant": "የአስተዳዳሪ ክሬዲት ስጦታ",
+        "contributorChampion": "የአስተዋጽኦ ሻምፒዮን ክሬዲት",
+        "feedback": "የግብረ-መልስ ክሬዲት",
+        "influencer": "የኢንፍሉዌንሰር ክሬዲት",
+        "ossMonthlyReset": "የክፍት ምንጭ ሶፍትዌር ክሬዲት ወርሃዊ እድሳት",
+        "ossSponsorship": "የክፍት ምንጭ ሶፍትዌር ድጋፍ ክሬዲት",
+        "pullRequest": "የማዋሃድ ጥያቄ ክሬዲት",
+        "usageIssue": "የአጠቃቀም ችግር ክሬዲት",
+        "vibeDay": "የVibe Day ክሬዲት"
       },
       "purchaseFallback": "የክሬዲት ግዢ",
       "receipt": "ደረሰኝ",
       "receiptA11y": "የ{{description}}፣ {{amount}}፣ ከ{{date}} ደረሰኝን ክፈት",
       "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።",
-      "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።"
+      "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።",
+      "voidedGrant": "ተሰርዟል፦ {{description}}"
     },
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
@@ -5099,6 +5117,20 @@
       "eu": "የአውሮፓ ህብረት",
       "au": "አውስትራሊያ",
       "jp": "ጃፓን"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "የምርጫዎች ፍለጋ",
+    "noMatches": "የሚዛመዱ ምርጫዎች የሉም",
+    "emptyDescription": "ሌላ የምርጫ ስም ወይም ቁልፍ ቃል ሞክር።",
+    "resultsStatus": "የተገኙ ምርጫዎች፦ {{resultCount}}",
+    "keywords": {
+      "signOut": "መውጣት|ዘግቶ መውጣት",
+      "appearance": "ገጽታ|ቀለም|ጨለማ",
+      "appUnlock": "ባዮሜትሪክስ|የፊት መለያ|የጣት አሻራ",
+      "language": "ቋንቋ|ትርጉም",
+      "notifications": "ማንቂያዎች|ማሳወቂያዎች",
+      "privacy": "ትንታኔ|ክትትል"
     }
   }
 }

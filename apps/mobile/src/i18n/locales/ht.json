@@ -309,6 +309,7 @@
     "hideBalance": "Kache balans",
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
+    "availableToSpendInOrganization": "Disponib pou depanse nan òganizasyon sa a",
     "signOutTitle": "Dekonekte?",
     "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "deleteAccountTitle": "Efase kont?",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Koreksyon ak amelyorasyon nan {{areas}}.",
     "changelogFixesPolish": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
     "changelogAreas": {
-      "signIn": "Koneksyon",
-      "profileOrganizations": "Pwofil ak òganizasyon"
+      "signIn": "koneksyon",
+      "profileOrganizations": "pwofil ak òganizasyon",
+      "chat": "diskisyon",
+      "notifications": "notifikasyon",
+      "integrations": "entegrasyon"
     }
   },
   "preferences": {
@@ -2561,7 +2565,7 @@
       "searchPlaceholder": "Chèche depo",
       "noMatches": "Pa gen rezilta",
       "noRepositories": "Pa gen depo disponib",
-      "noRepositoriesDescription": "Pa gen depo ki konekte ak kont ou a.",
+      "noRepositoriesDescription": "Konekte GitHub oswa GitLab pou chaje depo yo.",
       "loading": "Ap chaje…",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Paramèt faktirasyon sou entènèt",
       "changePlan": "Chanje plan",
       "buySeats": "Achte plas",
-      "managedOnWeb": "Se sou entènèt yo jere plan an, plas yo ak rechaj otomatik la.",
+      "managedOnWeb": "Se sou kilo.ai yo jere plan an, plas yo ak rechaj otomatik la.",
       "setupAutoTopUp": "Konfigire rechaj otomatik",
       "manageAutoTopUp": "Jere rechaj otomatik",
       "opensOnWeb": "Ap louvri sou entènèt la"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "Dediksyon kredi",
       "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
       "emptyTitle": "Pa gen istorik kredi",
+      "expiredGrant": "Ekspire: {{description}}",
       "googlePlayReceipt": "Resi ki nan Google Play",
       "kind": {
         "adjustment": "Ajisteman",
         "balanceNeutral": "San efè sou balans",
         "deduction": "Dediksyon",
         "grant": "Kredi gratis",
+        "promotionalCredits": "Kredi pwomosyonèl",
         "welcomeCredits": "Kredi byenvini",
         "purchase": "Acha"
+      },
+      "program": {
+        "adminBulkGrant": "Kredi administratè",
+        "contributorChampion": "Kredi chanpyon kontribitè",
+        "feedback": "Kredi kòmantè",
+        "influencer": "Kredi enfliyansè",
+        "ossMonthlyReset": "Reyinisyalizasyon chak mwa parennaj kòd ouvè",
+        "ossSponsorship": "Kredi parennaj kòd ouvè",
+        "pullRequest": "Kredi demann fizyon",
+        "usageIssue": "Kredi pou pwoblèm itilizasyon",
+        "vibeDay": "Kredi jou Vibe"
       },
       "purchaseFallback": "Acha kredi",
       "receipt": "Resi",
       "receiptA11y": "Louvri resi pou {{description}}, {{amount}}, soti {{date}}",
       "receiptUnavailable": "Pa gen resi disponib pou acha sa a.",
-      "retentionLimit": "Sa yo se istorik kredi ki pi resan an."
+      "retentionLimit": "Sa yo se istorik kredi ki pi resan an.",
+      "voidedGrant": "Anile: {{description}}"
     },
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
@@ -5099,6 +5117,20 @@
       "eu": "Inyon Ewopeyen",
       "au": "Ostrali",
       "jp": "Japon"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Non preferans lan",
+    "noMatches": "Pa gen preferans ki koresponn",
+    "emptyDescription": "Eseye yon lòt non preferans oswa mo kle.",
+    "resultsStatus": "Preferans yo jwenn: {{resultCount}}",
+    "keywords": {
+      "signOut": "dekonekte|soti|fèmen sesyon",
+      "appearance": "tèm|koulè|mòd nwa",
+      "appUnlock": "byometri|figi|anprent",
+      "language": "lang|tradiksyon",
+      "notifications": "alèt|notifikasyon",
+      "privacy": "analiz|swivi|konfidansyalite"
     }
   }
 }

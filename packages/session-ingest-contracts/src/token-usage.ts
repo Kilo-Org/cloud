@@ -1,0 +1,16 @@
+import { z } from 'zod';
+
+/**
+ * The one token-usage shape a message and an SDK payload both carry. An SDK
+ * payload extends it with an optional `total`; the counts themselves are the
+ * same five.
+ *
+ * Left non-strict on purpose: both producers send keys beyond these, and a
+ * reader keeping the counts must not reject a payload for them.
+ */
+export const tokenUsageSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  reasoning: z.number(),
+  cache: z.object({ read: z.number(), write: z.number() }),
+});

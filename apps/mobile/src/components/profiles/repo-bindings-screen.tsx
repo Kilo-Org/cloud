@@ -39,6 +39,7 @@ import {
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
+import { connectedServicesHref } from '@/lib/profile-navigation';
 import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
@@ -321,6 +322,7 @@ export function RepoBindingsScreen({
           onClose={() => {
             setRepoPickerOpen(false);
           }}
+          connectedServicesHref={connectedServicesHref(organizationId)}
         />
       ) : null}
 

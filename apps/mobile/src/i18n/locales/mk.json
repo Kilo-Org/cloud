@@ -309,6 +309,7 @@
     "hideBalance": "Скриј ја состојбата",
     "showBalance": "Прикажи ја состојбата",
     "balanceHidden": "Состојбата е скриена",
+    "availableToSpendInOrganization": "Достапно за трошење во оваа организација",
     "signOutTitle": "Да се одјавиш?",
     "signOutMessage": "Ќе треба повторно да се најавиш за да пристапиш до твојот работен простор.",
     "deleteAccountTitle": "Да се избрише сметката?",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Поправки и подобрувања во следниве области: {{areas}}.",
     "changelogFixesPolish": "Поправки и подобрувања низ целата апликација.",
     "changelogAreas": {
-      "signIn": "Најава",
-      "profileOrganizations": "Профил & организации"
+      "signIn": "најава",
+      "profileOrganizations": "профил & организации",
+      "chat": "разговор",
+      "notifications": "известувања",
+      "integrations": "интеграции"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "Пребарување репозиториуми",
       "noMatches": "Нема совпаѓања",
       "noRepositories": "Нема достапни репозиториуми",
-      "noRepositoriesDescription": "Ниту еден репозиториум не е поврзан со твојата сметка.",
+      "noRepositoriesDescription": "За да вчиташ репозиториуми, поврзи сметка на GitHub или GitLab.",
       "loading": "Вчитување…",
       "accessibility": "Репозиториум: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Поставки на наплатата на веб",
       "changePlan": "Промени план",
       "buySeats": "Купи места",
-      "managedOnWeb": "Планот, местата и автоматското дополнување се управуваат на веб.",
+      "managedOnWeb": "Планот, местата и автоматското дополнување се управуваат на kilo.ai.",
       "setupAutoTopUp": "Постави автоматско дополнување",
       "manageAutoTopUp": "Управувај со автоматско дополнување",
       "opensOnWeb": "Се отвора на веб"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "Одбивање кредити",
       "emptyDescription": "Купувањата на кредити, сметките и користењето ќе се појават тука.",
       "emptyTitle": "Нема историја на кредити",
+      "expiredGrant": "Истечен рок: {{description}}",
       "googlePlayReceipt": "Сметка од Google Play",
       "kind": {
         "adjustment": "Корекција",
         "balanceNeutral": "Без промена на салдото",
         "deduction": "Одбивање",
         "grant": "Доделени кредити",
+        "promotionalCredits": "Промоционални кредити",
         "welcomeCredits": "Кредити за добредојде",
         "purchase": "Купување"
+      },
+      "program": {
+        "adminBulkGrant": "Кредити од администратор",
+        "contributorChampion": "Кредит за шампион меѓу соработниците",
+        "feedback": "Кредит за повратни информации",
+        "influencer": "Кредит за инфлуенсери",
+        "ossMonthlyReset": "Месечно ресетирање на спонзорството за отворен код",
+        "ossSponsorship": "Кредит за спонзорство на отворен код",
+        "pullRequest": "Кредит за барање за спојување",
+        "usageIssue": "Кредит за проблем со користењето",
+        "vibeDay": "Кредит за Vibe day"
       },
       "purchaseFallback": "Купување кредити",
       "receipt": "Сметка",
       "receiptA11y": "Отвори ја сметката за {{description}}, {{amount}}, од {{date}}",
       "receiptUnavailable": "Не е достапна сметка за ова купување.",
-      "retentionLimit": "Се прикажува најновата историја на кредити."
+      "retentionLimit": "Се прикажува најновата историја на кредити.",
+      "voidedGrant": "Поништено: {{description}}"
     },
     "title": "Купи кредити",
     "description": "Кредитите се еднократна набавка што се додава на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App. Продавницата ви го наплатува сметката и кредитите се додаваат откако продавницата ќе го потврди плаќањето.",
@@ -5099,6 +5117,20 @@
       "eu": "Европска Унија",
       "au": "Австралија",
       "jp": "Јапонија"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Пребарување поставки",
+    "noMatches": "Нема соодветни поставки",
+    "emptyDescription": "Обиди се со друго име на поставка или клучен збор.",
+    "resultsStatus": "Пронајдени поставки: {{resultCount}}",
+    "keywords": {
+      "signOut": "одјава|излез од сметката",
+      "appearance": "тема|шема на бои",
+      "appUnlock": "биометрија|лице|отпечаток од прст",
+      "language": "јазик|превод",
+      "notifications": "предупредувања|известувања",
+      "privacy": "аналитика|следење"
     }
   }
 }

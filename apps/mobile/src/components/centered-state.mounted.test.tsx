@@ -130,11 +130,20 @@ async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>>
   act(() => {
     contentNode()?.props.onLayout?.(contentLayout as LayoutChangeEvent);
   });
+  // The scroller's own layout event is the only thing that starts a
+  // measurement: a mount requests none, so a test that expects a measured
+  // placement fires it before draining `native.measurements`.
+  const scrollLayout = () => {
+    act(() => {
+      scroll().onLayout?.(contentLayout as LayoutChangeEvent);
+    });
+  };
   return {
     ...mounted,
     content,
     contentNode,
     scroll,
+    scrollLayout,
     rerender: () => {
       act(() => {
         rerender?.();
@@ -259,6 +268,74 @@ describe('Shared state placement', () => {
 });
 
 describe('CenteredState measurements', () => {
+  it('starts one measurement for a mount, not two', async () => {
+    // The mount commit used to start two requests — the measuring callback ref
+    // for the scroller and the mount layout effect — and the token guard
+    // discarded one of them on every mount. The scroller's own layout event is
+    // the only trigger now, so a mount plus one event is exactly one request.
+    const mounted = await mount();
+    expect(native.measureInWindow).not.toHaveBeenCalled();
+    mounted.scrollLayout();
+    expect(native.measureInWindow).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
+  it('starts no second request in the commit that mounts the scroller', async () => {
+    // The second request on a mount came from the mount effect, not from a
+    // second layout event, so one event must cost exactly one measurement and
+    // only a new event may add another.
+    const mounted = await mount();
+    mounted.scrollLayout();
+    expect(native.measureInWindow).toHaveBeenCalledTimes(1);
+    mounted.scrollLayout();
+    expect(native.measureInWindow).toHaveBeenCalledTimes(2);
+    mounted.unmount();
+  });
+
+  it('keeps the scroller ref callback across a window change', async () => {
+    // The callback ref used to be rebuilt from the measurement, so a window
+    // height change detached the node and re-attached it, which marked the
+    // state unplaceable on the way back.
+    const mounted = await mount();
+    mounted.scrollLayout();
+    mounted.settle(380, 340);
+    expect(mounted.scroll().contentContainerStyle).toMatchObject({
+      minHeight: 340,
+      paddingBottom: 16,
+    });
+    expect(native.measureInWindow).toHaveBeenCalledTimes(1);
+    const refBefore = (
+      mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<typeof ScrollView>
+    ).ref;
+
+    native.window = { width: 400, height: 700 };
+    mounted.rerender();
+    expect(
+      (
+        mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<
+          typeof ScrollView
+        >
+      ).ref
+    ).toBe(refBefore);
+    // The shortened band waits for its own measurement; the placement already
+    // painted is not carried into a window it was not measured against.
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+
+    mounted.scrollLayout();
+    expect(native.measureInWindow).toHaveBeenCalledTimes(2);
+    mounted.settle(380, 340);
+    // The new window clips the scroller 20 above its bottom, so the placement
+    // carries that clip and the state is placed, not left at the estimate.
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 36,
+    });
+    mounted.unmount();
+  });
+
   it('keeps a horizontal inset on the content box, not the scroller', async () => {
     // The scroller's own padding does not narrow the scroll content, so an inset
     // set through `className` leaves the end side flush in a right-to-left layout.
@@ -286,6 +363,7 @@ describe('CenteredState measurements', () => {
       } else {
         expectPainted(mounted);
       }
+      mounted.scrollLayout();
       mounted.settle();
       expectPainted(mounted);
       expect(mounted.scroll().contentContainerStyle).toEqual({
@@ -325,6 +403,7 @@ describe('CenteredState measurements', () => {
       const mounted = await mount();
       expect(mounted.renderer.root.findAllByProps({ testID: 'state-content' })).toHaveLength(0);
       expect(mounted.scroll().contentContainerStyle).toBeUndefined();
+      mounted.scrollLayout();
       mounted.settle(80, 340);
       expectPainted(mounted);
       expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: bandHeight });
@@ -339,6 +418,7 @@ describe('CenteredState measurements', () => {
     native.surface.bottomInset = 78;
     const mounted = await mount();
     expect(mounted.renderer.root.findAllByProps({ testID: 'state-content' })).toHaveLength(0);
+    mounted.scrollLayout();
     act(() => {
       for (const onMeasure of native.measurements.splice(0)) {
         onMeasure(0, Number.NaN, 400, Number.NaN);
@@ -356,6 +436,7 @@ describe('CenteredState measurements', () => {
 
   it('waits for finite native viewport bounds without hiding the state', async () => {
     const mounted = await mount();
+    mounted.scrollLayout();
     act(() => {
       for (const onMeasure of native.measurements.splice(0)) {
         onMeasure(0, Number.NaN, 400, Number.NaN);
@@ -378,10 +459,9 @@ describe('CenteredState measurements', () => {
     // scene re-attaching its host view, a native clip edge arriving late — is no
     // reason to move a state that is already on screen.
     const mounted = await mount();
+    mounted.scrollLayout();
     mounted.settle(80, 340);
-    act(() => {
-      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
-    });
+    mounted.scrollLayout();
     const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     native.surface.frame = { top: 300, bottom: 800 };
@@ -399,11 +479,12 @@ describe('CenteredState measurements', () => {
 
   it('drops a stale viewport when the window it was measured in changes', async () => {
     const mounted = await mount();
+    mounted.scrollLayout();
     mounted.settle();
-    act(() => {
-      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
-    });
     expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
+    // A request still in flight when the window changes describes the band it
+    // was started for, so its answer must not place the state in the new one.
+    mounted.scrollLayout();
     const stale = native.measurements.splice(0);
     native.window = { width: 400, height: 700 };
     mounted.rerender();
@@ -418,6 +499,7 @@ describe('CenteredState measurements', () => {
     // A viewport measured against the old window is not reused for the new one.
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+    mounted.scrollLayout();
     mounted.settle(380, 340);
     expectPainted(mounted);
     // Content taller than the shortened band scrolls from its top, and the
@@ -433,10 +515,9 @@ describe('CenteredState measurements', () => {
 
   it('keeps a revealed state on screen with its placement when its scroller detaches', async () => {
     const mounted = await mount();
+    mounted.scrollLayout();
     mounted.settle();
-    act(() => {
-      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
-    });
+    mounted.scrollLayout();
     const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     const props = mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<
@@ -446,6 +527,7 @@ describe('CenteredState measurements', () => {
       throw new TypeError('Expected a measuring callback ref');
     }
     const ref = props.ref;
+    const beforeDetach = native.measureInWindow.mock.calls.length;
     act(() => {
       ref(null);
     });
@@ -464,6 +546,13 @@ describe('CenteredState measurements', () => {
     act(() => {
       ref(native.scroll as ScrollViewInstance);
     });
+    // Recording the node only records it: neither the detach nor the re-attach
+    // starts a request, so the placement stays and no answer is discarded.
+    expect(native.measureInWindow.mock.calls).toHaveLength(beforeDetach);
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
+    mounted.scrollLayout();
+    expect(native.measureInWindow.mock.calls).toHaveLength(beforeDetach + 1);
     mounted.settle();
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
@@ -472,6 +561,7 @@ describe('CenteredState measurements', () => {
 
   it('keeps the state painted and placed while the surface re-measures', async () => {
     const mounted = await mount();
+    mounted.scrollLayout();
     mounted.settle();
     expectPainted(mounted);
     const placed = mounted.scroll().contentContainerStyle;
@@ -484,11 +574,11 @@ describe('CenteredState measurements', () => {
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     native.surface.frame = frame;
     mounted.rerender();
-    mounted.settle();
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     // An unreadable re-measure leaves the state painted at the pending
     // placement; the next readable measurement places it again.
+    mounted.scrollLayout();
     mounted.settle(0, 0);
     expectPainted(mounted);
     act(() => {
@@ -528,6 +618,7 @@ describe('CenteredState first-frame paint', () => {
     cycle();
 
     // A real measurement still wins and replaces the pending placement.
+    mounted.scrollLayout();
     mounted.settle();
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual({
@@ -590,6 +681,7 @@ describe('CenteredState first-frame paint', () => {
     native.surface.topInset = 52;
     native.surface.bottomInset = 24;
     held.rerender();
+    held.scrollLayout();
     held.settle(80, 900 - 80);
     expectPainted(held);
     // First paint: the band style built from the reported insets. The band
@@ -633,6 +725,7 @@ describe('CenteredState first-frame paint', () => {
     native.surface.topInset = 0;
     native.surface.bottomInset = 0;
     const heldLate = await mount();
+    heldLate.scrollLayout();
     heldLate.settle(80, 900 - 80);
     expect(heldLate.contentNode()).toBeUndefined();
     expect(heldLate.scroll().contentContainerStyle).toBeUndefined();

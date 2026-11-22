@@ -70,9 +70,10 @@ export function selectProfileReadErrorView({
     // control offers.
     return { variant: 'not-found', showRetry: false, titleKey: null, descriptionKey: null };
   }
-  // Only an error with no coded verdict reaches connectivity: the read may
-  // recover as soon as the connection returns, and the error body says nothing
-  // about the request itself.
+  // A refusal that is not terminal is judged by connectivity: the server may
+  // answer differently once the device can reach it, and a confirmed-offline
+  // device is the honest cause until then. So is an error with no envelope at
+  // all, whose body says nothing about the request itself.
   if (connectivity === 'offline') {
     return {
       variant: 'offline',

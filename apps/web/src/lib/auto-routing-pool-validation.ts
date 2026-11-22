@@ -56,7 +56,7 @@ export async function buildEligibleCatalog(params: {
       'member',
       { countryCode: null }
     );
-    ownerModels = orgCatalog?.data ?? [];
+    ownerModels = orgCatalog.data;
   } else {
     ownerModels = managedModels;
   }

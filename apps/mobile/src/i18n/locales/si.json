@@ -309,6 +309,7 @@
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
+    "availableToSpendInOrganization": "මෙම සංවිධානය තුළ වියදම් කිරීමට ලබා ගත හැක",
     "signOutTitle": "පිටවන්නද?",
     "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "deleteAccountTitle": "ගිණුම මකන්නද?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogAreas": {
       "signIn": "පුරනය වීම",
-      "profileOrganizations": "පැතිකඩ හා සංවිධාන"
+      "profileOrganizations": "පැතිකඩ හා සංවිධාන",
+      "chat": "කතාබස්",
+      "notifications": "දැනුම්දීම්",
+      "integrations": "ඒකාබද්ධ කිරීම්"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "කේත ගබඩා සොයන්න",
       "noMatches": "ගැළපීම් නැත",
       "noRepositories": "ලබාගත හැකි ගබඩා නැත",
-      "noRepositoriesDescription": "ඔබේ ගිණුමට සම්බන්ධ වූ ගබඩා නොමැත.",
+      "noRepositoriesDescription": "ගබඩා පූරණය කිරීමට GitHub හෝ GitLab සම්බන්ධ කරන්න.",
       "loading": "පූරණය වෙමින්…",
       "accessibility": "ගබඩාව: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "වෙබයේ බිල්පත් සැකසීම්",
       "changePlan": "සැලැස්ම වෙනස් කරන්න",
       "buySeats": "සාමාජික ස්ථාන මිලදී ගන්න",
-      "managedOnWeb": "සැලැස්ම, සාමාජික ස්ථාන සහ ස්වයංක්‍රීය ටොප්-අප් වෙබයේ කළමනාකරණය කෙරේ.",
+      "managedOnWeb": "සැලැස්ම, සාමාජික ස්ථාන සහ ස්වයංක්‍රීය ටොප්-අප් kilo.ai හි කළමනාකරණය කෙරේ.",
       "setupAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් සකසන්න",
       "manageAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් කළමනාකරණය කරන්න",
       "opensOnWeb": "වෙබයේ විවෘත වේ"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
       "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
+      "expiredGrant": "කල් ඉකුත් වී ඇත: {{description}}",
       "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
       "kind": {
         "adjustment": "ගැලපීම",
         "balanceNeutral": "ශේෂයට බලපෑමක් නැත",
         "deduction": "අඩු කිරීම",
         "grant": "ක්‍රෙඩිට් ප්‍රදානය",
+        "promotionalCredits": "ප්‍රවර්ධන ක්‍රෙඩිට්",
         "welcomeCredits": "පිළිගැනීමේ ක්‍රෙඩිට්",
         "purchase": "මිලදී ගැනීම"
+      },
+      "program": {
+        "adminBulkGrant": "පරිපාලක ක්‍රෙඩිට් ප්‍රදානය",
+        "contributorChampion": "දායක ශූර ක්‍රෙඩිට්",
+        "feedback": "ප්‍රතිපෝෂණ ක්‍රෙඩිට්",
+        "influencer": "ඉන්ෆ්ලුවෙන්සර් ක්‍රෙඩිට්",
+        "ossMonthlyReset": "OSS අනුග්‍රහය යළි සැකසීම",
+        "ossSponsorship": "OSS අනුග්‍රහ ක්‍රෙඩිට්",
+        "pullRequest": "පුල් ඉල්ලීම් ක්‍රෙඩිට්",
+        "usageIssue": "භාවිත ගැටලු ක්‍රෙඩිට්",
+        "vibeDay": "Vibe day ක්‍රෙඩිට්"
       },
       "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
       "receipt": "රිසිට්පත",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
       "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
-      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි."
+      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි.",
+      "voidedGrant": "අවලංගු කර ඇත: {{description}}"
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
@@ -5099,6 +5117,20 @@
       "eu": "යුරෝපීය සංගමය",
       "au": "ඕස්ට්‍රේලියාව",
       "jp": "ජපානය"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "මනාප සොයන්න",
+    "noMatches": "ගැළපෙන මනාප නැත",
+    "emptyDescription": "වෙනත් මනාපයක නමක් හෝ මූලපදයක් යොදා බලන්න.",
+    "resultsStatus": "හමු වූ මනාප: {{resultCount}}",
+    "keywords": {
+      "signOut": "පිටවන්න|ගිණුමෙන් පිටවීම",
+      "appearance": "තේමාව|වර්ණ පටිපාටිය",
+      "appUnlock": "ජෛවමිතික|මුහුණ|ඇඟිලි සලකුණ",
+      "language": "භාෂාව|පරිවර්තනය",
+      "notifications": "ඇඟවීම්|දැනුම්දීම්",
+      "privacy": "විශ්ලේෂණ|ලුහුබැඳීම"
     }
   }
 }

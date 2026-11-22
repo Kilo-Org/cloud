@@ -309,6 +309,7 @@
     "hideBalance": "Zoo ego fọdụrụ",
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
+    "availableToSpendInOrganization": "Ọ dị maka imefu na òtù a",
     "signOutTitle": "Pụọ?",
     "signOutMessage": "Ị ga-abanyerịrị ọzọ iji nweta ebe ọrụ gị.",
     "deleteAccountTitle": "Hichapụ akaụntụ?",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Ndozi na mmezi na {{areas}}.",
     "changelogFixesPolish": "Ndozi na mmezi n'ebe niile n'ime ngwa ahụ.",
     "changelogAreas": {
-      "signIn": "Ịbanye",
-      "profileOrganizations": "Profaịlụ nakwa òtù"
+      "signIn": "ịbanye",
+      "profileOrganizations": "profaịlụ nakwa òtù",
+      "chat": "nkata",
+      "notifications": "ọkwa",
+      "integrations": "njikọ"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "Chọọ ebe nchekwa koodu",
       "noMatches": "Enweghị ndakọrịta",
       "noRepositories": "Enweghị ebe nchekwa koodu dị",
-      "noRepositoriesDescription": "Enweghị ebe nchekwa koodu ejikọrọ na akaụntụ gị.",
+      "noRepositoriesDescription": "Jikọọ GitHub ma ọ bụ GitLab iji budata ebe nchekwa koodu.",
       "loading": "Na-ebudata…",
       "accessibility": "Ebe nchekwa koodu: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Ntọala Ịkwụ ụgwọ na weebụ",
       "changePlan": "Gbanwee atụmatụ",
       "buySeats": "Zụta oghere",
-      "managedOnWeb": "A na-ejikwa atụmatụ, oghere na mgbakwunye akpaaka na weebụ.",
+      "managedOnWeb": "A na-ejikwa atụmatụ, oghere na mgbakwunye akpaaka na kilo.ai.",
       "setupAutoTopUp": "Hazie mgbakwunye akpaaka",
       "manageAutoTopUp": "Jikwaa mgbakwunye akpaaka",
       "opensOnWeb": "Na-emepe na weebụ"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "Mwepụ kredit",
       "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
       "emptyTitle": "Enweghị akụkọ kredit",
+      "expiredGrant": "Oge agwụla: {{description}}",
       "googlePlayReceipt": "Rịsịt sitere na Google Play",
       "kind": {
         "adjustment": "Mmezi",
         "balanceNeutral": "Enweghị mmetụta n'ego fọdụrụ",
         "deduction": "Mwepụ",
         "grant": "Onyinye kredit",
+        "promotionalCredits": "Kredit nkwalite",
         "welcomeCredits": "Kredit nnabata",
         "purchase": "Ịzụ ahịa"
+      },
+      "program": {
+        "adminBulkGrant": "Onyinye kredit onye nchịkwa",
+        "contributorChampion": "Kredit onye mmeri ntinye aka",
+        "feedback": "Kredit nzaghachi",
+        "influencer": "Kredit influencer",
+        "ossMonthlyReset": "Mmeghari nkwado ngwanrọ mepere emepe",
+        "ossSponsorship": "Kredit nkwado ngwanrọ mepere emepe",
+        "pullRequest": "Kredit arịrịọ ijikọ koodu",
+        "usageIssue": "Kredit nsogbu ojiji",
+        "vibeDay": "Kredit Vibe Day"
       },
       "purchaseFallback": "Ịzụ kredit",
       "receipt": "Rịsịt",
       "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
       "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a.",
-      "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ."
+      "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ.",
+      "voidedGrant": "E kagbuola: {{description}}"
     },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
@@ -5099,6 +5117,20 @@
       "eu": "Njikọ Yurop",
       "au": "Ostralịa",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Chọọ Mmasị",
+    "noMatches": "Enweghị mmasị dabara na ọchụchọ a",
+    "emptyDescription": "Nwaa aha mmasị ma ọ bụ mkpụrụokwu ọzọ.",
+    "resultsStatus": "Mmasị achọtara: {{resultCount}}",
+    "keywords": {
+      "signOut": "pụọ|ọpụpụ",
+      "appearance": "ọdịdị|agba",
+      "appUnlock": "njirimara ahụ|ihu|akara mkpịsị aka",
+      "language": "asụsụ|ntụgharị asụsụ",
+      "notifications": "ọkwa|ịma ọkwa|ịdọ aka ná ntị",
+      "privacy": "nyocha|nsuso|nzuzo"
     }
   }
 }

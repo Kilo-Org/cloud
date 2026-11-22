@@ -105,6 +105,17 @@ export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
   'policy_violation',
 ] as const satisfies readonly EnkryptDetectorId[];
 
+type ConfigurableInputDetectorId = (typeof ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS)[number];
+
+/** Writes one configurable detector into a detector set, keeping the key and its value together. */
+function assignConfigurableDetector<Id extends ConfigurableInputDetectorId>(
+  target: EnkryptInputDetectors,
+  source: EnkryptInputDetectors,
+  id: Id
+): void {
+  target[id] = source[id];
+}
+
 /**
  * The input detectors the gateway enforces: the configurable ones as saved and Kilo Default, which
  * turns them off, for every other one, whatever was saved for it. A detector without input controls
@@ -113,18 +124,29 @@ export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
 export function enforcedEnkryptInputDetectors(
   detectors: EnkryptInputDetectors
 ): EnkryptInputDetectors {
-  return {
-    ...createKiloDefaultEnkryptInputDetectors(),
-    injection_attack: detectors.injection_attack,
-    policy_violation: detectors.policy_violation,
-  };
+  const enforced: EnkryptInputDetectors = { ...createKiloDefaultEnkryptInputDetectors() };
+  for (const id of ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS) {
+    assignConfigurableDetector(enforced, detectors, id);
+  }
+  return enforced;
 }
 
-function withActionOnlyForLogging<Detector extends { enabled: boolean; action: 'log' | 'block' }>({
-  action,
-  ...detector
-}: Detector) {
-  return detector.enabled && action === 'log' ? { ...detector, action } : detector;
+type StorableEnkryptInputDetectors = z.input<typeof EnkryptInputDetectorsSchema>;
+
+/**
+ * Writes one configurable detector as saved. `Omit`ing `action` gives a union TypeScript cannot
+ * assign back to the one key it came from, so the narrowing lives in this copy of the detector.
+ */
+function assignStorableDetector<Id extends ConfigurableInputDetectorId>(
+  target: StorableEnkryptInputDetectors,
+  source: EnkryptInputDetectors,
+  id: Id
+): void {
+  const detector: StorableEnkryptInputDetectors[Id] = { ...source[id] };
+  const { action } = detector;
+  delete detector.action;
+  if (detector.enabled && action === 'log') detector.action = action;
+  target[id] = detector;
 }
 
 /**
@@ -135,11 +157,11 @@ function withActionOnlyForLogging<Detector extends { enabled: boolean; action: '
 export function storableEnkryptInputDetectors(
   detectors: EnkryptInputDetectors
 ): z.input<typeof EnkryptInputDetectorsSchema> {
-  return {
-    ...detectors,
-    injection_attack: withActionOnlyForLogging(detectors.injection_attack),
-    policy_violation: withActionOnlyForLogging(detectors.policy_violation),
-  };
+  const storable: StorableEnkryptInputDetectors = { ...detectors };
+  for (const id of ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS) {
+    assignStorableDetector(storable, detectors, id);
+  }
+  return storable;
 }
 
 export function enabledEnkryptDetectorIds(detectors: EnkryptInputDetectors): EnkryptDetectorId[] {

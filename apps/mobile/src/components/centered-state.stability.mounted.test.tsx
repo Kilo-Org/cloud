@@ -73,6 +73,15 @@ afterEach(() => vi.unstubAllGlobals());
 
 async function mount() {
   const mounted = await renderWithProviders(<CenteredState testID="state">{null}</CenteredState>);
+  // The scroller's own layout event is the only trigger that starts a
+  // measurement now: the mount commit requests none.
+  const scrollProps = mounted.renderer.root.findByType(ScrollView).props as ScrollViewProps;
+  const laidOut: Partial<LayoutChangeEvent> = {
+    nativeEvent: {
+      layout: { x: 0, y: 0, width: 400, height: native.viewportBottom - native.viewportTop },
+    },
+  };
+  await act(() => scrollProps.onLayout?.(laidOut as LayoutChangeEvent));
   const measure = async (height: number) => {
     const props = mounted.renderer.root.findByProps({ testID: 'state-content' }).props as ViewProps;
     const event: Partial<LayoutChangeEvent> = {

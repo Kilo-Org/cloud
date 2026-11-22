@@ -309,6 +309,7 @@
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
+    "availableToSpendInOrganization": "برای خرج کردن در این سازمان در دسترس است",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
       "signIn": "ورود",
-      "profileOrganizations": "نمایه & سازمان‌ها"
+      "profileOrganizations": "نمایه & سازمان‌ها",
+      "chat": "گفت‌وگو",
+      "notifications": "اعلان‌ها",
+      "integrations": "یکپارچه‌سازی‌ها"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "جست‌وجوی مخازن",
       "noMatches": "موردی پیدا نشد",
       "noRepositories": "هیچ مخزنی در دسترس نیست",
-      "noRepositoriesDescription": "هیچ مخزنی به حساب شما وصل نیست.",
+      "noRepositoriesDescription": "برای بارگذاری مخازن، GitHub یا GitLab را وصل کنید.",
       "loading": "در حال بارگذاری…",
       "accessibility": "مخزن: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "تنظیمات صورت‌حساب در وب",
       "changePlan": "تغییر طرح",
       "buySeats": "خرید مجوز کاربری",
-      "managedOnWeb": "طرح، مجوزهای کاربری و شارژ خودکار در وب مدیریت می‌شوند.",
+      "managedOnWeb": "طرح، مجوزهای کاربری و شارژ خودکار در kilo.ai مدیریت می‌شوند.",
       "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
       "manageAutoTopUp": "مدیریت شارژ خودکار",
       "opensOnWeb": "در وب باز می‌شود"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "کسر اعتبار",
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
       "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
+      "expiredGrant": "منقضی شد: {{description}}",
       "googlePlayReceipt": "رسید از Google Play",
       "kind": {
         "adjustment": "اصلاحیه",
         "balanceNeutral": "بدون تأثیر بر موجودی",
         "deduction": "کسر",
         "grant": "اعطای اعتبار",
+        "promotionalCredits": "اعتبار ترویجی",
         "welcomeCredits": "اعتبار خوش‌آمد",
         "purchase": "خرید"
+      },
+      "program": {
+        "adminBulkGrant": "اعطای اعتبار توسط مدیر",
+        "contributorChampion": "اعتبار قهرمان مشارکت‌کنندگان",
+        "feedback": "اعتبار بازخورد",
+        "influencer": "اعتبار اینفلوئنسر",
+        "ossMonthlyReset": "بازنشانی حمایت مالی متن‌باز",
+        "ossSponsorship": "اعتبار حمایت مالی متن‌باز",
+        "pullRequest": "اعتبار پول ریکوئست",
+        "usageIssue": "اعتبار مشکل مصرف",
+        "vibeDay": "اعتبار روز وایب"
       },
       "purchaseFallback": "خرید اعتبار",
       "receipt": "رسید",
       "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
       "receiptUnavailable": "رسیدی برای این خرید موجود نیست.",
-      "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود."
+      "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود.",
+      "voidedGrant": "باطل شد: {{description}}"
     },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
@@ -5099,6 +5117,20 @@
       "eu": "اتحادیه اروپا",
       "au": "استرالیا",
       "jp": "ژاپن"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "جست‌وجوی تنظیمات دلخواه",
+    "noMatches": "تنظیمات موردنظر پیدا نشد",
+    "emptyDescription": "نام تنظیم یا کلیدواژهٔ دیگری را امتحان کنید.",
+    "resultsStatus": "تنظیمات یافت‌شده: {{resultCount}}",
+    "keywords": {
+      "signOut": "خروج|خروج از حساب",
+      "appearance": "پوسته|رنگ‌بندی|حالت تاریک",
+      "appUnlock": "زیست‌سنجی|تشخیص چهره|اثر انگشت",
+      "language": "زبان|ترجمه",
+      "notifications": "اعلان|هشدار",
+      "privacy": "تحلیل داده‌ها|ردیابی"
     }
   }
 }

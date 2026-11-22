@@ -4,8 +4,8 @@ import {
   cloudAgentSessionScopeProtocolVersionV2,
   cloudAgentSessionScopeV2Headers,
   cloudAgentWorktreeIdSchema,
-  MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_BYTES,
-  measureCloudAgentSessionScopeV2HeaderBytes,
+  MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES,
+  measureCloudAgentSessionScopeV2HeaderValueBytes,
   tryEncodeCloudAgentSessionScopeV2Headers,
 } from '@kilocode/session-ingest-contracts';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
@@ -55,8 +55,9 @@ function stripCallerScopeHeaders(request: Request): Headers {
  * Encodes the scope view as the v2 header block, or null when the receiver
  * would reject it or it exceeds the contract limits: a scope outside the v2
  * assertion contract (a non-worktree scope id, an empty member-root list, more
- * than 32 roots, a malformed organization), or an encoded block over 4096
- * bytes. The facade maps null to its 503; it never truncates an authorized root.
+ * than 32 roots, a malformed organization), or header values whose encoded
+ * bytes sum over 4096. The facade maps null to its 503; it never truncates an
+ * authorized root.
  */
 export function encodeCloudAgentSessionScopeV2ViewHeaders(
   view: ScopeGrantView
@@ -70,7 +71,8 @@ export function encodeCloudAgentSessionScopeV2ViewHeaders(
   });
   if (encoded === null) return null;
   if (
-    measureCloudAgentSessionScopeV2HeaderBytes(encoded) > MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_BYTES
+    measureCloudAgentSessionScopeV2HeaderValueBytes(encoded) >
+    MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES
   ) {
     return null;
   }

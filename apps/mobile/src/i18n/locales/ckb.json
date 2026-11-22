@@ -309,6 +309,7 @@
     "hideBalance": "شاردنەوەی باڵانس",
     "showBalance": "پیشاندانی باڵانس",
     "balanceHidden": "باڵانس شاردراوەتەوە",
+    "availableToSpendInOrganization": "بۆ خەرجکردن لەم ڕێکخراوەدا بەردەستە",
     "signOutTitle": "دەرچوون؟",
     "signOutMessage": "بۆ دەستگەیشتن بە شوێنی کارەکەت، پێویستە دووبارە بچیتە ژوورەوە.",
     "deleteAccountTitle": "سڕینەوەی هەژمار؟",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "چاککردن و باشترکردن لە سەرتاسەری ئەپەکەدا.",
     "changelogAreas": {
       "signIn": "چوونەژوورەوە",
-      "profileOrganizations": "پرۆفایل و ڕێکخراوەکان"
+      "profileOrganizations": "پرۆفایل و ڕێکخراوەکان",
+      "chat": "گفتوگۆ",
+      "notifications": "ئاگادارکردنەوەکان",
+      "integrations": "یەکخستنەکان"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "گەڕان لە کۆگاکان",
       "noMatches": "هیچ ئەنجامێکی گونجاو نییە",
       "noRepositories": "هیچ کۆگایەک بەردەست نییە",
-      "noRepositoriesDescription": "هیچ کۆگایەک بە هەژمارەکەتەوە نەبەستراوەتەوە.",
+      "noRepositoriesDescription": "بۆ بارکردنی کۆگاکان، GitHub یان GitLab ببەستەوە.",
       "loading": "بارکردن…",
       "accessibility": "کۆگا: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "ڕێکخستنەکانی پارەدان لە وێب",
       "changePlan": "گۆڕینی پلان",
       "buySeats": "کڕینی شوێن",
-      "managedOnWeb": "پلانەکە، شوێنەکان و پڕکردنەوەی خۆکار لە وێب بەڕێوە دەبرێن.",
+      "managedOnWeb": "پلانەکە، شوێنەکان و پڕکردنەوەی خۆکار لە kilo.ai بەڕێوە دەبرێن.",
       "setupAutoTopUp": "ڕێکخستنی پڕکردنەوەی خۆکار",
       "manageAutoTopUp": "بەڕێوەبردنی پڕکردنەوەی خۆکار",
       "opensOnWeb": "لە وێب دەکرێتەوە"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "لێبڕینی کرێدیت",
       "emptyDescription": "کڕین، پسوولە و بەکارهێنانی کرێدیت لێرە دەردەکەون.",
       "emptyTitle": "هیچ مێژوویەکی کرێدیت نییە",
+      "expiredGrant": "بەسەرچوو: {{description}}",
       "googlePlayReceipt": "پسوولە لە Google Play",
       "kind": {
         "adjustment": "ڕێکخستنەوە",
         "balanceNeutral": "بێ کاریگەری لەسەر باڵانس",
         "deduction": "لێبڕین",
         "grant": "بەخشینی کرێدیت",
+        "promotionalCredits": "کرێدیتی پرۆمۆشناڵ",
         "welcomeCredits": "کرێدیتی بەخێربێیت",
         "purchase": "کڕین"
+      },
+      "program": {
+        "adminBulkGrant": "بەخشینی کرێدیت لەلایەن بەڕێوەبەر",
+        "contributorChampion": "کرێدیتی پاڵەوانی بەشداربوو",
+        "feedback": "کرێدیتی بۆچوون",
+        "influencer": "کرێدیتی ئینفلوانسەر",
+        "ossMonthlyReset": "نوێکردنەوەی پاڵپشتیی نەرمەکاڵای سەرچاوەکراوە",
+        "ossSponsorship": "کرێدیتی پاڵپشتیی نەرمەکاڵای سەرچاوەکراوە",
+        "pullRequest": "کرێدیتی داواکاری یەکخستن",
+        "usageIssue": "کرێدیتی کێشەی بەکارهێنان",
+        "vibeDay": "کرێدیتی ڕۆژی Vibe"
       },
       "purchaseFallback": "کڕینی کرێدیت",
       "receipt": "پسوولە",
       "receiptA11y": "کردنەوەی پسوولەی {{description}}، {{amount}}، لە {{date}}",
       "receiptUnavailable": "هیچ پسوولەیەک بۆ ئەم کڕینە بەردەست نییە.",
-      "retentionLimit": "نوێترین مێژووی کرێدیت پیشان دەدرێت."
+      "retentionLimit": "نوێترین مێژووی کرێدیت پیشان دەدرێت.",
+      "voidedGrant": "پووچەڵ کراوە: {{description}}"
     },
     "title": "کرێدیت بکڕە",
     "description": "کرێدیت کڕینێکی یەکجارە کە بۆ تەوازنی Kiloت زیاد دەکرێت بۆ بەڕێوەبردنی دانیشتنەکانی کۆدکردنی AI لە ئەپی Kilo. فرۆشگا پارە لە هەژمارەکەت وەردەگرێت و کرێدیت دوای پشتڕاستکردنەوەی پارەدان لەلایەن فرۆشگاوە زیاد دەکرێت.",
@@ -5099,6 +5117,20 @@
       "eu": "یەکێتیی ئەورووپا",
       "au": "ئوسترالیا",
       "jp": "ژاپۆن"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "گەڕان بەدوای ڕێکخستنە کەسییەکاندا",
+    "noMatches": "هیچ ڕێکخستنێکی هاوتا نەدۆزرایەوە",
+    "emptyDescription": "ناوی ڕێکخستنێکی تر یان وشەیەکی سەرەکیی تر تاقی بکەرەوە.",
+    "resultsStatus": "ڕێکخستنە دۆزراوەکان: {{resultCount}}",
+    "keywords": {
+      "signOut": "دەرچوون|دەرچوون لە هەژمار",
+      "appearance": "ڕووکار|ڕەنگ|دۆخی تاریک",
+      "appUnlock": "بایۆمەتریک|ناسینەوەی ڕوو|پەنجەمۆر",
+      "language": "زمان|وەرگێڕان",
+      "notifications": "ئاگادارکردنەوە|ئاگاداری",
+      "privacy": "شیکردنەوە|بەدواداچوون|تایبەتی"
     }
   }
 }

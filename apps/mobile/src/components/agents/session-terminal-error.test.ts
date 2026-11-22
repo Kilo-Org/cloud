@@ -424,6 +424,26 @@ describe('resolveSessionTerminalError', () => {
     });
   });
 
+  // A session-ingest outage reaches the mobile first open as this code, so the
+  // page-load card must keep its Retry: the same open succeeds once ingest is back.
+  it('keeps Retry for a coded temporary service outage', () => {
+    expect(
+      resolveSessionTerminalError(
+        codedIndicatorFor(
+          'Service is temporarily unavailable. Please retry in a moment.',
+          'service-temporarily-unavailable'
+        )
+      )
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: i18n.t('agentChat.session.serviceUnavailable'),
+      retryable: true,
+      retryWith: 'session',
+      detail: 'Service is temporarily unavailable. Please retry in a moment.',
+    });
+  });
+
   // The SDK's own lost-transport code is a retryable failure whatever type the
   // indicator carries: a screen that kept the skeleton beside the status line
   // showed a loading state and a failure in the same frame.

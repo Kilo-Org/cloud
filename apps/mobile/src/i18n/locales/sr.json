@@ -310,6 +310,7 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
+    "availableToSpendInOrganization": "Dostupno za potrošnju u ovoj organizaciji",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Moraćeš ponovo da se prijaviš da bi pristupio svom radnom prostoru.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -555,8 +556,11 @@
     "changelogFixesIn": "Ispravke i poboljšanja u sledećim oblastima: {{areas}}.",
     "changelogFixesPolish": "Ispravke i poboljšanja u celoj aplikaciji.",
     "changelogAreas": {
-      "signIn": "Prijavljivanje",
-      "profileOrganizations": "Profil te organizacije"
+      "signIn": "prijavljivanje",
+      "profileOrganizations": "profil te organizacije",
+      "chat": "ćaskanje",
+      "notifications": "obaveštenja",
+      "integrations": "integracije"
     }
   },
   "preferences": {
@@ -2609,7 +2613,7 @@
       "searchPlaceholder": "Pretraga repozitorijuma",
       "noMatches": "Nema podudaranja",
       "noRepositories": "Nema dostupnih repozitorijuma",
-      "noRepositoriesDescription": "Nijedan repozitorijum nije povezan sa tvojim nalogom.",
+      "noRepositoriesDescription": "Da bi učitao repozitorijume, poveži GitHub ili GitLab.",
       "loading": "Učitavanje…",
       "accessibility": "Repozitorijum: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3513,7 +3517,7 @@
       "manageOnWeb": "Podešavanja naplate na vebu",
       "changePlan": "Promeni plan",
       "buySeats": "Kupi mesta",
-      "managedOnWeb": "Planom, mestima i automatskom dopunom se upravlja na vebu.",
+      "managedOnWeb": "Planom, mestima i automatskom dopunom se upravlja na kilo.ai.",
       "setupAutoTopUp": "Podesi automatsku dopunu",
       "manageAutoTopUp": "Upravljaj automatskom dopunom",
       "opensOnWeb": "Otvara se na vebu"
@@ -4585,19 +4589,33 @@
       "deductionFallback": "Odbitak kredita",
       "emptyDescription": "Kupovine kredita, računi i potrošnja prikazaće se ovde.",
       "emptyTitle": "Nema istorije kredita",
+      "expiredGrant": "Isteklo: {{description}}",
       "googlePlayReceipt": "Račun iz prodavnice Google Play",
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Račun",
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
       "retentionLimit": "Prikazuje se najnovija istorija kredita.",
+      "voidedGrant": "Stornirano: {{description}}",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Bez uticaja na stanje",
         "deduction": "Odbitak",
         "grant": "Dodela kredita",
+        "promotionalCredits": "Promotivni krediti",
         "welcomeCredits": "Krediti dobrodošlice",
         "purchase": "Kupovina"
+      },
+      "program": {
+        "adminBulkGrant": "Krediti od administratora",
+        "contributorChampion": "Kredit za šampiona saradnika",
+        "feedback": "Kredit za povratne informacije",
+        "influencer": "Kredit za influensere",
+        "ossMonthlyReset": "Mesečna obnova sponzorskih kredita za otvoreni kod",
+        "ossSponsorship": "Kredit za sponzorstvo otvorenog koda",
+        "pullRequest": "Kredit za zahtev za spajanje",
+        "usageIssue": "Kredit za problem sa korišćenjem",
+        "vibeDay": "Kredit za Vibe day"
       }
     },
     "title": "Kupi kredite",
@@ -5186,6 +5204,20 @@
       "eu": "Evropska unija",
       "au": "Australija",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Pretraga podešavanja",
+    "noMatches": "Nema odgovarajućih podešavanja",
+    "emptyDescription": "Pokušaj sa drugim nazivom podešavanja ili ključnom reči.",
+    "resultsStatus": "Pronađena podešavanja: {{resultCount}}",
+    "keywords": {
+      "signOut": "odjava|odjavi se",
+      "appearance": "tema|šema boja",
+      "appUnlock": "biometrija|prepoznavanje lica|otisak prsta",
+      "language": "jezik|prevod",
+      "notifications": "upozorenja|obaveštenja",
+      "privacy": "analitika|praćenje"
     }
   }
 }

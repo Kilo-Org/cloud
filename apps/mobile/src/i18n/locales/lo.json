@@ -309,6 +309,7 @@
     "hideBalance": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອ",
     "showBalance": "ສະແດງຍອດເງິນຄົງເຫຼືອ",
     "balanceHidden": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອແລ້ວ",
+    "availableToSpendInOrganization": "ສາມາດໃຊ້ຈ່າຍໄດ້ໃນອົງກອນນີ້",
     "signOutTitle": "ອອກຈາກລະບົບບໍ?",
     "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
     "deleteAccountTitle": "ລຶບບັນຊີບໍ?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
     "changelogAreas": {
       "signIn": "ການເຂົ້າສູ່ລະບົບ",
-      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ"
+      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ",
+      "chat": "ສົນທະນາ",
+      "notifications": "ການແຈ້ງເຕືອນ",
+      "integrations": "ການເຊື່ອມໂຍງ"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "ຄົ້ນຫາຄັງໂຄ້ດ",
       "noMatches": "ບໍ່ພົບລາຍການທີ່ກົງກັນ",
       "noRepositories": "ບໍ່ມີຄັງໂຄດທີ່ໃຊ້ໄດ້",
-      "noRepositoriesDescription": "ຍັງບໍ່ມີຄັງໂຄດເຊື່ອມຕໍ່ກັບບັນຊີຂອງເຈົ້າ.",
+      "noRepositoriesDescription": "ເພື່ອໂຫຼດຄັງໂຄດ ໃຫ້ເຊື່ອມຕໍ່ GitHub ຫຼື GitLab.",
       "loading": "ກຳລັງໂຫຼດ…",
       "accessibility": "ຄັງໂຄດ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "ການຕັ້ງຄ່າການຮຽກເກັບເງິນໃນເວັບ",
       "changePlan": "ປ່ຽນແຜນ",
       "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
-      "managedOnWeb": "ແຜນ, ສິດຜູ້ໃຊ້ ແລະ ການເຕີມເງິນອັດຕະໂນມັດຖືກຈັດການຢູ່ໃນເວັບ.",
+      "managedOnWeb": "ແຜນ, ສິດຜູ້ໃຊ້ ແລະ ການເຕີມເງິນອັດຕະໂນມັດຖືກຈັດການທີ່ kilo.ai.",
       "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
       "manageAutoTopUp": "ຈັດການການເຕີມເງິນອັດຕະໂນມັດ",
       "opensOnWeb": "ເປີດໃນເວັບ"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "ການຫັກເຄຣດິດ",
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
+      "expiredGrant": "ໝົດອາຍຸແລ້ວ: {{description}}",
       "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
       "kind": {
         "adjustment": "ການປັບປຸງ",
         "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
         "deduction": "ການຫັກ",
         "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "promotionalCredits": "ເຄຣດິດໂປຣໂມຊັນ",
         "welcomeCredits": "ເຄຣດິດຕ້ອນຮັບ",
         "purchase": "ການຊື້"
+      },
+      "program": {
+        "adminBulkGrant": "ການມອບເຄຣດິດໂດຍຜູ້ດູແລລະບົບ",
+        "contributorChampion": "ເຄຣດິດຜູ້ສະໜັບສະໜູນດີເດັ່ນ",
+        "feedback": "ເຄຣດິດຄຳຕິຊົມ",
+        "influencer": "ເຄຣດິດອິນຟລູເອນເຊີ",
+        "ossMonthlyReset": "ການຕັ້ງຍອດການສະໜັບສະໜູນ OSS ໃໝ່",
+        "ossSponsorship": "ເຄຣດິດການສະໜັບສະໜູນ OSS",
+        "pullRequest": "ເຄຣດິດຈາກຄຳຂໍລວມໂຄ້ດ",
+        "usageIssue": "ເຄຣດິດບັນຫາການນຳໃຊ້",
+        "vibeDay": "ເຄຣດິດວັນ Vibe"
       },
       "purchaseFallback": "ການຊື້ເຄຣດິດ",
       "receipt": "ໃບຮັບເງິນ",
       "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
       "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້.",
-      "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ."
+      "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ.",
+      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}"
     },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
@@ -5099,6 +5117,20 @@
       "eu": "ສະຫະພາບເອີຣົບ",
       "au": "ອອສເຕຣເລຍ",
       "jp": "ຍີ່ປຸ່ນ"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ຄົ້ນຫາການຕັ້ງຄ່າສ່ວນຕົວ",
+    "noMatches": "ບໍ່ພົບການຕັ້ງຄ່າທີ່ກົງກັນ",
+    "emptyDescription": "ລອງໃຊ້ຊື່ການຕັ້ງຄ່າ ຫຼື ຄຳຄົ້ນອື່ນ.",
+    "resultsStatus": "ພົບການຕັ້ງຄ່າ: {{resultCount}}",
+    "keywords": {
+      "signOut": "ອອກຈາກລະບົບ|ອອກຈາກບັນຊີ",
+      "appearance": "ຮູບແບບ|ສີ|ໂໝດມືດ",
+      "appUnlock": "ຊີວະມິຕິ|ໃບໜ້າ|ລາຍນິ້ວມື",
+      "language": "ພາສາ|ການແປ",
+      "notifications": "ແຈ້ງເຕືອນ|ຂໍ້ຄວາມແຈ້ງເຕືອນ",
+      "privacy": "ການວິເຄາະ|ການຕິດຕາມ"
     }
   }
 }

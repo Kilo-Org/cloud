@@ -50,22 +50,26 @@ export const DEFAULT_ORGANIZATION_GROUP_POLICIES = [
   DEFAULT_ORGANIZATION_MODEL_ACCESS_POLICY,
 ] satisfies OrganizationGroupPolicies;
 
+/**
+ * Whether a stored policy entry is the retired `client_access` policy. Its type is
+ * no longer a member of the strict policy union, so one such entry would fail the
+ * parse of the whole array; dropping it keeps every other stored policy readable.
+ */
+function isLegacyClientAccessPolicy(policy: unknown): boolean {
+  return (
+    typeof policy === 'object' &&
+    policy !== null &&
+    'type' in policy &&
+    policy.type === 'client_access'
+  );
+}
+
 export function parseOrganizationGroupPolicies(
   value: unknown,
   context: { organizationId: string; groupId?: string; source: 'group' | 'default' }
 ): OrganizationGroupPolicies {
   const parsed = OrganizationGroupPoliciesSchema.safeParse(
-    Array.isArray(value)
-      ? value.filter(
-          (policy: unknown) =>
-            !(
-              typeof policy === 'object' &&
-              policy !== null &&
-              'type' in policy &&
-              policy.type === 'client_access'
-            )
-        )
-      : value
+    Array.isArray(value) ? value.filter(policy => !isLegacyClientAccessPolicy(policy)) : value
   );
   if (!parsed.success) {
     captureException(parsed.error, {
@@ -81,4 +85,16 @@ export function parseOrganizationGroupPolicies(
     });
   }
   return parsed.data;
+}
+
+/** Parse the stored policies of one group. */
+export function parseGroupPolicies(
+  group: { id: string; policies: unknown },
+  organizationId: string
+): OrganizationGroupPolicies {
+  return parseOrganizationGroupPolicies(group.policies, {
+    organizationId,
+    groupId: group.id,
+    source: 'group',
+  });
 }

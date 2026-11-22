@@ -8,44 +8,67 @@ import type { WorkerDb } from './client';
 import { and, eq, gt, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
-type DrizzleTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+/**
+ * The columns the expiration computation reads, declared once. The loader
+ * projection and `ExpiringTransaction` both derive from this map: a required
+ * column cannot leave the projection without a type error, and the optional-key
+ * list cannot name a column the map does not select.
+ */
+const expiringTransactionColumns = {
+  id: creditTransactionsTable.id,
+  amount_microdollars: creditTransactionsTable.amount_microdollars,
+  expiration_baseline_microdollars_used:
+    creditTransactionsTable.expiration_baseline_microdollars_used,
+  consumed_microdollars: creditTransactionsTable.consumed_microdollars,
+  retired_microdollars: creditTransactionsTable.retired_microdollars,
+  paid_credit_policy: creditTransactionsTable.paid_credit_policy,
+  credit_source: creditTransactionsTable.credit_source,
+  source_transaction_id: creditTransactionsTable.source_transaction_id,
+  expiry_date: creditTransactionsTable.expiry_date,
+  description: creditTransactionsTable.description,
+  is_free: creditTransactionsTable.is_free,
+} as const;
+
+type ExpiringTransactionColumn = keyof typeof expiringTransactionColumns;
+
+/** Lot columns a caller may omit; the computation reads an absent one as unset. */
+const optionalExpiringTransactionColumns = [
+  'consumed_microdollars',
+  'retired_microdollars',
+  'paid_credit_policy',
+  'credit_source',
+  'source_transaction_id',
+] as const satisfies readonly ExpiringTransactionColumn[];
+
+type OptionalExpiringTransactionColumn = (typeof optionalExpiringTransactionColumns)[number];
+
+export type ExpiringTransaction = Pick<
+  CreditTransaction,
+  Exclude<ExpiringTransactionColumn, OptionalExpiringTransactionColumn>
+> &
+  Partial<Pick<CreditTransaction, OptionalExpiringTransactionColumn>>;
+
+export type DrizzleTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 export type EntityForExpiration = { id: string; microdollars_used: number };
-export type OrganizationForExpiration = {
-  id: string;
-  microdollars_used: number;
+export type OrganizationForExpiration = EntityForExpiration & {
   next_credit_expiration_at: string | null;
   total_microdollars_acquired: number;
 };
-export type ExpiringTransaction = Pick<
-  CreditTransaction,
-  | 'id'
-  | 'amount_microdollars'
-  | 'expiration_baseline_microdollars_used'
-  | 'expiry_date'
-  | 'description'
-  | 'is_free'
-> &
-  Partial<
-    Pick<
-      CreditTransaction,
-      | 'consumed_microdollars'
-      | 'retired_microdollars'
-      | 'paid_credit_policy'
-      | 'credit_source'
-      | 'source_transaction_id'
-    >
-  >;
-type ExpirationResult = {
+export type ExpirationResult = {
   newTransactions: (typeof credit_transactions.$inferInsert)[];
   newBaselines: Map<CreditTransaction['id'], number>;
 };
+
+/** Expiry ordering: null never expires, otherwise the parsed instant. */
+function expiryMillis(value: string | null): number {
+  return value === null ? Infinity : new Date(value).getTime();
+}
+
 function sortCreditLots<T extends ExpiringTransaction>(transactions: T[]) {
   return transactions
     .filter(transaction => transaction.amount_microdollars > 0)
     .sort((a, b) => {
-      const aExpiry = a.expiry_date === null ? Infinity : new Date(a.expiry_date).getTime();
-      const bExpiry = b.expiry_date === null ? Infinity : new Date(b.expiry_date).getTime();
-      return aExpiry - bExpiry || a.id.localeCompare(b.id);
+      return expiryMillis(a.expiry_date) - expiryMillis(b.expiry_date) || a.id.localeCompare(b.id);
     });
 }
 
@@ -58,7 +81,7 @@ export function earliestUnexpiredExpiry(
     if (expiredTransactionIds.has(transaction.id)) continue;
     const expiry = transaction.expiry_date;
     if (expiry === null) continue;
-    if (earliest === null || expiry < earliest) earliest = expiry;
+    if (earliest === null || expiryMillis(expiry) < expiryMillis(earliest)) earliest = expiry;
   }
   return earliest;
 }
@@ -124,6 +147,11 @@ export function computeExpiration(
     if (transaction.expiry_date === null || new Date(transaction.expiry_date) > now) break;
     const consumed = claimLotUsage(sorted, index, entity.microdollars_used, newBaselines);
     const expired = lotExposure(transaction) - consumed;
+    // A zero amount is still a deliberate processed marker, not dead weight: the
+    // loader's lateral exclusion matches any credits_expired / orb_credit_expired /
+    // orb_credit_voided row for the original transaction regardless of amount, and
+    // expiredIds feeds earliestUnexpiredExpiry. Dropping the zero row would let the
+    // next reconcile re-expire the same lot.
     newTransactions.push({
       kilo_user_id,
       amount_microdollars: expired === 0 ? 0 : -expired,
@@ -186,19 +214,7 @@ export async function reconcileCreditExpirationsInTransaction(
       : eq(creditTransactionsTable.organization_id, owner.id);
   const loadOpenLots = (expiryCondition: SQL) =>
     tx
-      .select({
-        id: creditTransactionsTable.id,
-        amount_microdollars: creditTransactionsTable.amount_microdollars,
-        expiration_baseline_microdollars_used:
-          creditTransactionsTable.expiration_baseline_microdollars_used,
-        consumed_microdollars: creditTransactionsTable.consumed_microdollars,
-        retired_microdollars: creditTransactionsTable.retired_microdollars,
-        paid_credit_policy: creditTransactionsTable.paid_credit_policy,
-        credit_source: creditTransactionsTable.credit_source,
-        expiry_date: creditTransactionsTable.expiry_date,
-        description: creditTransactionsTable.description,
-        is_free: creditTransactionsTable.is_free,
-      })
+      .select(expiringTransactionColumns)
       .from(creditTransactionsTable)
       .leftJoinLateral(
         expiredCredits,

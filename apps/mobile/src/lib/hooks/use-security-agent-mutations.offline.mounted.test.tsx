@@ -63,6 +63,9 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => false,
   useOrgBoundary: () => ({ role: undefined }),
 }));
+// The capability read reaches the hook that owns the shared memberships
+// options, and that hook reads the auth token; only the token matters here.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',

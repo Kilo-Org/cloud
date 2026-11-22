@@ -2,6 +2,7 @@ import { withinSchemaBudget } from '@kilocode/web-shared/lib/ai-gateway/provider
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { appendToolSchemaConstraints } from '@kilocode/web-shared/lib/ai-gateway/providers/tool-schema-walk';
 
 const COMBINATORS = [
   ['allOf', 'all of'],
@@ -106,10 +107,6 @@ export function removeTopLevelSchemaCombinators(schema: unknown): string | undef
   return removeCombinators(schema).constraints;
 }
 
-function appendConstraints(description: string | null | undefined, constraints: string): string {
-  return description ? `${description}\n\n${constraints}` : constraints;
-}
-
 /**
  * The flattened schema accepts every input the original accepted, so a tool's
  * `strict` flag is kept: strict mode still enforces the remaining schema, and
@@ -125,36 +122,7 @@ export function removeTopLevelToolSchemaCombinators(request: GatewayRequest): vo
     return removal.constraints;
   };
 
-  switch (request.kind) {
-    case 'chat_completions':
-      for (const tool of request.body.tools ?? []) {
-        if (tool.type !== 'function') continue;
-        const { name, parameters, strict } = tool.function;
-        const constraints = rewrite(name, parameters, strict);
-        if (constraints) {
-          tool.function.description = appendConstraints(tool.function.description, constraints);
-        }
-      }
-      break;
-    case 'responses':
-      for (const tool of request.body.tools ?? []) {
-        if (tool.type !== 'function') continue;
-        const constraints = rewrite(tool.name, tool.parameters, tool.strict);
-        if (constraints) {
-          tool.description = appendConstraints(tool.description, constraints);
-        }
-      }
-      break;
-    case 'messages':
-      for (const tool of request.body.tools ?? []) {
-        if (!('input_schema' in tool)) continue;
-        const constraints = rewrite(tool.name, tool.input_schema, tool.strict);
-        if (constraints) {
-          tool.description = appendConstraints(tool.description, constraints);
-        }
-      }
-      break;
-  }
+  appendToolSchemaConstraints(request, rewrite);
 
   if (changedTools.length > 0) {
     warnExceptInTest(

@@ -5,11 +5,10 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { BillingWebSettings } from './billing-web-settings';
-
-import '@/i18n';
 
 const storefront = vi.hoisted(() => ({ linkAllowed: false }));
 
@@ -79,7 +78,7 @@ describe('BillingWebSettings', () => {
 
     expect(renderer.root.findAllByType('ExternalBillingLink' as never)).toEqual([]);
     expect(renderer.root.findAllByType('Section' as never)).toEqual([]);
-    expect(texts(renderer)).toEqual(['The plan, seats and auto top-up are managed on the web.']);
+    expect(texts(renderer)).toEqual([i18n.t('organization.billing.managedOnWeb')]);
     unmount();
   });
 

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Arganni nagaa haaraa ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Baay'ee hamaa",
+      "high": "Olaanaa",
+      "medium": "Giddu galeessa",
+      "low": "Gadi aanaa"
+    },
     "securityFindingSlaWarning": {
       "title": "Akeekkachiisa SLA"
     },

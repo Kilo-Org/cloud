@@ -70,7 +70,7 @@ export type StartAgentOutbox = {
     fingerprint: string;
     input: unknown;
   }) => Promise<void>;
-  removeOutboxRow: (fingerprint: string) => Promise<void>;
+  removeOutboxRow: (fingerprint: string) => Promise<boolean>;
 };
 
 // ── Operation key ─────────────────────────────────────────────────────
@@ -224,8 +224,8 @@ export function createOutbox(userId: string): StartAgentOutbox {
       const operationKey = storedKeyFor(rows, row.fingerprint) ?? row.operationKey;
       await writeOutboxRow(userId, { ...row, operationKey, taxonomy: 'safe-retry' });
     },
-    async removeOutboxRow(fingerprint): Promise<void> {
-      await removeStoredOutboxRow(userId, fingerprint);
+    removeOutboxRow(fingerprint: string): Promise<boolean> {
+      return removeStoredOutboxRow(userId, fingerprint);
     },
   };
 }

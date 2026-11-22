@@ -14,7 +14,6 @@ import {
   markServiceFeeAssessmentMissed,
   prepareServiceFeeAssessmentDecision,
   settleServiceFeeAssessment,
-  toServiceFeeTimestamp,
   upsertServiceFeeAssessment,
   type EffectiveExemptionLookup,
   type PreparedServiceFeeDecision,
@@ -46,6 +45,11 @@ import {
   type ServiceFeeLineMetadata,
   type ServiceFeeOutcome,
 } from '@kilocode/web-shared/lib/service-fees/types';
+import {
+  isServiceFeeFailureCode,
+  toIsoTimestamp,
+  trimToNull,
+} from '@kilocode/web-shared/lib/service-fees/values';
 
 export const SERVICE_FEE_ACTIVATION_BOUNDARY_WINDOW_SECONDS = 60;
 export const KILO_OWNED_AUTO_TOP_UP_INVOICE_TYPES = ['auto-topup', 'org-auto-topup'] as const;
@@ -565,7 +569,7 @@ export async function settleTrustedTopUpCharge(params: {
 }): Promise<TopUpSettlementResult> {
   const now = params.deps.now ?? new Date();
   const metadata = params.paymentIntent.metadata ?? {};
-  const assessmentKey = nonempty(metadata.serviceFeeAssessmentKey);
+  const assessmentKey = trimToNull(metadata.serviceFeeAssessmentKey);
   const metadataPrincipal = parseMinor(metadata.serviceFeePrincipalMinor);
   const amountCentsPrincipal = parseMinor(metadata.amountCents);
   const grossPaidMinor = params.charge.amount;
@@ -716,7 +720,7 @@ export async function settleTrustedAutoTopUpInvoice(params: {
   const now = params.deps.now ?? new Date();
   const metadata = params.invoice.metadata ?? {};
   const assessmentKey =
-    nonempty(metadata.serviceFeeAssessmentKey) ??
+    trimToNull(metadata.serviceFeeAssessmentKey) ??
     (params.invoice.id ? createInvoiceServiceFeeAssessmentKey(params.invoice.id) : null);
   const metadataPrincipal = parseMinor(metadata.serviceFeePrincipalMinor);
   const grossPaidMinor = params.invoice.amount_paid;
@@ -951,7 +955,7 @@ async function persistPreparedAssessment(params: {
   try {
     const decision = {
       ...params.prepared.decision,
-      eligibilityCreatedAt: toServiceFeeTimestamp(params.eligibilityCreatedAt),
+      eligibilityCreatedAt: toIsoTimestamp(params.eligibilityCreatedAt),
     };
     const record = await upsertServiceFeeAssessment({
       store: params.deps.store,
@@ -1346,20 +1350,12 @@ async function alertForRecord(
   });
 }
 
-async function alertMissed(params: {
-  assessmentKey: string;
-  flow: ServiceFeeFlow;
-  kiloUserId?: string | null;
-  organizationId?: string | null;
-  stripeCheckoutSessionId?: string | null;
-  stripeInvoiceId?: string | null;
-  stripePaymentIntentId?: string | null;
-  stripeChargeId?: string | null;
-  eligibleSubtotalMinor: number;
-  expectedFeeMinor: number;
-  failureCode: string;
-  deps: ServiceFeeCheckoutDependencies;
-}): Promise<void> {
+type MissedServiceFeeAlertPayload = Omit<
+  MissedServiceFeeAlertInput,
+  'currency' | 'attemptedAt' | 'livemode'
+> & { deps: ServiceFeeCheckoutDependencies };
+
+async function alertMissed(params: MissedServiceFeeAlertPayload): Promise<void> {
   const sendAlert = params.deps.sendAlert ?? sendMissedServiceFeeAlert;
   await sendAlert({
     assessmentKey: params.assessmentKey,
@@ -1379,20 +1375,14 @@ async function alertMissed(params: {
 }
 
 function failureCodeFromUnknown(error: unknown, fallback: string): string {
-  if (error instanceof Error && /^[a-z][a-z0-9_]{0,99}$/.test(error.message)) {
+  if (error instanceof Error && isServiceFeeFailureCode(error.message)) {
     return error.message;
   }
   return fallback;
 }
 
-function nonempty(value: string | null | undefined): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
 function parseMinor(value: string | null | undefined): number | null {
-  const raw = nonempty(value);
+  const raw = trimToNull(value);
   if (!raw) return null;
   if (!/^-?\d+$/.test(raw)) return null;
   const parsed = Number(raw);

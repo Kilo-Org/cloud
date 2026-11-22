@@ -310,6 +310,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
+    "availableToSpendInOrganization": "Disponible para gastar en esta organización",
     "signOutTitle": "¿Cerrar sesión?",
     "signOutMessage": "Tendrás que iniciar sesión de nuevo para acceder a tu espacio de trabajo.",
     "deleteAccountTitle": "¿Eliminar cuenta?",
@@ -555,8 +556,11 @@
     "changelogFixesIn": "Correcciones y mejoras en {{areas}}.",
     "changelogFixesPolish": "Correcciones y mejoras en toda la aplicación.",
     "changelogAreas": {
-      "signIn": "Inicio de sesión",
-      "profileOrganizations": "Perfil & organizaciones"
+      "signIn": "inicio de sesión",
+      "profileOrganizations": "perfil & organizaciones",
+      "chat": "conversación",
+      "notifications": "notificaciones",
+      "integrations": "integraciones"
     }
   },
   "preferences": {
@@ -2022,7 +2026,7 @@
       "searchPlaceholder": "Buscar repositorios",
       "noMatches": "Sin coincidencias",
       "noRepositories": "No hay repositorios disponibles",
-      "noRepositoriesDescription": "No hay repositorios conectados a tu cuenta.",
+      "noRepositoriesDescription": "Conecta GitHub o GitLab para cargar repositorios.",
       "loading": "Cargando…",
       "accessibility": "Repositorio: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3505,7 +3509,7 @@
       "manageOnWeb": "Ajustes de facturación en la web",
       "changePlan": "Cambiar plan",
       "buySeats": "Comprar licencias",
-      "managedOnWeb": "El plan, las licencias y la recarga automática se gestionan en la web.",
+      "managedOnWeb": "El plan, las licencias y la recarga automática se gestionan en kilo.ai.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Gestionar recarga automática",
       "opensOnWeb": "Se abre en la web"
@@ -4585,20 +4589,34 @@
       "deductionFallback": "Deducción de créditos",
       "emptyDescription": "Aquí aparecerán las compras de créditos, los recibos y el uso.",
       "emptyTitle": "No hay historial de créditos",
+      "expiredGrant": "Caducado: {{description}}",
       "googlePlayReceipt": "Recibo de Google Play",
       "kind": {
         "adjustment": "Ajuste",
         "balanceNeutral": "Sin efecto en el saldo",
         "deduction": "Deducción",
         "grant": "Créditos otorgados",
+        "promotionalCredits": "Créditos promocionales",
         "welcomeCredits": "Créditos de bienvenida",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Créditos otorgados por el administrador",
+        "contributorChampion": "Crédito de campeón colaborador",
+        "feedback": "Crédito por comentarios",
+        "influencer": "Crédito de influencer",
+        "ossMonthlyReset": "Renovación del patrocinio de código abierto",
+        "ossSponsorship": "Crédito de patrocinio de código abierto",
+        "pullRequest": "Crédito por solicitud de cambios",
+        "usageIssue": "Crédito por incidencia de uso",
+        "vibeDay": "Crédito por Vibe Day"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir el recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "No hay ningún recibo disponible para esta compra.",
-      "retentionLimit": "Mostrando el historial de créditos más reciente."
+      "retentionLimit": "Mostrando el historial de créditos más reciente.",
+      "voidedGrant": "Anulado: {{description}}"
     },
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",
@@ -5186,6 +5204,20 @@
       "eu": "Unión Europea",
       "au": "Australia",
       "jp": "Japón"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Buscar preferencias",
+    "noMatches": "No se encontraron preferencias",
+    "emptyDescription": "Prueba con otro nombre o palabra clave.",
+    "resultsStatus": "Preferencias encontradas: {{resultCount}}",
+    "keywords": {
+      "signOut": "cerrar sesión|salir|desconectar",
+      "appearance": "tema|colores|modo oscuro",
+      "appUnlock": "biometría|rostro|huella",
+      "language": "idioma|traducción",
+      "notifications": "alertas|avisos|notificaciones",
+      "privacy": "analítica|seguimiento|rastreo"
     }
   }
 }

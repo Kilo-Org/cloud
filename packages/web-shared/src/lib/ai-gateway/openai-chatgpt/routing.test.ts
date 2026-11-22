@@ -189,7 +189,7 @@ afterAll(() => {
 
 describe('getOpenAiChatGptByokModelIds', () => {
   it('tags only the served OpenAI models among the candidates', async () => {
-    jest.mocked(isOpenAiModelServed).mockImplementation(async (_apiKey, modelId) => {
+    jest.mocked(isOpenAiModelServed).mockImplementation(async modelId => {
       return modelId === 'gpt-5-nano';
     });
 
@@ -201,8 +201,8 @@ describe('getOpenAiChatGptByokModelIds', () => {
       ])
     ).resolves.toEqual(new Set(['openai/gpt-5-nano']));
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_OWNER);
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna-pro');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5-nano');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna-pro');
   });
 
   it('returns null without a usable connection so the list stays untouched', async () => {
@@ -246,7 +246,7 @@ describe('getOpenAiChatGptByokModelIds', () => {
 
 describe('tagOpenAiChatGptByokModels', () => {
   it('marks the served models and leaves the rest untouched', async () => {
-    jest.mocked(isOpenAiModelServed).mockImplementation(async (_apiKey, modelId) => {
+    jest.mocked(isOpenAiModelServed).mockImplementation(async modelId => {
       return modelId === 'gpt-5-nano';
     });
 
@@ -299,7 +299,7 @@ describe('latest-model aliases', () => {
     await expect(checkOpenAiChatGptByok(aliasInput(ALIAS))).resolves.toMatchObject({
       kind: 'provider',
     });
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna');
   });
 
   it.each(['~openai/gpt-oss-latest', '~anthropic/claude-sonnet-latest', '~openai/unknown-latest'])(
@@ -892,7 +892,7 @@ describe('checkOpenAiChatGptByok', () => {
     jest.mocked(isOpenAiModelServed).mockResolvedValue(false);
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5-nano');
   });
 
   it('keeps a `-pro` reasoning-mode slug off the delegated route', async () => {
@@ -908,7 +908,7 @@ describe('checkOpenAiChatGptByok', () => {
         })
       )
     ).resolves.toBeNull();
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna-pro');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna-pro');
   });
 
   it('is not eligible when no connection is stored', async () => {

@@ -1733,6 +1733,26 @@ test('rejects a push locale registry entry bound to another catalog', () => {
   );
 });
 
+test('reports an unparseable push locale registry as its parse error only', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en, 'ru': ru`,
+      ].join('\n'),
+    },
+  });
+  // The tree a refused parse yields is empty, so the registry walk would find no
+  // `pushCatalogs` and report a missing registry on top of the parse error that
+  // already names the cause. The rest of the audit still reports its own lines.
+  const text = found.join('\n');
+  assert.match(text, /packages\/notifications\/src\/i18n\.ts:3: cannot parse: /);
+  assert.doesNotMatch(text, /no push locale registry named/);
+  assert.match(text, /mobile\/ru: missing key "agents\.title"/);
+});
+
 test('rejects a push locale registry with no initializer', () => {
   const found = run({
     extraFiles: {
@@ -2098,6 +2118,90 @@ test('still rejects that push value in a language the exceptions do not list', (
   );
 });
 
+// The push title and the app's finding rows show one severity level, so both
+// catalogs must spell it the same way. These fixtures carry just the four pairs
+// the parity rule compares, with the English words equal on both sides.
+const SEVERITY_PARITY_MOBILE_ENGLISH = {
+  common: { critical: 'Critical' },
+  securityAgent: { sla: { high: 'High', medium: 'Medium', low: 'Low' } },
+};
+const SEVERITY_PARITY_SOURCE = [
+  "t('common.critical');",
+  "t('securityAgent.sla.high');",
+  "t('securityAgent.sla.medium');",
+  "t('securityAgent.sla.low');",
+].join('\n');
+const SEVERITY_PARITY_PUSH_ENGLISH = {
+  internal: {
+    securityFindingSeverity: {
+      critical: 'Critical',
+      high: 'High',
+      medium: 'Medium',
+      low: 'Low',
+    },
+  },
+};
+// The severity keys are string literals in the real producer, so the fixture
+// names them the same way and the usage check finds every one.
+const SEVERITY_PARITY_PUSH_SOURCE = [
+  'const SEVERITY_KEYS = [',
+  "  'internal.securityFindingSeverity.critical',",
+  "  'internal.securityFindingSeverity.high',",
+  "  'internal.securityFindingSeverity.medium',",
+  "  'internal.securityFindingSeverity.low',",
+  '];',
+].join('\n');
+
+test('accepts a severity the push catalog and the mobile catalog spell the same way', () => {
+  const found = run({
+    english: SEVERITY_PARITY_MOBILE_ENGLISH,
+    translated: {
+      common: { critical: 'Критично' },
+      securityAgent: { sla: { high: 'Высоко', medium: 'Средне', low: 'Низко' } },
+    },
+    source: SEVERITY_PARITY_SOURCE,
+    pushEnglish: SEVERITY_PARITY_PUSH_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingSeverity: {
+          critical: 'Критично',
+          high: 'Высоко',
+          medium: 'Средне',
+          low: 'Низко',
+        },
+      },
+    },
+    pushSource: SEVERITY_PARITY_PUSH_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a severity the push catalog and the mobile catalog spell two ways', () => {
+  const found = run({
+    english: SEVERITY_PARITY_MOBILE_ENGLISH,
+    translated: {
+      common: { critical: 'Критично' },
+      securityAgent: { sla: { high: 'Высоко', medium: 'Средне', low: 'Низко' } },
+    },
+    source: SEVERITY_PARITY_SOURCE,
+    pushEnglish: SEVERITY_PARITY_PUSH_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingSeverity: {
+          critical: 'Критично',
+          high: 'Высокий',
+          medium: 'Средне',
+          low: 'Низко',
+        },
+      },
+    },
+    pushSource: SEVERITY_PARITY_PUSH_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'notifications/ru: "internal.securityFindingSeverity.high" reads "Высокий" but mobile "securityAgent.sla.high" reads "Высоко"',
+  ]);
+});
+
 // Two non-English catalogs let a case leave one of them in English while the
 // other translates the same key. The every-locale rule then stays silent (the
 // value is not identical everywhere), so only the per-catalog rule can see the
@@ -2233,21 +2337,88 @@ test('accepts a mobile value its catalog lists as English on purpose', () => {
   assert.equal(result.stderr, '');
 });
 
-test('still reports a mobile value left in English in every locale', () => {
+test('stays silent when every catalog lists the prose value as English on purpose', () => {
+  // A reviewed entry is the decision that the value stays English in that
+  // catalog, so a key every catalog exempts is not a defect. Only the per-locale
+  // rule reads the map, which is why it, and not the every-locale rule, decides
+  // what a prose value means.
+  const english = { agents: { title: 'Your agents' } };
+  const source = "t('agents.title');";
+  const mapBody = /const MOBILE_ENGLISH_COPY_EXCEPTIONS = \{[\s\S]*?\n\};/.exec(
+    CHECKER_SOURCE
+  )?.[0];
+  assert.ok(mapBody, 'the shipped checker ships the exception map literal');
+  const filled = entries => {
+    const patched = CHECKER_SOURCE.replace(
+      mapBody,
+      ['const MOBILE_ENGLISH_COPY_EXCEPTIONS = {', ...entries, '};'].join('\n')
+    );
+    assert.notEqual(patched, CHECKER_SOURCE, 'the case must fill the exception map');
+    return patched;
+  };
+  const tree = checker =>
+    cliFixture(
+      {
+        ...standardFiles({ english, translated: english, source }),
+        ...PER_CATALOG_FRENCH_PUSH,
+        'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
+        'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(english),
+        'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(english),
+      },
+      checker
+    );
+
+  const both = cli(
+    tree(filled([`  fr: { 'Your agents': 'reviewed' },`, `  ru: { 'Your agents': 'reviewed' },`]))
+  );
+  assert.equal(both.status, 0, both.stderr);
+  assert.equal(both.stderr, '');
+
+  // One catalog without the entry still reports, so the silence above is the
+  // reviewed entry's doing and not a rule that stopped seeing the value.
+  const one = cli(tree(filled([`  fr: { 'Your agents': 'reviewed' },`])));
+  assert.equal(one.status, 1, one.stderr);
+  assert.match(
+    one.stderr,
+    /^mobile\/ru: "agents\.title" is English; translate it, or list the value for "ru" in MOBILE_ENGLISH_COPY_EXCEPTIONS$/m
+  );
+  assert.doesNotMatch(one.stderr, /^mobile\/fr: /m);
+  assert.doesNotMatch(one.stderr, /equals English in every locale/);
+});
+
+test('reports one line per locale for a prose value left in English everywhere', () => {
   const found = run({
     english: { agents: { title: 'Your agents' } },
     translated: { agents: { title: 'Your agents' } },
     source: "t('agents.title');",
   });
   assert.ok(
-    found.includes('mobile: "agents.title" equals English in every locale'),
-    found.join('\n')
-  );
-  assert.ok(
     found.includes(
       'mobile/ru: "agents.title" is English; translate it, or list the value for "ru" in MOBILE_ENGLISH_COPY_EXCEPTIONS'
     ),
     found.join('\n')
+  );
+  assert.ok(
+    !found.some(line => line.includes('equals English in every locale')),
+    `a prose value is reported per locale:\n${found.join('\n')}`
+  );
+});
+
+test('reports a value with no prose once, for every locale', () => {
+  // Nothing in a bare placeholder can be translated, so no locale can fix it:
+  // the per-locale rule says nothing and the every-locale rule names the key.
+  const found = run({
+    english: { agents: { tokenOnly: '{{name}}' } },
+    translated: { agents: { tokenOnly: '{{name}}' } },
+    source: "t('agents.tokenOnly');",
+  });
+  assert.ok(
+    found.includes('mobile: "agents.tokenOnly" equals English in every locale'),
+    found.join('\n')
+  );
+  assert.ok(
+    !found.some(line => line.includes('is English; translate it')),
+    `a value with no prose has nothing to translate per locale:\n${found.join('\n')}`
   );
 });
 
@@ -2420,83 +2591,6 @@ test('reports an unreadable catalog folder as one problem line', () => {
     .filter(line => line.startsWith('notifications: cannot audit the catalog folder:'));
   assert.equal(folderLines.length, 1, result.stderr);
 });
-
-// The descriptor policy guard keeps a misconfigured catalog from throwing: the
-// copy rules and the base-key reader are used after the catalogs' value
-// problems are collected, so a throw there would hide them. Each case patches
-// the notifications descriptor away from the checker source and leaves a mobile
-// problem in the tree, so the run must still print what it collected.
-const POLICY_PUSH_FILES = {
-  'packages/notifications/src/locales/en.json': JSON.stringify({
-    internal: { securityFindingNew: { title: 'New finding', body: 'Body' } },
-  }),
-  'packages/notifications/src/locales/ru.json': JSON.stringify({
-    internal: { securityFindingNew: { title: 'Новая находка', body: 'Текст' } },
-  }),
-  'packages/notifications/src/push-copy.ts': '',
-};
-
-// A descriptor-editing patch rewrites the notifications descriptor however the
-// upstream source words it: a rule list of one entry or two, a four-space tab,
-// or a line the merge moved. A literal replace would pass while patching
-// nothing when any of that drifts.
-const NOTIFICATIONS_DESCRIPTOR = /name: 'notifications',[\s\S]*?collectsDestructiveKeys: false,\n/;
-const editDescriptor = (source, edit) => {
-  const descriptors = source.match(new RegExp(NOTIFICATIONS_DESCRIPTOR.source, 'g')) ?? [];
-  assert.equal(
-    descriptors.length,
-    1,
-    'the notifications descriptor must be unique in the checker source'
-  );
-  const edited = edit(descriptors[0]);
-  assert.notEqual(edited, descriptors[0], 'the edit must change the descriptor');
-  return source.replace(descriptors[0], edited);
-};
-const WITHOUT_BASE_KEY_DESCRIPTOR = descriptor =>
-  descriptor.replace(/^(\s*)baseKeyOf:[^\n]*\n/m, '');
-
-for (const { label, field, patch } of [
-  {
-    label: 'without a base-key reader',
-    field: 'baseKeyOf',
-    patch: source => editDescriptor(source, WITHOUT_BASE_KEY_DESCRIPTOR),
-  },
-  {
-    label: 'with an empty copy-rule list',
-    field: 'englishCopyRules',
-    patch: source =>
-      editDescriptor(source, descriptor =>
-        descriptor.replace(/(\s*)englishCopyRules:\s*\[[^\]]*\],/, '$1englishCopyRules: [],')
-      ),
-  },
-  {
-    label: 'with a non-callable entry in its copy-rule list',
-    field: 'englishCopyRules',
-    patch: source =>
-      editDescriptor(source, descriptor =>
-        descriptor.replace(
-          /(\s*)englishCopyRules:\s*\[[^\]]*\],/,
-          "$1englishCopyRules: [checkPushEnglishCopy, 'not a rule'],"
-        )
-      ),
-  },
-]) {
-  test(`reports a descriptor ${label} through the command`, () => {
-    const patched = patch(CHECKER_SOURCE);
-    assert.notEqual(patched, CHECKER_SOURCE, 'the case must change the checker source');
-    const translated = { agents: { ...TRANSLATED.agents } };
-    delete translated.agents.title;
-    const root = cliFixture({ ...standardFiles({ translated }), ...POLICY_PUSH_FILES }, patched);
-    const result = cli(root);
-    assert.equal(result.status, 1, result.stderr);
-    assert.match(
-      result.stderr,
-      new RegExp(`notifications: the catalog descriptor declares no usable ${field}`)
-    );
-    assert.doesNotMatch(result.stderr, /TypeError/);
-    assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
-  });
-}
 
 // A confirmation's safe button falls back to the catalog's own Cancel label
 // (`cancelLabel ?? t('common.cancel')`), so a destructive label translated with
@@ -3143,24 +3237,28 @@ test('rejects the English source label that carries "and"', () => {
   );
 });
 
-// The sentence also joins the areas that render from shared keys, so those
-// labels obey the same rule: a notification or chat name that carries the
+// The sentence names every area from its own `profile.changelogAreas` key, so
+// each of those labels obeys the same rule: a name that carries the
 // conjunction splits one area into two.
 const CHANGELOG_SHARED_AREAS = {
-  common: { chat: 'Chat', notifications: 'Notifications' },
-  integrations: { title: 'Integrations' },
   profile: {
     changelogFixesIn: 'Fixes and improvements in {{areas}}.',
-    changelogAreas: { signIn: 'Sign-in', profileOrganizations: 'Profile & organizations' },
+    changelogAreas: {
+      signIn: 'sign-in',
+      profileOrganizations: 'profile & organizations',
+      chat: 'chat',
+      notifications: 'notifications',
+      integrations: 'integrations',
+    },
   },
 };
 const CHANGELOG_SHARED_SOURCE = [
   "t('profile.changelogFixesIn', { areas });",
-  "t('common.chat');",
-  "t('common.notifications');",
-  "t('integrations.title');",
   "t('profile.changelogAreas.signIn');",
   "t('profile.changelogAreas.profileOrganizations');",
+  "t('profile.changelogAreas.chat');",
+  "t('profile.changelogAreas.notifications');",
+  "t('profile.changelogAreas.integrations');",
 ].join('\n');
 
 test('rejects a shared area label that carries the list conjunction', () => {
@@ -3168,18 +3266,22 @@ test('rejects a shared area label that carries the list conjunction', () => {
     language: 'fr',
     english: CHANGELOG_SHARED_AREAS,
     translated: {
-      common: { chat: 'Discussion', notifications: 'Alertes et notifications' },
-      integrations: { title: 'Intégrations' },
       profile: {
         changelogFixesIn: 'Corrections et améliorations dans {{areas}}.',
-        changelogAreas: { signIn: 'Connexion', profileOrganizations: 'Profil & organisations' },
+        changelogAreas: {
+          signIn: 'Connexion',
+          profileOrganizations: 'Profil & organisations',
+          chat: 'Discussion et conversation',
+          notifications: 'Notifications',
+          integrations: 'Intégrations',
+        },
       },
     },
     source: CHANGELOG_SHARED_SOURCE,
   });
   assert.match(
     found.join('\n'),
-    /^mobile\/fr: "common\.notifications" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
+    /^mobile\/fr: "profile\.changelogAreas\.chat" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
   );
 });
 
@@ -3191,11 +3293,15 @@ test('reads the Serbian conjunction from the Latin script the app formats with',
     language: 'sr',
     english: CHANGELOG_SHARED_AREAS,
     translated: {
-      common: { chat: 'Ćaskanje', notifications: 'Obaveštenja' },
-      integrations: { title: 'Integracije' },
       profile: {
         changelogFixesIn: 'Ispravke i poboljšanja u {{areas}}.',
-        changelogAreas: { signIn: 'Prijavljivanje', profileOrganizations: 'Profil i organizacije' },
+        changelogAreas: {
+          signIn: 'Prijavljivanje',
+          profileOrganizations: 'Profil & organizacije',
+          chat: 'Ćaskanje i razgovor',
+          notifications: 'Obaveštenja',
+          integrations: 'Integracije',
+        },
       },
     },
     source: CHANGELOG_SHARED_SOURCE,
@@ -3203,7 +3309,7 @@ test('reads the Serbian conjunction from the Latin script the app formats with',
   const text = found.join('\n');
   assert.match(
     text,
-    /^mobile\/sr: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "i"/m
+    /^mobile\/sr: "profile\.changelogAreas\.chat" contains the list conjunction "i"/m
   );
   // The Cyrillic conjunction is not what this catalog renders, so a label that
   // happens to contain it is no finding.

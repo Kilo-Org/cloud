@@ -309,6 +309,7 @@
     "hideBalance": "ბალანსის დამალვა",
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
+    "availableToSpendInOrganization": "ამ ორგანიზაციაში დასახარჯად ხელმისაწვდომია",
     "signOutTitle": "ანგარიშიდან გასვლა?",
     "signOutMessage": "სამუშაო სივრცის გამოსაყენებლად ანგარიშში ხელახლა შესვლა დაგჭირდება.",
     "deleteAccountTitle": "ანგარიშის წაშლა?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "შესწორებები და გაუმჯობესებები მთელ აპში.",
     "changelogAreas": {
       "signIn": "შესვლა",
-      "profileOrganizations": "პროფილი & ორგანიზაციები"
+      "profileOrganizations": "პროფილი & ორგანიზაციები",
+      "chat": "ჩატი",
+      "notifications": "შეტყობინებები",
+      "integrations": "ინტეგრაციები"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "რეპოზიტორიების ძიება",
       "noMatches": "დამთხვევები არ არის",
       "noRepositories": "ხელმისაწვდომი რეპოზიტორიები არ არის",
-      "noRepositoriesDescription": "თქვენს ანგარიშთან არცერთი რეპოზიტორია არ არის დაკავშირებული.",
+      "noRepositoriesDescription": "რეპოზიტორიების ჩატვირთვისთვის დააკავშირე GitHub ან GitLab.",
       "loading": "ჩატვირთვა…",
       "accessibility": "რეპოზიტორია: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "ბილინგის პარამეტრები ვებში",
       "changePlan": "გეგმის შეცვლა",
       "buySeats": "ადგილების ყიდვა",
-      "managedOnWeb": "გეგმა, ადგილები და ავტომატური შევსება იმართება ვებში.",
+      "managedOnWeb": "გეგმა, ადგილები და ავტომატური შევსება იმართება kilo.ai-ზე.",
       "setupAutoTopUp": "ავტომატური შევსების დაყენება",
       "manageAutoTopUp": "ავტომატური შევსების მართვა",
       "opensOnWeb": "იხსნება ვებ-ვერსიაში"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "კრედიტების ჩამოჭრა",
       "emptyDescription": "კრედიტების შენაძენები, ქვითრები და გამოყენება აქ გამოჩნდება.",
       "emptyTitle": "კრედიტების ისტორია ცარიელია",
+      "expiredGrant": "ვადაგასულია: {{description}}",
       "googlePlayReceipt": "ქვითარი Google Play-დან",
       "kind": {
         "adjustment": "კორექტირება",
         "balanceNeutral": "ბალანსზე გავლენის გარეშე",
         "deduction": "ჩამოჭრა",
         "grant": "კრედიტების მინიჭება",
+        "promotionalCredits": "სარეკლამო კრედიტები",
         "welcomeCredits": "მისალმების კრედიტები",
         "purchase": "შენაძენი"
+      },
+      "program": {
+        "adminBulkGrant": "ადმინისტრატორის კრედიტების მინიჭება",
+        "contributorChampion": "კონტრიბუტორ-ჩემპიონის კრედიტები",
+        "feedback": "გამოხმაურების კრედიტები",
+        "influencer": "ინფლუენსერის კრედიტები",
+        "ossMonthlyReset": "ღია კოდის პროგრამის ყოველთვიური განულება",
+        "ossSponsorship": "ღია კოდის პროექტების სპონსორობის კრედიტები",
+        "pullRequest": "PR კრედიტები",
+        "usageIssue": "გამოყენების პრობლემის კრედიტები",
+        "vibeDay": "Vibe Day კრედიტები"
       },
       "purchaseFallback": "კრედიტების შეძენა",
       "receipt": "ქვითარი",
       "receiptA11y": "ქვითრის გახსნა: {{description}}, {{amount}}, {{date}}-დან",
       "receiptUnavailable": "ამ შენაძენისთვის ქვითარი ხელმისაწვდომი არ არის.",
-      "retentionLimit": "ნაჩვენებია კრედიტების უახლესი ისტორია."
+      "retentionLimit": "ნაჩვენებია კრედიტების უახლესი ისტორია.",
+      "voidedGrant": "ბათილია: {{description}}"
     },
     "title": "კრედიტების ყიდვა",
     "description": "კრედიტები ერთჯერადი შენაძენია, რომელიც ემატება თქვენს Kilo ბალანსს Kilo აპში AI კოდირების სესიების გასაშვებად. მაღაზია თქვენს ანგარიშს არიცხავს თანხას და კრედიტები ემატება მას შემდეგ, რაც მაღაზია გადახდას დაადასტურებს.",
@@ -5099,6 +5117,20 @@
       "eu": "ევროკავშირი",
       "au": "ავსტრალია",
       "jp": "იაპონია"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "პარამეტრების ძებნა",
+    "noMatches": "შესაბამისი პარამეტრები ვერ მოიძებნა",
+    "emptyDescription": "სცადეთ პარამეტრის სხვა სახელი ან საკვანძო სიტყვა.",
+    "resultsStatus": "ნაპოვნი პარამეტრები: {{resultCount}}",
+    "keywords": {
+      "signOut": "გამოსვლა|ანგარიშიდან გამოსვლა",
+      "appearance": "თემა|ფერთა სქემა",
+      "appUnlock": "ბიომეტრია|სახის ამოცნობა|თითის ანაბეჭდი",
+      "language": "ენა|თარგმანი",
+      "notifications": "შეტყობინებები|გაფრთხილებები",
+      "privacy": "ანალიტიკა|თვალთვალი"
     }
   }
 }

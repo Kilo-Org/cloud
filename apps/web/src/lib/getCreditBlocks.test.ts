@@ -265,6 +265,63 @@ describe('getCreditBlocks', () => {
     expect(result.deductions).toHaveLength(1);
     expect(result.deductions[0].purchase).toBeNull();
   });
+
+  it('reports an expiry of a free program grant with its own expiry and reason', () => {
+    const transactions = [
+      makeTransaction('influencer-grant', 0, 1_000_000, {
+        description: 'Promotional credit for influencer',
+        credit_category: 'influencer',
+        created_at: '2023-03-03',
+        expiry_date: '2024-01-10',
+      }),
+      makeTransaction('expiry', 0, -1_000_000, {
+        description: 'Expired: Promotional credit for influencer',
+        credit_category: 'credits_expired',
+        original_transaction_id: 'influencer-grant',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(0, 0), ENTITY_ID);
+
+    expect(result.deductions).toHaveLength(1);
+    expect(result.deductions[0]).toMatchObject({
+      id: 'expiry',
+      expiry: 'expired',
+      purchase: { id: 'influencer-grant', is_free: true, kind: 'influencer' },
+    });
+  });
+
+  it('reports a paid top-up deduction as neither an expiry nor a program grant', () => {
+    const transactions = [
+      makeTransaction('top-up', 0, 5_000_000, {
+        description: 'Top-up via stripe',
+        is_free: false,
+        credit_source: 'stripe',
+        expiry_date: '2027-06-20',
+        created_at: '2026-06-20',
+      }),
+      makeTransaction('spend', 0, -1_000_000, {
+        description: 'Deducting credits',
+        original_transaction_id: 'top-up',
+        created_at: '2026-06-21',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(1_000_000, 5_000_000), ENTITY_ID);
+
+    expect(result.deductions).toHaveLength(1);
+    expect(result.deductions[0]).toMatchObject({
+      id: 'spend',
+      expiry: null,
+      purchase: {
+        id: 'top-up',
+        is_free: false,
+        credit_source: 'stripe',
+        kind: 'adjustment',
+      },
+    });
+  });
 });
 
 describe('creditGrantReasonOf', () => {
@@ -288,13 +345,25 @@ describe('creditGrantReasonOf', () => {
     expect(creditGrantReasonOf('kilo-pass-bonus')).toBe('kilo_pass');
   });
 
-  it('maps a registered member-visible promo category to grant', () => {
+  it('maps a registered member-visible promo category to promotional', () => {
     // Retail categories whose plaintext is in source; the self-service promo
     // codes are encrypted, so no test may name one of those.
-    expect(creditGrantReasonOf('github-promo-2025-07-03')).toBe('grant');
+    expect(creditGrantReasonOf('github-promo-2025-07-03')).toBe('promotional');
     // `obsolete` marks a grant that predates the current catalogue, not a
     // balance correction, so it still prints as credit.
-    expect(creditGrantReasonOf('multiplier-promo')).toBe('grant');
+    expect(creditGrantReasonOf('multiplier-promo')).toBe('promotional');
+  });
+
+  it('maps a standing program category to the reason it was earned by', () => {
+    expect(creditGrantReasonOf('influencer')).toBe('influencer');
+    expect(creditGrantReasonOf('usage_issue')).toBe('usage_issue');
+    expect(creditGrantReasonOf('pull_request')).toBe('pull_request');
+    expect(creditGrantReasonOf('vibeday')).toBe('vibe_day');
+    expect(creditGrantReasonOf('feedback')).toBe('feedback');
+    expect(creditGrantReasonOf('admin-bulk-grant')).toBe('admin_bulk_grant');
+    expect(creditGrantReasonOf('oss-sponsorship')).toBe('oss_sponsorship');
+    expect(creditGrantReasonOf('oss-monthly-reset')).toBe('oss_monthly_reset');
+    expect(creditGrantReasonOf('contributor-champion-credits')).toBe('contributor_champion');
   });
 
   it('maps ledger accounting rows to adjustment', () => {
@@ -319,10 +388,10 @@ describe('creditGrantReasonOf', () => {
     expect(creditGrantReasonOf('organization_custom')).toBe('adjustment');
   });
 
-  it('maps an admin-created campaign category to grant', () => {
+  it('maps an admin-created campaign category to promotional', () => {
     // A campaign writes `c-<slug>` built at grant time, so it is never in the
     // promo registry; it is still a member-visible signup bonus.
-    expect(creditGrantReasonOf('c-summer-bonus')).toBe('grant');
+    expect(creditGrantReasonOf('c-summer-bonus')).toBe('promotional');
   });
 
   it('fails closed on an unclassified category', () => {

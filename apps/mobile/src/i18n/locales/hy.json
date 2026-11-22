@@ -309,6 +309,7 @@
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",
+    "availableToSpendInOrganization": "Հասանելի է այս կազմակերպությունում ծախսելու համար",
     "signOutTitle": "Դո՞ւրս գալ հաշվից",
     "signOutMessage": "Աշխատանքային տարածքից օգտվելու համար պետք է նորից մուտք գործեք։",
     "deleteAccountTitle": "Ջնջե՞լ հաշիվը",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Ուղղումներ և բարելավումներ հետևյալ բաժիններում՝ {{areas}}։",
     "changelogFixesPolish": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
     "changelogAreas": {
-      "signIn": "Մուտք",
-      "profileOrganizations": "Պրոֆիլ ու կազմակերպություններ"
+      "signIn": "մուտք",
+      "profileOrganizations": "պրոֆիլ ու կազմակերպություններ",
+      "chat": "զրույց",
+      "notifications": "ծանուցումներ",
+      "integrations": "ինտեգրումներ"
     }
   },
   "preferences": {
@@ -2561,7 +2565,7 @@
       "searchPlaceholder": "Որոնեք պահոցները…",
       "noMatches": "Համընկնումներ չկան",
       "noRepositories": "Հասանելի պահոցներ չկան",
-      "noRepositoriesDescription": "Ձեր հաշվին միացված պահոցներ չկան։",
+      "noRepositoriesDescription": "Պահոցները բեռնելու համար միացրու GitHub-ը կամ GitLab-ը։",
       "loading": "Բեռնվում է…",
       "accessibility": "Պահոց՝ {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Վճարումների կարգավորումները վեբում",
       "changePlan": "Փոխել պլանը",
       "buySeats": "Գնել տեղեր",
-      "managedOnWeb": "Պլանը, տեղերը և ավտոմատ համալրումը կառավարվում են վեբում։",
+      "managedOnWeb": "Պլանը, տեղերը և ավտոմատ համալրումը կառավարվում են kilo.ai-ում։",
       "setupAutoTopUp": "Կարգավորել ավտոմատ համալրումը",
       "manageAutoTopUp": "Կառավարել ավտոմատ համալրումը",
       "opensOnWeb": "Բացվում է վեբում"
@@ -4506,19 +4510,33 @@
       "deductionFallback": "Կրեդիտների դուրսգրում",
       "emptyDescription": "Կրեդիտների գնումները, անդորրագրերը և օգտագործումը կհայտնվեն այստեղ։",
       "emptyTitle": "Կրեդիտների պատմություն չկա",
+      "expiredGrant": "Ժամկետանց՝ {{description}}",
       "googlePlayReceipt": "Անդորրագիր Google Play-ից",
       "purchaseFallback": "Կրեդիտների գնում",
       "receipt": "Անդորրագիր",
       "receiptA11y": "Բացել անդորրագիրը՝ {{description}}, {{amount}}, {{date}}-ից",
       "receiptUnavailable": "Այս գնման համար անդորրագիր հասանելի չէ։",
       "retentionLimit": "Ցուցադրվում է կրեդիտների ամենավերջին պատմությունը։",
+      "voidedGrant": "Չեղարկված՝ {{description}}",
       "kind": {
         "adjustment": "Ճշգրտում",
         "balanceNeutral": "Առանց հաշվեկշռի փոփոխության",
         "deduction": "Դուրսգրում",
         "grant": "Կրեդիտների տրամադրում",
+        "promotionalCredits": "Պրոմո կրեդիտներ",
         "welcomeCredits": "Ողջույնի կրեդիտներ",
         "purchase": "Գնում"
+      },
+      "program": {
+        "adminBulkGrant": "Ադմինիստրատորի կրեդիտների տրամադրում",
+        "contributorChampion": "Ներդրող-չեմպիոնի կրեդիտներ",
+        "feedback": "Հետադարձ կապի կրեդիտներ",
+        "influencer": "Ինֆլուենսերների կրեդիտներ",
+        "ossMonthlyReset": "Բաց կոդով նախագծերի կրեդիտների ամսական վերականգնում",
+        "ossSponsorship": "Բաց կոդով նախագծերի հովանավորության կրեդիտներ",
+        "pullRequest": "Ձգման հարցման կրեդիտներ",
+        "usageIssue": "Օգտագործման խնդրի կրեդիտներ",
+        "vibeDay": "Vibe Day-ի կրեդիտներ"
       }
     },
     "title": "Գնել կրեդիտներ",
@@ -5099,6 +5117,20 @@
       "eu": "Եվրոպական Միություն",
       "au": "Ավստրալիա",
       "jp": "Ճապոնիա"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Նախապատվությունների որոնում",
+    "noMatches": "Համապատասխան նախապատվություններ չկան",
+    "emptyDescription": "Փորձեք նախապատվության այլ անուն կամ հիմնաբառ։",
+    "resultsStatus": "Գտնված նախապատվություններ՝ {{resultCount}}",
+    "keywords": {
+      "signOut": "դուրս գալ|ելք",
+      "appearance": "թեմա|գունային սխեմա|մուգ ռեժիմ",
+      "appUnlock": "կենսաչափություն|դեմքի ճանաչում|մատնահետք",
+      "language": "լեզու|թարգմանություն",
+      "notifications": "ծանուցումներ|ազդանշաններ",
+      "privacy": "վերլուծություն|հետևում"
     }
   }
 }

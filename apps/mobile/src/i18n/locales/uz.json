@@ -309,6 +309,7 @@
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
+    "availableToSpendInOrganization": "Bu tashkilotda sarflash uchun mavjud",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
     "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
-      "signIn": "Kirish",
-      "profileOrganizations": "Profil hamda tashkilotlar"
+      "signIn": "kirish",
+      "profileOrganizations": "profil hamda tashkilotlar",
+      "chat": "suhbat",
+      "notifications": "bildirishnomalar",
+      "integrations": "integratsiyalar"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "Repozitoriylarni qidirish",
       "noMatches": "Mos natija topilmadi",
       "noRepositories": "Repozitoriyalar yo'q",
-      "noRepositoriesDescription": "Hisobingizga ulangan repozitoriyalar yo'q.",
+      "noRepositoriesDescription": "Repozitoriyalarni yuklash uchun GitHub yoki GitLabni ulang.",
       "loading": "Yuklanmoqda…",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Veb-saytdagi to'lovlar sozlamalari",
       "changePlan": "Tarifni o'zgartirish",
       "buySeats": "O'rin sotib olish",
-      "managedOnWeb": "Tarif, o'rinlar va avtomatik to'ldirish veb-saytda boshqariladi.",
+      "managedOnWeb": "Tarif, o'rinlar va avtomatik to'ldirish kilo.ai saytida boshqariladi.",
       "setupAutoTopUp": "Avtomatik to'ldirishni sozlash",
       "manageAutoTopUp": "Avtomatik to'ldirishni boshqarish",
       "opensOnWeb": "Vebda ochiladi"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
+      "expiredGrant": "Muddati tugagan: {{description}}",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
         "adjustment": "Tuzatish",
         "balanceNeutral": "Balansga ta’sir qilmaydi",
         "deduction": "Yechib olish",
         "grant": "Bepul kredit",
+        "promotionalCredits": "Rag'bat kreditlari",
         "welcomeCredits": "Xush kelibsiz krediti",
         "purchase": "Xarid"
+      },
+      "program": {
+        "adminBulkGrant": "Administrator tomonidan berilgan kredit",
+        "contributorChampion": "Hissa qo'shuvchilar chempioni krediti",
+        "feedback": "Fikr-mulohaza uchun kredit",
+        "influencer": "Influencer krediti",
+        "ossMonthlyReset": "Ochiq kodli loyihalar homiyligining oylik yangilanishi",
+        "ossSponsorship": "Ochiq kodli loyihalarga homiylik krediti",
+        "pullRequest": "PR uchun kredit",
+        "usageIssue": "Foydalanish muammosi uchun kredit",
+        "vibeDay": "Vibe kuni krediti"
       },
       "purchaseFallback": "Kredit xaridi",
       "receipt": "Chek",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
-      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda."
+      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
+      "voidedGrant": "Bekor qilingan: {{description}}"
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
@@ -5099,6 +5117,20 @@
       "eu": "Yevropa Ittifoqi",
       "au": "Avstraliya",
       "jp": "Yaponiya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Sozlamalarni qidirish",
+    "noMatches": "Mos sozlamalar topilmadi",
+    "emptyDescription": "Boshqa sozlama nomi yoki kalit so'z bilan qidiring.",
+    "resultsStatus": "Topilgan sozlamalar: {{resultCount}}",
+    "keywords": {
+      "signOut": "chiqish|seans",
+      "appearance": "mavzu|rang|uslub",
+      "appUnlock": "biometriya|yuz|barmoq",
+      "language": "til|tarjima",
+      "notifications": "bildirishnomalar|ogohlantirishlar",
+      "privacy": "tahlil|kuzatuv"
     }
   }
 }

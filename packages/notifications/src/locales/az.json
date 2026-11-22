@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Yeni təhlükəsizlik tapıntısı ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritik",
+      "high": "Yüksək",
+      "medium": "Orta",
+      "low": "Aşağı"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA xəbərdarlığı"
     },

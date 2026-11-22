@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 
 import { sql } from 'drizzle-orm';
 
+import { toIsoTimestamp } from '@kilocode/web-shared/lib/service-fees/values';
+
 export const ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MIN_LENGTH = 3;
 export const ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MAX_LENGTH = 500;
 export const ORGANIZATION_SERVICE_FEE_EXEMPTION_LOCK_PREFIX = 'service-fee-exemption:';
@@ -48,6 +50,11 @@ export type OrganizationExemptionExecutor = {
   transaction?: <T>(fn: (tx: OrganizationExemptionExecutor) => Promise<T>) => Promise<T>;
 };
 
+/**
+ * Persistence port for organization service fee exemptions. Implementations
+ * return records whose `createdAt` is a normalized UTC ISO-8601 string (the
+ * drizzle store normalizes in its row mapper), so callers do not re-normalize.
+ */
 export type OrganizationServiceFeeExemptionStore = {
   transact<T>(fn: (store: OrganizationServiceFeeExemptionStore) => Promise<T>): Promise<T>;
   lockOrganization(organizationId: string): Promise<void>;
@@ -76,18 +83,6 @@ export async function acquireOrganizationServiceFeeExemptionLock(
   );
 }
 
-/**
- * Normalize a database timestamptz string (including production shapes such as
- * `2026-04-29 01:16:12.945+00`) to UTC ISO-8601 at the API boundary.
- */
-export function normalizeOrganizationExemptionTimestamp(value: string | Date): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error('organization exemption timestamp is invalid');
-  }
-  return date.toISOString();
-}
-
 export function normalizeOrganizationServiceFeeExemptionReason(reason: string): string {
   const trimmed = reason.trim();
   if (
@@ -102,15 +97,6 @@ export function normalizeOrganizationServiceFeeExemptionReason(reason: string): 
   return trimmed;
 }
 
-function withNormalizedTimestamp(
-  record: OrganizationServiceFeeExemptionRecord
-): OrganizationServiceFeeExemptionRecord {
-  return {
-    ...record,
-    createdAt: normalizeOrganizationExemptionTimestamp(record.createdAt),
-  };
-}
-
 export async function getEffectiveOrganizationServiceFeeExemption(params: {
   store: OrganizationServiceFeeExemptionStore;
   organizationId: string;
@@ -119,8 +105,7 @@ export async function getEffectiveOrganizationServiceFeeExemption(params: {
   if (Number.isNaN(params.at.getTime())) {
     throw new Error('eligibility timestamp is invalid');
   }
-  const exemption = await params.store.findAtOrBefore(params.organizationId, params.at);
-  return exemption ? withNormalizedTimestamp(exemption) : null;
+  return params.store.findAtOrBefore(params.organizationId, params.at);
 }
 
 export async function getOrganizationServiceFeeExemption(params: {
@@ -132,10 +117,7 @@ export async function getOrganizationServiceFeeExemption(params: {
     params.store.listNewestFirst(params.organizationId),
   ]);
 
-  return {
-    current: current ? withNormalizedTimestamp(current) : null,
-    history: history.map(withNormalizedTimestamp),
-  };
+  return { current, history };
 }
 
 export async function setOrganizationServiceFeeExemption(params: {
@@ -151,7 +133,7 @@ export async function setOrganizationServiceFeeExemption(params: {
 }> {
   const reason = normalizeOrganizationServiceFeeExemptionReason(params.reason);
   const requestedAt = params.now ?? new Date();
-  const requestedAtIso = normalizeOrganizationExemptionTimestamp(requestedAt);
+  const requestedAtIso = toIsoTimestamp(requestedAt, 'organization exemption');
 
   return params.store.transact(async store => {
     await store.lockOrganization(params.organizationId);
@@ -169,16 +151,14 @@ export async function setOrganizationServiceFeeExemption(params: {
     const createdAt =
       requestedAt.getTime() > currentAt ? requestedAtIso : new Date(currentAt + 1).toISOString();
 
-    const exemption = withNormalizedTimestamp(
-      await store.insert({
-        id: randomUUID(),
-        organizationId: params.organizationId,
-        isExempt: params.isExempt,
-        reason,
-        changedByKiloUserId: params.changedByKiloUserId,
-        createdAt,
-      })
-    );
+    const exemption = await store.insert({
+      id: randomUUID(),
+      organizationId: params.organizationId,
+      isExempt: params.isExempt,
+      reason,
+      changedByKiloUserId: params.changedByKiloUserId,
+      createdAt,
+    });
 
     return { current: exemption, history: exemption };
   });

@@ -309,6 +309,7 @@
     "hideBalance": "मौज्दात लुकाउनुहोस्",
     "showBalance": "मौज्दात देखाउनुहोस्",
     "balanceHidden": "मौज्दात लुकाइएको छ",
+    "availableToSpendInOrganization": "यो संस्थामा खर्च गर्न उपलब्ध",
     "signOutTitle": "साइन आउट गर्ने?",
     "signOutMessage": "आफ्नो कार्यक्षेत्र प्रयोग गर्न फेरि साइन इन गर्नुपर्नेछ।",
     "deleteAccountTitle": "खाता मेट्ने?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "सम्पूर्ण एपमा समाधान र सुधारहरू।",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल तथा संस्थाहरू"
+      "profileOrganizations": "प्रोफाइल तथा संस्थाहरू",
+      "chat": "कुराकानी",
+      "notifications": "सूचनाहरू",
+      "integrations": "एकीकरणहरू"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "रिपोजिटरीको खोजी",
       "noMatches": "मिल्ने नतिजा छैन",
       "noRepositories": "कुनै रिपोजिटरी उपलब्ध छैन",
-      "noRepositoriesDescription": "तपाईंको खातामा कुनै रिपोजिटरी जडान भएको छैन।",
+      "noRepositoriesDescription": "रिपोजिटरीहरू लोड गर्न GitHub वा GitLab खाता जडान गर्नुहोस्।",
       "loading": "लोड गर्दै…",
       "accessibility": "रिपोजिटरी: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "वेबमा बिलिङ सेटिङहरू",
       "changePlan": "प्लान बदल्नुहोस्",
       "buySeats": "सिटहरू किन्नुहोस्",
-      "managedOnWeb": "प्लान, सिटहरू र स्वतः टप-अप वेबमा व्यवस्थापन गरिन्छन्।",
+      "managedOnWeb": "प्लान, सिटहरू र स्वतः टप-अप kilo.ai मा व्यवस्थापन गरिन्छन्।",
       "setupAutoTopUp": "स्वतः टप-अप सेट अप गर्नुहोस्",
       "manageAutoTopUp": "स्वतः टप-अप व्यवस्थापन गर्नुहोस्",
       "opensOnWeb": "वेबमा खुल्छ"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "क्रेडिट कटौती",
       "emptyDescription": "क्रेडिट खरिद, रसिद र प्रयोग यहाँ देखिनेछन्।",
       "emptyTitle": "कुनै क्रेडिट इतिहास छैन",
+      "expiredGrant": "म्याद सकियो: {{description}}",
       "googlePlayReceipt": "Google Play बाट रसिद",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "ब्यालेन्समा असर नगर्ने",
         "deduction": "कटौती",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रचारात्मक क्रेडिटहरू",
         "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरिद"
+      },
+      "program": {
+        "adminBulkGrant": "प्रशासकको क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता च्याम्पियन क्रेडिट",
+        "feedback": "प्रतिक्रिया क्रेडिट",
+        "influencer": "इन्फ्लुएन्सर क्रेडिट",
+        "ossMonthlyReset": "खुला स्रोत क्रेडिटको मासिक रिसेट",
+        "ossSponsorship": "खुला स्रोत प्रायोजन क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्ट क्रेडिट",
+        "usageIssue": "प्रयोग समस्याको क्रेडिट",
+        "vibeDay": "Vibe Day क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरिद",
       "receipt": "रसिद",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} को रसिद खोल्नुहोस्",
       "receiptUnavailable": "यो खरिदको रसिद उपलब्ध छैन।",
-      "retentionLimit": "सबैभन्दा पछिल्लो क्रेडिट इतिहास देखाइँदै छ।"
+      "retentionLimit": "सबैभन्दा पछिल्लो क्रेडिट इतिहास देखाइँदै छ।",
+      "voidedGrant": "रद्द गरिएको: {{description}}"
     },
     "title": "क्रेडिट किन्नुहोस्",
     "description": "क्रेडिट भनेको Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo ब्यालेन्समा थपिने एक-पटकको खरिद हो। स्टोरले तपाईंको खाताबाट शुल्क लिन्छ र स्टोरले भुक्तानी पुष्टि गरेपछि क्रेडिट थपिन्छ।",
@@ -5099,6 +5117,20 @@
       "eu": "युरोपेली संघ",
       "au": "अस्ट्रेलिया",
       "jp": "जापान"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "रुचिहरूको खोजी",
+    "noMatches": "मिल्दो रुचिहरू भेटिएनन्",
+    "emptyDescription": "रुचिको अर्को नाम वा खोजशब्द प्रयोग गर्नुहोस्।",
+    "resultsStatus": "भेटिएका रुचिहरू: {{resultCount}}",
+    "keywords": {
+      "signOut": "बाहिर निस्कने|खाताबाट निस्कने",
+      "appearance": "रङ|स्वरूप|गाढा मोड",
+      "appUnlock": "अनुहार|औँठाछाप|बायोमेट्रिक",
+      "language": "भाषा|अनुवाद",
+      "notifications": "सूचना|चेतावनी",
+      "privacy": "विश्लेषण|निगरानी|गोपनीयता"
     }
   }
 }

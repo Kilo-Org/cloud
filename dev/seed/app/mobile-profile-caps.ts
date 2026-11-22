@@ -71,7 +71,7 @@ const SETUP_COMMANDS = [
   'pnpm run typecheck',
   'pnpm run lint',
   'pnpm run format:check',
-  'pnpm run dependency-cycle-check',
+  'pnpm run web:dependency-cycle-check',
   'pnpm run validate',
   'pnpm run test:setup-smoke',
   'pnpm run test:scripts',

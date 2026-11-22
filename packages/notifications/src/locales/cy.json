@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Canfyddiad diogelwch newydd ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Critigol",
+      "high": "Uchel",
+      "medium": "Canolig",
+      "low": "Isel"
+    },
     "securityFindingSlaWarning": {
       "title": "Rhybudd SLA"
     },

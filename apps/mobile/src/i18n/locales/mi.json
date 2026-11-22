@@ -309,6 +309,7 @@
     "hideBalance": "Hunaia te toenga",
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
+    "availableToSpendInOrganization": "E wātea ana mō te whakapaunga i tēnei rōpū",
     "signOutTitle": "Takiputa?",
     "signOutMessage": "Me takiuru anō koe kia uru ki tō wāhi mahi.",
     "deleteAccountTitle": "Mukua te pūkete?",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Ngā whakatika me ngā whakapainga i ēnei wāhanga: {{areas}}.",
     "changelogFixesPolish": "Ngā whakatika me ngā whakapainga puta noa i te taupānga.",
     "changelogAreas": {
-      "signIn": "Takiuru",
-      "profileOrganizations": "Kōtaha me ngā whakahaere"
+      "signIn": "takiuru",
+      "profileOrganizations": "kōtaha me ngā whakahaere",
+      "chat": "kōrerorero",
+      "notifications": "ngā whakamōhiotanga",
+      "integrations": "ngā tūhononga"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "Rapu putunga waehere...",
       "noMatches": "Kāore he mea e hāngai ana",
       "noRepositories": "Kāore he putunga waehere e wātea ana",
-      "noRepositoriesDescription": "Kāore he putunga waehere kua hono ki tō pūkete.",
+      "noRepositoriesDescription": "Hei uta i ngā putunga waehere, honoa tētahi pūkete GitHub, GitLab rānei.",
       "loading": "Kei te uta…",
       "accessibility": "Putunga waehere: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Ngā tautuhinga utu i te ipurangi",
       "changePlan": "Huri mahere",
       "buySeats": "Hoko raihana",
-      "managedOnWeb": "Ka whakahaerehia te mahere, ngā raihana me te whakakī aunoa i te ipurangi.",
+      "managedOnWeb": "Ka whakahaerehia te mahere, ngā raihana me te whakakī aunoa i kilo.ai.",
       "setupAutoTopUp": "Whakaritea te whakakī aunoa",
       "manageAutoTopUp": "Whakahaerehia te whakakī aunoa",
       "opensOnWeb": "Ka tuwhera i te ipurangi"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "Tangohanga whiwhinga",
       "emptyDescription": "Ka puta mai ki konei ngā hoko whiwhinga, ngā rihīti, me te whakamahinga.",
       "emptyTitle": "Kāore he hītori whiwhinga",
+      "expiredGrant": "Kua pau te wā: {{description}}",
       "googlePlayReceipt": "Rihīti mai i Google Play",
       "kind": {
         "adjustment": "Whakatikatika",
         "balanceNeutral": "Kāore e pā ki te toenga",
         "deduction": "Tangohanga",
         "grant": "Koha whiwhinga",
+        "promotionalCredits": "Whiwhinga whakatairanga",
         "welcomeCredits": "Whiwhinga nau mai",
         "purchase": "Hoko"
+      },
+      "program": {
+        "adminBulkGrant": "Koha whiwhinga nā te kaiwhakahaere",
+        "contributorChampion": "Whiwhinga toa kaituku",
+        "feedback": "Whiwhinga urupare",
+        "influencer": "Whiwhinga kaiwhakaawe",
+        "ossMonthlyReset": "Tautuhi anō ā-marama OSS",
+        "ossSponsorship": "Whiwhinga tautoko pūtea OSS",
+        "pullRequest": "Whiwhinga tono kume",
+        "usageIssue": "Whiwhinga raru whakamahinga",
+        "vibeDay": "Whiwhinga Vibe day"
       },
       "purchaseFallback": "Hoko whiwhinga",
       "receipt": "Rihīti",
       "receiptA11y": "Huakina te rihīti mō {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kāore he rihīti mō tēnei hoko.",
-      "retentionLimit": "E whakaatu ana i te hītori whiwhinga tino hou."
+      "retentionLimit": "E whakaatu ana i te hītori whiwhinga tino hou.",
+      "voidedGrant": "Kua whakakorea: {{description}}"
     },
     "title": "Hoko whiwhinga",
     "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
@@ -5099,6 +5117,20 @@
       "eu": "Te Kotahitanga o Ūropi",
       "au": "Ahitereiria",
       "jp": "Hapani"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Rapua ngā manakohanga",
+    "noMatches": "Kāore he manakohanga e ōrite ana",
+    "emptyDescription": "Whakamātauria tētahi atu ingoa manakohanga, kupu matua rānei.",
+    "resultsStatus": "Ngā manakohanga i kitea: {{resultCount}}",
+    "keywords": {
+      "signOut": "takiputa|puta atu",
+      "appearance": "āhua|kaupapa|huinga tae",
+      "appUnlock": "tautuhi koiora|kanohi|tā matimati",
+      "language": "reo|whakamāoritanga",
+      "notifications": "whakamōhiotanga|matohi",
+      "privacy": "tātaritanga|aroturuki|matatapu"
     }
   }
 }

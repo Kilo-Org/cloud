@@ -309,6 +309,7 @@
     "hideBalance": "លាក់សមតុល្យ",
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",
+    "availableToSpendInOrganization": "អាចប្រើសម្រាប់ចំណាយក្នុងស្ថាប័ននេះ",
     "signOutTitle": "ចេញពីគណនី?",
     "signOutMessage": "អ្នកត្រូវចូលគណនីម្តងទៀត ដើម្បីប្រើកន្លែងធ្វើការរបស់អ្នក។",
     "deleteAccountTitle": "លុបគណនី?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "ការជួសជុល និងការកែលម្អនៅទូទាំងកម្មវិធី។",
     "changelogAreas": {
       "signIn": "ការចូល",
-      "profileOrganizations": "ប្រវត្តិរូប និងស្ថាប័ន"
+      "profileOrganizations": "ប្រវត្តិរូប និងស្ថាប័ន",
+      "chat": "ជជែក",
+      "notifications": "ការជូនដំណឹង",
+      "integrations": "ការរួមបញ្ចូល"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "ស្វែងរកឃ្លាំងកូដ",
       "noMatches": "គ្មានលទ្ធផលត្រូវគ្នា",
       "noRepositories": "គ្មានឃ្លាំងកូដអាចប្រើបានទេ",
-      "noRepositoriesDescription": "គ្មានឃ្លាំងកូដណាមួយភ្ជាប់ទៅគណនីរបស់អ្នកទេ។",
+      "noRepositoriesDescription": "ដើម្បីផ្ទុកឃ្លាំងកូដ សូមភ្ជាប់ GitHub ឬ GitLab។",
       "loading": "កំពុងផ្ទុក…",
       "accessibility": "ឃ្លាំងកូដ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "ការកំណត់ការចេញវិក្កយបត្រនៅលើគេហទំព័រ",
       "changePlan": "ប្តូរគម្រោង",
       "buySeats": "ទិញកន្លែងសមាជិក",
-      "managedOnWeb": "គម្រោង កន្លែងសមាជិក និងការបញ្ចូលទឹកប្រាក់ស្វ័យប្រវត្តិ ត្រូវបានគ្រប់គ្រងនៅលើគេហទំព័រ។",
+      "managedOnWeb": "គម្រោង កន្លែងសមាជិក និងការបញ្ចូលទឹកប្រាក់ស្វ័យប្រវត្តិ ត្រូវបានគ្រប់គ្រងនៅ kilo.ai។",
       "setupAutoTopUp": "រៀបចំការបញ្ចូលទឹកប្រាក់ស្វ័យប្រវត្តិ",
       "manageAutoTopUp": "គ្រប់គ្រងការបញ្ចូលទឹកប្រាក់ស្វ័យប្រវត្តិ",
       "opensOnWeb": "បើកនៅលើគេហទំព័រ"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "ការកាត់ក្រេឌីត",
       "emptyDescription": "ការទិញក្រេឌីត បង្កាន់ដៃ និងការប្រើប្រាស់នឹងបង្ហាញនៅទីនេះ។",
       "emptyTitle": "គ្មានប្រវត្តិក្រេឌីត",
+      "expiredGrant": "បានផុតកំណត់៖ {{description}}",
       "googlePlayReceipt": "បង្កាន់ដៃពី Google Play",
       "kind": {
         "adjustment": "ការកែតម្រូវ",
         "balanceNeutral": "មិនប៉ះពាល់សមតុល្យ",
         "deduction": "ការកាត់",
         "grant": "ការផ្តល់ក្រេឌីត",
+        "promotionalCredits": "ឥណទានផ្សព្វផ្សាយ",
         "welcomeCredits": "ក្រេឌីតស្វាគមន៍",
         "purchase": "ការទិញ"
+      },
+      "program": {
+        "adminBulkGrant": "ការផ្តល់ឥណទានដោយអ្នកគ្រប់គ្រង",
+        "contributorChampion": "ឥណទានជើងឯកអ្នកចូលរួម",
+        "feedback": "ឥណទានមតិកែលម្អ",
+        "influencer": "ឥណទានអ្នកមានឥទ្ធិពល",
+        "ossMonthlyReset": "ការបន្តឧបត្ថម្ភកម្មវិធីប្រភពបើកចំហ",
+        "ossSponsorship": "ឥណទានឧបត្ថម្ភកម្មវិធីប្រភពបើកចំហ",
+        "pullRequest": "ឥណទានសំណើបញ្ចូលកូដ",
+        "usageIssue": "ឥណទានបញ្ហាការប្រើប្រាស់",
+        "vibeDay": "ឥណទាន Vibe Day"
       },
       "purchaseFallback": "ការទិញក្រេឌីត",
       "receipt": "បង្កាន់ដៃ",
       "receiptA11y": "បើកបង្កាន់ដៃសម្រាប់ {{description}}, {{amount}}, ពី {{date}}",
       "receiptUnavailable": "មិនមានបង្កាន់ដៃសម្រាប់ការទិញនេះទេ។",
-      "retentionLimit": "បង្ហាញប្រវត្តិឥណទានថ្មីៗបំផុត។"
+      "retentionLimit": "បង្ហាញប្រវត្តិឥណទានថ្មីៗបំផុត។",
+      "voidedGrant": "បានលុបចោល៖ {{description}}"
     },
     "title": "ទិញឥណទាន",
     "description": "ឥណទានគឺជាការទិញតែម្តងដែលបន្ថែមទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App។ ហាងគិតប្រាក់ពីគណនីរបស់អ្នក ហើយឥណទានត្រូវបានបន្ថែមបន្ទាប់ពីហាងបញ្ជាក់ការបង់ប្រាក់។",
@@ -5099,6 +5117,20 @@
       "eu": "សហភាពអឺរ៉ុប",
       "au": "អូស្ត្រាលី",
       "jp": "ជប៉ុន"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ស្វែងរកចំណូលចិត្ត",
+    "noMatches": "មិនមានចំណូលចិត្តដែលត្រូវគ្នា",
+    "emptyDescription": "សាកល្បងឈ្មោះចំណូលចិត្ត ឬពាក្យគន្លឹះផ្សេង។",
+    "resultsStatus": "ចំណូលចិត្តដែលបានរកឃើញ៖ {{resultCount}}",
+    "keywords": {
+      "signOut": "ចាកចេញ|ចេញពីគណនី",
+      "appearance": "រចនាប័ទ្ម|ពណ៌",
+      "appUnlock": "ជីវមាត្រ|ផ្ទៃមុខ|ស្នាមម្រាមដៃ",
+      "language": "ភាសា|ការបកប្រែ",
+      "notifications": "ការជូនដំណឹង|ការដាស់តឿន",
+      "privacy": "ការវិភាគ|ការតាមដាន"
     }
   }
 }

@@ -309,6 +309,7 @@
     "hideBalance": "బ్యాలెన్స్ దాచు",
     "showBalance": "బ్యాలెన్స్ చూపించు",
     "balanceHidden": "బ్యాలెన్స్ దాచబడింది",
+    "availableToSpendInOrganization": "ఈ సంస్థలో ఖర్చు చేయడానికి అందుబాటులో ఉంది",
     "signOutTitle": "సైన్ అవుట్ చేయాలా?",
     "signOutMessage": "మీ వర్క్‌స్పేస్‌ను ఉపయోగించడానికి మళ్లీ సైన్ ఇన్ చేయాలి.",
     "deleteAccountTitle": "ఖాతాను తొలగించాలా?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "యాప్ అంతటా పరిష్కారాలు మరియు మెరుగుదలలు.",
     "changelogAreas": {
       "signIn": "సైన్ ఇన్",
-      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు"
+      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు",
+      "chat": "చాట్",
+      "notifications": "నోటిఫికేషన్లు",
+      "integrations": "ఇంటిగ్రేషన్‌లు"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "రిపోజిటరీల శోధన",
       "noMatches": "సరిపోలికలు లేవు",
       "noRepositories": "రిపోజిటరీలు అందుబాటులో లేవు",
-      "noRepositoriesDescription": "మీ ఖాతాకు ఏ రిపోజిటరీలూ కనెక్ట్ కాలేదు.",
+      "noRepositoriesDescription": "రిపోజిటరీలను లోడ్ చేయడానికి, GitHub లేదా GitLabను కనెక్ట్ చేయండి.",
       "loading": "లోడ్ అవుతోంది…",
       "accessibility": "రిపోజిటరీ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "వెబ్‌లో బిల్లింగ్ సెట్టింగ్‌లు",
       "changePlan": "ప్లాన్ మార్చండి",
       "buySeats": "సీట్లు కొనండి",
-      "managedOnWeb": "ప్లాన్, సీట్లు మరియు ఆటో టాప్-అప్ వెబ్‌లో నిర్వహించబడతాయి.",
+      "managedOnWeb": "ప్లాన్, సీట్లు మరియు ఆటో టాప్-అప్ kilo.ai లో నిర్వహించబడతాయి.",
       "setupAutoTopUp": "ఆటో టాప్-అప్ సెటప్ చేయండి",
       "manageAutoTopUp": "ఆటో టాప్-అప్‌ను నిర్వహించండి",
       "opensOnWeb": "వెబ్‌లో తెరుచుకుంటుంది"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "క్రెడిట్ తగ్గింపు",
       "emptyDescription": "క్రెడిట్ కొనుగోళ్లు, రసీదులు మరియు వినియోగం ఇక్కడ కనిపిస్తాయి.",
       "emptyTitle": "క్రెడిట్ చరిత్ర లేదు",
+      "expiredGrant": "గడువు ముగిసింది: {{description}}",
       "googlePlayReceipt": "Google Play నుండి రసీదు",
       "kind": {
         "adjustment": "సర్దుబాటు",
         "balanceNeutral": "బ్యాలెన్స్‌పై ప్రభావం లేదు",
         "deduction": "తగ్గింపు",
         "grant": "క్రెడిట్ మంజూరు",
+        "promotionalCredits": "ప్రమోషనల్ క్రెడిట్",
         "welcomeCredits": "స్వాగత క్రెడిట్",
         "purchase": "కొనుగోలు"
+      },
+      "program": {
+        "adminBulkGrant": "నిర్వాహకుడి క్రెడిట్ మంజూరు",
+        "contributorChampion": "కాంట్రిబ్యూటర్ ఛాంపియన్ క్రెడిట్",
+        "feedback": "అభిప్రాయ క్రెడిట్",
+        "influencer": "ఇన్‌ఫ్లుయెన్సర్ క్రెడిట్",
+        "ossMonthlyReset": "OSS ప్రాయోజకత్వ పునరుద్ధరణ",
+        "ossSponsorship": "OSS ప్రాయోజకత్వ క్రెడిట్",
+        "pullRequest": "పుల్ రిక్వెస్ట్ క్రెడిట్",
+        "usageIssue": "వినియోగ సమస్య క్రెడిట్",
+        "vibeDay": "Vibe Day క్రెడిట్"
       },
       "purchaseFallback": "క్రెడిట్ కొనుగోలు",
       "receipt": "రసీదు",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} కోసం రసీదును తెరవండి",
       "receiptUnavailable": "ఈ కొనుగోలుకు రసీదు అందుబాటులో లేదు.",
-      "retentionLimit": "ఇటీవలి క్రెడిట్ చరిత్ర చూపబడుతోంది."
+      "retentionLimit": "ఇటీవలి క్రెడిట్ చరిత్ర చూపబడుతోంది.",
+      "voidedGrant": "రద్దు చేయబడింది: {{description}}"
     },
     "title": "క్రెడిట్‌లు కొనండి",
     "description": "క్రెడిట్‌లు అనేవి Kilo యాప్‌లో AI కోడింగ్ సెషన్‌లను నడపడానికి మీ Kilo బ్యాలెన్స్‌కు జోడించే ఒక-సారి కొనుగోలు. స్టోర్ మీ ఖాతా నుండి ఛార్జ్ చేస్తుంది మరియు స్టోర్ చెల్లింపును నిర్ధారించిన తర్వాత క్రెడిట్‌లు జోడించబడతాయి.",
@@ -5099,6 +5117,20 @@
       "eu": "యూరోపియన్ యూనియన్",
       "au": "ఆస్ట్రేలియా",
       "jp": "జపాన్"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ప్రాధాన్యతల కోసం శోధన",
+    "noMatches": "సరిపోలే ప్రాధాన్యతలు లేవు",
+    "emptyDescription": "వేరే ప్రాధాన్యత పేరు లేదా శోధన పదంతో ప్రయత్నించండి.",
+    "resultsStatus": "కనుగొన్న ప్రాధాన్యతలు: {{resultCount}}",
+    "keywords": {
+      "signOut": "సైన్ అవుట్|నిష్క్రమణ",
+      "appearance": "థీమ్|రంగులు|రూపం",
+      "appUnlock": "బయోమెట్రిక్స్|ముఖ గుర్తింపు|వేలిముద్ర",
+      "language": "భాష|అనువాదం",
+      "notifications": "హెచ్చరికలు|నోటిఫికేషన్లు",
+      "privacy": "గోప్యత|విశ్లేషణలు|ట్రాకింగ్"
     }
   }
 }

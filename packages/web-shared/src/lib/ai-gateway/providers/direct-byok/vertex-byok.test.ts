@@ -1,7 +1,8 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { GatewayRequest } from '../openrouter/types';
-import { ReasoningDetailsTransform, type TransformRequestContext } from '../types';
+import { ReasoningDetailsTransform } from '../types';
 import { getGoogleServiceAccountAccessToken } from '../../custom-llm/google-service-account';
+import type { DirectByokModel, DirectByokTransformRequestContext } from './types';
 import vertexByok, {
   buildGcpVertexUpstream,
   getGcpVertexHost,
@@ -197,8 +198,9 @@ describe('resolveGcpVertexUpstream', () => {
 describe('vertexByok definition', () => {
   function createContext(
     request: GatewayRequest,
+    directByokModel: Readonly<Pick<DirectByokModel, 'id' | 'endpoint'>>,
     model = 'vertex-byok/model'
-  ): TransformRequestContext {
+  ): DirectByokTransformRequestContext {
     return {
       provider: {
         type: 'direct-byok',
@@ -212,6 +214,7 @@ describe('vertexByok definition', () => {
         async transformRequest() {},
       },
       model,
+      directByokModel,
       request,
       originalHeaders: EmptyFraudDetectionHeaders,
       extraHeaders: {},
@@ -223,10 +226,13 @@ describe('vertexByok definition', () => {
   }
 
   it('moves the Claude model into the URL and sets the Vertex API version', () => {
-    const context = createContext({
-      kind: 'messages',
-      body: { model: 'claude-sonnet-4-6@default', messages: [], max_tokens: 10 },
-    });
+    const context = createContext(
+      {
+        kind: 'messages',
+        body: { model: 'claude-sonnet-4-6@default', messages: [], max_tokens: 10 },
+      },
+      { id: 'claude-sonnet-4-6@default', endpoint: 'anthropic' }
+    );
 
     vertexByok.transformRequest(context);
 
@@ -271,6 +277,7 @@ describe('vertexByok definition', () => {
           ...(mode !== 'omitted' && { thinking: { type: mode } }),
         },
       },
+      { id: upstreamModel, endpoint: 'anthropic' },
       model
     );
 
@@ -298,34 +305,37 @@ describe('vertexByok definition', () => {
   });
 
   it('reduces Mistral requests to the fields Mistral accepts', () => {
-    const context = createContext({
-      kind: 'chat_completions',
-      body: {
-        model: 'mistral-medium-3',
-        messages: [
-          { role: 'user', content: 'hi' },
-          {
-            role: 'assistant',
-            content: 'hello',
-            reasoning: 'thinking',
-            reasoning_details: [],
-          } as never,
-        ],
-        max_completion_tokens: 100,
-        seed: 7,
-        stream: true,
-        stream_options: { include_usage: true },
-        user: 'user-hash',
-        safety_identifier: 'user-hash',
-        prompt_cache_key: 'session-hash',
-        tools: [
-          {
-            type: 'function',
-            function: { name: 'read', parameters: { type: 'object' }, strict: true },
-          },
-        ],
+    const context = createContext(
+      {
+        kind: 'chat_completions',
+        body: {
+          model: 'mistral-medium-3',
+          messages: [
+            { role: 'user', content: 'hi' },
+            {
+              role: 'assistant',
+              content: 'hello',
+              reasoning: 'thinking',
+              reasoning_details: [],
+            } as never,
+          ],
+          max_completion_tokens: 100,
+          seed: 7,
+          stream: true,
+          stream_options: { include_usage: true },
+          user: 'user-hash',
+          safety_identifier: 'user-hash',
+          prompt_cache_key: 'session-hash',
+          tools: [
+            {
+              type: 'function',
+              function: { name: 'read', parameters: { type: 'object' }, strict: true },
+            },
+          ],
+        },
       },
-    });
+      { id: 'mistral-medium-3', endpoint: 'mistral' }
+    );
 
     vertexByok.transformRequest(context);
 
@@ -347,11 +357,49 @@ describe('vertexByok definition', () => {
     ['gemini-3.5-flash', 'google/gemini-3.5-flash'],
     ['zai-org/glm-5.2-maas', 'zai-org/glm-5.2-maas'],
   ])('sends %s as %s to the OpenAI-compatible endpoint', (model, upstreamModel) => {
-    const context = createContext({ kind: 'chat_completions', body: { model, messages: [] } });
+    const context = createContext(
+      { kind: 'chat_completions', body: { model, messages: [] } },
+      { id: model, endpoint: 'openapi' }
+    );
 
     vertexByok.transformRequest(context);
 
     expect(context.request.body.model).toBe(upstreamModel);
+  });
+
+  it('leaves a Responses request unchanged on the Grok endpoint', () => {
+    const body = { model: 'xai/grok-4.20-reasoning', input: 'hello' };
+    const context = createContext(
+      { kind: 'responses', body: structuredClone(body) },
+      { id: 'xai/grok-4.20-reasoning', endpoint: 'openapi-responses' }
+    );
+
+    vertexByok.transformRequest(context);
+
+    expect(context.request.body).toEqual(body);
+  });
+
+  it('reduces a Chat Completions request whose model metadata names the Mistral endpoint', () => {
+    const context = createContext(
+      {
+        kind: 'chat_completions',
+        body: {
+          model: 'vendor-chat-model',
+          messages: [{ role: 'user', content: 'hi' }],
+          max_completion_tokens: 10,
+          user: 'user-hash',
+        },
+      },
+      { id: 'vendor-chat-model', endpoint: 'mistral' }
+    );
+
+    vertexByok.transformRequest(context);
+
+    expect(context.request.body).toEqual({
+      model: 'vendor-chat-model',
+      messages: [{ role: 'user', content: 'hi' }],
+      max_tokens: 10,
+    });
   });
 });
 

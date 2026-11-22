@@ -85,6 +85,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     foreground: '#111111',
   }),
 }));
+// The repo picker sheet opens Connected services through the router; the real
+// `expo-router` entry cannot load in this project, so the suite stubs the one
+// hook the sheet calls.
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));

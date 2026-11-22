@@ -1,4 +1,4 @@
-import { formatModelReferenceName, formatShortModelDisplayName } from '@/lib/model-display-name';
+import { modelReferenceLabel } from '@/lib/model-display-name';
 
 type ModelSelectorLabelInput = {
   /** The catalog option's display name, when the value matches one. */
@@ -26,7 +26,8 @@ type ModelSelectorLabelInput = {
  * session-typed-kb-up) — so the chip falls back to the same short name the
  * model picker shows. Mirrors the web chat toolbar, which never renders the raw
  * model reference: a `vendor/model` reference the catalog does not carry falls
- * back to its readable last segment.
+ * back to `modelReferenceLabel`, the one readable rule the catalogue-backed rows
+ * (`modelLabelFromCatalogue`) also use.
  */
 export function resolveModelSelectorLabel(input: ModelSelectorLabelInput): string {
   if (input.selectedName !== undefined) {
@@ -39,12 +40,13 @@ export function resolveModelSelectorLabel(input: ModelSelectorLabelInput): strin
     return input.notSelectedLabel;
   }
   if (!input.providerAware) {
-    const shortName = formatShortModelDisplayName(input.value);
-    if (shortName !== '') {
-      // A `vendor/model` reference is an id, not copy: show its readable last
-      // segment. The chip read `deepseek/deepseek-v4.1-flash-1017` on a session
-      // whose picker named the same model `DeepSeek V4.1 Flash 1017`.
-      return shortName.includes('/') ? formatModelReferenceName(shortName) : shortName;
+    const referenceLabel = modelReferenceLabel(input.value);
+    if (referenceLabel !== '') {
+      // A `vendor/model` reference is an id, not copy: `modelReferenceLabel`
+      // shows its readable last segment, the same rule every other row uses.
+      // The chip read `deepseek/deepseek-v4.1-flash-1017` on a session whose
+      // picker named the same model `DeepSeek V4.1 Flash 1017`.
+      return referenceLabel;
     }
   }
   return input.fallbackLabel;

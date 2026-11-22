@@ -309,6 +309,7 @@
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
+    "availableToSpendInOrganization": "Kuyatholakala ukusebenzisa imali kule nhlangano",
     "signOutTitle": "Uyafuna ukuphuma ngemvume?",
     "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza.",
     "deleteAccountTitle": "Uyafuna ukususa i-akhawunti?",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Ukulungiswa nokuthuthukiswa kulezi zingxenye: {{areas}}.",
     "changelogFixesPolish": "Ukulungiswa nokuthuthukiswa kulo lonke uhlelo lokusebenza.",
     "changelogAreas": {
-      "signIn": "Ukungena ngemvume",
-      "profileOrganizations": "Iphrofayela nezinhlangano"
+      "signIn": "ukungena ngemvume",
+      "profileOrganizations": "iphrofayela nezinhlangano",
+      "chat": "ingxoxo",
+      "notifications": "izaziso",
+      "integrations": "ukuhlanganiswa"
     }
   },
   "preferences": {
@@ -2557,7 +2561,7 @@
       "searchPlaceholder": "Sesha izinqolobane zekhodi",
       "noMatches": "Akukho okufanayo",
       "noRepositories": "Azikho izinqolobane zekhodi ezitholakalayo",
-      "noRepositoriesDescription": "Azikho izinqolobane zekhodi ezixhunywe ku-akhawunti yakho.",
+      "noRepositoriesDescription": "Ukuze ulayishe izinqolobane zekhodi, xhuma i-GitHub noma i-GitLab.",
       "loading": "Kuyalayishwa…",
       "accessibility": "Inqolobane yekhodi: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Izilungiselelo zokukhokha kuwebhu",
       "changePlan": "Shintsha uhlelo",
       "buySeats": "Thenga izikhala",
-      "managedOnWeb": "Uhlelo, izikhala kanye nokugcwalisa okuzenzakalelayo kuphathwa kuwebhu.",
+      "managedOnWeb": "Uhlelo, izikhala kanye nokugcwalisa okuzenzakalelayo kuphathwa ku-kilo.ai.",
       "setupAutoTopUp": "Setha ukugcwalisa okuzenzakalelayo",
       "manageAutoTopUp": "Phatha ukugcwalisa okuzenzakalelayo",
       "opensOnWeb": "Kuvuleka kuwebhu"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "Ukudonswa kwamakhredithi",
       "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",
       "emptyTitle": "Awukho umlando wamakhredithi",
+      "expiredGrant": "Kuphelelwe yisikhathi: {{description}}",
       "googlePlayReceipt": "Irisidi evela ku-Google Play",
       "kind": {
         "adjustment": "Ulungiso",
         "balanceNeutral": "Akuthinti ibhalansi",
         "deduction": "Ukudonswa",
         "grant": "Isibonelelo samakhredithi",
+        "promotionalCredits": "Amakhredithi okukhangisa",
         "welcomeCredits": "Amakhredithi okwamukela",
         "purchase": "Ukuthenga"
+      },
+      "program": {
+        "adminBulkGrant": "Isibonelelo samakhredithi somlawuli",
+        "contributorChampion": "Amakhredithi omqhawe wabanikeli",
+        "feedback": "Amakhredithi empendulo",
+        "influencer": "Amakhredithi e-influencer",
+        "ossMonthlyReset": "Ukusetha kabusha kwanyanga zonke kwe-OSS",
+        "ossSponsorship": "Amakhredithi okuxhaswa kwe-OSS",
+        "pullRequest": "Amakhredithi e-PR",
+        "usageIssue": "Amakhredithi enkinga yokusetshenziswa",
+        "vibeDay": "Amakhredithi e-Vibe Day"
       },
       "purchaseFallback": "Ukuthengwa kwamakhredithi",
       "receipt": "Irisidi",
       "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga.",
-      "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva."
+      "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva.",
+      "voidedGrant": "Ikhanseliwe: {{description}}"
     },
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
@@ -5099,6 +5117,20 @@
       "eu": "Inyunyana YaseYurophu",
       "au": "I-Australia",
       "jp": "I-Japani"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Sesha okuncamelayo",
+    "noMatches": "Akukho okuncamelayo okuhambisana nosesho",
+    "emptyDescription": "Zama elinye igama lokuncamelayo noma igama elingukhiye.",
+    "resultsStatus": "Okuncamelayo okutholakele: {{resultCount}}",
+    "keywords": {
+      "signOut": "phuma|phuma ku-akhawunti",
+      "appearance": "indikimba|imibala",
+      "appUnlock": "ibhayomethrikhi|ubuso|isigxivizo somunwe",
+      "language": "ulimi|ukuhumusha",
+      "notifications": "izexwayiso|izaziso",
+      "privacy": "ukuhlaziya|ukulandelela"
     }
   }
 }

@@ -309,6 +309,7 @@
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
+    "availableToSpendInOrganization": "इस संगठन में खर्च करने के लिए उपलब्ध",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",
@@ -555,7 +556,10 @@
     "changelogFixesPolish": "त्रुटि-सुधार और बेहतरी।",
     "changelogAreas": {
       "signIn": "साइन-इन",
-      "profileOrganizations": "प्रोफ़ाइल व संगठन"
+      "profileOrganizations": "प्रोफ़ाइल व संगठन",
+      "chat": "चैट",
+      "notifications": "सूचनाएँ",
+      "integrations": "इंटीग्रेशन"
     }
   },
   "preferences": {
@@ -1956,7 +1960,7 @@
       "searchPlaceholder": "रिपॉज़िटरी खोजें…",
       "noMatches": "कोई मिलान नहीं",
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
-      "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है।",
+      "noRepositoriesDescription": "रिपॉज़िटरी लोड करने के लिए GitHub या GitLab जोड़ें।",
       "accessibility": "रिपॉज़िटरी: {{label}}",
       "loading": "लोड हो रहा है…",
       "platformBitbucket": "Bitbucket"
@@ -3443,7 +3447,7 @@
       "manageOnWeb": "वेब पर बिलिंग सेटिंग्स",
       "changePlan": "प्लान बदलें",
       "buySeats": "सीटें खरीदें",
-      "managedOnWeb": "प्लान, सीटें और ऑटो टॉप-अप वेब पर प्रबंधित किए जाते हैं।",
+      "managedOnWeb": "प्लान, सीटें और ऑटो टॉप-अप kilo.ai पर प्रबंधित किए जाते हैं।",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
       "manageAutoTopUp": "ऑटो टॉप-अप प्रबंधित करें",
       "opensOnWeb": "वेब पर खुलता है"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "क्रेडिट कटौती",
       "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहां दिखेंगे।",
       "emptyTitle": "कोई क्रेडिट इतिहास नहीं",
+      "expiredGrant": "समय समाप्त: {{description}}",
       "googlePlayReceipt": "Google Play की रसीद",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "बैलेंस पर असर नहीं",
         "deduction": "कटौती",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रमोशनल क्रेडिट",
         "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरीदारी"
+      },
+      "program": {
+        "adminBulkGrant": "एडमिन द्वारा क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता चैंपियन क्रेडिट",
+        "feedback": "प्रतिक्रिया क्रेडिट",
+        "influencer": "इन्फ्लुएंसर क्रेडिट",
+        "ossMonthlyReset": "OSS प्रायोजन नवीनीकरण",
+        "ossSponsorship": "OSS प्रायोजन क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्ट क्रेडिट",
+        "usageIssue": "उपयोग समस्या क्रेडिट",
+        "vibeDay": "Vibe Day क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरीदारी",
       "receipt": "रसीद",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} की रसीद खोलें",
       "receiptUnavailable": "इस खरीदारी की रसीद उपलब्ध नहीं है।",
-      "retentionLimit": "सबसे हाल का क्रेडिट इतिहास दिखाया जा रहा है।"
+      "retentionLimit": "सबसे हाल का क्रेडिट इतिहास दिखाया जा रहा है।",
+      "voidedGrant": "रद्द किया गया: {{description}}"
     },
     "title": "क्रेडिट खरीदें",
     "description": "क्रेडिट एक बार की खरीद है जो Kilo App में AI कोडिंग सत्र चलाने के लिए आपके Kilo बैलेंस में जोड़ी जाती है। स्टोर आपके खाते से शुल्क लेता है और स्टोर द्वारा भुगतान की पुष्टि के बाद क्रेडिट जोड़े जाते हैं।",
@@ -5100,6 +5118,20 @@
       "eu": "यूरोपीय संघ",
       "au": "ऑस्ट्रेलिया",
       "jp": "जापान"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "पसंद में खोजें",
+    "noMatches": "मेल खाती कोई पसंद नहीं मिली",
+    "emptyDescription": "पसंद का कोई दूसरा नाम या कीवर्ड आज़माएँ।",
+    "resultsStatus": "पसंद मिलीं: {{resultCount}}",
+    "keywords": {
+      "signOut": "साइन आउट|लॉग आउट|बाहर निकलें",
+      "appearance": "थीम|रंग|डार्क मोड",
+      "appUnlock": "बायोमेट्रिक्स|चेहरा|फिंगरप्रिंट",
+      "language": "भाषा|अनुवाद",
+      "notifications": "सूचनाएँ|अलर्ट",
+      "privacy": "विश्लेषण|ट्रैकिंग"
     }
   }
 }

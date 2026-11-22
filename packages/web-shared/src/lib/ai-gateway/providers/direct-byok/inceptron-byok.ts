@@ -5,8 +5,10 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'inceptron-byok';
+
 export default {
-  id: 'inceptron-byok',
+  id,
   openrouter_inference_provider_id: 'inceptron',
   models_dev_id: 'inceptron',
   ...apiKeyUpstream({
@@ -14,5 +16,5 @@ export default {
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  models: cachedDirectByokModelList('inceptron-byok'),
+  models: cachedDirectByokModelList(id),
 } satisfies DirectByokProvider;

@@ -121,6 +121,7 @@ describe('findVercelOnlyModels', () => {
   it('keeps described Vercel chat models that no OpenRouter id maps to, under their reversed ids', () => {
     const models = findVercelOnlyModels({
       openRouterModelIds: ['qwen/qwen3-max', 'openai/gpt-5'],
+      openRouterModels,
       vercelMetadata,
       overrides: new Map(),
     });
@@ -134,6 +135,8 @@ describe('findVercelOnlyModels', () => {
     ]);
     expect(models[0]).toEqual({
       id: 'qwen/qwen3.5-flash',
+      // `qwen/qwen3-max` supplies the `qwen` vendor name, so the listing name carries it.
+      name: 'Qwen: Qwen3.5 Flash',
       storedModel: vercelMetadata['alibaba/qwen3.5-flash'],
       contextWindow: 256_000,
       modalities: { input: ['text', 'image'], output: ['text'] },
@@ -218,6 +221,28 @@ describe('findVercelOnlyModels name matching', () => {
     expect(findWithOpenRouterNames(['Qwen: Qwen3.5 Flash', 'Qwen: Qwen3 Max'])).toEqual([
       'reflection/beam-free',
     ]);
+  });
+
+  it('drops a colliding model while a sibling keeps the same vendor-prefixed name form', () => {
+    const colliding = storedModel('alibaba/qwen3.5-flash', { name: 'Qwen3.5 Flash' });
+    const sibling = storedModel('alibaba/qwen3.5-flash-lite', { name: 'Qwen3.5 Flash Lite' });
+    const openRouterModelsForNames = [
+      { id: 'qwen/qwen3.5-flash-preview', name: 'Qwen: Qwen3.5 Flash' },
+      { id: 'qwen/qwen3-max', name: 'Qwen: Qwen3 Max' },
+    ];
+
+    const models = findVercelOnlyModels({
+      openRouterModelIds: openRouterModelsForNames.map(model => model.id),
+      openRouterModels: openRouterModelsForNames,
+      vercelMetadata: {
+        'alibaba/qwen3.5-flash': colliding,
+        'alibaba/qwen3.5-flash-lite': sibling,
+      },
+      overrides: new Map(),
+    });
+
+    expect(ids(models)).toEqual(['qwen/qwen3.5-flash-lite']);
+    expect(models[0].name).toBe('Qwen: Qwen3.5 Flash Lite');
   });
 
   it('matches a model without a vendor prefix by its plain name', () => {

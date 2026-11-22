@@ -309,6 +309,7 @@
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
+    "availableToSpendInOrganization": "Ebben a szervezetben elkölthető",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -554,8 +555,11 @@
     "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
     "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
-      "signIn": "Bejelentkezés",
-      "profileOrganizations": "Profil & szervezetek"
+      "signIn": "bejelentkezés",
+      "profileOrganizations": "profil & szervezetek",
+      "chat": "csevegés",
+      "notifications": "értesítések",
+      "integrations": "integrációk"
     }
   },
   "preferences": {
@@ -2561,7 +2565,7 @@
       "searchPlaceholder": "Adattárak keresése",
       "noMatches": "Nincs találat",
       "noRepositories": "Nincs elérhető adattár",
-      "noRepositoriesDescription": "Egyetlen adattár sincs a fiókodhoz kapcsolva.",
+      "noRepositoriesDescription": "Az adattárak betöltéséhez csatlakoztass GitHubot vagy GitLabot.",
       "loading": "Betöltés…",
       "accessibility": "Adattár: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3451,7 +3455,7 @@
       "manageOnWeb": "Számlázási beállítások a weben",
       "changePlan": "Csomag módosítása",
       "buySeats": "Férőhelyek vásárlása",
-      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a weben történik.",
+      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a kilo.ai oldalon történik.",
       "setupAutoTopUp": "Automatikus feltöltés beállítása",
       "manageAutoTopUp": "Automatikus feltöltés kezelése",
       "opensOnWeb": "A weben nyílik meg"
@@ -4506,20 +4510,34 @@
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
+      "expiredGrant": "Lejárt: {{description}}",
       "googlePlayReceipt": "A nyugta a Google Playen érhető el",
       "kind": {
         "adjustment": "Korrekció",
         "balanceNeutral": "Egyenlegsemleges",
         "deduction": "Levonás",
         "grant": "Kreditjuttatás",
+        "promotionalCredits": "Promóciós kreditek",
         "welcomeCredits": "Üdvözlő kreditek",
         "purchase": "Vásárlás"
+      },
+      "program": {
+        "adminBulkGrant": "Adminisztrátori kreditjuttatás",
+        "contributorChampion": "Közreműködői bajnok kredit",
+        "feedback": "Visszajelzéskredit",
+        "influencer": "Influenszerkredit",
+        "ossMonthlyReset": "Nyílt forráskódú támogatás visszaállítása",
+        "ossSponsorship": "Nyílt forráskódú támogatási kredit",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Használati problémáért járó kredit",
+        "vibeDay": "Vibe day kredit"
       },
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
-      "retentionLimit": "A legutóbbi kreditelőzmények láthatók."
+      "retentionLimit": "A legutóbbi kreditelőzmények láthatók.",
+      "voidedGrant": "Érvénytelenítve: {{description}}"
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
@@ -5099,6 +5117,20 @@
       "eu": "Európai Unió",
       "au": "Ausztrália",
       "jp": "Japán"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Beállítások keresése",
+    "noMatches": "Nincs megfelelő beállítás",
+    "emptyDescription": "Próbálj másik beállításnévre vagy kulcsszóra keresni.",
+    "resultsStatus": "Talált beállítások: {{resultCount}}",
+    "keywords": {
+      "signOut": "kijelentkezés|kilépés",
+      "appearance": "téma|színséma",
+      "appUnlock": "biometria|arcfelismerés|ujjlenyomat",
+      "language": "nyelv|fordítás",
+      "notifications": "értesítések|riasztások",
+      "privacy": "analitika|követés|adatvédelem"
     }
   }
 }

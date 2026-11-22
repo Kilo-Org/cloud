@@ -311,6 +311,7 @@
     "hideBalance": "Схаваць баланс",
     "showBalance": "Паказаць баланс",
     "balanceHidden": "Баланс схаваны",
+    "availableToSpendInOrganization": "Даступна для выдаткавання ў гэтай арганізацыі",
     "signOutTitle": "Выйсці?",
     "signOutMessage": "Каб вярнуцца ў сваю працоўную прастору, трэба будзе ўвайсці зноў.",
     "deleteAccountTitle": "Выдаліць уліковы запіс?",
@@ -556,8 +557,11 @@
     "changelogFixesIn": "Выпраўленні і паляпшэнні ў раздзелах: {{areas}}.",
     "changelogFixesPolish": "Выпраўленні і паляпшэнні ва ўсёй праграме.",
     "changelogAreas": {
-      "signIn": "Уваход",
-      "profileOrganizations": "Профіль ды арганізацыі"
+      "signIn": "уваход",
+      "profileOrganizations": "профіль ды арганізацыі",
+      "chat": "чат",
+      "notifications": "апавяшчэнні",
+      "integrations": "інтэграцыі"
     }
   },
   "preferences": {
@@ -2661,7 +2665,7 @@
       "searchPlaceholder": "Пошук рэпазіторыяў",
       "noMatches": "Няма супадзенняў",
       "noRepositories": "Няма даступных рэпазіторыяў",
-      "noRepositoriesDescription": "Да вашага ўліковага запісу не падключаны ніводны рэпазіторый.",
+      "noRepositoriesDescription": "Каб загрузіць рэпазіторыі, падключыце GitHub або GitLab.",
       "loading": "Загрузка…",
       "accessibility": "Рэпазіторый: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3575,7 +3579,7 @@
       "manageOnWeb": "Налады аплаты ў вэб-версіі",
       "changePlan": "Змяніць план",
       "buySeats": "Купіць месцы",
-      "managedOnWeb": "План, месцы і аўтапапаўненне кіруюцца ў вэб-версіі.",
+      "managedOnWeb": "План, месцы і аўтапапаўненне кіруюцца на kilo.ai.",
       "setupAutoTopUp": "Наладзіць аўтапапаўненне",
       "manageAutoTopUp": "Кіраваць аўтапапаўненнем",
       "opensOnWeb": "Адкрываецца ў вэб-версіі"
@@ -4664,20 +4668,34 @@
       "deductionFallback": "Спісанне крэдытаў",
       "emptyDescription": "Тут будуць адлюстроўвацца пакупкі крэдытаў, чэкі і выкарыстанне.",
       "emptyTitle": "Гісторыі крэдытаў няма",
+      "expiredGrant": "Тэрмін дзеяння скончыўся: {{description}}",
       "googlePlayReceipt": "Чэк у Google Play",
       "kind": {
         "adjustment": "Карэкціроўка",
         "balanceNeutral": "Без змены балансу",
         "deduction": "Спісанне",
         "grant": "Начысленне крэдытаў",
+        "promotionalCredits": "Прэміяльныя крэдыты",
         "welcomeCredits": "Вітальныя крэдыты",
         "purchase": "Пакупка"
+      },
+      "program": {
+        "adminBulkGrant": "Начысленне крэдытаў адміністратарам",
+        "contributorChampion": "Крэдыт чэмпіёна сярод удзельнікаў",
+        "feedback": "Крэдыт за водгук",
+        "influencer": "Крэдыт інфлюэнсера",
+        "ossMonthlyReset": "Штомесячнае абнаўленне OSS",
+        "ossSponsorship": "Крэдыт спонсарства OSS",
+        "pullRequest": "Крэдыт за запыт на зліццё",
+        "usageIssue": "Крэдыт за праблему з выкарыстаннем",
+        "vibeDay": "Крэдыт Vibe day"
       },
       "purchaseFallback": "Пакупка крэдытаў",
       "receipt": "Чэк",
       "receiptA11y": "Адкрыць чэк: {{description}}, {{amount}}, ад {{date}}",
       "receiptUnavailable": "Чэк для гэтай пакупкі недаступны.",
-      "retentionLimit": "Паказваецца самая апошняя гісторыя крэдытаў."
+      "retentionLimit": "Паказваецца самая апошняя гісторыя крэдытаў.",
+      "voidedGrant": "Ануляваны: {{description}}"
     },
     "title": "Купіць крэдыты",
     "description": "Крэдыты — гэта аднаразовая пакупка, якая дадаецца на ваш баланс Kilo для запуску AI-сеансаў праграмавання ў дадатку Kilo. Крама спісвае сродкі з вашага рахунку, і крэдыты дадаюцца пасля пацверджання аплаты крамай.",
@@ -5273,6 +5291,20 @@
       "eu": "Еўрапейскі саюз",
       "au": "Аўстралія",
       "jp": "Японія"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Пошук налад",
+    "noMatches": "Адпаведных налад не знойдзена",
+    "emptyDescription": "Паспрабуйце іншую назву налады або ключавое слова.",
+    "resultsStatus": "Знойдзена налад: {{resultCount}}",
+    "keywords": {
+      "signOut": "выйсці|выхад",
+      "appearance": "тэма|колеравая схема",
+      "appUnlock": "біяметрыя|распазнаванне твару|адбітак пальца",
+      "language": "мова|пераклад",
+      "notifications": "абвесткі|апавяшчэнні|пуш-апавяшчэнні",
+      "privacy": "аналітыка|адсочванне"
     }
   }
 }

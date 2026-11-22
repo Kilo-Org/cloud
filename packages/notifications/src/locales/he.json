@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "ממצא אבטחה חדש ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "קריטית",
+      "high": "גבוהה",
+      "medium": "בינונית",
+      "low": "נמוכה"
+    },
     "securityFindingSlaWarning": {
       "title": "אזהרת SLA"
     },

@@ -46,7 +46,8 @@ const DIRECT_BYOK_PROVIDERS = [
 /**
  * The provider list as one widened list, for lookups and iterations: the tuple keeps
  * `EveryDirectByokProviderHasDefinition` exhaustive, and consumers read this view instead of
- * restating the widening.
+ * restating the widening. It is also this module's default export, so both specifiers carry one
+ * value and one type.
  */
 export const directByokProviderList: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
 
@@ -58,4 +59,4 @@ type UndefinedDirectByokProviderId = Exclude<
 
 export type EveryDirectByokProviderHasDefinition = AssertNever<UndefinedDirectByokProviderId>;
 
-export default DIRECT_BYOK_PROVIDERS;
+export default directByokProviderList;

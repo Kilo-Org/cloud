@@ -313,6 +313,7 @@
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
+    "availableToSpendInOrganization": "Ar gael i'w wario yn y sefydliad hwn",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -558,8 +559,11 @@
     "changelogFixesIn": "Atgyweiriadau a gwelliannau i'r canlynol: {{areas}}.",
     "changelogFixesPolish": "Atgyweiriadau a gwelliannau ar draws yr ap.",
     "changelogAreas": {
-      "signIn": "Mewngofnodi",
-      "profileOrganizations": "Proffil a sefydliadau"
+      "signIn": "mewngofnodi",
+      "profileOrganizations": "proffil a sefydliadau",
+      "chat": "sgwrs",
+      "notifications": "hysbysiadau",
+      "integrations": "integreiddiadau"
     }
   },
   "preferences": {
@@ -2765,7 +2769,7 @@
       "searchPlaceholder": "Chwilio am ystorfeydd",
       "noMatches": "Dim canlyniadau cyfatebol",
       "noRepositories": "Dim ystorfeydd ar gael",
-      "noRepositoriesDescription": "Nid oes ystorfeydd wedi'u cysylltu â'ch cyfrif.",
+      "noRepositoriesDescription": "I lwytho ystorfeydd, cysylltwch â GitHub neu GitLab.",
       "loading": "Yn llwytho…",
       "accessibility": "Ystorfa: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3699,7 +3703,7 @@
       "manageOnWeb": "Gosodiadau bilio ar y we",
       "changePlan": "Newid cynllun",
       "buySeats": "Prynu seddau",
-      "managedOnWeb": "Caiff y cynllun, y seddau ac ail-lenwi awtomatig eu rheoli ar y we.",
+      "managedOnWeb": "Caiff y cynllun, y seddau ac ail-lenwi awtomatig eu rheoli ar kilo.ai.",
       "setupAutoTopUp": "Gosod ail-lenwi awtomatig",
       "manageAutoTopUp": "Rheoli ail-lenwi awtomatig",
       "opensOnWeb": "Yn agor ar y we"
@@ -4822,20 +4826,34 @@
       "deductionFallback": "Didyniad credyd",
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",
+      "expiredGrant": "Wedi dod i ben: {{description}}",
       "googlePlayReceipt": "Derbynneb gan Google Play",
       "kind": {
         "adjustment": "Addasiad",
         "balanceNeutral": "Dim effaith ar y balans",
         "deduction": "Didyniad",
         "grant": "Credyd am ddim",
+        "promotionalCredits": "Credydau hyrwyddo",
         "welcomeCredits": "Credydau croeso",
         "purchase": "Pryniant"
+      },
+      "program": {
+        "adminBulkGrant": "Credydau gweinyddwr",
+        "contributorChampion": "Credyd pencampwr cyfrannwyr",
+        "feedback": "Credyd adborth",
+        "influencer": "Credyd dylanwadwr",
+        "ossMonthlyReset": "Ailosodiad misol nawdd OSS",
+        "ossSponsorship": "Credyd nawdd OSS",
+        "pullRequest": "Credyd cais tynnu",
+        "usageIssue": "Credyd problem defnydd",
+        "vibeDay": "Credyd Diwrnod Vibe"
       },
       "purchaseFallback": "Pryniant credyd",
       "receipt": "Derbynneb",
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
       "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
-      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf."
+      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf.",
+      "voidedGrant": "Wedi'i ddirymu: {{description}}"
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
@@ -5447,6 +5465,20 @@
       "eu": "Undeb Ewropeaidd",
       "au": "Awstralia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Chwilio am ddewisiadau",
+    "noMatches": "Dim dewisiadau cyfatebol",
+    "emptyDescription": "Rhowch gynnig ar enw dewis neu allweddair gwahanol.",
+    "resultsStatus": "Dewisiadau wedi'u canfod: {{resultCount}}",
+    "keywords": {
+      "signOut": "allgofnodi|gadael cyfrif",
+      "appearance": "thema|cynllun lliwiau",
+      "appUnlock": "biometreg|adnabod wyneb|ôl bys",
+      "language": "iaith|cyfieithu",
+      "notifications": "rhybuddion|hysbysiadau gwthio",
+      "privacy": "dadansoddeg|olrhain"
     }
   }
 }

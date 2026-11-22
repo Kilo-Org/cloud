@@ -152,7 +152,7 @@ describe('download tier choice', () => {
     expect(downloadTierOf({ ...base, hasHold: false })).toBe('legacy');
   });
 
-  it('leaves the legacy guard unarmed for an approval that buys no file', () => {
+  it('leaves the legacy guard unarmed for an approval whose refusal named no file', () => {
     expect(
       downloadTierOf({
         canDownload: true,

@@ -2052,7 +2052,7 @@
       "searchPlaceholder": "Поиск репозиториев",
       "noMatches": "Нет совпадений",
       "noRepositories": "Нет доступных репозиториев",
-      "noRepositoriesDescription": "К вашему аккаунту не подключены репозитории.",
+      "noRepositoriesDescription": "Чтобы загрузить репозитории, подключите GitHub или GitLab.",
       "loading": "Загрузка…",
       "accessibility": "Репозиторий: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4559,6 +4559,7 @@
       "promptPlaceholder": "Вы …",
       "tools": "Инструменты",
       "wholeToolRule": "Этот агент применяет одно правило ко всем инструментам одновременно: {{rule}}. Эти переключатели доступны только для чтения.",
+      "toolRule": "Сохранённое правило: {{rule}}",
       "visibility": "Видимость",
       "visibilityPrimary": "Первичный — отображается в окне выбора.",
       "visibilitySubagent": "Субагент — доступен только для вызова от других",

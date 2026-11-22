@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Репозиторийлерді іздеу",
       "noMatches": "Сәйкестіктер жоқ",
       "noRepositories": "Қолжетімді репозиторийлер жоқ",
-      "noRepositoriesDescription": "Тіркелгіңізге қосылған репозиторийлер жоқ.",
+      "noRepositoriesDescription": "Репозиторийлерді жүктеу үшін GitHub немесе GitLab қосыңыз.",
       "loading": "Жүктелуде…",
       "accessibility": "Репозиторий: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Сіз …",
       "tools": "Құралдар",
       "wholeToolRule": "Бұл агент барлық құралға бір ережені бірден қолданады: {{rule}}. Бұл қосқыштар тек оқуға арналған.",
+      "toolRule": "Сақталған ереже: {{rule}}",
       "visibility": "Көріну",
       "visibilityPrimary": "Негізгі — таңдаушыда көрсетіледі",
       "visibilitySubagent": "Субагент — тек басқалардан шақыруға болады",

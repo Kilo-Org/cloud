@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Søg efter kodelagre",
       "noMatches": "Ingen resultater",
       "noRepositories": "Ingen tilgængelige kodelagre",
-      "noRepositoriesDescription": "Der er ingen kodelagre tilknyttet din konto.",
+      "noRepositoriesDescription": "Tilknyt GitHub eller GitLab for at indlæse kodelagre.",
       "loading": "Indlæser…",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Du er en…",
       "tools": "Værktøjer",
       "wholeToolRule": "Denne agent anvender én regel på alle værktøjer på én gang: {{rule}}. Disse kontakter er skrivebeskyttede.",
+      "toolRule": "Gemt regel: {{rule}}",
       "visibility": "Sigtbarhed",
       "visibilityPrimary": "Primær — vist i vælgeren",
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",

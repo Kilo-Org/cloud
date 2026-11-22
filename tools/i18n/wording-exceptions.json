@@ -1101,6 +1101,7 @@
   ],
   "ta": ["dismissed", "open", "open pull request", "pr opened", "superseded"],
   "te": [
+    "block",
     "cancelled",
     "commit",
     "deleted",
@@ -1108,6 +1109,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "search repositories",
     "sign out",
     "unknown"
   ],

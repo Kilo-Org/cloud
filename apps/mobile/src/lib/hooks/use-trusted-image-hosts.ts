@@ -62,11 +62,6 @@ const store = createSecureStorePreference<string[]>({
   mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
 });
 
-// Warm the store as soon as any image-trust-aware module is imported, so a host
-// trusted in a prior session auto-loads on a cold start without waiting for a
-// screen to mount.
-store.preload();
-
 export function useTrustedImageHosts() {
   const trustedImageHosts = useSyncExternalStore(store.subscribe, store.get);
   const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);
@@ -82,9 +77,6 @@ export function isTrustedImageHost(host: string): boolean {
 }
 
 export function trustImageHost(host: string): void {
-  // Start the disk read if it has not run, so the trust write merges with the
-  // persisted list instead of replacing it with the empty default.
-  store.preload();
   const current = store.getRequested();
   if (current.includes(host)) {
     return;

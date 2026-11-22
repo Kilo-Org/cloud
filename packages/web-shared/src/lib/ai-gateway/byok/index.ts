@@ -25,7 +25,7 @@ import {
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { isKiloFundedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-funded-model';
 import { markByokAvailable } from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
@@ -364,10 +364,10 @@ export async function getOrganizationByokProviderIds(
  * `tagClaudeBillingByokModels`), which only add a badge.
  */
 export async function addUserByokAvailability(
-  models: OpenRouterModel[],
+  models: OpenRouterCatalogModel[],
   enabledProviderIds: UserByokProviderId[],
   getAllowedProviders: (modelId: string) => ReadonlySet<string> | undefined = () => undefined
-): Promise<OpenRouterModel[]> {
+): Promise<OpenRouterCatalogModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
   const enabled = [...enabledProviders];
   const vercelModelMetadata = hasInferenceProviderKey(enabled)
@@ -461,9 +461,9 @@ export function isInferenceProviderUserByok(userByok: readonly BYOKResult[] | nu
  * (`getDirectByokCatalogModelIds`), alongside the gateway and Vercel BYOK availability.
  */
 export function addDirectByokCatalogAvailability(
-  models: OpenRouterModel[],
+  models: OpenRouterCatalogModel[],
   directByokCatalogModelIds: ReadonlySet<string>
-): OpenRouterModel[] {
+): OpenRouterCatalogModel[] {
   if (directByokCatalogModelIds.size === 0) return models;
   return models.map(model =>
     directByokCatalogModelIds.has(model.id) ? markByokAvailable(model) : model

@@ -46,11 +46,6 @@ export function setThemePreference(pref: ThemePreference): void {
   store.set(pref);
 }
 
-/** Start the theme-preference disk read at module scope, before React mounts. */
-export function preloadThemePreference(): void {
-  store.preload();
-}
-
 export function useThemePreference() {
   const preference = useSyncExternalStore(store.subscribe, store.get);
   const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);

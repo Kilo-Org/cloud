@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Raadinta kaydadka",
       "noMatches": "Wax u dhigma lama helin",
       "noRepositories": "Ma jiraan kaydad la heli karo",
-      "noRepositoriesDescription": "Ma jiraan kaydad ku xiran akoonkaaga.",
+      "noRepositoriesDescription": "Si aad u soo shubto kaydadka, ku xir GitHub ama GitLab.",
       "loading": "Waa la soo shubayaa…",
       "accessibility": "Kaydka: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Waxaad tahay…",
       "tools": "Qalabka",
       "wholeToolRule": "Wakiilkan waxa uu hal xeer isku mar ku dabaqaa qalab kasta: {{rule}}. Beddelladan waa akhris-kaliya.",
+      "toolRule": "Xeer kaydsan: {{rule}}",
       "visibility": "Muuqashada",
       "visibilityPrimary": "Aasaasiga ah — oo lagu muujiyay dooriyaha",
       "visibilitySubagent": "Subagent — kaliya kuwa kale looga yeeri karo",

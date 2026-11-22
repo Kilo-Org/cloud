@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Rapu putunga waehere...",
       "noMatches": "Kāore he mea e hāngai ana",
       "noRepositories": "Kāore he putunga waehere e wātea ana",
-      "noRepositoriesDescription": "Kāore he putunga waehere kua hono ki tō pūkete.",
+      "noRepositoriesDescription": "Hei uta i ngā putunga waehere, honoa tētahi pūkete GitHub, GitLab rānei.",
       "loading": "Kei te uta…",
       "accessibility": "Putunga waehere: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "He…",
       "tools": "Utauta",
       "wholeToolRule": "Ka whakahāngai tēnei māngai i tētahi ture ki ngā utauta katoa i te wā kotahi: {{rule}}. He pānui anake ēnei whakakā.",
+      "toolRule": "Ture kua tiakina: {{rule}}",
       "visibility": "Tirohanga",
       "visibilityPrimary": "Tuatahi — ka whakaatuhia ki te kaikokoti",
       "visibilitySubagent": "Māngai āpiti — ka taea anake te karanga mai i ētahi atu",

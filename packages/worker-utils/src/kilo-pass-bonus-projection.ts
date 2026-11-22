@@ -103,8 +103,28 @@ function getSubscriptionRecencyMillis(
   return Number.isFinite(createdAtMillis) ? createdAtMillis : Number.NEGATIVE_INFINITY;
 }
 
-export function isKiloPassSubscriptionEndedStatus(status: string): boolean {
-  return status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired';
+/**
+ * The terminal Stripe subscription statuses this projection treats as ended.
+ *
+ * `StripeSubscriptionStatus` is an open union, because the provider may return
+ * a value a pinned SDK version does not list. A comparison against that type
+ * alone therefore cannot reject a misspelled literal. Naming the ended
+ * statuses as their own closed union gives the list a checked domain: adding a
+ * wrong or misspelled entry here fails to compile, and callers get the ended
+ * statuses as a narrowed type instead of `string`.
+ */
+export type KiloPassEndedSubscriptionStatus = 'canceled' | 'unpaid' | 'incomplete_expired';
+
+const KILO_PASS_ENDED_SUBSCRIPTION_STATUSES: readonly KiloPassEndedSubscriptionStatus[] = [
+  'canceled',
+  'unpaid',
+  'incomplete_expired',
+];
+
+export function isKiloPassSubscriptionEndedStatus(
+  status: StripeSubscriptionStatus
+): status is KiloPassEndedSubscriptionStatus {
+  return KILO_PASS_ENDED_SUBSCRIPTION_STATUSES.some(ended => ended === status);
 }
 
 function getStatusPriority(row: KiloPassSubscriptionProjectionCandidate): number {

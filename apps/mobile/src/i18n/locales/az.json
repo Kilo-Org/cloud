@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Repozitoriya axtarışı",
       "noMatches": "Uyğunluq yoxdur",
       "noRepositories": "Mövcud repozitoriya yoxdur",
-      "noRepositoriesDescription": "Hesabına qoşulmuş repozitoriya yoxdur.",
+      "noRepositoriesDescription": "Repozitoriyaları yükləmək üçün GitHub və ya GitLab-ı qoş.",
       "loading": "Yüklənir…",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Siz bir…",
       "tools": "Alətlər",
       "wholeToolRule": "Bu agent bütün alətlərə eyni anda bir qayda tətbiq edir: {{rule}}. Bu keçidlər yalnız oxunaqlıdır.",
+      "toolRule": "Saxlanılan qayda: {{rule}}",
       "visibility": "Görünüş",
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",

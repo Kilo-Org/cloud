@@ -40,7 +40,10 @@ work, work after the upstream request starts, and exceptional paths may use it.
   gateway's replica load and the web app's primary load never answer for each
   other; `invalidateModelStatsCache` expires both. The gateway callers that load
   it (`providers/openrouter`, `handlers/models`, `handlers/model-validation`,
-  `organizations/organization-models`) pass `readDb`.
+  `organizations/organization-models`, `organizations/organization-auto-model`
+  via `auto-model/resolution`) pass `readDb`. A failed load is reported by the
+  cache itself, once per client, because it serves the last known-good snapshot
+  when it has one and its callers therefore never see the failure.
 - Usage accounting has its own transport selection; do not infer it from the
   general write guidance below. `usageAccountingTransport` selects queue or
   direct transport per request for `logMicrodollarUsage` and

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChevronDown, ChevronUp, Settings, Lock } from 'lucide-react';
+import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { ProviderSelection } from './util';
 
 interface CondensedProviderAndModelsListProps {
@@ -13,6 +14,20 @@ interface CondensedProviderAndModelsListProps {
   defaultModel?: string;
   onDefaultModelClick: () => void;
   readonly?: boolean;
+}
+
+/**
+ * The catalog's display names keyed by the canonical provider slug, which is
+ * what a provider selection carries.
+ */
+export function providerDisplayNamesBySlug(
+  providers: ReadonlyArray<{ slug: string; displayName: string }>
+): Map<string, string> {
+  const map = new Map<string, string>();
+  providers.forEach(provider => {
+    map.set(normalizeInferenceProviderId(provider.slug), provider.displayName);
+  });
+  return map;
 }
 
 export function CondensedProviderAndModelsList({
@@ -24,14 +39,7 @@ export function CondensedProviderAndModelsList({
   const [showAll, setShowAll] = useState(false);
   const { providers, isLoading } = useOpenRouterModelsAndProviders();
 
-  // Create a map of provider slugs to display names for quick lookup
-  const providerDisplayNames = useMemo(() => {
-    const map = new Map<string, string>();
-    providers.forEach(provider => {
-      map.set(provider.slug, provider.displayName);
-    });
-    return map;
-  }, [providers]);
+  const providerDisplayNames = useMemo(() => providerDisplayNamesBySlug(providers), [providers]);
 
   // Filter selections to only include providers with selected models
   const providersWithSelections = useMemo(() => {

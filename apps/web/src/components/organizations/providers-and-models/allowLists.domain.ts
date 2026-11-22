@@ -74,10 +74,11 @@ export function buildModelProvidersIndex(
 export function computeAllProviderSlugsWithEndpoints(
   openRouterProviders: OpenRouterProviderModelsSnapshot
 ): string[] {
-  return openRouterProviders
-    .filter(provider => provider.models.some(model => model.endpoint))
-    .map(provider => normalizeInferenceProviderId(provider.slug))
-    .sort((a, b) => a.localeCompare(b));
+  return sortUniqueStrings(
+    openRouterProviders
+      .filter(provider => provider.models.some(model => model.endpoint))
+      .map(provider => normalizeInferenceProviderId(provider.slug))
+  );
 }
 
 export function computeEnabledProviderSlugs(

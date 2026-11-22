@@ -32,6 +32,15 @@ describe('allowLists.domain', () => {
     expect(slugs).toEqual(['openai']);
   });
 
+  test('computeAllProviderSlugsWithEndpoints collapses rows that canonicalize to one slug', () => {
+    const slugs = computeAllProviderSlugsWithEndpoints([
+      { slug: 'OpenAI', models: [{ slug: 'openai/gpt-4.1', endpoint: 'chat' }] },
+      { slug: 'openai', models: [{ slug: 'openai/gpt-4o', endpoint: 'chat' }] },
+    ]);
+
+    expect(slugs).toEqual(['openai']);
+  });
+
   test('computeEnabledProviderSlugs matches a legacy mixed-case draft value to the canonical catalog slug', () => {
     const enabled = computeEnabledProviderSlugs(['OpenAI'], ['openai', 'anthropic']);
     expect([...enabled]).toEqual(['openai']);

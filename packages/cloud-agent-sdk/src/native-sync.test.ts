@@ -2928,7 +2928,10 @@ test('closing a live session drops its retained attachment bodies', async () => 
   });
   const actual =
     jest.requireActual<typeof NativeSnapshotModule>('./native-sync-snapshot').fetchNativeSnapshot;
-  snapshot.mockImplementationOnce(actual).mockImplementationOnce(actual);
+  snapshot
+    .mockImplementationOnce(actual)
+    .mockImplementationOnce(actual)
+    .mockImplementationOnce(actual);
   const key = kilo2AssetKey('msg_asset_000001', `media:${hash}`, 'image/png');
   let state: NativeSessionState | undefined;
   const connection = client.connectSession('ses_a', value => {
@@ -2940,6 +2943,11 @@ test('closing a live session drops its retained attachment bodies', async () => 
   for (let tick = 0; tick < 2000 && state?.assetURLs?.[key] === undefined; tick++)
     await Promise.resolve();
   expect(state?.assetURLs?.[key]).toBe('data:image/png;base64,AQID');
+  expect(blobReads).toBe(1);
+  // A second read answers from the retained body, which proves the body really was retained
+  // instead of the later count merely matching a body that was never kept.
+  const retained = await client.getSnapshot('ses_a');
+  expect(retained.assetURLs?.[key]).toBe('data:image/png;base64,AQID');
   expect(blobReads).toBe(1);
   connection.close();
   await flush();

@@ -277,6 +277,79 @@ describe('uploadOne', () => {
     });
   });
 
+  it('settles a stall as retryable even when the native cancel throws', async () => {
+    // `cancel()` is the last act of the window, after the promise already
+    // settled as retryable. A native cancel that throws must not escape the
+    // timer: nothing upstream can catch it there, and the chip is already on
+    // the retry path.
+    vi.useFakeTimers();
+    uploadAsyncImpl = () => new Promise(() => undefined);
+    createUploadTaskMock.mockImplementationOnce(() => ({
+      uploadAsync: vi.fn(() => uploadAsyncImpl()),
+      cancel: vi.fn(() => {
+        throw new Error('native cancel failed');
+      }),
+    }));
+
+    const pending = uploadOne({
+      attachmentId: 'att-8b',
+      path: 'path-8b',
+      extension: 'pdf',
+      contentType: 'application/pdf',
+      contentLength: 100,
+      localUri: 'file:///cache/stalled-cancel.pdf',
+      onProgress: () => undefined,
+    });
+    const error = rejectionOf(pending);
+
+    await vi.advanceTimersByTimeAsync(AGENT_ATTACHMENT_UPLOAD_STALL_MS);
+
+    expect(await error).toEqual(new Error('Upload stalled'));
+    expect(createdTask().cancel).toHaveBeenCalledTimes(1);
+    expect(classifyUploadFailure(await error)).toEqual({
+      retryable: true,
+      reason: expect.any(String),
+    });
+  });
+
+  it('removes the foreground listener once the transfer succeeds', async () => {
+    // The subscription is the window's only handle on the foreground source, so
+    // it must be released on the success path too, not only on a stall.
+    vi.useFakeTimers();
+    const listeners = new Set<(state: string) => void>();
+    setUploadForegroundSource({
+      addEventListener: (_type, handler) => {
+        listeners.add(handler);
+        return {
+          remove: () => {
+            listeners.delete(handler);
+          },
+        };
+      },
+    });
+    const transfer = Promise.withResolvers<unknown>();
+    uploadAsyncImpl = () => transfer.promise;
+
+    const pending = uploadOne({
+      attachmentId: 'att-8c',
+      path: 'path-8c',
+      extension: 'pdf',
+      contentType: 'application/pdf',
+      contentLength: 100,
+      localUri: 'file:///cache/succeeds.pdf',
+      onProgress: () => undefined,
+    });
+
+    // The window is built after the presign resolves, so let that land first.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listeners.size).toBe(1);
+
+    transfer.resolve({ status: 200, body: '', headers: {} });
+    await expect(pending).resolves.toEqual({ key: 'key.bin' });
+    expect(listeners.size).toBe(0);
+    setUploadForegroundSource({ addEventListener: () => ({ remove: () => undefined }) });
+  });
+
   it('re-arms the stall window on every progress event', async () => {
     vi.useFakeTimers();
     uploadAsyncImpl = () => new Promise(() => undefined);
@@ -375,9 +448,11 @@ describe('uploadOne', () => {
 
   it('registers no foreground listener when building the native task throws', async () => {
     // A cache-owned file can disappear between the cancel check and the task
-    // construction, so `createUploadTask` may throw. The window's listener must
-    // be added and removed on one path, or it outlives the failed setup for the
-    // rest of the app session with nothing holding a handle to remove it.
+    // construction, so `createUploadTask` may throw. This pins the registration
+    // ORDER, not add/remove on one path: the window is built before the task but
+    // `run()` — the one place that registers the listener — is called after it,
+    // so a throw from `createUploadTask` happens while nothing is subscribed.
+    // Reordering those two statements would leak a listener here.
     const listeners = new Set<(state: string) => void>();
     setUploadForegroundSource({
       addEventListener: (_type, handler) => {

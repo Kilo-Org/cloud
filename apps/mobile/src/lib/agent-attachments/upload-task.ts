@@ -100,7 +100,12 @@ function uploadStallWindow() {
     const stalled = Promise.withResolvers<never>();
     stall = () => {
       stalled.reject(new Error('Upload stalled'));
-      task.cancel();
+      try {
+        task.cancel();
+      } catch {
+        // Best-effort: a failed native cancel must not escape the timer, because
+        // the upload has already settled as retryable.
+      }
     };
     running = true;
     suspended = false;

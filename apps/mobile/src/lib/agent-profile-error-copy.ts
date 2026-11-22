@@ -18,23 +18,21 @@ export const ORGANIZATION_ROLE_DENIED_MESSAGE =
  * start; every other message reaches the screen unchanged.
  *
  * Two refusals have their own sentence here. The role denial names who may act
- * in the organization. The plan gate (`requireActiveSubscriptionOrTrial`) names
- * the lapsed plan, and its sentence depends on the reader: a profile screen
- * renders no billing step, so the caller's `canManageBilling` and the key table
- * decide between the owner-naming sentence and the one that names the
- * destination for the role that can act. The parameter is required rather than
- * defaulted, so a call site that forgets the role fails typecheck instead of
- * quietly reading as a reader who cannot act.
+ * in the organization. The plan gate (`requireActiveSubscriptionOrTrial`) is
+ * reached only by a caller who already passed the role check, and that role is
+ * owner or admin, which can change the plan: the copy is therefore the one for
+ * a reader who can act, resolved through the shared key table with no billing
+ * step on these screens. A role a refusal cannot reach does not need its own
+ * branch here, and reading the role inside the profile mutation hooks would pull
+ * the organization query chain (and with it the native runtime) into test
+ * projects that load those hooks without it.
  */
-export function agentProfileMutationErrorMessage(
-  message: string,
-  canManageBilling: boolean
-): string {
+export function agentProfileMutationErrorMessage(message: string): string {
   if (message === ORGANIZATION_ROLE_DENIED_MESSAGE) {
     return i18n.t('profiles.organizationRoleRequired');
   }
   if (message === ORGANIZATION_TRIAL_EXPIRED_MESSAGE) {
-    return i18n.t(trialRefusalCopyKey(canManageBilling, 'absent'));
+    return i18n.t(trialRefusalCopyKey(true, 'absent'));
   }
   return message;
 }

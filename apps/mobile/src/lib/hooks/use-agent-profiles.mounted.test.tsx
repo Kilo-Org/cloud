@@ -139,15 +139,6 @@ vi.mock('@/lib/trpc', () => {
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 
-// The mutation toasts' plan-refusal sentence depends on the reader's role, and
-// `@/lib/trial-refusal` reaches expo-router and the organization query chain,
-// which the mounted project cannot load without an app build. Only the role
-// read is stubbed; the sentence table stays the real one.
-const billingRole = vi.hoisted(() => ({ canManageBilling: false }));
-vi.mock('@/lib/trial-refusal', () => ({
-  useCanManageBilling: () => billingRole.canManageBilling,
-}));
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function summary(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -348,7 +339,6 @@ describe('useAgentProfileMutations', () => {
       mutation.mockReset().mockResolvedValue({ success: true });
     }
     mocks.toastError.mockReset();
-    billingRole.canManageBilling = false;
   });
 
   it('passes organizationId to the procedure and invalidates the agentProfiles key', async () => {
@@ -455,7 +445,6 @@ describe('useAgentProfileMutations', () => {
   });
 
   it('names the destination in a plan refusal for a reader who can change the plan', async () => {
-    billingRole.canManageBilling = true;
     mocks.mutations.create.mockRejectedValue(new Error('Organization trial has expired.'));
 
     const holder: { current: MutationsResult | null } = { current: null };
@@ -470,25 +459,6 @@ describe('useAgentProfileMutations', () => {
     await waitFor(() => mocks.toastError.mock.calls.length > 0);
     expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith(
       "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again."
-    );
-    unmount();
-  });
-
-  it('names the owner in a plan refusal for a reader who cannot change the plan', async () => {
-    mocks.mutations.create.mockRejectedValue(new Error('Organization trial has expired.'));
-
-    const holder: { current: MutationsResult | null } = { current: null };
-    const { unmount } = await renderWithProviders(createElement(MutationsProbe, { holder }));
-
-    await act(async () => {
-      await expect(current(holder).create.mutateAsync({ name: 'Team setup' })).rejects.toThrow(
-        'Organization trial has expired.'
-      );
-    });
-
-    await waitFor(() => mocks.toastError.mock.calls.length > 0);
-    expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith(
-      "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
     );
     unmount();
   });

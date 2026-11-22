@@ -7,7 +7,6 @@ import { agentProfileMutationErrorMessage } from '@/lib/agent-profile-error-copy
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
 import { type AgentRepoBinding } from '@/lib/hooks/agent-profile-types';
 import { keepPreviousDataForQueryKey } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageBilling } from '@/lib/trial-refusal';
 import { useTRPC } from '@/lib/trpc';
 
 /** Stable empty fallbacks so an unsettled result is not a new array each render. */
@@ -63,9 +62,6 @@ export function useRepoBindingMutations(organizationId?: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const bindingsFilter = trpc.agentProfiles.listRepoBindings.pathFilter();
-  // The toast's plan-refusal sentence names the reader's own step, so the role
-  // is read once here and handed to every mapped failure.
-  const canManageBilling = useCanManageBilling(organizationId);
 
   // `networkMode: 'always'` keeps a bind or unbind settling while the online
   // manager is offline (NetInfo can misreport while the backend is reachable):
@@ -76,7 +72,7 @@ export function useRepoBindingMutations(organizationId?: string) {
       void queryClient.invalidateQueries(bindingsFilter);
     },
     onError: (error: { message: string }) => {
-      toast.error(agentProfileMutationErrorMessage(error.message, canManageBilling));
+      toast.error(agentProfileMutationErrorMessage(error.message));
     },
   };
 

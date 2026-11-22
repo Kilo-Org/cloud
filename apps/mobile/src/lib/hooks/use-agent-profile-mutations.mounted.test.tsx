@@ -27,15 +27,6 @@ vi.mock('@/lib/trpc', async () => {
 });
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
-// The reader's role decides which plan-refusal sentence the toast carries, and
-// `@/lib/trial-refusal` reaches expo-router and the organization query chain,
-// which the mounted project cannot load without an app build. Only the role read
-// is stubbed; the sentence and the key table stay the real ones.
-const billingRole = vi.hoisted(() => ({ canManageBilling: false }));
-vi.mock('@/lib/trial-refusal', () => ({
-  useCanManageBilling: () => billingRole.canManageBilling,
-}));
-
 const responses: Record<string, unknown> = {
   'agentProfiles.list': [],
   'agentProfiles.vars': [
@@ -188,7 +179,6 @@ describe('useAgentProfileMutations toast copy', () => {
   beforeEach(() => {
     vi.mocked(toast.error).mockReset();
     transport.mockReset();
-    billingRole.canManageBilling = false;
   });
 
   afterEach(async () => {
@@ -196,7 +186,6 @@ describe('useAgentProfileMutations toast copy', () => {
   });
 
   it('offers the destination to a reader who can change the plan', async () => {
-    billingRole.canManageBilling = true;
     transport.mockImplementation(async () => {
       await Promise.resolve();
       return deniedResponse('Organization trial has expired.');
@@ -212,25 +201,6 @@ describe('useAgentProfileMutations toast copy', () => {
     // This screen renders no billing step, so the sentence names kilo.ai.
     expect(toast.error).toHaveBeenCalledExactlyOnceWith(
       "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again."
-    );
-    unmount();
-  });
-
-  it('names the owner who can change the plan to everyone else', async () => {
-    transport.mockImplementation(async () => {
-      await Promise.resolve();
-      return deniedResponse('Organization trial has expired.');
-    });
-
-    const holder: { current: CreateProfile | null } = { current: null };
-    const { unmount } = await mountCreateProbe(holder);
-    await act(async () => {
-      await holder.current?.({ name: 'Team setup' }).catch(() => undefined);
-    });
-
-    expect(callsTo('agentProfiles.create')).toBe(1);
-    expect(toast.error).toHaveBeenCalledExactlyOnceWith(
-      "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
     );
     unmount();
   });

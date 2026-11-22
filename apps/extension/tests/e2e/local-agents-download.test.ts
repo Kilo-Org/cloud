@@ -272,7 +272,7 @@ test('a guarded click whose attachment fails saves nothing and claims no file', 
 
     // 2. The human approved: the identical call with the token runs with the guard off. The route answers 500 with no
     // `Content-Disposition`, so the browser never creates a savable item: nothing is written to the folder, and the
-    // call reports the click as the ordinary success it was rather than claiming a file it never received.
+    // Call reports the click as the ordinary success it was rather than claiming a file it never received.
     const approvedAt = fixture.brokenHits();
     const approved = await session.callTool(
       'browser_click',

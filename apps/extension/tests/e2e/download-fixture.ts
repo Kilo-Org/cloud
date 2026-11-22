@@ -357,13 +357,13 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
   const port = typeof address === 'object' && address !== null ? address.port : 0;
 
   return {
+    brokenHits: () => brokenHits,
     close: async () => {
       server.closeAllConnections();
       server.close();
       await once(server, 'close');
     },
     dropReceived: () => dropsReceived,
-    brokenHits: () => brokenHits,
     hits: () => hits,
     lateHits: () => lateHits,
     releaseLate: () => {

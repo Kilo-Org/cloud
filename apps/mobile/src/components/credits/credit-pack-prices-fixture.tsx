@@ -354,25 +354,32 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
   const failedFailure = tapDriven
     ? [...states.values()].find(phase => phase.status === 'failed')
     : undefined;
-  // The tile has two owners and only one at a time. `seeded` is the state's own
-  // tile before the person touches a pack. The first tap hands the tile to the
-  // attempt, so the screen's clear-then-publish cycle runs: no tile while the
-  // request is open, the mapper's key after it refuses. Deriving that from the
-  // feedback alone cannot work, because clearing removes the entry and the seed
-  // would come back in its place.
-  const [tileSource, setTileSource] = useState<'seeded' | 'attempt'>('seeded');
-  const errorMessageKey =
-    tileSource === 'seeded'
-      ? initialErrorMessageKey(state)
-      : (failedFailure?.failure.messageKey ?? null);
+  // The tile has two owners and only one at a time. The state's own key stands
+  // until the person taps a pack. The first tap hands the tile to the attempt,
+  // so the screen's clear-then-publish cycle runs: no tile while the request is
+  // open, the mapper's key after it refuses. Deriving that from the feedback
+  // alone cannot work, because clearing removes the entry and the seed would
+  // come back in its place.
+  //
+  // The hand-off names the state that made it. This component stays mounted
+  // across a link for another state, so a bare flag would leave the next state
+  // without the tile it exists to show. A tap in a state that never publishes a
+  // failure also keeps its own tile: only the failed state runs the purchase.
+  const [tappedState, setTappedState] = useState<CreditPackPricesFixtureState | null>(null);
+  const tapped = tapDriven && tappedState === state;
+  const errorMessageKey = tapped
+    ? (failedFailure?.failure.messageKey ?? null)
+    : initialErrorMessageKey(state);
   const clearError = useCallback(() => {
-    setTileSource('attempt');
+    if (tapDriven) {
+      setTappedState(state);
+    }
     for (const [key, phase] of states) {
       if (phase.status === 'failed') {
         clearPurchaseFailure(key, () => true);
       }
     }
-  }, [clearPurchaseFailure, states]);
+  }, [clearPurchaseFailure, state, states, tapDriven]);
 
   const storefront = getCreditStorefront();
   const catalog = backendProductsFor(state);

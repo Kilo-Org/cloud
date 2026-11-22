@@ -285,9 +285,11 @@ export async function getOpenAiChatGptByokModelIds(
   owner: OpenAiChatGptOwner,
   candidateModelIds: readonly string[]
 ): Promise<Set<string> | null> {
-  if (!(await readServableStoredConnection(owner))) return null;
-
+  // Same order as routing: an unconfigured deployment cannot tag anything, so it
+  // must not read and decrypt the stored row to find that out.
   if (readOpenAiChatGptPartnerKey() === null) return null;
+
+  if (!(await readServableStoredConnection(owner))) return null;
 
   const tagged = await Promise.all(
     candidateModelIds.map(async modelId => {

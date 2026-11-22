@@ -234,6 +234,9 @@ describe('getOpenAiChatGptByokModelIds', () => {
     await expect(
       getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
     ).resolves.toBeNull();
+    // The key decides first, as in routing: an unconfigured deployment must not
+    // read and decrypt the stored row to learn it cannot tag anything.
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
   });
 
   it('never tags a gpt-oss model', async () => {

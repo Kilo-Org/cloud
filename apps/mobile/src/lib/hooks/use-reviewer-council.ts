@@ -49,11 +49,10 @@ function useCouncilEntitlement(scope: string, enabled: boolean) {
 }
 
 /**
- * Why a settled organization refusal reads refused. A settled entitlement
- * answer is the one state the reader can act on (the plan rule), so only it
- * may name the plan; a rollout flag the build cannot apply and a failed
- * entitlement read say nothing about the organization's plan and get the
- * neutral sentence instead.
+ * Why a settled organization refusal reads refused. Only a settled entitlement
+ * answer may name the plan rule, so the other two keep to what the reader can
+ * actually do: a rollout flag the build cannot apply is an app update, and a
+ * failed entitlement read is a retry that checks the plan again.
  */
 export type CouncilRefusalReason = 'flagUnavailable' | 'entitlementErrored' | 'refused';
 
@@ -66,6 +65,9 @@ export type CouncilRefusalReason = 'flagUnavailable' | 'entitlementErrored' | 'r
  * `pending` separates "the entitlement read is still in flight" from "this
  * organization is not entitled": only the latter may tell a reader the surface
  * is unavailable, or an entitled org would read that on every cold open.
+ * `retryEntitlement` re-runs that one read, which is the whole step the
+ * `entitlementErrored` refusal offers, and `entitlementFetching` is the same
+ * read's busy state, so the retry cannot report itself idle while it re-runs.
  */
 export function useCouncilGate(scope: string) {
   const flagEnabled = useFeatureFlag(CODE_REVIEW_COUNCIL_FLAG);
@@ -83,6 +85,8 @@ export function useCouncilGate(scope: string) {
     allowed: qualified && (entitlement.data?.entitled ?? false),
     pending: qualified && entitlement.isPending,
     refusalReason,
+    retryEntitlement: () => void entitlement.refetch(),
+    entitlementFetching: entitlement.isFetching,
   };
 }
 

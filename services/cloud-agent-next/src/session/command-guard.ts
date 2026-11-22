@@ -584,7 +584,10 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // through these options, so each is refused, as the review policy already does.
   // `sort` writes the file named by its output option, so that option is refused
   // at each position it can take. The option is named with its separator, because
-  // a bare `-o` inside a file name is not an option.
+  // a bare `-o` inside a file name is not an option. A short-option bundle cannot
+  // be bounded by a rule, so a bundle spelling keeps no deny of its own; a write
+  // to a git configuration file is refused by the target rules below for every
+  // option spelling.
   'sort -o *',
   'sort * -o *',
   'sort -o\t*',

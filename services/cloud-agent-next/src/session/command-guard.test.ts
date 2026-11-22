@@ -669,10 +669,11 @@ describe('security-remediation push command guard policy', () => {
       'sort -V versions.txt',
       'sort -m a.txt b.txt',
       // A short-option bundle whose arguments end in the option letter is not an
-      // output option.
+      // output option, and a bundle therefore keeps no deny rule of its own.
       'sort -n foo bar',
       'sort -u /tmp/foo',
       'sort -r repo/hello',
+      'sort -rno out.txt src/a.ts',
       'uniq -c src/a.ts',
       'mv src/config.ts src/conf.ts',
       'mv .github/workflows/a.yml .github/workflows/b.yml',

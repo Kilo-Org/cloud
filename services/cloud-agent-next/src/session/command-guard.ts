@@ -393,22 +393,22 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git -?* config -?* --replace-all *',
   'git -?* config -?* --unset *',
   // The `-c key=value` form sets the same keys on the command line. Each rule
-  // names the key itself, before its value, so a key that only contains the word
-  // keeps working.
-  'git -c *push=*',
-  'git -c *push.*=*',
-  'git -c *force=*',
-  'git -c *force.*=*',
-  'git -c *mirror=*',
-  'git -c *mirror.*=*',
-  'git -c *alias*=*',
-  'git *-c *push=*',
-  'git *-c *push.*=*',
-  'git *-c *force=*',
-  'git *-c *force.*=*',
-  'git *-c *mirror=*',
-  'git *-c *mirror.*=*',
-  'git *-c *alias*=*',
+  // names the key itself, before its value, and takes any separator run around
+  // it, so a key that only contains the word keeps working.
+  'git -c*push=*',
+  'git -c*push.*=*',
+  'git -c*force=*',
+  'git -c*force.*=*',
+  'git -c*mirror=*',
+  'git -c*mirror.*=*',
+  'git -c*alias*=*',
+  'git*-c*push=*',
+  'git*-c*push.*=*',
+  'git*-c*force=*',
+  'git*-c*force.*=*',
+  'git*-c*mirror=*',
+  'git*-c*mirror.*=*',
+  'git*-c*alias*=*',
 ];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [

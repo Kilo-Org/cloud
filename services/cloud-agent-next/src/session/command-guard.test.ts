@@ -484,6 +484,8 @@ describe('security-remediation push command guard policy', () => {
       'git -C . config remote.origin.mirror true',
       'git -c remote.origin.push=+HEAD:refs/heads/main push',
       'git -c remote.origin.mirror=true push',
+      'git -c\tremote.origin.push=+main push',
+      'git -c\t push.default=current push',
       "git -c alias.p='push --force' p",
       'git push ""--force',
       'git push ""+main',

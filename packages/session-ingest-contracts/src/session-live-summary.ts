@@ -41,8 +41,9 @@ export type SessionLiveFailureKind = (typeof SESSION_LIVE_FAILURE_KINDS)[number]
  * as the current one. They are the values the `todowrite` field description
  * names, not values its schema enforces, so a plan can also carry a status
  * outside this set. Such an entry is still a task the session has to do, so it
- * counts toward the total and is neither done nor current — the same way the
- * in-app task list reads it.
+ * counts toward the total and is neither done nor current. The mobile task list
+ * reads such an entry as an outstanding task the same way; the web todo
+ * projection leaves it out, so the two can differ for that input.
  */
 export const SESSION_LIVE_TODO_STATUSES = [
   'pending',

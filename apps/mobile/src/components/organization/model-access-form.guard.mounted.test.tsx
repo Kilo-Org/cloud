@@ -75,6 +75,9 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Platform: { OS: 'android', select: (options: { android: unknown }) => options.android },
   useColorScheme: () => 'light',
+  // The pinned footer reserves its own bottom band, which reads the window's
+  // font scale through `useWindowDimensions`.
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
 }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),

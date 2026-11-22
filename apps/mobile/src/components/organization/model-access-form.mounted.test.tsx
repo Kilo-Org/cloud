@@ -76,6 +76,9 @@ vi.mock('@/components/ui/button', async () => {
   };
 });
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
+// The pinned footer is a bar the suites query by type; its own band, hairline
+// and keyboard rule have their own suite, so this one stubs the bar.
+vi.mock('@/components/ui/screen-footer', () => ({ ScreenFooter: 'ScreenFooter' }));
 vi.mock('@/components/ui/text', async () => {
   const { createElement: h } = await import('react');
   return {
@@ -218,7 +221,7 @@ function list(root: ReactTestInstance, type: 'ModelDenyList' | 'ProviderAllowLis
   return root.findByType(type as never);
 }
 
-function selectTab(root: ReactTestInstance, tab: 'models' | 'providers') {
+function selectTab(root: ReactTestInstance, tab: 'models' | 'providers' | 'gateways') {
   act(() => {
     (root.findByType('SegmentedControl' as never).props.onChange as (next: string) => void)(tab);
   });
@@ -242,12 +245,9 @@ function changeProviders(root: ReactTestInstance, next: ModelAccessDraft) {
   });
 }
 
+/** The commit action: the footer's filled primary, found by the label it renders. */
 async function pressSave(root: ReactTestInstance) {
-  const buttons = root.findAllByType('Button' as never);
-  const save = buttons.at(-1);
-  if (!save) {
-    throw new Error('save button not found');
-  }
+  const save = buttonWithLabel(root, i18n.t('common.save'));
   await act(async () => {
     (save.props.onPress as () => void)();
     await Promise.resolve();
@@ -255,14 +255,9 @@ async function pressSave(root: ReactTestInstance) {
   return save;
 }
 
-/** The Cancel action: the outline button the form draws beside Save. */
+/** The Cancel action: the footer's outline button, found by the label it renders. */
 function pressCancel(root: ReactTestInstance) {
-  const cancel = root
-    .findAllByType('Button' as never)
-    .find(node => node.props.variant === 'outline');
-  if (!cancel) {
-    throw new Error('cancel button not found');
-  }
+  const cancel = buttonWithLabel(root, i18n.t('common.cancel'));
   act(() => {
     (cancel.props.onPress as () => void)();
   });
@@ -374,6 +369,38 @@ describe('ModelAccessForm save', () => {
     expect(saved.mutateAsync).not.toHaveBeenCalled();
     expect(String(statusMessage(root))).toContain('Leave at least one model on');
   });
+
+  it('pins both commit actions in the screen footer, and gives the Gateways tab none', () => {
+    const root = render(undefined);
+
+    // The two lists save together, so they commit from the screen's one footer
+    // rather than from a row inside the body above them.
+    const footers = root.findAllByType('ScreenFooter' as never);
+    expect(footers).toHaveLength(1);
+    const footer = footers[0];
+    if (footer === undefined) {
+      throw new Error('footer missing');
+    }
+    const footerButtons = footer.findAllByType('Button' as never);
+    const save = footerButtons.find(node =>
+      node
+        .findAllByType('Text' as never)
+        .some(child => child.props.children === i18n.t('common.save'))
+    );
+    const cancel = footerButtons.find(node =>
+      node
+        .findAllByType('Text' as never)
+        .some(child => child.props.children === i18n.t('common.cancel'))
+    );
+    // Save is the filled primary (the Button default), Cancel the outlined one.
+    expect(save?.props.variant ?? 'default').toBe('default');
+    expect(cancel?.props.variant).toBe('outline');
+
+    // The Gateways tab commits each control as it changes, so it has no footer.
+    selectTab(root, 'gateways');
+    expect(root.findAllByType('GatewaySettingsSection' as never)).toHaveLength(1);
+    expect(root.findAllByType('ScreenFooter' as never)).toHaveLength(0);
+  });
 });
 
 describe('ModelAccessForm without the catalog', () => {
@@ -482,8 +509,8 @@ describe('ModelAccessForm with both rebases in one render', () => {
     expect(draft.modelDenyList).toEqual(['openai/gpt']);
 
     // The form is clean on what the server answered, so save is off.
-    const cleanSave = root.findAllByType('Button' as never).at(-1);
-    expect(cleanSave?.props.disabled).toBe(true);
+    const cleanSave = buttonWithLabel(root, i18n.t('common.save'));
+    expect(cleanSave.props.disabled).toBe(true);
 
     // An edit writes the deny list the refetch brought, not the empty one the
     // form started from.
@@ -839,7 +866,7 @@ describe('ModelAccessForm durable draft', () => {
 
     expect(list(root, 'ModelDenyList').props.draft).toEqual(stored);
     // The restored lists differ from the saved ones, so the save is armed.
-    expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+    expect(buttonWithLabel(root, i18n.t('common.save')).props.disabled).toBe(false);
     // Nothing was typed, so nothing is written back over the restored draft.
     expect(draftStore.save).not.toHaveBeenCalled();
   });
@@ -1002,7 +1029,7 @@ describe('ModelAccessForm durable draft', () => {
     it('leaves Save disabled', () => {
       const root = renderAsViewer();
 
-      expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+      expect(buttonWithLabel(root, i18n.t('common.save')).props.disabled).toBe(true);
     });
 
     it('keeps the stored draft for a later editor session', () => {
@@ -1023,14 +1050,14 @@ describe('ModelAccessForm durable draft', () => {
       const root = render(['anthropic']);
       const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
       changeDraft(root, toggleModel(draft, 'openai/gpt', false));
-      expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+      expect(buttonWithLabel(root, i18n.t('common.save')).props.disabled).toBe(false);
 
       // The edit is still there, so the dirty flag alone no longer refuses the
       // write: the role has to, or the person could save from a screen that
       // told them the policy is read-only.
       const viewerRoot = rerender(['anthropic'], { canEdit: false });
 
-      expect(viewerRoot.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+      expect(buttonWithLabel(viewerRoot, i18n.t('common.save')).props.disabled).toBe(true);
       // The demoted session shows the organization's saved policy, not the edit
       // it made while it held the role.
       expect(list(viewerRoot, 'ModelDenyList').props.draft).toEqual({
@@ -1039,10 +1066,7 @@ describe('ModelAccessForm durable draft', () => {
       });
       // A clean draft disables Cancel, so no viewer press can clear the account's
       // stored copy of the person's work.
-      const cancel = viewerRoot
-        .findAllByType('Button' as never)
-        .find(node => node.props.variant === 'outline');
-      expect(cancel?.props.disabled).toBe(true);
+      expect(buttonWithLabel(viewerRoot, i18n.t('common.cancel')).props.disabled).toBe(true);
       expect(draftStore.clear).not.toHaveBeenCalled();
       await pressSave(viewerRoot);
       expect(saved.mutateAsync).not.toHaveBeenCalled();

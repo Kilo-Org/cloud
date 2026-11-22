@@ -11,7 +11,7 @@ import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
 import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { TAB_SCREEN_TRAILING_GAP } from '@/components/tab-screen';
 import {
   type DenyListModel,
   denyListRowNote,
@@ -24,6 +24,9 @@ import {
 } from '@/lib/organization/model-access';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
+
+/** The list's trailing gap only: the form's pinned footer owns the bottom edge. */
+const LIST_CONTENT_STYLE = { paddingBottom: TAB_SCREEN_TRAILING_GAP } satisfies ViewStyle;
 
 /** The search field and filter row both lists carry above their rows. */
 function ListHeader({
@@ -94,8 +97,6 @@ export function ProviderAllowList({
 }>) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
-  const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingBottom };
   // A row is searchable by its slug and by the name it shows, so a query typed
   // from either answer finds it.
   const shown = providers.filter(provider => matchesSearch([provider, names[provider]], search));
@@ -142,7 +143,7 @@ export function ProviderAllowList({
       renderItem={renderItem}
       style={listStyle}
       contentContainerClassName="px-4"
-      contentContainerStyle={contentContainerStyle}
+      contentContainerStyle={LIST_CONTENT_STYLE}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <ListHeader
@@ -203,8 +204,6 @@ export function ModelDenyList({
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [deniedOnly, setDeniedOnly] = useState(false);
-  const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingBottom };
   const shown = models.filter(
     model =>
       matchesSearch([model.name, model.id], search) &&
@@ -249,7 +248,7 @@ export function ModelDenyList({
       renderItem={renderItem}
       style={listStyle}
       contentContainerClassName="px-4"
-      contentContainerStyle={contentContainerStyle}
+      contentContainerStyle={LIST_CONTENT_STYLE}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <ListHeader

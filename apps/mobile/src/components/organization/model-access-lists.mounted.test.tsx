@@ -31,9 +31,10 @@ vi.mock('@shopify/flash-list', async () => {
   };
 });
 vi.mock('react-native', () => ({ View: 'View' }));
-// The frame's tab-bar clearance needs the tabs layout; these lists only use it
-// as bottom padding, which no assertion here reads.
-vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+// The lists keep only the tab screen's trailing gap. The pinned footer above
+// them owns the bottom band, so no tab-bar clearance is involved, and no
+// assertion here reads the gap.
+vi.mock('@/components/tab-screen', () => ({ TAB_SCREEN_TRAILING_GAP: 16 }));
 // The search field is driven through its own `onChangeText`, the query the
 // component keeps in state; the field's own layout has its own suite.
 vi.mock('@/components/ui/search-field', () => ({ SearchField: 'SearchField' }));

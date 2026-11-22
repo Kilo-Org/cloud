@@ -275,18 +275,19 @@ internal object SessionNotifications {
       if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
         builder.setTimeoutAfter(timeoutMs)
       }
-      manager(context).notify(
-        SessionNotificationIdentity.tag(card.sessionId),
-        SessionNotificationIdentity.NOTIFICATION_ID,
-        builder.build()
-      )
-      // `notify` answers nothing, and it drops a post whose channel the user
-      // disabled instead of throwing. A card that is not in the shade leaves the
-      // previous card there, so this post did not land either.
-      if (!isPosted(context, card.sessionId)) {
+      val notification = builder.build()
+      // `notify` answers nothing, and it discards a post the app may not show
+      // instead of throwing. Read that permission and the card's channel up
+      // front: reading the posted set here would race the system's own enqueue.
+      if (!canShow(context, CHANNEL_ID)) {
         abandonPost(context, card, previousJson, previousApprovalKey)
         return
       }
+      manager(context).notify(
+        SessionNotificationIdentity.tag(card.sessionId),
+        SessionNotificationIdentity.NOTIFICATION_ID,
+        notification
+      )
     } catch (error: Throwable) {
       abandonPost(context, card, previousJson, previousApprovalKey)
       throw error
@@ -320,14 +321,21 @@ internal object SessionNotifications {
   }
 
   /**
-   * Is this session's card in the shade? A tag-and-id pair names it, so the read
-   * cannot match another session's card.
+   * Can this app show a card on `channelId`? A disabled app or a channel the user
+   * turned off discards a post without an exception, and both answers are read
+   * before the post, so nothing here races the system's own enqueue.
    */
-  private fun isPosted(context: Context, sessionId: String): Boolean =
-    manager(context).activeNotifications.any {
-      it.tag == SessionNotificationIdentity.tag(sessionId) &&
-        it.id == SessionNotificationIdentity.NOTIFICATION_ID
+  private fun canShow(context: Context, channelId: String): Boolean {
+    val manager = manager(context)
+    if (!manager.areNotificationsEnabled()) {
+      return false
     }
+    if (Build.VERSION.SDK_INT < 26) {
+      return true
+    }
+    val channel = manager.getNotificationChannel(channelId)
+    return channel != null && channel.importance != NotificationManager.IMPORTANCE_NONE
+  }
 
   /**
    * Retire one superseded ask's record, naming it in the persisted set first: a

@@ -237,17 +237,23 @@ describe('a post that does not land leaves the card answering the request it sho
     expect(read).toBeLessThan(write);
   });
 
-  it('treats a post the system dropped as one that did not land', () => {
-    // `notify` answers nothing and drops a post on a channel the user disabled.
-    // Without this read the success path runs while the previous card is still
-    // the one in the shade.
+  it('treats a post the system cannot show as one that did not land', () => {
+    // `notify` answers nothing, and it discards a post when the app or the card's
+    // channel is turned off. Both are read before the post: reading the posted
+    // set afterwards would race the system's own enqueue.
     const notify = post.indexOf('manager(context).notify(');
-    const read = post.indexOf('if (!isPosted(context, card.sessionId)) {');
+    const check = post.indexOf('if (!canShow(context, CHANNEL_ID)) {');
     expect(notify, 'post must post the card').toBeGreaterThan(-1);
-    expect(read, 'post must confirm the card is in the shade').toBeGreaterThan(notify);
-    expect(post.slice(read)).toContain('abandonPost(context, card, previousJson, previousApprovalKey)');
-    expect(body(NOTIFICATIONS, 'private fun isPosted(')).toContain(
-      'it.tag == SessionNotificationIdentity.tag(sessionId)'
+    expect(check, 'post must check the card can be shown').toBeGreaterThan(-1);
+    expect(check).toBeLessThan(notify);
+    expect(post.slice(check)).toContain(
+      'abandonPost(context, card, previousJson, previousApprovalKey)'
+    );
+    const canShow = body(NOTIFICATIONS, 'private fun canShow(');
+    expect(canShow).toContain('manager.areNotificationsEnabled()');
+    expect(canShow).toContain('channel.importance != NotificationManager.IMPORTANCE_NONE');
+    expect(NOTIFICATIONS, 'nothing may read the posted set to decide this').not.toContain(
+      'activeNotifications'
     );
   });
 

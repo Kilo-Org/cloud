@@ -158,7 +158,11 @@ function diffLineCounts(diff: string): { additions: number; deletions: number } 
  */
 function isBinaryPlaceholderDiff(diff: string): boolean {
   const lines = diff.split('\n').filter(line => line.length > 0);
-  return lines.length === 1 && lines[0]?.startsWith('Binary files ') === true && lines[0].endsWith(' differ');
+  return (
+    lines.length === 1 &&
+    lines[0]?.startsWith('Binary files ') === true &&
+    lines[0].endsWith(' differ')
+  );
 }
 
 /**

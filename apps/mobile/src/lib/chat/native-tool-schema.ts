@@ -44,10 +44,9 @@ function joinPath(path: string, name: string): string {
   return path === '' ? name : `${path}.${name}`;
 }
 
-/** A refusal without the path it was found at; the record carries that path itself. */
-function bareReason(reason: string, path: string): string {
-  const prefix = `${path}: `;
-  return reason.startsWith(prefix) ? reason.slice(prefix.length) : reason;
+/** A refusal's path and words as one line, for the diagnostic log only. */
+function refusedAt(path: string, reason: string): string {
+  return path === '' ? reason : `${path}: ${reason}`;
 }
 
 /**
@@ -76,7 +75,8 @@ type Converted =
       readonly schema: NativeSchema;
       readonly omitted: readonly OmittedArgument[];
     }
-  | { readonly ok: false; readonly reason: string };
+  /** A refusal names the argument path it was found at, and its own words. */
+  | { readonly ok: false; readonly path: string; readonly reason: string };
 
 /** The keywords read here. Any other keyword stays on the node, so it can be refused by name. */
 const SchemaNode = z.looseObject({
@@ -149,11 +149,6 @@ function withoutNull(
   return withoutNull({ ...rest, ...only.data, ...descriptionOf(rest) });
 }
 
-/** A refusal's words, naming the argument path when the tool's own root is not the site. */
-function atPath(path: string, reason: string): string {
-  return path === '' ? reason : `${path}: ${reason}`;
-}
-
 function convertObject(node: SchemaNode, path: string): Converted {
   const properties = node.properties ?? {};
   // A map with free keys cannot be generated: the schema must name every key.
@@ -162,7 +157,7 @@ function convertObject(node: SchemaNode, path: string): Converted {
     node.additionalProperties !== undefined &&
     node.additionalProperties !== false
   ) {
-    return { ok: false, reason: atPath(path, 'an object with free keys') };
+    return { ok: false, path, reason: 'an object with free keys' };
   }
   const required = new Set(node.required);
   const converted: NativeProperty[] = [];
@@ -171,10 +166,9 @@ function convertObject(node: SchemaNode, path: string): Converted {
     const argument = joinPath(path, name);
     const property = convert(value, argument);
     if (property.ok) {
-      // A nested object's omissions are relative to it, so this level names them.
-      omitted.push(
-        ...property.omitted.map(one => ({ ...one, argument: joinPath(name, one.argument) }))
-      );
+      // Every omission already names its own path from the tool's root, so a
+      // deeper level only adds the array markers it walked through.
+      omitted.push(...property.omitted);
       const described = SchemaNode.safeParse(value);
       converted.push({
         name,
@@ -185,8 +179,10 @@ function convertObject(node: SchemaNode, path: string): Converted {
     } else if (required.has(name)) {
       return property;
     } else {
-      // The model cannot fill an optional key it is not shown; the tool still works without it.
-      omitted.push({ argument: name, reason: bareReason(property.reason, argument) });
+      /* The model cannot fill an optional key it is not shown; the tool still
+         works without it. The record names the exact argument that failed, so
+         an item inside an array reports its own path, not its parent's. */
+      omitted.push({ argument: property.path, reason: property.reason });
     }
   }
   return {
@@ -197,12 +193,16 @@ function convertObject(node: SchemaNode, path: string): Converted {
 }
 
 function convertArray(node: SchemaNode, path: string): Converted {
+  // An item's path keeps the marker the schema walk through it earns, so a
+  // nested omission names `filters[].op` rather than a path no argument has.
+  const itemPath = `${path}[]`;
   // A tuple (a list of item schemas) has no native form, and neither has a list of anything.
-  const items =
-    node.items === undefined || Array.isArray(node.items)
-      ? ({ ok: false, reason: atPath(path, 'an array without one item schema') } as const)
-      : convert(node.items, `${path}[]`);
+  if (node.items === undefined || Array.isArray(node.items)) {
+    return { ok: false, path, reason: 'an array without one item schema' };
+  }
+  const items = convert(node.items, itemPath);
   if (!items.ok) {
+    // A refusal inside an item keeps the item's own path.
     return items;
   }
   return {
@@ -221,21 +221,21 @@ function convertArray(node: SchemaNode, path: string): Converted {
 function convert(value: unknown, path: string): Converted {
   const parsed = SchemaNode.safeParse(value);
   if (!parsed.success) {
-    return { ok: false, reason: atPath(path, 'not a schema') };
+    return { ok: false, path, reason: 'not a schema' };
   }
   const unwrapped = withoutNull(parsed.data);
   if (!unwrapped.ok) {
-    return { ok: false, reason: atPath(path, unwrapped.reason) };
+    return { ok: false, path, reason: unwrapped.reason };
   }
   const { node } = unwrapped;
   const keyword = UNSUPPORTED_KEYWORDS.find(name => name in node);
   if (keyword !== undefined) {
-    return { ok: false, reason: atPath(path, keyword) };
+    return { ok: false, path, reason: keyword };
   }
   if (node.enum !== undefined) {
     const choices = StringChoices.safeParse(node.enum);
     return !choices.success || (node.type !== undefined && node.type !== 'string')
-      ? { ok: false, reason: atPath(path, 'an enum that is not a list of strings') }
+      ? { ok: false, path, reason: 'an enum that is not a list of strings' }
       : {
           ok: true,
           schema: { type: 'string', ...descriptionOf(node), choices: choices.data },
@@ -244,7 +244,7 @@ function convert(value: unknown, path: string): Converted {
   }
   const type = node.type ?? (node.properties === undefined ? undefined : 'object');
   if (type === undefined) {
-    return { ok: false, reason: atPath(path, 'no supported type') };
+    return { ok: false, path, reason: 'no supported type' };
   }
   switch (type) {
     case 'string':
@@ -260,7 +260,7 @@ function convert(value: unknown, path: string): Converted {
       return convertObject(node, path);
     }
     default: {
-      return { ok: false, reason: atPath(path, 'no supported type') };
+      return { ok: false, path, reason: 'no supported type' };
     }
   }
 }
@@ -269,7 +269,7 @@ function convert(value: unknown, path: string): Converted {
 export function nativeSchemaOf(tool: ToolDefinition): Converted {
   const converted = convert(tool.parameters, '');
   if (converted.ok && converted.schema.type !== 'object') {
-    return { ok: false, reason: 'arguments are not an object' };
+    return { ok: false, path: '', reason: 'arguments are not an object' };
   }
   return converted;
 }
@@ -285,7 +285,9 @@ function conversionOf(tool: ToolDefinition): ConvertedTool {
   if (!converted.ok) {
     return {
       tool: undefined,
-      omitted: [{ kind: 'tool', tool: tool.name, reason: converted.reason }],
+      omitted: [
+        { kind: 'tool', tool: tool.name, reason: refusedAt(converted.path, converted.reason) },
+      ],
     };
   }
   return {

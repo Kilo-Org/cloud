@@ -103,33 +103,25 @@ describe('native tool schema', () => {
   });
 
   it.each([
-    ['a real union', { anyOf: [{ type: 'string' }, { type: 'number' }] }, 'value: anyOf'],
-    ['a type list', { type: ['string', 'number'] }, 'value: a type list'],
-    ['a reference', { $ref: '#/$defs/value' }, 'value: $ref'],
-    ['an intersection', { allOf: [{ type: 'string' }] }, 'value: allOf'],
-    ['a constant', { type: 'string', const: 'x' }, 'value: const'],
-    [
-      'a number enum',
-      { type: 'integer', enum: [1, 2] },
-      'value: an enum that is not a list of strings',
-    ],
-    ['an empty enum', { enum: [] }, 'value: an enum that is not a list of strings'],
-    [
-      'a tuple',
-      { type: 'array', items: [{ type: 'string' }] },
-      'value: an array without one item schema',
-    ],
-    ['an array without items', { type: 'array' }, 'value: an array without one item schema'],
+    ['a real union', { anyOf: [{ type: 'string' }, { type: 'number' }] }, 'anyOf'],
+    ['a type list', { type: ['string', 'number'] }, 'a type list'],
+    ['a reference', { $ref: '#/$defs/value' }, '$ref'],
+    ['an intersection', { allOf: [{ type: 'string' }] }, 'allOf'],
+    ['a constant', { type: 'string', const: 'x' }, 'const'],
+    ['a number enum', { type: 'integer', enum: [1, 2] }, 'an enum that is not a list of strings'],
+    ['an empty enum', { enum: [] }, 'an enum that is not a list of strings'],
+    ['a tuple', { type: 'array', items: [{ type: 'string' }] }, 'an array without one item schema'],
+    ['an array without items', { type: 'array' }, 'an array without one item schema'],
     [
       'a map with free keys',
       { type: 'object', additionalProperties: { type: 'string' } },
-      'value: an object with free keys',
+      'an object with free keys',
     ],
-    ['no type', { description: 'Anything' }, 'value: no supported type'],
+    ['no type', { description: 'Anything' }, 'no supported type'],
   ])('refuses a required argument with %s', (_label, value, reason) => {
     expect(
       nativeSchemaOf(tool({ type: 'object', properties: { value }, required: ['value'] }))
-    ).toEqual({ ok: false, reason });
+    ).toEqual({ ok: false, path: 'value', reason });
   });
 
   it('leaves out an optional argument it cannot express and keeps the tool', () => {
@@ -201,6 +193,56 @@ describe('native tool schema', () => {
       { kind: 'argument', tool: 'tool', argument: 'filter', reason: 'anyOf' },
     ]);
     expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('names an optional argument inside an array item by its own path', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const omitted = omittedTools([
+      tool({
+        type: 'object',
+        properties: {
+          filters: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                field: { type: 'string' },
+                op: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+              },
+              required: ['field'],
+            },
+          },
+        },
+      }),
+    ]);
+    // The item's path keeps its marker, so a person reads a path the schema has.
+    expect(omitted).toEqual([
+      { kind: 'argument', tool: 'tool', argument: 'filters[].op', reason: 'anyOf' },
+    ]);
+    // The diagnostic line names that path once.
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('names a dropped optional array argument once, without repeating its path', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { omitted } = nativeTools([
+      tool({
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          filters: { type: 'array', items: { $ref: '#/x' } },
+        },
+        required: ['query'],
+      }),
+    ]);
+    expect(omitted).toEqual([
+      { kind: 'argument', tool: 'tool', argument: 'filters[]', reason: '$ref' },
+    ]);
+    expect(warn.mock.calls).toEqual([
+      ['[native-model] optional argument left out: tool.filters[]: $ref'],
+    ]);
     warn.mockRestore();
   });
 

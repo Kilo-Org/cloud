@@ -262,7 +262,14 @@ export const githubAppsRouter = createTRPCRouter({
         integration => !integration.github_disconnected_at
       ).length;
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
-      const organizationSlots = await getOrganizationGitHubInstallationSlots(input.organizationId);
+      // Only a row still awaiting completion reports a pending state, and that
+      // state is the sole consumer of the organization's current slots, so a
+      // list with nothing pending skips the extra query.
+      const organizationSlots = integrations.some(
+        integration => integration.integration_status === 'pending'
+      )
+        ? await getOrganizationGitHubInstallationSlots(input.organizationId)
+        : null;
       const canManageModel = canManageOrganizationBilling(role);
       const canManageConnections =
         canManageOrganization(role) && isGitHubConnectionManagementEnabled();

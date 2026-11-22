@@ -648,11 +648,42 @@ describe('githubAppsRouter organization install capability', () => {
     });
   });
 
-  it('reads the organization installation slots once for the whole list', async () => {
+  it('skips the organization installation slots read when no row is pending', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockListIntegrations.mockResolvedValue([
       organizationIntegration(),
       { ...organizationIntegration(), id: '00000000-0000-4000-8000-000000000003' },
+      { ...organizationIntegration(), id: '00000000-0000-4000-8000-000000000004' },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await caller.listOrganizationInstallations({ organizationId });
+
+    expect(mockGetOrganizationGitHubInstallationSlots).not.toHaveBeenCalled();
+  });
+
+  it('reads the organization installation slots once for a list that holds pending rows', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockGetOrganizationGitHubInstallationSlots.mockResolvedValue([
+      { installationId: '98765', appType: 'standard' },
+    ]);
+    const pending = organizationIntegration();
+    pending.integration_status = 'pending';
+    pending.platform_installation_id = null;
+    pending.metadata = {
+      pending_approval: {
+        status: 'blocked_by_existing_installation',
+        requester: {
+          kilo_user_id: 'user-1',
+          kilo_user_email: 'requester@example.com',
+          kilo_user_name: 'Requester',
+          requested_at: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    };
+    mockListIntegrations.mockResolvedValue([
+      pending,
+      { ...pending, id: '00000000-0000-4000-8000-000000000003' },
       { ...organizationIntegration(), id: '00000000-0000-4000-8000-000000000004' },
     ]);
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });

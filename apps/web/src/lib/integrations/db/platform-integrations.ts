@@ -1501,7 +1501,7 @@ export async function upsertPlatformIntegrationForOwner(
             existing.owned_by_user_id === null));
       if (existing && !sameOwner) return { ok: false, reason: 'claimed_by_other_owner' };
 
-      if (requiresOwnerCardinalityLock && owner.type === 'org') {
+      if (requiresOwnerCardinalityLock) {
         const ownerIntegrations = await getOrganizationGitHubInstallationSlots(owner.id, tx);
         if (
           ownerIntegrations.some(integration =>

@@ -490,8 +490,8 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
     `${tool} *confi?`,
     // The same target written with a one-character glob or a quoted segment.
     // The separator before it may be a space, a tab or a run, so it takes `*`.
-    `${tool} * con?ig`,
-    `${tool} * c?nfig`,
+    `${tool} *con?ig`,
+    `${tool} *c?nfig`,
     `${tool} *"config"*`,
     `${tool} *'config'*`,
     `${tool} *"confi?"*`,

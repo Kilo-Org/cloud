@@ -533,6 +533,7 @@ describe('security-remediation push command guard policy', () => {
       "cp /tmp/evil 'con'fig",
       'cp /tmp/evil "config"',
       'mv /tmp/evil \t"config"',
+      'mv /tmp/evil\tcon?ig',
       'echo "[alias]" >>\tconfig',
       'printf x >\tconfig',
       "mv /tmp/evil 'config'",

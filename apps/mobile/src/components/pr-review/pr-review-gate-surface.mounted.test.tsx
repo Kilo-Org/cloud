@@ -10,8 +10,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
-type MountedRenderer = ReactTestRenderer;
-
 import { PrReviewGateSurface } from './pr-review-gate-surface';
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -24,7 +22,7 @@ function ReviewStack() {
   return createElement('review-stack');
 }
 
-let mounted: MountedRenderer | undefined = undefined;
+let mounted: ReactTestRenderer | undefined = undefined;
 
 function update(arm: string | null): void {
   const tree = (
@@ -43,9 +41,7 @@ function update(arm: string | null): void {
 
 /** The wrapper that holds the covered subtree, found by its a11y-hiding view. */
 function coveredScene() {
-  const scene = mounted?.root
-    .findAllByType('View')
-    .find(view => view.props.collapsable === false);
+  const scene = mounted?.root.findAllByType('View').find(view => view.props.collapsable === false);
   if (!scene) {
     throw new Error('missing the covered scene wrapper');
   }

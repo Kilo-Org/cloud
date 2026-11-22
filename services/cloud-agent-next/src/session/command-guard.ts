@@ -369,9 +369,11 @@ const SECURITY_REMEDIATION_PUSH_HEAD = 'git*push';
 // the `*` absorb any run before it, so a run of any length and any mix of
 // spaces and tabs is covered.
 //
-// A shell joins adjacent quoted pieces into one argument, so quoting changes how
-// one token is read and cannot be bounded by counting its pieces. A push whose
-// text carries either quote is therefore refused rather than classified.
+// A shell joins adjacent quoted pieces into one argument, so a quote can split
+// one token wherever it sits and no rule can bound the count. The whole policy
+// therefore refuses both quote characters, installed last, so the split position
+// never has to be named. The cost: a message, a stream edit or a path that
+// carries a quote is refused too.
 // The matcher rewrites a backslash to a slash, and a shell removes that
 // backslash before git runs the command, so a word split by an escape reaches a
 // rule as a slash inside the word. The subcommand words that carry a push or a
@@ -410,8 +412,6 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}*\t-*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}* +*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*\t+*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}*'*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD}*"*`,
   // The matcher normalizes a backslash to a slash in both the pattern and the
   // command, so these rules reach a command that carries a backslash before the
   // option or the `+`. The same normalization makes the last rule reach a line
@@ -667,9 +667,10 @@ export function getCommandGuardPolicy(
       allowedAfterDenied: SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED,
       deniedAfterAllowedOverrides: SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED,
       // A shell expands a `$` or a backtick before git sees the command, so the
-      // text a rule reads is not the text git runs. Installed last, so it
-      // decides every command that carries either character.
-      terminalDenied: ['*$*', '*`*'],
+      // text a rule reads is not the text git runs, and it joins quoted pieces
+      // before the command runs. Installed last, so these rules decide every
+      // command that carries one of these characters.
+      terminalDenied: ['*$*', '*`*', "*'*", '*"*'],
     };
   }
 

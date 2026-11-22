@@ -592,6 +592,12 @@ describe('security-remediation push command guard policy', () => {
       'cp /tmp/evil con""fig',
       "sed -i s/a/b/ c''onfig",
       'git -\\c remote.origin.mirror=true push',
+      // The whole policy refuses both quote characters, so a quote anywhere is
+      // refused, including a commit message and a stream edit that carry one.
+      "git p'ush' --force",
+      'git pu""sh --force',
+      'git commit -m "tidy the retry path"',
+      'cp "src/a b.ts" dst.ts',
       'git -\\c remote.origin.push=+main push',
       // The directory spelling of the configuration target, with a repeated or
       // a dot separator. The shell resolves both to the same file.
@@ -628,24 +634,25 @@ describe('security-remediation push command guard policy', () => {
       'git -C . switch -c fix/thing',
       'git branch -c a b',
       'git -C . branch -c a b',
-      'git commit -m "tidy the retry path"',
       'mv src/a.ts src/b.ts',
       'cp src/a.ts src/b.ts',
       'sed -i s/a/b/ src/app.ts',
       'mv src/config.ts src/conf.ts',
       'cp config.example.json config.test.json',
+      'cp src/a.ts dst b.ts',
       'cat .gitignore',
       'cat assets/g/it.png',
       'cat docs/gi/t.md',
       'cat .github/workflows/ci.yml',
       'cat package/config.json',
-      "sed -i 's/^x/y/' src/app.ts",
-      "jq '.a' package.json",
-      'echo "all done"',
       'git push origin fix-cache',
       'git checkout -b fix-cache',
-      'git commit -m "fix pre-commit hook"',
       'pnpm test -- package',
+      // The whole policy refuses both quote characters, so these carry no quote
+      // and show the plain form each accepted cost replaces.
+      'sed -i s/^x/y/ src/app.ts',
+      'jq .a package.json',
+      'git commit -m fix-pre-commit-hook',
       // These pin the behaviour the narrowed rules must keep: a branch name
       // whose dot sits behind the `-c` of the branch-creation form stays
       // allowed, and a quote or a dot inside an ordinary path stays allowed.
@@ -655,8 +662,6 @@ describe('security-remediation push command guard policy', () => {
       'git switch -c release/1.2',
       'git -C . switch -c release/1.2',
       'git --no-pager branch -c a b',
-      'sed -i "s/^x/y/" src/app.ts',
-      'cp "src/a b.ts" dst.ts',
       'cp config.example.json config.test.json',
       'mv src/config.ts src/conf.ts',
       'touch src/config.ts',

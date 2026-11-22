@@ -2573,7 +2573,6 @@
       "noMatches": "Sen coincidencias",
       "noRepositories": "Non hai repositorios dispoñibles",
       "noRepositoriesDescription": "Conecta GitHub ou GitLab para cargar os repositorios.",
-      "loading": "Cargando…",
       "accessibility": "Repositorio: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

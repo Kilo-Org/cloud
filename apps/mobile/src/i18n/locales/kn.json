@@ -2569,7 +2569,6 @@
       "noMatches": "ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಗಳಿಲ್ಲ",
       "noRepositories": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
       "noRepositoriesDescription": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು GitHub ಅಥವಾ GitLab ಸಂಪರ್ಕಿಸಿ.",
-      "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "accessibility": "ರೆಪೊಸಿಟರಿ: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

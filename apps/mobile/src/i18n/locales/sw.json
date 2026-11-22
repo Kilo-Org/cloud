@@ -2569,7 +2569,6 @@
       "noMatches": "Hakuna matokeo yanayolingana",
       "noRepositories": "Hakuna hazina zinazopatikana",
       "noRepositoriesDescription": "Ili kupakia hazina, unganisha GitHub au GitLab.",
-      "loading": "Inapakia…",
       "accessibility": "Hazina: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

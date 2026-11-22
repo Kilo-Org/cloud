@@ -2622,7 +2622,6 @@
       "noMatches": "Cap coincidència",
       "noRepositories": "Cap repositori disponible",
       "noRepositoriesDescription": "Connecta GitHub o GitLab per carregar repositoris.",
-      "loading": "Carregant…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

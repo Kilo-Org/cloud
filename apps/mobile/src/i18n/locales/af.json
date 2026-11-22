@@ -2569,7 +2569,6 @@
       "noMatches": "Geen treffers nie",
       "noRepositories": "Geen bewaarplekke beskikbaar nie",
       "noRepositoriesDescription": "Koppel GitHub of GitLab om bewaarplekke te laai.",
-      "loading": "Laai…",
       "accessibility": "Bewaarplek: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

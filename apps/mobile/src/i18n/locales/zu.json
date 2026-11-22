@@ -2569,7 +2569,6 @@
       "noMatches": "Akukho okufanayo",
       "noRepositories": "Azikho izinqolobane zekhodi ezitholakalayo",
       "noRepositoriesDescription": "Ukuze ulayishe izinqolobane zekhodi, xhuma i-GitHub noma i-GitLab.",
-      "loading": "Kuyalayishwa…",
       "accessibility": "Inqolobane yekhodi: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

@@ -2569,7 +2569,6 @@
       "noMatches": "Ingen resultater",
       "noRepositories": "Ingen tilgængelige kodelagre",
       "noRepositoriesDescription": "Tilknyt GitHub eller GitLab for at indlæse kodelagre.",
-      "loading": "Indlæser…",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

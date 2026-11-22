@@ -2569,7 +2569,6 @@
       "noMatches": "Uyğunluq yoxdur",
       "noRepositories": "Mövcud repozitoriya yoxdur",
       "noRepositoriesDescription": "Repozitoriyaları yükləmək üçün GitHub və ya GitLab-ı qoş.",
-      "loading": "Yüklənir…",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

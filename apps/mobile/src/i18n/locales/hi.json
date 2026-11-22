@@ -1969,7 +1969,6 @@
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
       "noRepositoriesDescription": "रिपॉज़िटरी लोड करने के लिए GitHub या GitLab जोड़ें।",
       "accessibility": "रिपॉज़िटरी: {{label}}",
-      "loading": "लोड हो रहा है…",
       "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {

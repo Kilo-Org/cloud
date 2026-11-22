@@ -2569,7 +2569,6 @@
       "noMatches": "Asnjë përputhje",
       "noRepositories": "Asnjë depo e disponueshme",
       "noRepositoriesDescription": "Për të ngarkuar depot, lidhu me GitHub ose GitLab.",
-      "loading": "Duke u ngarkuar…",
       "accessibility": "Depoja: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

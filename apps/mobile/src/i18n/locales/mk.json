@@ -2569,7 +2569,6 @@
       "noMatches": "Нема совпаѓања",
       "noRepositories": "Нема достапни репозиториуми",
       "noRepositoriesDescription": "За да вчиташ репозиториуми, поврзи сметка на GitHub или GitLab.",
-      "loading": "Вчитување…",
       "accessibility": "Репозиториум: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

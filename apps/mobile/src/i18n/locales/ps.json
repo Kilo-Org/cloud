@@ -2569,7 +2569,6 @@
       "noMatches": "هېڅ پایله ونه موندل شوه",
       "noRepositories": "هېڅ زېرمتون نشته",
       "noRepositoriesDescription": "د زېرمتونونو د بارولو لپاره، GitHub یا GitLab حساب ونښلوئ.",
-      "loading": "بارېږي…",
       "accessibility": "زېرمتون: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

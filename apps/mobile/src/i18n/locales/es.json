@@ -2035,7 +2035,6 @@
       "noMatches": "Sin coincidencias",
       "noRepositories": "No hay repositorios disponibles",
       "noRepositoriesDescription": "Conecta GitHub o GitLab para cargar repositorios.",
-      "loading": "Cargando…",
       "accessibility": "Repositorio: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

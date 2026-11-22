@@ -2008,7 +2008,6 @@
       "noMatches": "一致する項目はありません",
       "noRepositories": "利用可能なリポジトリはありません",
       "noRepositoriesDescription": "リポジトリを読み込むには、GitHubまたはGitLabを連携してください。",
-      "loading": "読み込み中…",
       "accessibility": "リポジトリ：{{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -4950,7 +4949,7 @@
   },
   "organizationGuardrails": {
     "title": "AIガードレール",
-    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。$t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "AIガードレールを管理できるのは組織のオーナーと管理者のみです。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AIガードレールは有効になっていません",
     "unavailable": "Kiloは、リクエストに応じて組織のAIガードレールを有効にします。{{supportEmail}} までお問い合わせください。Kiloチームがお使いの組織に対して有効にします。",
     "contactSupport": "サポートに連絡",
@@ -5092,7 +5091,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "エンタープライズ機能",
     "enterpriseOnly": "プロバイダーとモデルは Enterprise プランで利用できます。",
-    "readOnly": "これらの設定を変更できるのは組織の所有者と管理者のみです。",
+    "readOnly": "これらの設定を変更できるのは組織のオーナーと管理者のみです。",
     "loadError": "プロバイダーとモデルを読み込めませんでした",
     "tabModels": "モデル",
     "tabProviders": "プロバイダー",

@@ -2012,7 +2012,6 @@
       "noMatches": "Tidak ada hasil yang cocok",
       "noRepositories": "Tidak ada repositori yang tersedia",
       "noRepositoriesDescription": "Hubungkan GitHub atau GitLab untuk memuat repositori.",
-      "loading": "Memuat…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

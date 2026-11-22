@@ -861,7 +861,7 @@
       "toolNameError": "Beim Werkzeug {{name}} ist ein Fehler aufgetreten.",
       "cancelReasonSuperseded": "Es wurde ein neuerer Commit gepusht, daher wurde dieses Review ersetzt.",
       "cancelReasonIntegrationDisconnected": "{{platform}} ist nicht verbunden, daher wurde dieses Review abgebrochen. Stelle die Verbindung wieder her und führe das Review erneut aus.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere es wieder und führe das Review erneut aus.",
+      "cancelReasonBitbucketReviewerDisabled": "Der Code-Prüfer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere ihn wieder und führe das Review erneut aus.",
       "cancelReasonBitbucketPullRequestChanged": "Der Bitbucket-Pull-Request wurde geändert, daher wurde dieses Review ersetzt.",
       "cancelReasonCancelled": "Dieses Review wurde abgebrochen.",
       "cancelReasonInterrupted": "Dieses Review wurde unterbrochen."
@@ -871,7 +871,7 @@
       "connectOwnerOnly": "Bitte einen Organisationsinhaber oder Admin, einen Anbieter zu verbinden.",
       "couldNotLoad": "Die Reviews konnten nicht geladen werden.",
       "noReviews": "Noch keine Reviews",
-      "noReviewsDescription": "Hier erscheinen Reviews, sobald Code Reviewer einen Pull-Request prüft.",
+      "noReviewsDescription": "Hier erscheinen Reviews, sobald der Code-Prüfer einen Pull-Request prüft.",
       "startManualReview": "Manuelles Review starten",
       "title": "Letzte Reviews"
     },
@@ -945,7 +945,7 @@
       "set": "Festgelegt",
       "notSet": "Nicht festgelegt"
     },
-    "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
+    "updateFailed": "Der Code-Prüfer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
     "status": {
       "interrupted": "Unterbrochen"
@@ -968,26 +968,26 @@
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "description": "Code Reviewer wurde deaktiviert, weil Kilo über keine aktive GitHub-App-Installation auf dieses Repository zugreifen kann. Aktualisiere die GitHub-App-Installation und aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil Kilo über keine aktive GitHub-App-Installation auf dieses Repository zugreifen kann. Aktualisiere die GitHub-App-Installation und aktiviere ihn anschließend wieder.",
         "recoveryLabel": "GitHub-App aktualisieren"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Der Code-Prüfer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere ihn anschließend wieder."
       },
       "gitlabProjectAccessRequired": {
-        "description": "Code Reviewer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere ihn anschließend wieder.",
         "recoveryLabel": "GitLab-Integration aktualisieren"
       },
       "byokInvalidKey": {
-        "description": "Code Reviewer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig ist, widerrufen wurde oder nicht die nötigen Berechtigungen hat. Aktualisiere den Schlüssel oder wähle ein anderes Modell. Aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig ist, widerrufen wurde oder nicht die nötigen Berechtigungen hat. Aktualisiere den Schlüssel oder wähle ein anderes Modell. Aktiviere den Code-Prüfer anschließend wieder.",
         "recoveryLabel": "BYOK-Einstellungen aktualisieren"
       },
       "selectedModelUnavailable": {
-        "description": "Code Reviewer wurde deaktiviert, weil das ausgewählte Modell für Cloud-Agent-Sitzungen nicht verfügbar ist. Wähle ein verfügbares Modell und aktiviere Code Reviewer anschließend wieder.",
-        "recoveryLabel": "Code-Reviewer-Einstellungen aktualisieren"
+        "description": "Der Code-Prüfer wurde deaktiviert, weil das ausgewählte Modell für Cloud-Agent-Sitzungen nicht verfügbar ist. Wähle ein verfügbares Modell und aktiviere ihn anschließend wieder.",
+        "recoveryLabel": "Code-Prüfer-Einstellungen aktualisieren"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Der Code-Prüfer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere ihn anschließend wieder."
       },
       "title": "Beim Code-Prüfer musst du eingreifen.",
       "recoveryLabel": "Support kontaktieren"
@@ -2008,7 +2008,6 @@
       "noMatches": "Keine Treffer",
       "noRepositories": "Keine Repositorys verfügbar",
       "noRepositoriesDescription": "Verbinde GitHub oder GitLab, um Repositorys zu laden.",
-      "loading": "Wird geladen…",
       "accessibility": "Code-Repository: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

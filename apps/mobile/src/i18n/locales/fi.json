@@ -2569,7 +2569,6 @@
       "noMatches": "Ei osumia",
       "noRepositories": "Ei koodivarastoja käytettävissä",
       "noRepositoriesDescription": "Yhdistä GitHub tai GitLab, jotta voit ladata koodivarastoja.",
-      "loading": "Ladataan…",
       "accessibility": "Koodivarasto: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

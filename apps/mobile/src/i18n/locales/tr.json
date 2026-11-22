@@ -2008,7 +2008,6 @@
       "noMatches": "Eşleşme yok",
       "noRepositories": "Kullanılabilir depo yok",
       "noRepositoriesDescription": "Depoları yüklemek için GitHub veya GitLab hesabını bağla.",
-      "loading": "Yükleniyor…",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

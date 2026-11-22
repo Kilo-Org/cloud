@@ -2673,7 +2673,6 @@
       "noMatches": "No matches",
       "noRepositories": "No repositories available",
       "noRepositoriesDescription": "Connect GitHub or GitLab to load repositories.",
-      "loading": "Loading...",
       "accessibility": "Repository: {{label}}"
     },
     "messageDetails": {

@@ -2062,7 +2062,6 @@
       "noMatches": "Brak wyników",
       "noRepositories": "Brak dostępnych repozytoriów",
       "noRepositoriesDescription": "Aby wczytać repozytoria, połącz konto GitHub lub GitLab.",
-      "loading": "Wczytywanie…",
       "accessibility": "Repozytorium: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

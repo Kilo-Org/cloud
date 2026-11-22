@@ -2622,7 +2622,6 @@
       "noMatches": "Niciun rezultat",
       "noRepositories": "Nu este disponibil niciun depozit",
       "noRepositoriesDescription": "Pentru a încărca depozite, conectează un cont GitHub sau GitLab.",
-      "loading": "Se încarcă…",
       "accessibility": "Depozit: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

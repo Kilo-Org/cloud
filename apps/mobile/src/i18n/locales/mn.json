@@ -2569,7 +2569,6 @@
       "noMatches": "Тохирох илэрц алга",
       "noRepositories": "Ашиглах боломжтой кодын сан алга",
       "noRepositoriesDescription": "Кодын санг ачаалахын тулд GitHub эсвэл GitLab бүртгэлээ холбоно уу.",
-      "loading": "Ачаалж байна…",
       "accessibility": "Кодын сан: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

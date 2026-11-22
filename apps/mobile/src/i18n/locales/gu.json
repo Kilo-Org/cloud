@@ -2573,7 +2573,6 @@
       "noMatches": "કોઈ મેળ નથી",
       "noRepositories": "કોઈ રિપોઝિટરી ઉપલબ્ધ નથી",
       "noRepositoriesDescription": "રિપોઝિટરીઓ લોડ કરવા માટે GitHub અથવા GitLab જોડો.",
-      "loading": "લોડ થઈ રહ્યું છે…",
       "accessibility": "રિપોઝિટરી: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

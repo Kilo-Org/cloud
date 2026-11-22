@@ -2569,7 +2569,6 @@
       "noMatches": "Walang tugma",
       "noRepositories": "Walang magagamit na imbakan ng code",
       "noRepositoriesDescription": "Ikonekta ang GitHub o GitLab para ma-load ang mga imbakan ng code.",
-      "loading": "Naglo-load…",
       "accessibility": "Imbakan ng code: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

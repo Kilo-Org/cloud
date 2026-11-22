@@ -2569,7 +2569,6 @@
       "noMatches": "Vasteid pole",
       "noRepositories": "Saadaolevaid hoidlaid pole",
       "noRepositoriesDescription": "Hoidlate laadimiseks ühenda GitHub või GitLab.",
-      "loading": "Laadimine…",
       "accessibility": "Hoidla: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

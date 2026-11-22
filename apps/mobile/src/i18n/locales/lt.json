@@ -2675,7 +2675,6 @@
       "noMatches": "Atitikčių nėra",
       "noRepositories": "Nėra prieinamų saugyklų",
       "noRepositoriesDescription": "Kad įkeltum saugyklas, prijunk GitHub arba GitLab.",
-      "loading": "Įkeliama…",
       "accessibility": "Saugykla: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

@@ -1915,7 +1915,6 @@
       "noMatches": "Aucun résultat",
       "noRepositories": "Aucun dépôt disponible",
       "noRepositoriesDescription": "Connectez GitHub ou GitLab pour charger des dépôts.",
-      "loading": "Chargement…",
       "accessibility": "Dépôt : {{label}}",
       "platformBitbucket": "Bitbucket"
     },

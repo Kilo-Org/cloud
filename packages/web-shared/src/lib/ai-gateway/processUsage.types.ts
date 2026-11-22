@@ -94,11 +94,15 @@ export type NotYetCostedUsageStats = {
 export type JustTheCostsUsageStats = {
   cost_mUsd: number;
   cacheDiscount_mUsd?: number;
-  /** The real cost before any free/BYOK/promo zeroing. Set by processTokenData. */
+  /**
+   * The real cost before any free/BYOK/promo zeroing. Set by processTokenData.
+   * In microdollars, the same unit as `cost_mUsd`; the row stores it in `market_cost`.
+   */
   market_cost?: number;
   /**
    * The part of `cost_mUsd` the gateway charged on top of BYOK inference, such as
    * server tools, plugins and PDF parsing. Absent when not reported separately.
+   * The row stores it in `non_inference_cost`.
    */
   nonInferenceCost_mUsd?: number;
   inputTokens: number;
@@ -116,32 +120,17 @@ export type PromptInfo = {
   user_prompt_prefix: string;
 };
 
-export type MicrodollarUsageContext = {
-  api_kind: GatewayApiKind;
-  kiloUserId: string;
-  fraudHeaders: FraudDetectionHeaders;
-  organizationId?: Organization['id'];
-  provider: ProviderType;
-  requested_model: string;
-  readonly is_free: boolean;
-  /** The requested custom LLM's pricing, which takes precedence over custom pricing. */
-  custom_llm_pricing: CustomPricingTiers | null;
-  promptInfo: PromptInfo;
+/**
+ * The fields a usage context and the persisted `microdollar_usage_metadata` row
+ * carry with the same name and type. Both shapes extend this alias, so a change
+ * cannot land in one shape only.
+ */
+export type SharedUsageRecordFields = {
   max_tokens: number | null;
   has_middle_out_transform: boolean | null;
-  isStreaming: boolean;
-  prior_microdollar_usage: number;
-  /** User email for authenticated users - used as PostHog distinctId. Undefined for anonymous users. */
-  posthog_distinct_id?: string;
-  project_id: string | null;
   status_code: number | null;
   editor_name: string | null;
   machine_id: string | null;
-  /** True if user/org is using their own API key - cost should be zeroed out */
-  user_byok: boolean;
-  has_tools: boolean;
-  /** Which product feature generated this API call. NULL if header not sent. */
-  feature: FeatureValue | null;
   /** Client session/task identifier from X-KiloCode-TaskId header. */
   session_id: string | null;
   /** Client mode from x-kilocode-mode header (e.g. 'code', 'build', 'architect'). */
@@ -152,6 +141,35 @@ export type MicrodollarUsageContext = {
   reasoning_setting: string | null;
   /** The Vercel AI Gateway inference region the request was pinned to, or null for global routing. */
   inference_region: string | null;
+};
+
+export type MicrodollarUsageContext = SharedUsageRecordFields & {
+  /** Context always knows the kind; the row column is nullable. */
+  api_kind: GatewayApiKind;
+  kiloUserId: string;
+  fraudHeaders: FraudDetectionHeaders;
+  organizationId?: Organization['id'];
+  provider: ProviderType;
+  requested_model: string;
+  /** Context is immutable and always known; the row column is nullable. */
+  readonly is_free: boolean;
+  /** The requested custom LLM's pricing, which takes precedence over custom pricing. */
+  custom_llm_pricing: CustomPricingTiers | null;
+  promptInfo: PromptInfo;
+  /** The row stores the same fact as `streamed`. */
+  isStreaming: boolean;
+  prior_microdollar_usage: number;
+  /** User email for authenticated users - used as PostHog distinctId. Undefined for anonymous users. */
+  posthog_distinct_id?: string;
+  project_id: string | null;
+  // The row stores the same fact as `is_user_byok`.
+  /** True if user/org is using their own API key - cost should be zeroed out */
+  user_byok: boolean;
+  /** Context always decides this; the row column is nullable for older senders. */
+  has_tools: boolean;
+  // Context carries the validated feature value; the row stores it as plain text.
+  /** Which product feature generated this API call. NULL if header not sent. */
+  feature: FeatureValue | null;
   /**
    * Time until the upstream response headers arrived, in milliseconds. Stored as
    * `latency` only when the usage stats do not carry a measured latency.
@@ -255,7 +273,7 @@ export type UsageAccountingResult = {
   createdAt: string;
 };
 
-export type UsageMetaData = {
+export type UsageMetaData = SharedUsageRecordFields & {
   id: string;
   message_id: string;
   created_at: string;
@@ -269,30 +287,28 @@ export type UsageMetaData = {
   system_prompt_prefix: string | null;
   system_prompt_length: number | null;
   http_user_agent: string | null;
-  max_tokens: number | null;
-  has_middle_out_transform: boolean | null;
-  status_code: number | null;
   upstream_id: string | null;
   finish_reason: string | null;
   latency: number | null;
   moderation_latency: number | null;
   generation_time: number | null;
   is_byok: boolean | null;
+  /** Carries the context's `user_byok`. */
   is_user_byok: boolean;
+  /** Carries the context's `isStreaming`. */
   streamed: boolean | null;
   cancelled: boolean | null;
-  editor_name: string | null;
+  /** Widened row column: the context always knows the value, the column is nullable. */
   api_kind: GatewayApiKind | null;
+  /** Widened row column: the context always decides this, the column is nullable for older senders. */
   has_tools: boolean | null;
-  machine_id: string | null;
+  /** Widened row column: the context carries the validated value, the column is plain text. */
   feature: string | null;
-  session_id: string | null;
-  mode: string | null;
-  auto_model: string | null;
-  reasoning_setting: string | null;
-  inference_region: string | null;
+  /** The same microdollar value the stats carry as `market_cost`. */
   market_cost: number | null;
+  /** The same microdollar value the stats carry as `nonInferenceCost_mUsd`. */
   non_inference_cost: number | null;
+  /** Widened row column: the context always knows the value, the column is nullable. */
   is_free: boolean | null;
   abuse_delay: number | null;
   abuse_downgraded_from: string | null;

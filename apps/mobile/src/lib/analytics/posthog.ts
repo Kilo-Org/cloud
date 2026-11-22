@@ -111,7 +111,6 @@ const readyListeners = new Set<() => void>();
 // Track every discard completion so resumePostHog can await all prior
 // work.  Each discard appends to this chain; resumePostHog captures the
 // tail at call time.  Discards that begin after resume are not waited on.
-// oxlint-disable-next-line promise/prefer-await-to-then -- seed value
 let discardChain: Promise<void> = Promise.resolve();
 
 /** True when `initPostHog` has created the client.  Layout-drain uses

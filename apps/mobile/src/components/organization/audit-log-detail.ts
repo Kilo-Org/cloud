@@ -7,7 +7,7 @@ import {
 import { type TFunction } from 'i18next';
 
 import { isolateBidiText } from '@/lib/bidi';
-import { formatList, formatNumber } from '@/lib/format';
+import { formatList, formatPrefixedMoney } from '@/lib/format';
 
 /**
  * The row's detail line in the reader's language, from the structured event the
@@ -31,6 +31,7 @@ export function auditEntryDetail(
   }
   const render = renderAuditDetail(detail, {
     t,
+    locale,
     isolated: isolateBidiText,
     list: (values: readonly string[]) => formatList(values, locale),
     state: (enabled: boolean) =>
@@ -42,6 +43,8 @@ export function auditEntryDetail(
 /** The parts every case would otherwise repeat. */
 type Tools = Readonly<{
   t: TFunction;
+  /** The reader's language, for a value the platform formats (money). */
+  locale: string;
   isolated: (value: string) => string;
   list: (values: readonly string[]) => string;
   state: (enabled: boolean) => string;
@@ -149,32 +152,44 @@ const DEFAULT_BEHAVIOR_KEYS = {
  * the type check here until its template exists.
  */
 function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefined {
-  const { t, isolated, list, state } = tools;
+  const { t, locale, isolated, list, state } = tools;
   const templates: AuditTemplates = {
     'mode.identity': d => ({
       key: 'organization.auditLog.detail.modeIdentity',
       values: { name: isolated(d.name), slug: isolated(d.slug) },
     }),
-    'mode.update': d => ({
-      key: 'organization.auditLog.detail.modeUpdate',
-      values: {
-        name: isolated(d.name),
-        slug: isolated(d.slug),
-        changes: list(
-          d.fields.map(change => {
-            const field = t(FIELD_KEYS[change.field]);
-            if (change.previous === undefined || change.next === undefined) {
-              return field;
-            }
-            return t('organization.auditLog.detail.fieldChange', {
-              field,
-              previous: isolated(change.previous),
-              next: isolated(change.next),
-            });
-          })
-        ),
-      },
-    }),
+    // A save that carried no field change has nothing to list, and the
+    // sentence ends in a bare colon, so it falls back to the mode's identity.
+    'mode.update': d => {
+      // A save that carried no field change has nothing to list, and the
+      // sentence would end in a bare colon, so it falls back to the identity.
+      if (d.fields.length === 0) {
+        return {
+          key: 'organization.auditLog.detail.modeIdentity',
+          values: { name: isolated(d.name), slug: isolated(d.slug) },
+        };
+      }
+      return {
+        key: 'organization.auditLog.detail.modeUpdate',
+        values: {
+          name: isolated(d.name),
+          slug: isolated(d.slug),
+          changes: list(
+            d.fields.map(change => {
+              const field = t(FIELD_KEYS[change.field]);
+              if (change.previous === undefined || change.next === undefined) {
+                return field;
+              }
+              return t('organization.auditLog.detail.fieldChange', {
+                field,
+                previous: isolated(change.previous),
+                next: isolated(change.next),
+              });
+            })
+          ),
+        },
+      };
+    },
 
     'member.role': d => ({
       key: 'organization.auditLog.detail.memberRole',
@@ -299,7 +314,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
           }
         : {
             key: 'organization.auditLog.detail.ssoDomainChanged',
-            values: { previous: isolated(d.previous), next: isolated(d.domain) },
+            values: { previous: isolated(d.previous), domain: isolated(d.domain) },
           },
     'sso.domainRemoved': d => ({
       key: 'organization.auditLog.detail.ssoDomainRemoved',
@@ -308,19 +323,19 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
 
     'funds.purchased': d => ({
       key: 'organization.auditLog.detail.fundsPurchased',
-      values: { amount: usd(d.amount), method: isolated(d.method) },
+      values: { amount: usd(d.amount, locale), method: isolated(d.method) },
     }),
     'funds.granted': d => ({
       key: 'organization.auditLog.detail.fundsGranted',
-      values: { amount: usd(d.amount) },
+      values: { amount: usd(d.amount, locale) },
     }),
     'funds.distributed': d => ({
       key: 'organization.auditLog.detail.fundsDistributed',
-      values: { amount: usd(d.amount), count: d.count },
+      values: { amount: usd(d.amount, locale), count: d.count },
     }),
     'funds.received': d => ({
       key: 'organization.auditLog.detail.fundsReceived',
-      values: { amount: usd(d.amount), parent: isolated(d.parent) },
+      values: { amount: usd(d.amount, locale), parent: isolated(d.parent) },
     }),
 
     'reviewAgent.platform': d => ({
@@ -366,14 +381,20 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
           };
     },
     'setting.defaultModel': d => defaultModelRow(d, tools),
-    'setting.autoRoute': d => ({
-      key: 'organization.auditLog.detail.settingAutoRoute',
-      values: {
-        mode: isolated(d.mode),
-        previous: d.previous === undefined ? '' : isolated(d.previous),
-        next: d.next === undefined ? '' : isolated(d.next),
-      },
-    }),
+    // The sentence reads "<from> → <to>", so it needs both arms. A route that
+    // was only set, or only cleared, has one, and the row shows its event name
+    // alone rather than a dangling arrow.
+    'setting.autoRoute': d =>
+      d.previous === undefined || d.next === undefined
+        ? undefined
+        : {
+            key: 'organization.auditLog.detail.settingAutoRoute',
+            values: {
+              mode: isolated(d.mode),
+              previous: isolated(d.previous),
+              next: isolated(d.next),
+            },
+          },
     'setting.defaultBehavior': d => ({
       key: DEFAULT_BEHAVIOR_KEYS[d.behavior],
       values: { model: d.model === undefined ? '' : isolated(d.model) },
@@ -391,7 +412,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
         ? {
             key: 'organization.auditLog.detail.settingMinimumBalanceOn',
             values: {
-              threshold: usd(d.threshold ?? 0),
+              threshold: usd(d.threshold ?? 0, locale),
               emails: list((d.emails ?? []).map(value => isolated(value))),
             },
           }
@@ -400,12 +421,12 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
       key: 'organization.auditLog.detail.settingRecommendationsDigest',
       values: { state: state(d.enabled) },
     }),
+    // The sentence names the policy alone. The allowed origins stay in the
+    // stored payload for a future row that can show them; computing a value no
+    // catalog interpolates would be dead work.
     'setting.browserControl': d => ({
       key: 'organization.auditLog.detail.settingBrowserControl',
-      values: {
-        policy: t(BROWSER_POLICY_KEYS[d.policy]),
-        origins: list((d.origins ?? []).map(value => isolated(value))),
-      },
+      values: { policy: t(BROWSER_POLICY_KEYS[d.policy]) },
     }),
     // The event name above the row already says what these three carry.
     'setting.accessLists': () => undefined,
@@ -428,10 +449,16 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
     'integration.keyAdded': d => keyEvent(tools, d.provider, 'integrationKeyAdded'),
     'integration.keyUpdated': d => keyEvent(tools, d.provider, 'integrationKeyUpdated'),
     'integration.keyDeleted': d => keyEvent(tools, d.provider, 'integrationKeyDeleted'),
-    'integration.keyToggled': d => ({
-      key: 'organization.auditLog.detail.integrationKeyToggled',
-      values: { provider: isolated(d.provider), state: state(d.enabled) },
-    }),
+    // The one sentence reports the key's own on/off state. A catalog-model
+    // toggle carries a different fact, so its row shows the event name alone
+    // instead of the key's state, which can read the opposite way.
+    'integration.keyToggled': d =>
+      d.catalogModels === undefined
+        ? {
+            key: 'organization.auditLog.detail.integrationKeyToggled',
+            values: { provider: isolated(d.provider), state: state(d.enabled) },
+          }
+        : undefined,
 
     'autoRouting.models': d => {
       const parts: string[] = [];
@@ -458,15 +485,16 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
     'namedPolicy.created': d => policyEvent(tools, d, 'namedPolicyCreated'),
     'namedPolicy.updated': d => policyEvent(tools, d, 'namedPolicyUpdated'),
     'namedPolicy.deleted': d => policyEvent(tools, d, 'namedPolicyDeleted'),
-    'namedPolicy.linked': d => ({
-      key: 'organization.auditLog.detail.namedPolicyLinked',
-      values: {
-        kind: isolated(d.policyKind),
-        scope: isolated(d.scope),
-        previous: d.previous === undefined ? '' : isolated(d.previous),
-        next: d.next === undefined ? '' : isolated(d.next),
-      },
-    }),
+    // The one sentence names the policy that is now linked. A removal has no
+    // policy to name, so the row shows its event name alone rather than
+    // "Linked … " with nothing after it.
+    'namedPolicy.linked': d =>
+      d.next === undefined
+        ? undefined
+        : {
+            key: 'organization.auditLog.detail.namedPolicyLinked',
+            values: { kind: isolated(d.policyKind), next: isolated(d.next) },
+          },
 
     'webhookTrigger.updated': d => ({
       key: 'organization.auditLog.detail.webhookTriggerUpdated',
@@ -492,9 +520,13 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
   return template?.(detail);
 }
 
-/** A credit amount in the reader's own currency format. */
-function usd(amount: number): string {
-  return formatNumber(Math.abs(amount), 'en', { style: 'currency', currency: 'USD' });
+/**
+ * A credit amount in the reader's own digits: the app's one money shape keeps
+ * the `$` prefix and takes the separators from the catalog's language, so a
+ * Japanese row does not print English grouping.
+ */
+function usd(amount: number, locale: string): string {
+  return formatPrefixedMoney(Math.abs(amount), locale);
 }
 
 /** The integration events that name only the service. */

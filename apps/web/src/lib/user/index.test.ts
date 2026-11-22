@@ -5402,6 +5402,9 @@ describe('User', () => {
 
     it('should anonymize organization audit logs', async () => {
       const user = await insertTestUser();
+      // A second member, so the suite can prove a row about someone else keeps
+      // that person's address when the author's account is deleted.
+      const otherUser = await insertTestUser();
       const orgId = randomUUID();
       await db.insert(organizations).values({
         id: orgId,
@@ -5422,19 +5425,42 @@ describe('User', () => {
         details: { id: 'invite.accepted', email: user.google_user_email },
       });
 
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.user.send_invite',
+        actor_id: user.id,
+        actor_email: user.google_user_email,
+        actor_name: user.google_user_name,
+        message: `Invited ${otherUser.google_user_email} as member`,
+        details: { id: 'invite.sent', email: otherUser.google_user_email, role: 'member' },
+      });
+
       await softDeleteUser(user.id);
 
       const logs = await db
         .select()
         .from(organization_audit_logs)
         .where(eq(organization_audit_logs.actor_id, user.id));
-      expect(logs).toHaveLength(1);
-      expect(logs[0].actor_email).toBeNull();
-      expect(logs[0].actor_name).toBeNull();
-      expect(logs[0].actor_id).toBe(user.id); // actor_id preserved for reference
-      expect(logs[0].message).toBe('User joined org'); // message preserved
+      expect(logs).toHaveLength(2);
+      for (const log of logs) {
+        expect(log.actor_email).toBeNull();
+        expect(log.actor_name).toBeNull();
+        expect(log.actor_id).toBe(user.id); // actor_id preserved for reference
+      }
+      const own = logs.find(log => log.action === 'organization.user.accept_invite');
+      expect(own?.message).toBe('User joined org'); // message preserved
       // The structured detail keeps its event, and no longer carries the address.
-      expect(logs[0].details).toEqual({ id: 'invite.accepted' });
+      expect(own?.details).toEqual({ id: 'invite.accepted' });
+      // A row about another member keeps that member's address: redaction is by
+      // the address a detail names, not by who authored the row.
+      const [otherSubject] = logs.filter(
+        log => log.action === 'organization.user.send_invite'
+      );
+      expect(otherSubject.details).toEqual({
+        id: 'invite.sent',
+        email: otherUser.google_user_email,
+        role: 'member',
+      });
     });
 
     it('should clear organization group attribution fields', async () => {

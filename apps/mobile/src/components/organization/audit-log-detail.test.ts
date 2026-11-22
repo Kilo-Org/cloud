@@ -92,6 +92,43 @@ describe('auditEntryDetail', () => {
     expect(auditEntryDetail(t, 'en', { id: 'member.removed' })).toBeUndefined();
   });
 
+  it('states a key toggle only when the key itself was toggled', async () => {
+    const toggled = await renderIn('ja', {
+      id: 'integration.keyToggled',
+      integration: 'byok',
+      provider: 'anthropic',
+      enabled: true,
+    });
+    expect(toggled).toContain('anthropic');
+
+    // A catalog-model toggle carries a different fact, so it states none.
+    expect(
+      await renderIn('ja', {
+        id: 'integration.keyToggled',
+        integration: 'byok',
+        provider: 'anthropic',
+        enabled: true,
+        catalogModels: true,
+      })
+    ).toBeUndefined();
+  });
+
+  it('renders no dangling arrow for a route that was only set or only cleared', async () => {
+    expect(
+      await renderIn('ja', { id: 'setting.autoRoute', mode: 'code', next: 'anthropic/x' })
+    ).toBeUndefined();
+    expect(
+      await renderIn('ja', { id: 'setting.autoRoute', mode: 'code', previous: 'anthropic/x' })
+    ).toBeUndefined();
+    const moved = await renderIn('ja', {
+      id: 'setting.autoRoute',
+      mode: 'code',
+      previous: 'anthropic/x',
+      next: 'openai/y',
+    });
+    expect(moved).toContain('openai/y');
+  });
+
   it('names both advanced policies when one row recorded both', async () => {
     const both = await renderIn('ja', {
       id: 'setting.advancedPolicies',
@@ -111,11 +148,16 @@ describe('auditEntryDetail', () => {
     // The renderer's map is keyed by `AuditDetail['id']`, so a union member
     // without a case fails the type check. This asserts the runtime half: each
     // id either renders a line or is one of the ids that deliberately does not.
+    // Ids whose own event name already states the event, and ids whose one
+    // sentence needs a value this sample does not carry (a set or a clear has
+    // only one arm, a removed link has no policy to name, and a catalog-model
+    // toggle is not the key's own state).
     const deliberatelyBare = new Set<string>([
       'setting.accessLists',
       'setting.byokPriorities',
       'token.user',
       'token.resource',
+      'namedPolicy.linked',
     ]);
     const samples = detailSample();
     for (const id of AUDIT_DETAIL_IDS) {
@@ -178,7 +220,7 @@ function detailSample(): Record<string, AuditDetail> {
       region: 'us',
     },
     'setting.defaultModel': { id: 'setting.defaultModel', previous: 'a', next: 'b' },
-    'setting.autoRoute': { id: 'setting.autoRoute', mode: 'code', next: 'b' },
+    'setting.autoRoute': { id: 'setting.autoRoute', mode: 'code', previous: 'a', next: 'b' },
     'setting.defaultBehavior': { id: 'setting.defaultBehavior', behavior: 'global' },
     'setting.dataCollection': { id: 'setting.dataCollection', mode: 'allowed' },
     'setting.projectsUi': { id: 'setting.projectsUi', enabled: true },

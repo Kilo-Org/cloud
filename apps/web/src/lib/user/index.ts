@@ -1954,20 +1954,30 @@ export async function anonymizeCloudUserData(
       )
     );
 
-  // Organization audit logs: keep the log entries, strip actor PII. A row's
-  // structured detail can name a member's address too, so its `email` key is
-  // dropped in the same statement rather than left in the JSON. The detail
-  // schema requires that key, so a redacted row's detail no longer parses and
-  // the row falls back to its event name — the same outcome as a row written
-  // before details existed.
+  // Organization audit logs: keep the log entries, strip the deleted user's PII.
+  //
+  // The actor columns belong to the person who acted, so they are cleared on
+  // the rows that person authored.
   await tx
     .update(organization_audit_logs)
-    .set({
-      actor_email: null,
-      actor_name: null,
-      details: sql`case when ${organization_audit_logs.details} is null then null else ${organization_audit_logs.details} - 'email' end`,
-    })
+    .set({ actor_email: null, actor_name: null })
     .where(eq(organization_audit_logs.actor_id, userId));
+
+  // A structured detail names its *subject*, which is usually someone else, so
+  // it is redacted by the address it holds rather than by the row's author.
+  // Clearing it where the author matched instead would have erased another
+  // member's address while leaving this one's in the rows about them. The
+  // detail schema requires `email`, so a redacted row's detail no longer parses
+  // and falls back to its event name — as a row written before the column did.
+  if (user.google_user_email) {
+    const address = user.google_user_email;
+    await tx
+      .update(organization_audit_logs)
+      .set({
+        details: sql`case when ${organization_audit_logs.details} is null then null else ${organization_audit_logs.details} - 'email' end`,
+      })
+      .where(eq(sql`${organization_audit_logs.details}->>'email'`, address));
+  }
 
   await tx
     .update(organization_groups)

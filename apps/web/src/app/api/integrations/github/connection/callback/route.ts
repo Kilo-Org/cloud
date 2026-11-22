@@ -8,7 +8,7 @@ import {
 } from '@/lib/integrations/github/connection-service';
 import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
-import { GitHubListingBudgetExceededError } from '@/lib/integrations/platforms/github/listing-budget';
+import { isInstallationAdministrationListingOverflow } from '@/lib/integrations/platforms/github/listing-budget';
 import {
   discoverAuthorizedGitHubInstallations,
   verifyGitHubInstallationAuthorization,
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     if (!completed.ok) return redirect(path, completed.reason);
     return redirect(`${path}?github_connection=success`);
   } catch (error) {
-    if (error instanceof GitHubListingBudgetExceededError) {
+    if (isInstallationAdministrationListingOverflow(error)) {
       return redirect(path, 'installation_listing_too_large');
     }
     return redirect(path, 'connection_failed');

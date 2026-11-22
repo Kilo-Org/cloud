@@ -10,7 +10,10 @@ import {
   discoverAuthorizedGitHubInstallations,
   verifyGitHubInstallationAuthorization,
 } from '@/lib/integrations/github/installation-authorization';
-import { GitHubListingBudgetExceededError } from '@/lib/integrations/platforms/github/listing-budget';
+import {
+  GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
@@ -174,7 +177,8 @@ test('reports the discovery listing outcome at the page bound', async () => {
   });
   mockedDiscover.mockRejectedValue(
     new GitHubListingBudgetExceededError(
-      'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
+      'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages',
+      GITHUB_INSTALLATION_ADMINISTRATION_LISTING
     )
   );
   const { GET } = await import('./route');
@@ -200,7 +204,8 @@ test('reports the confirmation listing outcome at the page bound', async () => {
   });
   mockedVerify.mockRejectedValue(
     new GitHubListingBudgetExceededError(
-      'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
+      'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages',
+      GITHUB_INSTALLATION_ADMINISTRATION_LISTING
     )
   );
   const { GET } = await import('./route');
@@ -214,6 +219,31 @@ test('reports the confirmation listing outcome at the page bound', async () => {
   expect(response.headers.get('location')).toContain(
     'github_connection_error=installation_listing_too_large'
   );
+});
+
+test('reports a membership read at the bound as a generic connection failure', async () => {
+  mockedConsumeState.mockResolvedValue({
+    attemptId,
+    stage: 'discover',
+    verifierRef: 'ref',
+    codeVerifier: 'verifier',
+    selectedInstallationId: candidate.installationId,
+  });
+  mockedDiscover.mockRejectedValue(
+    new GitHubListingBudgetExceededError(
+      'GitHub pagination limit exceeded: GitHub organization membership listing returned more than 100 pages',
+      'GitHub organization membership listing'
+    )
+  );
+  const { GET } = await import('./route');
+  const response = await GET(
+    new NextRequest(`http://localhost/callback?state=state&code=code`) as never
+  );
+  expect(mockedRecordDiscovery).not.toHaveBeenCalled();
+  expect(response.headers.get('location')).toContain(
+    `/organizations/${organizationId}/integrations/github`
+  );
+  expect(response.headers.get('location')).toContain('github_connection_error=connection_failed');
 });
 
 test.each([

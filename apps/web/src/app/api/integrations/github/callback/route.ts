@@ -21,7 +21,7 @@ import {
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
-import { GitHubListingBudgetExceededError } from '@/lib/integrations/platforms/github/listing-budget';
+import { isInstallationAdministrationListingOverflow } from '@/lib/integrations/platforms/github/listing-budget';
 import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
 import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import {
@@ -619,7 +619,7 @@ async function handleCoreInstallFlow(params: {
         },
         extra: { installationId },
       });
-      if (error instanceof GitHubListingBudgetExceededError) {
+      if (isInstallationAdministrationListingOverflow(error)) {
         return rejectWithReason('installation_listing_too_large');
       }
       return rejectWithReason('not_installation_admin');

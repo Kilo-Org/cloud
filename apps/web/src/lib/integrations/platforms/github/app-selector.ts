@@ -3,6 +3,7 @@ import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { Octokit } from '@octokit/rest';
 import {
   checkGitHubPaginationBounds,
+  GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
   GitHubListingBudget,
   withListingDeadline,
 } from './listing-budget';
@@ -102,7 +103,7 @@ export async function assertUserAdministersInstallation(params: {
   const octokit = new Octokit({ auth: accessToken });
 
   const perPage = 100;
-  const context = 'installation administration listing';
+  const context = GITHUB_INSTALLATION_ADMINISTRATION_LISTING;
   const budget = new GitHubListingBudget(context);
 
   try {

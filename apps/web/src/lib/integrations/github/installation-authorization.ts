@@ -4,6 +4,7 @@ import { Octokit } from '@octokit/rest';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
   checkGitHubPaginationBounds,
+  GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
   GitHubListingBudget,
   withListingDeadline,
 } from '@/lib/integrations/platforms/github/listing-budget';
@@ -115,7 +116,7 @@ export async function discoverAuthorizedGitHubInstallations(params: {
         ).data
     ),
     allPages<GitHubInstallationPageItem>(
-      'installation administration listing',
+      GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
       async (page, signal) => {
         const { data } = await client.rest.apps.listInstallationsForAuthenticatedUser({
           page,

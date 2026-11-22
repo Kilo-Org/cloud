@@ -11,12 +11,26 @@ export const GITHUB_LISTING_TIMEOUT_MS = 60_000;
 export const GITHUB_LISTING_BUDGET_MESSAGE =
   'This GitHub installation has more repositories or branches than Kilo can list. Limit its repository access and try again.';
 
+/** The installation administration read. */
+export const GITHUB_INSTALLATION_ADMINISTRATION_LISTING = 'installation administration listing';
+
 /** Raised when one paginated read passes a page, item, byte or duration bound. */
 export class GitHubListingBudgetExceededError extends Error {
-  constructor(message: string) {
+  readonly listing: string | null;
+
+  constructor(message: string, listing: string | null = null) {
     super(message);
     this.name = 'GitHubListingBudgetExceededError';
+    this.listing = listing;
   }
+}
+
+/** Whether a read that passed the bound is the installation administration read. */
+export function isInstallationAdministrationListingOverflow(error: unknown): boolean {
+  return (
+    error instanceof GitHubListingBudgetExceededError &&
+    error.listing === GITHUB_INSTALLATION_ADMINISTRATION_LISTING
+  );
 }
 
 /** One paginated read's budget: retained bytes and the shared deadline signal. */
@@ -31,7 +45,8 @@ export class GitHubListingBudget {
   constructor(context: string) {
     this.context = context;
     this.timeoutError = new GitHubListingBudgetExceededError(
-      `GitHub pagination limit exceeded: ${context} did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      `GitHub pagination limit exceeded: ${context} did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`,
+      context
     );
     this.timer = setTimeout(() => {
       // undici rejects with the abort reason itself, and Octokit's fetch wrapper rethrows that
@@ -59,7 +74,8 @@ export class GitHubListingBudget {
     this.retainedBytes += bytes;
     if (this.retainedBytes > MAX_GITHUB_LISTING_BYTES) {
       throw new GitHubListingBudgetExceededError(
-        `GitHub pagination limit exceeded: ${this.context} returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`
+        `GitHub pagination limit exceeded: ${this.context} returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`,
+        this.context
       );
     }
   }
@@ -90,12 +106,14 @@ export function checkGitHubPaginationBounds(
 ): void {
   if (page > MAX_GITHUB_PAGINATION_PAGES) {
     throw new GitHubListingBudgetExceededError(
-      `GitHub pagination limit exceeded: ${context} returned more than ${MAX_GITHUB_PAGINATION_PAGES} pages`
+      `GitHub pagination limit exceeded: ${context} returned more than ${MAX_GITHUB_PAGINATION_PAGES} pages`,
+      context
     );
   }
   if (itemCount > MAX_GITHUB_PAGINATION_ITEMS) {
     throw new GitHubListingBudgetExceededError(
-      `GitHub pagination limit exceeded: ${context} returned more than ${MAX_GITHUB_PAGINATION_ITEMS} items`
+      `GitHub pagination limit exceeded: ${context} returned more than ${MAX_GITHUB_PAGINATION_ITEMS} items`,
+      context
     );
   }
 }

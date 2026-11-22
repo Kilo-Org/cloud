@@ -44,7 +44,10 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
-import { GitHubListingBudgetExceededError } from '@/lib/integrations/platforms/github/listing-budget';
+import {
+  GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
@@ -1648,7 +1651,8 @@ describe('GET /api/integrations/github/callback admin proof', () => {
   test('reports the administration listing outcome at the page bound', async () => {
     mockedAssertUserAdministersInstallation.mockRejectedValue(
       new GitHubListingBudgetExceededError(
-        'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
+        'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages',
+        GITHUB_INSTALLATION_ADMINISTRATION_LISTING
       )
     );
 
@@ -1669,7 +1673,8 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
     mockedVerifyGitHubInstallationAuthorization.mockRejectedValue(
       new GitHubListingBudgetExceededError(
-        'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
+        'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages',
+        GITHUB_INSTALLATION_ADMINISTRATION_LISTING
       )
     );
 
@@ -1682,6 +1687,30 @@ describe('GET /api/integrations/github/callback admin proof', () => {
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, `/integrations/github?error=installation_listing_too_large`);
+    expect(mockedVerifyGitHubInstallationAuthorization).toHaveBeenCalled();
+    expect(mockedConnectVerifiedGitHubInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+  });
+
+  test('rejects a membership read at the bound as a non-admin install', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedVerifyGitHubInstallationAuthorization.mockRejectedValue(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: GitHub organization membership listing returned more than 100 pages',
+        'GitHub organization membership listing'
+      )
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
     expect(mockedVerifyGitHubInstallationAuthorization).toHaveBeenCalled();
     expect(mockedConnectVerifiedGitHubInstallation).not.toHaveBeenCalled();
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();

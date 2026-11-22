@@ -16,6 +16,17 @@ import {
 
 const COMMAND_TIMEOUT_MS = 30_000;
 const GENERIC_COMMAND_ERROR_MESSAGE = 'Command failed';
+// One bound for "the connection did not open", the same wait a queued command
+// tolerates. A pre-socket token call that outlives it is abandoned so the
+// bounded retry series owns the failure, instead of a promise that never
+// settles parking every later retry and resume behind its latch.
+const INITIAL_AUTH_TIMEOUT_MS = 30_000;
+// How long a lifecycle resume joins a pre-socket token request instead of
+// starting its own. One resume can arrive from several triggers at once (a wake
+// reports both `online` and a visibility change), and superseding on each would
+// abandon every attempt before it resolves. Mirrors `REFRESH_JOIN_DEADLINE_MS`,
+// which the base connection applies to a post-open ticket refresh.
+const PRE_SOCKET_JOIN_WINDOW_MS = 15_000;
 const INITIAL_AUTH_RETRY_BASE_MS = 1_000;
 const INITIAL_AUTH_RETRY_CAP_MS = 30_000;
 export const VIEWER_PING_INTERVAL_MS = 20_000;
@@ -218,6 +229,11 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
   let pingInterval: ReturnType<typeof setInterval> | null = null;
   let pongTimeout: ReturnType<typeof setTimeout> | null = null;
   let initialAuthRetryTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Deadline on the in-flight pre-socket token request this generation owns.
+  let initialAuthTimeout: ReturnType<typeof setTimeout> | null = null;
+  // When that request was started, so a resume can tell a fresh one from a
+  // stuck one.
+  let initialAuthStartedAt = 0;
   // Consecutive pre-socket token fetches allowed before the wrapper publishes
   // exhaustion. Shares the socket reconnect cap so both transport retry series
   // stop at the same point and exhaustion means one thing to recovery UI.
@@ -298,13 +314,61 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     initialAuthRetryAttempt = 0;
   }
 
+  function clearInitialAuthTimeout(): void {
+    if (initialAuthTimeout !== null) {
+      clearTimeout(initialAuthTimeout);
+      initialAuthTimeout = null;
+    }
+  }
+
+  /**
+   * Give up the in-flight pre-socket token request, if this generation owns one,
+   * so the caller can start a fresh attempt. The generation bump makes a ticket
+   * that arrives later a no-op, which is what keeps a superseded `getAuthToken`
+   * from opening a socket over the attempt that replaced it. `getAuthToken`
+   * takes no abort signal, so the abandoned call still runs to completion and
+   * its result is dropped.
+   */
+  function supersedePendingTokenAttempt(): void {
+    if (!started && connectPromise === null) return;
+    clearInitialAuthTimeout();
+    connectPromise = null;
+    started = false;
+    generation += 1;
+  }
+
+  /**
+   * Publish one failed pre-socket token attempt: reject what waited on the open,
+   * report it, and either schedule the next bounded retry or publish the
+   * exhaustion edge. `retryGeneration` is the generation that retry belongs to.
+   * Callers have already cleared the single-flight latch.
+   */
+  function failAuthAttempt(retryGeneration: number): void {
+    rejectPending('Failed to get auth token');
+    config.onError?.('Failed to get auth token');
+    // Bound the series the same way the base connection bounds socket
+    // reconnects: once the cap is reached, publish the exhaustion edge so the
+    // recovery surface renders instead of retrying silently forever. The
+    // counter stays spent here; only `retryConnection()` or a lifecycle
+    // resume restarts the series, and both go through
+    // `restartPreSocketAttemptSeries`.
+    if (initialAuthRetryAttempt + 1 >= maxInitialAuthAttempts) {
+      exhaustionSignal.set(true);
+      return;
+    }
+    scheduleInitialAuthRetry(retryGeneration);
+  }
+
   /**
    * Restart the pre-socket attempt series: drop the pending retry timer and its
-   * spent budget, clear exhaustion, and ask for a token again.
+   * spent budget, drop any token request still in flight, clear exhaustion, and
+   * ask for a token again. A user retry or a lifecycle resume must never be
+   * parked behind a request that has not answered yet.
    */
   function restartPreSocketAttemptSeries(): void {
     clearInitialAuthRetry();
     exhaustionSignal.set(false);
+    supersedePendingTokenAttempt();
     startConnection(false);
   }
 
@@ -325,10 +389,18 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
   }
 
   function requestPreSocketRecovery(): void {
-    if (destroyed || !hasLifetime() || baseConnection || started || connectPromise) return;
+    if (destroyed || !hasLifetime() || baseConnection) return;
+    // One resume reports several triggers at once (a wake fires `online` and a
+    // visibility change). Joining a token request that is still young keeps one
+    // resume at one ticket; superseding on every trigger would abandon each
+    // attempt before any could resolve.
+    const joiningPendingToken =
+      connectPromise !== null && Date.now() - initialAuthStartedAt < PRE_SOCKET_JOIN_WINDOW_MS;
+    if (joiningPendingToken) return;
     // Mirrors the base connection's resume paths: a fresh network or visibility
     // signal restarts the attempt series and clears exhaustion before the probe,
     // so the surface reads "reconnecting" rather than terminal while it tries.
+    // Past the join window the request counts as stuck and is superseded.
     restartPreSocketAttemptSeries();
   }
 
@@ -594,19 +666,8 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     const rejectAuthFailure = (): void => {
       if (expectedGeneration !== generation) return;
       started = false;
-      rejectPending('Failed to get auth token');
-      config.onError?.('Failed to get auth token');
-      // Bound the series the same way the base connection bounds socket
-      // reconnects: once the cap is reached, publish the exhaustion edge so the
-      // recovery surface renders instead of retrying silently forever. The
-      // counter stays spent here; only `retryConnection()` or a lifecycle
-      // resume restarts the series, and both go through
-      // `restartPreSocketAttemptSeries`.
-      if (initialAuthRetryAttempt + 1 >= maxInitialAuthAttempts) {
-        exhaustionSignal.set(true);
-        return;
-      }
-      scheduleInitialAuthRetry(expectedGeneration);
+      connectPromise = null;
+      failAuthAttempt(expectedGeneration);
     };
 
     try {
@@ -617,8 +678,24 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
       }
 
       connectPromise = tokenResult.then(openWithToken, rejectAuthFailure).finally(() => {
-        if (expectedGeneration === generation) connectPromise = null;
+        if (expectedGeneration !== generation) return;
+        clearInitialAuthTimeout();
+        connectPromise = null;
       });
+      initialAuthStartedAt = Date.now();
+      initialAuthTimeout = setTimeout(() => {
+        initialAuthTimeout = null;
+        if (destroyed || expectedGeneration !== generation) return;
+        // The token call never answered. Abandon this attempt the way a
+        // superseded one is abandoned — the generation bump makes a ticket that
+        // arrives later a no-op — then route into the same bounded backoff or
+        // exhaustion path a rejected token takes, so the series keeps moving
+        // instead of parking every later retry and resume.
+        generation += 1;
+        started = false;
+        connectPromise = null;
+        failAuthAttempt(generation);
+      }, INITIAL_AUTH_TIMEOUT_MS);
     } catch {
       rejectAuthFailure();
     }
@@ -631,6 +708,7 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     currentWs = null;
     clearLiveness();
     clearInitialAuthRetry();
+    clearInitialAuthTimeout();
     removePreSocketLifecycleListeners();
     rejectPending(message);
     baseConnection?.destroy();
@@ -785,7 +863,9 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
       if (destroyed || !hasLifetime()) return;
       // No base connection yet means the failure was token acquisition, which
       // the wrapper owns: clear that state, restart the attempt budget, and ask
-      // for a token again so the user can recover after signing in again.
+      // for a token again so the user can recover after signing in again. An
+      // explicit retry supersedes a token request that is still in flight,
+      // because the user is asking for a fresh attempt now.
       restartPreSocketAttemptSeries();
     },
     subscribeToCliSession(sessionId) {

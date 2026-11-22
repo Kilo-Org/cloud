@@ -410,9 +410,12 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
               value={draft.modelSlug}
               onValueChange={modelSlug =>
                 setDraft(current => {
-                  // Switching model can drop the chosen reasoning level; the
-                  // user's own change carries the normalization so Save never
-                  // posts a pair the model does not offer.
+                  // Picking the model that is already selected is not a change:
+                  // a stored reasoning level the model does not list stays until
+                  // the user resets it. Switching model can drop it, and that
+                  // normalization rides the user's own edit so Save never posts
+                  // a pair the model does not offer.
+                  if (modelSlug === current.modelSlug) return current;
                   const variants =
                     modelOptions.find(model => model.id === modelSlug)?.variants ?? [];
                   return {

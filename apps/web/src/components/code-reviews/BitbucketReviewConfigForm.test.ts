@@ -732,6 +732,27 @@ describe('BitbucketReviewConfigForm', () => {
     );
   });
 
+  it('keeps an unavailable reasoning level when the current model is picked again', async () => {
+    await render({
+      config: {
+        selectedRepositoryIds: [LISTED_REPOSITORY_ID],
+        thinkingEffort: 'low',
+      },
+      modelOptions: [{ id: DEFAULT_MODEL_SLUG, name: 'Claude Sonnet 4', variants: ['high'] }],
+    });
+    expect(statusText()).toBe('All changes saved');
+
+    await click(modelButton(DEFAULT_MODEL_SLUG));
+    await flush();
+
+    expect(statusText()).toBe('All changes saved');
+    expect(thinkingEffortOptions()).toEqual([
+      { value: '__default__', label: 'Default', disabled: false },
+      { value: 'high', label: 'High', disabled: false },
+      { value: 'low', label: 'Low (unavailable)', disabled: true },
+    ]);
+  });
+
   it('names the removal action when only stale repositories remain selected', async () => {
     await render({
       config: { selectedRepositoryIds: [UNAVAILABLE_REPOSITORY_ID] },

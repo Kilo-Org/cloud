@@ -1981,6 +1981,64 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     expect(labels).toEqual(['Retry review']);
   });
 
+  it('explains why the settings must change under a generic cancellation', () => {
+    // "This review was cancelled." names no next step of its own, so the card
+    // owns the sentence that says why the action below links to the settings.
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        manual_config: null,
+        error_message: 'Cancelled by user',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    const sentence = i18n.t('codeReviewer.reviewDetail.cancelReasonCancelled');
+    expect(texts).toContain(sentence);
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'));
+    expect(stateActions.rendered.map(action => action.label)).toEqual(['Fix settings']);
+    expect(texts.filter(text => text === 'Fix settings')).toHaveLength(1);
+    // The explanation sits between the sentence it qualifies and the action it
+    // describes, and both stay inside the conclusion block.
+    expect(texts.indexOf(sentence)).toBeLessThan(
+      texts.indexOf(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'))
+    );
+    expect(texts.indexOf(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'))).toBeLessThan(
+      texts.indexOf('Fix settings')
+    );
+  });
+
+  it('keeps the settings line out of a cancellation that states its own step', () => {
+    // "Reconnect it, then re-run the review." already says what to do, so a
+    // second instruction under it would repeat the sentence above.
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        manual_config: null,
+        error_message: 'Platform integration disconnected',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
+        platform: 'GitHub',
+      })
+    );
+    expect(stateActions.rendered.map(action => action.label)).toEqual(['Fix settings']);
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'));
+  });
+
   it('shows neither control while the config loads', () => {
     reviewConfig.query = { isPending: true, data: undefined };
 

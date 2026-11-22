@@ -15,7 +15,7 @@ import { statusMeta } from '@/components/code-reviewer/review-list-rows';
 import {
   findingsEmptyCopyKey,
   flattenCouncilFindings,
-  reviewCancellationLabel,
+  reviewCancellationCopy,
   reviewFailureCopy,
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
@@ -241,24 +241,26 @@ export function ReviewDetailScreen({
   )?.agentConfig?.gate_threshold;
   // A cancelled or interrupted row explains its outcome in the reader's own
   // words; only a failure or an unmapped diagnostic keeps the raw message.
-  const cancellationLabel = reviewCancellationLabel(t, {
+  const cancellationCopy = reviewCancellationCopy(t, {
     status: review.status,
     errorMessage: review.error_message,
     terminalReason: review.terminal_reason,
     platformLabel: reviewerPlatformLabel(review.platform),
   });
+  const cancellationLabel = cancellationCopy?.message;
   // The single message the conclusion block renders: the cancellation sentence,
   // the failure copy, or a diagnostic we have no copy for. `namesRecovery` says
   // whether that sentence already ends with its own next step, so the card never
-  // prints a second instruction under it. A cancellation keeps its own sentence,
-  // which already states what happens next; a raw diagnostic and a missing
-  // sentence name nothing, so they get the caller's own line.
+  // prints a second instruction under it. Only the sentences that carry their own
+  // instruction set it; a raw diagnostic and a missing sentence name nothing, so
+  // they get the caller's own line.
   const failureCopy =
     review.status === 'failed'
       ? reviewFailureCopy(t, review.error_message, review.terminal_reason)
       : undefined;
   const reviewMessage = cancellationLabel ?? failureCopy?.message ?? review.error_message;
-  const messageNamesRecovery = cancellationLabel != null || failureCopy?.namesRecovery === true;
+  const messageNamesRecovery =
+    cancellationCopy?.namesRecovery === true || failureCopy?.namesRecovery === true;
 
   return (
     <View className="flex-1 bg-background">

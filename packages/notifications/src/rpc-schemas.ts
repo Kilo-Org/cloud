@@ -334,31 +334,32 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   payloadFreeOutcome('duplicate'),
   z.object({ kind: z.literal('failed'), error: z.string() }),
 ]);
-type DispatchPushOutcomeRaw = z.infer<typeof dispatchPushOutcomeSchema>;
+export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
 
 /**
  * The dispatch outcome's discriminator set is the shared delivery vocabulary
  * plus `delivered`, and nothing else. The builder above catches a reason
  * renamed in the tuples; this catches one dropped from or added to the union,
  * so the hand-written member list above cannot drift from that vocabulary.
- * The assertion stays module-local and selects `DispatchPushOutcome` below, so
- * it is used without reaching the published schema entry.
+ *
+ * The check is an ambient declaration, so it compiles away: it emits no
+ * runtime value and adds nothing to the exported type. It stays module-local,
+ * so it never reaches the published schema entry, and it is still "used" for
+ * `noUnusedLocals` in the project that typechecks this file from outside the
+ * package.
  */
 type SameUnion<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type AssertTrue<T extends true> = T;
-type DispatchPushOutcomeVocabularyMatches = AssertTrue<
+declare const _dispatchPushOutcomeVocabularyChecked: AssertTrue<
   SameUnion<
-    DispatchPushOutcomeRaw['kind'],
+    DispatchPushOutcome['kind'],
     | 'delivered'
     | DeliveryOutcomeReason
     | ChannelDeliveryOutcomeReason
     | typeof RATE_LIMIT_SUPPRESSED_REASON
   >
 >;
-export type DispatchPushOutcome = DispatchPushOutcomeVocabularyMatches extends true
-  ? DispatchPushOutcomeRaw
-  : never;
 
 // ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
 

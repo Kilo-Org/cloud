@@ -1610,6 +1610,85 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expectRedirectLocation(response, `/integrations/github?error=installation_unavailable`);
   });
 
+  test('redirects with installation_unavailable for a suspended installation and writes nothing', async () => {
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => ({
+              data: {
+                account: { id: 12_345, login: 'securexg' },
+                created_at: '2026-07-09T19:00:00.000Z',
+                events: ['issues'],
+                permissions: { contents: 'write' },
+                repository_selection: 'all',
+                suspended_at: '2026-11-20T08:00:00.000Z',
+                suspended_by: { login: 'octocat' },
+              },
+            })),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_unavailable`);
+    expect(mockedConnectVerifiedGitHubInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedObserveGitHubInstallationLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('redirects with installation_unavailable for a suspended installation when the connection is app-initiated', async () => {
+    mockConsumedInstallState({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => ({
+              data: {
+                account: { id: 12_345, login: 'securexg' },
+                created_at: '2026-07-09T19:00:00.000Z',
+                events: ['issues'],
+                permissions: { contents: 'write' },
+                repository_selection: 'all',
+                suspended_at: '2026-11-20T08:00:00.000Z',
+                suspended_by: { login: 'octocat' },
+              },
+            })),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&error=installation_unavailable');
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+  });
+
   test('rejects an install when admin check returns false', async () => {
     mockedAssertUserAdministersInstallation.mockResolvedValue(false);
 

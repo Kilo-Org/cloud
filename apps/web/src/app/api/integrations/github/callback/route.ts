@@ -684,6 +684,29 @@ async function handleCoreInstallFlow(params: {
     throw error;
   }
 
+  // A suspended installation reaches no repository, so this request records
+  // nothing: it answers with the unavailable-installation outcome, and the
+  // recorded state stays as the provider's own webhooks wrote it until GitHub
+  // reports the installation active again.
+  if (
+    (setupAction === 'install' || setupAction === 'update') &&
+    installation.suspended_at != null
+  ) {
+    captureMessage('GitHub callback for a suspended installation', {
+      level: 'warning',
+      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
+      extra: { installationId, suspendedAt: installation.suspended_at },
+    });
+    if (isAppInitiated) {
+      return NextResponse.redirect(
+        new URL(appFallbackPath('error=installation_unavailable'), APP_URL)
+      );
+    }
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, 'error=installation_unavailable'), APP_URL)
+    );
+  }
+
   // Get selected repositories
   let repositories: PlatformRepository[] | null = null;
   if (installation.repository_selection === 'selected') {

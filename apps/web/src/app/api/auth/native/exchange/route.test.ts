@@ -123,6 +123,17 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
+  it('lets a limiter failure surface instead of reading a credential', async () => {
+    mockAddressRateLimited.mockRejectedValue(new Error('firewall transport failed'));
+
+    await expect(POST(createRequest(bearerHeaders))).rejects.toThrow('firewall transport failed');
+
+    expect(mockRequireAdmissionPayload).not.toHaveBeenCalled();
+    expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    expect(mockGetUserFromBearer).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
+  });
+
   it('refuses a request with no proof before reading any credential', async () => {
     mockRequireAdmissionPayload.mockReturnValue(undefined);
 

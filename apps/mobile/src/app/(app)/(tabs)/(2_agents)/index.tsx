@@ -96,12 +96,12 @@ export function buildGitHubInstallOutcomeAlert(
         };
       }
       // An existing installation holds the organization's slot, so a retry from
-      // the app is refused by the same rule; the remedy is on the web
-      // organization page.
+      // the app is refused by the same rule; the copy names the removal on the
+      // web organization page instead of offering that retry.
       if (result.code === 'github_installation_blocked') {
         return {
           title: i18n.t('agents.githubInstall.cannotCompleteTitle'),
-          message: i18n.t('agents.githubInstall.multipleInstallationsMessage'),
+          message: i18n.t('agents.githubInstall.blockedByExistingInstallationMessage'),
           buttons: [{ text: i18n.t('common.back') }],
         };
       }

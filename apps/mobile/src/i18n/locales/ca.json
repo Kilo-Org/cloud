@@ -2264,6 +2264,7 @@
       "alreadyClaimedMessage": "Aquesta instal·lació de GitHub ja està connectada a un altre compte de Kilo. Primer desconnecta-la allà.",
       "installationUnavailableMessage": "Aquesta instal·lació de l'aplicació de GitHub està suspesa o ja no està disponible. Restaura-la o torna-la a instal·lar a GitHub i, després, torna-ho a provar.",
       "multipleInstallationsMessage": "Aquesta organització de Kilo actualment només pot connectar una organització de GitHub.",
+      "blockedByExistingInstallationMessage": "Aquesta organització ja té la seva instal·lació de GitHub. A la pàgina de l'organització al web, elimina aquesta instal·lació i després torna a iniciar la connexió.",
       "didNotCompleteTitle": "La instal·lació no s'ha completat",
       "didNotCompleteMessage": "La instal·lació de l'aplicació de GitHub no s'ha completat. Torna-ho a provar des de l'aplicació."
     },

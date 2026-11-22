@@ -2215,6 +2215,7 @@
       "alreadyClaimedMessage": "Ai instalim i GitHub tashmë është i lidhur me një llogari tjetër Kilo. Shkëpute atje më parë.",
       "installationUnavailableMessage": "Ky instalim i GitHub App është pezulluar ose nuk është më i disponueshëm. Rivendose ose riinstaloje atë në GitHub, pastaj fillo përsëri.",
       "multipleInstallationsMessage": "Kjo organizatë Kilo mund të lidhë aktualisht vetëm një organizatë GitHub.",
+      "blockedByExistingInstallationMessage": "Kjo organizatë tashmë e ka instalimin e saj të GitHub. Në faqen e organizatës në ueb, hiqe atë instalim dhe pastaj nise përsëri lidhjen.",
       "didNotCompleteTitle": "Instalimi nuk u përfundua",
       "didNotCompleteMessage": "Instalimi i aplikacionit GitHub nuk përfundoi. Provo përsëri nga aplikacioni."
     },

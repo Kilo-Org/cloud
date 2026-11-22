@@ -2215,6 +2215,7 @@
       "alreadyClaimedMessage": "ການຕິດຕັ້ງ GitHub ນັ້ນເຊື່ອມຕໍ່ກັບບັນຊີ Kilo ອື່ນແລ້ວ. ຕັດການເຊື່ອມຕໍ່ຈາກບັນຊີນັ້ນກ່ອນ.",
       "installationUnavailableMessage": "ການຕິດຕັ້ງ GitHub App ນີ້ຖືກໂຈະ ຫຼື ບໍ່ມີໃຫ້ໃຊ້ອີກແລ້ວ. ກູ້ຄືນ ຫຼື ຕິດຕັ້ງຄືນໃໝ່ໃນ GitHub ແລ້ວເລີ່ມອີກຄັ້ງ.",
       "multipleInstallationsMessage": "ອົງກອນ Kilo ນີ້ສາມາດເຊື່ອມຕໍ່ກັບອົງກອນ GitHub ໄດ້ພຽງແຕ່ໜຶ່ງອົງກອນເທົ່ານັ້ນໃນປັດຈຸບັນ.",
+      "blockedByExistingInstallationMessage": "ອົງກອນນີ້ມີການຕິດຕັ້ງ GitHub ຂອງຕົນຢູ່ແລ້ວ. ໃນໜ້າອົງກອນໃນເວັບ ໃຫ້ລຶບການຕິດຕັ້ງນັ້ນອອກ ແລ້ວເລີ່ມການເຊື່ອມຕໍ່ອີກຄັ້ງ.",
       "didNotCompleteTitle": "ການຕິດຕັ້ງບໍ່ສຳເລັດ",
       "didNotCompleteMessage": "ການຕິດຕັ້ງແອັບ GitHub ຍັງບໍ່ສຳເລັດ. ລອງອີກຄັ້ງຈາກແອັບ."
     },

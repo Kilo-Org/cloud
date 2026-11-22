@@ -2215,6 +2215,7 @@
       "alreadyClaimedMessage": "Pemasangan GitHub itu sudah disambungkan ke akaun Kilo lain. Putuskan sambungannya di sana dahulu.",
       "installationUnavailableMessage": "Pemasangan GitHub App ini digantung atau tidak lagi tersedia. Pulihkan atau pasang semula di GitHub, kemudian mulakan semula.",
       "multipleInstallationsMessage": "Organisasi Kilo ini pada masa ini hanya boleh menyambungkan satu organisasi GitHub.",
+      "blockedByExistingInstallationMessage": "Organisasi ini sudah mempunyai pemasangan GitHub. Di halaman organisasi di web, alih keluar pemasangan itu, kemudian mulakan semula sambungan.",
       "didNotCompleteTitle": "Pemasangan tidak selesai",
       "didNotCompleteMessage": "Pemasangan apl GitHub tidak selesai. Cuba lagi daripada apl."
     },

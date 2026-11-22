@@ -2215,6 +2215,7 @@
       "alreadyClaimedMessage": "GitHub-ის ეს დაყენებული აპი უკვე სხვა Kilo ანგარიშთან არის დაკავშირებული. ჯერ იმ ანგარიშიდან გათიშე.",
       "installationUnavailableMessage": "GitHub App-ის ეს დაყენება შეჩერებულია ან აღარ არის ხელმისაწვდომი. აღადგინე ან ხელახლა დააყენე ის GitHub-ში, შემდეგ თავიდან დაიწყე.",
       "multipleInstallationsMessage": "ამ Kilo ორგანიზაციას ამჟამად მხოლოდ ერთი GitHub ორგანიზაციის დაკავშირება შეუძლია.",
+      "blockedByExistingInstallationMessage": "ამ ორგანიზაციას უკვე აქვს თავისი GitHub-ის დაყენება. ვებში ორგანიზაციის გვერდზე ამოიღე ეს დაყენება და შემდეგ თავიდან დაიწყე დაკავშირება.",
       "didNotCompleteTitle": "დაყენება არ დასრულდა",
       "didNotCompleteMessage": "GitHub აპის დაყენება არ დასრულდა. აპიდან ხელახლა სცადე."
     },

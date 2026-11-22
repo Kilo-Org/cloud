@@ -2307,6 +2307,7 @@
       "alreadyClaimedMessage": "That GitHub installation is already connected to another Kilo account. Disconnect it there first.",
       "installationUnavailableMessage": "This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.",
       "multipleInstallationsMessage": "This Kilo organization can currently connect only one GitHub organization.",
+      "blockedByExistingInstallationMessage": "This organization already holds its GitHub installation. On the web organization page, remove that installation, then start the connection again.",
       "didNotCompleteTitle": "Installation did not complete",
       "didNotCompleteMessage": "The GitHub App installation was not completed. Try again from the app."
     },

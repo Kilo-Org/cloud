@@ -2215,6 +2215,7 @@
       "alreadyClaimedMessage": "ते GitHub इन्स्टॉलेशन आधीच दुसऱ्या Kilo खात्याशी कनेक्ट आहे. आधी त्या खात्यातून ते डिस्कनेक्ट करा.",
       "installationUnavailableMessage": "हे GitHub App इन्स्टॉलेशन निलंबित आहे किंवा आता उपलब्ध नाही. ते GitHub मध्ये पुनर्संचयित करा किंवा पुन्हा इन्स्टॉल करा, त्यानंतर पुन्हा सुरू करा.",
       "multipleInstallationsMessage": "ही Kilo संस्था सध्या फक्त एका GitHub संस्थेशी कनेक्ट होऊ शकते.",
+      "blockedByExistingInstallationMessage": "या संस्थेकडे आधीच तिचे GitHub इन्स्टॉलेशन आहे. वेबवरील संस्था पृष्ठावर ते इन्स्टॉलेशन काढून टाका, त्यानंतर कनेक्शन पुन्हा सुरू करा.",
       "didNotCompleteTitle": "इन्स्टॉलेशन पूर्ण झाले नाही",
       "didNotCompleteMessage": "GitHub अॅपचे इन्स्टॉलेशन पूर्ण झाले नाही. अॅपमधून पुन्हा प्रयत्न करा."
     },

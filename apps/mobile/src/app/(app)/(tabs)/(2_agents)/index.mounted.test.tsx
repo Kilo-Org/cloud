@@ -264,7 +264,8 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
       )
     ).toEqual({
       title: 'Cannot complete installation',
-      message: 'This Kilo organization can currently connect only one GitHub organization.',
+      message:
+        'This organization already holds its GitHub installation. On the web organization page, remove that installation, then start the connection again.',
       buttons: [{ text: 'Back' }],
     });
   });

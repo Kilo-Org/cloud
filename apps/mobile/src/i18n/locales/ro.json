@@ -2264,6 +2264,7 @@
       "alreadyClaimedMessage": "Acea instalare GitHub este deja conectată la un alt cont Kilo. Deconecteaz-o mai întâi acolo.",
       "installationUnavailableMessage": "Această instalare GitHub App este suspendată sau nu mai este disponibilă. Restaureaz-o sau reinstaleaz-o în GitHub, apoi începe din nou.",
       "multipleInstallationsMessage": "Această organizație Kilo se poate conecta momentan doar la o singură organizație GitHub.",
+      "blockedByExistingInstallationMessage": "Această organizație are deja instalarea sa GitHub. Pe pagina organizației pe web, elimină acea instalare, apoi începe din nou conectarea.",
       "didNotCompleteTitle": "Instalarea nu s-a finalizat",
       "didNotCompleteMessage": "Instalarea aplicației pentru GitHub nu a fost finalizată. Încearcă din nou din aplicație."
     },

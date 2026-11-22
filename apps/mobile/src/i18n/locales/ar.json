@@ -543,7 +543,17 @@
       "nextStepInReview": "ستظهر النتيجة على هذه الشاشة، ويمكنك تقديم الطعن بعد صدور القرار.",
       "nextStepAppeal": "ستظهر نتيجة الطعن على هذه الشاشة.",
       "nextStepFinal": "قرار الطعن نهائي. لا يمكن تقديم طعن آخر.",
-      "viewReceipt": "عرض الإيصال"
+      "viewReceipt": "عرض الإيصال",
+      "targetLabel": "العنصر المُبلَّغ عنه",
+      "reasonLabel": "سبب البلاغ",
+      "targetMessage": "رد الذكاء الاصطناعي",
+      "targetComment": "تعليق طلب السحب",
+      "targetUser": "المستخدم",
+      "reasonHarmful": "محتوى ضار",
+      "reasonIllegal": "محتوى غير قانوني",
+      "reasonHarassment": "مضايقة",
+      "reasonSpam": "رسائل مزعجة",
+      "reasonOther": "سبب آخر"
     },
     "reportReceipts": {
       "title": "البلاغات",

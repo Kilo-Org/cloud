@@ -539,7 +539,17 @@
       "nextStepInReview": "结果将显示在此页面，作出决定后你可以提出申诉。",
       "nextStepAppeal": "申诉结果将显示在此页面。",
       "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
-      "viewReceipt": "查看回执"
+      "viewReceipt": "查看回执",
+      "targetLabel": "举报对象",
+      "reasonLabel": "举报原因",
+      "targetMessage": "AI 回复",
+      "targetComment": "PR 评论",
+      "targetUser": "用户",
+      "reasonHarmful": "有害内容",
+      "reasonIllegal": "违法内容",
+      "reasonHarassment": "骚扰",
+      "reasonSpam": "垃圾信息",
+      "reasonOther": "其他原因"
     },
     "reportReceipts": {
       "title": "举报记录",

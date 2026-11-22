@@ -539,7 +539,17 @@
       "nextStepInReview": "結果はこの画面に表示され、決定後は異議を申し立てられます。",
       "nextStepAppeal": "異議申し立ての結果はこの画面に表示されます。",
       "nextStepFinal": "異議申し立ての決定は確定しました。これ以上異議を申し立てることはできません。",
-      "viewReceipt": "受付確認を表示"
+      "viewReceipt": "受付確認を表示",
+      "targetLabel": "通報対象",
+      "reasonLabel": "通報理由",
+      "targetMessage": "AIの応答",
+      "targetComment": "プルリクエストのコメント",
+      "targetUser": "ユーザー",
+      "reasonHarmful": "有害なコンテンツ",
+      "reasonIllegal": "違法なコンテンツ",
+      "reasonHarassment": "ハラスメント",
+      "reasonSpam": "スパム",
+      "reasonOther": "その他の理由"
     },
     "reportReceipts": {
       "title": "通報一覧",

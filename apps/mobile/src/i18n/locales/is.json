@@ -539,7 +539,17 @@
       "nextStepInReview": "Niðurstaðan birtist á þessum skjá og þú getur áfrýjað eftir ákvörðun.",
       "nextStepAppeal": "Niðurstaða áfrýjunarinnar birtist á þessum skjá.",
       "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
-      "viewReceipt": "Skoða kvittun"
+      "viewReceipt": "Skoða kvittun",
+      "targetLabel": "Tilkynnt atriði",
+      "reasonLabel": "Ástæða tilkynningar",
+      "targetMessage": "Svar gervigreindar",
+      "targetComment": "Athugasemd í sameiningarbeiðni",
+      "targetUser": "Notandi",
+      "reasonHarmful": "Skaðlegt efni",
+      "reasonIllegal": "Ólöglegt efni",
+      "reasonHarassment": "Áreitni",
+      "reasonSpam": "Ruslpóstur",
+      "reasonOther": "Önnur ástæða"
     },
     "reportReceipts": {
       "title": "Tilkynningar",

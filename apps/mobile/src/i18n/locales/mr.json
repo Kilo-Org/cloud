@@ -539,7 +539,17 @@
       "nextStepInReview": "या तक्रारीचा निर्णय या स्क्रीनवर दिसेल आणि निर्णयानंतर तुम्ही अपील करू शकता.",
       "nextStepAppeal": "अपीलचा निर्णय या स्क्रीनवर दिसेल.",
       "nextStepFinal": "अपीलचा निर्णय अंतिम आहे. आता पुढील अपील दाखल करता येणार नाही.",
-      "viewReceipt": "पावती पहा"
+      "viewReceipt": "पावती पहा",
+      "targetLabel": "तक्रार केलेली बाब",
+      "reasonLabel": "तक्रारीचे कारण",
+      "targetMessage": "कृत्रिम बुद्धिमत्तेचे उत्तर",
+      "targetComment": "पुल रिक्वेस्टमधील टिप्पणी",
+      "targetUser": "व्यक्ती",
+      "reasonHarmful": "हानिकारक सामग्री",
+      "reasonIllegal": "बेकायदेशीर सामग्री",
+      "reasonHarassment": "छळवणूक",
+      "reasonSpam": "अवांछित जाहिरात",
+      "reasonOther": "इतर कारण"
     },
     "reportReceipts": {
       "title": "तक्रारी",

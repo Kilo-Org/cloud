@@ -540,7 +540,17 @@
       "nextStepInReview": "Rezultatul va apărea pe acest ecran, iar după decizie poți trimite o contestație.",
       "nextStepAppeal": "Rezultatul contestației va apărea pe acest ecran.",
       "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
-      "viewReceipt": "Vezi confirmarea"
+      "viewReceipt": "Vezi confirmarea",
+      "targetLabel": "Element raportat",
+      "reasonLabel": "Motivul raportării",
+      "targetMessage": "Răspuns AI",
+      "targetComment": "Comentariu PR",
+      "targetUser": "Utilizator",
+      "reasonHarmful": "Conținut dăunător",
+      "reasonIllegal": "Conținut ilegal",
+      "reasonHarassment": "Hărțuire",
+      "reasonSpam": "Mesaje nesolicitate",
+      "reasonOther": "Alt motiv"
     },
     "reportReceipts": {
       "title": "Raportări",

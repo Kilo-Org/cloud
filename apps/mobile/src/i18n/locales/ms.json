@@ -539,7 +539,17 @@
       "nextStepInReview": "Hasil semakan akan dipaparkan pada skrin ini, dan anda boleh merayu selepas keputusan dibuat.",
       "nextStepAppeal": "Hasil rayuan akan dipaparkan pada skrin ini.",
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
-      "viewReceipt": "Lihat resit"
+      "viewReceipt": "Lihat resit",
+      "targetLabel": "Perkara dilaporkan",
+      "reasonLabel": "Sebab laporan",
+      "targetMessage": "Balasan AI",
+      "targetComment": "Komen permintaan tarik",
+      "targetUser": "Pengguna",
+      "reasonHarmful": "Kandungan berbahaya",
+      "reasonIllegal": "Kandungan menyalahi undang-undang",
+      "reasonHarassment": "Gangguan",
+      "reasonSpam": "Iklan tidak diingini",
+      "reasonOther": "Sebab lain"
     },
     "reportReceipts": {
       "title": "Laporan",

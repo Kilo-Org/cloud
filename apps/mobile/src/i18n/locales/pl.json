@@ -541,7 +541,17 @@
       "nextStepInReview": "Wynik pojawi się na tym ekranie, a od decyzji można się odwołać.",
       "nextStepAppeal": "Wynik odwołania pojawi się na tym ekranie.",
       "nextStepFinal": "Decyzja w sprawie odwołania jest ostateczna. Nie można złożyć kolejnego odwołania.",
-      "viewReceipt": "Wyświetl potwierdzenie"
+      "viewReceipt": "Wyświetl potwierdzenie",
+      "targetLabel": "Zgłoszony element",
+      "reasonLabel": "Powód zgłoszenia",
+      "targetMessage": "Odpowiedź AI",
+      "targetComment": "Komentarz w PR",
+      "targetUser": "Użytkownik",
+      "reasonHarmful": "Szkodliwe treści",
+      "reasonIllegal": "Nielegalne treści",
+      "reasonHarassment": "Nękanie",
+      "reasonSpam": "Niechciane reklamy",
+      "reasonOther": "Inny powód"
     },
     "reportReceipts": {
       "title": "Zgłoszenia",

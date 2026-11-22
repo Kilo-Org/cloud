@@ -539,7 +539,17 @@
       "nextStepInReview": "Sonuç bu ekranda görünecek ve karar verildikten sonra itiraz edebilirsiniz.",
       "nextStepAppeal": "İtiraz sonucu bu ekranda görünecek.",
       "nextStepFinal": "İtiraz kararı kesindir. Başka itiraz gönderilemez.",
-      "viewReceipt": "Alındıyı görüntüle"
+      "viewReceipt": "Alındıyı görüntüle",
+      "targetLabel": "Bildirilen öğe",
+      "reasonLabel": "Bildirim nedeni",
+      "targetMessage": "Yapay zeka yanıtı",
+      "targetComment": "Çekme isteği yorumu",
+      "targetUser": "Kullanıcı",
+      "reasonHarmful": "Zararlı içerik",
+      "reasonIllegal": "Yasa dışı içerik",
+      "reasonHarassment": "Taciz",
+      "reasonSpam": "İstenmeyen içerik",
+      "reasonOther": "Diğer neden"
     },
     "reportReceipts": {
       "title": "Raporlar",

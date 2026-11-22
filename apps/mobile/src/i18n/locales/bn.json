@@ -539,7 +539,17 @@
       "nextStepInReview": "ফলাফল এই স্ক্রিনে দেখা যাবে, এবং সিদ্ধান্তের পর আপনি আপিল করতে পারবেন।",
       "nextStepAppeal": "আপনার আপিলের ফলাফল এই স্ক্রিনে দেখা যাবে।",
       "nextStepFinal": "আপিলের সিদ্ধান্ত চূড়ান্ত। আর কোনো আপিল করা যাবে না।",
-      "viewReceipt": "রসিদ দেখুন"
+      "viewReceipt": "রসিদ দেখুন",
+      "targetLabel": "রিপোর্ট করা আইটেম",
+      "reasonLabel": "রিপোর্টের কারণ",
+      "targetMessage": "AI-এর উত্তর",
+      "targetComment": "পুল রিকোয়েস্টের মন্তব্য",
+      "targetUser": "ব্যবহারকারী",
+      "reasonHarmful": "ক্ষতিকর কনটেন্ট",
+      "reasonIllegal": "অবৈধ কনটেন্ট",
+      "reasonHarassment": "হয়রানি",
+      "reasonSpam": "স্প্যাম",
+      "reasonOther": "অন্য কারণ"
     },
     "reportReceipts": {
       "title": "রিপোর্ট",

@@ -540,7 +540,17 @@
       "nextStepInReview": "Rezultāts parādīsies šajā ekrānā, un pēc lēmuma varēsiet iesniegt pārsūdzību.",
       "nextStepAppeal": "Pārsūdzības rezultāts parādīsies šajā ekrānā.",
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
-      "viewReceipt": "Skatīt apstiprinājumu"
+      "viewReceipt": "Skatīt apstiprinājumu",
+      "targetLabel": "Ziņotā vienība",
+      "reasonLabel": "Ziņojuma iemesls",
+      "targetMessage": "AI atbilde",
+      "targetComment": "Izmaiņu pieprasījuma komentārs",
+      "targetUser": "Lietotājs",
+      "reasonHarmful": "Kaitīgs saturs",
+      "reasonIllegal": "Nelikumīgs saturs",
+      "reasonHarassment": "Uzmākšanās",
+      "reasonSpam": "Mēstules",
+      "reasonOther": "Cits iemesls"
     },
     "reportReceipts": {
       "title": "Ziņojumi",

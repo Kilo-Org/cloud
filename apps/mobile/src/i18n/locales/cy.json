@@ -543,7 +543,17 @@
       "nextStepInReview": "Bydd y canlyniad yn ymddangos ar y sgrin hon, ac fe allwch apelio ar ôl penderfyniad.",
       "nextStepAppeal": "Bydd canlyniad eich apêl yn ymddangos ar y sgrin hon.",
       "nextStepFinal": "Mae penderfyniad yr apêl yn derfynol. Ni ellir cyflwyno apêl bellach.",
-      "viewReceipt": "Gweld y dderbynneb"
+      "viewReceipt": "Gweld y dderbynneb",
+      "targetLabel": "Eitem a adroddir",
+      "reasonLabel": "Rheswm yr adroddiad",
+      "targetMessage": "Ymateb AI",
+      "targetComment": "Sylw cais tynnu",
+      "targetUser": "Defnyddiwr",
+      "reasonHarmful": "Cynnwys niweidiol",
+      "reasonIllegal": "Cynnwys anghyfreithlon",
+      "reasonHarassment": "Aflonyddu",
+      "reasonSpam": "Sbam",
+      "reasonOther": "Rheswm arall"
     },
     "reportReceipts": {
       "title": "Adroddiadau",

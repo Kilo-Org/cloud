@@ -539,7 +539,17 @@
       "nextStepInReview": "Tulemus kuvatakse sellel ekraanil ja pärast otsust saab vaidlustuse esitada.",
       "nextStepAppeal": "Vaidlustuse tulemus kuvatakse sellel ekraanil.",
       "nextStepFinal": "Vaidlustuse otsus on lõplik. Edasist vaidlustust esitada ei saa.",
-      "viewReceipt": "Vaata kinnitust"
+      "viewReceipt": "Vaata kinnitust",
+      "targetLabel": "Teatatud objekt",
+      "reasonLabel": "Teatamise põhjus",
+      "targetMessage": "AI vastus",
+      "targetComment": "Tõmbetaotluse kommentaar",
+      "targetUser": "Kasutaja",
+      "reasonHarmful": "Kahjulik sisu",
+      "reasonIllegal": "Ebaseaduslik sisu",
+      "reasonHarassment": "Ahistamine",
+      "reasonSpam": "Rämpspost",
+      "reasonOther": "Muu põhjus"
     },
     "reportReceipts": {
       "title": "Teated",

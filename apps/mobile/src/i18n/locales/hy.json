@@ -539,7 +539,17 @@
       "nextStepInReview": "Արդյունքը կհայտնվի այս էկրանին, և որոշումից հետո կկարողանաք բողոքարկել։",
       "nextStepAppeal": "Բողոքարկման արդյունքը կհայտնվի այս էկրանին։",
       "nextStepFinal": "Բողոքարկման որոշումը վերջնական է։ Լրացուցիչ բողոքարկում հնարավոր չէ ներկայացնել։",
-      "viewReceipt": "Դիտել անդորրագիրը"
+      "viewReceipt": "Դիտել անդորրագիրը",
+      "targetLabel": "Հաղորդված տարր",
+      "reasonLabel": "Հաղորդման պատճառ",
+      "targetMessage": "ԱԲ պատասխան",
+      "targetComment": "PR-ի մեկնաբանություն",
+      "targetUser": "Օգտատեր",
+      "reasonHarmful": "Վնասակար բովանդակություն",
+      "reasonIllegal": "Ապօրինի բովանդակություն",
+      "reasonHarassment": "Ոտնձգություն",
+      "reasonSpam": "Սպամ",
+      "reasonOther": "Այլ պատճառ"
     },
     "reportReceipts": {
       "title": "Հաղորդումներ",

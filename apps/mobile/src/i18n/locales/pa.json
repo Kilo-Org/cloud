@@ -539,7 +539,17 @@
       "nextStepInReview": "ਨਤੀਜਾ ਇਸ ਸਕ੍ਰੀਨ ਉੱਤੇ ਦਿਖੇਗਾ, ਅਤੇ ਫ਼ੈਸਲੇ ਤੋਂ ਬਾਅਦ ਤੁਸੀਂ ਅਪੀਲ ਕਰ ਸਕਦੇ ਹੋ।",
       "nextStepAppeal": "ਅਪੀਲ ਦਾ ਨਤੀਜਾ ਇਸ ਸਕ੍ਰੀਨ ਉੱਤੇ ਦਿਖੇਗਾ।",
       "nextStepFinal": "ਅਪੀਲ ਦਾ ਫ਼ੈਸਲਾ ਅੰਤਿਮ ਹੈ। ਹੋਰ ਅਪੀਲ ਦਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
-      "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
+      "viewReceipt": "ਰਸੀਦ ਦੇਖੋ",
+      "targetLabel": "ਰਿਪੋਰਟ ਕੀਤੀ ਚੀਜ਼",
+      "reasonLabel": "ਰਿਪੋਰਟ ਦਾ ਕਾਰਨ",
+      "targetMessage": "AI ਦਾ ਜਵਾਬ",
+      "targetComment": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਟਿੱਪਣੀ",
+      "targetUser": "ਵਰਤੋਂਕਾਰ",
+      "reasonHarmful": "ਨੁਕਸਾਨਦਾਇਕ ਸਮੱਗਰੀ",
+      "reasonIllegal": "ਗੈਰ-ਕਾਨੂੰਨੀ ਸਮੱਗਰੀ",
+      "reasonHarassment": "ਛੇੜਛਾੜ",
+      "reasonSpam": "ਅਣਚਾਹੀ ਇਸ਼ਤਿਹਾਰਬਾਜ਼ੀ",
+      "reasonOther": "ਹੋਰ ਕਾਰਨ"
     },
     "reportReceipts": {
       "title": "ਰਿਪੋਰਟਾਂ",

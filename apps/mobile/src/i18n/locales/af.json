@@ -539,7 +539,17 @@
       "nextStepInReview": "Die uitkoms sal op hierdie skerm verskyn, en jy kan ná 'n besluit appèl aanteken.",
       "nextStepAppeal": "Die uitkoms van jou appèl sal op hierdie skerm verskyn.",
       "nextStepFinal": "Die appèlbesluit is finaal. Geen verdere appèl kan ingedien word nie.",
-      "viewReceipt": "Bekyk ontvangsbewys"
+      "viewReceipt": "Bekyk ontvangsbewys",
+      "targetLabel": "Gerapporteerde item",
+      "reasonLabel": "Rede vir verslag",
+      "targetMessage": "KI-antwoord",
+      "targetComment": "PR-kommentaar",
+      "targetUser": "Persoon",
+      "reasonHarmful": "Skadelike inhoud",
+      "reasonIllegal": "Onwettige inhoud",
+      "reasonHarassment": "Teistering",
+      "reasonSpam": "Ongewenste advertensies",
+      "reasonOther": "Ander rede"
     },
     "reportReceipts": {
       "title": "Verslae",

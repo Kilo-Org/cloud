@@ -539,7 +539,17 @@
       "nextStepInReview": "نتیجہ اس اسکرین پر نظر آئے گا، اور فیصلے کے بعد آپ اپیل کر سکتے ہیں۔",
       "nextStepAppeal": "اپیل کا نتیجہ اس اسکرین پر نظر آئے گا۔",
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
-      "viewReceipt": "رسید دیکھیں"
+      "viewReceipt": "رسید دیکھیں",
+      "targetLabel": "رپورٹ شدہ چیز",
+      "reasonLabel": "رپورٹ کی وجہ",
+      "targetMessage": "اے آئی جواب",
+      "targetComment": "پل ریکویسٹ تبصرہ",
+      "targetUser": "شخص",
+      "reasonHarmful": "نقصان دہ مواد",
+      "reasonIllegal": "غیر قانونی مواد",
+      "reasonHarassment": "ہراسانی",
+      "reasonSpam": "ناخواستہ اشتہارات",
+      "reasonOther": "کوئی اور وجہ"
     },
     "reportReceipts": {
       "title": "رپورٹس",

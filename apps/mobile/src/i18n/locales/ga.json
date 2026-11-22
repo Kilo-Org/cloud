@@ -542,7 +542,17 @@
       "nextStepInReview": "Beidh an toradh le feiceáil ar an scáileán seo, agus is féidir leat achomharc a dhéanamh tar éis an chinnidh.",
       "nextStepAppeal": "Beidh toradh an achomhairc le feiceáil ar an scáileán seo.",
       "nextStepFinal": "Tá cinneadh an achomhairc críochnaitheach. Ní féidir aon achomharc breise a chur isteach.",
-      "viewReceipt": "Féach ar an admháil"
+      "viewReceipt": "Féach ar an admháil",
+      "targetLabel": "Mír a tuairiscíodh",
+      "reasonLabel": "Cúis na tuairisce",
+      "targetMessage": "Freagra intleachta saorga",
+      "targetComment": "Trácht ar iarratas",
+      "targetUser": "Úsáideoir",
+      "reasonHarmful": "Ábhar díobhálach",
+      "reasonIllegal": "Ábhar mídhleathach",
+      "reasonHarassment": "Ciapadh",
+      "reasonSpam": "Turscar",
+      "reasonOther": "Cúis eile"
     },
     "reportReceipts": {
       "title": "Tuairiscí",

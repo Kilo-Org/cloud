@@ -539,7 +539,17 @@
       "nextStepInReview": "Àbájáde ìjábọ̀ yìí yóò hàn lórí ojú-ìwé yìí, o sì lè fi ẹ̀bẹ̀ ránṣẹ́ lẹ́yìn ìpinnu.",
       "nextStepAppeal": "Àbájáde ẹ̀bẹ̀ yìí yóò hàn lórí ojú-ìwé yìí.",
       "nextStepFinal": "Ìpinnu ẹ̀bẹ̀ yìí ti di ìparí. A kò lè fi ẹ̀bẹ̀ mìíràn ránṣẹ́ mọ́.",
-      "viewReceipt": "Wo ìwé ẹ̀rí"
+      "viewReceipt": "Wo ìwé ẹ̀rí",
+      "targetLabel": "Ohun ìjábọ̀",
+      "reasonLabel": "Ìdí ìjábọ̀",
+      "targetMessage": "Ìdáhùn ẹ̀rọ",
+      "targetComment": "Àsọyé ìbéèrè ìṣọ̀kan",
+      "targetUser": "Olùlò",
+      "reasonHarmful": "Àkóónú ìpalára",
+      "reasonIllegal": "Àkóónú àìbófin mu",
+      "reasonHarassment": "Ìnilára",
+      "reasonSpam": "Ìpolówó àìbéèrè",
+      "reasonOther": "Ìdí mìíràn"
     },
     "reportReceipts": {
       "title": "Àwọn ìjábọ̀",

@@ -539,7 +539,17 @@
       "nextStepInReview": "نتیجه در همین صفحه نمایش داده می‌شود و پس از تصمیم می‌توانید درخواست تجدیدنظر ارسال کنید.",
       "nextStepAppeal": "نتیجه درخواست تجدیدنظر در همین صفحه نمایش داده می‌شود.",
       "nextStepFinal": "تصمیم مربوط به درخواست تجدیدنظر قطعی است. امکان ارسال درخواست تجدیدنظر دیگری وجود ندارد.",
-      "viewReceipt": "مشاهده رسید"
+      "viewReceipt": "مشاهده رسید",
+      "targetLabel": "مورد گزارش‌شده",
+      "reasonLabel": "دلیل گزارش",
+      "targetMessage": "پاسخ هوش مصنوعی",
+      "targetComment": "نظر درخواست ادغام",
+      "targetUser": "کاربر",
+      "reasonHarmful": "محتوای مضر",
+      "reasonIllegal": "محتوای غیرقانونی",
+      "reasonHarassment": "آزار و اذیت",
+      "reasonSpam": "هرزنامه",
+      "reasonOther": "دلیل دیگر"
     },
     "reportReceipts": {
       "title": "گزارش‌ها",

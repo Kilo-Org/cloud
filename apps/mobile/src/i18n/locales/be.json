@@ -541,7 +541,17 @@
       "nextStepInReview": "Вынік будзе паказаны на гэтым экране, і пасля рашэння вы зможаце падаць апеляцыю.",
       "nextStepAppeal": "Вынік вашай апеляцыі будзе паказаны на гэтым экране.",
       "nextStepFinal": "Рашэнне па апеляцыі канчатковае. Падаць паўторную апеляцыю нельга.",
-      "viewReceipt": "Паглядзець квітанцыю"
+      "viewReceipt": "Паглядзець квітанцыю",
+      "targetLabel": "Прадмет скаргі",
+      "reasonLabel": "Прычына скаргі",
+      "targetMessage": "Адказ ШІ",
+      "targetComment": "Каментар у запыце",
+      "targetUser": "Карыстальнік",
+      "reasonHarmful": "Шкодны змест",
+      "reasonIllegal": "Незаконны змест",
+      "reasonHarassment": "Цкаванне",
+      "reasonSpam": "Непажаданая рэклама",
+      "reasonOther": "Іншая прычына"
     },
     "reportReceipts": {
       "title": "Скаргі",

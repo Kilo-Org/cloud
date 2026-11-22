@@ -539,7 +539,17 @@
       "nextStepInReview": "ผลลัพธ์จะแสดงบนหน้าจอนี้ และคุณสามารถยื่นอุทธรณ์ได้หลังจากมีคำตัดสิน.",
       "nextStepAppeal": "ผลลัพธ์ของการอุทธรณ์จะแสดงบนหน้าจอนี้.",
       "nextStepFinal": "คำตัดสินการอุทธรณ์ถือเป็นที่สิ้นสุด ไม่สามารถยื่นอุทธรณ์เพิ่มเติมได้.",
-      "viewReceipt": "ดูใบรับ"
+      "viewReceipt": "ดูใบรับ",
+      "targetLabel": "รายการที่ถูกรายงาน",
+      "reasonLabel": "เหตุผลที่รายงาน",
+      "targetMessage": "การตอบกลับของ AI",
+      "targetComment": "ความคิดเห็นใน PR",
+      "targetUser": "ผู้ใช้",
+      "reasonHarmful": "เนื้อหาที่เป็นอันตราย",
+      "reasonIllegal": "เนื้อหาที่ผิดกฎหมาย",
+      "reasonHarassment": "การคุกคาม",
+      "reasonSpam": "สแปม",
+      "reasonOther": "เหตุผลอื่น"
     },
     "reportReceipts": {
       "title": "รายงาน",

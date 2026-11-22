@@ -540,7 +540,17 @@
       "nextStepInReview": "Ishod će biti prikazan na ovom ekranu, a žalbu možete podneti nakon odluke.",
       "nextStepAppeal": "Ishod žalbe će biti prikazan na ovom ekranu.",
       "nextStepFinal": "Odluka po žalbi je konačna. Žalba se više ne može podneti.",
-      "viewReceipt": "Prikaži potvrdu"
+      "viewReceipt": "Prikaži potvrdu",
+      "targetLabel": "Prijavljena stavka",
+      "reasonLabel": "Razlog prijave",
+      "targetMessage": "AI odgovor",
+      "targetComment": "Komentar u zahtevu",
+      "targetUser": "Osoba",
+      "reasonHarmful": "Štetan sadržaj",
+      "reasonIllegal": "Nezakonit sadržaj",
+      "reasonHarassment": "Uznemiravanje",
+      "reasonSpam": "Neželjena pošta",
+      "reasonOther": "Drugi razlog"
     },
     "reportReceipts": {
       "title": "Prijave",

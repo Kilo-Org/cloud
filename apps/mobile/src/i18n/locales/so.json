@@ -539,7 +539,17 @@
       "nextStepInReview": "Natiijadu waxay ka muuqan doontaa shaashaddan, waxaadna rafcaan ka qaadan kartaa go'aan ka dib.",
       "nextStepAppeal": "Natiijada rafcaankaaga waxay ka muuqan doontaa shaashaddan.",
       "nextStepFinal": "Go'aanka rafcaanku waa kama dambays. Rafcaan kale lama gudbin karo.",
-      "viewReceipt": "Eeg rasiidka"
+      "viewReceipt": "Eeg rasiidka",
+      "targetLabel": "Waxa la soo sheegay",
+      "reasonLabel": "Sababta warbixinta",
+      "targetMessage": "Jawaabta caqliga macmalka",
+      "targetComment": "Faallada codsiga isku-darka",
+      "targetUser": "Isticmaale",
+      "reasonHarmful": "Nuxur waxyeello leh",
+      "reasonIllegal": "Nuxur sharci-darro ah",
+      "reasonHarassment": "Dhibaateyn",
+      "reasonSpam": "Xayeysiis aan loo baahnayn",
+      "reasonOther": "Sabab kale"
     },
     "reportReceipts": {
       "title": "Warbixinno",

@@ -541,7 +541,17 @@
       "nextStepInReview": "Výsledok sa zobrazí na tejto obrazovke a po rozhodnutí sa môžeš odvolať.",
       "nextStepAppeal": "Výsledok odvolania sa zobrazí na tejto obrazovke.",
       "nextStepFinal": "Rozhodnutie o odvolaní je konečné. Ďalšie odvolanie už nie je možné podať.",
-      "viewReceipt": "Zobraziť potvrdenie"
+      "viewReceipt": "Zobraziť potvrdenie",
+      "targetLabel": "Nahlásená položka",
+      "reasonLabel": "Dôvod nahlásenia",
+      "targetMessage": "Odpoveď AI",
+      "targetComment": "Komentár v žiadosti",
+      "targetUser": "Používateľ",
+      "reasonHarmful": "Škodlivý obsah",
+      "reasonIllegal": "Nelegálny obsah",
+      "reasonHarassment": "Obťažovanie",
+      "reasonSpam": "Nevyžiadaná reklama",
+      "reasonOther": "Iný dôvod"
     },
     "reportReceipts": {
       "title": "Nahlásenia",

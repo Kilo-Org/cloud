@@ -539,7 +539,17 @@
       "nextStepInReview": "Ka puta te otinga ki tēnei mata, ā, ka taea e koe te pīra i muri i te whakatau.",
       "nextStepAppeal": "Ka puta te otinga o te pīra ki tēnei mata.",
       "nextStepFinal": "Ko te whakatau mō te pīra he whakatau whakamutunga. Kāore e taea tētahi atu pīra te tuku.",
-      "viewReceipt": "Tirohia te rīhīti"
+      "viewReceipt": "Tirohia te rīhīti",
+      "targetLabel": "Mea i pūrongotia",
+      "reasonLabel": "Take mō te pūrongo",
+      "targetMessage": "Whakautu AI",
+      "targetComment": "Kōrero tono kume",
+      "targetUser": "Tangata",
+      "reasonHarmful": "Ihirangi kino",
+      "reasonIllegal": "Ihirangi takahi ture",
+      "reasonHarassment": "Whakawetiweti",
+      "reasonSpam": "Pānui pokanoa",
+      "reasonOther": "Take kē"
     },
     "reportReceipts": {
       "title": "Ngā pūrongo",

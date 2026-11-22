@@ -402,3 +402,83 @@ describe('code-review command guard policy', () => {
     }
   });
 });
+
+describe('security-remediation push command guard policy', () => {
+  it('denies every forced push spelling while allowing the plain push forms', () => {
+    const policy = getCommandGuardPolicy('security-remediation', 'github');
+    if (!policy) throw new Error('Expected security-remediation command guard policy');
+
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    // The broad push allow rules are installed first and a forced push deny
+    // follows each of them, so the deny is the last matching rule and decides.
+    // Every forced spelling must therefore resolve to deny while the plain push
+    // forms keep resolving to allow.
+    for (const command of [
+      'git push --force',
+      'git push -f',
+      'git push origin main --force',
+      'git push origin main -f',
+      'git push --mirror',
+      'git push origin --mirror',
+      'git push --mirror origin',
+      'git push --force-with-lease',
+      'git push --force-with-lease=main:abc origin HEAD:main',
+      'git push origin --force-with-lease=main:abc HEAD',
+      'git push --force-if-includes origin main',
+      'git push --force-w origin main',
+      'git push --force-i origin main',
+      'git push origin +main',
+      'git push +HEAD:refs/heads/x',
+      'git push origin main +HEAD:main',
+      'git push -fu origin main',
+      'git push -vfu origin main',
+      'git push origin main -fv',
+      'git push -nf origin main',
+      'git push origin main -qf',
+      'git push -4f origin main',
+      'git push origin main -6f',
+      'git push -df origin old',
+      'git push origin main -ff',
+      'git -C . push --force',
+      'git -C /tmp/repo push --force-with-lease',
+      'git -c core.pager=cat push --force',
+      'git -C . push origin --mirror',
+      'git -C . push origin +main',
+      'git -C . push -f origin main',
+      'git -C . push +main',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    for (const command of [
+      'git push',
+      'git push origin main',
+      'git push origin HEAD:refs/heads/branch',
+      'git push origin main:refs/heads/branch',
+      'git push -u origin feature/tidy',
+      'git push origin feature/fix-the-thing',
+      'git push --follow-tags origin main',
+      'git push --no-force origin main',
+      'git push --dry-run origin main',
+      'git push --set-upstream origin branch-2',
+      'git push origin refs/tags/v1.0.0',
+      'git push --tags origin',
+      'git push origin HEAD',
+      'git -C . push origin main',
+      'git -C . push -u origin tidy',
+      'git push origin feature/force-fix',
+      'git push origin a+b',
+      'git push --delete origin old',
+      'git push origin :old',
+      'git status',
+      'git diff --stat',
+      'git commit -m "handle push in the retry path"',
+      'git log --oneline -5',
+      'git fetch origin main',
+      'git switch -c fix/thing',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+  });
+});

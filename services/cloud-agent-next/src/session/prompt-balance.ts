@@ -12,10 +12,9 @@ import type { Env } from '../types.js';
 import { validateBalanceOnly, type BalanceOnlyResult } from '../balance-validation.js';
 
 /**
- * The payer a caller's own access gate already resolved. `organizationId` is
- * explicit rather than optional so "no organization" (the personal payer) can
- * never be confused with "not resolved yet"; the distinction is a value, not
- * the presence of a key.
+ * The payer a caller's own access gate already resolved. `organizationId` is a
+ * required value: an organization id, or `null` for the personal payer. A caller
+ * that resolved nothing passes no record at all.
  */
 export type ResolvedPayer = { organizationId: string | null };
 

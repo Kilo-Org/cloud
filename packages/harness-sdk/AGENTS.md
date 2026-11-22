@@ -280,7 +280,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `queue`, `together`, `subagent`, `tool-matrix`, `conversation`, `time`, `todo` |
+| One live run | `pnpm test:e2e:<name>`, where `<name>` is a `test:e2e:*` script in `package.json`. That file is the list, so a new run is added there and nowhere else |
 | Every live run | `pnpm test:e2e:all` (add names to pick a few, `full` for all eleven models) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
@@ -2055,8 +2055,8 @@ The root is narrower than `/core` on purpose. It re-exports whole only the
 modules a caller uses whole, and names what it takes from the ones that hold
 the machinery a session runs on: `wiringFor`, `makeId`, `sinceSummary`,
 `onStore` and the rest are reached through `/core` instead. The tool contracts
-are at the root — a caller writes tools — while `resolveTools`, `toolNamed`,
-`definitionsOf` and `locksFor` are machinery and are not.
+are at the root — a caller writes tools — while `resolveTools`, `toolNamed`
+and `definitionsOf` are machinery and are not.
 
 `src/index.test.ts` asserts both halves, because a module left out of a barrel
 is invisible from outside the package and every test here imports by path. It

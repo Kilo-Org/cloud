@@ -6561,6 +6561,10 @@
           "format": "starts_with",
           "pattern": "^ses_.*"
         },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
         "operationKey": {
           "type": "string",
           "format": "uuid",
@@ -6572,7 +6576,6 @@
         }
       },
       "required": [
-        "sourceKiloSessionId",
         "operationKey"
       ],
       "additionalProperties": false
@@ -6581,10 +6584,11 @@
       "cloudagentnext",
       "createworktreechat",
       "sourcekilosessionid",
+      "cloudagentsessionid",
       "operationkey",
       "kilosessionid"
     ],
-    "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. cloudagentnext createworktreechat sourcekilosessionid operationkey kilosessionid sourceKiloSessionId operationKey kiloSessionId"
+    "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. cloudagentnext createworktreechat sourcekilosessionid cloudagentsessionid operationkey kilosessionid sourceKiloSessionId cloudAgentSessionId operationKey kiloSessionId"
   },
   "cloudAgentNext.getAgentBoard": {
     "path": "cloudAgentNext.getAgentBoard",
@@ -7680,6 +7684,10 @@
                     "url": {
                       "type": "string",
                       "const": "workspace:new-chat"
+                    },
+                    "launchingSessionId": {
+                      "type": "string",
+                      "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     }
                   },
                   "required": [
@@ -8356,6 +8364,10 @@
                     "url": {
                       "type": "string",
                       "const": "workspace:new-chat"
+                    },
+                    "launchingSessionId": {
+                      "type": "string",
+                      "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     }
                   },
                   "required": [
@@ -18781,6 +18793,10 @@
               "format": "starts_with",
               "pattern": "^ses_.*"
             },
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
             "operationKey": {
               "type": "string",
               "format": "uuid",
@@ -18797,7 +18813,6 @@
             }
           },
           "required": [
-            "sourceKiloSessionId",
             "operationKey",
             "organizationId"
           ],
@@ -18811,10 +18826,11 @@
       "createworktreechat",
       "organizationid",
       "sourcekilosessionid",
+      "cloudagentsessionid",
       "operationkey",
       "kilosessionid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid operationkey kilosessionid organizationId sourceKiloSessionId operationKey kiloSessionId"
+    "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid cloudagentsessionid operationkey kilosessionid organizationId sourceKiloSessionId cloudAgentSessionId operationKey kiloSessionId"
   },
   "organizations.cloudAgentNext.getAgentBoard": {
     "path": "organizations.cloudAgentNext.getAgentBoard",
@@ -20300,6 +20316,10 @@
                         "url": {
                           "type": "string",
                           "const": "workspace:new-chat"
+                        },
+                        "launchingSessionId": {
+                          "type": "string",
+                          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         }
                       },
                       "required": [
@@ -20982,6 +21002,10 @@
                         "url": {
                           "type": "string",
                           "const": "workspace:new-chat"
+                        },
+                        "launchingSessionId": {
+                          "type": "string",
+                          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         }
                       },
                       "required": [

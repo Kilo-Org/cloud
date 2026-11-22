@@ -70,10 +70,16 @@ async function loadEntries(fromDb: ModelStatsLoadClient): Promise<ModelStatsCach
     .orderBy(desc(modelStats.codingIndex));
 }
 
+/** The client a snapshot load uses: the caller's, or the primary when it passes none. */
+export function modelStatsLoadClient(fromDb?: ModelStatsLoadClient): ModelStatsLoadClient {
+  return fromDb ?? db;
+}
+
 export async function getModelStatsSnapshot({
-  fromDb = db,
+  fromDb,
 }: { fromDb?: ModelStatsLoadClient } = {}): Promise<ModelStatsSnapshot> {
-  const state = cacheFor(fromDb);
+  const client = modelStatsLoadClient(fromDb);
+  const state = cacheFor(client);
   if (state.cached && isModelStatsSnapshotFresh(state.cached)) return state.cached;
   if (state.inFlight) return state.inFlight;
   if (state.failure && Date.now() < state.failure.retryAt) {
@@ -85,7 +91,7 @@ export async function getModelStatsSnapshot({
   const thisLoad = (async () => {
     try {
       const [entries, customLlmsById] = await Promise.all([
-        loadEntries(fromDb),
+        loadEntries(client),
         requireCustomLlmsById(),
       ]);
       const snapshot = {

@@ -13,9 +13,14 @@ import type {
   ModelStatsSnapshot,
 } from './model-stats-cache';
 
-jest.mock('./model-stats-cache', () => ({
-  getModelStatsSnapshot: jest.fn(),
-}));
+jest.mock('./model-stats-cache', () => {
+  const primaryClient = { select: jest.fn() };
+  return {
+    getModelStatsSnapshot: jest.fn(),
+    // Mirrors the real resolver: the caller's client, or the primary when it passes none.
+    modelStatsLoadClient: jest.fn((fromDb?: unknown) => fromDb ?? primaryClient),
+  };
+});
 
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),
@@ -242,6 +247,25 @@ describe('getTerminalBenchSummaries', () => {
 
     expect(mockSnapshot).toHaveBeenCalledTimes(3);
     expect(mockWarn).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the dedupe per read client', async () => {
+    // The snapshot cache keeps one state per client, so another client's successful load must not
+    // re-arm this client's warning while its own cooldown still rethrows the same error.
+    const primary = { select: jest.fn() } as unknown as ModelStatsLoadClient;
+    const replica = { select: jest.fn() } as unknown as ModelStatsLoadClient;
+    const outage = new Error('replica unavailable');
+    mockSnapshot.mockImplementation(async ({ fromDb } = {}) => {
+      if (fromDb === replica) throw outage;
+      return snapshot([row()]);
+    });
+
+    await getTerminalBenchSummaries({ fromDb: replica });
+    await getTerminalBenchSummaries({ fromDb: primary });
+    await getTerminalBenchSummaries({ fromDb: replica });
+
+    expect(mockSnapshot).toHaveBeenCalledTimes(3);
+    expect(mockWarn).toHaveBeenCalledTimes(1);
   });
 });
 

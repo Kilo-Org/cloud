@@ -16,7 +16,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { isModelAllowedForProviderKey } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import type { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { validateOrganizationAutoTarget } from './organization-auto-model';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));

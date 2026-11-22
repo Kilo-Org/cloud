@@ -21,7 +21,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import {
   KILO_AUTO_BALANCED_MODEL,
   ORG_AUTO_MODEL,

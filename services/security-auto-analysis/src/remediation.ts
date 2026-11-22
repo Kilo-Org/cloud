@@ -522,8 +522,10 @@ Rules:
 - Change manifests, lockfiles, Dockerfiles, CI, or build/deploy files only when directly required.
 - Create and check out branch ${params.branchName} from the current checkout before changing files, unless already on that branch.
 - Do not open no-change PR. If no changes are needed, return no_changes_needed.
-- Write the commit message with the file-writing tool and pass it with git commit -F <file>. Put the summary and the Kilo finding backlink ${params.findingUrl} in that message body, because the pull request title and body come from the commit.
-- Open the pull request with gh pr create --fill, which reads the title and body from that commit. Add --draft only when validation is incomplete or risk is nontrivial.
+- Write the commit message with the file-writing tool to /tmp/commit-message.txt, outside the checkout, and pass it with git commit -F /tmp/commit-message.txt. Put the summary and the Kilo finding backlink ${params.findingUrl} in that message body, because the pull request title and body come from the commit.
+- Stage only the files you changed with git add <path>; do not use git add -A, which would commit the message file.
+- Push the branch before opening the pull request with git push origin ${params.branchName}. The command policy refuses a push that carries an option, so pass no option to the push and never run git push -u or git push --set-upstream.
+- Open the pull request with gh pr create --fill --head ${params.branchName}, which reads the title and body from that commit; --head names the pushed branch so the command needs no upstream. Add --draft only when validation is incomplete or risk is nontrivial.
 - A command that carries a quote character is refused, so pass no text on a command line.
 - Final assistant response must contain only normal summary plus machine-readable result block:
 

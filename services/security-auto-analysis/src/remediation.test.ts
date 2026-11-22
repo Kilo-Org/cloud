@@ -269,12 +269,23 @@ describe('security remediation launch contract', () => {
 
     // The policy refuses a command that carries a quote character, so the prompt
     // must name the file form of both commands it requires.
-    expect(prompt).toContain('git commit -F <file>');
+    expect(prompt).toContain('git commit -F /tmp/commit-message.txt');
+    // The message file lives outside the checkout, and staging stays explicit.
+    expect(prompt).toContain('outside the checkout');
+    expect(prompt).toContain('do not use git add -A');
     // The backlink travels in the commit message, because the pull request body
     // comes from that commit.
     expect(prompt).toContain('Put the summary and the Kilo finding backlink');
+    // The push names the branch with no option, and the create command names the
+    // pushed branch so it needs no upstream.
+    expect(prompt).toContain(
+      'git push origin security-remediation/handlebars-ghsa-765h-qjxv-5f44/b04cabeb31-1'
+    );
+    expect(prompt).toContain(
+      '--head security-remediation/handlebars-ghsa-765h-qjxv-5f44/b04cabeb31-1'
+    );
     // The create command is named, and the draft choice stays conditional.
-    expect(prompt).toContain('gh pr create --fill');
+    expect(prompt).toContain('gh pr create --fill --head');
     expect(prompt).toContain('Add --draft only when validation is incomplete');
   });
 });

@@ -123,7 +123,6 @@ export function ConsentCard({ mode = 'onboarding', settingsTarget }: ConsentCard
       icon={LineChart}
       title={t('consent.helpImprove')}
       subtitle={t('consent.helpImproveDescription')}
-      subtitleNumberOfLines={2}
       trailing={<Skeleton className="h-8 w-14 rounded-full" />}
     />
   ) : (

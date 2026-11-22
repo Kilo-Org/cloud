@@ -113,6 +113,7 @@ export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?
               icon={Globe}
               title={t(PREFERENCES_HUB_SETTINGS.account.label)}
               subtitle={t('preferences.accountSubtitle')}
+              subtitleNumberOfLines={2}
               onPress={() => {
                 router.push('/(app)/(tabs)/(3_profile)/account' as Href);
               }}

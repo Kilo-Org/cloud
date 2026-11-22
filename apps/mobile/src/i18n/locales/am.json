@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "የማከማቻ ፍለጋ",
       "noMatches": "ምንም ተዛማጆች የሉም",
       "noRepositories": "ምንም ማከማቻዎች አይገኙም",
-      "noRepositoriesDescription": "ማከማቻዎችን ለመጫን GitHub ወይም GitLabን $t(integrations.sectionTitle) ውስጥ አገናኝ።",
+      "noRepositoriesDescription": "ማከማቻዎችን ለመጫን GitHub ወይም GitLabን አገናኝ።",
       "loading": "በመጫን ላይ…",
       "accessibility": "ማከማቻ፦ {{label}}",
       "platformBitbucket": "Bitbucket"

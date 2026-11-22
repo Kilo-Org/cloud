@@ -2661,7 +2661,7 @@
       "searchPlaceholder": "Iskanje repozitorijev",
       "noMatches": "Ni zadetkov",
       "noRepositories": "Ni razpoložljivih skladišč",
-      "noRepositoriesDescription": "Za nalaganje skladišč poveži GitHub ali GitLab v razdelku $t(integrations.sectionTitle).",
+      "noRepositoriesDescription": "Za nalaganje skladišč poveži GitHub ali GitLab.",
       "loading": "Nalaganje…",
       "accessibility": "Skladišče: {{label}}",
       "platformBitbucket": "Bitbucket"

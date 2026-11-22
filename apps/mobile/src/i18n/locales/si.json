@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "කේත ගබඩා සොයන්න",
       "noMatches": "ගැළපීම් නැත",
       "noRepositories": "ලබාගත හැකි ගබඩා නැත",
-      "noRepositoriesDescription": "ගබඩා පූරණය කිරීමට $t(integrations.sectionTitle) තුළ GitHub හෝ GitLab සම්බන්ධ කරන්න.",
+      "noRepositoriesDescription": "ගබඩා පූරණය කිරීමට GitHub හෝ GitLab සම්බන්ධ කරන්න.",
       "loading": "පූරණය වෙමින්…",
       "accessibility": "ගබඩාව: {{label}}",
       "platformBitbucket": "Bitbucket"

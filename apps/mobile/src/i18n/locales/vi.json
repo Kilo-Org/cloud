@@ -1996,7 +1996,7 @@
       "searchPlaceholder": "Tìm kho mã nguồn",
       "noMatches": "Không có kết quả phù hợp",
       "noRepositories": "Không có kho mã nào để chọn",
-      "noRepositoriesDescription": "Để tải kho mã, hãy kết nối GitHub hoặc GitLab trong $t(integrations.sectionTitle).",
+      "noRepositoriesDescription": "Để tải kho mã, hãy kết nối GitHub hoặc GitLab.",
       "loading": "Đang tải…",
       "accessibility": "Kho mã: {{label}}",
       "platformBitbucket": "Bitbucket"

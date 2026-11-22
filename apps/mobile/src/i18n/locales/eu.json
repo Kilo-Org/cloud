@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Biltegien bilaketa",
       "noMatches": "Ez dago bat etortzerik",
       "noRepositories": "Ez dago biltegi erabilgarririk",
-      "noRepositoriesDescription": "Biltegiak kargatzeko, konektatu GitHub edo GitLab $t(integrations.sectionTitle) atalean.",
+      "noRepositoriesDescription": "Biltegiak kargatzeko, konektatu GitHub edo GitLab.",
       "loading": "Kargatzen…",
       "accessibility": "Biltegia: {{label}}",
       "platformBitbucket": "Bitbucket"

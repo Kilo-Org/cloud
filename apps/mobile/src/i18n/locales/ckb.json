@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "گەڕان لە کۆگاکان",
       "noMatches": "هیچ ئەنجامێکی گونجاو نییە",
       "noRepositories": "هیچ کۆگایەک بەردەست نییە",
-      "noRepositoriesDescription": "بۆ بارکردنی کۆگاکان، GitHub یان GitLab لە $t(integrations.sectionTitle) ببەستەوە.",
+      "noRepositoriesDescription": "بۆ بارکردنی کۆگاکان، GitHub یان GitLab ببەستەوە.",
       "loading": "بارکردن…",
       "accessibility": "کۆگا: {{label}}",
       "platformBitbucket": "Bitbucket"

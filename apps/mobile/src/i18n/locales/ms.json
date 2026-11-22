@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Cari repositori",
       "noMatches": "Tiada padanan",
       "noRepositories": "Tiada repositori tersedia",
-      "noRepositoriesDescription": "Untuk memuatkan repositori, sambungkan akaun GitHub atau GitLab dalam $t(integrations.sectionTitle).",
+      "noRepositoriesDescription": "Untuk memuatkan repositori, sambungkan akaun GitHub atau GitLab.",
       "loading": "Memuatkan…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"

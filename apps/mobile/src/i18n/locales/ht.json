@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Chèche depo",
       "noMatches": "Pa gen rezilta",
       "noRepositories": "Pa gen depo disponib",
-      "noRepositoriesDescription": "Konekte GitHub oswa GitLab nan $t(integrations.sectionTitle) pou chaje depo yo.",
+      "noRepositoriesDescription": "Konekte GitHub oswa GitLab pou chaje depo yo.",
       "loading": "Ap chaje…",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"

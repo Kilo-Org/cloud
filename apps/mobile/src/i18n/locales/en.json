@@ -2661,7 +2661,7 @@
       "searchPlaceholder": "Search repositories...",
       "noMatches": "No matches",
       "noRepositories": "No repositories available",
-      "noRepositoriesDescription": "Connect GitHub or GitLab in $t(integrations.sectionTitle) to load repositories.",
+      "noRepositoriesDescription": "Connect GitHub or GitLab to load repositories.",
       "loading": "Loading...",
       "accessibility": "Repository: {{label}}"
     },

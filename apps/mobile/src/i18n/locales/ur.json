@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "ریپوزٹریز کی تلاش",
       "noMatches": "کوئی نتیجہ نہیں ملا",
       "noRepositories": "کوئی ریپوزٹری دستیاب نہیں",
-      "noRepositoriesDescription": "ریپوزٹریز لوڈ کرنے کے لیے $t(integrations.sectionTitle) میں GitHub یا GitLab کو منسلک کریں۔",
+      "noRepositoriesDescription": "ریپوزٹریز لوڈ کرنے کے لیے GitHub یا GitLab کو منسلک کریں۔",
       "loading": "لوڈ ہو رہا ہے…",
       "accessibility": "ریپوزٹری: {{label}}",
       "platformBitbucket": "Bitbucket"

@@ -122,16 +122,16 @@ afterEach(() => {
 });
 
 describe('RepoPickerSheet empty state', () => {
-  it('offers the Connected services action beside the sentence that names it', () => {
+  it('offers the Connected services action without naming the destination twice', () => {
     mountSheet(connectedServicesHref());
 
     const state = emptyStateProps();
     const label = i18n.t('integrations.sectionTitle');
-    // The message's own interpolation names the destination, so the sentence is
-    // not a copy of the label spelled twice in two places: it resolves to the
-    // same translated words the action carries.
+    // The action names the destination; the sentence beside it must not name
+    // the same destination again, or three lines show it twice and read as two
+    // controls.
     expect(state.description).toBe(i18n.t('agentChat.repoPicker.noRepositoriesDescription'));
-    expect(state.description).toContain(label);
+    expect(state.description).not.toContain(label);
     expect(actionProps()?.label).toBe(label);
   });
 

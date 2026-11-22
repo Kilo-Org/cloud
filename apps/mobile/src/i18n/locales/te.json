@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "రిపోజిటరీల శోధన",
       "noMatches": "సరిపోలికలు లేవు",
       "noRepositories": "రిపోజిటరీలు అందుబాటులో లేవు",
-      "noRepositoriesDescription": "రిపోజిటరీలను లోడ్ చేయడానికి, $t(integrations.sectionTitle)లో GitHub లేదా GitLabను కనెక్ట్ చేయండి.",
+      "noRepositoriesDescription": "రిపోజిటరీలను లోడ్ చేయడానికి, GitHub లేదా GitLabను కనెక్ట్ చేయండి.",
       "loading": "లోడ్ అవుతోంది…",
       "accessibility": "రిపోజిటరీ: {{label}}",
       "platformBitbucket": "Bitbucket"

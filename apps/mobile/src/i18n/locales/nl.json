@@ -1996,7 +1996,7 @@
       "searchPlaceholder": "Coderepository's zoeken",
       "noMatches": "Geen resultaten",
       "noRepositories": "Geen repositories beschikbaar",
-      "noRepositoriesDescription": "Koppel een GitHub- of GitLab-account in $t(integrations.sectionTitle) om repositories te laden.",
+      "noRepositoriesDescription": "Koppel een GitHub- of GitLab-account om repositories te laden.",
       "loading": "Laden…",
       "accessibility": "Gekozen repository: {{label}}",
       "platformBitbucket": "Bitbucket"

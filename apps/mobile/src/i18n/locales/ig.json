@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Chọọ ebe nchekwa koodu",
       "noMatches": "Enweghị ndakọrịta",
       "noRepositories": "Enweghị ebe nchekwa koodu dị",
-      "noRepositoriesDescription": "Jikọọ GitHub ma ọ bụ GitLab na $t(integrations.sectionTitle) iji budata ebe nchekwa koodu.",
+      "noRepositoriesDescription": "Jikọọ GitHub ma ọ bụ GitLab iji budata ebe nchekwa koodu.",
       "loading": "Na-ebudata…",
       "accessibility": "Ebe nchekwa koodu: {{label}}",
       "platformBitbucket": "Bitbucket"

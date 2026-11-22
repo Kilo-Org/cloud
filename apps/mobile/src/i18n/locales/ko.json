@@ -1996,7 +1996,7 @@
       "searchPlaceholder": "저장소 검색",
       "noMatches": "검색 결과 없음",
       "noRepositories": "사용 가능한 저장소가 없습니다",
-      "noRepositoriesDescription": "저장소를 불러오려면 $t(integrations.sectionTitle)에서 GitHub 또는 GitLab을 연결하세요.",
+      "noRepositoriesDescription": "저장소를 불러오려면 GitHub 또는 GitLab을 연결하세요.",
       "loading": "불러오는 중…",
       "accessibility": "저장소: {{label}}",
       "platformBitbucket": "Bitbucket"

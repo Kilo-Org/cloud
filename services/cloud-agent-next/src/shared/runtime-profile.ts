@@ -1,5 +1,31 @@
 import * as z from 'zod';
-import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
+
+/**
+ * Agent ids the Kilo CLI owns, plus the cloud mode aliases that resolve to them.
+ * The wrapper build copies only `src/shared` and `wrapper`, so this list cannot
+ * come from a workspace package; a parity test keeps it equal to
+ * `RESERVED_AGENT_SLUGS` in `@kilocode/app-shared/agent-profile`.
+ */
+export const RESERVED_RUNTIME_AGENT_SLUGS = [
+  'code',
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+  'build',
+  'architect',
+  'custom',
+  'general',
+  'explore',
+  'compaction',
+  'title',
+  'summary',
+] as const;
+
+/** True when an agent id belongs to the CLI's own agents. */
+export function isReservedRuntimeAgentSlug(slug: string): boolean {
+  return RESERVED_RUNTIME_AGENT_SLUGS.some(reserved => reserved === slug);
+}
 
 export const RuntimeProfileLimits = {
   MAX_RUNTIME_INSTRUCTIONS: 50,
@@ -186,7 +212,7 @@ export function projectStoredRuntimeAgents(value: unknown): unknown {
     if (typeof agent !== 'object' || agent === null) return true;
     if (!('slug' in agent)) return true;
     const slug = agent.slug;
-    return typeof slug !== 'string' || !isReservedAgentSlug(slug);
+    return typeof slug !== 'string' || !isReservedRuntimeAgentSlug(slug);
   });
 }
 
@@ -253,7 +279,7 @@ export const RuntimeAgentSchema = z.object({
     .min(1)
     .max(RuntimeProfileLimits.MAX_RUNTIME_AGENT_SLUG_LENGTH)
     .regex(/^[a-z][a-z0-9-]*$/, 'Agent slug must start with a letter')
-    .refine(slug => !isReservedAgentSlug(slug), {
+    .refine(slug => !isReservedRuntimeAgentSlug(slug), {
       message: 'Slug conflicts with a built-in agent; choose a different slug',
     }),
   name: z.string().min(1).max(RuntimeProfileLimits.MAX_RUNTIME_AGENT_NAME_LENGTH),

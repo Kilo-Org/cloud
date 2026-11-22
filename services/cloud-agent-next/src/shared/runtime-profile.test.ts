@@ -1,14 +1,30 @@
 import { describe, expect, it } from 'vitest';
+import { RESERVED_AGENT_SLUGS } from '@kilocode/app-shared/agent-profile';
 import {
+  isReservedRuntimeAgentSlug,
   PersistedRuntimeAgentsSchema,
   projectStoredRouteSpec,
   projectStoredRuntimeAgents,
+  RESERVED_RUNTIME_AGENT_SLUGS,
   RuntimeAgentSchema,
 } from './runtime-profile.js';
 
 function agent(slug: string) {
   return { slug, name: slug, config: { prompt: `You are ${slug}` } };
 }
+
+describe('shared agent id list parity', () => {
+  it('keeps the runtime list equal to the shared profile list', () => {
+    expect([...RESERVED_RUNTIME_AGENT_SLUGS].sort()).toEqual([...RESERVED_AGENT_SLUGS].sort());
+  });
+
+  it('agrees with the shared helper on every id', () => {
+    for (const slug of RESERVED_AGENT_SLUGS) {
+      expect(isReservedRuntimeAgentSlug(slug), slug).toBe(true);
+    }
+    expect(isReservedRuntimeAgentSlug('reviewer')).toBe(false);
+  });
+});
 
 describe('RuntimeAgentSchema CLI-owned ids', () => {
   it.each(['general', 'explore', 'compaction', 'title', 'summary'])(

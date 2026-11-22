@@ -31,6 +31,7 @@ const state = vi.hoisted(() => ({
   syncedAt: null as string | null,
   githubAppInstalled: true as boolean | undefined,
   reposLoading: false,
+  reposUnanswered: false,
   reposError: false,
   resync: vi.fn(() => Promise.resolve()),
   resyncing: false,
@@ -215,11 +216,13 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isError: state.reposError,
     isFetching: false,
     refetch: vi.fn(),
-    data: {
-      repositories: state.platform === 'github' ? state.repositories : [],
-      syncedAt: state.syncedAt,
-      integrationInstalled: state.githubAppInstalled,
-    },
+    data: state.reposUnanswered
+      ? undefined
+      : {
+          repositories: state.platform === 'github' ? state.repositories : [],
+          syncedAt: state.syncedAt,
+          integrationInstalled: state.githubAppInstalled,
+        },
   }),
   useGitLabRepositories: () => ({
     isLoading: state.reposLoading,
@@ -351,6 +354,7 @@ beforeEach(() => {
   state.syncedAt = '2026-10-20T06:04:13.436632+00';
   state.githubAppInstalled = true;
   state.reposLoading = false;
+  state.reposUnanswered = false;
   state.reposError = false;
   state.resync.mockClear();
   state.resyncing = false;
@@ -684,6 +688,20 @@ describe('all repositories mode body', () => {
     // The state follows the explanation and the reserved count row, so it drops
     // the surface-level top air a 'top' placement adds.
     expect(state.emptyStateClassNames.at(-1)).toBe('pt-4');
+    unmount();
+  });
+
+  it('keeps the skeleton while the repositories read has not answered', async () => {
+    state.reposUnanswered = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(ORGANIZATION_EXPLANATION));
+
+    // A paused read is pending with nothing in flight, so an unanswered list must
+    // not be graded: the empty copy would claim a settled empty snapshot.
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(1);
+    expect(texts(renderer)).not.toContain('No repositories found');
     unmount();
   });
 

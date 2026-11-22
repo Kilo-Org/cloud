@@ -77,14 +77,18 @@ export function getActiveTokenSnapshot(): ActiveTokenSnapshot | null {
  * Publishes a resolved expiry into the held owner after the cold path read
  * `TOKEN_EXPIRES_AT_KEY`. Applies only when the owner still holds the same
  * token for the current epoch, so a newer owner published while the expiry
- * was read is never overwritten.
+ * was read is never overwritten. A resolved value is never replaced by a
+ * lesser one either: a cold read that started before a newer publish of the
+ * same token can only confirm that token's expiry, and an `absent` answer
+ * from it would otherwise cancel the proactive refresh for the token's life.
  */
 export function publishActiveTokenExpiry(snapshot: ActiveTokenSnapshot, expiry: TokenExpiry): void {
   if (
     !activeToken ||
     activeToken.token !== snapshot.token ||
     activeToken.epoch !== snapshot.epoch ||
-    !isCurrentAuthEpoch(activeToken.epoch)
+    !isCurrentAuthEpoch(activeToken.epoch) ||
+    (activeToken.expiry.kind === 'known' && expiry.kind !== 'known')
   ) {
     return;
   }

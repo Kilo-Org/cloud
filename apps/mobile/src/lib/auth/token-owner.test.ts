@@ -295,6 +295,16 @@ describe('token-owner', () => {
       expect(getActiveToken()).toEqual({ token: 'token-b', expiresAtMs: 5678 });
     });
 
+    it('does not replace a resolved expiry with a stale read of the same token', () => {
+      setActiveToken('token-a', null);
+      const snapshot = currentSnapshot();
+      // A sign-in publishes the same token with its known expiry while a cold
+      // read that started earlier is still in flight.
+      setActiveToken('token-a', 5678);
+      publishActiveTokenExpiry(snapshot, { kind: 'absent' });
+      expect(getActiveToken()).toEqual({ token: 'token-a', expiresAtMs: 5678 });
+    });
+
     it('does nothing when no owner is held', () => {
       publishActiveTokenExpiry(
         { token: 'token-a', expiry: { kind: 'unknown' }, epoch: 0 },

@@ -53,7 +53,8 @@ it('materializes only the profile agents that carry an id of their own', async (
     { slug: 'general' },
     { slug: 'reviewer' },
   ]);
-  await expect(getAgentsForSession(client.db, profile.id)).resolves.toEqual([
-    { slug: 'reviewer', name: 'Reviewer', config: { prompt: 'Review.' } },
-  ]);
+  await expect(getAgentsForSession(client.db, profile.id)).resolves.toEqual({
+    agents: [{ slug: 'reviewer', name: 'Reviewer', config: { prompt: 'Review.' } }],
+    skippedSlugs: ['explore', 'general'],
+  });
 });

@@ -77,10 +77,11 @@ describe('getAgentsForSession', () => {
     }),
   } as unknown as WorkerDb;
 
-  test('omits stored agents whose id belongs to the CLI', async () => {
-    await expect(getAgentsForSession(db, TEST_PROFILE_ID)).resolves.toEqual([
-      { slug: 'reviewer', name: 'Reviewer', config: {} },
-    ]);
+  test('omits stored agents whose id belongs to the CLI and names them', async () => {
+    await expect(getAgentsForSession(db, TEST_PROFILE_ID)).resolves.toEqual({
+      agents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
+      skippedSlugs: ['explore', 'general'],
+    });
   });
 
   test('keeps CLI-owned ids visible to the profile editor', async () => {

@@ -105,7 +105,12 @@ describe('prepareSession runtime agent ids', () => {
 
   it('lets a profile agent id through the same boundary', async () => {
     const response = await SELF.fetch(prepareRequest(input('reviewer-probe')));
-    const text = await response.text();
-    expect(text).not.toContain('Slug conflicts with a built-in agent');
+    const body = (await response.json()) as { error?: { message?: string } };
+
+    // The e2e entry leaves the session Durable Object unbound, so an accepted
+    // request reaches the handler and fails there. Reaching the handler is what
+    // proves the input passed validation.
+    expect(response.status).toBe(500);
+    expect(body.error?.message).toContain('createSessionForCloudAgent');
   });
 });

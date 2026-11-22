@@ -729,7 +729,8 @@ describe('spawnCloudAgentSession delegation', () => {
   );
 
   it('returns the retry reply when the requester access lookup fails', async () => {
-    mockFetchGitLabProjectAccessLevel.mockRejectedValueOnce(new Error('lookup unavailable'));
+    // The lookup is tried twice, so both attempts must fail for the reply.
+    mockFetchGitLabProjectAccessLevel.mockRejectedValue(new Error('lookup unavailable'));
 
     const result = await spawnCloudAgentSession(
       { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },

@@ -90,6 +90,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: false,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).resolves.toEqual({ allowed: true });
     expect(mockGetAllIntegrationsForOwner).not.toHaveBeenCalled();
@@ -124,6 +125,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.example.test',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).resolves.toEqual({ allowed: true });
     expect(mockGetAllIntegrationsForOwner).toHaveBeenCalledWith({ type: 'user', id: 'user-1' });
@@ -147,6 +149,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).resolves.toEqual({ allowed: true });
   });
@@ -160,6 +163,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -177,6 +181,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -196,6 +201,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.example.test',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).resolves.toEqual({ allowed: true });
     expect(mockGetValidGitLabToken).toHaveBeenCalledTimes(1);
@@ -221,6 +227,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -241,6 +248,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.example.test/team-a',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -261,6 +269,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.example.test',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).resolves.toEqual({ allowed: true });
     expect(mockGetValidGitLabToken).toHaveBeenCalledWith(
@@ -280,6 +289,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -298,6 +308,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.example.test/team-a',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -316,6 +327,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -336,6 +348,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).rejects.toBe(failure);
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
@@ -354,6 +367,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).rejects.toBe(failure);
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
@@ -372,6 +386,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).rejects.toBe(failure);
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
@@ -387,6 +402,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).rejects.toBe(failure);
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
@@ -401,6 +417,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -418,6 +435,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -437,6 +455,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -455,6 +474,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 
@@ -472,8 +492,94 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     ).rejects.toBe(failure);
+  });
+
+  it('allows the project when the token read fails once and then succeeds', async () => {
+    mockGetValidGitLabToken.mockRejectedValueOnce(new Error('socket hang up'));
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+        retryDelayMs: 0,
+      })
+    ).resolves.toEqual({ allowed: true });
+    expect(mockGetValidGitLabToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates the second token read failure', async () => {
+    const second = new Error('second token failure');
+    mockGetValidGitLabToken
+      .mockRejectedValueOnce(new Error('first token failure'))
+      .mockRejectedValueOnce(second);
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+        retryDelayMs: 0,
+      })
+    ).rejects.toBe(second);
+    expect(mockGetValidGitLabToken).toHaveBeenCalledTimes(2);
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it('does not retry a definitive token refusal', async () => {
+    mockGetValidGitLabToken.mockRejectedValue(new TRPCError({ code: 'NOT_FOUND' }));
+
+    const markdown = refusalMarkdown(
+      await authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+        retryDelayMs: 0,
+      })
+    );
+
+    expect(markdown).toContain('GitLab connection in Kilo Code settings');
+    expect(mockGetValidGitLabToken).toHaveBeenCalledTimes(1);
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it('allows the project when the access read fails once and then succeeds', async () => {
+    mockFetchGitLabProjectAccessLevel.mockRejectedValueOnce(new Error('lookup failed'));
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+        retryDelayMs: 0,
+      })
+    ).resolves.toEqual({ allowed: true });
+    expect(mockFetchGitLabProjectAccessLevel).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates the second access read failure', async () => {
+    const second = new Error('lookup failed');
+    mockFetchGitLabProjectAccessLevel
+      .mockRejectedValueOnce(new Error('first lookup failure'))
+      .mockRejectedValueOnce(second);
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+        retryDelayMs: 0,
+      })
+    ).rejects.toBe(second);
+    expect(mockFetchGitLabProjectAccessLevel).toHaveBeenCalledTimes(2);
   });
 
   it('refuses instead of throwing when the project instance URL is malformed', async () => {
@@ -483,6 +589,7 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'not a url',
         organizationOwned: true,
         requesterUserId: 'user-1',
+        retryDelayMs: 0,
       })
     );
 

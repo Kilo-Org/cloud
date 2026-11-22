@@ -84,6 +84,35 @@ type GitLabConnectionRefusal = { matched: false; reason: 'projectAccess' | 'inst
 type RequesterGitLabConnection = { matched: true; token: string } | GitLabConnectionRefusal;
 
 /**
+ * Pause before the second read of a failed lookup. A transient DNS or 5xx
+ * failure retried within milliseconds usually fails again, so the retry waits
+ * this long first. The pause happens at most once per lookup, and only when the
+ * first failure is not a definitive credential refusal.
+ */
+const LOOKUP_RETRY_DELAY_MS = 500;
+
+/**
+ * Runs a GitLab read at most twice: a single thrown failure must not end the
+ * action. A definitive credential refusal is not retried, because the second
+ * read cannot succeed until the owner reconnects. Two thrown failures in a row
+ * mean the read stayed unavailable, and the second error propagates unchanged.
+ * When `retryDelayMs` is positive, the second attempt waits that long first.
+ */
+async function withGitLabLookupRetry<T>(read: () => Promise<T>, retryDelayMs: number): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (isGitLabCredentialRefusal(error)) throw error;
+  }
+  if (retryDelayMs > 0) {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, retryDelayMs);
+    await promise;
+  }
+  return read();
+}
+
+/**
  * The requester's own GitLab connection for the project's instance, with the
  * credential it stores. A row is usable only when it is healthy: a suspended or
  * reauthorization-required row cannot answer for the account. One account may
@@ -92,11 +121,12 @@ type RequesterGitLabConnection = { matched: true; token: string } | GitLabConnec
  * stored instance cannot be normalized is skipped. A definitive credential
  * refusal is `projectAccess`; every other failure propagates, so the caller
  * answers one retry reply and captures the error instead of reporting it as
- * this account's access.
+ * this account's access. The token read is tried once more before that.
  */
 async function requesterGitLabConnection(
   requesterUserId: string,
-  projectInstance: string
+  projectInstance: string,
+  retryDelayMs: number
 ): Promise<RequesterGitLabConnection> {
   const integrations = await getAllIntegrationsForOwner({ type: 'user', id: requesterUserId });
   const healthy = integrations.filter(
@@ -116,7 +146,10 @@ async function requesterGitLabConnection(
   }
 
   try {
-    const token = await getValidGitLabToken(integration, { userId: requesterUserId });
+    const token = await withGitLabLookupRetry(
+      () => getValidGitLabToken(integration, { userId: requesterUserId }),
+      retryDelayMs
+    );
     return { matched: true, token };
   } catch (error) {
     if (!isGitLabCredentialRefusal(error)) throw error;
@@ -135,9 +168,11 @@ async function requesterGitLabConnection(
  * GitLab connection must reach a project on the session's instance with write
  * access.
  *
- * A lookup that fails is not answered here: it propagates to the caller, which
- * reports it as one retry reply. Only a definitive credential refusal answers
- * the access copy.
+ * A read that fails is tried once more, after a short pause when `retryDelayMs`
+ * is positive, so a single transient failure no longer fails the turn. A
+ * genuine failure now costs that one pause before the caller answers its retry
+ * reply. A definitive credential refusal is not retried: it answers the access
+ * copy, because mentioning the bot again cannot change it.
  */
 export async function authorizeGitLabProject(params: {
   /** Requested project path, `group/project` or `group/subgroup/project`. */
@@ -148,8 +183,16 @@ export async function authorizeGitLabProject(params: {
   organizationOwned: boolean;
   /** The person who triggered this run, when the platform supplied a verified account. */
   requesterUserId?: string;
+  /** Pause before a retried read; tests pass 0 to skip the pause. */
+  retryDelayMs?: number;
 }): Promise<GitLabProjectAuthorization> {
-  const { project, projectInstanceUrl, organizationOwned, requesterUserId } = params;
+  const {
+    project,
+    projectInstanceUrl,
+    organizationOwned,
+    requesterUserId,
+    retryDelayMs = LOOKUP_RETRY_DELAY_MS,
+  } = params;
 
   // A personally owned connection is controlled by its owner, whose own
   // credential starts the session, so it needs no separate project
@@ -174,7 +217,11 @@ export async function authorizeGitLabProject(params: {
 
   // One row supplies both the instance and the credential, so the access read
   // cannot pair an instance from one connection with a token from another.
-  const connection = await requesterGitLabConnection(requesterUserId, projectInstance);
+  const connection = await requesterGitLabConnection(
+    requesterUserId,
+    projectInstance,
+    retryDelayMs
+  );
   if (!connection.matched) {
     return {
       allowed: false,
@@ -186,13 +233,17 @@ export async function authorizeGitLabProject(params: {
   }
 
   // Write access is read with the requester's own credential, so the answer
-  // covers the project the session will use on this instance. A credential the
-  // provider rejects answers the access copy, because mentioning the bot again
-  // cannot change it; every other failure propagates to the caller's retry
-  // reply.
+  // covers the project the session will use on this instance. The read is tried
+  // once more after a transient failure. A credential the provider rejects
+  // answers the access copy, because mentioning the bot again cannot change it;
+  // every other failure that lasts both attempts propagates to the caller's
+  // retry reply.
   let accessLevel: number | null;
   try {
-    accessLevel = await fetchGitLabProjectAccessLevel(connection.token, project, projectInstance);
+    accessLevel = await withGitLabLookupRetry(
+      () => fetchGitLabProjectAccessLevel(connection.token, project, projectInstance),
+      retryDelayMs
+    );
   } catch (error) {
     if (!isGitLabCredentialRefusal(error)) throw error;
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };

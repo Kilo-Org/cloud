@@ -2,6 +2,7 @@ import type { ControlPlanePromptPayload } from '../../shared/control-plane-proto
 import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { MessageSettlement } from './message-settlement.js';
 
 /**
  * Spec §5 message state: `queued → accepted → completed | failed | cancelled`.
@@ -41,6 +42,7 @@ export type SessionMessage = {
   reason: string | null;
   billingFailure?: CustomerBillingFailure;
   container?: CloudAgentRunContainer;
+  settlement?: MessageSettlement;
 };
 
 /** The messages a reducer changed, so the caller can emit their events. */

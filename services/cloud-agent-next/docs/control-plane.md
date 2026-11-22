@@ -184,7 +184,9 @@ still prevents an older reader from projecting a network value as a plaintext en
 
 A message stores `messageId`, its immutable intent (turn, agent, model, attachments,
 finalization), `state`, `createdAt`, `acceptedAt`, `settledAt` and a failure `reason` when
-terminal. Nothing else.
+terminal. It may also store a billing failure, container metadata and a settlement record.
+The settlement record holds the failure and gate facts, the final assistant message ID and
+the last seen branch available when the message settles.
 
 | Event | Effect |
 |---|---|
@@ -2066,8 +2068,12 @@ Registry entries are discovery hints: every returned child is reauthorized, and 
 outages fail the query rather than reporting an empty list. An empty page can still have a
 `nextCursor` when its entries no longer authorize. Children created before the original index was
 introduced are not backfilled; explicit management by ID still checks their lineage.
-Message-result queries preserve terminal assistant output and safe failure details. Prefer completion
-callbacks; bounded status checks are supported, but busy polling is not needed.
+`getMessageResult` returns the message status, structured failure with stage and code, final
+assistant message ID and text, gate result, and last seen branch when available. It also returns
+a preparation summary for the requested message with attempt status, failed step label and safe
+reason, without commands or output. Only the final message settled by an outcome captures an
+assistant answer. Prefer completion callbacks for notification when a batch drains and for recent
+activity, which polling does not return. Use bounded polling to check a specific message's result.
 
 Rollout: existing workspaces adopt their creating chat's authorization on first use, with the same
 authorization ID, so MCP credentials issued before the rollout stay valid until their own expiry.

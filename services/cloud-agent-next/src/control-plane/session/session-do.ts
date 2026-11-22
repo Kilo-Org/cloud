@@ -80,10 +80,7 @@ import {
 import { handleCommandsAvailable } from '../../session/ingest-handlers/commands-available.js';
 import { createMessageId } from '../../session/message-id.js';
 import { generateSessionTitle } from '../../session/generate-session-title.js';
-import type {
-  SafeMessageResultResponse,
-  MessageResultRPCResponse,
-} from '../../session/message-result.js';
+import type { MessageResultRPCResponse } from '../../session/message-result.js';
 import { createSessionEventQueries, type SessionEventQueries } from './event-queries.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
 import { isControlSession, sessionIdFromDoName } from '../../session-identity.js';
@@ -91,6 +88,7 @@ import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
   listPreparationAttempts,
+  readLatestPreparationAttemptForMessage,
   readPreparationAttempt,
   readPreparationSteps,
   type PreparationOutcome,
@@ -197,6 +195,14 @@ import {
 } from './messages.js';
 import { answerMessageIntent } from './answers.js';
 import { messageFailureText } from './failure-messages.js';
+import { projectMessageResult } from './message-result-projection.js';
+import {
+  parseMessageSettlement,
+  serializeMessageSettlement,
+  withMessageSettlements,
+  type MessageSettlement,
+} from './message-settlement.js';
+import { setupCommandLabel } from './setup-command-label.js';
 import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
@@ -226,7 +232,7 @@ import {
   reportAnchorForQueue,
   type ControlPlaneReportFacts,
 } from './reports.js';
-import { createMessageCallbacks, type MessageCallbacks } from './callbacks.js';
+import { createMessageCallbacks, lastSeenBranch, type MessageCallbacks } from './callbacks.js';
 import {
   createReportOutbox,
   readReportAnchor,
@@ -364,12 +370,6 @@ const SETUP_COMMAND_PHASE_TITLES: Record<SetupCommandKind, string> = {
   session_setup: 'Running session setup',
   start: 'Running start commands',
 };
-const SETUP_COMMAND_LABELS: Record<SetupCommandKind, string> = {
-  build: 'Build command',
-  session_setup: 'Session setup command',
-  start: 'Start command',
-};
-
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
@@ -380,17 +380,6 @@ function setupCommandPhase(kind: SetupCommandKind | undefined): string {
 
 function setupCommandPhaseTitle(kind: SetupCommandKind | undefined): string {
   return kind === undefined ? 'Running setup commands' : SETUP_COMMAND_PHASE_TITLES[kind];
-}
-
-function setupCommandLabel(
-  kind: SetupCommandKind | undefined,
-  command: number,
-  commandText: string | undefined
-): string {
-  const name = kind === undefined ? 'Setup command' : SETUP_COMMAND_LABELS[kind];
-  return commandText === undefined
-    ? `${name} ${command}`
-    : `${name} ${command} · \`${commandText}\``;
 }
 
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
@@ -685,6 +674,7 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
       ? {}
       : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
     ...(container === undefined ? {} : { container }),
+    settlement: parseMessageSettlement(row.settlement),
   };
 }
 
@@ -700,6 +690,7 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     billing_failure:
       message.billingFailure === undefined ? null : JSON.stringify(message.billingFailure),
     container: message.container === undefined ? null : JSON.stringify(message.container),
+    settlement: serializeMessageSettlement(message.settlement),
   };
 }
 
@@ -3075,21 +3066,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.registration === null) return { type: 'session-not-found' };
     const message = this.messages.find(item => item.messageId === messageId);
     if (message === undefined) return { type: 'message-not-found' };
-    const result: SafeMessageResultResponse = {
-      messageId: message.messageId,
-      status:
-        message.state === 'queued'
-          ? 'queued'
-          : message.state === 'accepted'
-            ? 'running'
-            : message.state === 'cancelled'
-              ? 'interrupted'
-              : message.state,
-      createdAt: message.createdAt,
-      ...(message.acceptedAt === null ? {} : { acceptedAt: message.acceptedAt }),
-      ...(message.settledAt === null ? {} : { terminalAt: message.settledAt }),
+    const result = projectMessageResult({
       cloudAgentSessionId: this.sessionId,
-    };
+      message,
+      readAssistantText: assistantMessageId => {
+        try {
+          this.partText.flush();
+          return this.eventQueries.getAssistantAnswerByMessageId(this.sessionId, assistantMessageId)
+            ?.text;
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId, messageId })
+            .warn('Unable to read the assistant answer for the message result');
+          return undefined;
+        }
+      },
+      readPreparation: () => {
+        try {
+          return readLatestPreparationAttemptForMessage(this.eventQueries, messageId);
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId, messageId })
+            .warn('Unable to read preparation for the message result');
+          return undefined;
+        }
+      },
+    });
     return { type: 'found', result };
   }
 
@@ -4378,6 +4380,44 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
   }
 
+  private settlementFor(
+    message: SessionMessage,
+    facts: ControlPlaneReportFacts | undefined,
+    answerPromptId: string
+  ): MessageSettlement {
+    const metadata = this.metadata;
+    const settlement: MessageSettlement = {
+      branch: metadata === null ? undefined : lastSeenBranch(metadata),
+    };
+    if (facts !== undefined) {
+      const { assistantReason, providerOwnership, workspaceSubtype, gateResult } = facts;
+      if (
+        [assistantReason, providerOwnership, workspaceSubtype, gateResult].some(
+          value => value !== undefined
+        )
+      ) {
+        settlement.facts = { assistantReason, providerOwnership, workspaceSubtype, gateResult };
+      }
+    }
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (message.state === 'completed' && message.messageId === answerPromptId && kiloSessionId) {
+      try {
+        this.partText.flush();
+        settlement.assistantMessageId =
+          this.eventQueries.getAssistantAnswerMessageIdForUserMessage(
+            this.sessionId,
+            kiloSessionId,
+            message.messageId
+          ) ?? undefined;
+      } catch {
+        logger
+          .withFields({ sessionId: this.sessionId, messageId: message.messageId })
+          .warn('Unable to include the assistant answer in the message settlement');
+      }
+    }
+    return settlement;
+  }
+
   /**
    * One owner for the side effects of a terminal transition: durable rows,
    * terminal stream events, the `session_message_committed` diagnostic the
@@ -4390,18 +4430,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     facts?: ControlPlaneReportFacts,
     source: ControlPlaneMessageSource = 'coordinator'
   ): Promise<void> {
-    if (reduction.changed.length === 0) {
+    const answerPrompt = reduction.changed.at(-1);
+    if (answerPrompt === undefined) {
       await this.armAlarm();
       return;
     }
     const previousStates = new Map(
       this.messages.map(message => [message.messageId, message.state])
     );
-    this.messages = reduction.messages;
-    await this.persistMessages(reduction.changed);
-    if (reduction.changed.some(message => previousStates.get(message.messageId) === 'accepted'))
+    const { messages, changed } = withMessageSettlements(reduction, message =>
+      this.settlementFor(message, facts, answerPrompt.messageId)
+    );
+    this.messages = messages;
+    await this.persistMessages(changed);
+    if (changed.some(message => previousStates.get(message.messageId) === 'accepted'))
       await this.settleRootStatus();
-    for (const message of reduction.changed) {
+    for (const message of changed) {
       const lifecycleEventInserted = this.emitTerminal(message);
       this.recordReport(message, facts);
       logControlDiagnostic('session_message_committed', {
@@ -4418,7 +4462,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     // Persist the callback, attempt delivery now, then arm only what remains:
     // a failed send keeps its due time and is retried by the alarm.
-    this.persistBatchCallback(reduction.changed, facts);
+    this.persistBatchCallback(changed, facts);
     await this.repairOutboxes();
     await this.armAlarm();
   }

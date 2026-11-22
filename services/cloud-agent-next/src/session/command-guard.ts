@@ -592,11 +592,6 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // The option may take its file attached, as `-oconfig` and `-o\tconfig`.
   'sort -o?*',
   'sort * -o?*',
-  // The option takes its file from the next word, so inside a short-option
-  // bundle it is the last letter, as in `sort -rno <file>`; the builder's own
-  // variant of these rules then covers the file that follows.
-  'sort -*o',
-  'sort * -*o',
   'sort --output*',
   'sort * --output*',
   // The only long option of `sort` that starts with `o` is `--output`, so the

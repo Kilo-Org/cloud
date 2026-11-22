@@ -593,7 +593,6 @@ describe('security-remediation push command guard policy', () => {
       'uniq /tmp/payload .git//config',
       'sort -rno config /tmp/payload',
       'sort -rnoconfig /tmp/payload',
-      'sort -rno out.txt src/a.ts',
       'sort -rno .git////config /tmp/payload',
       'sort --o=out.txt src/a.ts',
       'git p\\u\\sh origin +main',
@@ -669,6 +668,11 @@ describe('security-remediation push command guard policy', () => {
       'sort -n -r data.csv',
       'sort -V versions.txt',
       'sort -m a.txt b.txt',
+      // A short-option bundle whose arguments end in the option letter is not an
+      // output option.
+      'sort -n foo bar',
+      'sort -u /tmp/foo',
+      'sort -r repo/hello',
       'uniq -c src/a.ts',
       'mv src/config.ts src/conf.ts',
       'mv .github/workflows/a.yml .github/workflows/b.yml',

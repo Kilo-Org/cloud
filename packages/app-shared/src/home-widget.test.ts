@@ -599,11 +599,31 @@ describe('native Home presentation timeline', () => {
       ...scope,
       sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T10:05:00Z' }],
     });
-    const at = buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at);
-    const [wake, retry] = [at[1], at[2]] as [number, number];
-    expect(wake).toBe(now + 5 * 60 * 1000);
-    expect(retry).toBe(wake + 15 * 60 * 1000);
-    expect(new Set(at).size).toBe(at.length);
+    const wake = now + 5 * 60 * 1000;
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([
+      now,
+      wake,
+      wake + 15 * 60 * 1000,
+      now + GLANCEABLE_STALE_MS,
+    ]);
+  });
+
+  it('drops the retry when it lands on the stale instant', () => {
+    // A wake fifteen minutes after the snapshot write puts the retry on the
+    // stale deadline exactly (active cadence is thirty minutes), so the two
+    // boundaries coincide and the timeline publishes the instant once.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'scheduled', scheduledAt: new Date(now + 15 * 60 * 1000).toISOString() },
+      ],
+    });
+    const wake = now + 15 * 60 * 1000;
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([
+      now,
+      wake,
+      now + GLANCEABLE_STALE_MS,
+    ]);
   });
 
   it('keeps every built timeline inside the response schema the client parses', () => {

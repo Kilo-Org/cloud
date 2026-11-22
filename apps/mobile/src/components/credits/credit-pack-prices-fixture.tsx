@@ -110,6 +110,20 @@ const STORE_CONNECTION_REFUSAL = createPurchaseError({
 });
 
 /**
+ * How long the stand-in store takes to refuse a purchase. A real store answers
+ * from another process, so the screen's clear-then-publish cycle lasts long
+ * enough to see: the tile goes while the request is open and returns after it.
+ */
+const STORE_ANSWER_DELAY_MS = 600;
+
+/** Waits out the store's own answer time, so the refusal is not instantaneous. */
+async function waitForStoreAnswer(): Promise<void> {
+  const answer = Promise.withResolvers<undefined>();
+  setTimeout(answer.resolve, STORE_ANSWER_DELAY_MS);
+  await answer.promise;
+}
+
+/**
  * The inline error tile a state starts with, before any tap publishes its own.
  * `failed` reads the real mapper's key for a store that lost its billing
  * connection, so its tile is the sentence production shows; `timed-out` reads
@@ -340,8 +354,19 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
   const failedFailure = tapDriven
     ? [...states.values()].find(phase => phase.status === 'failed')
     : undefined;
-  const errorMessageKey = failedFailure?.failure.messageKey ?? initialErrorMessageKey(state);
+  // The tile has two owners and only one at a time. `seeded` is the state's own
+  // tile before the person touches a pack. The first tap hands the tile to the
+  // attempt, so the screen's clear-then-publish cycle runs: no tile while the
+  // request is open, the mapper's key after it refuses. Deriving that from the
+  // feedback alone cannot work, because clearing removes the entry and the seed
+  // would come back in its place.
+  const [tileSource, setTileSource] = useState<'seeded' | 'attempt'>('seeded');
+  const errorMessageKey =
+    tileSource === 'seeded'
+      ? initialErrorMessageKey(state)
+      : (failedFailure?.failure.messageKey ?? null);
   const clearError = useCallback(() => {
+    setTileSource('attempt');
     for (const [key, phase] of states) {
       if (phase.status === 'failed') {
         clearPurchaseFailure(key, () => true);
@@ -361,8 +386,12 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
         appAccountToken: catalog.appAccountToken,
         creditPackAppleProductIds: catalog.products.map(product => product.appleProductId),
         creditPackGoogleProductIds: catalog.products.map(product => product.googleProductId),
+        // The store answers the way a device without a billing client does, and
+        // it takes a moment to do so. A store call answers from another process,
+        // so an instant refusal would hide the screen's own clear-then-publish
+        // cycle behind one frame.
         requestPurchase: async () => {
-          await Promise.resolve();
+          await waitForStoreAnswer();
           throw STORE_CONNECTION_REFUSAL;
         },
         completeAppStorePurchase: async () => {

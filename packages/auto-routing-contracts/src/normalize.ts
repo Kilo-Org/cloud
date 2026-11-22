@@ -170,7 +170,7 @@ type CommonBody = {
 // Values the caller captured before the body was mutated (the gateway
 // rewrites `model` and provider fields in place during routing). When
 // provided they are used verbatim and the body's own values are ignored.
-type NormalizeOverrides = {
+export type NormalizeOverrides = {
   requestedModel: string;
   providerHints: NormalizedClassifierInput['providerHints'];
 };

@@ -1214,6 +1214,8 @@
       "emptyTitle": "Engar tilkynningar ennþá",
       "emptyCategoryTitle": "Engar tilkynningar í þessum flokki",
       "emptyBody": "Tilkynningar sem þessi reikningur fær birtast hér. Þær eru geymdar í {{days}} daga.",
+      "emptyBody_one": "Tilkynningar sem þessi reikningur fær birtast hér. Þær eru geymdar í {{days}} daga.",
+      "emptyBody_other": "Tilkynningar sem þessi reikningur fær birtast hér. Þær eru geymdar í {{days}} daga.",
       "capped": "Nýjustu tilkynningarnar eru sýndar.",
       "loadError": "Ekki tókst að hlaða tilkynningasögu.",
       "openFailed": "Þessi tilkynning opnast hvergi lengur."

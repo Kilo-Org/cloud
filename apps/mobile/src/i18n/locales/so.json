@@ -1214,6 +1214,8 @@
       "emptyTitle": "Weli ogeysiisyo ma jiraan",
       "emptyCategoryTitle": "Qaybtaan ogeysiisyo ma jiraan",
       "emptyBody": "Ogeysiisyada ay hesho akoonkan ayaa halkan ka muuqda. Waxaa la hayaa {{days}} maalmood.",
+      "emptyBody_one": "Ogeysiisyada ay hesho akoonkan ayaa halkan ka muuqda. Waxaa la hayaa {{days}} maalmood.",
+      "emptyBody_other": "Ogeysiisyada ay hesho akoonkan ayaa halkan ka muuqda. Waxaa la hayaa {{days}} maalmood.",
       "capped": "Waxaa la muujinayaa ogeysiisyada ugu dambeeyay.",
       "loadError": "Taariikhda ogeysiisyada lama soo dejin karin.",
       "openFailed": "Ogeysiiskan mar dambe meelna lagama furi karo."

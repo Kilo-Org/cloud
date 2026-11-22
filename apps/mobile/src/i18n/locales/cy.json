@@ -1322,6 +1322,12 @@
       "emptyTitle": "Dim hysbysiadau eto",
       "emptyCategoryTitle": "Dim hysbysiadau yn y categori hwn",
       "emptyBody": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_zero": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_one": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_two": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_few": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_many": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_other": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
       "capped": "Yn dangos y hysbysiadau diweddaraf.",
       "loadError": "Methu llwytho hanes hysbysiadau.",
       "openFailed": "Nid yw'r hysbysiad hwn yn agor yn unman mwyach."

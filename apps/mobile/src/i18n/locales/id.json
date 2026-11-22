@@ -653,6 +653,8 @@
       "emptyTitle": "Belum ada notifikasi",
       "emptyCategoryTitle": "Tidak ada notifikasi di kategori ini",
       "emptyBody": "Notifikasi yang diterima akun ini akan muncul di sini. Notifikasi disimpan selama {{days}} hari.",
+      "emptyBody_one": "Notifikasi yang diterima akun ini akan muncul di sini. Notifikasi disimpan selama {{days}} hari.",
+      "emptyBody_other": "Notifikasi yang diterima akun ini akan muncul di sini. Notifikasi disimpan selama {{days}} hari.",
       "capped": "Menampilkan notifikasi terbaru.",
       "loadError": "Tidak dapat memuat riwayat notifikasi.",
       "openFailed": "Notifikasi ini tidak lagi dapat dibuka di mana pun."

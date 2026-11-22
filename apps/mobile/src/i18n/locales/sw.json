@@ -1214,6 +1214,8 @@
       "emptyTitle": "Hakuna arifa bado",
       "emptyCategoryTitle": "Hakuna arifa katika kundi hili",
       "emptyBody": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
+      "emptyBody_one": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
+      "emptyBody_other": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
       "capped": "Inaonyesha arifa za hivi karibuni.",
       "loadError": "Imeshindikana kupakia historia ya arifa.",
       "openFailed": "Arifa hii haifunguki tena popote."

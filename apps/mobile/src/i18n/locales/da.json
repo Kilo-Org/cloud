@@ -1214,6 +1214,8 @@
       "emptyTitle": "Ingen notifikationer endnu",
       "emptyCategoryTitle": "Ingen notifikationer i denne kategori",
       "emptyBody": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
+      "emptyBody_one": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
+      "emptyBody_other": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
       "capped": "Viser de seneste notifikationer.",
       "loadError": "Kunne ikke indlæse notifikationshistorikken.",
       "openFailed": "Denne notifikation kan ikke længere åbnes nogen steder."

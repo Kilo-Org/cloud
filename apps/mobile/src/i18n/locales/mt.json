@@ -1295,6 +1295,11 @@
       "emptyTitle": "Għad m'hemmx notifiki",
       "emptyCategoryTitle": "Għad m'hemmx notifiki f'din il-kategorija",
       "emptyBody": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
+      "emptyBody_one": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
+      "emptyBody_two": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
+      "emptyBody_few": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
+      "emptyBody_many": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
+      "emptyBody_other": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
       "capped": "Qed jintwerew in-notifiki l-aktar reċenti.",
       "loadError": "Ma setgħetx tiġi mgħobbija l-kronoloġija tan-notifiki.",
       "openFailed": "Din in-notifika m'għadhiex tinfetaħ imkien."

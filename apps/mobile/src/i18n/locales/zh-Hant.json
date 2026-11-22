@@ -653,6 +653,8 @@
       "emptyTitle": "尚無通知",
       "emptyCategoryTitle": "此類別尚無通知",
       "emptyBody": "此帳戶收到的通知會顯示在這裡。通知會保留 {{days}} 天。",
+      "emptyBody_one": "此帳戶收到的通知會顯示在這裡。通知會保留 {{days}} 天。",
+      "emptyBody_other": "此帳戶收到的通知會顯示在這裡。通知會保留 {{days}} 天。",
       "capped": "顯示最近的通知。",
       "loadError": "無法載入通知歷史。",
       "openFailed": "此通知已無法開啟。"

@@ -1214,6 +1214,8 @@
       "emptyTitle": "Kāore anō he whakamōhiotanga",
       "emptyCategoryTitle": "Kāore he whakamōhiotanga i tēnei kāwai",
       "emptyBody": "Ka puta mai ki konei ngā whakamōhiotanga ka riro i tēnei pūkete. Ka tiakina mō {{days}} rā.",
+      "emptyBody_one": "Ka puta mai ki konei ngā whakamōhiotanga ka riro i tēnei pūkete. Ka tiakina mō {{days}} rā.",
+      "emptyBody_other": "Ka puta mai ki konei ngā whakamōhiotanga ka riro i tēnei pūkete. Ka tiakina mō {{days}} rā.",
       "capped": "E whakaatu ana i ngā whakamōhiotanga tino hou.",
       "loadError": "Kāore i taea te uta i te hītori whakamōhiotanga.",
       "openFailed": "Kua kore tēnei whakamōhiotanga e taea te whakatuwhera ahakoa ki hea."

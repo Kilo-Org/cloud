@@ -1241,6 +1241,9 @@
       "emptyTitle": "Nicio notificare încă",
       "emptyCategoryTitle": "Nicio notificare în această categorie",
       "emptyBody": "Notificările primite de acest cont apar aici. Acestea se păstrează pentru {{days}} zile.",
+      "emptyBody_one": "Notificările primite de acest cont apar aici. Acestea se păstrează pentru {{days}} zile.",
+      "emptyBody_few": "Notificările primite de acest cont apar aici. Acestea se păstrează pentru {{days}} zile.",
+      "emptyBody_other": "Notificările primite de acest cont apar aici. Acestea se păstrează pentru {{days}} zile.",
       "capped": "Se afișează cele mai recente notificări.",
       "loadError": "Nu s-a putut încărca istoricul notificărilor.",
       "openFailed": "Această notificare nu se mai deschide nicăieri."

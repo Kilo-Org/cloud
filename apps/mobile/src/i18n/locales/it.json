@@ -593,6 +593,9 @@
       "emptyTitle": "Nessuna notifica per ora",
       "emptyCategoryTitle": "Nessuna notifica in questa categoria",
       "emptyBody": "Le notifiche ricevute da questo account compaiono qui. Vengono conservate per {{days}} giorni.",
+      "emptyBody_one": "Le notifiche ricevute da questo account compaiono qui. Vengono conservate per {{days}} giorni.",
+      "emptyBody_many": "Le notifiche ricevute da questo account compaiono qui. Vengono conservate per {{days}} giorni.",
+      "emptyBody_other": "Le notifiche ricevute da questo account compaiono qui. Vengono conservate per {{days}} giorni.",
       "capped": "Vengono mostrate le notifiche più recenti.",
       "loadError": "Impossibile caricare la cronologia delle notifiche.",
       "openFailed": "Questa notifica non si apre più da nessuna parte."

@@ -622,6 +622,10 @@
       "emptyTitle": "Nenhuma notificação ainda",
       "emptyCategoryTitle": "Nenhuma notificação nesta categoria",
       "emptyBody": "As notificações que esta conta recebe aparecem aqui. Elas são mantidas por {{days}} dias.",
+      "emptyBody_zero": "As notificações que esta conta recebe aparecem aqui. Elas são mantidas por {{days}} dias.",
+      "emptyBody_one": "As notificações que esta conta recebe aparecem aqui. Elas são mantidas por {{days}} dias.",
+      "emptyBody_many": "As notificações que esta conta recebe aparecem aqui. Elas são mantidas por {{days}} dias.",
+      "emptyBody_other": "As notificações que esta conta recebe aparecem aqui. Elas são mantidas por {{days}} dias.",
       "capped": "Mostrando as notificações mais recentes.",
       "loadError": "Não foi possível carregar o histórico de notificações.",
       "openFailed": "Esta notificação não abre mais em lugar nenhum."

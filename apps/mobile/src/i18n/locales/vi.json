@@ -653,6 +653,8 @@
       "emptyTitle": "Chưa có thông báo nào",
       "emptyCategoryTitle": "Không có thông báo nào trong danh mục này",
       "emptyBody": "Các thông báo mà tài khoản này nhận được sẽ xuất hiện ở đây. Chúng được lưu trong {{days}} ngày.",
+      "emptyBody_one": "Các thông báo mà tài khoản này nhận được sẽ xuất hiện ở đây. Chúng được lưu trong {{days}} ngày.",
+      "emptyBody_other": "Các thông báo mà tài khoản này nhận được sẽ xuất hiện ở đây. Chúng được lưu trong {{days}} ngày.",
       "capped": "Đang hiển thị các thông báo gần đây nhất.",
       "loadError": "Không thể tải lịch sử thông báo.",
       "openFailed": "Thông báo này không còn mở được ở đâu nữa."

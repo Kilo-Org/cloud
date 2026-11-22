@@ -1268,6 +1268,10 @@
       "emptyTitle": "Ainda não há notificações",
       "emptyCategoryTitle": "Ainda não há notificações nesta categoria",
       "emptyBody": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_zero": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_one": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_many": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_other": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
       "capped": "A mostrar as notificações mais recentes.",
       "loadError": "Não foi possível carregar o histórico de notificações.",
       "openFailed": "Esta notificação já não abre em lado nenhum."

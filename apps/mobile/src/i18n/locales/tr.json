@@ -653,6 +653,8 @@
       "emptyTitle": "Henüz bildirim yok",
       "emptyCategoryTitle": "Bu kategoride bildirim yok",
       "emptyBody": "Bu hesabın aldığı bildirimler burada görünür. {{days}} gün boyunca saklanır.",
+      "emptyBody_one": "Bu hesabın aldığı bildirimler burada görünür. {{days}} gün boyunca saklanır.",
+      "emptyBody_other": "Bu hesabın aldığı bildirimler burada görünür. {{days}} gün boyunca saklanır.",
       "capped": "En son bildirimler gösteriliyor.",
       "loadError": "Bildirim geçmişi yüklenemedi.",
       "openFailed": "Bu bildirim artık hiçbir yerde açılmıyor."

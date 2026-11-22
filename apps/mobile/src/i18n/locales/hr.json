@@ -1241,6 +1241,9 @@
       "emptyTitle": "Još nema obavijesti",
       "emptyCategoryTitle": "Nema obavijesti u ovoj kategoriji",
       "emptyBody": "Obavijesti koje ovaj račun prima pojavljuju se ovdje. Čuvaju se {{days}} dana.",
+      "emptyBody_one": "Obavijesti koje ovaj račun prima pojavljuju se ovdje. Čuvaju se {{days}} dana.",
+      "emptyBody_few": "Obavijesti koje ovaj račun prima pojavljuju se ovdje. Čuvaju se {{days}} dana.",
+      "emptyBody_other": "Obavijesti koje ovaj račun prima pojavljuju se ovdje. Čuvaju se {{days}} dana.",
       "capped": "Prikazuju se najnovije obavijesti.",
       "loadError": "Nije moguće učitati povijest obavijesti.",
       "openFailed": "Ova se obavijest više ne otvara nigdje."

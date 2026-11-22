@@ -1241,6 +1241,9 @@
       "emptyTitle": "Vēl nav paziņojumu",
       "emptyCategoryTitle": "Šajā kategorijā nav paziņojumu",
       "emptyBody": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
+      "emptyBody_zero": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
+      "emptyBody_one": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
+      "emptyBody_other": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
       "capped": "Tiek rādīti jaunākie paziņojumi.",
       "loadError": "Neizdevās ielādēt paziņojumu vēsturi.",
       "openFailed": "Šis paziņojums vairs nekur neatveras."

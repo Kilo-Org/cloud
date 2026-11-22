@@ -1214,6 +1214,8 @@
       "emptyTitle": "Teavitusi veel pole",
       "emptyCategoryTitle": "Selles kategoorias pole teavitusi",
       "emptyBody": "Teavitused, mille see konto saab, kuvatakse siin. Neid säilitatakse {{days}} päeva.",
+      "emptyBody_one": "Teavitused, mille see konto saab, kuvatakse siin. Neid säilitatakse {{days}} päeva.",
+      "emptyBody_other": "Teavitused, mille see konto saab, kuvatakse siin. Neid säilitatakse {{days}} päeva.",
       "capped": "Kuvatakse kõige hiljutisemad teavitused.",
       "loadError": "Teavituste ajaloo laadimine ebaõnnestus.",
       "openFailed": "See teavitus ei avane enam kuskil."

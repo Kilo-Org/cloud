@@ -1214,6 +1214,8 @@
       "emptyTitle": "Ammatti beeksisoonni hin jiran",
       "emptyCategoryTitle": "Beeksisoonni rammii kana keessatti hin jiran",
       "emptyBody": "Beeksisoonni herregni kun fudhatu asitti mul'atu. Guyyaa {{days}}f ni eegamu.",
+      "emptyBody_one": "Beeksisoonni herregni kun fudhatu asitti mul'atu. Guyyaa {{days}}f ni eegamu.",
+      "emptyBody_other": "Beeksisoonni herregni kun fudhatu asitti mul'atu. Guyyaa {{days}}f ni eegamu.",
       "capped": "Beeksisoonni haaraan agarsiifamaa jiran.",
       "loadError": "Seenaa beeksisaa fiduu hin dandeenye.",
       "openFailed": "Beeksisni kun amma bakka tokkollee hin banamu."

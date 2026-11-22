@@ -1214,6 +1214,8 @@
       "emptyTitle": "Hələ bildiriş yoxdur",
       "emptyCategoryTitle": "Bu kateqoriyada bildiriş yoxdur",
       "emptyBody": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
+      "emptyBody_one": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
+      "emptyBody_other": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
       "capped": "Ən son bildirişlər göstərilir.",
       "loadError": "Bildiriş tarixçəsini yükləmək mümkün olmadı.",
       "openFailed": "Bu bildiriş artıq heç yerdə açılmır."

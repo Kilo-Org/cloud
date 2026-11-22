@@ -1268,6 +1268,10 @@
       "emptyTitle": "Kol kas pranešimų nėra",
       "emptyCategoryTitle": "Šioje kategorijoje pranešimų nėra",
       "emptyBody": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "emptyBody_one": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "emptyBody_few": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "emptyBody_many": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "emptyBody_other": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
       "capped": "Rodomi naujausi pranešimai.",
       "loadError": "Nepavyko įkelti pranešimų istorijos.",
       "openFailed": "Šio pranešimo nebegalima atidaryti niekur."

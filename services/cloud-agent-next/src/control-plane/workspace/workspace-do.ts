@@ -182,10 +182,16 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
         .map(([key]) => key.slice(CHILD_PREFIX.length)),
       ...(anchorId ? [anchorId] : []),
     ]);
+    let readFailure: { error: unknown } | undefined;
     for (const childId of childIds) {
-      const metadata = await this.readChildMetadata(authority, childId);
-      if (metadata?.workspace?.worktreeId === worktreeId) return;
+      try {
+        const metadata = await this.readChildMetadata(authority, childId);
+        if (metadata?.workspace?.worktreeId === worktreeId) return;
+      } catch (error) {
+        readFailure ??= { error };
+      }
     }
+    if (readFailure) throw readFailure.error;
     throw new Error('Stack target must be this workspace or a direct child workspace');
   }
 

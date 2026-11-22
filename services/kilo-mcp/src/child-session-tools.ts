@@ -193,7 +193,7 @@ const fieldDescriptions: Record<string, string> = {
     'Include repositories only to select branches for additional repositories in the environment.',
   stackOnWorktreeId: 'Use your own or a direct child’s worktree ID after its branch is pushed.',
   callbackTarget:
-    'Use {"url":"workspace:<session-id>"} with the cloud-agent-context ID to notify this chat. With workspace:new-chat, set launchingSessionId to route questions here and results to a new chat.',
+    'Use {"url":"workspace:<session-id>"} with the cloud-agent-context ID to notify this chat. If the parent has a worktree, workspace:new-chat sends results to a new chat; set launchingSessionId to route questions here.',
   sessionId: 'The workspace_* child session ID, not kiloSessionId.',
   messageUuid: 'Use one new UUID as the upload group for all files attached to the same prompt.',
   attachmentId: 'Use a different UUID for each file.',

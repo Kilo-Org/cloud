@@ -89,19 +89,26 @@ async function validateCallbackTarget(
   }
   const targetSessionId = parseWorkspaceSessionCallbackTarget(target.url);
   const sessionId = targetSessionId ?? target.launchingSessionId;
-  if (sessionId === undefined) return { url: target.url };
   const [targetSession, workspace] = await Promise.all([
-    loadCallbackSession(ctx, authority.ownerId, sessionId),
+    sessionId === undefined ? null : loadCallbackSession(ctx, authority.ownerId, sessionId),
     withDORetry(
       () => getWorkspaceStub(ctx.env, authority.ownerId, authority.parentSessionId),
       stub => stub.describe(),
       'describe'
     ),
   ]);
+  if (targetSessionId === null && workspace.worktreeId === null) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'A new-chat callback requires a worktree',
+    });
+  }
+  if (workspace.state !== 'active' || workspace.organizationId !== authority.organizationId) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Callback workspace is not available' });
+  }
+  if (sessionId === undefined) return { url: target.url };
   if (
     !targetSession ||
-    workspace.state !== 'active' ||
-    workspace.organizationId !== authority.organizationId ||
     targetSession.identity.sessionId !== sessionId ||
     targetSession.identity.userId !== authority.ownerId ||
     (targetSession.identity.orgId ?? null) !== authority.organizationId ||

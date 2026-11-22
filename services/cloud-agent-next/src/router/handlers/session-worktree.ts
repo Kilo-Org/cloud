@@ -1796,15 +1796,23 @@ const createWorktreeChatHandler = cloudAgentManagedProcedure
       })
     );
     if (authority) {
-      await withDORetry(
-        () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
-        stub =>
-          stub.recordChild({
-            cloudAgentSessionId: result.cloudAgentSessionId,
-            worktreeId: result.worktreeId,
-          }),
-        'recordChild'
-      );
+      try {
+        await withDORetry(
+          () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
+          stub =>
+            stub.recordChild({
+              cloudAgentSessionId: result.cloudAgentSessionId,
+              worktreeId: result.worktreeId,
+            }),
+          'recordChild'
+        );
+      } catch {
+        logControlDiagnostic(
+          'worktree_chat_child_registry_write_failed',
+          { cloudAgentSessionId: result.cloudAgentSessionId, worktreeId: result.worktreeId },
+          'warn'
+        );
+      }
     }
     return result;
   });

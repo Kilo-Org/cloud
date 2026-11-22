@@ -186,8 +186,14 @@ export function createMessageCallbacks(
       !isWorkspaceCallbackTargetUrl(target.url)
     )
       return false;
-    const question = ChildQuestionSchema.safeParse(raw).data;
-    if (!question) return false;
+    const parsed = ChildQuestionSchema.safeParse(raw);
+    if (!parsed.success) {
+      logger
+        .withFields({ sessionId: metadata.identity.sessionId, reason: 'invalid_question' })
+        .warn('Child question callback was not queued');
+      return false;
+    }
+    const question = parsed.data;
     const key = callbackKey(`question:${question.id}`);
     if (storage.kv.get(key) !== undefined) return false;
     const job = {
@@ -198,10 +204,18 @@ export function createMessageCallbacks(
       parentSession: { userId: metadata.identity.userId, messageId: createMessageId() },
       payload: { cloudAgentSessionId: metadata.identity.sessionId, question },
     };
-    if (
-      new TextEncoder().encode(JSON.stringify(job)).byteLength > CALLBACK_QUEUE_MAX_SERIALIZED_BYTES
-    )
+    const serializedBytes = new TextEncoder().encode(JSON.stringify(job)).byteLength;
+    if (serializedBytes > CALLBACK_QUEUE_MAX_SERIALIZED_BYTES) {
+      logger
+        .withFields({
+          sessionId: metadata.identity.sessionId,
+          reason: 'queue_payload_too_large',
+          serializedBytes,
+          maxSerializedBytes: CALLBACK_QUEUE_MAX_SERIALIZED_BYTES,
+        })
+        .warn('Child question callback was not queued');
       return false;
+    }
     storage.kv.put<PendingCallbackJob>(key, { job, attempts: 0, dueAt: Date.now() });
     return true;
   }

@@ -352,40 +352,79 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(parsed).not.toHaveProperty('allowSubagentSessions');
   });
 
-  it.each(['workspace:new-chat'])(
-    'derives child lineage from authority and requires a ledger operation key for %s',
-    async url => {
+  it('derives child lineage from authority for a new-chat callback in a worktree', async () => {
+    const url = 'workspace:new-chat';
+    useSessionMetadata([
+      [
+        WORKSPACE_PARENT_ID,
+        callbackMetadata(WORKSPACE_PARENT_ID, { worktreeId: WORKSPACE_WORKTREE_ID }),
+      ],
+    ]);
+    const context = createContext();
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    const authority = {
+      version: 1,
+      ownerId: context.userId ?? 'user-123',
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    } satisfies NonNullable<TRPCContext['cloudAgentAuthority']>;
+    context.cloudAgentAuthority = authority;
+    const caller = router.createCaller(context);
+    await caller.prepareSession({
+      prompt: 'child',
+      callbackTarget: { url, launchingSessionId: WORKSPACE_PARENT_ID },
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      operationKey: OPERATION_KEY,
+      createdOnPlatform: 'cloud-agent',
+    });
+    const [request, registration, options] = createSessionWithLedgerMock.mock.calls[0];
+    expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
+    expect(request).not.toHaveProperty('allowSubagentSessions');
+    expect(request.options.createdOnPlatform).toBe('cloud-agent-web');
+    expect(request.options.callbackTarget).toEqual({
+      url,
+      launchingSessionId: WORKSPACE_PARENT_ID,
+    });
+    expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
+    expect(options.operationKey).toBe(OPERATION_KEY);
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, WORKSPACE_PARENT_ID])(
+    'rejects new-chat callbacks from a standalone parent (launching session: %s)',
+    async launchingSessionId => {
+      useSessionMetadata([[WORKSPACE_PARENT_ID, callbackMetadata(WORKSPACE_PARENT_ID)]]);
       const context = createContext();
       context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
-      const authority = {
+      context.cloudAgentAuthority = {
         version: 1,
-        ownerId: context.userId ?? 'user-123',
-        parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+        ownerId: 'test-user-123',
+        parentSessionId: WORKSPACE_PARENT_ID,
         organizationId: null,
         authorizationId: '12345678-1234-4234-8234-123456789abc',
         expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
-      } satisfies NonNullable<TRPCContext['cloudAgentAuthority']>;
-      context.cloudAgentAuthority = authority;
-      const caller = router.createCaller(context);
-      await caller.prepareSession({
-        prompt: 'child',
-        callbackTarget: { url },
-        mode: 'code',
-        model: 'kilo/test-model',
-        githubRepo: 'acme/repo',
-        autoInitiate: true,
-        operationKey: OPERATION_KEY,
-        createdOnPlatform: 'cloud-agent',
+      };
+      await expect(
+        router.createCaller(context).prepareSession({
+          prompt: 'child',
+          callbackTarget: { url: 'workspace:new-chat', launchingSessionId },
+          mode: 'code',
+          model: 'kilo/test-model',
+          githubRepo: 'acme/repo',
+          autoInitiate: true,
+          operationKey: OPERATION_KEY,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'A new-chat callback requires a worktree',
       });
-      const [request, registration, options] = createSessionWithLedgerMock.mock.calls[0];
-      expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
-      expect(request).not.toHaveProperty('allowSubagentSessions');
-      expect(request.options.createdOnPlatform).toBe('cloud-agent-web');
-      expect(request.options.callbackTarget).toEqual({ url });
-      expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
-      expect(options.operationKey).toBe(OPERATION_KEY);
-      expect(startNewSessionMock).not.toHaveBeenCalled();
-      expect(registerNewSessionMock).not.toHaveBeenCalled();
+      expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
     }
   );
 

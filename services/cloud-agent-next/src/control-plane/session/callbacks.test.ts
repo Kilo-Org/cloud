@@ -19,7 +19,7 @@ const metadata = {
 } satisfies SessionMetadata;
 
 describe('control-plane callback recent activity', () => {
-  it('persists one question callback directed to the launching chat', () => {
+  it('persists one question callback at the SDK limits, directed to the launching chat', () => {
     const stored = new Map<string, PendingCallbackJob>();
     const launchingSessionId = 'workspace_22345678-1234-4234-8234-123456789abc';
     const callbacks = createMessageCallbacks({
@@ -42,7 +42,14 @@ describe('control-plane callback recent activity', () => {
     });
     const question = {
       id: 'question-1',
-      questions: [{ question: 'Continue?', options: [{ label: 'Yes' }] }],
+      questions: Array.from({ length: 32 }, (_, index) => ({
+        question: index === 0 ? 'Q'.repeat(4_097) : 'Continue?',
+        header: 'Continue',
+        options: Array.from({ length: 32 }, (_, option) => ({
+          label: `Option ${option + 1}`,
+          description: 'Answer',
+        })),
+      })),
     };
     expect(callbacks.persistQuestionCallback(question)).toBe(true);
     expect(callbacks.persistQuestionCallback(question)).toBe(false);

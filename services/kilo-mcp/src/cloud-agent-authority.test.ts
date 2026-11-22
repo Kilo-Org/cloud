@@ -902,8 +902,10 @@ describe('Cloud Agent MCP authority', () => {
         properties: { sessionId: { type: 'string' } },
       });
       expect(schemaFor('sendMessage')).not.toHaveProperty('properties.payload.properties.command');
-      expect(schemaFor('sendMessage')).toHaveProperty('properties.payload.properties.attachments');
-      expect(schemaFor('sendMessage')).not.toHaveProperty('properties.attachments');
+      expect(schemaFor('sendMessage')).not.toHaveProperty(
+        'properties.payload.properties.attachments'
+      );
+      expect(schemaFor('sendMessage')).toHaveProperty('properties.attachments');
       expect(schemaFor('prepareSession')).toMatchObject({
         properties: {
           githubRepo: { type: 'string' },

@@ -1548,7 +1548,7 @@ function buildSessionRegistrationCommand(
 ) {
   return {
     generatedBranch: allocation.generatedBranch,
-    allowSubagentSessions: isPolicyBearingAuthToken(ctx.authToken),
+    allowSubagentSessions: ctx.botId === undefined && isPolicyBearingAuthToken(ctx.authToken),
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     identity: {

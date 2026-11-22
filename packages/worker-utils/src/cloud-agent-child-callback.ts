@@ -35,23 +35,27 @@ export const ChildSessionCallbackPayloadSchema = z
 export type ChildSessionCallbackPayload = z.infer<typeof ChildSessionCallbackPayloadSchema>;
 
 export const ChildQuestionSchema = z.object({
-  id: z.string().min(1).max(256),
+  id: z.string().min(1),
   questions: z
     .array(
       z.object({
-        question: z.string().max(4096),
-        header: z.string().max(256).optional(),
+        question: z.string(),
+        header: z.string().optional(),
         options: z
           .array(
-            z.object({ label: z.string().max(256), description: z.string().max(1024).optional() })
+            z.object({
+              label: z.string(),
+              description: z.string().optional(),
+              mode: z.string().optional(),
+            })
           )
-          .max(20),
+          .max(32),
         multiple: z.boolean().optional(),
         custom: z.boolean().optional(),
       })
     )
     .min(1)
-    .max(10),
+    .max(32),
 });
 
 const childQuestionCallbackSchema = z.object({

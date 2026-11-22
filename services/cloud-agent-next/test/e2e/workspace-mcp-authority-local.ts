@@ -415,50 +415,36 @@ async function exerciseQuestions(config: DriverConfig, url: string, root: Chat, 
   );
   assert.equal(await waitForTurn(config, child, initialMessageId), 'completed');
   observe('question-callback-and-answer', { result: 'passed' });
-  if (process.env.WORKSPACE_MCP_STEPS?.split(',').includes('queue')) {
-    const slowMessageId = createMessageId();
-    await sendMessage(config, {
-      cloudAgentSessionId: child.cloudAgentSessionId,
-      messageId: slowMessageId,
-      prompt: fakeDirective('slow:60:1000:16'),
-    });
-    const deadline = Date.now() + 15_000;
-    while (
-      (await getMessageResult(config, child.cloudAgentSessionId, slowMessageId)).status !==
-      'running'
-    ) {
-      assert.ok(Date.now() < deadline, 'paced turn did not start');
-      await sleep(500);
-    }
-    const { messageId } = z
-      .object({ messageId: z.string() })
-      .parse(await toolData(url, token, 'generate_message_id', {}));
-    await toolData(url, token, 'send_message', {
-      cloudAgentSessionId: child.cloudAgentSessionId,
-      messageId,
-      payload: {
-        type: 'prompt',
-        prompt: fakeDirective('echo:must-not-run'),
-        mode: 'code',
+}
+
+async function exerciseQueuedCancellation(config: DriverConfig, url: string, token: string) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const child = childSchema.parse(
+      await toolData(url, token, 'spawn_session', {
+        publicRepoUrl: config.gitUrl,
         model: config.model,
-      },
-    });
+        mode: 'code',
+        operationKey: randomUUID(),
+        prompt: fakeDirective('echo:queue-cancel-check'),
+      })
+    );
+    const messageId = await initialMessage(url, token, child);
     const cancelInput = { sessionId: child.cloudAgentSessionId, messageId };
     const cancelled = z
       .object({ dropped: z.boolean() })
       .parse(await toolData(url, token, 'cancel_queued_message', cancelInput));
-    assert.deepEqual(await toolData(url, token, 'cancel_queued_message', cancelInput), {
-      dropped: false,
-    });
-    // Delivery moves a queued message to the runtime within the same pass, so
-    // the cancel can lose the race. A delivered message runs; a dropped one
-    // settles without running.
     assert.equal(
       await waitForTurn(config, child, messageId),
       cancelled.dropped ? 'interrupted' : 'completed'
     );
-    observe('queued-message-cancel', { result: 'passed', dropped: cancelled.dropped });
+    if (!cancelled.dropped) continue;
+    assert.deepEqual(await toolData(url, token, 'cancel_queued_message', cancelInput), {
+      dropped: false,
+    });
+    observe('queued-message-cancel', { result: 'passed', attempt });
+    return;
   }
+  assert.fail('Cancellation did not drop a queued message in three cold launches');
 }
 
 type Inspection = {
@@ -610,6 +596,10 @@ async function main(): Promise<void> {
   if (scenario.has('questions')) {
     assert.ok(rootMcp.token, 'root MCP credential unavailable');
     await exerciseQuestions(config, mcpUrl, root, rootMcp.token);
+  }
+  if (scenario.has('queue')) {
+    assert.ok(rootMcp.token, 'root MCP credential unavailable');
+    await exerciseQueuedCancellation(config, mcpUrl, rootMcp.token);
   }
 
   if (scenario.has('expiry')) {

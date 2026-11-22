@@ -3352,7 +3352,7 @@ describe('createSessionWithLedger admission ladder', () => {
     'leaves %s browser sessions ungrouped with their requested auto-commit',
     async (_label, runtime, botId) => {
       const doStub = makeDoStub();
-      const ctx = { ...makeContext(doStub), ...(botId ? { botId } : {}) };
+      const ctx = { ...modernContext(makeContext(doStub)), botId };
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
       await runCreate(
@@ -3371,6 +3371,7 @@ describe('createSessionWithLedger admission ladder', () => {
       expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           finalization: { autoCommit: true },
+          allowSubagentSessions: false,
           workspace: expect.not.objectContaining({ worktreeId: expect.anything() }),
         })
       );

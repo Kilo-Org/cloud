@@ -14,6 +14,7 @@ const SOURCE_WORKSPACE_ID = `workspace_${UUID}` as const;
 const WORKTREE_ID = `worktree_${UUID}` as const;
 
 type SourceSession = {
+  kiloSessionId: string;
   cloudAgentSessionId: string | null;
   worktreeId: string | null;
 };
@@ -72,7 +73,11 @@ describe('createWorktreeChat', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLimit.mockResolvedValue([
-      { cloudAgentSessionId: SOURCE_WORKSPACE_ID, worktreeId: WORKTREE_ID },
+      {
+        kiloSessionId: SOURCE_KILO_SESSION_ID,
+        cloudAgentSessionId: SOURCE_WORKSPACE_ID,
+        worktreeId: WORKTREE_ID,
+      },
     ]);
     mockWorkerCreateWorktreeChat.mockResolvedValue(result);
   });

@@ -334,9 +334,9 @@ const scopedChildOperations = {
             mode: scopedPrepareSessionSchema.shape.mode,
             model: scopedPrepareSessionSchema.shape.model,
             variant: scopedPrepareSessionSchema.shape.variant,
-            attachments: AttachmentsSchema.optional(),
           })
           .strict(),
+        attachments: AttachmentsSchema.optional(),
         autoCommit: z.boolean().optional(),
         expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
       })

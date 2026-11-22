@@ -581,10 +581,19 @@ describe('discord-service bot removal', () => {
     );
   });
 
-  it.each([403, 404])('treats a %i answer as a membership that is already gone', async status => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status }));
+  it('treats a 404 answer as a membership that is already gone', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 404 }));
 
     await expect(removeBotFromGuild(guildId)).resolves.toEqual({ status: 'already_absent' });
+  });
+
+  it('reports a 403 answer as a temporary failure rather than a membership that is gone', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 403 }));
+
+    await expect(removeBotFromGuild(guildId)).resolves.toEqual({
+      status: 'temporary_failure',
+      reason: 'response_error',
+    });
   });
 
   it.each([

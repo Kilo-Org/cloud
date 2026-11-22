@@ -104,9 +104,12 @@ export const DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE =
 /**
  * Outcome of asking Discord to remove the bot from a server.
  *
- * `left` is Discord's 204. `already_absent` is its 403/404 answer for a server
- * the bot no longer belongs to, where the membership this disconnect revokes is
- * already gone. Every other outcome must be reported instead of a disconnect.
+ * `left` is Discord's 204. `already_absent` is its 404 answer, which is the
+ * answer for a server the bot is not in, so the membership this disconnect
+ * revokes is already gone. A 403 means the token may not act on the guild and
+ * does not prove the bot left, so it stays a reported failure. Every outcome
+ * other than a confirmed membership that is gone must be reported instead of a
+ * disconnect.
  */
 export type DiscordBotRemoval =
   | { status: 'left' }
@@ -496,7 +499,9 @@ export async function upsertDiscordInstallation(
  * `DELETE /users/@me/guilds/{guild.id}` is the endpoint a bot uses to leave a
  * server. The OAuth exchange stores no user token, deliberately, so this call is
  * the one that ends the membership the integration holds. Discord answers 204
- * when the bot left, and 403 or 404 when the bot is not a member of that server.
+ * when the bot left and 404 for a server it is not in. A 403 means the token may
+ * not act on that guild, so it is reported as a failure rather than read as a
+ * membership that is already gone.
  *
  * `timeoutMs` bounds the request. A caller inside the installation lock passes a
  * value below that lock's wait; without one the full default applies.
@@ -539,9 +544,11 @@ export async function removeBotFromGuild(
       return { status: 'unavailable', reason: 'rejected_token' };
     }
 
-    // 404 is an unknown server and 403 a server the bot is not in; in both
-    // cases the membership is already gone, so there is nothing left to revoke.
-    if (response.status === 403 || response.status === 404) {
+    // 404 is an unknown server, which is the answer for a server the bot is not
+    // in, so the membership is already gone. 403 is not that answer: Discord
+    // reports it when the token may not act on the guild, which does not prove
+    // the bot left, so it stays a reported failure.
+    if (response.status === 404) {
       return { status: 'already_absent' };
     }
 

@@ -164,11 +164,7 @@ describe('useRetireCoveredSource', () => {
     expect(resetMock).not.toHaveBeenCalled();
 
     setStack(
-      [
-        r('detail-1', 'findings/[id]'),
-        r('dash-1', 'index'),
-        r('list-1', 'findings/index'),
-      ],
+      [r('detail-1', 'findings/[id]'), r('dash-1', 'index'), r('list-1', 'findings/index')],
       2
     );
     endTransition();

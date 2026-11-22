@@ -5,7 +5,10 @@ import { organization_seats_purchases, organizations } from '@kilocode/db/schema
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-import type { ModelRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
+import {
+  getEligibleProviderRoutes,
+  type ModelRestrictions,
+} from '@kilocode/web-shared/lib/model-allow.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { computeSnapshotDiff, type SnapshotDiff } from '@/lib/providers/openrouter/snapshot-diff';
@@ -39,11 +42,10 @@ function precompute(restrictions: ModelRestrictions): PrecomputedRestrictions {
 }
 
 /**
- * Determine whether a model id is accessible to an org given a model→providers
- * index snapshot. Returns `{ allowed: true, reasonProvider }` when accessible,
- * where `reasonProvider` is a deterministically-picked provider slug (first
- * alphabetically among allowed providers) that admits the model — used as the
- * human-readable "because of X" reason.
+ * Accessibility comes from `getEligibleProviderRoutes`, the same rule
+ * `getEffectiveModelDecision` applies. `reasonProvider` is the alphabetically-first
+ * provider that both lists the model and has an eligible route, so a router admitted
+ * through the `virtual` provider is labelled by the provider the snapshot lists it under.
  */
 function checkAvailability(
   providerSlugsForModel: Set<string> | undefined,
@@ -57,17 +59,17 @@ function checkAvailability(
     return { allowed: false, reasonProvider: null };
   }
 
-  const sortedProviders = [...providerSlugsForModel].sort((a, b) => a.localeCompare(b));
+  const routes = precomputed.providerAllowSet
+    ? getEligibleProviderRoutes(providerSlugsForModel, precomputed.providerAllowSet)
+    : providerSlugsForModel;
 
-  const { providerAllowSet } = precomputed;
-  if (providerAllowSet !== undefined) {
-    const allowedProvider = sortedProviders.find(slug => providerAllowSet.has(slug));
-    return allowedProvider
-      ? { allowed: true, reasonProvider: allowedProvider }
-      : { allowed: false, reasonProvider: null };
-  }
+  const admittingProvider = [...providerSlugsForModel]
+    .filter(slug => routes.has(slug))
+    .sort((a, b) => a.localeCompare(b))[0];
 
-  return { allowed: true, reasonProvider: sortedProviders[0] };
+  return admittingProvider
+    ? { allowed: true, reasonProvider: admittingProvider }
+    : { allowed: false, reasonProvider: null };
 }
 
 /**

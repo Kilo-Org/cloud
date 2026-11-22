@@ -2079,10 +2079,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             return;
           }
           if (page.kind !== 'success') {
+            // A retryable read keeps the generic retry copy the app already
+            // renders a Retry for; the terminal kinds name the history
+            // failure they are, so no surface offers a CTA a retry cannot
+            // recover.
             storeChildHydrationFailure(
               storage,
               childSessionId,
-              sessionSnapshotFailureMessage(page.kind).message
+              page.kind === 'retryable_failure'
+                ? formatError(page)
+                : sessionSnapshotFailureMessage(page.kind).message
             );
             return;
           }

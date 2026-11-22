@@ -3574,11 +3574,11 @@ export const createBrowserRuntime = ({
          * origin the call really asked to open, never against the tab it happened to start on.
          */
         const navigatedOrigin =
-          preflight === undefined || !preflight.ok
-            ? undefined
-            : runIsTranslation || preflight.class === 'navigate'
-              ? preflight.origin
-              : undefined;
+          preflight !== undefined &&
+          preflight.ok &&
+          (runIsTranslation || preflight.class === 'navigate')
+            ? preflight.origin
+            : undefined;
 
         if (downloadCapable) {
           takeOverDownloads(tabId);

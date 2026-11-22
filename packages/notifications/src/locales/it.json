@@ -7,6 +7,7 @@
       "spendAlert": "La tua spesa richiede attenzione",
       "securityFinding": "Un risultato di sicurezza richiede attenzione",
       "securityUpdate": "Un controllo di sicurezza ha un aggiornamento",
+      "agentBriefing": "Il tuo briefing dell'agente è pronto",
       "activeAgentsGlanceable": "Gli agenti attivi hanno un aggiornamento"
     }
   },

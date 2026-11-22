@@ -189,6 +189,7 @@ import type {
   ContributorChampionTier,
 } from './schema-types';
 import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
+import type { AuditDetail } from '@kilocode/app-shared/organizations';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
@@ -4500,6 +4501,14 @@ export const organization_audit_logs = pgTable(
     actor_name: text(),
     organization_id: uuid().notNull(),
     message: text().notNull(),
+    /**
+     * The structured shape of the event, for readers that render it in their
+     * own language. `message` stays the English sentence the web client shows;
+     * this nullable column carries the same event as values, validated by
+     * `AuditDetailSchema` in `@kilocode/app-shared/organizations`. A row
+     * written before this column existed has none.
+     */
+    details: jsonb().$type<AuditDetail>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

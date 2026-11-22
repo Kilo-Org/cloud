@@ -522,6 +522,7 @@
       "receiptLabel": "Ontvangstbewijs",
       "copyReceiptId": "Ontvangstbewijs-ID kopiëren",
       "appealLabel": "Bezwaar",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ontvangen",
       "triageOpen": "In behandeling",
       "triageActioned": "Gegrond",
@@ -555,7 +556,7 @@
       "title": "Meldingen",
       "rowSubtitle": "Meldingen die je hebt ingediend en hun uitkomsten",
       "emptyTitle": "Nog geen meldingen",
-      "emptyDescription": "Meldingen die je vanuit een reactie of een AI-antwoord indient, verschijnen hier.",
+      "emptyDescription": "Meldingen die je indient vanuit een opmerking in een pull request-discussie of vanuit een AI-antwoord in de sessie van een agent, verschijnen hier met hun uitkomst.",
       "couldNotLoad": "Kon je meldingen niet laden",
       "capped": "Je ziet je meest recente meldingen."
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessies",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessies",
       "live": "ACTIEF",
-      "updating": "Bijwerken"
+      "updating": "Bijwerken",
+      "retentionLimit": "De meest recente sessies worden weergegeven."
     },
     "sessionRow": {
       "deleteTitle": "Sessie verwijderen?",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
       "emptyReadOnlyTitle": "Geen berichten in deze sessie",
-      "renameAccessibility": "Sessie hernoemen: {{title}}",
       "cloningSession": "Sessie klonen…",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
       "historyTooLarge": "Het transcript van deze sessie is te groot om te laden.",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "Account opnieuw laden",
     "retryLoadingPrivacy": "Privacykeuzes opnieuw laden"
   },
+  "accountBlocked": {
+    "title": "Account geblokkeerd",
+    "description": "Kilo heeft dit account geblokkeerd en opnieuw inloggen heft de blokkade niet op. De helpdesk kan de blokkade op verzoek bekijken.",
+    "domainDescription": "Kilo staat geen accounts toe op dit e-maildomein en opnieuw inloggen verandert daar niets aan. De helpdesk kan het domein op verzoek bekijken.",
+    "contactSupport": "Contact opnemen met de helpdesk"
+  },
   "addCredits": {
     "cta": "Tegoed aanvullen",
     "billingPage": "factureringspagina"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "Het verzoek duurde te lang. Probeer het opnieuw."
   },
   "screenHeader": {
-    "openMenu": "Menu openen",
-    "openMenuFor": "Menu voor {{title}} openen"
+    "openMenu": "Menu openen"
   },
   "picker": {
     "optionsExpired": "Opties niet meer geldig",
@@ -3443,6 +3449,142 @@
         "guardrailUpdate": "Guardrail bijgewerkt",
         "guardrailRemove": "Guardrail verwijderd",
         "unknown": "Auditgebeurtenis"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Modus \"{{name}}\" (identificatie: {{slug}})",
+        "modeUpdate": "Modus \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Automatische routering",
+          "defaultModel": "Standaardmodel"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} toegevoegd als {{role}}",
+        "memberRemoved": "{{email}} verwijderd",
+        "memberParentAdded": "{{email}} toegevoegd vanuit bovenliggende organisatie {{parent}}",
+        "memberParentRemoved": "{{email}} verwijderd uit bovenliggende organisatie {{parent}}",
+        "inviteSent": "{{email}} als {{role}}",
+        "inviteRevoked": "Uitnodiging voor {{email}} ingetrokken",
+        "inviteAccepted": "{{email}} geaccepteerd",
+        "groupIdentity": "Groep \"{{name}}\"",
+        "groupMembers": "Groep \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} groepen",
+        "groupMemberGroups_one": "{{displayCount}} groep",
+        "groupMemberGroups_other": "{{displayCount}} groepen",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} groepen",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} groep",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} groepen",
+        "groupPolicySet": "Groep \"{{name}}\": beleid voor {{policy}} ingesteld",
+        "groupPolicyRemoved": "Groep \"{{name}}\": beleid voor {{policy}} verwijderd",
+        "groupDefaultPolicySet": "Standaardbeleid voor {{policy}} ingesteld",
+        "groupDefaultPolicyRemoved": "Standaardbeleid voor {{policy}} verwijderd",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AI-beveiligingsmaatregelen {{state}}",
+        "guardrailConfigGroup": "{{state}} voor groep \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO-domein {{domain}}",
+        "ssoDomainChanged": "{{domain}} (voorheen {{previous}})",
+        "ssoDomainRemoved": "SSO-domein {{domain}} gewist",
+        "fundsPurchased": "{{amount}} via {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} naar {{displayCount}} dochterorganisaties",
+        "fundsDistributed_one": "{{amount}} naar {{displayCount}} dochterorganisatie",
+        "fundsDistributed_other": "{{amount}} naar {{displayCount}} dochterorganisaties",
+        "fundsReceived": "{{amount}} van {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}}-configuratie",
+        "reviewAgentConfigStyle": "{{platform}}: stijl {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} bijgewerkt",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} bijgewerkt",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} bijgewerkt",
+        "reviewAgentSecretsFailed": "{{displayCount}} fouten",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} fout",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} fouten",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Inferentieregio: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Modus \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Globale standaard",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Toegestaan",
+          "denied": "Geweigerd",
+          "followSetting": "Volgt de instelling van de extensie"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projecten UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} naar {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Aanbevelingenoverzicht {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: geen toegestane origins",
+        "settingName": "Hernoemd van {{previous}} naar {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Scannen voor gebruik aan",
+        "scanBeforeUseOff": "Scannen voor gebruik uit",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Verwijderd: {{models}}",
+        "browserPolicyOff": "Browsergebruik geblokkeerd",
+        "browserPolicyAllow": "Alleen toegestane origins",
+        "browserPolicyPlaywrightOnly": "Alleen browsergebruik",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "AI-modellen gewijzigd: {{values}}",
+        "integrationConnected": "{{integration}} gekoppeld",
+        "integrationDisconnected": "{{integration}} losgekoppeld",
+        "integrationRefreshed": "{{integration}} vernieuwd",
+        "integrationCancelled": "{{integration}} geannuleerd",
+        "integrationModelUpdated": "{{integration}}: AI-model {{model}}",
+        "integrationKeyAdded": "API-sleutel toegevoegd voor {{provider}}",
+        "integrationKeyUpdated": "API-sleutel bijgewerkt voor {{provider}}",
+        "integrationKeyDeleted": "API-sleutel verwijderd voor {{provider}}",
+        "integrationKeyToggled": "API-sleutel voor {{provider}}: {{state}}",
+        "namedPolicyCreated": "Beleid {{id}} van type {{kind}} aangemaakt",
+        "namedPolicyUpdated": "Beleid {{id}} van type {{kind}} bijgewerkt",
+        "namedPolicyDeleted": "Beleid {{id}} van type {{kind}} verwijderd",
+        "namedPolicyLinked": "Beleid van type {{kind}} gekoppeld aan {{next}}",
+        "webhookTriggerUpdated": "Aanleiding {{trigger}}",
+        "organizationRenamed": "Organisatie hernoemd van {{previous}} naar {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Je eigen API-sleutel"
+        }
       }
     },
     "billing": {
@@ -3952,6 +4094,9 @@
       "fieldName": "Weergavenaam",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Voer een geldige server-URL in.",
+      "fieldUrlCredentials": "Verwijder de gebruikersnaam en het wachtwoord uit de URL.",
+      "fieldUrlFragment": "Verwijder het #-gedeelte uit de URL.",
+      "fieldUrlInsecure": "Voer een https-URL in, of http alleen voor localhost.",
       "duplicateUrl": "Die URL is al opgeslagen.",
       "serverNotFound": "Deze server is niet meer opgeslagen.",
       "enableServer": "Deze server inschakelen: {{name}}",
@@ -3977,6 +4122,7 @@
       "app": {
         "label": "Interface van de tool",
         "failed": "De interface van deze tool kon niet worden geladen.",
+        "tooLarge": "De interface van deze tool is groter dan de limiet van {{size}}.",
         "empty": "De interface van deze tool heeft niets te tonen."
       }
     },
@@ -4092,6 +4238,7 @@
         "network": "De download is niet voltooid. Controleer je verbinding en probeer het opnieuw.",
         "invalidFile": "Het gedownloade bestand is geen model dat deze app kan uitvoeren, dus het is verwijderd.",
         "checksum": "Het gedownloade bestand komt niet overeen met de gepubliceerde controlesom, dus het is verwijderd. Probeer het opnieuw te downloaden.",
+        "unreadable": "Dit apparaat kon het gedownloade bestand niet controleren, dus het is verwijderd. Probeer het opnieuw te downloaden.",
         "writeFailed": "Dit apparaat kon het model niet opslaan. Probeer het opnieuw te downloaden."
       }
     },
@@ -4700,6 +4847,7 @@
     "contextAll": "Alle contexten",
     "dismiss": "Briefing negeren",
     "dismissFailed": "Deze briefing kon nog niet worden genegeerd. Er wordt op de achtergrond opnieuw geprobeerd.",
+    "readMarkFailed": "Deze briefing kon niet als gelezen worden gemarkeerd. Er wordt opnieuw geprobeerd zodra de briefing opnieuw laadt.",
     "offline": "Offline · opgeslagen briefing",
     "cached": "Opgeslagen briefing · vernieuwen niet beschikbaar",
     "summary": "AI-samenvatting",
@@ -4719,6 +4867,9 @@
     "morningEnd": "Briefing beschikbaar tot",
     "timeHint": "De Home-kaart toont weer de live status als het briefingvenster eindigt, ook offline.",
     "invalidSchedule": "Kies een geldige tijdzone en een niet-leeg briefingvenster.",
+    "scheduleEmptyNight": "Het briefingvenster is leeg. Kies een tijdstip waarop de briefing gereed is dat later ligt dan de start van het venster.",
+    "scheduleEmptyMorning": "Het tijdstip waarop de briefing gereed is en het tijdstip tot wanneer deze beschikbaar is, vallen samen. Kies hoe lang de briefing beschikbaar blijft.",
+    "scheduleFullDay": "De twee vensters beslaan een volledige dag. Laat een deel van de dag buiten de briefing.",
     "notificationsHint": "Eén algemene melding per geplande briefing. Los van betaalde AI-samenvattingen.",
     "notificationPermission": "Schakel pushmeldingen in om je briefing te ontvangen.",
     "defaultModel": "Standaardmodel van Kilo gebruiken",
@@ -4728,7 +4879,9 @@
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
     "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen. Pas het model of de limieten aan, of probeer het later opnieuw.",
     "confirmPaid": "Betaalde samenvattingen inschakelen voor {{context}}?",
-    "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} min. Kosten gelden ook als het genereren mislukt.",
+    "paidDisclosure_one": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuut. Kosten gelden ook als het genereren mislukt.",
+    "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuten. Kosten gelden ook als het genereren mislukt.",
+    "paidDisclosure_other": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuten. Kosten gelden ook als het genereren mislukt.",
     "enable": "Betaalde samenvattingen inschakelen",
     "allContexts": "Persoonlijke en organisatiebriefings blijven gescheiden.",
     "emptyHistory": "Geen opgeslagen briefings",
@@ -4771,7 +4924,7 @@
     "sourceActivity": "Activiteit zonder titel",
     "metadataFailureProvider": "providerfout",
     "metadataFailureTool": "toolfout",
-    "metadataFailureCancelled": "Geannuleerd",
+    "metadataStopped": "Laatste beurt gestopt",
     "metadataFailureOther": "onbekende fout"
   },
   "systemSearch": {

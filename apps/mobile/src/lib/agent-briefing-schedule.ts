@@ -8,8 +8,11 @@ export type BriefingScheduleDraft = {
   morningEnd: string;
 };
 
+/** The first reason a draft's three times cannot be saved. */
+export type BriefingTimeRefusal = 'format' | 'emptyNight' | 'emptyMorning' | 'fullDay';
+
 /** Which parts of a draft the server would refuse. */
-export type BriefingScheduleProblems = { timezone: boolean; times: boolean };
+export type BriefingScheduleProblems = { timezone: boolean; times: BriefingTimeRefusal | null };
 
 const WALL_CLOCK_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -30,34 +33,36 @@ function briefingTimezoneValid(timezone: string): boolean {
 /**
  * The night runs from `nightStart` to `morningStart` and the morning from
  * `morningStart` to `morningEnd`, so the two periods must both be non-empty and
- * together cover less than a full day.
+ * together cover less than a full day. Each refusal names the one window the
+ * person has to change, and the first refusal found is the one reported.
  */
-function briefingTimesValid({
+function briefingTimesRefusal({
   nightStart,
   morningStart,
   morningEnd,
-}: BriefingScheduleDraft): boolean {
+}: BriefingScheduleDraft): BriefingTimeRefusal | null {
   if (![nightStart, morningStart, morningEnd].every(time => WALL_CLOCK_RE.test(time))) {
-    return false;
+    return 'format';
   }
-  if (nightStart === morningStart || morningStart === morningEnd) {
-    return false;
+  if (nightStart === morningStart) {
+    return 'emptyNight';
   }
-  const [night, morning, end] = [nightStart, morningStart, morningEnd].map(
-    time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3))
-  );
-  return (
-    night !== undefined &&
-    morning !== undefined &&
-    end !== undefined &&
-    ((morning - night + 1440) % 1440) + ((end - morning + 1440) % 1440) < 1440
-  );
+  if (morningStart === morningEnd) {
+    return 'emptyMorning';
+  }
+  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+  const night = minutes(nightStart);
+  const morning = minutes(morningStart);
+  const end = minutes(morningEnd);
+  return ((morning - night + 1440) % 1440) + ((end - morning + 1440) % 1440) >= 1440
+    ? 'fullDay'
+    : null;
 }
 
 export function briefingScheduleProblems(draft: BriefingScheduleDraft): BriefingScheduleProblems {
   return {
     timezone: !briefingTimezoneValid(draft.timezone),
-    times: !briefingTimesValid(draft),
+    times: briefingTimesRefusal(draft),
   };
 }
 

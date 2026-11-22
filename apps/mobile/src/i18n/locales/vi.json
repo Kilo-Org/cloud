@@ -522,6 +522,7 @@
       "receiptLabel": "Biên nhận",
       "copyReceiptId": "Sao chép mã biên nhận",
       "appealLabel": "Kháng nghị",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Đã tiếp nhận",
       "triageOpen": "Đang xem xét",
       "triageActioned": "Được chấp nhận",
@@ -555,7 +556,7 @@
       "title": "Báo cáo",
       "rowSubtitle": "Các báo cáo bạn đã gửi và kết quả của chúng",
       "emptyTitle": "Chưa có báo cáo nào",
-      "emptyDescription": "Các báo cáo bạn gửi từ bình luận hoặc phản hồi của AI sẽ xuất hiện ở đây.",
+      "emptyDescription": "Các báo cáo bạn gửi từ bình luận trong thảo luận pull request hoặc từ phản hồi của AI trong phiên tác nhân sẽ xuất hiện ở đây cùng với kết quả của chúng.",
       "couldNotLoad": "Không thể tải báo cáo của bạn",
       "capped": "Đang hiển thị các báo cáo gần đây nhất của bạn."
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} phiên",
       "sectionAccessibility": "{{title}}: {{displayCount}} phiên",
       "live": "TRỰC TIẾP",
-      "updating": "Đang cập nhật"
+      "updating": "Đang cập nhật",
+      "retentionLimit": "Đang hiển thị các phiên gần đây nhất của bạn."
     },
     "sessionRow": {
       "deleteTitle": "Xóa phiên?",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "emptyReadOnlyTitle": "Phiên này không có tin nhắn",
-      "renameAccessibility": "Đổi tên phiên: {{title}}",
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
       "historyTooLarge": "Kết xuất của phiên này quá lớn để tải.",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "Thử tải lại thông tin tài khoản",
     "retryLoadingPrivacy": "Thử tải lại các tùy chọn quyền riêng tư"
   },
+  "accountBlocked": {
+    "title": "Tài khoản bị chặn",
+    "description": "Kilo đã chặn tài khoản này và đăng nhập lại sẽ không gỡ được lệnh chặn. Bộ phận hỗ trợ có thể xem xét lệnh chặn theo yêu cầu.",
+    "domainDescription": "Kilo không cho phép tài khoản trên tên miền email này và đăng nhập lại sẽ không thay đổi điều đó. Bộ phận hỗ trợ có thể xem xét tên miền theo yêu cầu.",
+    "contactSupport": "Liên hệ hỗ trợ"
+  },
   "addCredits": {
     "cta": "Nạp tiền",
     "billingPage": "trang thanh toán"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "Yêu cầu đã quá thời gian chờ. Vui lòng thử lại."
   },
   "screenHeader": {
-    "openMenu": "Mở trình đơn",
-    "openMenuFor": "Mở trình đơn cho {{title}}"
+    "openMenu": "Mở trình đơn"
   },
   "picker": {
     "optionsExpired": "Tùy chọn đã hết hạn",
@@ -3443,6 +3449,142 @@
         "guardrailUpdate": "Đã cập nhật rào chắn an toàn",
         "guardrailRemove": "Đã xóa rào chắn an toàn",
         "unknown": "Sự kiện kiểm tra"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Chế độ \"{{name}}\" (mã định danh: {{slug}})",
+        "modeUpdate": "Chế độ \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Định tuyến tự động",
+          "defaultModel": "Mô hình mặc định"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Đã thêm {{email}} với vai trò {{role}}",
+        "memberRemoved": "Đã xóa {{email}}",
+        "memberParentAdded": "Đã thêm {{email}} từ tổ chức mẹ {{parent}}",
+        "memberParentRemoved": "Đã xóa {{email}} khỏi tổ chức mẹ {{parent}}",
+        "inviteSent": "{{email}} với vai trò {{role}}",
+        "inviteRevoked": "Đã thu hồi lời mời của {{email}}",
+        "inviteAccepted": "Đã chấp nhận {{email}}",
+        "groupIdentity": "Nhóm \"{{name}}\"",
+        "groupMembers": "Nhóm \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} nhóm",
+        "groupMemberGroups_one": "{{displayCount}} nhóm",
+        "groupMemberGroups_other": "{{displayCount}} nhóm",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} nhóm",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} nhóm",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} nhóm",
+        "groupPolicySet": "Nhóm \"{{name}}\": đã đặt chính sách {{policy}}",
+        "groupPolicyRemoved": "Nhóm \"{{name}}\": đã xóa chính sách {{policy}}",
+        "groupDefaultPolicySet": "Đã đặt chính sách {{policy}} mặc định",
+        "groupDefaultPolicyRemoved": "Đã xóa chính sách {{policy}} mặc định",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Rào chắn AI {{state}}",
+        "guardrailConfigGroup": "{{state}} cho nhóm \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Tên miền SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (trước đây là {{previous}})",
+        "ssoDomainRemoved": "Đã xóa tên miền SSO {{domain}}",
+        "fundsPurchased": "{{amount}} bằng {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} cho {{displayCount}} tổ chức con",
+        "fundsDistributed_one": "{{amount}} cho {{displayCount}} tổ chức con",
+        "fundsDistributed_other": "{{amount}} cho {{displayCount}} tổ chức con",
+        "fundsReceived": "{{amount}} từ {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Cấu hình {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: Cách rà soát {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} đã cập nhật",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} đã cập nhật",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} đã cập nhật",
+        "reviewAgentSecretsFailed": "{{displayCount}} lỗi",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} lỗi",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} lỗi",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Khu vực suy luận: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Chế độ \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Mặc định toàn cục",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Được phép",
+          "denied": "Bị từ chối",
+          "followSetting": "Theo cài đặt của tiện ích"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Dự án UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} đến {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Tóm tắt đề xuất {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: không có origin được phép",
+        "settingName": "Đã đổi tên từ {{previous}} thành {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Quét trước khi dùng: bật",
+        "scanBeforeUseOff": "Quét trước khi dùng: tắt",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Đã xóa: {{models}}",
+        "browserPolicyOff": "Sử dụng trình duyệt bị chặn",
+        "browserPolicyAllow": "Chỉ các origin được phép",
+        "browserPolicyPlaywrightOnly": "Chỉ sử dụng trình duyệt",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Đã thay đổi Mô hình: {{values}}",
+        "integrationConnected": "{{integration}} đã kết nối",
+        "integrationDisconnected": "{{integration}} đã ngắt kết nối",
+        "integrationRefreshed": "{{integration}} đã làm mới",
+        "integrationCancelled": "{{integration}} đã hủy",
+        "integrationModelUpdated": "{{integration}}: mô hình {{model}}",
+        "integrationKeyAdded": "Đã thêm khóa API cho {{provider}}",
+        "integrationKeyUpdated": "Đã cập nhật khóa API cho {{provider}}",
+        "integrationKeyDeleted": "Đã xóa khóa API cho {{provider}}",
+        "integrationKeyToggled": "Khóa API cho {{provider}}: {{state}}",
+        "namedPolicyCreated": "Đã tạo chính sách {{kind}} {{id}}",
+        "namedPolicyUpdated": "Đã cập nhật chính sách {{kind}} {{id}}",
+        "namedPolicyDeleted": "Đã xóa chính sách {{kind}} {{id}}",
+        "namedPolicyLinked": "Đã liên kết chính sách {{kind}} với {{next}}",
+        "webhookTriggerUpdated": "Kích hoạt {{trigger}}",
+        "organizationRenamed": "Đã đổi tên tổ chức từ {{previous}} thành {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Khóa API riêng của bạn"
+        }
       }
     },
     "billing": {
@@ -3952,6 +4094,9 @@
       "fieldName": "Tên hiển thị",
       "fieldUrl": "URL máy chủ",
       "fieldUrlInvalid": "Nhập URL máy chủ hợp lệ.",
+      "fieldUrlCredentials": "Xóa tên người dùng và mật khẩu khỏi URL máy chủ.",
+      "fieldUrlFragment": "Xóa phần # khỏi URL máy chủ.",
+      "fieldUrlInsecure": "Nhập URL https, hoặc chỉ dùng http cho localhost.",
       "duplicateUrl": "URL này đã được lưu.",
       "serverNotFound": "Máy chủ này không còn được lưu nữa.",
       "enableServer": "Bật máy chủ này: {{name}}",
@@ -3977,6 +4122,7 @@
       "app": {
         "label": "Giao diện công cụ",
         "failed": "Không thể tải giao diện của công cụ này.",
+        "tooLarge": "Giao diện của công cụ này lớn hơn giới hạn {{size}}.",
         "empty": "Giao diện của công cụ này không có gì để hiển thị."
       }
     },
@@ -4092,6 +4238,7 @@
         "network": "Tải xuống chưa hoàn tất. Kiểm tra kết nối của bạn và thử lại.",
         "invalidFile": "Tệp đã tải xuống không phải là mô hình mà ứng dụng này có thể chạy, nên tệp đã bị xóa.",
         "checksum": "Tệp đã tải xuống không khớp với mã kiểm tra đã công bố, nên tệp đã bị xóa. Hãy thử tải xuống lại.",
+        "unreadable": "Thiết bị này không thể kiểm tra tệp đã tải xuống, nên tệp đã bị xóa. Hãy thử tải xuống lại.",
         "writeFailed": "Thiết bị này không thể lưu mô hình. Hãy thử tải xuống lại."
       }
     },
@@ -4700,6 +4847,7 @@
     "contextAll": "Tất cả ngữ cảnh",
     "dismiss": "Bỏ qua bản tin",
     "dismissFailed": "Chưa thể bỏ qua bản tin này. Hệ thống sẽ tự thử lại trong nền.",
+    "readMarkFailed": "Chưa thể đánh dấu bản tin này là đã đọc. Hệ thống sẽ tự thử lại khi bản tin tải lại.",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Bản tin đã lưu · không thể làm mới",
     "summary": "Tóm tắt AI",
@@ -4719,6 +4867,9 @@
     "morningEnd": "Bản tin có sẵn đến",
     "timeHint": "Thẻ Trang chủ sẽ trở lại trạng thái trực tiếp khi khung thời gian bản tin kết thúc, kể cả khi ngoại tuyến.",
     "invalidSchedule": "Hãy chọn múi giờ hợp lệ và khung thời gian bản tin không trống.",
+    "scheduleEmptyNight": "Khung thời gian bản tin đang trống. Hãy chọn thời điểm bản tin sẵn sàng muộn hơn thời điểm bắt đầu khung.",
+    "scheduleEmptyMorning": "Thời điểm bản tin sẵn sàng và thời điểm bản tin có sẵn đến trùng nhau. Hãy chọn khoảng thời gian bản tin có sẵn.",
+    "scheduleFullDay": "Hai khung thời gian bao trùm cả ngày. Hãy để một phần trong ngày nằm ngoài bản tin.",
     "notificationsHint": "Một thông báo chung cho mỗi bản tin theo lịch. Không phụ thuộc vào tóm tắt AI trả phí.",
     "notificationPermission": "Bật thông báo đẩy để nhận bản tin của bạn.",
     "defaultModel": "Dùng mô hình mặc định của Kilo",
@@ -4728,7 +4879,9 @@
     "estimate": "Ước tính {{estimate}} · tối đa {{maximum}}",
     "estimateUnavailable": "Không có bản tóm tắt trả phí cho các cài đặt này. Hãy đổi mô hình hoặc giới hạn, hoặc thử lại sau.",
     "confirmPaid": "Bật tóm tắt trả phí cho {{context}}?",
+    "paidDisclosure_one": "Ước tính {{estimate}}, tối đa {{maximum}}, giới hạn {{minutes}} phút. Vẫn tính phí kể cả khi tạo thất bại.",
     "paidDisclosure": "Ước tính {{estimate}}, tối đa {{maximum}}, giới hạn {{minutes}} phút. Vẫn tính phí kể cả khi tạo thất bại.",
+    "paidDisclosure_other": "Ước tính {{estimate}}, tối đa {{maximum}}, giới hạn {{minutes}} phút. Vẫn tính phí kể cả khi tạo thất bại.",
     "enable": "Bật tóm tắt trả phí",
     "allContexts": "Bản tin cá nhân và tổ chức được tách riêng.",
     "emptyHistory": "Chưa có bản tin đã lưu",
@@ -4767,7 +4920,7 @@
     "sourceActivity": "Hoạt động chưa đặt tên",
     "metadataFailureProvider": "lỗi nhà cung cấp",
     "metadataFailureTool": "lỗi công cụ",
-    "metadataFailureCancelled": "Đã hủy",
+    "metadataStopped": "Lượt trước đã bị dừng",
     "metadataFailureOther": "lỗi không xác định",
     "metadataPlan_one": "Kế hoạch: {{displayDone}}/{{displayTotal}} bước đã xong",
     "metadataFiles_one": "{{displayCount}} tệp đã thay đổi",

@@ -7,7 +7,7 @@
     "directory": "بوخچەی کارکردن",
     "createSession": "دانیشتنێکی نەیتیڤ دروست بکە",
     "queueIfOffline": "ئەگەر هۆست ئۆفلاین بوو، پڕۆمپت بخەرە ڕیزەوە",
-    "prompt": "پڕۆمپت یان \u2066/command\u2069",
+    "prompt": "پڕۆمپت یان ⁦/command⁩",
     "localClear": "دیمەنی ناوخۆیی پاک بکەرەوە",
     "abort": "نۆرەکە بوەستێنە",
     "failed": "کرداری کۆنترۆڵی دوورەوەی نەیتیڤ سەرکەوتوو نەبوو",
@@ -522,6 +522,7 @@
       "receiptLabel": "پسوولە",
       "copyReceiptId": "ناسنامەی پسوولەکە کۆپی بکە",
       "appealLabel": "تانە",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "وەرگیرا",
       "triageOpen": "لە پێداچوونەوەدایە",
       "triageActioned": "پەسەند کرا",
@@ -555,7 +556,7 @@
       "title": "ڕاپۆرتەکان",
       "rowSubtitle": "ڕاپۆرتە نێردراوەکانت و ئەنجامەکانیان",
       "emptyTitle": "هێشتا هیچ ڕاپۆرتێک نییە",
-      "emptyDescription": "ئەو ڕاپۆرتانەی لە لێدوانێک یان وەڵامێکی AI بنێریت لێرە دەردەکەون.",
+      "emptyDescription": "ئەو ڕاپۆرتانەی لە لێدوانێک لە گفتوگۆیەکی pull request یان لە وەڵامێکی AI لە سێشنی ئەجێنت بنێریت، لەگەڵ ئەنجامەکەیان لێرە دەردەکەون.",
       "couldNotLoad": "نەتوانرا ڕاپۆرتەکانت بار بکرێن",
       "capped": "نوێترین ڕاپۆرتەکانت پیشان دەدرێن."
     },
@@ -2175,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} سێشن",
       "sectionAccessibility": "{{title}}: {{displayCount}} سێشن",
       "live": "ڕاستەوخۆ",
-      "updating": "لە نوێکردنەوەدایە"
+      "updating": "لە نوێکردنەوەدایە",
+      "retentionLimit": "نوێترین سێشنەکان پیشان دەدرێن."
     },
     "sessionRow": {
       "deleteTitle": "سێشنەکە بسڕدرێتەوە؟",
@@ -2245,7 +2247,6 @@
       "scrollToBottom": "چوون بۆ کۆتایی",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
       "emptyReadOnlyTitle": "هیچ پەیامێک لەم سێشنەدا نییە",
-      "renameAccessibility": "گۆڕینی ناوی سێشن: {{title}}",
       "cloningSession": "سێشنەکە کۆپی دەکرێت",
       "couldNotLoadThisSession": "نەتوانرا ئەم سێشنە بار بکرێت.",
       "historyTooLarge": "نوسینی ئەم سێشنە زۆر گەورەیە بۆ بارکردن.",
@@ -3094,6 +3095,12 @@
     "retryLoadingAccount": "دووبارە هەوڵی بارکردنی هەژمارەکە بدەوە",
     "retryLoadingPrivacy": "دووبارە هەوڵی بارکردنی هەڵبژاردەکانی پاراستنی تایبەتی بدەوە"
   },
+  "accountBlocked": {
+    "title": "هەژمار بلۆک کراوە",
+    "description": "Kilo ئەم هەژمارەی بلۆک کردووە، و چوونەژوورەوەی دووبارە بلۆکەکە لای نادات. پشتگیری دەتوانێت بەپێی داواکاری بلۆکەکە پێداچوونەوە بکات.",
+    "domainDescription": "Kilo هەژمارەکان لەسەر ئەم دۆمەینی ئیمەیڵە بلۆک کردووە، و چوونەژوورەوەی دووبارە بلۆکەکە لای نادات. پشتگیری دەتوانێت بەپێی داواکاری دۆمەینەکە پێداچوونەوە بکات.",
+    "contactSupport": "پەیوەندیکردن بە پشتگیری"
+  },
   "addCredits": {
     "cta": "زیادکردنی کرێدیت",
     "billingPage": "پەڕەی پارەدان"
@@ -3166,8 +3173,7 @@
     "timeoutDescription": "داواکارییەکە پێش تەواوبوونی ماوەکەی تەواو بوو. تکایە دووبارە هەوڵ بدە."
   },
   "screenHeader": {
-    "openMenu": "مێنۆ بکەرەوە",
-    "openMenuFor": "مێنۆی {{title}} بکەرەوە"
+    "openMenu": "مێنۆ بکەرەوە"
   },
   "picker": {
     "optionsExpired": "بەسەرچوونی بژاردەکان",
@@ -3451,6 +3457,142 @@
         "guardrailUpdate": "سنوورە پارێزەرەکان نوێکرایەوە",
         "guardrailRemove": "سنوورە پارێزەرەکان لابردرا",
         "unknown": "ڕووداوی وردبینی"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "مۆد \"{{name}}\" (ناسێنەر: {{slug}})",
+        "modeUpdate": "مۆد \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "ڕێکردنی خۆکار",
+          "defaultModel": "مۆدێلی بنەڕەت"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} وەک {{role}} زیادکرا",
+        "memberRemoved": "{{email}} لابرا",
+        "memberParentAdded": "{{email}} لە ڕێکخراوی سەرەکی {{parent}} زیادکرا",
+        "memberParentRemoved": "{{email}} لە ڕێکخراوی سەرەکی {{parent}} لابرا",
+        "inviteSent": "{{email}} وەک {{role}}",
+        "inviteRevoked": "بانگهێشتی {{email}} هەڵوەشێنرا",
+        "inviteAccepted": "{{email}} وەرگیرا",
+        "groupIdentity": "گرووپ \"{{name}}\"",
+        "groupMembers": "گرووپ \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} گرووپ",
+        "groupMemberGroups_one": "{{displayCount}} گرووپ",
+        "groupMemberGroups_other": "{{displayCount}} گرووپ",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} گرووپ",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} گرووپ",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} گرووپ",
+        "groupPolicySet": "گرووپ \"{{name}}\": سیاسەتی {{policy}} دانرا",
+        "groupPolicyRemoved": "گرووپ \"{{name}}\": سیاسەتی {{policy}} لابردرا",
+        "groupDefaultPolicySet": "سیاسەتی بنەڕەتی {{policy}} دانرا",
+        "groupDefaultPolicyRemoved": "سیاسەتی بنەڕەتی {{policy}} لابردرا",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "سنوورە پارێزەرەکانی AI {{state}}",
+        "guardrailConfigGroup": "{{state}} بۆ گرووپ \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "دۆمەینی SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} ({{previous}} بوو)",
+        "ssoDomainRemoved": "دۆمەینی SSO {{domain}} لابرا",
+        "fundsPurchased": "{{amount}} بە {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} بۆ {{displayCount}} ڕێکخراوی منداڵ",
+        "fundsDistributed_one": "{{amount}} بۆ {{displayCount}} ڕێکخراوی منداڵ",
+        "fundsDistributed_other": "{{amount}} بۆ {{displayCount}} ڕێکخراوی منداڵ",
+        "fundsReceived": "{{amount}} لە {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "ڕێکخستنی {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: شێواز {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} نوێکرا",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} نوێکرا",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} نوێکرا",
+        "reviewAgentSecretsFailed": "{{displayCount}} هەڵە",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} هەڵە",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} هەڵە",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "ناوچەی ئینفەرێنس: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "مۆد \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "بنەڕەتی گشتی",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "ڕێگەپێدراو",
+          "denied": "ڕێگەپێنەدراو",
+          "followSetting": "شوێن ڕێکخستنی ئێکستێنشنەکە دەکەوێت"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "ڕووکاری Projects {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} بۆ {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "کورتەی پێشنیارەکان {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: هیچ سەرچاوەیەکی ڕێگەپێدراو نییە",
+        "settingName": "ناونیشان لە {{previous}} بۆ {{next}} گۆڕدرا",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "پشکنین پێش بەکارهێنان چالاک",
+        "scanBeforeUseOff": "پشکنین پێش بەکارهێنان ناچالاک",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "لابرا: {{models}}",
+        "browserPolicyOff": "بەکارهێنانی وێبگەڕ بلۆککرا",
+        "browserPolicyAllow": "تەنها سەرچاوە ڕێگەپێدراوەکان",
+        "browserPolicyPlaywrightOnly": "تەنها بەکارهێنانی وێبگەڕ",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "مۆدێلەکان گۆڕدران: {{values}}",
+        "integrationConnected": "{{integration}} پەیوەستکرا",
+        "integrationDisconnected": "پەیوەندی {{integration}} پچڕا",
+        "integrationRefreshed": "{{integration}} نوێکرایەوە",
+        "integrationCancelled": "{{integration}} هەڵوەشاوە",
+        "integrationModelUpdated": "{{integration}}: مۆدێل {{model}}",
+        "integrationKeyAdded": "کلیل بۆ {{provider}} زیادکرا",
+        "integrationKeyUpdated": "کلیل بۆ {{provider}} نوێکرایەوە",
+        "integrationKeyDeleted": "کلیل بۆ {{provider}} لابردرا",
+        "integrationKeyToggled": "کلیل بۆ {{provider}}: {{state}}",
+        "namedPolicyCreated": "سیاسەتی {{kind}} {{id}} دروستکرا",
+        "namedPolicyUpdated": "سیاسەتی {{kind}} {{id}} نوێکرایەوە",
+        "namedPolicyDeleted": "سیاسەتی {{kind}} {{id}} لابردرا",
+        "namedPolicyLinked": "سیاسەتی {{kind}} بۆ {{next}} بەسترا",
+        "webhookTriggerUpdated": "تریگەر {{trigger}}",
+        "organizationRenamed": "ناوی ڕێکخراو لە {{previous}} بۆ {{next}} گۆڕدرا",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "کلیلی API ی خۆت"
+        }
       }
     },
     "billing": {
@@ -3952,6 +4094,9 @@
       "fieldName": "ناوی پیشاندراو",
       "fieldUrl": "URL ی سێرڤەر",
       "fieldUrlInvalid": "URLی سێرڤەری دروست بنووسە.",
+      "fieldUrlCredentials": "ناوی بەکارهێنەر و وشەی نهێنی لە URLەکە بسڕەوە.",
+      "fieldUrlFragment": "بەشی # لە URLەکە بسڕەوە.",
+      "fieldUrlInsecure": "URLێکی https بنووسە، یان http تەنها بۆ localhost.",
       "duplicateUrl": "ئەم URLە پێشتر پاشەکەوت کراوە.",
       "serverNotFound": "ئەم سێرڤەرە چیتر پاشەکەوت نەکراوە.",
       "enableServer": "چالاککردنی ئەم سێرڤەرە: {{name}}",
@@ -3977,6 +4122,7 @@
       "app": {
         "label": "ڕووکاری ئامراز",
         "failed": "ڕووکاری ئەم ئامرازە بار نەکرا.",
+        "tooLarge": "ڕووکاری ئەم ئامرازە لە سنووری {{size}} گەورەترە.",
         "empty": "ڕووکاری ئەم ئامرازە هیچ شتێکی نییە بۆ پیشاندان."
       }
     },
@@ -4092,6 +4238,7 @@
         "network": "داگرتنەکە تەواو نەبوو. پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەوە.",
         "invalidFile": "فایلە داگیراوەکە مۆدێلێک نییە کە ئەم ئەپە بتوانێت بیخاتە کار، بۆیە لابرا.",
         "checksum": "فایلە داگیراوەکە لەگەڵ چێکسەمە بڵاوکراوەکەی ناگونجێت، بۆیە لابرا. دووبارە هەوڵی داگرتنەکە بدەرەوە.",
+        "unreadable": "ئەم ئامێرە نەیتوانی فایلە داگیراوەکە بپشکنێت، بۆیە لابرا. دووبارە هەوڵی داگرتنەکە بدەرەوە.",
         "writeFailed": "ئەم ئامێرە نەیتوانی مۆدێلەکە پاشەکەوت بکات. دووبارە هەوڵی داگرتنەکە بدەرەوە."
       }
     },
@@ -4700,6 +4847,7 @@
     "contextAll": "هەموو چوارچێوەکان",
     "dismiss": "پشتگوێخستنی ڕاپۆرت",
     "dismissFailed": "پشتگوێخستنی ئەم ڕاپۆرتە هێشتا سەر نەکەوتووە. لە پاشخاندا دووبارە هەوڵ دەدرێتەوە",
+    "readMarkFailed": "نەتوانرا ئەم ڕاپۆرتە وەک خوێندراو نیشان بکرێت. کاتێک ڕاپۆرتەکە دووبارە بار بکرێتەوە، دووبارە هەوڵ دەدرێتەوە.",
     "offline": "دەرهێڵ · ڕاپۆرتی پاشەکەوتکراو",
     "cached": "ڕاپۆرتی پاشەکەوتکراو · نوێکردنەوە بەردەست نییە",
     "summary": "کورتەی AI",
@@ -4719,6 +4867,9 @@
     "morningEnd": "ڕاپۆرت بەردەستە تا",
     "timeHint": "کارتی سەرەکی دۆخی ڕاستەوخۆ دەگەڕێنێتەوە کاتێک ماوەی ڕاپۆرت کۆتایی دێت، تەنانەت بە دەرهێڵیش.",
     "invalidSchedule": "ناوچەیەکی کاتیی دروست و ماوەیەکی ڕاپۆرتی بەتاڵنەبوو هەڵبژێرە.",
+    "scheduleEmptyNight": "ماوەی ڕاپۆرتەکە بەتاڵە. کاتێکی ئامادەبوون هەڵبژێرە کە دوای سەرەتای ماوەکە بێت.",
+    "scheduleEmptyMorning": "کاتی ئامادەبوون و کاتی کۆتایی بەردەستبوون یەک دەگرن. هەڵبژێرە بۆ چەندە ڕاپۆرت بەردەست دەمێنێتەوە.",
+    "scheduleFullDay": "هەردوو ماوەکە ڕۆژێکی تەواو دەگرنەوە. بەشێکی ڕۆژەکە لە دەرەوەی ڕاپۆرت بەجێبهێڵە.",
     "notificationsHint": "یەک ئاگادارکردنەوەی گشتی بۆ هەر ڕاپۆرتێکی خشتەکراو. سەربەخۆیە لە پوختە پارەدارەکانی AI.",
     "notificationPermission": "ئاگادارکردنەوەکانی پوش چالاک بکە بۆ وەرگرتنی ڕاپۆرتەکەت",
     "defaultModel": "مۆدێلی بنەڕەتیی Kilo بەکاربهێنە",
@@ -4728,6 +4879,8 @@
     "estimate": "خەملێنراوە {{estimate}} · زۆرترین {{maximum}}",
     "estimateUnavailable": "کورتەی پارەدار بۆ ئەم ڕێکخستانانە بەردەست نییە. مۆدێل یان سنوورەکان بگۆڕە، یان دواتر دووبارە هەوڵ بدەوە",
     "confirmPaid": "کورتەی پارەدار بۆ {{context}} چالاک بکرێت؟",
+    "paidDisclosure_one": "خەمڵێنراو {{estimate}}، تا {{maximum}}، بە سنووری {{minutes}} خولەک. تێچوو دەبڕدرێت تەنانەت ئەگەر دروستکردن سەرکەوتوو نەبێت.",
+    "paidDisclosure_other": "خەمڵێنراو {{estimate}}، تا {{maximum}}، بە سنووری {{minutes}} خولەک. تێچوو دەبڕدرێت تەنانەت ئەگەر دروستکردن سەرکەوتوو نەبێت.",
     "paidDisclosure": "خەمڵێنراو {{estimate}}، تا {{maximum}}، بە سنووری {{minutes}} خولەک. تێچوو دەبڕدرێت تەنانەت ئەگەر دروستکردن سەرکەوتوو نەبێت.",
     "enable": "چالاککردنی کورتەی پارەدار",
     "allContexts": "ڕاپۆرتەکانی کەسی و ڕێکخراو جیا دەمێننەوە.",
@@ -4771,7 +4924,7 @@
     "sourceActivity": "چالاکی بێ ناونیشان",
     "metadataFailureProvider": "هەڵەی دابینکەر",
     "metadataFailureTool": "هەڵەی ئامراز",
-    "metadataFailureCancelled": "هەڵوەشاوە",
+    "metadataStopped": "دوایین خول وەستێنرا",
     "metadataFailureOther": "هەڵەی نەناسراو"
   },
   "systemSearch": {

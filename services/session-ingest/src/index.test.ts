@@ -51,6 +51,7 @@ type TestBindings = {
   NEXTAUTH_SECRET: unknown;
   NEXTAUTH_SECRET_RAW?: string;
   INTERNAL_API_SECRET_PROD: { get(): Promise<string> };
+  SESSION_ROWS_EXPORT_TOKEN: { get(): Promise<string> };
   SESSION_SHARE_JWT_SECRET_PROD: { get(): Promise<string> };
   SESSION_SHARE_TOKEN_MIN_IAT: string;
 };
@@ -83,6 +84,7 @@ const defaultEnv: TestBindings = {
   NEXTAUTH_SECRET: {},
   NEXTAUTH_SECRET_RAW: 'secret',
   INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+  SESSION_ROWS_EXPORT_TOKEN: { get: async () => 'session-rows-export-token' },
   SESSION_SHARE_JWT_SECRET_PROD: {
     get: async () => 'session-share-secret-for-tests-32-bytes',
   },
@@ -646,5 +648,257 @@ describe('public session route', () => {
       created_at: '2026-08-19T10:00:00.000Z',
     });
     expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+});
+
+describe('internal session-rows export route', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const route = '/internal/session-rows/export';
+  const exportToken = 'session-rows-export-token';
+  const headers = {
+    'content-type': 'application/json',
+    'X-Session-Rows-Export-Token': exportToken,
+  };
+  const body = { kiloUserId: 'usr_export', sessionId: 'ses_12345678901234567890123456' };
+
+  it('rejects a request without the export token', async () => {
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('rejects the shared internal API secret', async () => {
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'X-Internal-Secret': 'internal-secret' },
+        body: JSON.stringify(body),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('rejects an incorrect export token', async () => {
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers: { ...headers, 'X-Session-Rows-Export-Token': `${exportToken}x` },
+        body: JSON.stringify(body),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('reports an unavailable export token as a service failure', async () => {
+    const res = await app.request(
+      route,
+      { method: 'POST', headers, body: JSON.stringify(body) },
+      {
+        ...defaultEnv,
+        SESSION_ROWS_EXPORT_TOKEN: {
+          get: async () => {
+            throw new Error('secrets store unavailable');
+          },
+        },
+      }
+    );
+
+    expect(res.status).toBe(503);
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('rejects a request whose session id cannot address a Durable Object', async () => {
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, sessionId: 'ses_/../escape' }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(400);
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('accepts a stored session id that predates the canonical shape', async () => {
+    const legacySessionId = 'legacy-session_1';
+    const stub = { exportSessionRowsStream: vi.fn(async () => new Response('').body!) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, sessionId: legacySessionId, requireSessionRow: false }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(200);
+    expect(getSessionIngestDO).toHaveBeenCalledWith(defaultEnv, {
+      kiloUserId: body.kiloUserId,
+      sessionId: legacySessionId,
+    });
+    expect(stub.exportSessionRowsStream).toHaveBeenCalledOnce();
+  });
+
+  it('writes one audit line per export without row bodies', async () => {
+    const stub = { exportSessionRowsStream: vi.fn(async () => new Response('').body!) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const res = await app.request(
+        route,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ...body,
+            requireSessionRow: false,
+            exportId: 'export-job-1',
+          }),
+        },
+        defaultEnv
+      );
+
+      expect(res.status).toBe(200);
+      expect(log).toHaveBeenCalledWith('Raw session row export', {
+        operation: 'session-rows-export',
+        sessionId: body.sessionId,
+        exportId: 'export-job-1',
+      });
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('returns 404 without touching a Durable Object when the session row is absent', async () => {
+    const { db } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const res = await app.request(
+      route,
+      { method: 'POST', headers, body: JSON.stringify(body) },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'no_session_row' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('streams the Durable Object rows as uncached NDJSON when the session row exists', async () => {
+    const { db, selectResult } = makeDbFakes();
+    selectResult.mockResolvedValue([{ session_id: body.sessionId }]);
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const payload = '{"t":"meta","key":"sessionId","value":"x"}\n{"t":"end","rows":0}\n';
+    const stub = { exportSessionRowsStream: vi.fn(async () => new Response(payload).body!) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+
+    const res = await app.request(
+      route,
+      { method: 'POST', headers, body: JSON.stringify(body) },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/x-ndjson; charset=utf-8');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.text()).toBe(payload);
+    expect(stub.exportSessionRowsStream).toHaveBeenCalledOnce();
+    expect(getSessionIngestDO).toHaveBeenCalledWith(defaultEnv, {
+      kiloUserId: body.kiloUserId,
+      sessionId: body.sessionId,
+    });
+  });
+
+  it('skips the existence gate when the caller asks for an ungated probe', async () => {
+    const stub = { exportSessionRowsStream: vi.fn(async () => new Response('').body!) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, requireSessionRow: false }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(200);
+    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(stub.exportSessionRowsStream).toHaveBeenCalledOnce();
+    expect(stub.exportSessionRowsStream).toHaveBeenCalledWith({ deleteIfEmpty: false });
+  });
+
+  it('passes the opt-in empty cleanup to the Durable Object', async () => {
+    const stub = {
+      exportSessionRowsStream: vi.fn(
+        async () => new Response('{"t":"end","rows":0,"empty_cleanup_scheduled":true}\n').body!
+      ),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, requireSessionRow: false, deleteIfEmpty: true }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('{"t":"end","rows":0,"empty_cleanup_scheduled":true}\n');
+    expect(stub.exportSessionRowsStream).toHaveBeenCalledWith({ deleteIfEmpty: true });
+  });
+
+  it('does not let the export token authenticate other internal routes', async () => {
+    const cache = { invalidateOrganization: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(cache as never);
+
+    const res = await app.request(
+      '/internal/session-access/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Session-Rows-Export-Token': exportToken,
+        },
+        body: JSON.stringify({
+          kiloUserId: 'usr_removed',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+        }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+    expect(cache.invalidateOrganization).not.toHaveBeenCalled();
   });
 });

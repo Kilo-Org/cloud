@@ -522,6 +522,7 @@
       "receiptLabel": "접수증",
       "copyReceiptId": "접수증 ID 복사",
       "appealLabel": "이의 제기",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "접수됨",
       "triageOpen": "검토 중",
       "triageActioned": "조치됨",
@@ -555,7 +556,7 @@
       "title": "신고 내역",
       "rowSubtitle": "접수한 신고와 그 결과",
       "emptyTitle": "아직 신고 내역이 없습니다",
-      "emptyDescription": "댓글이나 AI 응답에서 접수한 신고가 여기에 표시됩니다.",
+      "emptyDescription": "풀 리퀘스트 토론의 댓글이나 에이전트 세션의 AI 응답에서 접수한 신고가 결과와 함께 여기에 표시됩니다.",
       "couldNotLoad": "신고 내역을 불러올 수 없습니다",
       "capped": "최근 신고 내역만 표시됩니다."
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: 세션 {{displayCount}}개",
       "sectionAccessibility": "{{title}}: 세션 {{displayCount}}개",
       "live": "실시간",
-      "updating": "업데이트 중"
+      "updating": "업데이트 중",
+      "retentionLimit": "최근 세션을 표시합니다."
     },
     "sessionRow": {
       "deleteTitle": "세션을 삭제할까요?",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "맨 아래로 스크롤",
       "emptyTitle": "아직 메시지가 없습니다",
       "emptyReadOnlyTitle": "이 세션에는 메시지가 없습니다",
-      "renameAccessibility": "세션 이름 변경: {{title}}",
       "cloningSession": "세션 복제 중",
       "couldNotLoadThisSession": "이 세션을 불러오지 못했습니다.",
       "historyTooLarge": "이 세션의 기록이 너무 커서 불러올 수 없습니다.",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "계정 정보 불러오기 다시 시도",
     "retryLoadingPrivacy": "개인정보 보호 설정 불러오기 다시 시도"
   },
+  "accountBlocked": {
+    "title": "계정이 차단되었습니다",
+    "description": "Kilo가 이 계정을 차단했으며 다시 로그인해도 차단이 해제되지 않습니다. 지원팀은 요청 시 차단을 검토할 수 있습니다.",
+    "domainDescription": "Kilo가 이 이메일 도메인의 계정을 차단하며 다시 로그인해도 차단이 해제되지 않습니다. 지원팀은 요청 시 도메인을 검토할 수 있습니다.",
+    "contactSupport": "지원팀에 문의"
+  },
   "addCredits": {
     "cta": "크레딧 충전",
     "billingPage": "결제 페이지"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "요청 시간이 초과되었습니다. 다시 시도하세요."
   },
   "screenHeader": {
-    "openMenu": "메뉴 열기",
-    "openMenuFor": "{{title}} 메뉴 열기"
+    "openMenu": "메뉴 열기"
   },
   "picker": {
     "optionsExpired": "선택 항목 만료",
@@ -3443,6 +3449,142 @@
         "guardrailUpdate": "가드레일 업데이트됨",
         "guardrailRemove": "가드레일 제거됨",
         "unknown": "감사 이벤트"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "모드 \"{{name}}\" (식별자: {{slug}})",
+        "modeUpdate": "모드 \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "자동 라우팅",
+          "defaultModel": "기본 모델"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}}을(를) {{role}}(으)로 추가함",
+        "memberRemoved": "{{email}}을(를) 제거함",
+        "memberParentAdded": "상위 조직 {{parent}}에서 {{email}}을(를) 추가함",
+        "memberParentRemoved": "상위 조직 {{parent}}에서 {{email}}을(를) 제거함",
+        "inviteSent": "{{email}} — {{role}}",
+        "inviteRevoked": "{{email}}에 대한 초대 취소함",
+        "inviteAccepted": "{{email}} 초대 수락함",
+        "groupIdentity": "그룹 \"{{name}}\"",
+        "groupMembers": "그룹 \"{{name}}\": {{members}}",
+        "groupMemberGroups": "그룹 {{displayCount}}개",
+        "groupMemberGroups_one": "그룹 {{displayCount}}개",
+        "groupMemberGroups_other": "그룹 {{displayCount}}개",
+        "groupMemberGroupsOf": "{{email}}: 그룹 {{displayCount}}개",
+        "groupMemberGroupsOf_one": "{{email}}: 그룹 {{displayCount}}개",
+        "groupMemberGroupsOf_other": "{{email}}: 그룹 {{displayCount}}개",
+        "groupPolicySet": "그룹 \"{{name}}\": {{policy}} 정책 설정함",
+        "groupPolicyRemoved": "그룹 \"{{name}}\": {{policy}} 정책 제거함",
+        "groupDefaultPolicySet": "기본 {{policy}} 정책 설정함",
+        "groupDefaultPolicyRemoved": "기본 {{policy}} 정책 제거함",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "인공지능 가드레일 {{state}}",
+        "guardrailConfigGroup": "그룹 \"{{group}}\": {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO 도메인 {{domain}}",
+        "ssoDomainChanged": "{{domain}} (이전: {{previous}})",
+        "ssoDomainRemoved": "SSO 도메인 {{domain}} 제거함",
+        "fundsPurchased": "{{method}}(으)로 {{amount}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "하위 조직 {{displayCount}}곳에 {{amount}}",
+        "fundsDistributed_one": "하위 조직 {{displayCount}}곳에 {{amount}}",
+        "fundsDistributed_other": "하위 조직 {{displayCount}}곳에 {{amount}}",
+        "fundsReceived": "상위 조직 {{parent}}에서 {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} 구성",
+        "reviewAgentConfigStyle": "{{platform}}: 스타일 {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}}개 업데이트됨",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}}개 업데이트됨",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}}개 업데이트됨",
+        "reviewAgentSecretsFailed": "{{displayCount}}개 오류",
+        "reviewAgentSecretsFailed_one": "{{displayCount}}개 오류",
+        "reviewAgentSecretsFailed_other": "{{displayCount}}개 오류",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "추론 리전: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "모드 \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "전역 기본값",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "허용됨",
+          "denied": "거부됨",
+          "followSetting": "확장 프로그램 설정을 따름"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "프로젝트 UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}}에서 {{emails}}(으)로",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "추천 다이제스트 {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: 허용된 출처 없음",
+        "settingName": "{{previous}}에서 {{next}}(으)로 이름 변경됨",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "사용 전 검사 켬",
+        "scanBeforeUseOff": "사용 전 검사 끔",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "제거됨: {{models}}",
+        "browserPolicyOff": "브라우저 사용 차단됨",
+        "browserPolicyAllow": "허용된 출처만",
+        "browserPolicyPlaywrightOnly": "브라우저 사용만",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "모델 변경됨: {{values}}",
+        "integrationConnected": "{{integration}} 연결됨",
+        "integrationDisconnected": "{{integration}} 연결 해제됨",
+        "integrationRefreshed": "{{integration}} 새로 고침됨",
+        "integrationCancelled": "{{integration}} 취소됨",
+        "integrationModelUpdated": "{{integration}}: 모델 {{model}}",
+        "integrationKeyAdded": "{{provider}} 키 추가됨",
+        "integrationKeyUpdated": "{{provider}} 키 업데이트됨",
+        "integrationKeyDeleted": "{{provider}} 키 제거됨",
+        "integrationKeyToggled": "{{provider}} 키: {{state}}",
+        "namedPolicyCreated": "{{kind}} 정책 {{id}} 생성됨",
+        "namedPolicyUpdated": "{{kind}} 정책 {{id}} 업데이트됨",
+        "namedPolicyDeleted": "{{kind}} 정책 {{id}} 제거됨",
+        "namedPolicyLinked": "{{kind}} 정책 {{next}} 연결됨",
+        "webhookTriggerUpdated": "트리거 {{trigger}}",
+        "organizationRenamed": "조직 이름 변경됨: {{previous}}에서 {{next}}(으)로",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "자체 API 키"
+        }
       }
     },
     "billing": {
@@ -3952,6 +4094,9 @@
       "fieldName": "표시 이름",
       "fieldUrl": "서버 URL",
       "fieldUrlInvalid": "유효한 서버 URL을 입력하세요.",
+      "fieldUrlCredentials": "서버 URL에서 사용자 이름과 비밀번호를 제거하세요.",
+      "fieldUrlFragment": "서버 URL에서 # 부분을 제거하세요.",
+      "fieldUrlInsecure": "https 주소를 입력하고 http는 localhost에서만 사용하세요.",
       "duplicateUrl": "이미 저장된 URL입니다.",
       "serverNotFound": "이 서버는 더 이상 저장되어 있지 않습니다.",
       "enableServer": "이 서버 사용: {{name}}",
@@ -3977,6 +4122,7 @@
       "app": {
         "label": "도구 인터페이스",
         "failed": "이 도구의 인터페이스를 불러올 수 없습니다.",
+        "tooLarge": "이 도구의 인터페이스가 {{size}} 제한보다 큽니다.",
         "empty": "이 도구의 인터페이스에 표시할 항목이 없습니다."
       }
     },
@@ -4092,6 +4238,7 @@
         "network": "다운로드가 완료되지 않았습니다. 연결을 확인한 후 다시 시도하세요.",
         "invalidFile": "다운로드한 파일은 이 앱에서 실행할 수 있는 모델이 아니므로 삭제되었습니다.",
         "checksum": "다운로드한 파일이 게시된 체크섬과 일치하지 않으므로 삭제되었습니다. 다시 다운로드해 보세요.",
+        "unreadable": "이 기기에서는 다운로드한 파일을 확인하지 못해 삭제되었습니다. 다시 다운로드해 보세요.",
         "writeFailed": "이 기기에서는 모델을 저장하지 못했습니다. 다시 다운로드해 보세요."
       }
     },
@@ -4700,6 +4847,7 @@
     "contextAll": "모든 컨텍스트",
     "dismiss": "브리핑 무시",
     "dismissFailed": "아직 이 브리핑을 무시하지 못했습니다. 백그라운드에서 다시 시도합니다.",
+    "readMarkFailed": "이 브리핑을 읽음으로 표시하지 못했습니다. 브리핑이 다시 로드되면 다시 시도합니다.",
     "offline": "오프라인 · 저장된 브리핑",
     "cached": "저장된 브리핑 · 새로고침 불가",
     "summary": "AI 요약",
@@ -4719,6 +4867,9 @@
     "morningEnd": "브리핑 제공 종료 시각",
     "timeHint": "브리핑 기간이 끝나면 오프라인 상태에서도 홈 카드가 실시간 상태로 돌아갑니다.",
     "invalidSchedule": "유효한 시간대와 비어 있지 않은 브리핑 기간을 선택하세요.",
+    "scheduleEmptyNight": "브리핑 기간이 비어 있습니다. 브리핑 기간 시작 이후의 준비 완료 시각을 선택하세요.",
+    "scheduleEmptyMorning": "브리핑 준비 완료 시각과 브리핑 제공 종료 시각이 같습니다. 브리핑을 얼마나 오래 제공할지 선택하세요.",
+    "scheduleFullDay": "두 브리핑 기간이 하루 전체를 차지합니다. 하루 중 일부는 브리핑 기간 밖으로 남겨 두세요.",
     "notificationsHint": "예약된 브리핑마다 일반 알림을 한 번 보냅니다. 유료 AI 요약과는 별개입니다.",
     "notificationPermission": "브리핑을 받으려면 푸시 알림을 켜세요.",
     "defaultModel": "Kilo 기본 모델 사용",
@@ -4728,7 +4879,9 @@
     "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
     "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다. 모델이나 한도를 변경하거나 나중에 다시 시도하세요.",
     "confirmPaid": "{{context}}에 유료 요약을 사용하시겠습니까?",
+    "paidDisclosure_one": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "paidDisclosure": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
+    "paidDisclosure_other": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "enable": "유료 요약 사용",
     "allContexts": "개인 및 조직 브리핑은 별도로 유지됩니다.",
     "emptyHistory": "저장된 브리핑 없음",
@@ -4767,7 +4920,7 @@
     "sourceActivity": "제목 없는 활동",
     "metadataFailureProvider": "프로바이더 오류",
     "metadataFailureTool": "도구 오류",
-    "metadataFailureCancelled": "취소됨",
+    "metadataStopped": "지난 턴 중단됨",
     "metadataFailureOther": "기타 오류",
     "metadataPlan_one": "계획: {{displayTotal}}단계 중 {{displayDone}}단계 완료",
     "metadataFiles_one": "{{displayCount}}개 파일 변경됨",

@@ -9,6 +9,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
+import { INPUT_FRAME_CLASS } from '@/components/ui/input-frame';
 import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { codeFieldTextStyle, hasRtlScript, withoutMonoFamily } from '@/lib/rtl-text';
@@ -78,12 +79,7 @@ export function SetupCommandField({
       <View className="gap-1.5">
         <View className={gapClassName ?? 'gap-1.5'}>
           <FormFieldLabel label={label} />
-          <View
-            className={cn(
-              INPUT_BOX_SHAPE_CLASS,
-              'justify-center rounded-md border border-input bg-background py-2.5 dark:bg-[#FFFFFF0A]'
-            )}
-          >
+          <View className={cn(INPUT_BOX_SHAPE_CLASS, INPUT_FRAME_CLASS, 'justify-center py-2.5')}>
             <SelectableText
               accessibilityLabel={label}
               accessibilityHint={accessibilityHint}

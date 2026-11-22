@@ -14,7 +14,7 @@ import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
 import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
-import { trpcClient } from '@/lib/trpc';
+import { retireDeviceRemoteState } from '@/lib/auth/device-retire';
 
 /**
  * Safe-retry records for remote cleanup that failed at logout (DEC-01).
@@ -290,8 +290,16 @@ function uniqueTokens(tokens: readonly string[]): string[] {
  * deletion). It NEVER throws: every step is internally caught, so a remote
  * or storage failure can never block local sign-out.
  *
- * - Revokes the current device session and unregisters the device push token
- *   concurrently, bounded at 15 s each by the tRPC client's `deadlineFetch`.
+ * - The device push token is unregistered FIRST, then the current device
+ *   session is revoked. The order is required, not cosmetic: the revoke ends
+ *   this credential's auth, so a deletion that lands after it is refused with
+ *   "Device session is no longer active", and an account that cannot sign back
+ *   in never retries it. Both calls are serial but share ONE
+ *   `CONTROL_PLANE_DEADLINE_MS` budget, so local sign-out waits at most 15 s
+ *   for the pair; the alternative — running them concurrently — loses the
+ *   deletion to the race. The push step is capped at half that budget, so a
+ *   stalled unregister is retried from its record while the revoke still gets
+ *   its own attempt on the budget that is left.
  * - A failed revoke is not recorded: see the record type for why. A failed
  *   push or activity-token unregister is merged into this account's record; a
  *   fully successful one leaves this account's record only when no earlier
@@ -329,14 +337,9 @@ export async function runLogoutCleanup(): Promise<void> {
     const activityResult = await getGlanceableDelivery().unregisterTokens();
     const needsActivityUnregister = !activityResult.ok;
 
-    const results = await Promise.allSettled([
-      trpcClient.user.revokeCurrentDeviceSession.mutate(),
-      pushToken
-        ? trpcClient.user.unregisterPushToken.mutate({ token: pushToken })
-        : Promise.resolve(),
-    ]);
-
-    const unregister = results[1];
+    // The device push token goes before the revoke, and the pair shares ONE
+    // control-plane budget; see `retireDeviceRemoteState`.
+    const unregister = await retireDeviceRemoteState(pushToken);
 
     // A fulfilled unregister for a real token is a definitive outcome; emit
     // it. No emit when there is no token (nothing was unregistered).

@@ -53,6 +53,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'ios' },
+  I18nManager: { isRTL: false },
   Keyboard: { dismiss: vi.fn() },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));

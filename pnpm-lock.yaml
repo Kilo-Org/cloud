@@ -1613,6 +1613,9 @@ importers:
 
   packages/cloud-agent-profile:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../app-shared
       '@kilocode/db':
         specifier: workspace:*
         version: link:../db
@@ -2473,6 +2476,9 @@ importers:
       '@kilocode/cloud-agent-profile':
         specifier: workspace:*
         version: link:../../packages/cloud-agent-profile
+      '@kilocode/cloud-agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/cloud-agent-sdk
       '@kilocode/container-usage':
         specifier: workspace:*
         version: link:../../packages/container-usage

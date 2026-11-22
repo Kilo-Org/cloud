@@ -5,15 +5,45 @@ import { modelPickerSlot } from '@/lib/route-registry';
 // Development-only remote CLI catalog, on the picker fixture's own dev link.
 // The same link carries `unavailable=1`, which serves the all-unavailable
 // projection (one dead row, the session's current selection) instead of the
-// multi-provider catalog: it rides this path rather than a path of its own
-// because the design gate must open the same route on the merge base, whose
-// fixture only knows this path.
+// multi-provider catalog, and `empty=1`, which serves a catalog the session's
+// refetch has not filled yet. Both ride this path rather than paths of their
+// own because the design gate must open the same route on the merge base,
+// whose fixture only knows this path.
 export function modelPickerFixtureRoute(path: string): string | null {
   if (!/(?:^|\/)dev\/model-picker-fixture\/multiple-providers\/?(?:[?#].*)?$/.test(path)) {
     return null;
   }
 
   const routeKey = 'model-picker-fixture';
+
+  if (/[?&]empty=1(?:[&#]|$)/.test(path)) {
+    // The composer's chip opens the picker with the catalog it holds. When that
+    // catalog is empty the session can still refetch it, and the sheet offers
+    // that as its one action. The fixture records the ask instead of reaching a
+    // backend the picker cannot, so the action and its close are provable on a
+    // device without a live catalog.
+    const emptyScope: ModelPickerBridge['selectionScope'] = {
+      sessionId: routeKey,
+      ownerConnectionId: 'fixture-remote-cli',
+      protocol: 'v1',
+      catalogGenerationIdentity: {},
+    };
+    const emptyBridge: ModelPickerBridge = {
+      options: [],
+      currentValue: '',
+      currentVariant: '',
+      acceptsVariant: true,
+      selectionScope: emptyScope,
+      isSelectionCurrent: () => true,
+      onSelect: () => undefined,
+      retryCatalog: () => {
+        // eslint-disable-next-line no-console -- dev-only fixture feedback in the Metro log
+        console.info('[model-picker-fixture] catalog retry requested');
+      },
+    };
+    modelPickerSlot.set(routeKey, emptyBridge);
+    return `/(app)/agent-chat/model-picker?routeKey=${routeKey}`;
+  }
 
   if (/[?&]unavailable=1(?:[&#]|$)/.test(path)) {
     // `buildUnavailableRemoteOptions` in `use-session-model-options` projects a

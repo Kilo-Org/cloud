@@ -7,6 +7,7 @@
       "spendAlert": "支出の確認が必要です",
       "securityFinding": "セキュリティの検出結果の確認が必要です",
       "securityUpdate": "セキュリティチェックに更新があります",
+      "agentBriefing": "エージェントブリーフィングの準備ができました",
       "activeAgentsGlanceable": "アクティブなエージェントに更新があります"
     }
   },

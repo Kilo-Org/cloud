@@ -26,7 +26,7 @@ const snapshotSchema = z.object({
   prevId: z.string(),
   tables: z.record(z.string(), tableSchema),
 });
-const snapshots = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'].map(version =>
+const snapshots = ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008'].map(version =>
   snapshotSchema.parse(
     JSON.parse(
       readFileSync(new URL(`./drizzle/meta/${version}_snapshot.json`, import.meta.url), 'utf8')
@@ -39,13 +39,12 @@ describe('restored history migration bundle', () => {
     const baseline = snapshots[0];
     for (let index = 1; index < snapshots.length; index += 1)
       expect(snapshots[index].prevId).toBe(snapshots[index - 1].id);
-    // History migrations preserve coordinator messages; 0006 adds billing failures
-    // and 0007 adds the cost-total tables, so both trail the preserved shape.
-    for (let index = 2; index < snapshots.length - 2; index += 1) {
-      expect(snapshots[index].tables.control_plane_messages).toEqual(
+    // Only the history migrations (0003–0005) must preserve the original message schema.
+    for (const snapshot of snapshots.slice(2, 5)) {
+      expect(snapshot.tables.control_plane_messages).toEqual(
         baseline.tables.control_plane_messages
       );
-      expect(snapshots[index].tables.events.columns).toEqual({
+      expect(snapshot.tables.events.columns).toEqual({
         ...baseline.tables.events.columns,
         mutation_cursor: {
           name: 'mutation_cursor',
@@ -56,7 +55,7 @@ describe('restored history migration bundle', () => {
           default: 0,
         },
       });
-      expect(snapshots[index].tables.events.indexes).toEqual({
+      expect(snapshot.tables.events.indexes).toEqual({
         ...baseline.tables.events.indexes,
         idx_events_mutation_cursor: {
           name: 'idx_events_mutation_cursor',
@@ -96,6 +95,7 @@ describe('restored history migration bundle', () => {
       '0005_native_history_scope',
       '0006_confused_shiva',
       '0007_session_cost_totals',
+      '0008_message_settlement',
     ]);
     expect(Object.keys(migrations.migrations)).toEqual([
       'm0000',
@@ -106,6 +106,7 @@ describe('restored history migration bundle', () => {
       'm0005',
       'm0006',
       'm0007',
+      'm0008',
     ]);
     expect(migrations.migrations.m0003).toContain('UPDATE `events` SET `mutation_cursor` = `id`');
     expect(migrations.migrations.m0003).toContain('coalesce(max(`mutation_cursor`), 0)');

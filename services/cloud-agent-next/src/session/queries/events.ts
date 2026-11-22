@@ -335,6 +335,20 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
     );
   }
 
+  function finalTurnAssistantRow(
+    sessionId: string,
+    kiloSessionId: string,
+    promptMessageId: string
+  ) {
+    return db
+      .select()
+      .from(events)
+      .where(turnAssistantRows(sessionId, kiloSessionId, promptMessageId))
+      .orderBy(desc(events.entity_id))
+      .limit(1)
+      .get();
+  }
+
   return {
     insert(params: InsertEventParams): EventId {
       const row = db
@@ -458,22 +472,66 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
         .all() satisfies StoredEvent[];
     },
 
+    findLatestAttemptSnapshotForMessage(
+      prefix: string,
+      triggerMessageId: string
+    ): StoredEvent | null {
+      const upperBound = prefixUpperBound(prefix);
+      const row = db
+        .select()
+        .from(events)
+        .where(
+          and(
+            gte(events.entity_id, prefix),
+            upperBound === null ? undefined : lt(events.entity_id, upperBound),
+            sql`+${events.stream_event_type} = 'preparing'`,
+            sql`instr(${events.entity_id}, '/step/') = 0`,
+            eq(sql<string>`json_extract(${events.payload}, '$.action')`, 'attempt_snapshot'),
+            eq(sql<string>`json_extract(${events.payload}, '$.triggerMessageId')`, triggerMessageId)
+          )
+        )
+        .orderBy(desc(sql`json_extract(${events.payload}, '$.attempt.startedAt')`), desc(events.id))
+        .limit(1)
+        .get();
+      return row ?? null;
+    },
+
     /** The last root assistant message of the turn, its final answer. */
     getAssistantAnswerForUserMessage(
       sessionId: string,
       kiloSessionId: string,
       promptMessageId: string
     ): AssistantAnswer | null {
+      const messageRow = finalTurnAssistantRow(sessionId, kiloSessionId, promptMessageId);
+      return messageRow ? readAssistantAnswer(sessionId, rawSql, messageRow) : null;
+    },
+
+    getAssistantAnswerMessageIdForUserMessage(
+      sessionId: string,
+      kiloSessionId: string,
+      promptMessageId: string
+    ): string | null {
+      const messageRow = finalTurnAssistantRow(sessionId, kiloSessionId, promptMessageId);
+      return messageRow?.entity_id?.slice('message/'.length) ?? null;
+    },
+
+    getAssistantAnswerByMessageId(
+      sessionId: string,
+      assistantMessageId: string
+    ): AssistantAnswer | null {
       const messageRow = db
         .select()
         .from(events)
-        .where(turnAssistantRows(sessionId, kiloSessionId, promptMessageId))
-        .orderBy(desc(events.entity_id))
-        .limit(1)
+        .where(
+          and(
+            eq(events.entity_id, `message/${assistantMessageId}`),
+            eq(events.session_id, sessionId),
+            eq(events.stream_event_type, 'kilocode'),
+            sql.raw(assistantRowSql('"events"."payload"'))
+          )
+        )
         .get();
-      if (!messageRow) return null;
-
-      return readAssistantAnswer(sessionId, rawSql, messageRow);
+      return messageRow ? readAssistantAnswer(sessionId, rawSql, messageRow) : null;
     },
 
     getRecentAssistantAnswersForUserMessage(

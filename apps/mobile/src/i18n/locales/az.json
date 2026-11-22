@@ -522,6 +522,7 @@
       "receiptLabel": "Qəbz",
       "copyReceiptId": "Qəbz ID-ni kopyala",
       "appealLabel": "Apellyasiya",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Qəbul edildi",
       "triageOpen": "Nəzərdən keçirilir",
       "triageActioned": "Təsdiqləndi",
@@ -555,7 +556,7 @@
       "title": "Şikayətlər",
       "rowSubtitle": "Göndərdiyiniz şikayətlər və onların nəticələri",
       "emptyTitle": "Hələ şikayət yoxdur",
-      "emptyDescription": "Şərhdən və ya AI cavabından göndərdiyiniz şikayətlər burada görünəcək.",
+      "emptyDescription": "Pull request müzakirəsindəki şərhdən və ya agent sessiyasındakı AI cavabından göndərdiyiniz şikayətlər nəticələri ilə birlikdə burada görünəcək.",
       "couldNotLoad": "Şikayətləriniz yüklənə bilmədi",
       "capped": "Ən son şikayətləriniz göstərilir."
     },
@@ -2175,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessiya",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessiya",
       "live": "CANLI",
-      "updating": "Yenilənir"
+      "updating": "Yenilənir",
+      "retentionLimit": "Ən son sessiyalarınız göstərilir."
     },
     "sessionRow": {
       "deleteTitle": "Sessiya silinsin?",
@@ -2245,7 +2247,6 @@
       "scrollToBottom": "Ən aşağıya sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
       "emptyReadOnlyTitle": "Bu sessiyada mesaj yoxdur",
-      "renameAccessibility": "Sessiyanın adını dəyiş: {{title}}",
       "cloningSession": "Sessiya klonlanır",
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
       "historyTooLarge": "Bu sessiyanın transkripti yükləmək üçün çox böyükdür.",
@@ -3094,6 +3095,12 @@
     "retryLoadingAccount": "Hesabı yükləməyə yenidən cəhd et",
     "retryLoadingPrivacy": "Məxfilik seçimlərini yükləməyə yenidən cəhd et"
   },
+  "accountBlocked": {
+    "title": "Hesab bloklanıb",
+    "description": "Kilo bu hesabı bloklayıb və yenidən daxil olmaq bloku aradan qaldırmayacaq. Dəstək xidməti sorğu əsasında bloku nəzərdən keçirə bilər.",
+    "domainDescription": "Kilo bu e-poçt domenindəki hesabları bloklayır və yenidən daxil olmaq bunu dəyişməyəcək. Dəstək xidməti sorğu əsasında domeni nəzərdən keçirə bilər.",
+    "contactSupport": "Dəstək xidməti ilə əlaqə saxla"
+  },
   "addCredits": {
     "cta": "Kredit əlavə et",
     "billingPage": "ödəniş səhifəsi"
@@ -3166,8 +3173,7 @@
     "timeoutDescription": "Sorğu tamamlanmazdan əvvəl vaxtı bitdi. Yenidən cəhd et."
   },
   "screenHeader": {
-    "openMenu": "Menyunu aç",
-    "openMenuFor": "{{title}} üçün menyunu aç"
+    "openMenu": "Menyunu aç"
   },
   "picker": {
     "optionsExpired": "Seçimlərin müddəti bitib",
@@ -3451,6 +3457,142 @@
         "guardrailUpdate": "Qoruyucu qayda yeniləndi",
         "guardrailRemove": "Qoruyucu qayda çıxarıldı",
         "unknown": "Audit hadisəsi"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Rejim \"{{name}}\" (identifikator: {{slug}})",
+        "modeUpdate": "Rejim \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Avtomatik marşrutlaşdırma",
+          "defaultModel": "Standart model"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} {{role}} olaraq əlavə edildi",
+        "memberRemoved": "{{email}} çıxarıldı",
+        "memberParentAdded": "{{email}} {{parent}} ana təşkilatından əlavə edildi",
+        "memberParentRemoved": "{{email}} {{parent}} ana təşkilatından çıxarıldı",
+        "inviteSent": "{{email}} {{role}} olaraq",
+        "inviteRevoked": "{{email}} üçün dəvət ləğv edildi",
+        "inviteAccepted": "{{email}} qəbul etdi",
+        "groupIdentity": "Qrup \"{{name}}\"",
+        "groupMembers": "Qrup \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} qrup",
+        "groupMemberGroups_one": "{{displayCount}} qrup",
+        "groupMemberGroups_other": "{{displayCount}} qrup",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} qrup",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} qrup",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} qrup",
+        "groupPolicySet": "Qrup \"{{name}}\": {{policy}} siyasəti təyin edildi",
+        "groupPolicyRemoved": "Qrup \"{{name}}\": {{policy}} siyasəti çıxarıldı",
+        "groupDefaultPolicySet": "Standart {{policy}} siyasəti təyin edildi",
+        "groupDefaultPolicyRemoved": "Standart {{policy}} siyasəti çıxarıldı",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Süni intellekt qoruyucu qaydaları {{state}}",
+        "guardrailConfigGroup": "Qrup \"{{group}}\" üçün {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO domeni {{domain}}",
+        "ssoDomainChanged": "{{domain}} (əvvəlki {{previous}})",
+        "ssoDomainRemoved": "SSO domeni {{domain}} silindi",
+        "fundsPurchased": "{{amount}} {{method}} ilə",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} {{displayCount}} alt təşkilata",
+        "fundsDistributed_one": "{{amount}} {{displayCount}} alt təşkilata",
+        "fundsDistributed_other": "{{amount}} {{displayCount}} alt təşkilata",
+        "fundsReceived": "{{amount}} {{parent}} tərəfindən",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} konfiqurasiyası",
+        "reviewAgentConfigStyle": "{{platform}}: üslub {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} yeniləndi",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} yeniləndi",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} yeniləndi",
+        "reviewAgentSecretsFailed": "{{displayCount}} xəta",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} xəta",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} xəta",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "İnferens regionu: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Rejim \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Qlobal standart",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "İcazə verilir",
+          "denied": "İcazə verilmir",
+          "followSetting": "Uzantı ayarını izləyir"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects interfeysi {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} {{emails}} ünvanlarına",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Tövsiyə xülasəsi {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: icazəli mənbə yoxdur",
+        "settingName": "{{previous}} adından {{next}} adına dəyişdirildi",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "İstifadədən əvvəl skanlama aktiv",
+        "scanBeforeUseOff": "İstifadədən əvvəl skanlama deaktiv",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Çıxarıldı: {{models}}",
+        "browserPolicyOff": "Brauzer istifadəsi bloklandı",
+        "browserPolicyAllow": "Yalnız icazəli mənbələr",
+        "browserPolicyPlaywrightOnly": "Yalnız brauzer istifadəsi",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Modellər dəyişdirildi: {{values}}",
+        "integrationConnected": "{{integration}} qoşuldu",
+        "integrationDisconnected": "{{integration}} qoşulması kəsildi",
+        "integrationRefreshed": "{{integration}} yeniləndi",
+        "integrationCancelled": "{{integration}} ləğv edildi",
+        "integrationModelUpdated": "{{integration}}: süni intellekt modeli {{model}}",
+        "integrationKeyAdded": "{{provider}} üçün açar əlavə edildi",
+        "integrationKeyUpdated": "{{provider}} üçün açar yeniləndi",
+        "integrationKeyDeleted": "{{provider}} üçün açar silindi",
+        "integrationKeyToggled": "{{provider}} üçün açar: {{state}}",
+        "namedPolicyCreated": "{{kind}} siyasəti {{id}} yaradıldı",
+        "namedPolicyUpdated": "{{kind}} siyasəti {{id}} yeniləndi",
+        "namedPolicyDeleted": "{{kind}} siyasəti {{id}} silindi",
+        "namedPolicyLinked": "{{kind}} siyasəti {{next}} ilə əlaqələndirildi",
+        "webhookTriggerUpdated": "Tətikləyici {{trigger}}",
+        "organizationRenamed": "Təşkilatın adı {{previous}}-dən {{next}}-ə dəyişdirildi",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Öz açarınız"
+        }
       }
     },
     "billing": {
@@ -3952,6 +4094,9 @@
       "fieldName": "Göstərilən ad",
       "fieldUrl": "Server URL-i",
       "fieldUrlInvalid": "Etibarlı server URL-i daxil edin.",
+      "fieldUrlCredentials": "URL-dən istifadəçi adını və parolu silin.",
+      "fieldUrlFragment": "URL-in # hissəsini silin.",
+      "fieldUrlInsecure": "https URL-i daxil edin, http isə yalnız localhost üçün icazəlidir.",
       "duplicateUrl": "Bu URL artıq yadda saxlanılıb.",
       "serverNotFound": "Bu server artıq yadda saxlanılmır.",
       "enableServer": "Bu serveri aktiv et: {{name}}",
@@ -3977,6 +4122,7 @@
       "app": {
         "label": "Alətin interfeysi",
         "failed": "Bu alətin interfeysi yüklənə bilmədi.",
+        "tooLarge": "Bu alətin interfeysi {{size}} həddindən böyükdür.",
         "empty": "Bu alətin interfeysində göstəriləcək heç nə yoxdur."
       }
     },
@@ -4092,6 +4238,7 @@
         "network": "Yükləmə tamamlanmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
         "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi.",
         "checksum": "Yüklənmiş fayl dərc olunmuş yoxlama cəmi ilə uyğun gəlmir, ona görə silindi. Yükləməni yenidən cəhd edin.",
+        "unreadable": "Bu cihaz yüklənmiş faylı yoxlaya bilmədi, ona görə silindi. Yükləməni yenidən cəhd edin.",
         "writeFailed": "Bu cihaz modeli saxlaya bilmədi. Yükləməni yenidən cəhd edin."
       }
     },
@@ -4700,6 +4847,7 @@
     "contextAll": "Bütün kontekstlər",
     "dismiss": "Hesabatı rədd et",
     "dismissFailed": "Bu hesabatı rədd etmək hələ alınmadı. Arxa planda yenidən cəhd edilir.",
+    "readMarkFailed": "Bu hesabatı oxunmuş kimi qeyd etmək alınmadı. Hesabat yenidən yüklənəndə təkrar cəhd ediləcək.",
     "offline": "Oflayn · saxlanmış hesabat",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
     "summary": "AI xülasəsi",
@@ -4719,6 +4867,9 @@
     "morningEnd": "Hesabatın mövcud olduğu son vaxt",
     "timeHint": "Hesabat pəncərəsi bitəndə Əsas kart, hətta oflayn olsa belə, canlı statusu bərpa edir.",
     "invalidSchedule": "Etibarlı saat qurşağı və boş olmayan hesabat pəncərəsi seçin.",
+    "scheduleEmptyNight": "Hesabat pəncərəsi boşdur. Pəncərənin başlanğıcından sonra olan hazır vaxtı seçin.",
+    "scheduleEmptyMorning": "Hazır vaxt mövcudluğun son vaxtı ilə üst-üstə düşür. Hesabatın nə qədər mövcud qalacağını seçin.",
+    "scheduleFullDay": "İki pəncərə tam bir günü əhatə edir. Günün bir hissəsini hesabatdan kənarda buraxın.",
     "notificationsHint": "Hər planlaşdırılmış hesabat üçün bir ümumi bildiriş. Ödənişli AI xülasələrindən asılı deyil.",
     "notificationPermission": "Hesabatı almaq üçün push bildirişlərini aktiv edin.",
     "defaultModel": "Kilonun standart modelindən istifadə et",
@@ -4728,6 +4879,8 @@
     "estimate": "Təxmin {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu parametrlər üçün ödənişli xülasə mövcud deyil. Modeli və ya limitləri dəyişin, yaxud bir az sonra yenidən cəhd edin.",
     "confirmPaid": "{{context}} üçün ödənişli xülasələr aktiv edilsin?",
+    "paidDisclosure_one": "Təxminən {{estimate}}, maksimum {{maximum}}, {{minutes}} dəqiqəlik limitlə. Yaratma uğursuz olsa belə ödəniş tutulur.",
+    "paidDisclosure_other": "Təxminən {{estimate}}, maksimum {{maximum}}, {{minutes}} dəqiqəlik limitlə. Yaratma uğursuz olsa belə ödəniş tutulur.",
     "paidDisclosure": "Təxminən {{estimate}}, maksimum {{maximum}}, {{minutes}} dəqiqəlik limitlə. Yaratma uğursuz olsa belə ödəniş tutulur.",
     "enable": "Ödənişli xülasələri aktiv et",
     "allContexts": "Şəxsi və təşkilat hesabatları ayrı saxlanılır.",
@@ -4771,7 +4924,7 @@
     "sourceActivity": "Adsız fəaliyyət",
     "metadataFailureProvider": "provayder xətası",
     "metadataFailureTool": "alət xətası",
-    "metadataFailureCancelled": "Ləğv edildi",
+    "metadataStopped": "Son tur dayandırıldı",
     "metadataFailureOther": "müəyyən edilməmiş xəta"
   },
   "systemSearch": {

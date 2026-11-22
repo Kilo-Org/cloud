@@ -522,6 +522,7 @@
       "receiptLabel": "ரசீது",
       "copyReceiptId": "ரசீது ID-ஐ நகலெடுக்கவும்",
       "appealLabel": "மேல்முறையீடு",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "பெறப்பட்டது",
       "triageOpen": "மதிப்பாய்வில் உள்ளது",
       "triageActioned": "உறுதிசெய்யப்பட்டது",
@@ -555,7 +556,7 @@
       "title": "புகார்கள்",
       "rowSubtitle": "நீங்கள் சமர்ப்பித்த புகார்களும் அவற்றின் முடிவுகளும்",
       "emptyTitle": "இன்னும் புகார்கள் இல்லை",
-      "emptyDescription": "ஒரு கருத்து அல்லது AI பதிலில் இருந்து நீங்கள் சமர்ப்பிக்கும் புகார்கள் இங்கே தோன்றும்.",
+      "emptyDescription": "pull request விவாதத்தில் உள்ள ஒரு கருத்தில் இருந்தோ அல்லது முகவர் அமர்வில் வரும் AI பதிலில் இருந்தோ நீங்கள் சமர்ப்பிக்கும் புகார்கள் அவற்றின் முடிவுடன் இங்கே தோன்றும்.",
       "couldNotLoad": "உங்கள் புகார்களை ஏற்ற முடியவில்லை",
       "capped": "உங்கள் சமீபத்திய புகார்கள் காட்டப்படுகின்றன."
     },
@@ -2175,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} அமர்வுகள்",
       "sectionAccessibility": "{{title}}: {{displayCount}} அமர்வுகள்",
       "live": "நேரலை",
-      "updating": "புதுப்பிக்கப்படுகிறது"
+      "updating": "புதுப்பிக்கப்படுகிறது",
+      "retentionLimit": "உங்கள் மிகச் சமீபத்திய அமர்வுகள் காட்டப்படுகின்றன."
     },
     "sessionRow": {
       "deleteTitle": "அமர்வை நீக்கவா?",
@@ -2245,7 +2247,6 @@
       "scrollToBottom": "கடைசிக்குச் செல்லவும்",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
       "emptyReadOnlyTitle": "இந்த அமர்வில் செய்திகள் இல்லை",
-      "renameAccessibility": "{{title}} அமர்வின் பெயரை மாற்றவும்",
       "cloningSession": "அமர்வு நகலாக்கப்படுகிறது",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை.",
       "historyTooLarge": "இந்த அமர்வின் பதிவேடு ஏற்ற முடியாற்படி மிகப் பெரிது.",
@@ -3094,6 +3095,12 @@
     "retryLoadingAccount": "கணக்கை ஏற்ற மீண்டும் முயற்சிக்கவும்",
     "retryLoadingPrivacy": "தனியுரிமை விருப்பங்களை ஏற்ற மீண்டும் முயற்சிக்கவும்"
   },
+  "accountBlocked": {
+    "title": "கணக்கு தடைசெய்யப்பட்டது",
+    "description": "Kilo இந்தக் கணக்கைத் தடைசெய்துள்ளது, மீண்டும் உள்நுழைவதால் அது நீங்காது. கோரிக்கையின் பேரில் உதவிக் குழு தடையை மதிப்பாய்வு செய்யலாம்.",
+    "domainDescription": "Kilo இந்த மின்னஞ்சல் டொமைனில் கணக்குகளைத் தடைசெய்கிறது, மீண்டும் உள்நுழைவதால் அது மாறாது. கோரிக்கையின் பேரில் உதவிக் குழு டொமைனை மதிப்பாய்வு செய்யலாம்.",
+    "contactSupport": "உதவிக் குழுவைத் தொடர்புகொள்ளவும்"
+  },
   "addCredits": {
     "cta": "கிரெடிட்களைச் சேர்க்கவும்",
     "billingPage": "கட்டணப் பக்கம்"
@@ -3166,8 +3173,7 @@
     "timeoutDescription": "கோரிக்கை நிறைவடையும் முன் நேரம் காலாவதியானது. மீண்டும் முயற்சிக்கவும்."
   },
   "screenHeader": {
-    "openMenu": "மெனுவைத் திறக்கவும்",
-    "openMenuFor": "{{title}}-க்கான மெனுவைத் திறக்கவும்"
+    "openMenu": "மெனுவைத் திறக்கவும்"
   },
   "picker": {
     "optionsExpired": "விருப்பங்கள் காலாவதியாகின",
@@ -3451,6 +3457,142 @@
         "guardrailUpdate": "பாதுகாப்பு வரம்பு புதுப்பிக்கப்பட்டது",
         "guardrailRemove": "பாதுகாப்பு வரம்பு நீக்கப்பட்டது",
         "unknown": "தணிக்கை நிகழ்வு"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "முறை \"{{name}}\" (அடையாளங்காட்டி: {{slug}})",
+        "modeUpdate": "முறை \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "தானியங்கி வழிமாற்றம்",
+          "defaultModel": "இயல்புநிலை மாதிரி"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} {{role}} ஆகச் சேர்க்கப்பட்டார்",
+        "memberRemoved": "{{email}} அகற்றப்பட்டார்",
+        "memberParentAdded": "தாய் நிறுவனம் {{parent}} இலிருந்து {{email}} சேர்க்கப்பட்டார்",
+        "memberParentRemoved": "தாய் நிறுவனம் {{parent}} இலிருந்து {{email}} அகற்றப்பட்டார்",
+        "inviteSent": "{{email}} {{role}} ஆக",
+        "inviteRevoked": "{{email}} க்கான அழைப்பு ரத்து செய்யப்பட்டது",
+        "inviteAccepted": "{{email}} ஏற்கப்பட்டது",
+        "groupIdentity": "குழு \"{{name}}\"",
+        "groupMembers": "குழு \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} குழுக்கள்",
+        "groupMemberGroups_one": "{{displayCount}} குழு",
+        "groupMemberGroups_other": "{{displayCount}} குழுக்கள்",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} குழுக்கள்",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} குழு",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} குழுக்கள்",
+        "groupPolicySet": "குழு \"{{name}}\": {{policy}} கொள்கை அமைக்கப்பட்டது",
+        "groupPolicyRemoved": "குழு \"{{name}}\": {{policy}} கொள்கை நீக்கப்பட்டது",
+        "groupDefaultPolicySet": "இயல்புநிலை {{policy}} கொள்கை அமைக்கப்பட்டது",
+        "groupDefaultPolicyRemoved": "இயல்புநிலை {{policy}} கொள்கை நீக்கப்பட்டது",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "செயற்கை நுண்ணறிவு பாதுகாப்பு வேலிகள் {{state}}",
+        "guardrailConfigGroup": "குழு \"{{group}}\" க்கு {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO டொமைன் {{domain}}",
+        "ssoDomainChanged": "{{domain}} (முன்பு {{previous}})",
+        "ssoDomainRemoved": "SSO டொமைன் {{domain}} அகற்றப்பட்டது",
+        "fundsPurchased": "{{method}} மூலம் {{amount}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} துணை நிறுவனங்களுக்கு {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} துணை நிறுவனத்திற்கு {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} துணை நிறுவனங்களுக்கு {{amount}}",
+        "fundsReceived": "{{parent}} இலிருந்து {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} உள்ளமைவு",
+        "reviewAgentConfigStyle": "{{platform}}: {{style}} நடை",
+        "reviewAgentSecretsUpdated": "{{displayCount}} புதுப்பிக்கப்பட்டன",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} புதுப்பிக்கப்பட்டது",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} புதுப்பிக்கப்பட்டன",
+        "reviewAgentSecretsFailed": "{{displayCount}} பிழைகள்",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} பிழை",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} பிழைகள்",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "அனுமானப் பிராந்தியம்: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "முறை \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "உலகளாவிய இயல்புநிலை",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "அனுமதிக்கப்பட்டது",
+          "denied": "மறுக்கப்பட்டது",
+          "followSetting": "நீட்டிப்பு அமைப்பைப் பின்பற்றுகிறது"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "திட்டம் UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} {{emails}} க்கு",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "பரிந்துரைச் சுருக்கம் {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: அனுமதிக்கப்பட்ட மூலங்கள் இல்லை",
+        "settingName": "{{previous}} இலிருந்து {{next}} என மறுபெயரிடப்பட்டது",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "பயன்படுத்தும் முன் ஸ்கேன் இயக்கப்பட்டது",
+        "scanBeforeUseOff": "பயன்படுத்தும் முன் ஸ்கேன் முடக்கப்பட்டது",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "நீக்கப்பட்டது: {{models}}",
+        "browserPolicyOff": "உலாவி பயன்பாடு தடுக்கப்பட்டது",
+        "browserPolicyAllow": "அனுமதிக்கப்பட்ட மூலங்கள் மட்டும்",
+        "browserPolicyPlaywrightOnly": "உலாவி பயன்பாடு மட்டும்",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "மாதிரிகள் மாற்றப்பட்டன: {{values}}",
+        "integrationConnected": "{{integration}} இணைக்கப்பட்டது",
+        "integrationDisconnected": "{{integration}} துண்டிக்கப்பட்டது",
+        "integrationRefreshed": "{{integration}} புதுப்பிக்கப்பட்டது",
+        "integrationCancelled": "{{integration}} ரத்து செய்யப்பட்டது",
+        "integrationModelUpdated": "{{integration}}: மாதிரி {{model}}",
+        "integrationKeyAdded": "{{provider}} க்கான விசை சேர்க்கப்பட்டது",
+        "integrationKeyUpdated": "{{provider}} க்கான விசை புதுப்பிக்கப்பட்டது",
+        "integrationKeyDeleted": "{{provider}} க்கான விசை அகற்றப்பட்டது",
+        "integrationKeyToggled": "{{provider}} க்கான விசை: {{state}}",
+        "namedPolicyCreated": "{{kind}} கொள்கை {{id}} உருவாக்கப்பட்டது",
+        "namedPolicyUpdated": "{{kind}} கொள்கை {{id}} புதுப்பிக்கப்பட்டது",
+        "namedPolicyDeleted": "{{kind}} கொள்கை {{id}} அகற்றப்பட்டது",
+        "namedPolicyLinked": "{{kind}} கொள்கை {{next}} உடன் இணைக்கப்பட்டது",
+        "webhookTriggerUpdated": "தூண்டுதல் {{trigger}}",
+        "organizationRenamed": "நிறுவனம் {{previous}} இலிருந்து {{next}} ஆக மறுபெயரிடப்பட்டது",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "உங்கள் சொந்த API விசை"
+        }
       }
     },
     "billing": {
@@ -3952,6 +4094,9 @@
       "fieldName": "காட்டப்படும் பெயர்",
       "fieldUrl": "சேவையக URL",
       "fieldUrlInvalid": "செல்லுபடியாகும் சேவையக URL உள்ளிடவும்.",
+      "fieldUrlCredentials": "முகவரியில் இருந்து பயனர் பெயரையும் கடவுச்சொல்லையும் நீக்கவும்.",
+      "fieldUrlFragment": "முகவரியின் # பகுதியை நீக்கவும்.",
+      "fieldUrlInsecure": "https முகவரியை உள்ளிடவும்; http என்பது localhost க்கு மட்டும் அனுமதிக்கப்படும்.",
       "duplicateUrl": "அந்த URL ஏற்கனவே சேமிக்கப்பட்டுள்ளது.",
       "serverNotFound": "இந்த சேவையகம் இனிச் சேமிக்கப்படவில்லை.",
       "enableServer": "இந்தச் சேவையகத்தை இயக்கு: {{name}}",
@@ -3977,6 +4122,7 @@
       "app": {
         "label": "கருவி இடைமுகம்",
         "failed": "இந்த கருவியின் இடைமுகத்தை ஏற்ற முடியவில்லை.",
+        "tooLarge": "இந்த கருவியின் இடைமுகம் {{size}} வரம்பை விட பெரியது.",
         "empty": "இந்த கருவியின் இடைமுகத்தில் காட்ட எதுவும் இல்லை."
       }
     },
@@ -4092,6 +4238,7 @@
         "network": "பதிவிறக்கம் முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
         "invalidFile": "பதிவிறக்கிய கோப்பு இந்த ஆப் இயக்கக்கூடிய மாதிரி அல்ல, எனவே அது நீக்கப்பட்டது.",
         "checksum": "பதிவிறக்கிய கோப்பு அதன் வெளியிடப்பட்ட செக்சம் மதிப்புடன் பொருந்தவில்லை, எனவே அது நீக்கப்பட்டது. மீண்டும் பதிவிறக்க முயலவும்.",
+        "unreadable": "இந்தச் சாதனத்தால் பதிவிறக்கிய கோப்பைச் சரிபார்க்க முடியவில்லை, எனவே அது நீக்கப்பட்டது. மீண்டும் பதிவிறக்க முயலவும்.",
         "writeFailed": "இந்தச் சாதனத்தால் மாதிரியைச் சேமிக்க முடியவில்லை. மீண்டும் பதிவிறக்க முயலவும்."
       }
     },
@@ -4700,6 +4847,7 @@
     "contextAll": "அனைத்துச் சூழல்களும்",
     "dismiss": "அறிக்கையைப் புறக்கணிக்கவும்",
     "dismissFailed": "இந்த அறிக்கையை இன்னும் புறக்கணிக்க இயலவில்லை. பின்புலத்தில் தானாகவே மீண்டும் முயற்சிக்கப்படும்.",
+    "readMarkFailed": "இந்த அறிக்கையைப் படித்ததாகக் குறிக்க இயலவில்லை. அறிக்கை மீண்டும் ஏற்றப்படும்போது தானாகவே மீண்டும் முயற்சிக்கப்படும்.",
     "offline": "ஆஃப்லைன் · சேமித்த அறிக்கை",
     "cached": "சேமித்த அறிக்கை · புதுப்பிக்க இயலாது",
     "summary": "AI சுருக்கம்",
@@ -4719,6 +4867,9 @@
     "morningEnd": "அறிக்கை கிடைக்கும் வரை",
     "timeHint": "அறிக்கைக் காலம் முடிந்ததும், ஆஃப்லைனிலும், முகப்பு அட்டை நேரடி நிலையை மீட்டமைக்கும்.",
     "invalidSchedule": "சரியான நேர மண்டலத்தையும், காலியில்லாத அறிக்கைக் காலத்தையும் தேர்வுசெய்யவும்.",
+    "scheduleEmptyNight": "அறிக்கைக் காலம் காலியாக உள்ளது. காலத் தொடக்கத்திற்குப் பிறகான தயாராகும் நேரத்தைத் தேர்வுசெய்யவும்.",
+    "scheduleEmptyMorning": "தயாராகும் நேரமும் கிடைக்கும் வரை நேரமும் ஒத்துள்ளன. அறிக்கை எவ்வளவு காலம் கிடைக்கும் என்பதைத் தேர்வுசெய்யவும்.",
+    "scheduleFullDay": "இரண்டு காலங்களும் ஒரு முழு நாளை உள்ளடக்குகின்றன. நாளின் ஒரு பகுதியை அறிக்கைக்கு வெளியே விடவும்.",
     "notificationsHint": "திட்டமிடப்பட்ட அறிக்கைக்கு ஒரு பொது அறிவிப்பு. கட்டண AI சுருக்கங்களைச் சாராதது.",
     "notificationPermission": "உங்கள் அறிக்கையைப் பெற புஷ் அறிவிப்புகளை இயக்கவும்.",
     "defaultModel": "Kilo இன் இயல்பு மாடலைப் பயன்படுத்து",
@@ -4728,7 +4879,9 @@
     "estimate": "மதிப்பீடு {{estimate}} · அதிகபட்சம் {{maximum}}",
     "estimateUnavailable": "இந்த அமைப்புகளுக்கு கட்டண சுருக்கம் கிடைக்கவில்லை. மாடலையோ வரம்புகளையோ மாற்றவும், அல்லது பின்னர் மீண்டும் முயற்சிக்கவும்.",
     "confirmPaid": "{{context}} க்குக் கட்டணச் சுருக்கங்களை இயக்கவா?",
-    "paidDisclosure": "மதிப்பீடு {{estimate}}, அதிகபட்சம் {{maximum}}, {{minutes}} நிமிட வரம்புடன். உருவாக்கம் தோல்வியடைந்தாலும் கட்டணம் உண்டு.",
+    "paidDisclosure_one": "மதிப்பீடு {{estimate}}, அதிகபட்சம் {{maximum}}, {{minutes}} நிமிடம் கொண்ட வரம்புடன். உருவாக்கம் தோல்வியடைந்தாலும் கட்டணம் உண்டு.",
+    "paidDisclosure": "மதிப்பீடு {{estimate}}, அதிகபட்சம் {{maximum}}, {{minutes}} நிமிடங்கள் கொண்ட வரம்புடன். உருவாக்கம் தோல்வியடைந்தாலும் கட்டணம் உண்டு.",
+    "paidDisclosure_other": "மதிப்பீடு {{estimate}}, அதிகபட்சம் {{maximum}}, {{minutes}} நிமிடங்கள் கொண்ட வரம்புடன். உருவாக்கம் தோல்வியடைந்தாலும் கட்டணம் உண்டு.",
     "enable": "கட்டணச் சுருக்கங்களை இயக்கு",
     "allContexts": "தனிப்பட்ட மற்றும் நிறுவன அறிக்கைகள் தனித்தனியாக இருக்கும்.",
     "emptyHistory": "சேமித்த அறிக்கைகள் இல்லை",
@@ -4771,7 +4924,7 @@
     "sourceActivity": "தலைப்பில்லா செயல்பாடு",
     "metadataFailureProvider": "வழங்குநர் பிழை",
     "metadataFailureTool": "கருவி பிழை",
-    "metadataFailureCancelled": "ரத்து செய்யப்பட்டது",
+    "metadataStopped": "கடைசி சுற்று நிறுத்தப்பட்டது",
     "metadataFailureOther": "குறிப்பிடப்படாத பிழை"
   },
   "systemSearch": {

@@ -15,7 +15,7 @@ import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { parseSessionAttachMcpServers } from '../../mcp-config.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
-import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import { controlPlaneSandboxSelectionSchema } from './sandbox-selection.js';
 
 function generateKeyPair() {
@@ -409,7 +409,22 @@ describe('migrated origin permissions', () => {
       const { spec } = buildControlPlaneSessionRegistration(input, selection);
       expect(spec.permission).toMatchObject({
         question: 'deny',
-        edit: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny',
+        edit:
+          createdOnPlatform === 'security-remediation'
+            ? {
+                '*': 'allow',
+                '.git': 'deny',
+                '.git/*': 'deny',
+                '*.git': 'deny',
+                '*.git/*': 'deny',
+                '.g?t': 'deny',
+                '.g?t/*': 'deny',
+                '.g*t': 'deny',
+                '.g*t/*': 'deny',
+                '*gitconfig*': 'deny',
+                '*/.git/config*': 'deny',
+              }
+            : 'deny',
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
@@ -420,7 +435,7 @@ describe('migrated origin permissions', () => {
           ? {
               'git push': 'allow',
               'gh pr create': 'allow',
-              'git push --force': 'deny',
+              'git*push* -*': 'deny',
               curl: 'deny',
             }
           : {
@@ -1405,7 +1420,7 @@ describe('stored runtime skill projection', () => {
   it('keeps the accepted companion entries when a stored route spec is parsed', () => {
     const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
     const parsed = controlPlaneRouteSpecSchema.parse(
-      projectStoredRouteSpecSkills({ ...spec, runtimeSkills: storedSkills })
+      projectStoredRouteSpec({ ...spec, runtimeSkills: storedSkills })
     );
     expect(parsed.runtimeSkills).toEqual([
       { name: 'review', rawMarkdown: 'Review', files: { 'scripts/run.sh': 'echo ok' } },

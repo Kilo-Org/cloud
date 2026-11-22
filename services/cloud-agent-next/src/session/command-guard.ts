@@ -351,8 +351,13 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 //
 // The git configuration files decide what a push does, so a shell write to the
 // repository's own file or to the user's own file is refused, by the directory
-// spelling and by the file-name prefix, and the edit tool refuses the same files
-// through its own map.
+// spelling, the file-name prefix, the bare target and the spellings of that
+// target, and the edit tool refuses the same files through its own map.
+//
+// The bound: a rule reads the command text, so a write performed inside a
+// general-purpose program that this policy admits is outside these rules.
+// That program cannot be narrowed by a text rule without refusing the ordinary
+// use the fix workflow needs, so the allow list keeps it and this bound stands.
 //
 // The denies are installed after the `git push` allow, and the last matching
 // rule decides. A ref that is deleted by name, with `--delete` or with an empty
@@ -381,6 +386,11 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}*/-*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*/+*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*/\n*`,
+  // The matcher normalizes a backslash to a slash in the subcommand word too, so
+  // a word split by a continuation reaches this rule as a slash before the end of
+  // the word.
+  'git pu/s*',
+  'git pus/h*',
 ];
 
 // The repository's own directory name, written once as text and once for each
@@ -449,6 +459,17 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   ...SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS.flatMap(tool => [
     `${tool} *config`,
     `${tool} *confi?`,
+    // The same target written with a one-character glob or a quoted segment.
+    `${tool} * con?ig`,
+    `${tool} * c?nfig`,
+    `${tool} * "con"*`,
+    `${tool} * 'con'*`,
+  ]),
+  // The subcommand form compares a key without regard to case, so a rule names
+  // the upper-case spelling as well as the lower-case one.
+  ...['PUSH', 'FORCE', 'ALIAS', 'MIRROR'].flatMap(key => [
+    `git config *.${key}*`,
+    `git -?* config *.${key}*`,
   ]),
   // The redirect operator is written with or without a space before the target,
   // so one rule covers both spellings and either operator. A rule sees the

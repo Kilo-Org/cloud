@@ -525,6 +525,16 @@ describe('security-remediation push command guard policy', () => {
       'echo "[alias]" >>config',
       'printf x >config',
       'mv /tmp/evil confi?',
+      // The same target spelled with a one-character glob or a quoted segment,
+      // and the subcommand form of a configuration key in upper case.
+      'mv /tmp/evil con?ig',
+      'cp /tmp/evil c?nfig',
+      'mv /tmp/evil "con"fig',
+      "cp /tmp/evil 'con'fig",
+      'git config remote.origin.PUSH +main',
+      'git -C . config alias.P "push --force"',
+      // The subcommand word split by a continuation.
+      'git pu\\sh --force',
       // A shell hands a line continuation to git inside one command; the
       // matcher normalizes the backslash to a slash, so the push rules reach it.
       'git push \\\n--force',

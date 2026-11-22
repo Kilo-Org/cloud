@@ -109,6 +109,10 @@ vi.mock('@/components/profiles/instruction-form-sheet', () => ({
 /** The name the fixture row holds; the dialog must isolate exactly this run. */
 const INSTRUCTION_NAME = 'zalgo-2026';
 
+/** A file name far longer than a phone row paints on one line. */
+const LONG_INSTRUCTION_NAME =
+  'release-checklist-for-the-hindi-and-urdu-partner-team-handoff-before-every';
+
 type TestInstruction = { id: string; name: string; content: string; enabled: boolean };
 
 function testInstruction(overrides: Partial<TestInstruction> = {}): TestInstruction {
@@ -393,6 +397,14 @@ describe('ProfileInstructionsScreen row controls', () => {
       )
     ).toBe(false);
 
+    // The press opens the form that shows the whole name, so this row keeps the
+    // name on one line and paints it bare: no clamp to lift, no isolate marks.
+    const nameLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === INSTRUCTION_NAME
+    );
+    expect(nameLine?.props.numberOfLines).toBe(1);
+    expect(nameLine?.props.children).toBe(INSTRUCTION_NAME);
+
     unmount();
   });
 });
@@ -412,14 +424,30 @@ describe('ProfileInstructionsScreen read-only row', () => {
       i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME })
     );
     const nameLine = findAll(renderer.root, 'Text').find(
-      node => node.props.children === INSTRUCTION_NAME
+      node => node.props.children === isolateLtrBidiText(INSTRUCTION_NAME)
     );
     expect(nameLine?.props.accessibilityLabel).toBe(
       [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ')
     );
     expect(nameLine?.props.accessible).toBeUndefined();
     expect(nameLine?.props.importantForAccessibility).toBeUndefined();
+    // No press opens the form that would show a cut name, so this line wraps
+    // instead of clamping, and its run keeps its own left-to-right direction.
+    expect(nameLine?.props.numberOfLines).toBeUndefined();
+    expect(nameLine?.props.children).toBe(isolateLtrBidiText(INSTRUCTION_NAME));
     expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
+
+    unmount();
+  });
+
+  it('paints a long file name in full instead of clamping it', async () => {
+    h.query.data = [testInstruction({ name: LONG_INSTRUCTION_NAME })];
+    const { renderer, unmount } = await mountScreen();
+
+    const nameLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === isolateLtrBidiText(LONG_INSTRUCTION_NAME)
+    );
+    expect(nameLine?.props.numberOfLines).toBeUndefined();
 
     unmount();
   });

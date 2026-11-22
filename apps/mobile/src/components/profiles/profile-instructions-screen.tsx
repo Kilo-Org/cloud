@@ -74,6 +74,10 @@ function hasUsableMessage(error: unknown): boolean {
  * row's spoken name instead of a second painted line — the content press while
  * the row opens the form, the static row's own label when it does not, because
  * a read-only row has no press to carry it.
+ *
+ * The name keeps one line only where a press opens the form that shows it in
+ * full; a read-only row has no such surface, so it wraps to the name's whole
+ * length and isolates that run left-to-right across the wrap.
  */
 function InstructionRow({
   instruction,
@@ -127,11 +131,11 @@ function InstructionRow({
     >
       <Text
         variant="mono"
-        numberOfLines={1}
+        numberOfLines={contentIsPress ? 1 : undefined}
         accessibilityLabel={rowAccessibilityLabel}
         {...nameLineA11y}
       >
-        {instruction.name}
+        {contentIsPress ? instruction.name : isolateLtrBidiText(instruction.name)}
       </Text>
     </RowFrame>
   );

@@ -370,11 +370,18 @@ export function customRouterTarget(
         }
         // A gateway entry's own row comes from the map above when the id has one. An alias id has
         // none (aliases never appear in `model_stats`), so rank and filter the logical pool entry
-        // with the concrete model it would run: the saved pin the worker still serves, otherwise
-        // the live target this caller's snapshot stores for the alias. A bare alias whose target
-        // this request cannot name keeps no row here and is resolved or refused at redemption.
+        // with the concrete model it would run, read the same way `entryServesRequest` reads it:
+        // the pin the benchmark worker still serves, otherwise the live alias target this caller's
+        // snapshot stores. A retired pin is not what runs and its target has usually left the
+        // catalog, so gating on it would fail the entry closed; but a request that cannot name the
+        // alias's live target has nothing better than that pin, which is the last concrete model
+        // measured for the alias, and the retirement retry above decides the request. A bare alias
+        // with neither keeps no row and is resolved or refused at redemption.
         if (entry.kind !== 'gateway') continue;
-        const dispatchModel = entry.servingPin?.model ?? routing.aliasTargets.get(entry.model);
+        const dispatchModel =
+          routing.usablePins.get(customRouterEntryKey(entry)) ??
+          routing.aliasTargets.get(entry.model) ??
+          entry.servingPin?.model;
         const dispatchCaps =
           dispatchModel === undefined ? undefined : gatewayCapabilities.get(dispatchModel);
         if (dispatchCaps) capabilities.set(customRouterCandidateModel(entry), dispatchCaps);

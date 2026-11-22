@@ -757,6 +757,24 @@ describe('public custom router decide', () => {
     });
   });
 
+  it('ranks a retired-pin entry with its live alias target, not the target that left the catalog', async () => {
+    // The saved pin names a model that has left the catalog, so the worker reported it retired and
+    // the entry dispatches the live alias target instead. Gating on the retired pin's row would
+    // fail the entry closed on a row that no longer exists; the target that actually runs has an
+    // active row, so the pool must serve it and mark the retirement.
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    capabilityRows.delete(SONNET);
+    retiredPin();
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: ALIAS,
+      servingFallback: true,
+      fallback: false,
+    });
+    expect(decision).not.toHaveProperty('servingPin');
+  });
+
   it('marks nothing when the pinned target is still usable', async () => {
     findServingCustomRouter.mockResolvedValue(servingSnapshot());
     usablePin();

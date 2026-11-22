@@ -8,7 +8,7 @@ import {
 import { fetchNativeSnapshot, type NativeSnapshot } from './native-sync-snapshot';
 import type * as NativeSnapshotModule from './native-sync-snapshot';
 import { kilo2AssetKey } from './kilo2-source-messages';
-import { NATIVE_SYNC_TICKET_MINT_DEADLINE_MS } from './limits';
+import { NATIVE_SYNC_REQUEST_DEADLINE_MS, NATIVE_SYNC_TICKET_MINT_DEADLINE_MS } from './limits';
 import { readNativeConversation } from './native-conversation-source';
 import { z } from 'zod';
 
@@ -2694,16 +2694,25 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
   const ordinary = fetcher.getMockImplementation();
   if (!ordinary) throw new Error('Missing fetch fixture');
   const authorizations: (string | null)[] = [];
-  let assetCalls = 0;
+  const signals: (AbortSignal | null | undefined)[] = [];
   const controller = new AbortController();
+  let assetCalls = 0;
+  let holdAsset = false;
+  let heldAsset: (response: Response) => void = () => {};
   fetcher.mockImplementation(async (input, init) => {
     if (!new URL(String(input)).pathname.endsWith('/blobs/owned')) return ordinary(input, init);
     authorizations.push(new Headers(init?.headers).get('Authorization'));
-    expect(init?.signal).toBe(controller.signal);
+    signals.push(init?.signal);
+    // The exchange owns the signal it hands the fetcher; caller cancellation reaches it through
+    // a listener, so the caller's own signal is not the one on the wire.
+    expect(init?.signal?.aborted).toBe(false);
     assetCalls++;
-    return assetCalls === 1
-      ? Response.json({ error: { code: 'expired' } }, { status: 401 })
-      : new Response(new Uint8Array([1, 2, 3]).buffer);
+    if (assetCalls === 1) return Response.json({ error: { code: 'expired' } }, { status: 401 });
+    if (holdAsset)
+      return new Promise<Response>(resolve => {
+        heldAsset = resolve;
+      });
+    return new Response(new Uint8Array([1, 2, 3]).buffer);
   });
   const expected: NativeSnapshot = {
     position: 1,
@@ -2731,11 +2740,29 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
     await readAsset('/v1/sessions/ses_a/blobs/owned', 3, { signal });
     return expected;
   });
+  holdAsset = true;
+  const stalled = client.getSnapshot('ses_a', 'organization-owned', controller.signal);
+  let settled = 'pending';
+  void stalled.then(
+    () => {
+      settled = 'resolved';
+    },
+    (error: { code?: string }) => {
+      settled = error.code ?? 'failed';
+    }
+  );
+  await flush();
+  expect(assetCalls).toBe(3);
+  const wire = signals[signals.length - 1];
+  expect(wire?.aborted).toBe(false);
   controller.abort();
-  await expect(
-    client.getSnapshot('ses_a', 'organization-owned', controller.signal)
-  ).rejects.toMatchObject({ code: 'request_canceled' });
-  expect(assetCalls).toBe(2);
+  await flush();
+  expect(settled).toBe('request_canceled');
+  expect(wire?.aborted).toBe(true);
+  await expect(stalled).rejects.toMatchObject({ code: 'request_canceled' });
+  heldAsset(new Response(new Uint8Array([1, 2, 3]).buffer));
+  await flush();
+  expect(assetCalls).toBe(3);
 });
 
 function assetSnapshotFixture(response: Response, advertisedBytes = 3) {
@@ -3119,4 +3146,137 @@ test('a later missing terminal tool frame keeps its own frontier while an earlie
   expect(state?.pendingSnapshotMessageIDs).toEqual([]);
   expect(state?.error).toBeUndefined();
   connection.close();
+});
+
+test('a stalled grant exchange times out, fails the call, and is replaced on the next call', async () => {
+  let exchanges = 0;
+  let stallExchange = true;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      exchanges++;
+      if (stallExchange) return new Promise<Response>(() => {});
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  const call = client.listSessions();
+  let settled = 'pending';
+  void call.then(
+    () => {
+      settled = 'resolved';
+    },
+    (error: { code?: string }) => {
+      settled = error.code ?? 'failed';
+    }
+  );
+  await flush();
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(settled).toBe('request_timeout');
+  await expect(call).rejects.toMatchObject({ code: 'request_timeout' });
+  // A cached rejected promise would answer the second call without a new exchange.
+  stallExchange = false;
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(exchanges).toBe(2);
+});
+
+test('a stalled ticket mint reaches the connect backoff', async () => {
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  let stallTicket = true;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith('/exchange'))
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (path.endsWith('live-ticket')) {
+      if (stallTicket) return new Promise<Response>(() => {});
+      return Response.json({
+        ticket: 'private-ticket',
+        expiresAt: new Date(Date.now() + 90_000).toISOString(),
+      });
+    }
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  try {
+    await flush();
+    expect(state?.connection).toBe('connecting');
+    await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+    await flush();
+    expect(state?.connection).toBe('disconnected');
+    stallTicket = false;
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(FakeSocket.sockets).toHaveLength(1);
+    connectedSocket().frame('hello', hello());
+    await flush();
+    expect(state?.connection).toBe('connected');
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
+test('a caller abort during a stalled exchange stays request_canceled', async () => {
+  const controller = new AbortController();
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange')
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (path === '/v1/sessions/ses_a') return new Promise<Response>(() => {});
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  snapshot.mockImplementationOnce(async (request, sessionID) => {
+    await request(`/v1/sessions/${sessionID}`, { signal: controller.signal });
+    return { position: 0, revision: 1, session: sessionMetadata, entities: [], messages: [] };
+  });
+  const pending = client.getSnapshot('ses_a', undefined, controller.signal);
+  let settled = 'pending';
+  void pending.then(
+    () => {
+      settled = 'resolved';
+    },
+    (error: { code?: string }) => {
+      settled = error.code ?? 'failed';
+    }
+  );
+  await flush();
+  controller.abort();
+  await flush();
+  expect(settled).toBe('request_canceled');
+  // The deadline never rewrites a failure the caller already caused.
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(settled).toBe('request_canceled');
+  await expect(pending).rejects.toMatchObject({ code: 'request_canceled' });
 });

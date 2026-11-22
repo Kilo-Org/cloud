@@ -19,6 +19,7 @@ import {
   type Kilo2FileReference,
 } from './kilo2-source-messages';
 import {
+  NATIVE_SYNC_REQUEST_DEADLINE_MS,
   NATIVE_SYNC_RETAINED_WORK_BYTES,
   NATIVE_SYNC_RETAINED_WORK_FRAMES,
   NATIVE_SYNC_TICKET_MINT_DEADLINE_MS,
@@ -176,6 +177,80 @@ const isPermanent = (error: unknown) =>
   (error instanceof Error &&
     'code' in error &&
     (error.code === 'session_deleted' || error.code === 'snapshot_unavailable'));
+
+/**
+ * Settles with `operation` unless the signal aborts first, then rejects with `failure()`.
+ * The fetcher may ignore the abort signal, so the deadline must win the race; the operation
+ * keeps a rejection handler so a late failure is never unhandled.
+ */
+function raceAbort<T>(
+  signal: AbortSignal,
+  failure: () => Error,
+  operation: () => Promise<T>
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(failure());
+      return;
+    }
+    const abort = () => reject(failure());
+    signal.addEventListener('abort', abort, { once: true });
+    void operation().then(
+      value => {
+        signal.removeEventListener('abort', abort);
+        if (signal.aborted) reject(failure());
+        else resolve(value);
+      },
+      error => {
+        signal.removeEventListener('abort', abort);
+        reject(error);
+      }
+    );
+  });
+}
+
+/** Read one authorized asset body, bounded to the advertised blob size and never left locked. */
+async function readAssetBytes(response: Response, advertisedBytes: number): Promise<ArrayBuffer> {
+  const reader = response.body?.getReader();
+  try {
+    const length = response.headers.get('Content-Length');
+    if (length !== null) {
+      if (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))) {
+        throw new NativeSyncError('invalid_content_length');
+      }
+      if (Number(length) > advertisedBytes) {
+        throw new NativeSyncError('blob_hash_mismatch');
+      }
+    }
+    if (!reader) {
+      if (advertisedBytes === 0) return new ArrayBuffer(0);
+      throw new NativeSyncError('blob_hash_mismatch');
+    }
+    const bytes = new Uint8Array(advertisedBytes);
+    let offset = 0;
+    while (true) {
+      const result = await reader.read();
+      if (result.done) {
+        if (offset !== advertisedBytes) throw new NativeSyncError('blob_hash_mismatch');
+        return bytes.buffer;
+      }
+      if (result.value.byteLength > advertisedBytes - offset) {
+        throw new NativeSyncError('blob_hash_mismatch');
+      }
+      bytes.set(result.value, offset);
+      offset += result.value.byteLength;
+    }
+  } catch (error) {
+    try {
+      await reader?.cancel();
+    } catch {
+      // The bounded read fails closed even if the stream cannot be canceled.
+    }
+    throw error;
+  } finally {
+    reader?.releaseLock();
+  }
+}
 
 // Count UTF-16 storage conservatively for raw frames and retained parsed replay.
 const liveFrameBytes = 512 * 1024;
@@ -405,73 +480,124 @@ export class NativeSyncClient {
     const pending = (async () => {
       const credential = await this.options.getCredential();
       return grantSchema.parse(
-        await (
-          await this.response('/v1/auth/exchange', {
+        await this.exchange(
+          '/v1/auth/exchange',
+          {
             method: 'POST',
             headers: { Authorization: `Bearer ${credential}` },
             body: JSON.stringify({ version: 1, ...(organizationID ? { organizationID } : {}) }),
-          })
-        ).json()
+          },
+          response => response.json()
+        )
       );
     })();
     this.grants.set(key, pending);
     try {
       return await pending;
     } catch (error) {
-      this.grants.delete(key);
+      if (this.grants.get(key) === pending) this.grants.delete(key);
       throw error;
     }
   }
-  private async response(path: string, init?: RequestInit): Promise<Response> {
-    const response = await this.fetcher(new URL(path, this.options.baseUrl).href, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
-    });
-    if (!response.ok) {
-      const body = record(await response.json().catch(() => null));
-      const error = record(body['error']);
-      const retry = response.headers.get('Retry-After');
-      const retryAfterMs = retry
-        ? /^\d+$/.test(retry)
-          ? Number(retry) * 1000
-          : Math.max(0, Date.parse(retry) - Date.now())
-        : 0;
-      throw new NativeSyncError(
-        typeof error['code'] === 'string' ? error['code'] : `HTTP ${response.status}`,
-        response.status,
-        retryAfterMs
-      );
-    }
-    return response;
-  }
-  private async authorizedResponse(
+  private async exchange<T>(
     path: string,
-    init?: RequestInit,
-    organizationID?: string
-  ): Promise<Response> {
-    const grant = await this.grant(organizationID);
+    init: RequestInit | undefined,
+    read: (response: Response) => Promise<T>
+  ): Promise<T> {
+    const controller = new AbortController();
+    let failure = new NativeSyncError('request_canceled');
+    const timer = setTimeout(() => {
+      failure = new NativeSyncError('request_timeout');
+      controller.abort();
+    }, NATIVE_SYNC_REQUEST_DEADLINE_MS);
+    const cancel = () => {
+      failure = new NativeSyncError('request_canceled');
+      controller.abort();
+    };
+    init?.signal?.addEventListener('abort', cancel, { once: true });
+    if (init?.signal?.aborted) cancel();
+    try {
+      const response = await raceAbort(
+        controller.signal,
+        () => failure,
+        () =>
+          this.fetcher(new URL(path, this.options.baseUrl).href, {
+            ...init,
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json', ...init?.headers },
+          })
+      );
+      if (!response.ok) {
+        const body = record(await response.json().catch(() => null));
+        const error = record(body['error']);
+        const retry = response.headers.get('Retry-After');
+        const retryAfterMs = retry
+          ? /^\d+$/.test(retry)
+            ? Number(retry) * 1000
+            : Math.max(0, Date.parse(retry) - Date.now())
+          : 0;
+        throw new NativeSyncError(
+          typeof error['code'] === 'string' ? error['code'] : `HTTP ${response.status}`,
+          response.status,
+          retryAfterMs
+        );
+      }
+      return await raceAbort(
+        controller.signal,
+        () => failure,
+        () => read(response)
+      );
+    } finally {
+      clearTimeout(timer);
+      init?.signal?.removeEventListener('abort', cancel);
+    }
+  }
+  /**
+   * The grant is shared across callers, so one caller's cancellation must not abort it; it
+   * stops waiting instead, and the exchange stays bounded by its own deadline.
+   */
+  private async grantFor(
+    organizationID: string | undefined,
+    signal: AbortSignal | null | undefined
+  ) {
+    if (!signal) return await this.grant(organizationID);
+    return await raceAbort(
+      signal,
+      () => new NativeSyncError('request_canceled'),
+      () => this.grant(organizationID)
+    );
+  }
+  private async authorized<T>(
+    path: string,
+    init: RequestInit | undefined,
+    organizationID: string | undefined,
+    read: (response: Response) => Promise<T>
+  ): Promise<T> {
+    const grant = await this.grantFor(organizationID, init?.signal);
     if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
     try {
-      return await this.response(path, {
-        ...init,
-        headers: { ...init?.headers, Authorization: `Bearer ${grant.token}` },
-      });
+      return await this.exchange(
+        path,
+        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${grant.token}` } },
+        read
+      );
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       if (!(error instanceof NativeSyncError) || error['status'] !== 401) throw error;
       this.grants.delete(organizationID ?? '');
-      const renewed = await this.grant(organizationID);
+      const renewed = await this.grantFor(organizationID, init?.signal);
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
-      return await this.response(path, {
-        ...init,
-        headers: { ...init?.headers, Authorization: `Bearer ${renewed.token}` },
-      });
+      return await this.exchange(
+        path,
+        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${renewed.token}` } },
+        read
+      );
     }
   }
   async request<T>(path: string, init?: RequestInit, organizationID?: string): Promise<T> {
     // Snapshot parsing lives at its canonical boundary; other callers validate below.
     try {
-      return (await (await this.authorizedResponse(path, init, organizationID)).json()) as T;
+      return (await this.authorized(path, init, organizationID, response => response.json())) as T;
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       throw error;
@@ -484,46 +610,9 @@ export class NativeSyncClient {
     organizationID?: string
   ): Promise<ArrayBuffer> {
     try {
-      const response = await this.authorizedResponse(path, init, organizationID);
-      const reader = response.body?.getReader();
-      try {
-        const length = response.headers.get('Content-Length');
-        if (length !== null) {
-          if (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))) {
-            throw new NativeSyncError('invalid_content_length');
-          }
-          if (Number(length) > advertisedBytes) {
-            throw new NativeSyncError('blob_hash_mismatch');
-          }
-        }
-        if (!reader) {
-          if (advertisedBytes === 0) return new ArrayBuffer(0);
-          throw new NativeSyncError('blob_hash_mismatch');
-        }
-        const bytes = new Uint8Array(advertisedBytes);
-        let offset = 0;
-        while (true) {
-          const result = await reader.read();
-          if (result.done) {
-            if (offset !== advertisedBytes) throw new NativeSyncError('blob_hash_mismatch');
-            return bytes.buffer;
-          }
-          if (result.value.byteLength > advertisedBytes - offset) {
-            throw new NativeSyncError('blob_hash_mismatch');
-          }
-          bytes.set(result.value, offset);
-          offset += result.value.byteLength;
-        }
-      } catch (error) {
-        try {
-          await reader?.cancel();
-        } catch {
-          // The bounded read fails closed even if the stream cannot be canceled.
-        }
-        throw error;
-      } finally {
-        reader?.releaseLock();
-      }
+      return await this.authorized(path, init, organizationID, response =>
+        readAssetBytes(response, advertisedBytes)
+      );
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       throw error;

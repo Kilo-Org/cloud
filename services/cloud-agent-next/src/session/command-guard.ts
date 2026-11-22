@@ -334,6 +334,13 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 // cannot start with a dash, so that head names a global option and cannot reach
 // an argument.
 //
+// git can also take the refspec and the force flag from its own configuration,
+// where a rule that reads only the command text cannot see them. A configuration
+// write that names a push key, a force key or an alias is therefore refused too.
+// The forms below also refuse the reads of those keys: a rule that admits a read
+// would also admit a write appended to it, because a trailing `*` cannot stop
+// before the next argument.
+//
 // The denies are installed after the `git push` allow, and the last matching
 // rule decides. A ref that is deleted by name, with `--delete` or with an empty
 // source in the refspec, is not a rewrite; the plain empty-source form carries
@@ -355,10 +362,39 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = SECURITY_REMEDIATION_PUSH_HEAD
   `${head} * +*`,
 ]);
 
+const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
+  'git config *push*',
+  'git config *force*',
+  'git config alias*',
+  'git config --add *',
+  'git config --replace-all *',
+  'git config --unset *',
+  'git config -?* *push*',
+  'git config -?* *force*',
+  'git config -?* alias*',
+  'git config -?* --add *',
+  'git config -?* --replace-all *',
+  'git config -?* --unset *',
+  // A global option before the subcommand, e.g. `git -C <dir> config …`.
+  'git -?* config *push*',
+  'git -?* config *force*',
+  'git -?* config alias*',
+  'git -?* config --add *',
+  'git -?* config --replace-all *',
+  'git -?* config --unset *',
+  'git -?* config -?* *push*',
+  'git -?* config -?* *force*',
+  'git -?* config -?* alias*',
+  'git -?* config -?* --add *',
+  'git -?* config -?* --replace-all *',
+  'git -?* config -?* --unset *',
+];
+
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
   'git reset --hard',
   'git clean',
   ...SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS,
+  ...SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS,
   'git remote set-url',
   'git tag',
   'git worktree',

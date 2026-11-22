@@ -465,6 +465,13 @@ describe('security-remediation push command guard policy', () => {
       'git push\t--force',
       'git -C . push  -f',
       'git  -C .  push --force',
+      "git config remote.origin.push '+HEAD:refs/heads/main'",
+      'git config --add remote.origin.push +main',
+      'git config push.default current',
+      "git config --global alias.p 'push --force'",
+      'git -C . config remote.origin.push +main',
+      "git -C . config alias.p 'push --force'",
+      'git -c core.pager=cat config push.default current',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
@@ -491,6 +498,8 @@ describe('security-remediation push command guard policy', () => {
       'git diff --stat',
       'git log --oneline -5',
       'git fetch origin main',
+      'git config user.email',
+      'git -C . config user.email',
       'git switch -c fix/thing',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');

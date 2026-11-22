@@ -4,6 +4,7 @@ import {
   instructionErrorKey,
   instructionNameErrorShown,
   instructionNameHint,
+  instructionNameHintKey,
 } from '@/components/profiles/instruction-model';
 import {
   cleanInstructionName,
@@ -108,6 +109,25 @@ describe('instructionNameHint', () => {
   it('previews a name the fold narrows but does not empty', () => {
     expect(instructionNameHint('Café Notes')).toEqual({ kind: 'preview', slug: 'cafe-notes' });
     expect(instructionNameHint('é')).toEqual({ kind: 'preview', slug: 'e' });
+  });
+});
+
+describe('instructionNameHintKey', () => {
+  it('gives one key per hint, so an unchanged hint keeps its object', () => {
+    const slug = instructionNameHint('release-notes');
+    expect(instructionNameHintKey(slug)).toBe(instructionNameHintKey(instructionNameHint('notes')));
+    expect(instructionNameHintKey(instructionNameHint('Release Notes'))).not.toBe(
+      instructionNameHintKey(instructionNameHint('Release Notes 2'))
+    );
+    expect(instructionNameHintKey(instructionNameHint('規則'))).toBe(
+      instructionNameHintKey(instructionNameHint('पुणे'))
+    );
+  });
+
+  it('separates the rule from the preview state', () => {
+    expect(instructionNameHintKey({ kind: 'rule' })).not.toBe(
+      instructionNameHintKey({ kind: 'preview', slug: 'rule' })
+    );
   });
 });
 

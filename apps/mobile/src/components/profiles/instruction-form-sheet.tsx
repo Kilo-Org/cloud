@@ -10,6 +10,7 @@ import {
   instructionNameErrorShown,
   instructionNameHint,
   type InstructionNameHint,
+  instructionNameHintKey,
 } from '@/components/profiles/instruction-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -55,6 +56,41 @@ type InstructionFormSheetProps = Readonly<{
   saveFailureTone?: 'error' | 'warn';
 }>;
 
+type InstructionNameHintLineProps = Readonly<{
+  hint: InstructionNameHint;
+  /** The field's own error copy, which already states the rule when it shows. */
+  nameError: string | undefined;
+}>;
+
+/**
+ * The one line under the name field: the slug a save will store, or the rule a
+ * name must follow when the fold leaves nothing to store. It renders nothing
+ * for a name that saves as typed, and it stays quiet while the field's own
+ * error states the same sentence, so the rule is never read twice. The rule
+ * goes through `AccessibleStatus`, so a reader using a screen reader hears it
+ * while typing instead of at Save.
+ */
+function InstructionNameHintLine({ hint, nameError }: InstructionNameHintLineProps) {
+  const { t } = useTranslation();
+  if (hint.kind === 'preview') {
+    return (
+      <Text variant="muted" className="text-xs">
+        {t('profiles.instructionNamePreview', { name: hint.slug })}
+      </Text>
+    );
+  }
+  if (hint.kind === 'rule' && nameError === undefined) {
+    return (
+      <AccessibleStatus
+        message={t('profiles.instructionNameInvalid')}
+        tone="status"
+        className="text-xs"
+      />
+    );
+  }
+  return null;
+}
+
 /**
  * The add/edit instruction sheet: a rules file name and its markdown. Mounted
  * only while open, so every open seeds the fields from the instruction it
@@ -86,6 +122,15 @@ export function InstructionFormSheet({
     instructionNameHint(nameRef.current)
   );
   const [error, setError] = useState<InstructionInputError | null>(null);
+  // The hint lives in state only because the line under the field renders from
+  // it, and a form draft forbids re-rendering on a keystroke that changes
+  // nothing. The setter reads the current hint and keeps its object when the
+  // new one means the same, so a name that is already a slug costs no render.
+  const applyNameHint = (hint: InstructionNameHint) => {
+    setNameHint(current =>
+      instructionNameHintKey(current) === instructionNameHintKey(hint) ? current : hint
+    );
+  };
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'status' | 'name' | 'content'
   >();
@@ -188,19 +233,30 @@ export function InstructionFormSheet({
           containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value;
-            setNameHint(instructionNameHint(value));
+            applyNameHint(instructionNameHint(value));
             if (error !== null && instructionNameErrorShown(error)) {
               setError(null);
             }
           }}
         />
-        {nameHint.kind === 'none' ? null : (
-          <Text variant="muted" className="-mt-2 text-xs">
-            {nameHint.kind === 'preview'
-              ? t('profiles.instructionNamePreview', { name: nameHint.slug })
-              : t('profiles.instructionNameInvalid')}
-          </Text>
-        )}
+        {/* One reserved line under the name field, always mounted: a hint that
+            comes and goes must not push the content field down while the person
+            types. A hidden full-width copy of the longer copy holds the height,
+            and the shown line draws over it. The rule is not repeated while the
+            field's own error already says the same sentence. */}
+        <View className="-mt-2">
+          <View
+            className="flex-row opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Text className="w-full shrink-0 text-xs">{t('profiles.instructionNameInvalid')}</Text>
+          </View>
+          <View className="absolute inset-x-0 top-0">
+            <InstructionNameHintLine hint={nameHint} nameError={nameError} />
+          </View>
+        </View>
         <FormField
           label={t('profiles.instructionContentLabel')}
           defaultValue={contentRef.current}

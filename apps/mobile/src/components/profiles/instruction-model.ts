@@ -50,6 +50,16 @@ export function instructionNameHint(typed: string): InstructionNameHint {
 }
 
 /**
+ * One value per hint, so a keystroke that leaves the hint the same keeps the
+ * previous object. The sheet stores the hint to render it, and a fresh object
+ * on every character would re-render the whole form on typing that changes
+ * nothing, which `lib/form-draft` forbids.
+ */
+export function instructionNameHintKey(hint: InstructionNameHint): string {
+  return hint.kind === 'preview' ? `preview:${hint.slug}` : hint.kind;
+}
+
+/**
  * The copy key for an error that belongs under the content field, or `null`
  * for every error the name field owns. The two content errors differ in the
  * bound they name, so the sheet passes the content bound when it renders it.

@@ -208,6 +208,13 @@ export function formatFileSize(bytes: number, locale: string): string {
     value /= 1000;
     unit += 1;
   }
+  // A count just under the next step rounds up to it at two fraction digits, so
+  // "999,999 bytes" would print "1,000 kB". It takes the next unit's name, so a
+  // reader never sees a figure the unit cannot hold.
+  while (unit < units.length - 1 && Number(value.toFixed(2)) >= 1000) {
+    value /= 1000;
+    unit += 1;
+  }
   return formatNumber(value, locale, {
     style: 'unit',
     unit: units[unit],

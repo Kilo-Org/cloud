@@ -179,6 +179,11 @@ describe('localized format helpers', () => {
     expect(formatFileSize(1024, 'en')).toBe('1.02 kB');
     expect(formatFileSize(1_048_576, 'en')).toBe('1.05 MB');
     expect(formatFileSize(1_073_741_824, 'en')).toBe('1.07 GB');
+    // A count that rounds up to the next step takes the next unit's name, so a
+    // figure the unit cannot hold is never printed.
+    expect(formatFileSize(999_500, 'en')).toBe('999.5 kB');
+    expect(formatFileSize(999_999, 'en')).toBe('1 MB');
+    expect(formatFileSize(999_999_999, 'en')).toBe('1 GB');
   });
 
   it('parses localized numbers and rejects other input', () => {

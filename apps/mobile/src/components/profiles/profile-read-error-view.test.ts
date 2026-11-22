@@ -23,6 +23,14 @@ describe('selectProfileReadErrorView', () => {
     ).toEqual({ variant: 'not-found', showRetry: false, titleKey: null });
   });
 
+  it('names a terminal refusal that is not an access outcome as missing', () => {
+    for (const code of ['BAD_REQUEST', 'UNPROCESSABLE_CONTENT']) {
+      expect(
+        selectProfileReadErrorView({ error: makeTrpcError(code), connectivity: 'unknown' })
+      ).toEqual({ variant: 'not-found', showRetry: false, titleKey: null });
+    }
+  });
+
   it('keeps a server fault retryable and titled as a load failure', () => {
     for (const error of [makeTrpcError('INTERNAL_SERVER_ERROR'), new Error('boom'), undefined]) {
       expect(selectProfileReadErrorView({ error, connectivity: 'unknown' })).toEqual({

@@ -206,7 +206,8 @@ describe('ProfileRepoPinsSection', () => {
     unmount();
   });
 
-  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+  it('offline: keeps the load-failure title and a Retry that refetches', async () => {
+    h.connectivity = 'offline';
     Object.assign(h.bindingsQuery, {
       isError: true,
       isLoading: false,
@@ -217,7 +218,7 @@ describe('ProfileRepoPinsSection', () => {
     const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
       | RenderedQueryError
       | undefined;
-    expect(queryError?.variant).toBe('server');
+    expect(queryError?.variant).toBe('offline');
     expect(queryError?.title).toBe("Couldn't load profiles");
     expect(typeof queryError?.onRetry).toBe('function');
     act(() => {

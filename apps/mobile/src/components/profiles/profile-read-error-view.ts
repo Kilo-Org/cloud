@@ -7,8 +7,10 @@
 // membership removed elsewhere, a deleted organization). Those answers are
 // terminal: the same request can never start succeeding, so the screen must
 // name the state instead of reporting a server fault and offering a Retry that
-// cannot work. A confirmed-offline device is a connectivity failure, not a
-// server one, and stays retryable.
+// cannot work. A terminal refusal that is not an access outcome reads as
+// unavailable, because the not-found copy says so and the server copy would ask
+// for a retry no control offers. A confirmed-offline device is a connectivity
+// failure, not a server one, and stays retryable.
 //
 // The variant and retry decision reuse the shared tRPC helpers, so these reads
 // and the organization Members list classify an error the same way.
@@ -34,10 +36,16 @@ export function selectProfileReadErrorView({
     return { variant: 'offline', showRetry: true, titleKey: 'profiles.loadFailed' };
   }
   const code = readTrpcErrorField(error, 'code');
-  const variant = trpcErrorVariant(error);
+  const terminal = isTerminalTrpcCode(code);
+  const reported = trpcErrorVariant(error);
+  // A terminal refusal that is not an access outcome (a malformed id in a deep
+  // link, an unprocessable read) means this profile cannot be opened. The
+  // not-found copy states that; the server copy would ask for a retry no
+  // control offers.
+  const variant = terminal && reported === 'server' ? 'not-found' : reported;
   return {
     variant,
-    showRetry: !isTerminalTrpcCode(code),
+    showRetry: !terminal,
     // A permission or not-found state has its own title and description; the
     // read's "couldn't load" title would describe the wrong cause.
     titleKey: variant === 'server' ? 'profiles.loadFailed' : null,

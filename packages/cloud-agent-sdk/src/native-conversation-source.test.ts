@@ -910,7 +910,7 @@ test('unresolved live media stays explicit without hiding other messages or cras
   ).toEqual(['msg_media']);
 });
 
-test('a native message whose attachment can never display keeps its text and reports the withheld file', () => {
+test('a native message whose attachment can never display keeps its text without being reported incomplete', () => {
   const messages: NativeSnapshotMessage[] = [
     {
       seq: 1,

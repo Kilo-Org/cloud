@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { resolveResetTarget } from './require-reset-target';
+import { refusalMessage, resolveResetTarget } from './reset-target';
 
 const APP_URL = 'postgres://postgres:postgres@localhost:5432/postgres';
 
@@ -29,6 +29,19 @@ describe('resolveResetTarget', () => {
     ).toEqual({ kind: 'use', scriptUrl: 'postgres://postgres:postgres@localhost:5432/postgres' });
   });
 
+  it('accepts an omitted port beside the default port', () => {
+    // `new URL()` keeps '' for an omitted port, while `pg` connects to 5432 for both URLs.
+    expect(
+      resolveResetTarget(
+        'postgres://postgres:postgres@localhost/postgres',
+        'postgres://postgres:postgres@localhost:5432/postgres'
+      )
+    ).toEqual({
+      kind: 'use',
+      scriptUrl: 'postgres://postgres:postgres@localhost:5432/postgres',
+    });
+  });
+
   it('refuses two databases on one host', () => {
     expect(
       resolveResetTarget(APP_URL, 'postgres://postgres:postgres@localhost:5432/scripts')
@@ -41,6 +54,12 @@ describe('resolveResetTarget', () => {
     ).toEqual({ kind: 'refuse', reason: 'different-databases' });
   });
 
+  it('refuses two ports on one host that carry the same database name', () => {
+    expect(
+      resolveResetTarget(APP_URL, 'postgres://postgres:postgres@localhost:5433/postgres')
+    ).toEqual({ kind: 'refuse', reason: 'different-databases' });
+  });
+
   it('refuses a value that is not a connection URL', () => {
     expect(resolveResetTarget(APP_URL, 'not-a-connection-url')).toEqual({
       kind: 'refuse',
@@ -50,5 +69,19 @@ describe('resolveResetTarget', () => {
       kind: 'refuse',
       reason: 'unparseable',
     });
+  });
+});
+
+describe('refusalMessage', () => {
+  it('names the variables for a mismatch', () => {
+    expect(refusalMessage({ kind: 'refuse', reason: 'different-databases' })).toContain(
+      'POSTGRES_URL and POSTGRES_SCRIPT_URL name different databases'
+    );
+  });
+
+  it('has text for every refusal reason', () => {
+    for (const reason of ['both-unset', 'unparseable', 'different-databases']) {
+      expect(refusalMessage({ kind: 'refuse', reason })).toMatch(/^Refusing to reset: /);
+    }
   });
 });

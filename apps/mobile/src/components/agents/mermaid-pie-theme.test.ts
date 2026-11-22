@@ -6,11 +6,14 @@ import {
   DARK_PIE_STROKE_COLOR,
   darkPieThemeVariables,
 } from './mermaid-pie-theme';
-import { relativeLuminance } from '@/lib/pr-review/diff/syntax-colors';
+import { darkColors } from '@/lib/hooks/theme-colors.generated';
+import { compositeOver, relativeLuminance } from '@/lib/pr-review/diff/syntax-colors';
 
-/** The dark diagram page the fills are painted on, stated as the palette
- * composites it so a change to the token shows up here as a failure. */
-const DARK_DIAGRAM_PAGE = '#0E0E10';
+/** The dark diagram page the fills are painted on: the same composition
+ * `markdown-palette` makes for a dark diagram. Derived from the tokens rather
+ * than restated, so a change to `background` or `card` fails here instead of
+ * leaving the module painting a page that no longer exists. */
+const DARK_DIAGRAM_PAGE = compositeOver(darkColors.background, darkColors.card);
 
 const MIN_TEXT_RATIO = 4.5;
 

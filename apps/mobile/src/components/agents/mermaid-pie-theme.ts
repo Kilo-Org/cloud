@@ -1,3 +1,6 @@
+import { darkColors } from '@/lib/hooks/theme-colors.generated';
+import { compositeOver } from '@/lib/pr-review/diff/syntax-colors';
+
 /**
  * The pie chart theme for mermaid's dark diagram page.
  *
@@ -19,9 +22,10 @@
  * the fills that ramp would use, so it is deliberately not changed here.
  */
 
-/** The dark diagram page: the app's `background` token, and the surface
- * `markdown-palette` composites for a dark diagram. */
-const DARK_PIE_SURFACE = '#0E0E10';
+/** The dark diagram page: the same composition `markdown-palette` makes for a
+ * dark diagram, taken from the tokens rather than restated, so the fills are
+ * always measured against the page the app really paints. */
+const DARK_PIE_SURFACE = compositeOver(darkColors.background, darkColors.card);
 
 export const DARK_PIE_STROKE_COLOR = DARK_PIE_SURFACE;
 

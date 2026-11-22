@@ -19,6 +19,7 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import {
   type AvailableModel,
+  canonicalDraft,
   type CatalogModel,
   catalogProviderSlugs,
   denyListModels,
@@ -167,7 +168,7 @@ export function ModelAccessForm({
   // replaces what the person already moved, and a restore runs once per mount.
   const touchedRef = useRef(false);
   const restoredRef = useRef(false);
-  const restoredDraft = formDraft.kind === 'ready' ? formDraft.value : null;
+  const restoredValue = formDraft.kind === 'ready' ? formDraft.value : null;
   // A viewer who may not manage the organization never adopts a stored draft.
   // The displayed list is already the saved baseline for that viewer, and this
   // gate keeps `form.draft` clean too, so a role that returns within the same
@@ -177,6 +178,7 @@ export function ModelAccessForm({
   // person may hold it again, and the durable draft exists to survive exactly
   // that reload. Nothing is lost for the viewer, who reads the saved policy, and
   // the next editor mount restores the draft as before.
+  const restoredDraft = restoredValue === null ? null : canonicalDraft(restoredValue);
   useEffect(() => {
     if (!canEdit || restoredDraft === null || touchedRef.current || restoredRef.current) {
       return;

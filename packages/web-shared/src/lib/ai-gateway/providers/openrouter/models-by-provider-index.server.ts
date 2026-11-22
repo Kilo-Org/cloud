@@ -93,16 +93,19 @@ export function buildModelIdToProviderSlugsIndex(
   const index = new Map<string, Set<string>>();
 
   for (const provider of getKiloRouteProviders(snapshot)) {
+    // Snapshot slugs are stored verbatim, so index the canonical slug that
+    // provider allow lists and routing ids are compared against.
+    const providerSlug = normalizeInferenceProviderId(provider.slug);
     for (const model of provider.models) {
       const normalizedModelId = normalizeModelId(model.slug);
       const existing = index.get(normalizedModelId);
 
       if (existing) {
-        existing.add(provider.slug);
+        existing.add(providerSlug);
         continue;
       }
 
-      index.set(normalizedModelId, new Set([provider.slug]));
+      index.set(normalizedModelId, new Set([providerSlug]));
     }
   }
 

@@ -236,6 +236,13 @@ export function applyReasoningDetailsTransform(
   }
 }
 
+/**
+ * Whose account the upstream provider bills, as the request-level routing and
+ * billing rules see it. Distinct from the `Payer` of a routing decision, which
+ * names the selected route rather than the account that pays.
+ */
+type RequestPayer = 'kilo' | 'user_gateway' | 'user_byok';
+
 export type ApplyProviderSpecificLogicInput = {
   provider: Provider;
   requestedModel: string;
@@ -270,9 +277,18 @@ export async function applyProviderSpecificLogic({
   // gateway's paid server features bill that account rather than Kilo's.
   const usesUserGatewayKey =
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
+  // The three payer cases, named once: Kilo pays, the user's own gateway key
+  // pays, or another user BYOK key pays. Every billing- and routing-sensitive
+  // branch below reads this classification instead of re-deriving the case from
+  // the two raw inputs.
+  const payer: RequestPayer =
+    userByok === null ? 'kilo' : usesUserGatewayKey ? 'user_gateway' : 'user_byok';
 
   removeModelsFallback(requestedModel, requestToMutate);
-  if (isFreeModel(requestedModel) || (userByok !== null && !usesUserGatewayKey)) {
+  // Kilo's paid server features are removed for a free model, and for a user BYOK
+  // key that is not a gateway key. A user gateway key keeps them: the gateway
+  // runs them on that account's key.
+  if (isFreeModel(requestedModel) || payer === 'user_byok') {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
@@ -348,7 +364,7 @@ export async function applyProviderSpecificLogic({
   }
 
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
-  if (userByok === null && (provider.type === 'openrouter' || provider.type === 'vercel')) {
+  if (payer === 'kilo' && (provider.type === 'openrouter' || provider.type === 'vercel')) {
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
       requestedModel,
@@ -380,8 +396,8 @@ export async function applyProviderSpecificLogic({
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
-      usesUserGatewayKey ? null : userByok,
-      userByok === null ? dataRegion : null
+      payer === 'user_gateway' ? null : userByok,
+      payer === 'kilo' ? dataRegion : null
     );
   }
 

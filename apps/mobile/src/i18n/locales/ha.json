@@ -4098,6 +4098,7 @@
         "network": "Saukarwar ba ta kammala ba. Duba haɗin ka sannan ka sake gwadawa.",
         "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi.",
         "checksum": "Fayil ɗin da aka sauke bai yi daidai da checksum ɗinsa da aka wallafa ba, don haka an cire shi. Sake gwada saukewa.",
+        "unreadable": "Wannan na'urar ba ta iya duba fayil ɗin da aka sauke ba, don haka an cire shi. Sake gwada saukewa.",
         "writeFailed": "Wannan na'urar ba ta iya adana samfurin ba. Ka sake gwada saukewa."
       }
     },

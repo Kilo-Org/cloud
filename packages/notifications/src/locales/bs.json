@@ -7,6 +7,7 @@
       "spendAlert": "Vaša potrošnja treba pažnju",
       "securityFinding": "Sigurnosni nalaz treba pažnju",
       "securityUpdate": "Sigurnosna provjera ima ažuriranje",
+      "agentBriefing": "Vaš izvještaj o aktivnosti agenta je spreman",
       "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje"
     }
   },

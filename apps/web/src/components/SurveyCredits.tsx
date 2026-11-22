@@ -1,5 +1,5 @@
 import type { CustomerInfo } from '@kilocode/web-shared/lib/customerInfo';
-import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { has_used1usd_andHoldOrPayment } from '@kilocode/web-shared/lib/promoCustomerRequirement';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions } from '@kilocode/db/schema';
@@ -9,8 +9,7 @@ const SURVEY_PROMOTIONAL_KEY = 'in-app-5usd';
 
 export const SurveyCredits = async (customerInfo: CustomerInfo) => {
   const { user } = customerInfo;
-  const posthogClient = PostHogClient();
-  const isFlagEnabled = await posthogClient.isFeatureEnabled('show-feedback-form', user.id);
+  const isFlagEnabled = await isFeatureFlagEnabled('show-feedback-form', user.id);
 
   if (!isFlagEnabled) return null;
   if (!has_used1usd_andHoldOrPayment(customerInfo).success) return null;

@@ -7,6 +7,7 @@
       "spendAlert": "La teva despesa necessita atenció",
       "securityFinding": "Una troballa de seguretat necessita atenció",
       "securityUpdate": "Una comprovació de seguretat té una actualització",
+      "agentBriefing": "El teu informe de l'agent està llest",
       "activeAgentsGlanceable": "Els agents actius tenen una actualització"
     }
   },

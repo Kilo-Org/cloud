@@ -74,6 +74,8 @@ import {
   publicCloudAgentDirectory,
 } from './public-sdk-projection.js';
 import { openSystemFeedStream, SYSTEM_FEED_KILO_PATH } from './system-feed.js';
+import { decodeSessionHistoryCursor } from '../control-plane/session/history.js';
+import { readPublicV2History, validatePublicV2HistoryCursor } from './persisted-v2-history.js';
 
 export const KILO_FACADE_USER_ID_HEADER = 'x-kilo-facade-user-id';
 export const KILO_FACADE_AUTH_TOKEN_HEADER = 'x-kilo-facade-auth-token';
@@ -441,7 +443,7 @@ function parseSessionMessagesQuery(
         'Session messages before requires a positive limit'
       );
     }
-    if (!validateKiloSdkMessagesCursor(before)) {
+    if (!validateKiloSdkMessagesCursor(before) && !isV2HistoryCursor(before)) {
       return facadeError(
         400,
         'KILO_QUERY_INVALID',
@@ -451,6 +453,15 @@ function parseSessionMessagesQuery(
     params.before = before;
   }
   return params;
+}
+
+function isV2HistoryCursor(cursor: string): boolean {
+  try {
+    decodeSessionHistoryCursor(cursor);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isExactSessionDetailRead(method: string, kiloPath: string, routePath: string): boolean {
@@ -988,9 +999,49 @@ async function persistedSessionMessagesResponse(params: {
   env: Env;
   userId: string;
   kiloSessionId: string;
+  cloudAgentSessionId: string;
   url: URL;
   query: Pick<GetCloudAgentRootSessionMessagesParams, 'limit' | 'before'>;
 }): Promise<Response> {
+  let source;
+  try {
+    source = await withDORetry(
+      () => getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId),
+      stub => stub.getSessionHistorySource(params.kiloSessionId),
+      'getSessionHistorySource'
+    );
+  } catch {
+    return retryableSessionReadResponse();
+  }
+  if (source === null) return missingRootKiloSessionResponse();
+  if (source === 'v2') {
+    if (!validatePublicV2HistoryCursor(params))
+      return facadeError(
+        400,
+        'KILO_QUERY_INVALID',
+        'Session messages before is not a valid cursor'
+      );
+    const history = await readPublicV2History(params);
+    switch (history.kind) {
+      case 'not_found':
+        return missingRootKiloSessionResponse();
+      case 'retryable_failure':
+        return retryableSessionReadResponse();
+      case 'invalid_data':
+        return invalidPersistedSessionDataResponse('messages');
+      case 'too_large':
+        return transcriptTooLargeResponse();
+      case 'success':
+        return messagesPageResponse(
+          params.url,
+          history.messages,
+          history.nextCursor,
+          history.omittedItemCount
+        );
+    }
+  }
+  if (params.query.before !== undefined && !validateKiloSdkMessagesCursor(params.query.before))
+    return facadeError(400, 'KILO_QUERY_INVALID', 'Session messages before is not a valid cursor');
   const result = await params.env.SESSION_INGEST.getCloudAgentRootSessionMessages({
     kiloUserId: params.userId,
     kiloSessionId: params.kiloSessionId,
@@ -1032,6 +1083,7 @@ function persistedSessionReadResponse(params: {
   env: Env;
   userId: string;
   kiloSessionId: string;
+  cloudAgentSessionId: string;
   url: URL;
   read: PersistedSessionRead;
 }): Promise<Response> {
@@ -1242,6 +1294,7 @@ async function readOwnedKiloSession(params: {
     env: params.env,
     userId: params.userId,
     kiloSessionId: params.kiloSessionId,
+    cloudAgentSessionId: params.cloudAgentSessionId,
     url: params.url,
     read: params.read,
   });

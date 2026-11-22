@@ -4098,6 +4098,7 @@
         "network": "Hindi natapos ang pag-download. Suriin ang iyong koneksyon at subukan muli.",
         "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito.",
         "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli.",
+        "unreadable": "Hindi masuri ng device na ito ang na-download na file, kaya inalis ito. Subukang i-download itong muli.",
         "writeFailed": "Hindi na-save ng device na ito ang modelo. Subukang i-download itong muli."
       }
     },

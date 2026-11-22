@@ -4098,6 +4098,7 @@
         "network": "Upakuaji haukukamilika. Angalia muunganisho wako na ujaribu tena.",
         "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa.",
         "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena.",
+        "unreadable": "Kifaa hiki hakikuweza kukagua faili iliyopakuliwa, kwa hivyo iliondolewa. Jaribu kupakua tena.",
         "writeFailed": "Kifaa hiki hakikuweza kuhifadhi modeli. Jaribu kupakua tena."
       }
     },

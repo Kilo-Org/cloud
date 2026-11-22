@@ -135,7 +135,10 @@ function facadeFixture() {
         },
       })),
     },
-    SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn(() => ({ answer })) },
+    SANDBOX_SESSION: {
+      idFromName: vi.fn(),
+      get: vi.fn(() => ({ answer, getSessionHistorySource: vi.fn(async () => 'v1') })),
+    },
   } as unknown as Env;
   const deps = {
     resolveRootSessionForKiloSession: vi.fn(async () => ({ cloudAgentSessionId })),

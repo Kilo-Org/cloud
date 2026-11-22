@@ -26,7 +26,7 @@ import {
 import { isMarkdownImageLoadAllowed, requestMarkdownImageTrust } from './markdown-image-confirm';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { clearMarkdownParseCachesForTests } from './markdown-parse-cache';
-import { extendsPreviousRaw, incrementalInput, MarkdownText } from './markdown-text';
+import { extendsPreviousRaw, MarkdownText, publishConversion } from './markdown-text';
 
 const EMPTY_SNAPSHOT: MarkdownHtmlSnapshot = {
   value: '',
@@ -911,6 +911,12 @@ const INCREMENTAL_CORPUS = [
   // paragraph and the first list. Completing the bullet merges `2. b ` back into
   // the paragraph, so the boundary must back up over the paragraph's whole run.
   '<b>x</b>\n2. b \n- i\n\n',
+  // A zero-output inline element closes a line whose conversion is already
+  // final, then a root block follows. The block separator is inserted by the
+  // conversion of the appended region alone, so composing that region after the
+  // previous conversion adds one newline the whole value does not have; the
+  // gate must decline instead of composing a different string.
+  'some <b>bold</b> text\n<b></b>\n<h1>Title</h1>\n\n',
   // A line holding only a tab does not end a paragraph in marked's GFM
   // paragraph tokenizer: `…\n\t\n` lexes as a paragraph plus a `space` token
   // while the next line does not interrupt the paragraph, but as one paragraph
@@ -926,6 +932,11 @@ const INCREMENTAL_CORPUS = [
 ].join('');
 
 const STREAM_STEPS = 40;
+
+// The append size of the chunked corpus pass: large enough to carry a whole
+// element and a block separator in one region, which a one-character pass never
+// does.
+const CHUNKED_PUBLISH_STEP = 24;
 
 // Block fragments whose token boundaries move when an append arrives: an item
 // marker that only becomes a list item once its dot lands (`2.`), a loose list
@@ -1036,27 +1047,132 @@ describe('splitMarkdownHtmlIncremental', () => {
       const value = INCREMENTAL_CORPUS.slice(0, index);
       const whole = convertHtmlToMarkdown(value);
       const record = extendsPreviousRaw(value, prior);
-      const input = incrementalInput(value, record, prior);
+      const conversion = publishConversion(value, record, prior);
       const composed =
-        record?.appended !== undefined && prior !== undefined
+        record?.mode === 'appended' && prior !== undefined
           ? prior.convert(record.appended, prior.tail.value)
           : whole;
       expect(composed, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toBe(whole);
-      if (record?.appended !== undefined) {
+      if (record?.mode === 'appended') {
         gatedPublishes += 1;
       }
-      const result = splitMarkdownHtmlIncremental(input);
+      const result = splitMarkdownHtmlIncremental(conversion.input);
       expect(result.segments, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toEqual(
         splitMarkdownHtml(whole)
       );
       prior = {
         tail: result.snapshot,
         rawValue: value,
+        // The record the component writes carries the tail this publish's own
+        // conversion found, so the gate's next comparison never re-converts the
+        // region. This is the product's own value, so the two cannot drift.
+        conversion: conversion.tail,
         convert: (suffix, previous) =>
           suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
       };
     }
     expect(gatedPublishes).toBeGreaterThan(0);
+  });
+
+  it('keeps the composition equal over multi-character appends of the corpus', () => {
+    // One-character publishes only ever extend the final text node, so they
+    // cannot reach a gate decision that depends on a whole appended region. A
+    // chunked pass appends elements, blocks and separators in one region, which
+    // is the shape a streamed model reply produces.
+    let prior: MarkdownHtmlIncrementalConverted | undefined = undefined;
+    let gatedPublishes = 0;
+    let publishes = 0;
+    for (
+      let end = CHUNKED_PUBLISH_STEP;
+      end <= INCREMENTAL_CORPUS.length;
+      end += CHUNKED_PUBLISH_STEP
+    ) {
+      const value = INCREMENTAL_CORPUS.slice(0, end);
+      const whole = convertHtmlToMarkdown(value);
+      const record = extendsPreviousRaw(value, prior);
+      const conversion = publishConversion(value, record, prior);
+      const composed =
+        record?.mode === 'appended' && prior !== undefined
+          ? prior.convert(record.appended, prior.tail.value)
+          : whole;
+      publishes += 1;
+      expect(composed, `publish at ${end}`).toBe(whole);
+      if (record?.mode === 'appended') {
+        gatedPublishes += 1;
+      }
+      const result = splitMarkdownHtmlIncremental(conversion.input);
+      expect(result.segments, `publish at ${end}`).toEqual(splitMarkdownHtml(whole));
+      prior = {
+        tail: result.snapshot,
+        rawValue: value,
+        conversion: conversion.tail,
+        convert: (suffix, previous) =>
+          suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
+      };
+    }
+    expect(publishes).toBeGreaterThan(0);
+    expect(gatedPublishes).toBeGreaterThan(0);
+  });
+
+  it('declines an append whose block separator the whole conversion does not add', () => {
+    // A zero-output inline element closes a line whose conversion is already
+    // final, then a root block follows. Converted alone, the append inserts its
+    // own block separator, so composing it after the previous conversion adds a
+    // newline the whole value does not have. The gate must decline: the composed
+    // string has to stay byte-identical to a whole conversion, not merely render
+    // the same.
+    const first = 'some <b>bold</b> text\n';
+    const appended = '<b></b>\n<h1>Title</h1>';
+    const firstConversion = publishConversion(first, null, undefined);
+    const firstSplit = splitMarkdownHtmlIncremental(firstConversion.input);
+    const prior: MarkdownHtmlIncrementalConverted = {
+      tail: firstSplit.snapshot,
+      rawValue: first,
+      conversion: firstConversion.tail,
+      convert: (suffix, previous) =>
+        suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
+    };
+    const value = first + appended;
+
+    const record = extendsPreviousRaw(value, prior);
+    expect(record?.mode).toBe('whole');
+    expect(publishConversion(value, record, prior).input).toEqual({
+      value,
+      previous: prior,
+      wholeConverted: convertHtmlToMarkdown(value),
+    });
+    // The composition the gate refused is a different string, which is why the
+    // refusal is load-bearing rather than cosmetic.
+    expect(`${convertHtmlToMarkdown(first)}${convertHtmlToMarkdown(appended)}`).not.toBe(
+      convertHtmlToMarkdown(value)
+    );
+  });
+
+  it('declines an append that turns a final backtick into an open code span', () => {
+    // A backtick at the end of the last content line is literal text while that
+    // line ends at a paragraph break: the scan treats it as a closed span. The
+    // next append removes the break, so the backtick opens a span that swallows
+    // the appended tag. The isolated conversion of the append cannot see that,
+    // so the gate must decline rather than drop the tag.
+    const first = 'a`\n';
+    const appended = '<i>x</i>';
+    const firstConversion = publishConversion(first, null, undefined);
+    const firstSplit = splitMarkdownHtmlIncremental(firstConversion.input);
+    const prior: MarkdownHtmlIncrementalConverted = {
+      tail: firstSplit.snapshot,
+      rawValue: first,
+      conversion: firstConversion.tail,
+      convert: (suffix, previous) =>
+        suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
+    };
+    const value = first + appended;
+
+    expect(extendsPreviousRaw(value, prior)?.mode).toBe('whole');
+    // The refused composition would have rendered different markdown: it
+    // converts the appended tag into emphasis the whole value keeps as HTML.
+    expect(`${convertHtmlToMarkdown(first)}${convertHtmlToMarkdown(appended)}`).not.toBe(
+      convertHtmlToMarkdown(value)
+    );
   });
 
   it('keeps the snapshot to the fields the next parse reuses', () => {
@@ -1420,15 +1536,16 @@ describe('MarkdownText streaming conversion tail', () => {
           0
         );
         expectWholeValueRender(renderer, value, `publish ${index}`);
-        // The gate's verification re-converts from just past the previous
-        // value's last non-blank character, so a gated publish folds only the
-        // final block plus the appended region. The publish work stays flat
-        // while the value grows: bounded by a small multiple of the appended
-        // step, and under half the value's length once the value is several
-        // steps long.
-        expect(convertedCharacters, `publish ${index}`).toBeLessThanOrEqual(3 * step.length);
-        if (index >= 5) {
-          expect(convertedCharacters, `publish ${index}`).toBeLessThan(value.length / 2);
+        // The gate's verification converts the last content line plus the
+        // appended region and compares them with the same region of the value,
+        // so a gated publish folds at most about five steps: the anchor line,
+        // the append, the region both together, and the tail's own scan. The
+        // work stays flat while the value grows, which is what the fixed budget
+        // and the length ratio below measure; a whole-value publish would pass
+        // both as soon as the value is several steps long.
+        expect(convertedCharacters, `publish ${index}`).toBeLessThanOrEqual(5 * step.length);
+        if (index >= 8) {
+          expect(convertedCharacters, `publish ${index}`).toBeLessThan(value.length);
         }
         // The composition closure saw exactly the appended region.
         expect(componentCalls, `publish ${index}`).toContain(appended);
@@ -1437,6 +1554,156 @@ describe('MarkdownText streaming conversion tail', () => {
       }
     } finally {
       spy.mockRestore();
+    }
+  });
+
+  it('matches the whole value and stays region-bounded when a publish extends a mid-line value', async () => {
+    // The ordinary streaming shape: the reply is inside a paragraph, so every
+    // publish extends a value that ends in text rather than at a blank line.
+    // Each publish must still render exactly what a whole conversion of that
+    // value renders, and its conversion work must stay bounded by the open
+    // region instead of growing with the accumulated message.
+    const calls: string[] = [];
+    const original = convertModule.convertHtmlToMarkdown;
+    const originalWithTail = convertModule.convertHtmlToMarkdownWithTail;
+    const spy = vi.spyOn(convertModule, 'convertHtmlToMarkdown').mockImplementation(value => {
+      calls.push(value);
+      return original(value);
+    });
+    // A whole-value scan of a mid-line publish would come through here: the
+    // record the gate hands on carries its region's conversion, so no gated
+    // publish needs to scan the value.
+    const withTailSpy = vi
+      .spyOn(convertModule, 'convertHtmlToMarkdownWithTail')
+      .mockImplementation(value => {
+        calls.push(`WITH_TAIL:${value.length}`);
+        return originalWithTail(value);
+      });
+    try {
+      const paragraphs = Array.from(
+        { length: 6 },
+        (_, index) =>
+          `Paragraph ${index + 1} with <b>bold</b> text and <span>a span</span> plus enough words to wrap.`
+      ).join('\n\n');
+      const step = ' and <span>more</span> text';
+      const openParagraph = `Final paragraph`;
+      let running = `${paragraphs}\n\n${openParagraph}`;
+      const renderer = await mount(<MarkdownText value={running} />);
+      expectWholeValueRender(renderer, running, 'first publish');
+      const firstPublishLength = running.length;
+      for (let index = 1; index <= 6; index += 1) {
+        running += step;
+        const value = running;
+        calls.length = 0;
+        // eslint-disable-next-line no-await-in-loop -- each step settles one publish before the next arrives
+        await act(async () => {
+          await Promise.resolve();
+          renderer.update(<MarkdownText value={value} />);
+        });
+        // Read the component's own work before the harness's whole-value
+        // conversion below also flows through the spy.
+        const componentCalls = [...calls];
+        const convertedCharacters = componentCalls.reduce(
+          (total, source) => total + source.length,
+          0
+        );
+        // The rendered markdown must equal a whole conversion of the same value.
+        expectWholeValueRender(renderer, value, `publish ${index}`);
+        // The accumulated message grows with every publish.
+        expect(value.length).toBeGreaterThan(firstPublishLength);
+        // The work is bounded by the open region, not the message: every call
+        // the publish makes converts the final paragraph plus the appended
+        // step, which is a small multiple of that paragraph. The paragraph is
+        // constant here while the message grows by a step each publish, so a
+        // fixed budget on the open region proves the message length never
+        // enters the work — a whole-value publish would exceed it at once.
+        const openPara = openParagraph.length + step.length * index;
+        // A gated publish converts the region twice (the previous tail and the
+        // region plus the append, compared as strings) and the appended step
+        // once for the join, so its work is at most about 3x the region.
+        expect(convertedCharacters, `publish ${index}`).toBeLessThanOrEqual(
+          3 * (openPara + step.length)
+        );
+        // And each call is region-sized, never the whole accumulated message.
+        for (const source of componentCalls) {
+          expect(source.length, `publish ${index} call size`).toBeLessThanOrEqual(openPara);
+        }
+        // No publish may fold the accumulated message, and none may fall back
+        // to a whole-value scan either.
+        expect(componentCalls, `publish ${index}`).not.toContain(value);
+        expect(
+          componentCalls.filter(call => call.startsWith('WITH_TAIL:')),
+          `publish ${index} whole-value scans`
+        ).toEqual([]);
+      }
+    } finally {
+      spy.mockRestore();
+      withTailSpy.mockRestore();
+    }
+  });
+
+  it('converts a declined publish exactly once', async () => {
+    // The first publish of a mount and every declined publish convert the whole
+    // value once: the conversion returns the markdown and its tail in one scan,
+    // and the splitter receives that same markdown instead of converting the
+    // value again. No publish may pass the whole accumulated value to the plain
+    // converter, and the tail scan may see the whole value at most once.
+    const calls: string[] = [];
+    const scans: string[] = [];
+    const original = convertModule.convertHtmlToMarkdown;
+    const originalWithTail = convertModule.convertHtmlToMarkdownWithTail;
+    const spy = vi.spyOn(convertModule, 'convertHtmlToMarkdown').mockImplementation(value => {
+      calls.push(value);
+      return original(value);
+    });
+    const withTailSpy = vi
+      .spyOn(convertModule, 'convertHtmlToMarkdownWithTail')
+      .mockImplementation(value => {
+        scans.push(value);
+        return originalWithTail(value);
+      });
+    try {
+      // A single-line value's open region starts at offset 0, so the next
+      // publish cannot reproduce any of its conversion by composition and the
+      // gate declines on a mid-line append rather than at a block boundary.
+      const first = 'Intro text `code';
+      const second = 'Intro text `code span';
+      expect(
+        publishConversion(first, null, undefined).tail.start,
+        'a single line leaves nothing final'
+      ).toBe(0);
+
+      calls.length = 0;
+      scans.length = 0;
+      const renderer = await mount(<MarkdownText value={first} />);
+      // Read the component's work before `expectWholeValueRender`'s own
+      // whole-value conversion flows through the spies.
+      const firstCalls = [...calls];
+      const firstScans = [...scans];
+      expectWholeValueRender(renderer, first, 'first publish');
+      expect(firstCalls, 'first publish plain conversions').not.toContain(first);
+      expect(
+        firstScans.filter(source => source === first),
+        'first publish whole-value scans'
+      ).toHaveLength(1);
+
+      calls.length = 0;
+      scans.length = 0;
+      await act(async () => {
+        await Promise.resolve();
+        renderer.update(<MarkdownText value={second} />);
+      });
+      const declinedCalls = [...calls];
+      const declinedScans = [...scans];
+      expectWholeValueRender(renderer, second, 'declined publish');
+      expect(declinedCalls, 'declined publish plain conversions').not.toContain(second);
+      expect(
+        declinedScans.filter(source => source === second),
+        'declined publish whole-value scans'
+      ).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+      withTailSpy.mockRestore();
     }
   });
 
@@ -1482,7 +1749,11 @@ describe('MarkdownText streaming conversion tail', () => {
       });
       const publishCalls = [...calls];
       const convertedCharacters = publishCalls.reduce((total, source) => total + source.length, 0);
-      expect(convertedCharacters, 'post-remount publish work').toBeLessThanOrEqual(3 * step.length);
+      // The gate converts the previous value's last content line and the
+      // appended text, then that same region of the new value: three regions,
+      // each at most one step here. The publish stays region-bounded, never
+      // whole-value.
+      expect(convertedCharacters, 'post-remount publish work').toBeLessThanOrEqual(5 * step.length);
       expect(publishCalls, 'post-remount publish').not.toContain(after);
       expectWholeValueRender(second, after, 'post-remount publish');
       // The remount itself must not have re-converted the whole value either:

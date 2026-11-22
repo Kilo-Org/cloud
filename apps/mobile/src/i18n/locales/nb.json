@@ -4098,6 +4098,7 @@
         "network": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen, og prøv igjen.",
         "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet.",
         "checksum": "Den nedlastede filen samsvarer ikke med den publiserte kontrollsummen, så den ble fjernet. Prøv nedlastingen på nytt.",
+        "unreadable": "Denne enheten kunne ikke kontrollere den nedlastede filen, så den ble fjernet. Prøv nedlastingen på nytt.",
         "writeFailed": "Denne enheten kunne ikke lagre modellen. Prøv nedlastingen på nytt."
       }
     },

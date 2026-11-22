@@ -4246,6 +4246,7 @@
         "network": "O download não foi concluído. Verifique sua conexão e tente novamente.",
         "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido.",
         "checksum": "O arquivo baixado não corresponde à soma de verificação publicada, então ele foi removido. Tente baixar novamente.",
+        "unreadable": "Este dispositivo não conseguiu verificar o arquivo baixado, então ele foi removido. Tente baixar novamente.",
         "writeFailed": "Este dispositivo não conseguiu salvar o modelo. Tente baixar novamente."
       }
     },

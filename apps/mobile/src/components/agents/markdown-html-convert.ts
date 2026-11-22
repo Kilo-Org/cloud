@@ -1,6 +1,11 @@
 import { blockLines, MARKDOWN_BLOCK_TAGS } from './markdown-html-block';
 import { type ConvertContext, inlineContent } from './markdown-html-inline';
-import { type HtmlElement, scanMarkdownCode } from './markdown-html-scan';
+import {
+  type HtmlElement,
+  type HtmlNode,
+  type MaskRange,
+  scanMarkdownCode,
+} from './markdown-html-scan';
 import { parseMarkdownHtml } from './markdown-html-tree';
 
 const LINE_END = /[ \t]*(?:\n|$)/y;
@@ -13,6 +18,9 @@ const BREAK_BLOCKED_LINE = /(?: {4}|\t|[^\S\n]*(?:#|>|[-+*][^\S\n]|\d{1,9}[.)][^
 const PARAGRAPH_ENDING_LINE =
   /(?:[ \t]*(?:\n|$)| {0,3}(?:#{1,6}(?:\s|$)|>|[-+*][ \t]|\d{1,9}[.)][ \t]|`{3}|~{3}|<|[=-]+[ \t]*(?:\n|$)|(?:[*_][ \t]*){3,}(?:\n|$)))/y;
 const WHITESPACE = /\s/;
+// A tag still streaming in at the end of a value, whose close is not written
+// yet, so the conversion of the text before it can still change.
+const PARTIAL_TAG_AT_END = /<\/?[a-zA-Z][^<>]*$/;
 
 /** The line of a root `<br>`: where it begins and ends, and whether a break can continue it. */
 type LineInfo = {
@@ -135,14 +143,128 @@ function rootBlock(context: ConvertContext, element: HtmlElement): string[] | nu
  * markdown only grows as the message does.
  */
 export function convertHtmlToMarkdown(value: string): string {
+  // Plain text converts to itself; skip the scan and the tail it would report.
   if (!value.includes('<')) {
     return value;
   }
-  const context: ConvertContext = { value, masks: scanMarkdownCode(value) };
-  const nodes = parseMarkdownHtml(value, context.masks);
-  if (!nodes.some(node => node.kind === 'element')) {
-    return value;
+  return convertHtmlToMarkdownWithTail(value).markdown;
+}
+
+/**
+ * The conversion of a value plus the offset at which that conversion is not
+ * yet final.
+ */
+export type ConvertedMarkdown = {
+  markdown: string;
+  /**
+   * Source offset where the still-open region begins: the start of the open
+   * line, walked back over every code mask and root element that crosses it.
+   * 0 means no reuse (nothing is final). Equal to `value.length` means the
+   * whole conversion is final.
+   */
+  tailStart: number;
+};
+
+/**
+ * `convertHtmlToMarkdown` plus the offset where its conversion stops being
+ * final, from the same masks and root nodes the conversion itself reads.
+ *
+ * Everything before `tailStart` converts the same whatever follows it: the
+ * region begins at the start of the open line, backed up to the start of every
+ * construct that crosses that line start, so no fence, code span, comment, or
+ * element straddles the seam. A caller that streams a value can then convert
+ * only `value.slice(tailStart)` on the next publish.
+ */
+export function convertHtmlToMarkdownWithTail(value: string): ConvertedMarkdown {
+  // Plain text converts to itself, so its tail is its open line — unless it
+  // holds a fence or code-span marker, which makes a construct that reaches the
+  // end of the value and can swallow what the next publish appends, or ends
+  // after a backslash, which escapes the character the next publish adds.
+  if (!value.includes('<') && !value.includes('`') && !value.includes('~~~')) {
+    return {
+      markdown: value,
+      tailStart: endsInsideOpenConstruct(value) ? 0 : value.lastIndexOf('\n') + 1,
+    };
   }
+  const masks = scanMarkdownCode(value);
+  const nodes = parseMarkdownHtml(value, masks);
+  const tailStart = openTailStart(value, masks, nodes);
+  if (!nodes.some(node => node.kind === 'element')) {
+    return { markdown: value, tailStart };
+  }
+  return { markdown: renderMarkdown(value, masks, nodes), tailStart };
+}
+
+/**
+ * Where the conversion of `value` stops being final: the start of its open
+ * line, walked back to the start of each code range and root element that
+ * crosses it, until no construct crosses the boundary. 0 when the open region
+ * ends inside a tag or after a backslash, whose next character can rewrite the
+ * text before it.
+ *
+ * A construct that is still open at the end of the value crosses a boundary
+ * there even though its own bounds end just before it: a fence runs to the end
+ * of the value, and an element the parse closed implicitly at its last prose
+ * keeps absorbing the next line, since only a blank line closes an inline tag.
+ */
+function openTailStart(
+  value: string,
+  masks: readonly MaskRange[],
+  nodes: readonly HtmlNode[]
+): number {
+  let lastProse = value.length;
+  while (lastProse > 0 && WHITESPACE.test(value[lastProse - 1] ?? '')) {
+    lastProse -= 1;
+  }
+  // An element closed implicitly at the last prose character is still open: the
+  // next publish extends it, and a blank line would be what closes it instead.
+  const openAtEnd = (node: HtmlElement) => node.contentEnd === node.end && node.end >= lastProse;
+  let boundary = value.lastIndexOf('\n') + 1;
+  // Backing up moves the boundary to a construct's start, which an earlier
+  // construct can cross in turn, so walk until nothing crosses it.
+  for (;;) {
+    let start = boundary;
+    for (const mask of masks) {
+      if (mask.start < boundary && (mask.end > boundary || mask.end === value.length)) {
+        start = Math.min(start, mask.start);
+      }
+    }
+    for (const node of nodes) {
+      if (
+        node.kind === 'element' &&
+        node.start < boundary &&
+        (node.end > boundary || openAtEnd(node))
+      ) {
+        start = Math.min(start, node.start);
+      }
+    }
+    if (start === boundary) {
+      break;
+    }
+    boundary = start;
+  }
+  if (boundary === 0 || boundary === value.length) {
+    return boundary;
+  }
+  return endsInsideOpenConstruct(value.slice(boundary)) ? 0 : boundary;
+}
+
+/**
+ * Whether `value` ends inside a construct whose next character rewrites the
+ * text before it: a tag still streaming in, or a backslash waiting for the
+ * character it escapes. No conversion of a value ending this way is final.
+ */
+function endsInsideOpenConstruct(value: string): boolean {
+  return PARTIAL_TAG_AT_END.test(value) || (value.length > 0 && value.endsWith('\\'));
+}
+
+/** The markdown for `value`, over the code ranges and root nodes it was scanned into. */
+function renderMarkdown(
+  value: string,
+  masks: readonly MaskRange[],
+  nodes: readonly HtmlNode[]
+): string {
+  const context: ConvertContext = { value, masks };
   // The output and its last two characters. Reading a character back from the
   // output copies it, so a value with many root nodes would copy the whole
   // converted message once per node; the tail answers those reads instead.

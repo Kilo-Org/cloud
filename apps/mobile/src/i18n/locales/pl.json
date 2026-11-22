@@ -4246,6 +4246,7 @@
         "network": "Pobieranie nie zostało ukończone. Sprawdź połączenie i spróbuj ponownie.",
         "invalidFile": "Pobrany plik nie jest modelem, który ta aplikacja może uruchomić, więc został usunięty.",
         "checksum": "Pobrany plik nie zgadza się z opublikowaną sumą kontrolną, więc został usunięty. Spróbuj pobrać go ponownie.",
+        "unreadable": "To urządzenie nie mogło sprawdzić pobranego pliku, więc został usunięty. Spróbuj pobrać go ponownie.",
         "writeFailed": "To urządzenie nie mogło zapisać modelu. Spróbuj pobrać go ponownie."
       }
     },

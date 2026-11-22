@@ -92,6 +92,7 @@
     "details": "Podrobnosti",
     "draft": "Koncept",
     "enabled": "Zapnuto",
+    "fileUnavailable": "Tento soubor už není možné stáhnout",
     "github": "GitHub",
     "imageUnavailable": "Obrázek není k dispozici.",
     "loading": "Načítá se…",

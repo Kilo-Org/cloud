@@ -1,9 +1,10 @@
 import { i18n } from '@/i18n';
 import {
-  getShareRemoteFileReason,
+  getShareFailureKind,
+  type ShareFailureKind,
   shareRemoteFile,
-  type ShareRemoteFileReason,
 } from '@/lib/share-remote-file';
+import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { firstNonEmpty } from '@/lib/utils';
 
 const INVOICE_CACHE_DIRECTORY = 'invoices';
@@ -40,20 +41,31 @@ export function selectInvoiceRowState(input: InvoiceRowStateInput): InvoiceRowSt
 /**
  * Toast copy for a failed invoice download/share.
  *
- * `download-failed` is retryable by tapping the row again (no toast CTA).
+ * A retryable failure is answered by tapping the row again (no toast CTA).
  * `sharing-unavailable` is terminal: the message says sharing is not available
- * and there is no retry CTA.
+ * and there is no retry CTA. `file-unavailable` is terminal too, for the other
+ * reason: the document the server holds is gone.
  */
-export function selectInvoiceDownloadErrorMessage(reason: ShareRemoteFileReason): string {
-  if (reason === 'sharing-unavailable') {
-    return invoiceSharingUnavailableMessage();
+export function selectInvoiceDownloadErrorMessage(kind: ShareFailureKind): string {
+  switch (kind) {
+    case 'sharing-unavailable': {
+      return invoiceSharingUnavailableMessage();
+    }
+    case 'file-unavailable': {
+      return i18n.t('common.fileUnavailable');
+    }
+    case 'retry':
+    case 'general': {
+      return invoiceDownloadFailedMessage();
+    }
+    default: {
+      return assertSurfaceFailureHandled(kind);
+    }
   }
-  return invoiceDownloadFailedMessage();
 }
 
 export function getInvoiceDownloadErrorMessage(error: unknown): string {
-  const reason = getShareRemoteFileReason(error) ?? 'download-failed';
-  return selectInvoiceDownloadErrorMessage(reason);
+  return selectInvoiceDownloadErrorMessage(getShareFailureKind(error));
 }
 
 export function getInvoicePdfFilename(invoice: {

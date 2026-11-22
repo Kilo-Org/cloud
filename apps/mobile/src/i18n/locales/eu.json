@@ -90,6 +90,7 @@
     "details": "Xehetasunak",
     "draft": "Zirriborroa",
     "enabled": "Gaituta",
+    "fileUnavailable": "Fitxategi hau jada ez dago deskargatzeko eskuragarri",
     "github": "GitHub",
     "imageUnavailable": "Irudia ez dago eskuragarri.",
     "loading": "Kargatzen…",

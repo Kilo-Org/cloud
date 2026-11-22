@@ -92,6 +92,7 @@
     "details": "Detalhes",
     "draft": "Rascunho",
     "enabled": "Ativado",
+    "fileUnavailable": "Este ficheiro já não está disponível para transferência",
     "github": "GitHub",
     "imageUnavailable": "A imagem não está disponível.",
     "loading": "A carregar…",

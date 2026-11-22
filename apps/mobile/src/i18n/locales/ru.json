@@ -92,6 +92,7 @@
     "details": "Подробности",
     "draft": "Черновик",
     "enabled": "Включено",
+    "fileUnavailable": "Этот файл больше недоступен для скачивания",
     "github": "GitHub",
     "imageUnavailable": "Изображение недоступно.",
     "loading": "Загрузка…",

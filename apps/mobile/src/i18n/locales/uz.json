@@ -90,6 +90,7 @@
     "details": "Tafsilotlar",
     "draft": "Qoralama",
     "enabled": "Yoqilgan",
+    "fileUnavailable": "Bu faylni endi yuklab bo‘lmaydi",
     "github": "GitHub",
     "imageUnavailable": "Rasmni ko‘rsatib bo‘lmaydi.",
     "loading": "Yuklanmoqda…",

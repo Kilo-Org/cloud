@@ -90,6 +90,7 @@
     "details": "Подробности",
     "draft": "Чернова",
     "enabled": "Включено",
+    "fileUnavailable": "Този файл вече не е достъпен за изтегляне",
     "github": "GitHub",
     "imageUnavailable": "Изображението е недостъпно.",
     "loading": "Зареждане…",

@@ -7,11 +7,8 @@ import { toast } from 'sonner-native';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import {
-  getShareRemoteFileReason,
-  shareLocalFile,
-  ShareRemoteFileError,
-} from '@/lib/share-remote-file';
+import { getShareFailureKind, shareLocalFile } from '@/lib/share-remote-file';
+import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 
 import { getToolFileAttachments } from './tool-card-attachments';
 import { isToolCardImagePending, useToolCardImageUri } from './tool-card-image-cache';
@@ -92,16 +89,28 @@ function FileChip({
     try {
       await shareLocalFile(fileUri, { mimeType: mime });
     } catch (error: unknown) {
-      const reason = getShareRemoteFileReason(error);
-      if (reason === 'sharing-unavailable') {
-        toast.error(t('agentChat.filePart.sharingUnavailable'));
-        return;
+      const kind = getShareFailureKind(error);
+      switch (kind) {
+        case 'sharing-unavailable': {
+          toast.error(t('agentChat.filePart.sharingUnavailable'));
+          return;
+        }
+        case 'file-unavailable': {
+          toast.error(t('common.fileUnavailable'));
+          return;
+        }
+        case 'retry': {
+          toast.error(t('agentChat.filePart.shareFailedRetry'));
+          return;
+        }
+        case 'general': {
+          toast.error(t('agentChat.filePart.shareFailed'));
+          return;
+        }
+        default: {
+          assertSurfaceFailureHandled(kind);
+        }
       }
-      if (error instanceof ShareRemoteFileError) {
-        toast.error(t('agentChat.filePart.shareFailedRetry'));
-        return;
-      }
-      toast.error(t('agentChat.filePart.shareFailed'));
     }
   }
 

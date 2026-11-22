@@ -90,6 +90,7 @@
     "details": "Részletek",
     "draft": "Piszkozat",
     "enabled": "Engedélyezve",
+    "fileUnavailable": "Ez a fájl már nem tölthető le",
     "github": "GitHub",
     "imageUnavailable": "A kép nem érhető el",
     "loading": "Betöltés…",

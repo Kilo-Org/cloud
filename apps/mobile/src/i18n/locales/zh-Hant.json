@@ -90,6 +90,7 @@
     "details": "詳細資料",
     "draft": "草稿",
     "enabled": "已啟用",
+    "fileUnavailable": "此檔案已無法下載",
     "github": "GitHub",
     "imageUnavailable": "無法顯示圖片。",
     "loading": "載入中…",

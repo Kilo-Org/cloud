@@ -90,6 +90,7 @@
     "details": "Tiedot",
     "draft": "Luonnos",
     "enabled": "Käytössä",
+    "fileUnavailable": "Tiedosto ei ole enää ladattavissa",
     "github": "GitHub",
     "imageUnavailable": "Kuva ei ole saatavilla",
     "loading": "Ladataan…",

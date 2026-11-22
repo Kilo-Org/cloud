@@ -90,6 +90,7 @@
     "details": "विवरण",
     "draft": "मस्यौदा",
     "enabled": "चालु",
+    "fileUnavailable": "यो फाइल अब डाउनलोड गर्न उपलब्ध छैन",
     "github": "GitHub",
     "imageUnavailable": "तस्बिर उपलब्ध छैन।",
     "loading": "लोड हुँदै…",

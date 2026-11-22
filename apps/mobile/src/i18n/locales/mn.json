@@ -90,6 +90,7 @@
     "details": "Дэлгэрэнгүй",
     "draft": "Ноорог",
     "enabled": "Идэвхтэй",
+    "fileUnavailable": "Энэ файлыг татаж авах боломжгүй болсон",
     "github": "GitHub",
     "imageUnavailable": "Зургийг харуулах боломжгүй.",
     "loading": "Ачаалж байна…",

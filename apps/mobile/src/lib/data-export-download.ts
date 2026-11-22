@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
-import { getShareRemoteFileReason, shareRemoteFile } from '@/lib/share-remote-file';
+import { getShareFailureKind, shareRemoteFile } from '@/lib/share-remote-file';
+import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 
 const DATA_EXPORT_CACHE_DIRECTORY = 'data-exports';
 
@@ -7,14 +8,28 @@ const DATA_EXPORT_CACHE_DIRECTORY = 'data-exports';
 const DATA_EXPORT_FILENAME = 'kilo-data-export.jsonl.gz';
 
 /**
- * Copy for a failed export download. A download failure is retryable by taking
- * the code again; `sharing-unavailable` means the device has no share sheet,
- * which the reader cannot fix from this screen.
+ * Copy for a failed export download. A retryable failure is answered by taking
+ * the artifact again; `sharing-unavailable` means the device has no share
+ * sheet, and `file-unavailable` means the export the server holds is gone.
+ * Neither is something the reader can fix from this screen.
  */
 export function getDataExportFailureMessage(error: unknown): string {
-  return getShareRemoteFileReason(error) === 'sharing-unavailable'
-    ? i18n.t('organization.invoices.sharingUnavailable')
-    : i18n.t('profile.dataExport.downloadFailed');
+  const kind = getShareFailureKind(error);
+  switch (kind) {
+    case 'sharing-unavailable': {
+      return i18n.t('organization.invoices.sharingUnavailable');
+    }
+    case 'file-unavailable': {
+      return i18n.t('common.fileUnavailable');
+    }
+    case 'retry':
+    case 'general': {
+      return i18n.t('profile.dataExport.downloadFailed');
+    }
+    default: {
+      return assertSurfaceFailureHandled(kind);
+    }
+  }
 }
 
 /**

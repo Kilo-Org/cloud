@@ -91,6 +91,7 @@
     "details": "Detalls",
     "draft": "Esborrany",
     "enabled": "Activat",
+    "fileUnavailable": "Aquest fitxer ja no es pot descarregar",
     "github": "GitHub",
     "imageUnavailable": "La imatge no està disponible.",
     "loading": "S'està carregant…",

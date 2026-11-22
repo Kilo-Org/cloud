@@ -6,11 +6,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  getShareRemoteFileReason,
-  shareLocalFile,
-  ShareRemoteFileError,
-} from '@/lib/share-remote-file';
+import { getShareFailureKind, shareLocalFile } from '@/lib/share-remote-file';
 
 import { ToolCardFileAttachments } from './tool-card-file-attachments';
 import { __resetToolCardImageCacheForTests, cacheToolAttachment } from './tool-card-image-cache';
@@ -89,8 +85,7 @@ vi.mock('@/lib/share-remote-file', () => ({
   shareLocalFile: vi.fn(async () => {
     await Promise.resolve();
   }),
-  getShareRemoteFileReason: vi.fn(() => null),
-  ShareRemoteFileError: class ShareRemoteFileErrorMock extends Error {},
+  getShareFailureKind: vi.fn(() => 'general'),
   getSafeCacheFilename: ({ id, filename }: { id: string; filename: string }) =>
     `${id}-${filename.replaceAll(/[^a-zA-Z0-9._-]/g, '_')}`,
 }));
@@ -361,7 +356,8 @@ describe('ToolCardFileAttachments mounted', () => {
     const renderer = await mount(makeToolPart('send_file', [reportPdf]));
     const root = renderer.root;
 
-    vi.mocked(shareLocalFile).mockRejectedValueOnce(new ShareRemoteFileError('download-failed'));
+    vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('network down'));
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('retry');
 
     await pressShare(root);
 
@@ -379,11 +375,29 @@ describe('ToolCardFileAttachments mounted', () => {
     const root = renderer.root;
 
     vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('boom'));
-    vi.mocked(getShareRemoteFileReason).mockReturnValueOnce('sharing-unavailable');
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('sharing-unavailable');
 
     await pressShare(root);
 
     expect(toast.error).toHaveBeenCalledWith('File sharing is not available on this device.');
+
+    await unmount(renderer);
+  });
+
+  it('toasts that the file is gone when the server says the document is unavailable', async () => {
+    await act(async () => {
+      await Promise.resolve();
+      seedFileCache();
+    });
+    const renderer = await mount(makeToolPart('send_file', [reportPdf]));
+    const root = renderer.root;
+
+    vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('boom'));
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('file-unavailable');
+
+    await pressShare(root);
+
+    expect(toast.error).toHaveBeenCalledWith('This file is no longer available to download');
 
     await unmount(renderer);
   });

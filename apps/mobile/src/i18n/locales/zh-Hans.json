@@ -4701,6 +4701,7 @@
     "contextAll": "所有使用情境",
     "dismiss": "忽略简报",
     "dismissFailed": "暂时无法忽略此简报。将在后台自动重试。",
+    "readMarkFailed": "暂时无法将此简报标记为已读。将在简报重新加载时自动重试。",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的简报 · 无法刷新",
     "summary": "AI 摘要",

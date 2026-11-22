@@ -4701,6 +4701,7 @@
     "contextAll": "Semua konteks",
     "dismiss": "Abaikan laporan",
     "dismissFailed": "Belum bisa mengabaikan laporan ini. Akan dicoba ulang di latar belakang.",
+    "readMarkFailed": "Belum bisa menandai laporan ini sebagai sudah dibaca. Akan dicoba ulang saat laporan dimuat ulang.",
     "offline": "Offline · laporan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
     "summary": "Ringkasan AI",

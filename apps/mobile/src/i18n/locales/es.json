@@ -4785,6 +4785,7 @@
     "contextAll": "Todos los contextos",
     "dismiss": "Descartar informe",
     "dismissFailed": "Todavía no se ha podido descartar este informe. Se reintentará en segundo plano.",
+    "readMarkFailed": "No se ha podido marcar este informe como leído. Se reintentará cuando se vuelva a cargar el informe.",
     "offline": "Sin conexión · informe guardado",
     "cached": "Informe guardado · no se puede actualizar",
     "summary": "Resumen de IA",

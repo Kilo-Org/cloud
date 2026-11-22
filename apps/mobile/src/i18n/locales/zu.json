@@ -4701,6 +4701,7 @@
     "contextAll": "Imimongo yonke",
     "dismiss": "Chitha umbiko",
     "dismissFailed": "Umbiko awukachithwanga okwamanje. Uzama kabusha ngasemuva.",
+    "readMarkFailed": "Ayikwazekanga ukumaka lo mbiko njengokufundiwe. Kuzozanywa futhi lapho umbiko ulayishwa kabusha.",
     "offline": "Akuxhunyiwe · umbiko olondoloziwe",
     "cached": "Umbiko olondoloziwe · ukuvuselela akutholakali",
     "summary": "Isifinyezo se-AI",

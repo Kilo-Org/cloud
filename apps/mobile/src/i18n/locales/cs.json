@@ -4869,6 +4869,7 @@
     "contextAll": "Všechny kontexty",
     "dismiss": "Skrýt přehled",
     "dismissFailed": "Přehled se zatím nepodařilo skrýt. Pokus se automaticky opakuje na pozadí.",
+    "readMarkFailed": "Tento přehled se nepodařilo označit jako přečtený. Při příštím načtení přehledu se pokus zopakuje.",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
     "summary": "AI shrnutí",

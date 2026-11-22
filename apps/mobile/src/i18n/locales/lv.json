@@ -4785,6 +4785,7 @@
     "contextAll": "Visi konteksti",
     "dismiss": "Noraidīt atskaiti",
     "dismissFailed": "Šo atskaiti vēl neizdevās noraidīt. Mēģinājums tiks atkārtots fonā.",
+    "readMarkFailed": "Neizdevās atzīmēt šo atskaiti kā lasītu. Mēģinājums tiks atkārtots, kad atskaite pārlādēsies.",
     "offline": "Bezsaistē · saglabāta atskaite",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
     "summary": "AI kopsavilkums",

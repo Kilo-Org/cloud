@@ -4701,6 +4701,7 @@
     "contextAll": "Alle kontekste",
     "dismiss": "Verwerp verslag",
     "dismissFailed": "Hierdie verslag kon nog nie verwerp word nie. Dit word op die agtergrond weer probeer.",
+    "readMarkFailed": "Kon nie hierdie verslag as gelees merk nie. Dit word weer probeer wanneer die verslag herlaai.",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfrissing nie beskikbaar nie",
     "summary": "AI-opsomming",

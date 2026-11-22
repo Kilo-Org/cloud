@@ -4701,6 +4701,7 @@
     "contextAll": "Kaikki kontekstit",
     "dismiss": "Sivuuta katsaus",
     "dismissFailed": "Tätä katsausta ei voitu vielä sivuuttaa. Yritämme uudelleen taustalla.",
+    "readMarkFailed": "Tätä katsausta ei voitu merkitä luetuksi. Yritämme uudelleen, kun katsaus latautuu uudelleen.",
     "offline": "Offline · tallennettu katsaus",
     "cached": "Tallennettu katsaus · päivitys ei käytettävissä",
     "summary": "AI-yhteenveto",

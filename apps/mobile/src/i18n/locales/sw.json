@@ -4701,6 +4701,7 @@
     "contextAll": "Miktadha yote",
     "dismiss": "Puuza ripoti",
     "dismissFailed": "Ripoti hii bado haiwezi kupuuzwa. Inajaribu tena katika usuli.",
+    "readMarkFailed": "Imeshindwa kuweka ripoti hii kama imesomwa. Itajaribu tena ripoti inapopakiwa upya.",
     "offline": "Nje ya mtandao · ripoti iliyohifadhiwa",
     "cached": "Ripoti iliyohifadhiwa · haiwezi kuonyeshwa upya",
     "summary": "Muhtasari wa AI",

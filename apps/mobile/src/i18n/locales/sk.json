@@ -4869,6 +4869,7 @@
     "contextAll": "Všetky kontexty",
     "dismiss": "Ignorovať prehľad",
     "dismissFailed": "Tento prehľad sa zatiaľ nepodarilo ignorovať. Na pozadí sa to pokúsi znova.",
+    "readMarkFailed": "Tento prehľad sa nepodarilo označiť ako prečítaný. Pri ďalšom načítaní prehľadu sa to pokúsi znova.",
     "offline": "Offline · uložený prehľad",
     "cached": "Uložený prehľad · obnovenie nedostupné",
     "summary": "AI zhrnutie",

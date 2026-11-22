@@ -4785,6 +4785,7 @@
     "contextAll": "Toate contextele",
     "dismiss": "Ignoră raportul",
     "dismissFailed": "Raportul nu a putut fi ignorat încă. Se reîncearcă în fundal.",
+    "readMarkFailed": "Raportul nu a putut fi marcat ca citit. Se va reîncerca la reîncărcarea raportului.",
     "offline": "Offline · raport salvat",
     "cached": "Raport salvat · reîmprospătare indisponibilă",
     "summary": "Rezumat AI",

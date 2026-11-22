@@ -4785,6 +4785,7 @@
     "contextAll": "Svi konteksti",
     "dismiss": "Odbaci izvještaj",
     "dismissFailed": "Ovaj izvještaj još nije moguće odbaciti. Pokušaj se ponavlja u pozadini.",
+    "readMarkFailed": "Ovaj izvještaj nije bilo moguće označiti kao pročitan. Pokušat će ponovo kad se izvještaj učita.",
     "offline": "Van mreže · sačuvani izvještaj",
     "cached": "Sačuvani izvještaj · osvježavanje nedostupno",
     "summary": "AI sažetak",

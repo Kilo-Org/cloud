@@ -4869,6 +4869,7 @@
     "contextAll": "Wszystkie konteksty",
     "dismiss": "Odrzuć raport",
     "dismissFailed": "Nie udało się jeszcze odrzucić tego raportu. Zostanie to ponowione w tle.",
+    "readMarkFailed": "Nie udało się oznaczyć tego raportu jako przeczytany. Spróbujemy ponownie przy następnym wczytaniu raportu.",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
     "summary": "Podsumowanie AI",

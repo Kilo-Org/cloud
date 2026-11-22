@@ -5037,6 +5037,7 @@
     "contextAll": "Pob cyd-destun",
     "dismiss": "Diystyru'r briff",
     "dismissFailed": "Methwyd â diystyru'r briff hwn am y tro. Bydd yn rhoi cynnig arall yn y cefndir.",
+    "readMarkFailed": "Methwyd â marcio'r briff hwn fel wedi'i ddarllen. Bydd yn rhoi cynnig arall pan fydd y briff yn ail-lwytho.",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Briff wedi'i gadw · methu adnewyddu",
     "summary": "Crynodeb AI",

@@ -4701,6 +4701,7 @@
     "contextAll": "Tất cả ngữ cảnh",
     "dismiss": "Bỏ qua bản tin",
     "dismissFailed": "Chưa thể bỏ qua bản tin này. Hệ thống sẽ tự thử lại trong nền.",
+    "readMarkFailed": "Chưa thể đánh dấu bản tin này là đã đọc. Hệ thống sẽ tự thử lại khi bản tin tải lại.",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Bản tin đã lưu · không thể làm mới",
     "summary": "Tóm tắt AI",

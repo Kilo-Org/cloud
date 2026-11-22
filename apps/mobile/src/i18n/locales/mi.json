@@ -4701,6 +4701,7 @@
     "contextAll": "Ngā horopaki katoa",
     "dismiss": "Whakakorea te pūrongo",
     "dismissFailed": "Kāore anō kia taea te whakakore i tēnei pūrongo. Ka ngana aunoa anō i muri mai.",
+    "readMarkFailed": "Kāore i taea te tohu i tēnei pūrongo kua pānuitia. Ka ngana aunoa anō ina utaina anō te pūrongo.",
     "offline": "Tuimotu · pūrongo kua tiakina",
     "cached": "Pūrongo kua tiakina · kāore e taea te whakahou",
     "summary": "Whakarāpopototanga AI",

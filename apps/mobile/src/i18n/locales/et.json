@@ -4701,6 +4701,7 @@
     "contextAll": "Kõik kontekstid",
     "dismiss": "Jäta ülevaade kõrvale",
     "dismissFailed": "Selle ülevaate kõrvale jätmine ei õnnestunud veel. Taustal proovitakse uuesti.",
+    "readMarkFailed": "Seda ülevaadet ei õnnestunud loetuks märkida. Uuesti proovitakse, kui ülevaade taas laaditakse.",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud ülevaade · värskendamine pole saadaval",
     "summary": "AI kokkuvõte",

@@ -4701,6 +4701,7 @@
     "contextAll": "Összes kontextus",
     "dismiss": "Jelentés elvetése",
     "dismissFailed": "A jelentés elvetése egyelőre nem sikerült. A háttérben újrapróbálkozik.",
+    "readMarkFailed": "Nem sikerült olvasottként megjelölni ezt a jelentést. A jelentés újratöltésekor újrapróbálkozik.",
     "offline": "Offline · mentett jelentés",
     "cached": "Mentett jelentés · frissítés nem érhető el",
     "summary": "AI-összefoglaló",

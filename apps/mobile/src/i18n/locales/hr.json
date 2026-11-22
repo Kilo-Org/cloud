@@ -4785,6 +4785,7 @@
     "contextAll": "Svi konteksti",
     "dismiss": "Odbaci izvješće",
     "dismissFailed": "Ovo izvješće još nije moguće odbaciti. Ponovni pokušaj odvija se u pozadini.",
+    "readMarkFailed": "Ovo izvješće nije moguće označiti kao pročitano. Ponovni pokušaj odvija se kad se izvješće ponovno učita.",
     "offline": "Izvan mreže · spremljeno izvješće",
     "cached": "Spremljeno izvješće · osvježavanje nije dostupno",
     "summary": "AI sažetak",

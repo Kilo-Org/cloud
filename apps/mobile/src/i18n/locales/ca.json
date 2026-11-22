@@ -4785,6 +4785,7 @@
     "contextAll": "Tots els contextos",
     "dismiss": "Descarta l'informe",
     "dismissFailed": "Encara no s'ha pogut descartar aquest informe. Es torna a provar en segon pla.",
+    "readMarkFailed": "No s'ha pogut marcar aquest informe com a llegit. Es tornarà a provar quan es recarregui l'informe.",
     "offline": "Sense connexió · informe desat",
     "cached": "Informe desat · no es pot actualitzar",
     "summary": "Resum d'IA",

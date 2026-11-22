@@ -5,7 +5,6 @@ import { type TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { BriefingScorecard } from './briefing-card';
 import { BriefingMetadataRows } from './briefing-metadata-rows';
@@ -21,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   BRIEFING_PATH,
   type BriefingReport,
@@ -117,18 +117,22 @@ export function BriefingDetailScreen() {
   const read = useMutation(
     trpc.agentBriefing.read.mutationOptions({
       onError: () => {
-        toast.error(t('common.somethingWentWrong'));
+        announcingToast.error(t('agentBriefing.readMarkFailed'));
       },
     })
   );
-  const marked = useRef<string | null>(null);
+  // One announced attempt per fetched payload. A keyed-by-report-id attempt made
+  // a failure sticky for the rest of the visit; keying by the payload generation
+  // reports a failed mark once and tries again on the next fetch or the next
+  // visit, without a retry timer or a counter that could loop.
+  const attemptedAt = useRef<number | null>(null);
   useEffect(() => {
-    if (!report || offline || report.readAt || marked.current === report.id) {
+    if (!report || offline || report.readAt || attemptedAt.current === query.dataUpdatedAt) {
       return;
     }
-    marked.current = report.id;
+    attemptedAt.current = query.dataUpdatedAt;
     read.mutate({ reportId: report.id });
-  }, [offline, read, report]);
+  }, [offline, query.dataUpdatedAt, read, report]);
   const phase = selectBriefingDetailPhase({
     hasReport: report !== undefined,
     offline,

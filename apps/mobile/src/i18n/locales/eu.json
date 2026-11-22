@@ -4701,6 +4701,7 @@
     "contextAll": "Testuinguru guztiak",
     "dismiss": "Baztertu txostena",
     "dismissFailed": "Oraindik ezin izan da txosten hau baztertu. Atzeko planoan berriro saiatuko da.",
+    "readMarkFailed": "Ezin izan da txosten hau irakurritzat markatu. Berriro saiatuko da txostena hurrengoan kargatzean.",
     "offline": "Lineaz kanpo · gordetako txostena",
     "cached": "Gordetako txostena · ezin da freskatu",
     "summary": "AI laburpena",

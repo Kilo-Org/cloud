@@ -4785,6 +4785,7 @@
     "contextAll": "Svi konteksti",
     "dismiss": "Odbaci izveštaj",
     "dismissFailed": "Odbacivanje izveštaja za sada nije uspelo. Pokušaće se ponovo u pozadini.",
+    "readMarkFailed": "Nije bilo moguće označiti ovaj izveštaj kao pročitan. Pokušaće se ponovo kada se izveštaj ponovo učita.",
     "offline": "Van mreže · sačuvan izveštaj",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
     "summary": "AI rezime",

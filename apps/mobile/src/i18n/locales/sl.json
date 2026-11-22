@@ -4869,6 +4869,7 @@
     "contextAll": "Vsi konteksti",
     "dismiss": "Zavrzi poročilo",
     "dismissFailed": "Poročila še ni mogoče zavreči. Ponovni poskus bo izveden v ozadju.",
+    "readMarkFailed": "Tega poročila ni bilo mogoče označiti kot prebrano. Ponovni poskus bo izveden ob ponovnem nalaganju poročila.",
     "offline": "Brez povezave · shranjeno poročilo",
     "cached": "Shranjeno poročilo · osvežitev ni na voljo",
     "summary": "AI povzetek",

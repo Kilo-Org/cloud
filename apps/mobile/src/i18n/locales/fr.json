@@ -4785,6 +4785,7 @@
     "contextAll": "Tous les contextes",
     "dismiss": "Ignorer le briefing",
     "dismissFailed": "Impossible d’ignorer ce briefing pour l’instant. Une nouvelle tentative est effectuée en arrière-plan.",
+    "readMarkFailed": "Impossible de marquer ce briefing comme lu. Une nouvelle tentative aura lieu au rechargement du briefing.",
     "offline": "Hors ligne · briefing enregistré",
     "cached": "Briefing enregistré · actualisation indisponible",
     "summary": "Résumé IA",

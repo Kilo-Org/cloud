@@ -4953,6 +4953,7 @@
     "contextAll": "Il-kuntesti kollha",
     "dismiss": "Warrab il-briefing",
     "dismissFailed": "Dan il-briefing għadux twarrab. Jerġa' jipprova fil-isfond.",
+    "readMarkFailed": "Dan il-briefing ma setax jiġi mmarkat bħala moqri. Se jerġa' jipprova meta l-briefing jerġa' jitgħabba.",
     "offline": "Offline · briefing issejvjat",
     "cached": "Briefing issejvjat · aġġornament mhux disponibbli",
     "summary": "Sommarju AI",

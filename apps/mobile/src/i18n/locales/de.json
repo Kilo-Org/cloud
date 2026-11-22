@@ -4701,6 +4701,7 @@
     "contextAll": "Alle Kontexte",
     "dismiss": "Briefing ausblenden",
     "dismissFailed": "Dieses Briefing konnte noch nicht ausgeblendet werden. Der Vorgang wird im Hintergrund wiederholt.",
+    "readMarkFailed": "Dieses Briefing konnte noch nicht als gelesen markiert werden. Der Vorgang wird beim nächsten Laden des Briefings wiederholt.",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeichertes Briefing · Aktualisierung nicht verfügbar",
     "summary": "AI-Zusammenfassung",

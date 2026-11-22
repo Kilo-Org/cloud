@@ -4701,6 +4701,7 @@
     "contextAll": "所有使用情境",
     "dismiss": "忽略簡報",
     "dismissFailed": "暫時無法忽略此簡報。系統會在背景自動重試。",
+    "readMarkFailed": "暫時無法將此簡報標示為已讀。簡報重新載入時會再試一次。",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的簡報 · 無法重新整理",
     "summary": "AI 摘要",

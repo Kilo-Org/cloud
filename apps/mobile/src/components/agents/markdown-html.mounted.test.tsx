@@ -1,4 +1,4 @@
-/* eslint-disable max-classes-per-file, typescript-eslint/no-extraneous-class, typescript-eslint/no-unnecessary-condition, eslint/class-methods-use-this, eslint/no-empty-function, eslint-plugin-promise/prefer-await-to-callbacks, eslint-plugin-promise/prefer-await-to-then, typescript-eslint/promise-function-async -- the react-native host stub must mimic the module surface the real @native-html/render engine consumes (classes with no-op methods, promise-returning Linking shims); test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-classes-per-file, max-lines, typescript-eslint/no-extraneous-class, typescript-eslint/no-unnecessary-condition, eslint/class-methods-use-this, eslint/no-empty-function, eslint-plugin-promise/prefer-await-to-callbacks, eslint-plugin-promise/prefer-await-to-then, typescript-eslint/promise-function-async -- the react-native host stub must mimic the module surface the real @native-html/render engine consumes (classes with no-op methods, promise-returning Linking shims); test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx); one suite covers routing, styling, the image fallback, details, and block direction against one engine harness */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
@@ -125,12 +125,24 @@ function flattenStyle(style: unknown): Record<string, unknown>[] {
   return [style as Record<string, unknown>];
 }
 
-async function mountHtml(html: string): Promise<TestRenderer.ReactTestRenderer> {
+/** One merged style object from the entries the engine passed to a host node. */
+function mergedStyle(style: unknown): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const entry of flattenStyle(style)) {
+    Object.assign(merged, entry);
+  }
+  return merged;
+}
+
+async function mountHtml(
+  html: string,
+  documentDirection?: 'ltr'
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
     ref.current = TestRenderer.create(
-      createElement(MarkdownHtml, { html, palette, selectable: true })
+      createElement(MarkdownHtml, { html, palette, documentDirection, selectable: true })
     );
   });
   if (!ref.current) {
@@ -145,6 +157,16 @@ function styledTexts(renderer: TestRenderer.ReactTestRenderer) {
     .map(node => ({
       text: node.children.map(child => (typeof child === 'string' ? child : '')).join(''),
       style: flattenStyle(node.props.style),
+    }));
+}
+
+/** Every host node of one type, with its merged style and the tag it came from. */
+function hostStyles(renderer: TestRenderer.ReactTestRenderer, type: 'View' | 'Text') {
+  return renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === type)
+    .map(node => ({
+      tag: typeof node.props.testID === 'string' ? node.props.testID : undefined,
+      style: mergedStyle(node.props.style),
     }));
 }
 
@@ -217,16 +239,34 @@ describe('MarkdownHtml unsupported-image fallback', () => {
     expect(style).toMatchObject({ color: '#111111', fontSize: 16, lineHeight: 24 });
   });
 
-  it('applies the RTL paragraph direction to the fallback text in RTL', async () => {
+  it('gives the fallback its own direction from the alt text, not the interface', async () => {
     const isRtl = rnStub.I18nManager;
     isRtl.isRTL = true;
     try {
-      const renderer = await mountHtml('<img src="ftp://example.com/photo.png" alt="A photo">');
-      const fallback = styledTexts(renderer).find(entry => entry.text === 'A photo');
+      const latin = await mountHtml('<img src="ftp://example.com/a.png" alt="A photo">');
+      const latinStyle = styledTexts(latin).find(entry => entry.text === 'A photo');
+      expect(latinStyle).toBeDefined();
+      // Interface stays right to left; the English alt keeps its own left edge.
+      expect(mergedStyle(latinStyle?.style)).toMatchObject({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+      });
 
-      expect(fallback).toBeDefined();
-      const style: Record<string, unknown> = Object.assign({}, ...(fallback?.style ?? []));
-      expect(style.writingDirection).toBe('rtl');
+      const arabic = await mountHtml('<img src="ftp://example.com/a.png" alt="صورة">');
+      const arabicStyle = styledTexts(arabic).find(entry => entry.text === 'صورة');
+      expect(arabicStyle).toBeDefined();
+      expect(mergedStyle(arabicStyle?.style)).toMatchObject({
+        direction: 'rtl',
+        writingDirection: 'rtl',
+      });
+
+      // A document body keeps its one direction whatever the alt says.
+      const document = await mountHtml('<img src="ftp://example.com/a.png" alt="صورة">', 'ltr');
+      const documentStyle = styledTexts(document).find(entry => entry.text === 'صورة');
+      expect(mergedStyle(documentStyle?.style)).toMatchObject({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+      });
     } finally {
       isRtl.isRTL = false;
     }
@@ -348,5 +388,93 @@ describe('MarkdownHtml inline keys, subscripts, and superscripts', () => {
     const two = styledTexts(renderer).filter(entry => entry.text === '2');
     expect(two).toHaveLength(2);
     expect(two.every(entry => entry.style.some(style => style.fontSize === 11))).toBe(true);
+  });
+});
+
+describe('MarkdownHtml block direction', () => {
+  it('gives each block the direction of its own first strong character', async () => {
+    const isRtl = rnStub.I18nManager;
+    isRtl.isRTL = true;
+    try {
+      const renderer = await mountHtml(
+        '<p><del>struck</del> and <sub>low</sub> <sup>high</sup></p><p>مرحبا</p>'
+      );
+      const paragraphs = hostStyles(renderer, 'View').filter(entry => entry.tag === 'p');
+      const texts = hostStyles(renderer, 'Text');
+
+      expect(paragraphs).toHaveLength(2);
+      // The Latin block names left to right, so its paragraph resolves to its
+      // own left edge inside a right-to-left interface instead of the
+      // interface's start edge.
+      expect(paragraphs[0]?.style).toMatchObject({ direction: 'ltr' });
+      expect(texts.find(entry => entry.style.fontSize === 16)?.style).toMatchObject({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+      });
+      // The Arabic block names right to left, in the same body and the same
+      // interface.
+      expect(paragraphs[1]?.style).toMatchObject({ direction: 'rtl' });
+      expect(texts.find(entry => entry.style.writingDirection === 'rtl')?.style).toMatchObject({
+        direction: 'rtl',
+      });
+      expect(texts.some(entry => entry.style.writingDirection === 'ltr')).toBe(true);
+    } finally {
+      isRtl.isRTL = false;
+    }
+  });
+
+  it('gives one block per element, not one direction for a merged input', async () => {
+    const renderer = await mountHtml('<p>alpha</p><p>بيتا</p><h2>gamma</h2>');
+    const blocks = hostStyles(renderer, 'View').filter(entry =>
+      ['p', 'h2'].includes(entry.tag ?? '')
+    );
+
+    expect(blocks.map(entry => entry.style.direction)).toEqual(['ltr', 'rtl', 'ltr']);
+    const texts = hostStyles(renderer, 'Text');
+    expect(texts.some(entry => entry.style.direction === 'rtl')).toBe(true);
+    expect(texts.some(entry => entry.style.direction === 'ltr')).toBe(true);
+  });
+
+  it('names nothing for a block whose text has no letter', async () => {
+    const renderer = await mountHtml('<p>42 — 7</p>');
+    const paragraph = hostStyles(renderer, 'View').find(entry => entry.tag === 'p');
+
+    expect(paragraph).toBeDefined();
+    expect(paragraph?.style).not.toHaveProperty('direction');
+    const text = hostStyles(renderer, 'Text').find(entry => entry.style.fontSize === 16);
+    expect(text?.style).not.toHaveProperty('direction');
+    expect(text?.style).not.toHaveProperty('writingDirection');
+  });
+
+  it('keeps one direction for a document body', async () => {
+    const renderer = await mountHtml('<p>alpha</p><p>بيتا</p>', 'ltr');
+    const paragraphs = hostStyles(renderer, 'View').filter(entry => entry.tag === 'p');
+
+    expect(paragraphs).toHaveLength(2);
+    for (const paragraph of paragraphs) {
+      expect(paragraph.style).toMatchObject({ direction: 'ltr' });
+    }
+  });
+
+  it('leaves a container of blocks unset and lets the blocks name their own', async () => {
+    const renderer = await mountHtml(
+      '<blockquote><p>quote</p><p>اقتباس</p></blockquote><details open>' +
+        '<summary>More</summary><p>بيتا</p></details>'
+    );
+    const blocks = hostStyles(renderer, 'View');
+
+    // A container draws no text of its own, so it names no direction: a
+    // direction on its view would reorder the blocks inside it instead.
+    expect(blocks.find(entry => entry.tag === 'blockquote')?.style).not.toHaveProperty('direction');
+    const row = renderer.root.findByType('Pressable' as never);
+    const wrapperStyle = mergedStyle(row.parent?.props.style);
+    expect(wrapperStyle).not.toHaveProperty('direction');
+
+    const directions = blocks
+      .filter(entry => entry.tag === 'p')
+      .map(entry => entry.style.direction);
+    expect(directions).toEqual(['ltr', 'rtl', 'rtl']);
+    const summaryText = styledTexts(renderer).find(entry => entry.text === 'More');
+    expect(mergedStyle(summaryText?.style)).toMatchObject({ direction: 'ltr' });
   });
 });

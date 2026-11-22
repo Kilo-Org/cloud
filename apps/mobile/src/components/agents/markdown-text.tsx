@@ -154,9 +154,11 @@ export type MarkdownTextProps = {
    * Base direction of the document body, when it has one of its own: a legal
    * document is English in every interface language, so its prose keeps a
    * left-to-right base direction and the left edge while the screen around it
-   * mirrors. Chat and every other content body omit this: each paragraph then
-   * resolves from its own first strong character, so English content keeps its
-   * left edge and Arabic content sits on the right in either interface.
+   * mirrors. Chat and every other content body omit this: each block then
+   * resolves from its own first strong character — its paragraphs, headings and
+   * list items, whose markers sit on that block's own leading edge — so English
+   * content keeps its left edge and Arabic content sits on the right in either
+   * interface.
    */
   documentDirection?: 'ltr';
   selectable?: boolean;
@@ -266,7 +268,6 @@ export function MarkdownText({
             key={`md-content-${index}`}
             raw={segment.raw}
             palette={palette}
-            documentDirection={documentDirection}
             selectable={selectable}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
@@ -281,7 +282,6 @@ export function MarkdownText({
 type MarkdownRunProps = {
   raw: string;
   palette: MarkdownPalette;
-  documentDirection?: 'ltr';
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
@@ -294,11 +294,15 @@ type MarkdownRunProps = {
  * the native renderer. A mermaid fence keeps the diagram renderer once it is
  * closed; while a streamed append is still open the source shows as code, as the
  * fence regex it replaces did.
+ *
+ * No base direction is handed down here: markdown is copy the app did not write,
+ * so the native renderer resolves each block from its own first strong character
+ * (`markdown-enriched`). Only an HTML-carrying segment needs one, and it takes
+ * the prop from `MarkdownText`.
  */
 function MarkdownRun({
   raw,
   palette,
-  documentDirection,
   selectable,
   onLongPressLink,
   onPressLink,
@@ -314,7 +318,6 @@ function MarkdownRun({
               key={`md-text-${index}`}
               value={run.raw}
               palette={palette}
-              documentDirection={documentDirection}
               selectable={selectable}
               onLongPressLink={onLongPressLink}
               onPressLink={onPressLink}

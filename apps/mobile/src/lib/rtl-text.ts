@@ -121,6 +121,12 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
 export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirection: 'ltr' };
 
 /**
+ * Base direction for copy written right to left: the twin of
+ * `LTR_TEXT_DIRECTION`, naming both spellings for the same reason.
+ */
+export const RTL_TEXT_DIRECTION: TextStyle = { direction: 'rtl', writingDirection: 'rtl' };
+
+/**
  * A field value that names something — a path, a command, an identifier — or
  * that is a number: its characters keep their left-to-right order, and the
  * block sits on the same start edge as the label above it.
@@ -203,7 +209,13 @@ function firstLetter(node: ReactNode): string | undefined {
 const RTL_LETTER =
   /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
 
-const CONTENT_RTL_DIRECTION: TextStyle = { direction: 'rtl', writingDirection: 'rtl' };
+/** The direction a leading letter names, or `undefined` when there is none. */
+function directionOfLetter(letter: string | undefined): TextStyle | undefined {
+  if (letter === undefined) {
+    return undefined;
+  }
+  return RTL_LETTER.test(letter) ? RTL_TEXT_DIRECTION : LTR_TEXT_DIRECTION;
+}
 
 /**
  * Base direction for copy the app did not write — a server's message, a user's
@@ -227,11 +239,17 @@ const CONTENT_RTL_DIRECTION: TextStyle = { direction: 'rtl', writingDirection: '
  * the `Text` itself, so the box still sits where the interface's flexbox puts it.
  */
 export function contentTextDirection(children: ReactNode): TextStyle | undefined {
-  const letter = firstLetter(children);
-  if (letter === undefined) {
-    return undefined;
-  }
-  return RTL_LETTER.test(letter) ? CONTENT_RTL_DIRECTION : LTR_TEXT_DIRECTION;
+  return directionOfLetter(firstLetter(children));
+}
+
+/**
+ * `contentTextDirection` for copy that arrives as a string rather than as a
+ * React child tree — an HTML block's own text, which no element wraps. Same
+ * rule: the copy's own first letter names the block's base direction, and
+ * `undefined` (no letter) leaves the interface's direction.
+ */
+export function contentStringDirection(text: string): TextStyle | undefined {
+  return directionOfLetter(LETTER.exec(text)?.[0]);
 }
 
 /**

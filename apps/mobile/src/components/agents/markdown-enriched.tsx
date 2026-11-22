@@ -1,5 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
-import { I18nManager, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import {
   type AccessibilityLabels,
   EnrichedMarkdownText,
@@ -28,13 +28,10 @@ import {
 import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { getMarkdownHeadingStyles, type MarkdownPalette } from './markdown-palette';
-import { rtlListItems } from './markdown-rtl-list-items';
 
 type MarkdownEnrichedProps = {
   value: string;
   palette: MarkdownPalette;
-  /** Base direction of the document body; see `MarkdownTextProps`. */
-  documentDirection?: 'ltr';
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
@@ -158,7 +155,6 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
 export function MarkdownEnriched({
   value,
   palette,
-  documentDirection,
   selectable,
   onLongPressLink,
   onPressLink,
@@ -210,25 +206,15 @@ export function MarkdownEnriched({
       ),
     [value, images, displayable, t]
   );
-  // Android resolves each paragraph from its own first strong character and
-  // gives a list no alignment, so a bullet's marker and text stay on the
-  // physical left while the heading and every other block name the interface
-  // start edge. The iOS renderer indents a list from the paragraph's own
-  // direction, so only Android needs the mark. A body with its own base
-  // direction wants its markers on the physical left, where it already puts
-  // them.
-  const renderedMarkdown = useMemo(
-    () =>
-      Platform.OS === 'android' && I18nManager.isRTL && documentDirection !== 'ltr'
-        ? rtlListItems(markdown)
-        : markdown,
-    [markdown, documentDirection]
-  );
   return (
     <>
       <EnrichedMarkdownText
         flavor="github"
-        markdown={renderedMarkdown}
+        // The renderer resolves each paragraph from its own first strong
+        // character and draws a list's marker on that paragraph's own leading
+        // edge, so every block of a message follows one rule: nothing here
+        // forces a block to the interface edge, and no mark has to name one.
+        markdown={markdown}
         markdownStyle={markdownStyle}
         accessibilityLabels={accessibilityLabels}
         selectable={selectable}

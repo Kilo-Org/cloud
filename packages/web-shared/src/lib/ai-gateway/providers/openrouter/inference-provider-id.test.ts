@@ -8,6 +8,7 @@ import {
   isVercelUserByokProviderAllowed,
   UserByokProviderIdSchema,
   UserByokTestModels,
+  normalizeInferenceProviderIds,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -176,6 +177,38 @@ describe('inference provider ids', () => {
     expect(getVercelUserByokProviderIdForEndpoint('vertexAnthropic')).toBe('vertex');
     expect(getVercelUserByokProviderIdForEndpoint('vertex')).toBe('vertex');
     expect(getVercelUserByokProviderIdForEndpoint('unsupported')).toBeUndefined();
+  });
+
+  test('lowercases allow-list entries', () => {
+    expect(normalizeInferenceProviderIds(['OpenAI'])).toEqual(['openai']);
+  });
+
+  test('reduces an allow-list entry naming a model to its provider slug', () => {
+    expect(normalizeInferenceProviderIds(['openai/gpt-4o'])).toEqual(['openai']);
+  });
+
+  test('trims allow-list entries', () => {
+    expect(normalizeInferenceProviderIds([' openai ', '\tanthropic'])).toEqual([
+      'openai',
+      'anthropic',
+    ]);
+  });
+
+  test('drops allow-list entries that name no provider', () => {
+    expect(normalizeInferenceProviderIds(['openai', '', '   ', 'anthropic', '/gpt-4o'])).toEqual([
+      'openai',
+      'anthropic',
+    ]);
+  });
+
+  test('keeps the first occurrence of an allow-list entry that differs only in case', () => {
+    expect(normalizeInferenceProviderIds(['OpenAI', 'openai', 'OPENAI/gpt-4o'])).toEqual([
+      'openai',
+    ]);
+    expect(normalizeInferenceProviderIds(['Anthropic', 'openai', 'anthropic'])).toEqual([
+      'anthropic',
+      'openai',
+    ]);
   });
 });
 

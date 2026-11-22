@@ -27,7 +27,13 @@ export function getPaidCreditPolicyPresentation(effectiveAt: string | null, now 
   };
 }
 
-export function resolvePaidCreditPolicy(grant: PaidCreditGrant) {
+export type PaidCreditPolicy = 'settlement' | 'apple_exempt' | 'legacy' | 'one_year';
+
+export function resolvePaidCreditPolicy(grant: PaidCreditGrant): {
+  paid_credit_policy: PaidCreditPolicy;
+  credit_source: PaidCreditSource;
+  expiry_date: string | null;
+} {
   if (grant.source === 'settlement') {
     return { paid_credit_policy: 'settlement', credit_source: grant.source, expiry_date: null };
   }

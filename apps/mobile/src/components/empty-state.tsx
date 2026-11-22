@@ -152,7 +152,11 @@ function EmptyStateBody({
             <Icon size={iconSize} color={iconColor ?? stateIconInk} strokeWidth={iconStrokeWidth} />
           </View>
         )}
-        <View className="items-center gap-1">
+        {/* The reading measure is the full form's alone. In the compact form
+            the band is already short, so the cap would add a line exactly where
+            vertical room is what the compact form buys; a landscape window's
+            content box is wider than the cap anyway. */}
+        <View className={cn('items-center gap-1', !compact && 'max-w-sm')}>
           <Text
             variant="large"
             className={cn('text-center', compact ? compactTitleClassName : undefined)}
@@ -168,7 +172,14 @@ function EmptyStateBody({
           {
             // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
             typeof description === 'string' ? (
-              <Text variant="muted" className="text-center">
+              <Text
+                variant="muted"
+                className="text-center"
+                // The full form's block is capped at `max-w-sm`, so a long
+                // sentence wraps there; greedy wrap would leave one word alone
+                // on the second line. Android-only; iOS ignores the prop.
+                textBreakStrategy="balanced"
+              >
                 {description}
               </Text>
             ) : (
@@ -206,14 +217,28 @@ type StateActionProps = {
   accessibilityLabel?: string;
   /** Extra context a name cannot carry, e.g. what the retry re-reads. */
   accessibilityHint?: string;
+  /** How the action reads where it sits. `primary` is a state surface's one way out
+   *  (the default). `quiet` is the same 48pt compact frame as an outlined control,
+   *  for a content card on a screen that already owns its primary action: two
+   *  brand-filled controls on one screen make the eye choose between them
+   *  (`DESIGN.md` 'one primary action per surface'). */
+  emphasis?: 'primary' | 'quiet';
 };
 
 /**
- * The one way a state's `action` slot is filled: the primary, compact,
- * label-sized button, with its leading icon centred together with the label and
- * the shared 48pt state-action floor. Callers own nothing visual — the slot
- * above owns the gap, and this component owns the style — so no state can
- * invent a full-width, outlined or shadowed way out.
+ * The one way a state's `action` slot is filled: the compact, label-sized
+ * button, with its leading icon centred together with the label and the shared
+ * 48pt state-action floor. Callers own nothing visual — the slot above owns the
+ * gap, and this component owns the style — so no state can invent a full-width
+ * or shadowed way out.
+ *
+ * `emphasis` picks the weight it paints at, not its frame: `primary` (the
+ * default) is a state surface's one way out, on the brand fill; `quiet` is the
+ * same frame as an outlined control, for an action inside a content card on a
+ * screen whose primary action lives elsewhere. Two brand fills on one screen
+ * make the eye choose between them, so the card's way out takes the quiet face
+ * and the screen keeps its one primary (`DESIGN.md` 'one primary action per
+ * surface').
  *
  * `loading` is a busy state, not a different face of the control: the label and
  * its strength never change while the request runs, only the leading icon
@@ -230,20 +255,35 @@ export function StateAction({
   testID,
   accessibilityLabel,
   accessibilityHint,
+  emphasis = 'primary',
 }: Readonly<StateActionProps>) {
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const busy = Boolean(loading);
-  // A busy action keeps its enabled face — the brand fill and the label ink the
+  const quiet = emphasis === 'quiet';
+  // A busy action keeps its enabled face — the fill and the label ink the
   // button paints on it (`Button` never dims or mutes a control that announces
   // busy) — so its mark must take that same ink. The muted ink is only for the
   // disabled face, whose fill is the palette's muted surface; on the brand fill
   // it measures about 1.4:1 and the spinner all but disappears.
-  const markColor = disabled === true && !busy ? mutedDisabledInk : colors.primaryForeground;
+  const showMutedInk = disabled === true && !busy;
+  // The quiet face is an outlined control, whose label ink `Button` paints as
+  // `foreground`; only the leading mark's colour is computed here, so it takes
+  // that same ink, and the primary face keeps the brand fill's contrasting ink.
+  let enabledInk = colors.primaryForeground;
+  if (quiet) {
+    enabledInk = colors.foreground;
+  }
+  const markColor = showMutedInk ? mutedDisabledInk : enabledInk;
   return (
     <Button
       size="sm"
-      className={STATE_ACTION_CLASS}
+      variant={quiet ? 'outline' : 'default'}
+      // The `outline` variant paints `bg-card dark:bg-secondary`, and `--card`
+      // is the same step as the `Card` a quiet action sits on, so the control
+      // would lose its fill in dark. The filled neutral takes a visible step
+      // above that card instead, as `AddCreditsButton`'s quiet face does.
+      className={cn(STATE_ACTION_CLASS, quiet && 'dark:bg-secondary-fill')}
       disabled={Boolean(disabled) || busy}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? label}

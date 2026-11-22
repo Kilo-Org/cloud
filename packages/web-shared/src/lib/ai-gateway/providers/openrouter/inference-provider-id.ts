@@ -1,5 +1,8 @@
 import { DIRECT_BYOK_PROVIDER_IDS } from '@kilocode/worker-utils/direct-byok-model';
 import * as z from 'zod';
+// The canonical provider-slug rule lives in app-shared so the mobile editor and
+// every web read path compare with the same rule.
+import { normalizeInferenceProviderId as normalizeInferenceProviderIdFromAppShared } from '@kilocode/app-shared/organizations/model-access-providers';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -276,13 +279,23 @@ const vercelInferenceProviderIdByOpenRouterId = new Map<string, VercelInferenceP
   Object.entries(openRouterToVercelInferenceProviderMapping)
 );
 
+// The rule itself lives in app-shared; this wrapper keeps the `undefined`
+// overload that callers pass an optional provider tag through.
 export function normalizeInferenceProviderId(providerId: string): string;
 export function normalizeInferenceProviderId(providerId: string | undefined): string | undefined;
 export function normalizeInferenceProviderId(providerId: string | undefined) {
   if (!providerId) return providerId;
-  const slashIndex = providerId.indexOf('/');
-  return (slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId).toLowerCase();
+  return normalizeInferenceProviderIdFromAppShared(providerId);
 }
+
+/**
+ * The canonical form of an allow list of provider slugs: each entry trimmed and
+ * through `normalizeInferenceProviderId`, entries that name no provider dropped,
+ * and the first occurrence of a slug kept. Writers store this form and every
+ * comparison against catalog slugs builds its set from it, so one stored value
+ * means the same provider whatever wrote it.
+ */
+export { normalizeInferenceProviderIds } from '@kilocode/app-shared/organizations/model-access-providers';
 
 export function openRouterToVercelInferenceProviderId(providerId: string): string {
   const normalizedProviderId = normalizeInferenceProviderId(providerId);

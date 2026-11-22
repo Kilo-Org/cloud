@@ -25,14 +25,17 @@ import {
 } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
+import {
+  type TriggerFormFailure,
+  triggerSaveFailure,
+} from '@/lib/cloud-triggers/trigger-save-failure';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { deviceTimeZone } from '@/lib/intl-cache';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
-import { TriggerForm, type TriggerFormFailure } from './trigger-form';
+import { TriggerForm } from './trigger-form';
 
 type TriggerCreateScreenProps = Readonly<{
   organizationId?: string;
@@ -129,8 +132,7 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
         router.replace(triggerDetailHref(created.triggerId, organizationId));
       });
     } catch (error) {
-      const message = readTrpcErrorField(error, 'message') ?? t('common.somethingWentWrong');
-      attempt.fail({ kind: isRetryableTrpcError(error) ? 'retryable' : 'rejected', message });
+      attempt.fail(triggerSaveFailure(error, { mode: 'create', name: draft.name }));
     }
   };
 

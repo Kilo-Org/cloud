@@ -186,6 +186,7 @@ describe('LoginMethodsScreen', () => {
 
     // Two methods: the control is live and states no rule, and no note is drawn.
     expect(github.props.disabled).toBe(false);
+    expect(github.props.accessibilityLabel).toBe('Unlink GitHub');
     expect(github.props.accessibilityHint).toBeUndefined();
     expect(noteTexts(root)).toHaveLength(0);
 
@@ -214,8 +215,10 @@ describe('LoginMethodsScreen', () => {
     }
 
     expect(github.props.disabled).toBe(true);
-    expect(github.props.accessibilityLabel).toBe('Unlink GitHub');
-    expect(github.props.accessibilityHint).toBe(LAST_METHOD);
+    // The name carries the rule: TalkBack never reads a hint, and the caption
+    // under the row still shows the sentence.
+    expect(github.props.accessibilityLabel).toBe(`Unlink GitHub, ${LAST_METHOD}`);
+    expect(github.props.accessibilityHint).toBeUndefined();
     expect(noteTexts(root)).toHaveLength(1);
     // The row's own note owns the sentence, so the status must not repeat it.
     expect(statusMessages(root)).toEqual([null]);
@@ -273,7 +276,8 @@ describe('LoginMethodsScreen', () => {
       throw new Error('missing GitHub unlink button');
     }
     expect(github.props.disabled).toBe(true);
-    expect(github.props.accessibilityHint).toBe(LAST_METHOD);
+    expect(github.props.accessibilityLabel).toBe(`Unlink GitHub, ${LAST_METHOD}`);
+    expect(github.props.accessibilityHint).toBeUndefined();
     expect(noteTexts(renderer.root)).toHaveLength(1);
     expect(statusMessages(renderer.root)).toEqual([null]);
   });

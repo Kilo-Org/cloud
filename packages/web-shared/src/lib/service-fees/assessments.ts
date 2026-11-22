@@ -257,6 +257,7 @@ function normalizeCurrency(currency: string): string {
 function enrichNullableString(
   assessmentKey: string,
   field: string,
+  reason: ServiceFeeAssessmentConflictReason,
   existing: string | null,
   incoming: string | null | undefined
 ): string | null {
@@ -269,13 +270,7 @@ function enrichNullableString(
   if (existing === incoming) {
     return existing;
   }
-  conflict(
-    assessmentKey,
-    field === 'kiloUserId' ? 'owner' : 'stripe_id',
-    field,
-    existing,
-    incoming
-  );
+  conflict(assessmentKey, reason, field, existing, incoming);
 }
 
 function mergeStripeIds(
@@ -298,7 +293,13 @@ function mergeStripeIds(
   if (!incoming) return merged;
 
   for (const field of STRIPE_ID_FIELDS) {
-    merged[field] = enrichNullableString(assessmentKey, field, existing[field], incoming[field]);
+    merged[field] = enrichNullableString(
+      assessmentKey,
+      field,
+      'stripe_id',
+      existing[field],
+      incoming[field]
+    );
   }
   return merged;
 }
@@ -548,6 +549,7 @@ async function mergePreparedAssessment(
   const kiloUserId = enrichNullableString(
     existing.assessmentKey,
     'kiloUserId',
+    'owner',
     existing.kiloUserId,
     decision.kiloUserId
   );

@@ -19,6 +19,7 @@ import {
   getOwnerFromInstallation,
   getModel,
 } from '@/lib/integrations/discord-service';
+import { isPlatformIntegrationActive } from '@/lib/integrations/core/health';
 import { runBot } from '@/lib/bots/core/run-bot';
 import {
   formatGitHubRepositoriesForPrompt,
@@ -297,6 +298,22 @@ export async function processDiscordBotMessage(
       toolCallsMade: [],
       error: 'No Discord installation found',
       installation: null,
+    };
+  }
+
+  // A suspended connection keeps its row, so the message must not reach the model.
+  if (!isPlatformIntegrationActive(installation)) {
+    console.log('[DiscordBot] Refused message for inactive installation', {
+      guildId,
+      integrationStatus: installation.integration_status,
+      suspendedAt: installation.suspended_at,
+    });
+    return {
+      response: '',
+      modelUsed: '',
+      toolCallsMade: [],
+      error: 'installation_not_active',
+      installation,
     };
   }
 

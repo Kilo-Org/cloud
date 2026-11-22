@@ -2956,6 +2956,43 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('keeps a cli-catalog override through an empty-catalog error that retains the catalog', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'error',
+        error: 'Remote model catalog is empty',
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+    });
+
     it('clears remote model state and override immediately when switching sessions', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

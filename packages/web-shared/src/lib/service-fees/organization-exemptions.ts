@@ -129,7 +129,7 @@ export async function setOrganizationServiceFeeExemption(params: {
   now?: Date;
 }): Promise<{
   current: OrganizationServiceFeeExemptionRecord;
-  history: OrganizationServiceFeeExemptionRecord;
+  created: OrganizationServiceFeeExemptionRecord;
 }> {
   const reason = normalizeOrganizationServiceFeeExemptionReason(params.reason);
   const requestedAt = params.now ?? new Date();
@@ -160,6 +160,6 @@ export async function setOrganizationServiceFeeExemption(params: {
       createdAt,
     });
 
-    return { current: exemption, history: exemption };
+    return { current: exemption, created: exemption };
   });
 }

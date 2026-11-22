@@ -2,8 +2,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 
 /**
  * Platforms that share the generic OAuth connect and callback route pair.
- * Each one uses `/api/integrations/<platform>/connect` and
- * `/api/integrations/<platform>/callback`.
+ * Each one serves both routes below `/api/integrations/<platform>`.
  */
 export const STANDARD_OAUTH_PLATFORMS = [
   PLATFORM.DISCORD,
@@ -27,7 +26,14 @@ export type StandardOAuthPlatform = (typeof STANDARD_OAUTH_PLATFORMS)[number];
 export type OAuthConnectPlatform = StandardOAuthPlatform | typeof PLATFORM.BITBUCKET;
 
 /**
- * Returns the connect path for a platform.
+ * The route base the connect and callback paths share, one per platform.
+ */
+function platformIntegrationsBase(platform: OAuthConnectPlatform): string {
+  return `/api/integrations/${platform}`;
+}
+
+/**
+ * Returns the platform's `/connect` path.
  *
  * `organizationId` and `returnTo` are optional. The function leaves an omitted,
  * `undefined` or empty value out of the query. It returns the bare path when
@@ -37,7 +43,7 @@ export function getPlatformOAuthConnectPath(
   platform: OAuthConnectPlatform,
   options: { organizationId?: string; returnTo?: string } = {}
 ): string {
-  const path = `/api/integrations/${platform}/connect`;
+  const path = `${platformIntegrationsBase(platform)}/connect`;
   const { organizationId, returnTo } = options;
 
   const params = new URLSearchParams();
@@ -51,6 +57,9 @@ export function getPlatformOAuthConnectPath(
   return query ? `${path}?${query}` : path;
 }
 
+/**
+ * Returns the platform's `/callback` path, the second half of the pair above.
+ */
 export function getPlatformOAuthCallbackPath(platform: StandardOAuthPlatform): string {
-  return `/api/integrations/${platform}/callback`;
+  return `${platformIntegrationsBase(platform)}/callback`;
 }

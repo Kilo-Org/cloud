@@ -71,6 +71,20 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
   setConnectCtaCollapsed: collapseState.setConnectCtaCollapsed,
 }));
 
+// Mutable so each case answers the caller's organization membership role. The
+// default is a billing role: every case that predates the restriction keeps
+// today's permissive card, and the denial cases lower it explicitly.
+const orgState = vi.hoisted(() => ({ role: 'owner' as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: (organizationId?: string) => ({
+    organizationId,
+    role: orgState.role,
+    org: organizationId === undefined ? null : { organizationId, organizationName: 'Acme' },
+    isResolving: false,
+    isError: false,
+  }),
+}));
+
 /** The rendered Text node holding exactly `copy`, if it is mounted. */
 function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
   // The action label is the row's centre-aligned Text; the card headers carry
@@ -115,6 +129,7 @@ beforeEach(() => {
   resetSelectedBranchOverrides();
   collapseState.collapsedCtas = [];
   collapseState.setConnectCtaCollapsed.mockClear();
+  orgState.role = 'owner';
 });
 
 describe('NewSessionRepositorySection repository picker', () => {
@@ -224,9 +239,207 @@ describe('NewSessionRepositorySection Bitbucket connect card', () => {
   });
 });
 
+describe('NewSessionRepositorySection Bitbucket connect authority', () => {
+  // The connect action is the centre-aligned label inside the provider's
+  // action row (`textNode`), which the card header's copy alone does not match.
+  it('names the roles that can connect instead of offering a refused action', () => {
+    // Every organization Bitbucket connect takes billing authority, so a member
+    // without it gets the restriction instead of a tap that can only end in the
+    // server's refusal, and keeps the refresh that asks the provider again once
+    // someone else connects it.
+    orgState.role = 'member';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
+    // The refresh is the card's only control once the connect action is gone.
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: i18n.t('agentChat.newSession.refreshRepositories'),
+      })
+    ).toBeDefined();
+    // The card keeps its header and its collapsible frame: only the action goes.
+    expect(connectHeader(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(
+      connectHeader(renderer, i18n.t('common.connectBitbucket'))?.props.accessibilityState
+    ).toEqual({ expanded: true });
+  });
+
+  it.each(['admin', 'billing_manager'])('keeps the action for the %s role', role => {
+    orgState.role = role;
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(text).not.toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
+    // The one action row carries this provider's connect action and its refresh.
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
+  });
+
+  it('keeps the action while the membership read has not answered', () => {
+    // An unresolved role is not a verdict, so the card must not withhold an
+    // action the member may hold: it would otherwise offer nothing and then
+    // show the action a request later.
+    orgState.role = undefined;
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    expect(renderedText(renderer)).toContain(
+      i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
+    );
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
+  });
+
+  it('names Bitbucket in the compact row of a member who already selected', () => {
+    // This row has no header, so the copy names the provider instead of relying
+    // on one, and the refresh stays as the only control.
+    orgState.role = 'member';
+    const renderer = mountSection({
+      value: 'github:owner/repo',
+      organizationId: 'org-1',
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketNotConnectedTitle'));
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
+    expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
+  });
+
+  it('names Bitbucket above the reconnect note in a member compact row', () => {
+    // The reconnect sentence's only subject is a pronoun, and this row has no
+    // header, so the row states the provider name on the line above it.
+    orgState.role = 'member';
+    const renderer = mountSection({
+      value: 'github:owner/repo',
+      organizationId: 'org-1',
+      groups: [
+        group('github', 'repos'),
+        { key: 'bitbucket', status: 'connect', rowsUnlisted: true, repositories: [] },
+      ],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
+    expect(text).toContain(i18n.t('prReview.connect.reconnectAdminOnlyDescription'));
+    expect(text).not.toContain(i18n.t('prReview.connect.bitbucketNotConnectedTitle'));
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
+  });
+
+  it('leaves the other providers actionable for a member', () => {
+    orgState.role = 'member';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [group('github', 'connect'), group('gitlab', 'connect')],
+    });
+
+    expect(textNode(renderer, i18n.t('agentChat.newSession.openGithub'))).toBeDefined();
+    expect(textNode(renderer, i18n.t('agentChat.newSession.openGitlab'))).toBeDefined();
+    // One action row per provider, each carrying its connect action and a
+    // refresh.
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(4);
+    expect(renderedText(renderer)).not.toContain(
+      i18n.t('prReview.connect.bitbucketAdminOnlyDescription')
+    );
+  });
+
+  it('asks a member to reconnect a connected workspace instead of connecting it', () => {
+    // `not_connected`, `workspace_selection_required`, `reconnect_required` and
+    // `insufficient_permissions` all map to `connect`, but only the first is a
+    // first connect: the other three are a connected workspace whose answer
+    // still needs a selection or fresh credentials, which `rowsUnlisted`
+    // reports. The note must ask for the reconnect the sheet itself offers.
+    orgState.role = 'member';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [
+        group('github', 'repos'),
+        { key: 'bitbucket', status: 'connect', rowsUnlisted: true, repositories: [] },
+      ],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('prReview.connect.reconnectAdminOnlyDescription'));
+    expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
+    // The header agrees with the note rather than announcing a first connect.
+    expect(
+      connectHeader(renderer, i18n.t('prReview.connect.reconnectTitleBitbucket'))
+    ).toBeDefined();
+    expect(text).not.toContain(i18n.t('common.connectBitbucket'));
+    expect(connectHeader(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(text).not.toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    // No action the server would refuse, and no first-connect copy either.
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: i18n.t('agentChat.newSession.refreshRepositories'),
+      })
+    ).toBeDefined();
+  });
+
+  it('keeps the organizations-only note and action for an admin in that state', () => {
+    // A billing role can reconnect it, so the card keeps its action and the
+    // note that explains why Bitbucket connects for an organization, exactly as
+    // in the first-connect state.
+    orgState.role = 'admin';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [
+        group('github', 'repos'),
+        { key: 'bitbucket', status: 'connect', rowsUnlisted: true, repositories: [] },
+      ],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
+  });
+
+  it('keeps the connect card title for an owner who still cannot select rows', () => {
+    // The reconnect header names a step the reader cannot take, so the
+    // card keeps its first-connect header beside the ask instead.
+    orgState.role = 'owner';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [
+        group('github', 'repos'),
+        { key: 'bitbucket', status: 'connect', rowsUnlisted: true, repositories: [] },
+      ],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
+  });
+});
+
 describe('NewSessionRepositorySection connect card open action', () => {
   it('gives every provider open label the row width and pins it to one line', () => {
     const renderer = mountSection({
+      // Bitbucket offers its action only in an organization scope with a
+      // billing role, so this case mounts one; the default role covers the
+      // authority.
+      organizationId: 'org-1',
       groups: [
         group('github', 'connect'),
         group('gitlab', 'connect'),

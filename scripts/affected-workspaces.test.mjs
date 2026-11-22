@@ -88,7 +88,6 @@ test('documentation and unchecked root paths select nothing', () => {
     'services/leaf/README.md',
     'docs/a.ts',
     '.github/workflows/deploy.yml',
-    'dev/a.ts',
   ]) {
     assert.deepEqual(select([file]).dirs, [], file);
   }
@@ -110,6 +109,39 @@ test('the shared tool helpers are attributed to the app that runs them', () => {
   // this attribution exists to scope.
   assert.deepEqual(select(['tools/lib/source-files.mjs']).packages, ['kilo-app']);
   assert.deepEqual(select(['tools/lib/catalogs.mjs']).packages, ['kilo-app']);
+});
+
+test('the dev scripts the web typecheck reads select the web workspace', () => {
+  // `dev/tsconfig.json` is one of the programs the web typecheck group runs, so a
+  // change to the program or to a file it includes selects that group. The shared
+  // fixture's readers widen `dirs`, as they do for the `scripts/web-env` entry, so
+  // the attribution itself is checked against the web workspace alone.
+  const attributed = file =>
+    selectAffected({
+      items: [workspace('web', 'apps/web')],
+      changedFiles: [file],
+      dependencyDirs: [],
+      references: [],
+    });
+  for (const file of ['dev/discord-gateway-cron.ts', 'dev/tsconfig.json']) {
+    const selection = attributed(file);
+    assert.deepEqual(selection.dirs, ['apps/web'], file);
+    assert.deepEqual(
+      selectGroups({
+        full_checks: selection.full_checks,
+        dirs: selection.dirs,
+        packages: selection.packages,
+      }),
+      { typecheck_groups: ['web'], lint_groups: ['rest'] },
+      file
+    );
+  }
+  assert.deepEqual(selectGroups(select(['dev/discord-gateway-cron.ts'])).typecheck_groups, ['web']);
+  // No program covers the `dev/` subtrees, a file that is not TypeScript, or a
+  // second tsconfig beside the program.
+  for (const file of ['dev/local/infra-env.ts', 'dev/grafana/a.json', 'dev/tsconfig.probe.json']) {
+    assert.deepEqual(select([file]).dirs, [], file);
+  }
 });
 
 test('an unattributable or global change selects everything', () => {

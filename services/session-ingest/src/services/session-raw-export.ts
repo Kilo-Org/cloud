@@ -26,6 +26,10 @@ export const sessionRawExportRequestSchema = z.object({
   // Opaque caller-side identifier for the audit line, so one export can be
   // traced back to the job that asked for it.
   exportId: z.string().min(1).max(128).optional(),
+  // Opt-in cleanup for a session that stores nothing at all: the export resets
+  // the Durable Object's storage instead of leaving an empty object behind.
+  // `false` (the default) keeps the export read-only.
+  deleteIfEmpty: z.boolean().optional(),
 });
 
 export type SessionRawExportRequest = z.infer<typeof sessionRawExportRequestSchema>;
@@ -63,7 +67,7 @@ export async function getSessionRawExport(
 
   const stream = await withDORetry(
     () => getSessionIngestDO(env, { kiloUserId: input.kiloUserId, sessionId: input.sessionId }),
-    stub => stub.exportSessionRowsStream(),
+    stub => stub.exportSessionRowsStream({ deleteIfEmpty: input.deleteIfEmpty === true }),
     'SessionIngestDO.exportSessionRowsStream'
   );
 

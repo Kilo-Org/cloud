@@ -159,10 +159,12 @@ describe('usage publisher', () => {
     expect((await worker.fetch(request(JSON.stringify(event)), env)).status).toBe(202);
     send.mockClear();
     // Compact exponent notation grows when the validated event is reserialized.
+    // `metadata.latency` stays a plain number, so this body passes validation and
+    // the size check is what rejects it.
     const compact = JSON.stringify({
       ...event,
       posthog_distinct_id: event.posthog_distinct_id.slice(3),
-      prior_microdollar_usage: 1e20,
+      metadata: { ...event.metadata, latency: 1e20 },
     }).replace('100000000000000000000', '1e20');
     expect(Buffer.byteLength(compact)).toBeLessThanOrEqual(MAX_USAGE_BYTES);
     expect((await worker.fetch(request(compact), env)).status).toBe(413);

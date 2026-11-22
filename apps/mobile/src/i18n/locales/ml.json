@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} സെഷനുകൾ",
       "sectionAccessibility": "{{title}}: {{displayCount}} സെഷനുകൾ",
       "live": "തത്സമയം",
-      "updating": "അപ്ഡേറ്റ് ചെയ്യുന്നു"
+      "updating": "അപ്ഡേറ്റ് ചെയ്യുന്നു",
+      "retentionLimit": "നിങ്ങളുടെ ഏറ്റവും പുതിയ സെഷനുകൾ കാണിക്കുന്നു."
     },
     "sessionRow": {
       "deleteTitle": "സെഷൻ ഇല്ലാതാക്കണോ?",

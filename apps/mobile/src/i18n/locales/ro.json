@@ -2223,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesiuni",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesiuni",
       "live": "ÎN TIMP REAL",
-      "updating": "Se actualizează"
+      "updating": "Se actualizează",
+      "retentionLimit": "Se afișează cele mai recente sesiuni."
     },
     "sessionRow": {
       "deleteTitle": "Ștergi sesiunea?",

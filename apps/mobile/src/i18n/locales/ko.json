@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: 세션 {{displayCount}}개",
       "sectionAccessibility": "{{title}}: 세션 {{displayCount}}개",
       "live": "실시간",
-      "updating": "업데이트 중"
+      "updating": "업데이트 중",
+      "retentionLimit": "최근 세션을 표시합니다."
     },
     "sessionRow": {
       "deleteTitle": "세션을 삭제할까요?",

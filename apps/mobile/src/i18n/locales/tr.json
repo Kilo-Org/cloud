@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} oturum",
       "sectionAccessibility": "{{title}}: {{displayCount}} oturum",
       "live": "CANLI",
-      "updating": "Güncelleniyor"
+      "updating": "Güncelleniyor",
+      "retentionLimit": "En son oturumlar gösteriliyor."
     },
     "sessionRow": {
       "deleteTitle": "Oturum silinsin mi?",

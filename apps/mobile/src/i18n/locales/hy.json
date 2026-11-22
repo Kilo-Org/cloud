@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} նստաշրջան",
       "sectionAccessibility": "{{title}}: {{displayCount}} նստաշրջան",
       "live": "ԱԿՏԻՎ",
-      "updating": "Թարմացվում է"
+      "updating": "Թարմացվում է",
+      "retentionLimit": "Ցուցադրվում են ամենավերջին նստաշրջանները։"
     },
     "sessionRow": {
       "deleteTitle": "Ջնջե՞լ նստաշրջանը",

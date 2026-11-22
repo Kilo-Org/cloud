@@ -2178,7 +2178,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} సెషన్‌లు",
       "sectionAccessibility": "{{title}}: {{displayCount}} సెషన్‌లు",
       "live": "లైవ్",
-      "updating": "నవీకరిస్తోంది"
+      "updating": "నవీకరిస్తోంది",
+      "retentionLimit": "మీ ఇటీవలి సెషన్‌లు చూపబడుతున్నాయి."
     },
     "sessionRow": {
       "deleteTitle": "సెషన్‌ను తొలగించాలా?",

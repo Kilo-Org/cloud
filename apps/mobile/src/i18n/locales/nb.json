@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} økter",
       "sectionAccessibility": "{{title}}: {{displayCount}} økter",
       "live": "SANNTID",
-      "updating": "Oppdaterer"
+      "updating": "Oppdaterer",
+      "retentionLimit": "Viser de nyeste øktene."
     },
     "sessionRow": {
       "deleteTitle": "Slette økt?",

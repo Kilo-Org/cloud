@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} அமர்வுகள்",
       "sectionAccessibility": "{{title}}: {{displayCount}} அமர்வுகள்",
       "live": "நேரலை",
-      "updating": "புதுப்பிக்கப்படுகிறது"
+      "updating": "புதுப்பிக்கப்படுகிறது",
+      "retentionLimit": "உங்கள் மிகச் சமீபத்திய அமர்வுகள் காட்டப்படுகின்றன."
     },
     "sessionRow": {
       "deleteTitle": "அமர்வை நீக்கவா?",

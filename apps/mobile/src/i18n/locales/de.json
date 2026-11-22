@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} Sitzungen",
       "sectionAccessibility": "{{title}}: {{displayCount}} Sitzungen",
       "live": "IN ECHTZEIT",
-      "updating": "Wird aktualisiert"
+      "updating": "Wird aktualisiert",
+      "retentionLimit": "Es werden die neuesten Sitzungen angezeigt."
     },
     "sessionRow": {
       "deleteTitle": "Sitzung löschen?",

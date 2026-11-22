@@ -2268,7 +2268,8 @@
       "sectionAccessibility_one": "{{title}}, {{displayCount}} session",
       "sectionAccessibility": "{{title}}, {{displayCount}} sessions",
       "sectionAccessibility_other": "{{title}}, {{displayCount}} sessions",
-      "live": "LIVE"
+      "live": "LIVE",
+      "retentionLimit": "Showing your most recent sessions."
     },
     "sessionRow": {
       "deleteTitle": "Delete session?",

@@ -2270,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} relácie",
       "sectionAccessibility": "{{title}}: {{displayCount}} relácie",
       "live": "NAŽIVO",
-      "updating": "Aktualizuje sa"
+      "updating": "Aktualizuje sa",
+      "retentionLimit": "Zobrazujú sa najnovšie relácie."
     },
     "sessionRow": {
       "deleteTitle": "Odstrániť reláciu?",

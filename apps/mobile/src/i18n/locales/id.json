@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesi",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesi",
       "live": "LANGSUNG",
-      "updating": "Memperbarui"
+      "updating": "Memperbarui",
+      "retentionLimit": "Menampilkan sesi terbaru."
     },
     "sessionRow": {
       "deleteTitle": "Hapus sesi?",

@@ -1656,7 +1656,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сеанса",
       "sectionAccessibility": "{{title}}: {{displayCount}} сеанса",
       "live": "В РЕАЛЬНОМ ВРЕМЕНИ",
-      "updating": "Обновление"
+      "updating": "Обновление",
+      "retentionLimit": "Показаны последние сеансы."
     },
     "sessionRow": {
       "deleteTitle": "Удалить сеанс?",

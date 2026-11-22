@@ -2270,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sej",
       "sectionAccessibility": "{{title}}: {{displayCount}} sej",
       "live": "V ŽIVO",
-      "updating": "Posodabljanje"
+      "updating": "Posodabljanje",
+      "retentionLimit": "Prikazane so najnovejše seje."
     },
     "sessionRow": {
       "deleteTitle": "Izbrišem sejo?",

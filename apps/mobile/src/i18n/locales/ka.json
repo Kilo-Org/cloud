@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} სესია",
       "sectionAccessibility": "{{title}}: {{displayCount}} სესია",
       "live": "აქტიური",
-      "updating": "ახლდება"
+      "updating": "ახლდება",
+      "retentionLimit": "ნაჩვენებია თქვენი უახლესი სესიები."
     },
     "sessionRow": {
       "deleteTitle": "სესიის წაშლა?",

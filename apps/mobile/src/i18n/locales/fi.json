@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} istuntoa",
       "sectionAccessibility": "{{title}}: {{displayCount}} istuntoa",
       "live": "REAALIAJASSA",
-      "updating": "Päivitetään"
+      "updating": "Päivitetään",
+      "retentionLimit": "Näytetään uusimmat istunnot."
     },
     "sessionRow": {
       "deleteTitle": "Poistetaanko istunto?",

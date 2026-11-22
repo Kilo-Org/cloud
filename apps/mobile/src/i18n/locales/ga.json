@@ -2317,7 +2317,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seisiún",
       "sectionAccessibility": "{{title}}: {{displayCount}} seisiún",
       "live": "BEO",
-      "updating": "Ag nuashonrú"
+      "updating": "Ag nuashonrú",
+      "retentionLimit": "Taispeántar do sheisiúin is déanaí."
     },
     "sessionRow": {
       "deleteTitle": "An scriosfar an seisiún?",

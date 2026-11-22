@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} session",
       "sectionAccessibility": "{{title}}: {{displayCount}} session",
       "live": "AKTIBO",
-      "updating": "Ina-update"
+      "updating": "Ina-update",
+      "retentionLimit": "Ipinapakita ang iyong mga pinakabagong session."
     },
     "sessionRow": {
       "deleteTitle": "Burahin ang session?",

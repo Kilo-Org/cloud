@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessiya",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessiya",
       "live": "CANLI",
-      "updating": "Yenilənir"
+      "updating": "Yenilənir",
+      "retentionLimit": "Ən son sessiyalarınız göstərilir."
     },
     "sessionRow": {
       "deleteTitle": "Sessiya silinsin?",

@@ -2223,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessions",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessions",
       "live": "EN DIRECTE",
-      "updating": "S'està actualitzant"
+      "updating": "S'està actualitzant",
+      "retentionLimit": "Es mostren les sessions més recents."
     },
     "sessionRow": {
       "deleteTitle": "Vols eliminar la sessió?",

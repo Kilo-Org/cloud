@@ -2270,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} relace",
       "sectionAccessibility": "{{title}}: {{displayCount}} relace",
       "live": "ŽIVĚ",
-      "updating": "Aktualizace"
+      "updating": "Aktualizace",
+      "retentionLimit": "Zobrazují se nejnovější relace."
     },
     "sessionRow": {
       "deleteTitle": "Smazat relaci?",

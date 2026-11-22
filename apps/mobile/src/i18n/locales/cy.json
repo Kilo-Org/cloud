@@ -2364,7 +2364,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesiwn",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesiwn",
       "live": "BYW",
-      "updating": "Yn diweddaru"
+      "updating": "Yn diweddaru",
+      "retentionLimit": "Yn dangos eich sesiynau diweddaraf."
     },
     "sessionRow": {
       "deleteTitle": "Dileu sesiwn?",

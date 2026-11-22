@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 件のセッション",
       "sectionAccessibility": "{{title}}：{{displayCount}} 件のセッション",
       "live": "ライブ",
-      "updating": "更新中"
+      "updating": "更新中",
+      "retentionLimit": "最新のセッションを表示しています。"
     },
     "sessionRow": {
       "deleteTitle": "セッションを削除しますか？",

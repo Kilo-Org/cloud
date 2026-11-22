@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} lotur",
       "sectionAccessibility": "{{title}}: {{displayCount}} lotur",
       "live": "Í RAUNTÍMA",
-      "updating": "Uppfæri"
+      "updating": "Uppfæri",
+      "retentionLimit": "Nýjustu loturnar eru sýndar."
     },
     "sessionRow": {
       "deleteTitle": "Eyða lotu?",

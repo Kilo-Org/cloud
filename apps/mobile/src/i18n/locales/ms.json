@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesi",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesi",
       "live": "LANGSUNG",
-      "updating": "Mengemas kini"
+      "updating": "Mengemas kini",
+      "retentionLimit": "Memaparkan sesi terkini."
     },
     "sessionRow": {
       "deleteTitle": "Padam sesi?",

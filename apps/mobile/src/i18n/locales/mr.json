@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} सत्रे",
       "sectionAccessibility": "{{title}}: {{displayCount}} सत्रे",
       "live": "थेट",
-      "updating": "अपडेट होत आहे"
+      "updating": "अपडेट होत आहे",
+      "retentionLimit": "सर्वात अलीकडची सत्रे दाखवली जात आहेत."
     },
     "sessionRow": {
       "deleteTitle": "सत्र हटवायचे?",

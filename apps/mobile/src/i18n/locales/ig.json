@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} nnọkọ",
       "sectionAccessibility": "{{title}}: {{displayCount}} nnọkọ",
       "live": "NA-AGA UGBU A",
-      "updating": "Na-emelite"
+      "updating": "Na-emelite",
+      "retentionLimit": "Na-egosi nnọkọ gị ndị kachasị ọhụrụ."
     },
     "sessionRow": {
       "deleteTitle": "Hichapụ nnọkọ?",

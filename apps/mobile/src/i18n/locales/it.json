@@ -1602,7 +1602,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioni",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessioni",
       "live": "IN TEMPO REALE",
-      "updating": "Aggiornamento in corso"
+      "updating": "Aggiornamento in corso",
+      "retentionLimit": "Vengono mostrate le sessioni più recenti."
     },
     "sessionRow": {
       "deleteTitle": "Eliminare la sessione?",

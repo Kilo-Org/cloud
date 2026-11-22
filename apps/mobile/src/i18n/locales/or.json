@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ସେସନ୍",
       "sectionAccessibility": "{{title}}: {{displayCount}} ସେସନ୍",
       "live": "ଲାଇଭ୍",
-      "updating": "ଅପଡେଟ୍ ହେଉଛି"
+      "updating": "ଅପଡେଟ୍ ହେଉଛି",
+      "retentionLimit": "ସର୍ବାଧିକ ନୂଆ ସେସନ୍ ଦେଖାଯାଉଛି।"
     },
     "sessionRow": {
       "deleteTitle": "ସେସନ୍ ବିଲୋପ କରିବେ?",

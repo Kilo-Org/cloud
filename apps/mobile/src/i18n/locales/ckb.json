@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} سێشن",
       "sectionAccessibility": "{{title}}: {{displayCount}} سێشن",
       "live": "ڕاستەوخۆ",
-      "updating": "لە نوێکردنەوەدایە"
+      "updating": "لە نوێکردنەوەدایە",
+      "retentionLimit": "نوێترین سێشنەکان پیشان دەدرێن."
     },
     "sessionRow": {
       "deleteTitle": "سێشنەکە بسڕدرێتەوە؟",

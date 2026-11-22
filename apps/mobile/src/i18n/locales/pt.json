@@ -2270,7 +2270,8 @@
       "sectionAccessibility_zero": "{{title}}: {{displayCount}} sessões",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessões",
       "live": "EM TEMPO REAL",
-      "updating": "A atualizar"
+      "updating": "A atualizar",
+      "retentionLimit": "A mostrar as sessões mais recentes."
     },
     "sessionRow": {
       "deleteTitle": "Eliminar sessão?",

@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: စက်ရှင် {{displayCount}} ခု",
       "sectionAccessibility": "{{title}}: စက်ရှင် {{displayCount}} ခု",
       "live": "တိုက်ရိုက်",
-      "updating": "မွမ်းမံနေသည်"
+      "updating": "မွမ်းမံနေသည်",
+      "retentionLimit": "သင့်နောက်ဆုံးရ စက်ရှင်များကို ပြသနေပါသည်။"
     },
     "sessionRow": {
       "deleteTitle": "စက်ရှင်ကို ဖျက်မလား",

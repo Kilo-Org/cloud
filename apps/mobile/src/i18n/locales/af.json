@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessies",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessies",
       "live": "REGSTREEKS",
-      "updating": "Besig om op te dateer"
+      "updating": "Besig om op te dateer",
+      "retentionLimit": "Die mees onlangse sessies word gewys."
     },
     "sessionRow": {
       "deleteTitle": "Skrap sessie?",

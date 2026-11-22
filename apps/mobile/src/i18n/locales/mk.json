@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сесии",
       "sectionAccessibility": "{{title}}: {{displayCount}} сесии",
       "live": "ВО ЖИВО",
-      "updating": "Се ажурира"
+      "updating": "Се ажурира",
+      "retentionLimit": "Се прикажуваат најновите сесии."
     },
     "sessionRow": {
       "deleteTitle": "Да се избрише сесијата?",

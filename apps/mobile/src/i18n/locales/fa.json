@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} نشست",
       "sectionAccessibility": "{{title}}: {{displayCount}} نشست",
       "live": "زنده",
-      "updating": "در حال به‌روزرسانی"
+      "updating": "در حال به‌روزرسانی",
+      "retentionLimit": "جدیدترین نشست‌ها نمایش داده می‌شوند."
     },
     "sessionRow": {
       "deleteTitle": "نشست حذف شود؟",

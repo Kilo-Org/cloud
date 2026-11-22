@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ເຊດຊັນ",
       "sectionAccessibility": "{{title}}: {{displayCount}} ເຊດຊັນ",
       "live": "ສົດ",
-      "updating": "ກຳລັງອັບເດດ"
+      "updating": "ກຳລັງອັບເດດ",
+      "retentionLimit": "ກຳລັງສະແດງເຊດຊັນທີ່ຜ່ານມາຫຼ້າສຸດ."
     },
     "sessionRow": {
       "deleteTitle": "ລຶບເຊດຊັນບໍ?",

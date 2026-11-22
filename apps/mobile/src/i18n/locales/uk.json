@@ -1656,7 +1656,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сеансу",
       "sectionAccessibility": "{{title}}: {{displayCount}} сеансу",
       "live": "НАЖИВО",
-      "updating": "Оновлення"
+      "updating": "Оновлення",
+      "retentionLimit": "Показано ваші найновіші сеанси."
     },
     "sessionRow": {
       "deleteTitle": "Видалити сеанс?",

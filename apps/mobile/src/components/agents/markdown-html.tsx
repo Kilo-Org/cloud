@@ -158,12 +158,16 @@ function htmlDomVisitors(namesBlockDirection: boolean): DomVisitorCallbacks {
         return;
       }
       const directionClass = namesBlockDirection ? blockDirectionClass(element) : undefined;
+      // A direction class the content wrote is always dropped, whether or not
+      // this element names one: a container of blocks must never carry one, and
+      // a block's own class is recomputed from its own text on every parse.
+      const classes = element.attribs.class?.split(/\s+/).filter(Boolean) ?? [];
+      const kept = classes.filter(name => !isDirectionClass(name));
       if (directionClass !== undefined) {
-        const classes = element.attribs.class?.split(/\s+/).filter(Boolean) ?? [];
-        element.attribs.class = [
-          ...classes.filter(name => !isDirectionClass(name)),
-          directionClass,
-        ].join(' ');
+        kept.push(directionClass);
+      }
+      if (kept.length !== classes.length || directionClass !== undefined) {
+        element.attribs.class = kept.join(' ');
       }
     },
   };

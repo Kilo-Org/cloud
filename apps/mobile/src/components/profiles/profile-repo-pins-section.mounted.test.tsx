@@ -24,7 +24,12 @@ type TestBinding = {
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 
 /** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
-type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+};
 
 const h = vi.hoisted(() => ({
   success: vi.fn(),
@@ -206,7 +211,29 @@ describe('ProfileRepoPinsSection', () => {
       | undefined;
     expect(queryError?.variant).toBe('permission');
     expect(queryError?.title).toBeUndefined();
+    // The permission state names who can grant access instead of repeating its
+    // own title.
+    expect(queryError?.message).toBe('Ask an organization owner or admin to grant you access.');
     expect(queryError?.onRetry).toBeUndefined();
+    unmount();
+  });
+
+  it('forbidden: withholds the Pin a repo action on a terminal read', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    // The section names a read failure, so it must not offer the write the
+    // failed read was going to show.
+    expect(
+      findAll(renderer.root, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Pin a repo'
+      )
+    ).toBe(false);
+
     unmount();
   });
 

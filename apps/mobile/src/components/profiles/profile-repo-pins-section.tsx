@@ -188,11 +188,16 @@ export function ProfileRepoPinsSection({
     );
   }
 
+  // A terminal read failure means the section is not showing this profile's
+  // pins at all, so its action and the sheet it opens are withheld: an owner
+  // would otherwise be offered a write over a state that names a read failure.
+  const readErrorTerminal = bindingsQuery.isError && !readError.showRetry;
+
   return (
     <Section
       label={t('profiles.repoBindings.pinnedTitle')}
       actionLabel={t('profiles.repoBindings.pinRepo')}
-      actionHidden={!canManage}
+      actionHidden={!canManage || readErrorTerminal}
       actionDisabled={bind.isPending}
       onActionPress={() => {
         if (!bind.isPending) {
@@ -202,7 +207,7 @@ export function ProfileRepoPinsSection({
     >
       <Text variant="caption">{t('profiles.repoBindings.pinnedDescription')}</Text>
       {body}
-      {pickerOpen ? (
+      {pickerOpen && !readErrorTerminal ? (
         <RepoPickerSheet
           repositories={repoOptions.repositories}
           isLoading={repoOptions.isLoading}

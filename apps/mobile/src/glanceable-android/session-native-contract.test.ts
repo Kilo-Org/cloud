@@ -286,13 +286,24 @@ describe('a post that does not land leaves the card answering the request it sho
     );
   });
 
-  it('retires the superseded ask only after the card is posted, and records it first', () => {
+  it('sweeps before the card is built, then retires the superseded ask after the post', () => {
     const notify = post.indexOf('manager(context).notify(');
+    const legacy = post.indexOf('cancelLegacy(context, card.sessionId, card)');
     const sweep = post.indexOf('sweepRetiring(context, card.sessionId)');
+    const build = post.indexOf('val builder = builder(');
     const retire = post.indexOf('retire(context, card.sessionId, previousApprovalKey)');
     expect(notify, 'post must post the card').toBeGreaterThan(-1);
-    expect(sweep, 'post must sweep an ask a crash left recorded').toBeGreaterThan(notify);
-    expect(retire, 'the superseded ask must be retired').toBeGreaterThan(sweep);
+    expect(legacy, 'post must retire the earlier build first').toBeGreaterThan(-1);
+    expect(sweep, 'post must sweep an ask a crash left recorded').toBeGreaterThan(-1);
+    expect(build, 'post must build the card').toBeGreaterThan(-1);
+    // The earlier build's records are retired first and the recorded asks are
+    // swept next, before this post builds the record of the card it shows: a
+    // key recorded for a later card must not cancel a record this one needs.
+    expect(sweep).toBeGreaterThan(legacy);
+    expect(sweep).toBeLessThan(build);
+    expect(build).toBeLessThan(notify);
+    // The ask this post supersedes is retired only once the newer card landed.
+    expect(retire, 'the superseded ask must be retired').toBeGreaterThan(notify);
     // The record names the ask before cancelling it, so a crash between the two
     // steps leaves it for the next post or teardown.
     const retireBody = body(NOTIFICATIONS, 'private fun retire(');
@@ -301,6 +312,31 @@ describe('a post that does not land leaves the card answering the request it sho
     expect(record, 'retire must record the ask first').toBeGreaterThan(-1);
     expect(cancel).toBeGreaterThan(record);
     expect(retireBody.slice(cancel)).toContain('keys -> keys - approvalKey');
+  });
+
+  it('sweeps a re-ask before the build, so the record its card shows survives', () => {
+    // A re-ask of the same request carries the same record key, so a sweep that
+    // ran after the post could cancel the record the posted card shows.
+    const build = post.indexOf('val builder = builder(');
+    const sweep = post.indexOf('sweepRetiring(context, card.sessionId)');
+    const notify = post.indexOf('manager(context).notify(');
+    expect(build, 'post must build the card').toBeGreaterThan(-1);
+    expect(sweep, 'post must sweep before it builds the card').toBeGreaterThan(-1);
+    expect(sweep).toBeLessThan(build);
+    expect(post.indexOf('sweepRetiring(context, card.sessionId)', notify)).toBe(-1);
+  });
+
+  it('keeps the post alive when a stored entry cannot be read', () => {
+    const askOf = body(NOTIFICATIONS, 'private fun approvalKeyOf(');
+    const attempt = askOf.indexOf('try {');
+    const parse = askOf.indexOf('SessionNotificationCard().apply { fillFromJson(JSONObject(it)) }');
+    const guard = askOf.indexOf('catch (error: JSONException)');
+    expect(attempt, 'the stored entry must be parsed in a guard').toBeGreaterThan(-1);
+    expect(parse, 'the stored entry must be parsed').toBeGreaterThan(attempt);
+    expect(guard, 'an unreadable entry must be caught').toBeGreaterThan(parse);
+    expect(askOf.slice(guard), 'the catch must answer no ask').toMatch(
+      /catch \(error: JSONException\) \{[\s\S]*?\bnull\b/
+    );
   });
 
   it('retires an ask a crash left recorded from the teardown too', () => {

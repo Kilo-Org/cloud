@@ -246,7 +246,9 @@ internal object SessionNotifications {
    * A post that does not land leaves the previous card in the shade, so it
    * leaves that card answering the request it shows: the stored facts go back
    * to it, and the Approve record of the newer ask this call built is dropped
-   * because nothing shows it. The superseded ask's record is retired only after
+   * because nothing shows it. The asks a crash left recorded are swept before
+   * this post builds its own record, so a re-ask of the same request keeps the
+   * record its card shows. The superseded ask's record is retired only after
    * the newer card is posted.
    */
   fun post(context: Context, card: SessionNotificationCard, dismissAfterMs: Long) {
@@ -270,6 +272,12 @@ internal object SessionNotifications {
     // Retire the earlier build's records before this post builds its own, so
     // the retirement can only act on what the earlier build left behind.
     cancelLegacy(context, card.sessionId, card)
+    // Sweep the asks a crash left recorded before this post builds its own
+    // record: a re-ask of the same request carries the same record key, so a
+    // sweep after the post could cancel the record the card just posted shows.
+    // Every recorded key is one a later card superseded, so a sweep here cannot
+    // reach a card still in the shade.
+    sweepRetiring(context, card.sessionId)
     try {
       val builder = builder(context, card.shownAt(nowMs))
       if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
@@ -295,7 +303,6 @@ internal object SessionNotifications {
     // The post landed: record the superseded ask before retiring it, so a
     // process that dies between these two steps cannot leave its record behind
     // with nothing left to name it.
-    sweepRetiring(context, card.sessionId)
     if (previousApprovalKey != null && previousApprovalKey != card.approvalKey) {
       retire(context, card.sessionId, previousApprovalKey)
     }
@@ -402,9 +409,17 @@ internal object SessionNotifications {
     editor.commitOrReport("Cannot restore the followed session card")
   }
 
-  /** The ask one stored card answers, or null when it stores none. */
+  /** The ask one stored card answers, or null when it stores none or cannot be read. */
   private fun approvalKeyOf(stored: String?): String? =
-    stored?.let { SessionNotificationCard().apply { fillFromJson(JSONObject(it)) }.approvalKey }
+    stored?.let {
+      try {
+        SessionNotificationCard().apply { fillFromJson(JSONObject(it)) }.approvalKey
+      } catch (error: JSONException) {
+        // An entry that cannot be read names no ask to keep, and it must not
+        // take the post down before the card is posted.
+        null
+      }
+    }
 
   /**
    * Arm the quiet moment of a Working card, or disarm it for every other card.

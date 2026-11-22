@@ -436,6 +436,9 @@ observable behavior is the same.
   still in the shade. A post that does not land restores the facts of the card
   that is still posted and drops the record of the newer ask, and the
   superseded ask's record is retired only once the newer card is posted.
+- The asks a crash left recorded are swept before the newer card's record is
+  built, so a repeated ask keeps the record the posted card shows, and a stored
+  entry that cannot be read is ignored rather than failing the post.
 
 ### 2026-10-27 -- Android answers keep their own ask, and cards survive a failed write
 

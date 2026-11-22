@@ -176,11 +176,15 @@ const draftSchema = z
   .strip();
 
 /**
- * The problem a failed draft names. Read the issue PATH, never its message: an
- * issue can quote a credential or a custom header.
+ * The problem a failed draft names. Read the issue PATH and its code, never its
+ * message: an issue can quote a credential or a custom header. The only custom
+ * issue at the key's path is the character rule, so a value of the wrong type
+ * still names no field.
  */
 function inputProblem(error: z.ZodError): BackendInputProblem {
-  return error.issues.some(issue => issue.path[0] === 'apiKey') ? 'invalidApiKey' : 'invalidInput';
+  return error.issues.some(issue => issue.code === 'custom' && issue.path[0] === 'apiKey')
+    ? 'invalidApiKey'
+    : 'invalidInput';
 }
 
 export function validateChatBackendDraft(input: unknown): ChatBackendDraft {

@@ -192,6 +192,13 @@ describe('secure backend profiles', () => {
     expect(failure).toBeInstanceOf(store.BackendInputError);
     expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
     expect(failure.message).toBe('invalidInput');
+
+    const wrongType = captureError(() =>
+      store.validateChatBackendDraft({ ...draft, apiKey: 42 })
+    );
+    expect((wrongType as InstanceType<typeof store.BackendInputError>).problem).toBe(
+      'invalidInput'
+    );
   });
 
   it('persists the selected limit field and defaults profiles that predate the setting', async () => {

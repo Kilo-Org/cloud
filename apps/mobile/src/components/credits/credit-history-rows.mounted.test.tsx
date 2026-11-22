@@ -430,6 +430,28 @@ describe('LedgerHistoryRow', () => {
     expect(painted.some(text => text.startsWith('Expired: '))).toBe(false);
     renderer.unmount();
   });
+
+  it('names a paid grant whose stored description is empty', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        description: 'Expired: ',
+        expiry: 'expired',
+        purchase: deductionGrant({
+          is_free: false,
+          credit_source: 'stripe',
+          description: '',
+        }),
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The ledger stores a description the server does not guarantee is
+    // non-empty, and a blank title line reads as a broken row.
+    expect(painted).toContain('Credit purchase');
+    expect(painted).toContain('Expired: Credit purchase');
+    expect(painted.some(text => text.trim() === 'Expired:')).toBe(false);
+    renderer.unmount();
+  });
 });
 
 describe('GrantHistoryRow', () => {

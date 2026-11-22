@@ -92,7 +92,6 @@ vi.mock('@/lib/app-shell-handoff', () => ({
 }));
 const router = vi.hoisted(() => ({ dismissTo: vi.fn(), push: vi.fn() }));
 vi.mock('expo-router', () => ({
-  useSegments: () => ['(app)', 'pr-review', 'github', 'owner', 'repo', '1'],
   usePathname: () => '/pr-review/github/owner/repo/1',
   useRouter: () => router,
   useFocusEffect: (effect: () => undefined | (() => void)) => {

@@ -91,7 +91,6 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.example' }));
 const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
 vi.mock('expo-router', () => ({
-  useSegments: () => ['(app)', 'pr-review', 'gitlab', 'group', 'repo', '3'],
   usePathname: () => '/pr-review/gitlab/group/repo/3',
   useRouter: () => router,
   useFocusEffect: (effect: () => undefined | (() => void)) => {

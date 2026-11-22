@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- The gate renders the connect, wrong-instance and org-only states, each with its own copy, for two providers with different browser hand-offs. */
 import { useQuery } from '@tanstack/react-query';
-import { useSegments } from 'expo-router';
 import { GitMerge, PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -78,9 +77,6 @@ export function ProviderConnectGate({
 }>) {
   const trpc = useTRPC();
   const pushOnce = useSinglePushRoute();
-  // The current route segments: an arm must not tear down a presented sheet
-  // (see `PrReviewGateSurface`).
-  const segments = useSegments();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const scope = useProviderPrScopeOrNull();
@@ -437,9 +433,5 @@ export function ProviderConnectGate({
     return null;
   }
 
-  return (
-    <PrReviewGateSurface arm={renderArm()} segments={segments}>
-      {children}
-    </PrReviewGateSurface>
-  );
+  return <PrReviewGateSurface arm={renderArm()}>{children}</PrReviewGateSurface>;
 }

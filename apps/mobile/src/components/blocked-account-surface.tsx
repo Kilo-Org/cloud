@@ -8,12 +8,15 @@ import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
  * The blocked-account explanation, shaped by the refusal reason the server
  * published.
  *
- * For an account block, Retry re-reads the account over the session that was
- * refused (it does not sign in), so a block lifted server-side dismisses the
- * surface without a sign-out. With no session left (the refresh route's
- * refusal) Contact support is the next step, and the exit only reveals the
- * screen the app has already settled on — the login screen — so it is labelled
- * for that reveal instead of for a sign-out that already happened.
+ * Contact support is the filled action in every state: it is the only step
+ * that can change a block, and the copy says a fresh sign-in cannot. For an
+ * account block, Retry is the outlined secondary below it — it re-reads the
+ * account over the session that was refused (it does not sign in), so a block
+ * lifted server-side dismisses the surface without a sign-out. With no session
+ * left (the refresh route's refusal) nothing is left to re-read, so Retry is
+ * gone and the exit moves up: it only reveals the screen the app has already
+ * settled on — the login screen — so it is labelled for that reveal instead of
+ * for a sign-out that already happened.
  */
 export function BlockedAccountSurface({
   reason,
@@ -27,7 +30,7 @@ export function BlockedAccountSurface({
   reason: AccountBlockedRefusalReason;
   /** False once the refused session is gone: nothing is left to re-read. */
   canRetry: boolean;
-  /** A retry read is in flight; the primary button shows its busy state. */
+  /** A retry read is in flight; the outlined retry shows its busy state. */
   retrying: boolean;
   onRetry: () => void;
   onContactSupport: () => void;
@@ -37,14 +40,18 @@ export function BlockedAccountSurface({
   // Without a session the exit cannot sign out: it clears the explanation and
   // reveals the login screen, so it says what it does.
   const exitLabel = canRetry ? t('common.signOut') : t('common.continue');
+  const description =
+    reason === 'email_domain_blocked'
+      ? t('accountBlocked.domainDescription')
+      : t('accountBlocked.description');
   // A domain refusal is a property of the email domain, not of this account's
-  // state, so a re-read returns the same answer: no Retry in either state, and
-  // Contact support becomes the primary action.
-  if (reason === 'email_domain_blocked') {
+  // state, so a re-read returns the same answer: it gets no retry row, and the
+  // exit takes the secondary slot straight under the support action.
+  if (!canRetry || reason === 'email_domain_blocked') {
     return (
       <BootstrapErrorScreen
         title={t('accountBlocked.title')}
-        description={t('accountBlocked.domainDescription')}
+        description={description}
         primaryLabel={t('accountBlocked.contactSupport')}
         primaryAccessibilityLabel={t('accountBlocked.contactSupport')}
         onPrimaryPress={onContactSupport}
@@ -54,26 +61,20 @@ export function BlockedAccountSurface({
       />
     );
   }
-  const copy = {
-    title: t('accountBlocked.title'),
-    description: t('accountBlocked.description'),
-    secondaryLabel: t('accountBlocked.contactSupport'),
-    secondaryAccessibilityLabel: t('accountBlocked.contactSupport'),
-    onSecondaryPress: onContactSupport,
-    tertiaryLabel: exitLabel,
-    tertiaryAccessibilityLabel: exitLabel,
-    onTertiaryPress: onSignOut,
-  };
-  if (!canRetry) {
-    return <BootstrapErrorScreen {...copy} />;
-  }
   return (
     <BootstrapErrorScreen
-      {...copy}
-      primaryLabel={t('common.retry')}
-      primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
-      onPrimaryPress={onRetry}
-      primaryLoading={retrying}
+      title={t('accountBlocked.title')}
+      description={description}
+      primaryLabel={t('accountBlocked.contactSupport')}
+      primaryAccessibilityLabel={t('accountBlocked.contactSupport')}
+      onPrimaryPress={onContactSupport}
+      secondaryLabel={t('common.retry')}
+      secondaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
+      onSecondaryPress={onRetry}
+      secondaryLoading={retrying}
+      tertiaryLabel={exitLabel}
+      tertiaryAccessibilityLabel={exitLabel}
+      onTertiaryPress={onSignOut}
     />
   );
 }

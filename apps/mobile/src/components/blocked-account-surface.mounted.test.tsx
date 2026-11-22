@@ -89,7 +89,7 @@ describe('BlockedAccountSurface', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   });
 
-  it('offers Retry, Contact support and Sign out in that order while the session exists', async () => {
+  it('leads with Contact support, then Retry and Sign out while the session exists', async () => {
     const onRetry = vi.fn<() => void>();
     const onContactSupport = vi.fn<() => void>();
     const onSignOut = vi.fn<() => void>();
@@ -103,12 +103,20 @@ describe('BlockedAccountSurface', () => {
     });
 
     expect(pressableLabels(renderer.root)).toEqual([
-      RETRY_LABEL,
       CONTACT_SUPPORT_LABEL,
+      RETRY_LABEL,
       SIGN_OUT_LABEL,
     ]);
 
+    // Only the support action carries the filled primary surface; the re-read
+    // is the outlined step below it, because the copy says a fresh sign-in
+    // cannot clear the block.
+    const support = findPressableByAccessibilityLabel(renderer.root, CONTACT_SUPPORT_LABEL);
     const retry = findPressableByAccessibilityLabel(renderer.root, RETRY_LABEL);
+    expect(support.props.className).toContain('bg-primary');
+    expect(support.props.disabled).toBe(false);
+    expect(retry.props.className).toContain('border-input');
+    expect(retry.props.className).not.toContain('bg-primary');
     expect(retry.props.disabled).toBe(false);
     // `retrying` is always a boolean, so the button renders its busy layout
     // in both states and reports `busy: false` while idle.

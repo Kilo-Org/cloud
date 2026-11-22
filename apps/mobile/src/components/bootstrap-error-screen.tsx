@@ -10,8 +10,8 @@ type PrimaryAction = {
   readonly primaryAccessibilityLabel: string;
   readonly onPrimaryPress: () => void;
   /** Shows the primary button's inline spinner and disables it while the
-   *  primary action is in flight. The secondary button stays enabled in all
-   *  states: it is the escape hatch. */
+   *  primary action is in flight. Unless its own caller marks it busy, the
+   *  secondary button stays enabled in all states: it is the escape hatch. */
   readonly primaryLoading?: boolean;
 };
 
@@ -48,6 +48,11 @@ type BootstrapErrorScreenProps = {
   readonly secondaryLabel: string;
   readonly secondaryAccessibilityLabel: string;
   readonly onSecondaryPress: () => void;
+  /** Marks the secondary action in flight: it shows the same inline spinner and
+   *  refuses presses, for a surface whose secondary action is the one that
+   *  re-reads rather than the one that leads. Left unset, the secondary control
+   *  is the escape hatch and never goes busy. */
+  readonly secondaryLoading?: boolean;
 } & (PrimaryAction | NoPrimaryAction) &
   (TertiaryAction | NoTertiaryAction);
 
@@ -61,6 +66,7 @@ export function BootstrapErrorScreen({
   secondaryLabel,
   secondaryAccessibilityLabel,
   onSecondaryPress,
+  secondaryLoading,
   tertiaryLabel,
   tertiaryAccessibilityLabel,
   onTertiaryPress,
@@ -89,6 +95,7 @@ export function BootstrapErrorScreen({
           <Button
             variant="outline"
             size="lg"
+            loading={secondaryLoading}
             onPress={onSecondaryPress}
             accessibilityLabel={secondaryAccessibilityLabel}
           >

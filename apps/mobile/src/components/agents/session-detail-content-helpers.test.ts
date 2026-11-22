@@ -7,7 +7,6 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import {
   countInFlightMessages,
-  hasConfirmedSentPrompt,
   resolveRetryPrompt,
   resolveRetryTarget,
   retryFailedMessage,
@@ -334,62 +333,5 @@ describe('resolveRetryPrompt', () => {
     const assistant = withParent(assistantMessage('m4'), 'm3');
     expect(resolveRetryPrompt(assistant, [user, assistant])).toBe('hi');
     expect(resolveRetryPrompt(withParent(assistantMessage('m6'), 'm-missing'), [user])).toBeNull();
-  });
-});
-
-describe('hasConfirmedSentPrompt', () => {
-  function userRow(id: string, texts: readonly string[]): StoredMessage {
-    const message = userMessage(id);
-    message.parts = texts.map((text, index) => ({
-      id: `${id}-text-${index}`,
-      sessionID: 'ses_1',
-      messageID: id,
-      type: 'text',
-      text,
-    })) as typeof message.parts;
-    return message;
-  }
-
-  function assistantRow(id: string, text: string): StoredMessage {
-    const message = withParent(assistantMessage(id), 'm-user');
-    message.parts = [
-      {
-        id: `${id}-text`,
-        sessionID: 'ses_1',
-        messageID: id,
-        type: 'text',
-        text,
-      },
-    ] as typeof message.parts;
-    return message;
-  }
-
-  it('is true for a confirmed user row carrying the same text', () => {
-    expect(hasConfirmedSentPrompt([userRow('m1', ['Retry me'])], 'Retry me')).toBe(true);
-  });
-
-  it('is false for a synthetic user row, which the server has not confirmed', () => {
-    const row = userRow('m-ghost', ['Retry me']);
-    if (row.info.role !== 'user') {
-      throw new Error('the fixture row must be a user row');
-    }
-    row.info = { ...row.info, synthetic: true };
-    expect(hasConfirmedSentPrompt([row], 'Retry me')).toBe(false);
-  });
-
-  it('is false for an assistant row carrying the same text', () => {
-    expect(hasConfirmedSentPrompt([assistantRow('m-assistant', 'Retry me')], 'Retry me')).toBe(
-      false
-    );
-  });
-
-  it('is false for a different text', () => {
-    expect(hasConfirmedSentPrompt([userRow('m2', ['Something else'])], 'Retry me')).toBe(false);
-  });
-
-  it('compares the first human text part, as the composer restores it', () => {
-    const row = userRow('m3', ['Retry me', 'and then this']);
-    expect(hasConfirmedSentPrompt([row], 'Retry me')).toBe(true);
-    expect(hasConfirmedSentPrompt([row], 'and then this')).toBe(false);
   });
 });

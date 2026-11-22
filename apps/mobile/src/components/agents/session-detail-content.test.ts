@@ -119,10 +119,9 @@ type PendingSendRecord = {
 // record — the ordinary session that never failed a send — and the guard cases
 // swap the implementation so the answer lands after the mount.
 const readPendingSendConfirmations = vi.hoisted(() =>
-  vi.fn<(userId: string, sessionId: string) => Promise<PendingSendRecord>>(async () => ({
-    items: [],
-    complete: true,
-  }))
+  vi.fn<(userId: string, sessionId: string) => Promise<PendingSendRecord>>(() =>
+    Promise.resolve({ items: [], complete: true })
+  )
 );
 // The open gate's verdict the list mock publishes. `true` is the settled open
 // these cases describe; a test that needs the still-measuring window sets it to

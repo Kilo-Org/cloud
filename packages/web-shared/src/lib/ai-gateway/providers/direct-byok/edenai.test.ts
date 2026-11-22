@@ -1,6 +1,6 @@
 import { getAiSdkProvider } from '../model-settings';
 import type { GatewayRequest } from '../openrouter/types';
-import type { TransformRequestContext } from '../types';
+import type { DirectByokTransformRequestContext } from './types';
 import edenai from './edenai';
 
 describe('Eden AI direct BYOK provider', () => {
@@ -22,8 +22,14 @@ describe('Eden AI direct BYOK provider', () => {
       kind: 'chat_completions',
       body: { model: 'test', messages: [], ...body },
     };
+    // The definition reads only the request, but the direct BYOK contract requires the served
+    // model.
+    const context = {
+      request,
+      directByokModel: { id: 'test' },
+    } as DirectByokTransformRequestContext;
 
-    edenai.transformRequest({ request } as TransformRequestContext);
+    edenai.transformRequest(context);
 
     expect(request.body).toMatchObject({ reasoning_effort: expectedEffort });
     expect(request.body).not.toHaveProperty('reasoning');

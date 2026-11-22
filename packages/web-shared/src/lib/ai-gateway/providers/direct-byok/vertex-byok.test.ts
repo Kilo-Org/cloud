@@ -1,8 +1,8 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { GatewayRequest } from '../openrouter/types';
-import { ReasoningDetailsTransform, type TransformRequestContext } from '../types';
+import { ReasoningDetailsTransform } from '../types';
 import { getGoogleServiceAccountAccessToken } from '../../custom-llm/google-service-account';
-import type { DirectByokModel } from './types';
+import type { DirectByokModel, DirectByokTransformRequestContext } from './types';
 import vertexByok, {
   buildGcpVertexUpstream,
   getGcpVertexHost,
@@ -200,7 +200,7 @@ describe('vertexByok definition', () => {
     request: GatewayRequest,
     directByokModel: Readonly<Pick<DirectByokModel, 'id' | 'endpoint'>>,
     model = 'vertex-byok/model'
-  ): TransformRequestContext {
+  ): DirectByokTransformRequestContext {
     return {
       provider: {
         type: 'direct-byok',
@@ -399,32 +399,6 @@ describe('vertexByok definition', () => {
       model: 'vendor-chat-model',
       messages: [{ role: 'user', content: 'hi' }],
       max_tokens: 10,
-    });
-  });
-
-  it('classifies from the requested model when the context has no served model', () => {
-    const context = createContext(
-      {
-        kind: 'chat_completions',
-        body: {
-          model: 'mistral-medium-3',
-          messages: [{ role: 'user', content: 'hi' }],
-          max_completion_tokens: 5,
-          user: 'user-hash',
-        },
-      },
-      { id: 'mistral-medium-3', endpoint: 'openapi' },
-      'vertex-byok/mistral-medium-3'
-    );
-    // A caller that is not the direct BYOK route builds the context without the served model.
-    delete context.directByokModel;
-
-    vertexByok.transformRequest(context);
-
-    expect(context.request.body).toEqual({
-      model: 'mistral-medium-3',
-      messages: [{ role: 'user', content: 'hi' }],
-      max_tokens: 5,
     });
   });
 });

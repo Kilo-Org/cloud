@@ -236,11 +236,9 @@ export default {
   models_dev_id: 'google-vertex',
   transformRequest(context) {
     const { request } = context;
-    // The route passes the served model metadata. A context built anywhere else carries none, and
-    // then the requested `<provider>/<model>` id without its provider prefix classifies the model.
-    const endpoint = getGcpVertexEndpoint(
-      context.directByokModel ?? { id: context.model.slice(context.model.indexOf('/') + 1) }
-    );
+    // The route passes the served model with its endpoint metadata, so the endpoint needs no
+    // classification from the requested model id.
+    const endpoint = getGcpVertexEndpoint(context.directByokModel);
     switch (endpoint) {
       case 'anthropic':
         dropThinkingBlocksOnPrefixMismatch(context);

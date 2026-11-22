@@ -79,6 +79,10 @@ const CHECK_INPUTS = [
 // pattern also covers it.
 const OWNED = [
   [/^scripts\/web-env\//, 'apps/web'],
+  // `dev/tsconfig.json` is one of the programs the web typecheck group runs, so
+  // a change to a file that program includes selects the group that checks it.
+  // The subdirectories stay neutral: no program covers them.
+  [/^dev\/[^/]+\.ts$/, 'apps/web'],
   [/^tools\/(i18n|nativewind)\//, 'apps/mobile'],
   // The shared source walk, syntax tree and catalog helpers every tool above
   // reads: a change there is read by the app's own catalog and class checks,
@@ -102,9 +106,11 @@ const EXTRA_INPUTS = [
   [/^apps\/web\/\.env(\.test)?$/, 'apps/ai-gateway'],
 ];
 
-// Root paths that no typecheck or lint reads. The formatter config belongs here:
-// the ci.yml format-check job runs on every run, so a change to it needs no
-// workspace selection.
+// Root paths that no typecheck or lint reads. OWNED is consulted first, so a
+// file inside one of these roots that a check does read is attributed there (the
+// top-level `dev/` scripts). The formatter config belongs here: the ci.yml
+// format-check job runs on every run, so a change to it needs no workspace
+// selection.
 const NEUTRAL = [
   /\.md$/,
   /^(\.specs|\.plans|docs|dev|\.kilo|\.agents|\.vscode|\.husky|\.cursor|script|\.github|scripts)\//,

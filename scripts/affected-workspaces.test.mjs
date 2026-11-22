@@ -88,7 +88,6 @@ test('documentation and unchecked root paths select nothing', () => {
     'services/leaf/README.md',
     'docs/a.ts',
     '.github/workflows/deploy.yml',
-    'dev/a.ts',
   ]) {
     assert.deepEqual(select([file]).dirs, [], file);
   }
@@ -110,6 +109,33 @@ test('the shared tool helpers are attributed to the app that runs them', () => {
   // this attribution exists to scope.
   assert.deepEqual(select(['tools/lib/source-files.mjs']).packages, ['kilo-app']);
   assert.deepEqual(select(['tools/lib/catalogs.mjs']).packages, ['kilo-app']);
+});
+
+test('the dev scripts the web typecheck reads select the web workspace', () => {
+  // `dev/tsconfig.json` is one of the programs the web typecheck group runs, so a
+  // change to a file it includes selects that group. The shared fixture's readers
+  // widen `dirs`, as they do for the `scripts/web-env` entry, so the attribution
+  // itself is checked against the web workspace alone.
+  const attributed = selectAffected({
+    items: [workspace('web', 'apps/web')],
+    changedFiles: ['dev/discord-gateway-cron.ts'],
+    dependencyDirs: [],
+    references: [],
+  });
+  assert.deepEqual(attributed.dirs, ['apps/web']);
+  const selection = select(['dev/discord-gateway-cron.ts']);
+  assert.deepEqual(
+    selectGroups({
+      full_checks: selection.full_checks,
+      dirs: selection.dirs,
+      packages: selection.packages,
+    }),
+    { typecheck_groups: ['web'], lint_groups: ['rest'] }
+  );
+  // No program covers the `dev/` subtrees or a file that is not TypeScript.
+  for (const file of ['dev/local/infra-env.ts', 'dev/grafana/a.json']) {
+    assert.deepEqual(select([file]).dirs, [], file);
+  }
 });
 
 test('an unattributable or global change selects everything', () => {

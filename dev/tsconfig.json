@@ -7,8 +7,8 @@
   //
   // The `local/` and `seed/` subtrees are deliberately outside this program. They
   // carry long-standing type errors under its settings and need their own
-  // clean-up before they can join it, so they stay covered only by the
-  // `test:dev-local` tsx runs until then.
+  // clean-up before they can join it. Until then `test:dev-local` runs them
+  // through `tsx`, which does not typecheck.
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",

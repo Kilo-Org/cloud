@@ -43,20 +43,19 @@ const SWITCH_BOX_STYLE = {
  * is what keeps its touches inside the row's bounds (Android delivers a touch
  * only inside a parent view).
  */
-export function textActionBoxStyle() {
+function textActionBoxStyle() {
   return { marginVertical: -textActionRowOverhangDp() };
 }
 
 /**
  * The box a placeholder takes when it holds a row's trailing action space
  * before that action is known — a pending read that decides between two
- * buttons. The action's own margin cancels its target down to the row's 27pt
- * content band, so the placeholder lays out on that band instead of the
- * compact button's 36pt frame and the row does not shrink when the read lands.
- * The band is 27pt on both platforms: `textActionTargetDp()` less twice
- * `textActionRowOverhangDp()` is `(44 or 48) - (44 or 48 - 27)`.
+ * buttons. The placeholder holds the compact button's own `sm` frame
+ * (`min-h-[36px]`), so the row does not move when the action's compact button
+ * lands in its place. Explicit px, because NativeWind's rem is 14pt here and
+ * `h-9` would measure 31.5pt against the button's 36pt frame.
  */
-export const TEXT_ACTION_SKELETON_CLASS = 'h-[27px] w-24 rounded-md';
+export const TEXT_ACTION_SKELETON_CLASS = 'h-[36px] w-24 rounded-md';
 
 /**
  * The trailing cell of a row. Every variant shares the row's height, so a mark,
@@ -107,15 +106,14 @@ export type RowTrailingSpec =
       kind: 'node';
       node: ReactNode;
       /**
-       * The cell occupies the platform target in a stacked row: either a
-       * control that carries the target on its own node — the Integrations
-       * hub's outline buttons, which take `textActionTargetClass` and cancel
-       * its overhang with `textActionBoxStyle` — or the placeholder that
-       * reserves the same space so the row does not move when the real cell
-       * lands. A stacked frame must host such a cell at the target, or Android
-       * delivers its touches through the wrapper's 27pt band
+       * The cell must be delivered at the platform target in a stacked row:
+       * either a control that reaches it — through its own box, or through the
+       * compact `hitSlop` the shared `Button` gives its `sm` size — or the
+       * placeholder that reserves the same line so the row does not move when
+       * the real cell lands. A stacked frame must host such a cell at the
+       * target, or Android delivers its touches through the wrapper's band
        * (`rowTargetHostClass`); the flat frame ignores this, because the cell
-       * then overhangs the frame's own padding inside the row's bounds.
+       * then sits inside the row's own padding and its bounds.
        */
       target?: boolean;
     }>

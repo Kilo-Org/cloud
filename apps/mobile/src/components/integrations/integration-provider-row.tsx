@@ -15,11 +15,9 @@ import {
   renderRowTrailing,
   type RowTrailingSpec,
   TEXT_ACTION_SKELETON_CLASS,
-  textActionBoxStyle,
 } from '@/components/ui/row-trailing';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
   canManageProvider,
@@ -110,15 +108,17 @@ export function IntegrationProviderRow({
   let action: RowTrailingSpec | undefined = undefined;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
-    // not landed, so the row holds the button's space instead of guessing.
-    // The placeholder takes the band the action's overhang leaves, so the row keeps
-    // the height it settles at. Where a cell will land, it also reserves the target
-    // on a stacked row: that cell carries the platform target there, and a stacked
-    // line sized to the flat band alone would grow when it lands. The flat frame
-    // ignores the mark, so the band still holds where the row does not stack.
-    // The placeholder reserves the stacked target line only when a cell will
+    // not landed, so the row holds the button's space instead of guessing. The
+    // placeholder holds the compact button's own 36pt frame, which is what the
+    // settled cell lays out, so the row does not move when the read lands.
+    // Where a cell will land, it also marks the line for the target: a stacked
+    // row must host the cell at the platform target, and a stacked line sized
+    // to the cell's compact frame alone would not deliver its touches. The flat
+    // frame ignores the mark, so the row's own padding still holds where the
+    // row does not stack.
+    // The placeholder asks for the stacked target line only when a cell will
     // land: every settled branch is gated on the same permission, so a row
-    // whose viewer cannot disconnect keeps the plain line and does not shrink
+    // whose viewer cannot disconnect keeps the plain line and does not grow
     // when the read lands.
     action = {
       kind: 'node',
@@ -129,15 +129,15 @@ export function IntegrationProviderRow({
     action = canDisconnect
       ? {
           kind: 'node',
-          // The cell is a control whose own box is the platform target, so a
-          // stacked frame hosts it at the target instead of on its 27pt band.
+          // The cell keeps the base's compact label-sized frame; its reach is
+          // the compact button's own `hitSlop`. The mark stays because a
+          // stacked row must host the cell at the target for Android to deliver
+          // its touches instead of clipping them to the row's line.
           target: true,
           node: (
             <Button
               size="sm"
               variant="outline"
-              className={textActionTargetClass()}
-              style={textActionBoxStyle()}
               onPress={onOpenOnWeb}
               accessibilityLabel={namedAction(t('common.manageOnWeb'))}
             >
@@ -150,14 +150,13 @@ export function IntegrationProviderRow({
     action = canDisconnect
       ? {
           kind: 'node',
-          // Target-sized like the web-managed cell: a stacked frame hosts it.
+          // Compact like the web-managed cell, and marked for the same reason:
+          // a stacked frame hosts it at the target.
           target: true,
           node: (
             <Button
               size="sm"
               variant="outline"
-              className={textActionTargetClass()}
-              style={textActionBoxStyle()}
               loading={disconnecting}
               onPress={onDisconnect}
               accessibilityLabel={namedAction(t('integrations.disconnect'))}
@@ -174,14 +173,12 @@ export function IntegrationProviderRow({
     action = canDisconnect
       ? {
           kind: 'node',
-          // Target-sized like the other two cells: a stacked frame hosts it.
+          // Compact like the other two cells, and marked for the same reason.
           target: true,
           node: (
             <Button
               size="sm"
               variant="outline"
-              className={textActionTargetClass()}
-              style={textActionBoxStyle()}
               loading={retryingConnection}
               onPress={onRetryConnection}
               accessibilityLabel={namedAction(t('common.retry'))}
@@ -228,10 +225,10 @@ export function IntegrationProviderRow({
       subtitle={subtitle}
       subtitleNumberOfLines={1}
       trailing={action === undefined ? undefined : renderRowTrailing(action)}
-      // The cell occupies the platform target in a stacked row, so a stacked
-      // frame must host it at the target: an outline cell carries the target on
-      // its own node, a text action (Connect) carries it on its pressable, and
-      // the pending placeholder reserves that same line.
+      // The cell must reach the platform target in a stacked row, so a stacked
+      // frame must host it there: an outline cell reaches it through its
+      // compact button's `hitSlop`, a text action (Connect) through its own
+      // pressable, and the pending placeholder reserves that same line.
       trailingIsTarget={
         action?.kind === 'action' || (action?.kind === 'node' && action.target === true)
       }

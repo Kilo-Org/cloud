@@ -4,18 +4,16 @@
 // action. Four filled primary buttons on one screen read as four primary
 // actions, which the layout contract allows one of, so the row keeps the
 // action in its trailing cell and nothing else acts.
-//
-// Installed and pending rows stay inert: their action is destructive, or not
-// known yet.
 
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TEXT_ACTION_SKELETON_CLASS } from '@/components/ui/row-trailing';
 import {
+  COMPACT_BUTTON_HIT_SLOP,
+  tapTargetReachDp,
   textActionRowOverhangDp,
   textActionTargetClass,
-  textActionTargetDp,
   TOUCH_TARGET_DP,
   TOUCH_TARGET_OVERHANG_DP,
 } from '@/lib/a11y/tap-target';
@@ -83,6 +81,16 @@ function integrationRow(overrides: Partial<IntegrationRow> = {}): IntegrationRow
 }
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+/** The shared `Button`'s `sm` size class list (`button.tsx`). */
+const COMPACT_BUTTON_CLASS = 'min-h-[36px] rounded-md px-3 py-1.5';
+
+/** The height a class list compiles to through the app's own theme, in dp. */
+async function compiledBoxHeight(className: string): Promise<number | undefined> {
+  type Box = { height?: number; minHeight?: number };
+  const box = Object.assign({}, ...((await compiledDimensions(className)) as Box[])) as Box;
+  return box.minHeight ?? box.height;
+}
 
 function renderRow(props: {
   row: IntegrationRow;
@@ -249,7 +257,7 @@ describe('IntegrationProviderRow action cell', () => {
     { scope: 'organization' as const, role: 'member', trailingIsTarget: false },
   ])(
     'holds the action cell while the connections read has not landed ($scope)',
-    ({ scope, role, trailingIsTarget }) => {
+    async ({ scope, role, trailingIsTarget }) => {
       const root = renderRow({
         row: integrationRow({ actionPending: true }),
         scope,
@@ -258,20 +266,18 @@ describe('IntegrationProviderRow action cell', () => {
 
       expect(controls(root)).toHaveLength(0);
       expect(root.findAllByType('Skeleton')).toHaveLength(1);
-      // The settled row's button cancels its target's overhang out of the frame,
-      // so the cell lays out on the row's 27pt content band; the placeholder
-      // takes that same band instead of the 36pt frame it used to hold, so the
-      // row does not shrink when the read lands.
+      // The settled cell is the shared compact button's own `sm` frame, so the
+      // placeholder holds that same height and the row does not move when the
+      // read lands. Both heights are compiled, not compared as strings:
+      // NativeWind's rem is 14pt, so `h-9` would reserve 31.5pt, not 36pt.
       expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(TEXT_ACTION_SKELETON_CLASS);
-      expect(TEXT_ACTION_SKELETON_CLASS).toContain('h-[27px]');
+      const buttonHeight = await compiledBoxHeight(COMPACT_BUTTON_CLASS);
+      expect(await compiledBoxHeight(TEXT_ACTION_SKELETON_CLASS)).toBe(buttonHeight);
       // The placeholder is not a control, and it must hold the same stacked line
-      // the settled target takes — but only where a cell lands: the real cell
-      // carries the platform target on a stacked row, and a line sized to the
-      // flat band alone would grow when the read lands. A row whose viewer
-      // cannot disconnect settles without a cell, so its placeholder stays off
-      // the target and the line keeps its 30pt icon tile. The flat frame ignores
-      // the mark, so the band the placeholder exists for still holds where the
-      // row does not stack.
+      // the settled cell takes — but only where a cell lands: a stacked frame
+      // hosts the cell at the platform target so Android delivers its reach. A
+      // row whose viewer cannot disconnect settles without a cell, so its
+      // placeholder stays off the target and the line keeps its 30pt tile.
       expect(sharedRow(root).props.trailingIsTarget).toBe(trailingIsTarget);
     }
   );
@@ -294,10 +300,10 @@ describe('IntegrationProviderRow action cell', () => {
     );
   });
 
-  // The outline buttons rendered their `sm` 36pt frame, a box a control-size
-  // audit reads under the 44pt the design requires and under Android's 48dp
-  // minimum. Each takes the platform target on its own node and cancels the
-  // overhang out of the row, so the frame keeps the height its neighbours have.
+  // The outline buttons keep the base's compact `sm` frame and reach the design
+  // target through the shared `Button`'s own `sm` `hitSlop` (5pt a side), not
+  // through a taller box: a full-height box filled each row and outweighed the
+  // integration names beside it.
   it.each<{ name: string; row: Partial<IntegrationRow> }>([
     { name: 'manage on the web', row: { installed: true, webManaged: true } },
     {
@@ -313,7 +319,7 @@ describe('IntegrationProviderRow action cell', () => {
       name: 'retry',
       row: { provider: 'bitbucket', installed: true, canDisconnectNatively: false },
     },
-  ])('gives the $name button the platform touch target on the row band', async ({ name, row }) => {
+  ])('keeps the $name button compact and reaching the target by hitSlop', async ({ name, row }) => {
     const root = renderRow({
       row: integrationRow(row),
       scope: 'organization',
@@ -324,25 +330,26 @@ describe('IntegrationProviderRow action cell', () => {
       throw new Error(`the ${name} row rendered no button`);
     }
 
-    expect(button.props.className).toBe(textActionTargetClass());
-    const style: unknown = button.props.style;
-    if (typeof style !== 'object' || style === null) {
-      throw new Error(`the ${name} button carries no style`);
-    }
-    const margin: unknown = 'marginVertical' in style ? style.marginVertical : undefined;
-    expect(margin).toBe(-textActionRowOverhangDp());
+    // The compact base frame, exactly as the shared `Button` renders `sm`: no
+    // height class of the row's own and no negative margin cancelling an
+    // overhang, so the cell stays label-sized instead of filling the row.
+    expect(button.props.size).toBe('sm');
+    expect(button.props.className).toBeUndefined();
+    expect(button.props.style).toBeUndefined();
 
-    // The cell is the row's only target-sized control, and the row marks it as
-    // such: without that, a stacked frame lays the wrapper out on the row's
-    // 27pt band and Android delivers the button's touches through 27pt, while a
-    // control-size audit still reads the button's own 44/48pt rect.
+    // The reach still clears the design target: the shared `Button`'s `sm` class
+    // list (`COMPACT_BUTTON_CLASS`) compiled through the app's own theme, plus
+    // the `hitSlop` the button gives every `sm` pressable.
+    const reach = tapTargetReachDp(
+      (await compiledBoxHeight(COMPACT_BUTTON_CLASS)) as number,
+      COMPACT_BUTTON_HIT_SLOP.top
+    );
+    expect(reach).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+
+    // The cell still marks the line for the target: without that, a stacked frame
+    // lays the wrapper out on the row's band and Android delivers its touches
+    // through it, however far the `hitSlop` reaches.
     expect(sharedRow(root).props.trailingIsTarget).toBe(true);
-
-    const declarations = (await compiledDimensions(button.props.className as string)) as {
-      minHeight?: number;
-    }[];
-    const box = Object.assign({}, ...declarations) as { minHeight: number };
-    expect(box.minHeight).toBe(textActionTargetDp());
   });
 
   it('offers the failed connection read again on an installed row it cannot name', () => {

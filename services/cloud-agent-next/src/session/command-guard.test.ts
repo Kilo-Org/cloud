@@ -477,6 +477,9 @@ describe('security-remediation push command guard policy', () => {
       "git push\t'--force'",
       'git push\t"--force"',
       "git push 'origin +main'",
+      'git push origin "+main"',
+      "git push origin '+main'",
+      'git push\t"+main"',
       'git config remote.origin.mirror true',
       'git -C . config remote.origin.mirror true',
     ]) {

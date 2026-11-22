@@ -2622,7 +2622,111 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: 'abc123 feat: add feature',
+        message: 'abc123 · feat: add feature',
+      });
+    });
+
+    it('keeps only the subject of a message that has a body', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+
+      expect(state.getStatus()).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: 'aaaaaaa · Actual commit',
+        commitHash: localCommit.commitHash,
+      });
+    });
+
+    it('bounds a long subject to 72 code points and marks the cut', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...localCommit,
+        commitMessage: 'x'.repeat(200),
+      });
+
+      expect(state.getStatus()).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: `aaaaaaa · ${'x'.repeat(72)}…`,
+        commitHash: localCommit.commitHash,
+      });
+    });
+
+    it('marks a server-truncated single-line message as cut', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...localCommit,
+        commitMessage: 'fix: single line',
+        commitMessageTruncated: true,
+      });
+
+      expect(state.getStatus()).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: 'aaaaaaa · fix: single line…',
+        commitHash: localCommit.commitHash,
+      });
+    });
+
+    it('adds no cut mark when only the body of a multi-line message was truncated', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...localCommit,
+        commitMessageTruncated: true,
+      });
+
+      expect(state.getStatus()).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: 'aaaaaaa · Actual commit',
+        commitHash: localCommit.commitHash,
+      });
+    });
+
+    it('shows the short hash alone when the message is empty', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...localCommit,
+        commitHash: 'b'.repeat(64),
+        commitMessage: '',
+      });
+
+      expect(state.getStatus()).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: 'bbbbbbb',
+        commitHash: 'b'.repeat(64),
+      });
+    });
+
+    it('shows the subject alone when the event carries no hash', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'autocommit_completed',
+        messageId: 'msg-1',
+        success: true,
+        commitMessage: 'feat: subject only\n\nbody',
+      });
+
+      expect(state.getStatus()).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: 'feat: subject only',
       });
     });
 

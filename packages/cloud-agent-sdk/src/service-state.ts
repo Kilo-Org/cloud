@@ -55,6 +55,23 @@ function utf8Tail(text: string, maxBytes: number): { text: string; truncated: bo
   return { text: new TextDecoder().decode(bytes.subarray(start)), truncated: true };
 }
 
+const SHORT_COMMIT_HASH_LENGTH = 7;
+const AUTOCOMMIT_SUBJECT_MAX_CHARS = 72;
+
+/** The first line of a commit message, trimmed, or undefined when it is blank. */
+function commitSubject(commitMessage: string): string | undefined {
+  const firstLine = commitMessage.split('\n', 1)[0] ?? '';
+  const subject = (firstLine.endsWith('\r') ? firstLine.slice(0, -1) : firstLine).trim();
+  return subject.length === 0 ? undefined : subject;
+}
+
+/** Bound a subject to whole code points so an emoji pair is never split. */
+function boundCommitSubject(subject: string): { subject: string; truncated: boolean } {
+  const codePoints = Array.from(subject);
+  if (codePoints.length <= AUTOCOMMIT_SUBJECT_MAX_CHARS) return { subject, truncated: false };
+  return { subject: codePoints.slice(0, AUTOCOMMIT_SUBJECT_MAX_CHARS).join(''), truncated: true };
+}
+
 /**
  * Keep a known goal reason when a later update for the same session carries the
  * same goal without one. The CLI reports a terminal goal (complete/blocked)
@@ -835,12 +852,28 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       );
     }
     if (event.success || commitHash) {
-      const parts = [event.commitHash, event.commitMessage].filter(Boolean);
-      const message = parts.length > 0 ? parts.join(' ') : 'Committed';
+      // The line is one status row rendered verbatim by web and mobile, so it
+      // carries the short hash and the bounded subject only: the full hash
+      // already rides the structured commitHash, and a 16 KiB message must not
+      // stretch the row.
+      const shortHash = event.commitHash?.slice(0, SHORT_COMMIT_HASH_LENGTH);
+      const rawSubject =
+        event.commitMessage === undefined ? undefined : commitSubject(event.commitMessage);
+      const bounded = rawSubject === undefined ? undefined : boundCommitSubject(rawSubject);
+      // A cut by our bound, or a server cut of a message that holds no newline,
+      // both fell inside the subject; a cut body after a newline is invisible.
+      const cutSubject =
+        bounded !== undefined &&
+        (bounded.truncated ||
+          (event.commitMessageTruncated === true && !(event.commitMessage ?? '').includes('\n')));
+      const parts = [shortHash, bounded?.subject].filter(
+        (part): part is string => part !== undefined && part.length > 0
+      );
+      const base = parts.length === 0 ? 'Committed' : parts.join(' · ');
       status = {
         type: 'autocommit',
         step: 'completed',
-        message,
+        message: cutSubject ? `${base}…` : base,
         ...(commitHash ? { commitHash } : {}),
         ...(parts.length === 0 ? { code: 'committed' } : {}),
       };

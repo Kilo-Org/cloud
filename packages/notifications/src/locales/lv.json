@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Jauns drošības atradums ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritisks",
+      "high": "Augsts",
+      "medium": "Vidējs",
+      "low": "Zems"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA brīdinājums"
     },

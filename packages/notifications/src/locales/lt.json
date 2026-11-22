@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Naujas saugumo radinys ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritinis",
+      "high": "Aukštas",
+      "medium": "Vidutinis",
+      "low": "Žemas"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA įspėjimas"
     },

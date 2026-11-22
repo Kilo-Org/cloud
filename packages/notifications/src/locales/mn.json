@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Шинэ аюулгүй байдлын олдолт ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Ноцтой",
+      "high": "Өндөр",
+      "medium": "Дунд",
+      "low": "Бага"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA анхааруулга"
     },

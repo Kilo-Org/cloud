@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Sabon binciken tsaro ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Mai tsanani",
+      "high": "Babba",
+      "medium": "Matsakaici",
+      "low": "Ƙarami"
+    },
     "securityFindingSlaWarning": {
       "title": "Faɗakarwar SLA"
     },

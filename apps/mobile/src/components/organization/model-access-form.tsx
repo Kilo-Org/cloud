@@ -139,7 +139,16 @@ export function ModelAccessForm({
   if (synced !== form) {
     setForm(synced);
   }
-  const { baseline, draft } = form;
+  // A role that fails the manage check mid-session — a refetch delivering a
+  // demotion — turns the screen read-only without remounting it, and the screen
+  // must then present the organization's saved policy alone. So the displayed
+  // draft is the saved one for that viewer while `form.draft` keeps the person's
+  // edits untouched: Save is disabled and `onSave` refuses, the draft is clean
+  // so Cancel is disabled and no viewer press can clear the account's stored
+  // copy, and a role that comes back within the same mount shows the edits again
+  // instead of discarding them.
+  const { baseline } = form;
+  const draft = canEdit ? form.draft : baseline;
 
   // The lists also live in the account-scoped encrypted store: a device language
   // change that flips the text direction reloads the bundle, which kills this
@@ -159,8 +168,17 @@ export function ModelAccessForm({
   const touchedRef = useRef(false);
   const restoredRef = useRef(false);
   const restoredDraft = formDraft.kind === 'ready' ? formDraft.value : null;
+  // A viewer who may not manage the organization never adopts a stored draft.
+  // The displayed list is already the saved baseline for that viewer, and this
+  // gate keeps `form.draft` clean too, so a role that returns within the same
+  // mount shows the person's own edits rather than a stored draft written under
+  // a viewer. The stored value stays where it is instead of being cleared: it is
+  // the account's own unfinished work from a session that held the role, a
+  // person may hold it again, and the durable draft exists to survive exactly
+  // that reload. Nothing is lost for the viewer, who reads the saved policy, and
+  // the next editor mount restores the draft as before.
   useEffect(() => {
-    if (restoredDraft === null || touchedRef.current || restoredRef.current) {
+    if (!canEdit || restoredDraft === null || touchedRef.current || restoredRef.current) {
       return;
     }
     restoredRef.current = true;
@@ -173,7 +191,9 @@ export function ModelAccessForm({
       draft: restoredDraft,
       providerListEdited: providerListEditedBy(previous, restoredDraft),
     }));
-  }, [restoredDraft]);
+    // The role is a dependency too: a draft that lands while the role is still
+    // unknown restores once the role arrives and says this person may edit.
+  }, [canEdit, restoredDraft]);
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
@@ -206,7 +226,10 @@ export function ModelAccessForm({
   });
   const blockingIssue =
     savePayload.kind === 'ready' ? null : t(BLOCKING_ISSUE_KEYS[savePayload.kind]);
-  const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
+  // A viewer who may not manage the organization cannot write, so Save is
+  // disabled for the same reason the two lists are; the rest of the reading —
+  // a clean draft, a save in flight, a refused payload — holds either way.
+  const cannotSave = !canEdit || !dirty || saving || savePayload.kind !== 'ready';
   const noticeFacts = { catalogUnavailable, catalogProvidersEmpty, providersEmpty };
   const noticeKey = providerDataNotice(noticeFacts);
   const notice = noticeKey === null ? null : t(noticeKey);
@@ -224,7 +247,9 @@ export function ModelAccessForm({
   };
 
   const onSave = async () => {
-    if (savePayload.kind !== 'ready') {
+    // The disabled control already refuses a viewer's press; this guard keeps a
+    // stale one from reaching the mutation.
+    if (!canEdit || savePayload.kind !== 'ready') {
       return;
     }
     const attempt = begin();

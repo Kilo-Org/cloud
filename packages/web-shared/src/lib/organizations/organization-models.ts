@@ -77,9 +77,12 @@ export async function getAvailableModelsForOrganization(
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
   // `getOrganizationByokProviderIds` and `getAllowedDirectByokCatalogModelIds` read the
-  // replica on purpose even when the caller injects `fromDb`, so the returned catalog
-  // mixes connections. BYOK key state only tags availability and decides no membership or
-  // entitlement, so replica lag delays a tag rather than granting access.
+  // replica on purpose even when the caller injects `fromDb`, so the returned catalog mixes
+  // connections: in the web app, where `fromDb` is the primary, a key that was just disabled
+  // can keep its model listed until the replica catches up. Both values only shape this list,
+  // and inference re-resolves the policy and the keys per request, so the lag cannot change
+  // what a request may use. Threading `fromDb` would instead put both reads on the primary for
+  // list data alone.
   const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
     getEnhancedOpenRouterModels({ countryCode, fromDb }),
     getOrganizationByokProviderIds(readDb, organizationId),

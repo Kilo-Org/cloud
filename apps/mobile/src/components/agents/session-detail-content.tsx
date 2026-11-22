@@ -1922,16 +1922,20 @@ export function SessionDetailContent({
     }
   }, [manager, t]);
 
-  // The model chip's Retry for an empty catalog. A remote session's catalog is
-  // the CLI's model list, so the ask goes back through the connection; every
-  // other session lists the gateway catalog, which is the query the chip reads.
+  // The chip's Retry for an empty catalog. The chip lists whichever catalog its
+  // source projects: a v1 CLI answer is re-asked through the connection, and a
+  // legacy session's rows come from the gateway catalog, which the CLI cannot
+  // refresh.
   const handleRetryModels = useCallback(() => {
-    if (activeSessionType === 'remote') {
+    if (
+      sessionModels.source === 'remote-cli-catalog' ||
+      sessionModels.source === 'remote-unavailable'
+    ) {
       manager.retryRemoteModels();
     } else {
       void refetchCatalog();
     }
-  }, [activeSessionType, manager, refetchCatalog]);
+  }, [manager, refetchCatalog, sessionModels.source]);
 
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {

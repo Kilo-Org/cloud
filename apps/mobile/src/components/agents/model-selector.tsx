@@ -257,9 +257,11 @@ export function ModelSelector({
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
   const catalogEmpty = pickerOptions.length === 0;
-  // An empty catalog has no value to name, so the pill states the state itself
-  // in the value slot; the spoken name reads the same words.
-  const shownLabel = catalogEmpty ? t('common.noModelsAvailable') : label;
+  // The pill names the model it still has: a session keeps its stored model
+  // while the catalog read fails, so only a pill with nothing chosen states the
+  // empty catalog in the value slot. The empty state rides the spoken name and
+  // the sheet for a named model.
+  const shownLabel = catalogEmpty && nothingChosen ? t('common.noModelsAvailable') : label;
   const chipParts = [
     shownLabel,
     collectsData ? freeModelDataLabel() : undefined,
@@ -281,13 +283,18 @@ export function ModelSelector({
   // The chip names one model, so it states that model's state. Every option
   // being unavailable is therefore not what decides the announcement.
   const selectedUnavailable = selectedModel?.unavailable === true;
-  // The empty catalog states itself in the pill's value and keeps the press so
-  // the picker can offer Retry; a locked or disabled composer still refuses.
-  const chipDisabled = disabled;
+  // An empty catalog keeps the press so the picker can offer its Retry, even
+  // under a composer disabled by that same failed read; a chip that is locked
+  // to an agent model keeps refusing.
+  const chipDisabled = disabled && !(catalogEmpty && lockLabel === undefined);
   const accessibilityLabel = [
     // "Not selected" alone would not say what is not selected.
     nothingChosen ? t('common.model') : undefined,
     spokenModel,
+    // The pill names the model it still has, so an empty catalog is spoken here
+    // rather than drawn over that name. A pill with nothing chosen already
+    // draws the words, so it does not say them twice.
+    catalogEmpty && !nothingChosen ? t('common.noModelsAvailable') : undefined,
     selectedUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
     lockLabel && disabled
       ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel })

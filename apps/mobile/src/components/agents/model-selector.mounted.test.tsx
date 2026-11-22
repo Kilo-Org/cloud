@@ -685,6 +685,60 @@ describe('ModelSelector chip availability disclosure', () => {
     expect(routerPush).toHaveBeenCalledTimes(1);
   });
 
+  // A cloud-agent or read-only session keeps its stored model while the
+  // gateway catalog read fails, so `options: []` with a chosen value is the
+  // common failed-read state: the pill must keep naming that model instead of
+  // claiming nothing is available.
+  it('keeps naming a chosen model whose catalog came back empty', () => {
+    const renderer = renderSelector({ value: 'gone-vendor/retired-model', options: [] });
+    const pill = chip(renderer);
+    const texts = textStrings(renderer.root);
+    const emptyCopy = i18n.t('common.noModelsAvailable');
+
+    expect(texts).toContain('retired model');
+    expect(texts).not.toContain(emptyCopy);
+    // The empty state still has to reach a screen reader, which reads the
+    // model's own name as well.
+    const label = String(pill.props.accessibilityLabel);
+    expect(label).toContain('retired model');
+    expect(label).toContain(emptyCopy);
+    expect(pill.props.disabled).toBe(false);
+  });
+
+  // A composer disables its chip exactly when the models read failed, so a
+  // disabled chip over an empty catalog would hide the sheet's Retry.
+  it('keeps an empty catalog pressable under a disabled composer', () => {
+    routerPush.mockClear();
+    const renderer = renderSelector({ options: [], disabled: true });
+    const pill = chip(renderer);
+
+    expect(pill.props.disabled).toBe(false);
+    expect(pill.props.accessibilityState).toEqual({ disabled: false });
+
+    TestRenderer.act(() => {
+      const press = pill.props.onPress as (() => void) | undefined;
+      press?.();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an empty catalog locked on an agent-pinned chip', () => {
+    routerPush.mockClear();
+    const renderer = renderSelector({ options: [], disabled: true, lockLabel: 'Reviewer' });
+    const pill = chip(renderer);
+
+    expect(pill.props.disabled).toBe(true);
+    expect(pill.props.accessibilityState).toEqual({ disabled: true });
+
+    TestRenderer.act(() => {
+      const press = pill.props.onPress as (() => void) | undefined;
+      press?.();
+    });
+
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
   it('draws a lock marker beside a locked chip and keeps its value at full contrast', () => {
     const option = cliCatalogOption({ name: 'Minimax M2.5' });
     const renderer = renderSelector({

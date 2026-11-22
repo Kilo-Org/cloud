@@ -156,8 +156,8 @@ describe('session state transitions', () => {
 
     mockWs.onclose?.({ code: 1008, reason: 'unauthorized', wasClean: false } as CloseEvent);
 
-    // refreshAuthAndReconnect: await refreshTicket() (1 tick for the resolved promise
-    // wrapping getTicket), then connectInternal creates a new WebSocket
+    // The single-flight refresh: await refreshTicket() (1 tick for the resolved
+    // promise wrapping getTicket), then connectInternal creates a new WebSocket
     await Promise.resolve(); // refreshAuth resolves
     await Promise.resolve(); // getTicket promise resolves inside refreshTicket
 

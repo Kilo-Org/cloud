@@ -41,6 +41,10 @@ export function useTriggerRepositories(organizationId: string | undefined, enabl
     repositories,
     isLoading: enabled && query.isPending,
     isError: query.isError,
+    // The active query's error, so the picker can name the cause (an access
+    // denial is not a server fault) instead of reporting every failure the same
+    // way.
+    error: query.error,
     refetch: () => {
       void query.refetch();
     },

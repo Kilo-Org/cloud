@@ -66,7 +66,7 @@ export function SlackIntegrationDetails({
   organizationId,
   success,
   error,
-  canManage = true,
+  canManage = false,
   connectPath,
 }: SlackIntegrationDetailsProps) {
   const trpc = useTRPC();

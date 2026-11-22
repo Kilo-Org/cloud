@@ -12,6 +12,7 @@ import { KiloPassOrgBonusMode, KiloPassOrgIssuanceKind } from '@kilocode/db/sche
 import type { OrganizationTransaction } from './organization-usage';
 import { and, eq, gt, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import {
+  emptyOrganizationUsageResult,
   mutateOrganizationUsage,
   type OrganizationUsageMutationResult,
 } from './organization-usage';
@@ -33,12 +34,6 @@ export type OrganizationConsumptionResult = {
   organizationUsage: OrganizationUsageMutationResult;
 };
 
-const noAlert: OrganizationUsageMutationResult = {
-  crossedMinimumBalance: false,
-  recipients: [],
-  minimumBalanceMicrodollars: null,
-};
-
 function sourceIdentity(input: RecordOrganizationConsumptionInput): string {
   return `kpo:consumption:${input.source}:${input.sourceId}`;
 }
@@ -56,7 +51,7 @@ export async function recordOrganizationConsumption(
   input: RecordOrganizationConsumptionInput
 ): Promise<OrganizationConsumptionResult> {
   if (!Number.isSafeInteger(input.amountMicrodollars) || input.amountMicrodollars <= 0) {
-    return { recorded: false, organizationUsage: noAlert };
+    return { recorded: false, organizationUsage: emptyOrganizationUsageResult() };
   }
 
   const [parentAgreement] = await tx
@@ -127,7 +122,7 @@ export async function recordOrganizationConsumption(
 
   // The category uniqueness index makes a replay a no-op for every financial
   // side effect below. Do not infer an existing source from mutable usage rows.
-  if (!credit) return { recorded: false, organizationUsage: noAlert };
+  if (!credit) return { recorded: false, organizationUsage: emptyOrganizationUsageResult() };
 
   const organizationUsage = await mutateOrganizationUsage(tx, {
     kilo_user_id: input.kiloUserId,

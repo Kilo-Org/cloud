@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { BITBUCKET_MAX_REPOSITORY_ITEMS } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { BitbucketApiError, type BitbucketRepository } from './bitbucket-api.js';
 import {
   listBitbucketRepositories,
@@ -333,6 +334,19 @@ describe('selectCachedBitbucketRepository', () => {
         private: true,
         defaultBranch: 'main',
       },
+    });
+  });
+
+  it('checks the cached entry count before selecting a repository', () => {
+    const entries = Array.from({ length: BITBUCKET_MAX_REPOSITORY_ITEMS + 1 }, (_value, index) => ({
+      id: `entry-${index}`,
+      name: `entry-${index}`,
+      full_name: `acme/entry-${index}`,
+      private: false,
+    }));
+
+    expect(selectCachedBitbucketRepository(entries, { workspaceUuid, repositoryUuid })).toEqual({
+      status: 'temporarily_unavailable',
     });
   });
 

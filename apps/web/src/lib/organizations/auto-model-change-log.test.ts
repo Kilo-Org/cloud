@@ -253,6 +253,37 @@ describe('computeRelevantChangesForOrg', () => {
     expect(changes.addedByReasonProvider.get('azure')).toEqual(['openai/gpt-5']);
     expect(changes.addedByReasonProvider.has('openai')).toBe(false);
   });
+
+  test('allow-list mode: virtual-only router under a virtual-only allow list is NOT accessible', () => {
+    const org = buildEnterpriseOrg({
+      settings: {
+        provider_allow_list: ['virtual'],
+      },
+    });
+    const oldSnapshot = buildSnapshot([{ slug: 'virtual', models: [] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'virtual', models: ['router/auto'] }]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+    const changes = computeRelevantChangesForOrg(org, diff);
+
+    expect(relevantChangesIsEmpty(changes)).toBe(true);
+  });
+
+  test('allow-list mode: virtual router keeps the virtual provider label when the allow list also names a real provider', () => {
+    const org = buildEnterpriseOrg({
+      settings: {
+        provider_allow_list: ['virtual', 'openai'],
+      },
+    });
+    const oldSnapshot = buildSnapshot([{ slug: 'virtual', models: [] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'virtual', models: ['router/auto'] }]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+    const changes = computeRelevantChangesForOrg(org, diff);
+
+    expect(changes.addedByReasonProvider.get('virtual')).toEqual(['router/auto']);
+    expect(changes.addedByReasonProvider.has('openai')).toBe(false);
+  });
 });
 
 describe('buildAutoChangeMessage', () => {

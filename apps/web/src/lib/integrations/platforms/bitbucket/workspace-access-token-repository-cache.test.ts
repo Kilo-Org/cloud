@@ -11,6 +11,7 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
+import { BITBUCKET_MAX_REPOSITORY_ITEMS } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { fetchBitbucketRepositoriesForOrganization as FetchForOrganization } from '@/lib/cloud-agent/bitbucket-integration-helpers';
@@ -190,6 +191,25 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
       ],
       syncedAt: CACHED_AT,
     });
+    expect(mockFetchBitbucketRepositoriesFromTokenService).not.toHaveBeenCalled();
+  });
+
+  it('treats a stored repository list longer than the maximum repository count as an absent cache', async () => {
+    const tooLong = Array.from({ length: BITBUCKET_MAX_REPOSITORY_ITEMS + 1 }, (_, index) => ({
+      ...CACHED_REPOSITORY,
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      name: `repository-${index}`,
+      full_name: `acme/repository-${index}`,
+    }));
+    await insertStaticIntegration(organization.id, user.id, { repositories: tooLong });
+
+    await expect(getBitbucketWorkspaceAccessTokenStatus(organization.id)).resolves.toMatchObject({
+      status: 'connected',
+      repositoryCache: { status: 'uninitialized', repositories: [], syncedAt: null },
+    });
+    await expect(
+      readCachedBitbucketWorkspaceAccessTokenRepositories({ organizationId: organization.id })
+    ).resolves.toEqual({ status: 'temporarily_unavailable' });
     expect(mockFetchBitbucketRepositoriesFromTokenService).not.toHaveBeenCalled();
   });
 

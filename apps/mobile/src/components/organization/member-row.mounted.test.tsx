@@ -619,4 +619,50 @@ describe('MemberRow daily spend', () => {
       )
     ).toBe(false);
   });
+
+  // The limit sits in a caption a reader cannot otherwise hear, so the row's
+  // accessible name carries it after the name and the email.
+  it('speaks the daily limit after the name and the email', async () => {
+    const limited = { ...member, dailyUsageLimitUsd: 10 } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: limited });
+
+    expect(renderer.root.findByType('Pressable').props.accessibilityLabel).toBe(
+      [
+        i18n.t('organization.members.manageA11y', { name: 'Member E2E' }),
+        'member@example.com',
+        limitOnly,
+      ].join(', ')
+    );
+  });
+
+  it('speaks a nameless member limit without repeating the email', async () => {
+    const namelessLimited = {
+      ...member,
+      name: '',
+      dailyUsageLimitUsd: 10,
+    } as unknown as Parameters<typeof MemberRow>[0]['member'];
+    const renderer = await renderRow({ member: namelessLimited });
+
+    expect(renderer.root.findByType('Pressable').props.accessibilityLabel).toBe(
+      [i18n.t('organization.members.manageA11y', { name: 'member@example.com' }), limitOnly].join(
+        ', '
+      )
+    );
+  });
+
+  it('speaks the paired spend line, not the limit sentence, for a sales demo', async () => {
+    const renderer = await renderRow({ member: spendMember, isSalesDemo: true });
+
+    const label = renderer.root.findByType('Pressable').props.accessibilityLabel as string;
+    expect(label).toBe(
+      [
+        i18n.t('organization.members.manageA11y', { name: 'Member E2E' }),
+        'member@example.com',
+        pair,
+      ].join(', ')
+    );
+    expect(label).not.toContain(limitOnly);
+  });
 });

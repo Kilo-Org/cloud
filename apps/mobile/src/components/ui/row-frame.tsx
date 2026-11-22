@@ -94,11 +94,14 @@ type RowFrameProps = Readonly<{
   onPress?: () => void;
   /**
    * Where the press lives. `row` (the default) makes the whole row the control.
-   * `content` presses only the leading cell and the text, so a trailing control
-   * (a switch) owns its own touch and its own accessible node. A `content` press
-   * is hidden from assistive technology unless `contentAccessibilityLabel`
-   * names it, so without that label the trailing control must carry the row's
-   * name itself (a preference row passes its title to the switch).
+   * `content` presses the leading cell and the text beside a trailing control,
+   * so a trailing control (a switch) owns its own touch and its own accessible
+   * node. A stacked row keeps the stack's shape: the leading cell and that
+   * control share the top line, and the press owns the text under them, so a
+   * long title still takes the row's full width. A `content` press is hidden
+   * from assistive technology unless `contentAccessibilityLabel` names it, so
+   * without that label the trailing control must carry the row's name itself (a
+   * preference row passes its title to the switch).
    */
   pressTarget?: 'row' | 'content';
   /**
@@ -254,6 +257,32 @@ export function RowFrame({
       ? cn(stack ? ROW_FRAME_STACK_CLASS : ROW_FRAME_CLASS, className)
       : cn(ROW_FRAME_COLUMN_CLASS, className);
 
+  // The line lays its cells out on the row's 27pt content band, so a
+  // trailing cell that occupies the platform target in this presentation —
+  // a control carrying it on its own node, or the placeholder that reserves
+  // the same space — would be delivered through this wrapper's band, not
+  // the row's padded bounds: Android delivers a touch only inside every
+  // ancestor view. A spec that marks its cell as such (`target`) takes the
+  // host at the target, which grows this line to the target in the stacked
+  // presentation only (`rowTargetHostClass`).
+  const trailingClass =
+    trailing?.kind === 'node' && trailing.target === true
+      ? cn('shrink-0', rowTargetHostClass())
+      : 'shrink-0';
+
+  /**
+   * A stack's top line: the leading cell and the trailing cell above the text,
+   * so a long title takes the row's full width instead of sharing it with them.
+   * A press handed to the content uses the same line, so the stacked shape is
+   * one shape whether the row press covers the whole row or not.
+   */
+  const stackLine = (
+    <View className={cn('w-full', ROW_FRAME_LINE_CLASS)}>
+      {leadingNode}
+      {trailingNode ? <View className={trailingClass}>{trailingNode}</View> : null}
+    </View>
+  );
+
   /**
    * The row's own line, in the order the caller's shape asks for. A footer
    * closes the column below it, so the line keeps the leading cell, the text
@@ -274,24 +303,9 @@ export function RowFrame({
       );
     }
     if (stack) {
-      // The line lays its cells out on the row's 27pt content band, so a
-      // trailing cell that occupies the platform target in this presentation —
-      // a control carrying it on its own node, or the placeholder that reserves
-      // the same space — would be delivered through this wrapper's band, not
-      // the row's padded bounds: Android delivers a touch only inside every
-      // ancestor view. A spec that marks its cell as such (`target`) takes the
-      // host at the target, which grows this line to the target in the stacked
-      // presentation only (`rowTargetHostClass`).
-      const trailingClass =
-        trailing?.kind === 'node' && trailing.target === true
-          ? cn('shrink-0', rowTargetHostClass())
-          : 'shrink-0';
       return (
         <>
-          <View className={cn('w-full', ROW_FRAME_LINE_CLASS)}>
-            {leadingNode}
-            {trailingNode ? <View className={trailingClass}>{trailingNode}</View> : null}
-          </View>
+          {stackLine}
           {textBlock}
         </>
       );
@@ -329,24 +343,41 @@ export function RowFrame({
       accessibilityHint: contentAccessibilityHint,
       accessibilityState: contentOwnsName ? { disabled } : undefined,
     };
+    // A footer closes the row's own line below the whole row, and a row with no
+    // text has nothing to put under the top line, so only a stack with text
+    // moves the press there. The press then cancels the frame's bottom padding
+    // and pads itself back, exactly as the unstacked press does, so a stacked
+    // row is the same height whether its press covers the whole row or not.
+    const stacksContentPress = stack && footer === undefined && hasText;
+    const contentPressClass = stacksContentPress
+      ? 'w-full -mb-3 pb-3'
+      : cn(
+          'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
+          ROW_FRAME_CONTENT_PRESS_CLASS
+        );
     const contentPress = (
       <Pressable
         {...contentProps}
-        className={cn(
-          'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
-          ROW_FRAME_CONTENT_PRESS_CLASS,
-          !disabled && 'active:opacity-70'
-        )}
+        className={cn(contentPressClass, !disabled && 'active:opacity-70')}
       >
-        {leadingNode}
+        {stacksContentPress ? null : leadingNode}
         {textBlock}
       </Pressable>
     );
     if (footer === undefined) {
       return (
         <View testID={testID} className={frameClass} onLayout={onLayout}>
-          {contentPress}
-          {trailingNode}
+          {stacksContentPress ? (
+            <>
+              {stackLine}
+              {contentPress}
+            </>
+          ) : (
+            <>
+              {contentPress}
+              {trailingNode}
+            </>
+          )}
         </View>
       );
     }

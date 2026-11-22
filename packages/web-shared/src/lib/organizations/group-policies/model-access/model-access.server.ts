@@ -12,10 +12,7 @@ import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-util
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
-  VIRTUAL_PROVIDER,
-  withoutVirtualProvider,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import {
+  getEligibleProviderRoutes,
   getModelInferenceProviders,
   isModelRestrictionExempt,
   type CustomLlmGrantee,
@@ -121,22 +118,6 @@ export function evaluateEffectiveModelAccessPolicy(
       ),
     },
   };
-}
-
-/**
- * Routers listed under the snapshot-only virtual provider pick a real provider
- * per request. Allowing `virtual` lets them route to every real provider that
- * the same allow list permits; without one, they have nowhere to route.
- */
-function getEligibleProviderRoutes(
-  modelProviders: ReadonlySet<string>,
-  allowedProviders: ReadonlySet<string>
-): Set<string> {
-  if (modelProviders.has(VIRTUAL_PROVIDER.slug) && allowedProviders.has(VIRTUAL_PROVIDER.slug)) {
-    const realProviders = withoutVirtualProvider([...allowedProviders]);
-    return new Set(realProviders.length > 0 ? [VIRTUAL_PROVIDER.slug, ...realProviders] : []);
-  }
-  return new Set([...modelProviders].filter(provider => allowedProviders.has(provider)));
 }
 
 export async function getEffectiveModelDecision(

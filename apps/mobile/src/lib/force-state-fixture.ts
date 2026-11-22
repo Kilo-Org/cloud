@@ -6,8 +6,18 @@
  * - `kiloapp:///dev/force-state/<mode>?next=<url-encoded app link>` forces the
  *   mode, then opens `next` the way the app opens that link on its own
  *   (`next` is optional; without it the current screen stays and reloads).
- * - `kiloapp:///dev/force-state/clear` returns live answers and opens Home
- *   (or `?next=`).
+ * - `?only=<prefix>[,<prefix>]` narrows the mode to the listed tRPC
+ *   procedures, dotted from the router root
+ *   (`?only=agentProfiles.list,codeReviews`). A call is forced only when its
+ *   procedure path equals a prefix or starts with it and a `.`, so
+ *   `agentProfiles` holds every profile read while `agentProfiles.list` leaves
+ *   `agentProfiles.listCombined` live. Every other non-bootstrap procedure
+ *   answers from the backend, so one read can be forced while the screen
+ *   around it stays live. Without `only` the mode forces every non-bootstrap
+ *   procedure, and each link replaces the previous scope rather than inheriting
+ *   it. `offline` is not procedure-scoped: it reports no network at all.
+ * - `kiloapp:///dev/force-state/clear` returns live answers, drops the scope
+ *   and opens Home (or `?next=`).
  *
  * Modes, each the answer a real backend or device gives:
  *
@@ -29,7 +39,8 @@
  * procedures ({@link BOOTSTRAP_PROCEDURES}) keep their live answers, so the
  * account, the organization context and the session plumbing stay intact.
  * Forcing a mode resets the cached tRPC queries (except the bootstrap ones), so
- * each screen shows its first-load state instead of cached rows.
+ * each screen shows its first-load state instead of cached rows; a scoped mode
+ * resets only the reads it holds, and `clear` resets every non-bootstrap read.
  *
  * From the first forced mode until the app restarts, the encrypted read cache
  * takes no writes: the reset queries and forced failures never reach it, and
@@ -58,7 +69,15 @@ export type ForceStateMode = (typeof FORCE_STATE_MODES)[number];
 type ForceState =
   // No mode was forced since the app started.
   | { readonly kind: 'live' }
-  | { readonly kind: 'forced'; readonly mode: ForceStateMode }
+  /**
+   * `scope` is the `only` parameter: null forces every non-bootstrap
+   * procedure, a list narrows the mode to those procedure prefixes.
+   */
+  | {
+      readonly kind: 'forced';
+      readonly mode: ForceStateMode;
+      readonly scope: readonly string[] | null;
+    }
   // Live answers again; the read cache stays held until the app restarts.
   | { readonly kind: 'cleared' };
 
@@ -136,9 +155,24 @@ export function getForcedMode(): ForceStateMode | null {
   return state.kind === 'forced' ? state.mode : null;
 }
 
-/** True when a forced mode answers this procedure instead of the backend. */
+/**
+ * True when a forced mode answers this procedure instead of the backend: every
+ * non-bootstrap procedure, or only the ones the mode's `only` scope lists.
+ * `isForcedOffline` and the connectivity subscription ignore the scope: the
+ * `offline` mode still reports no network at all.
+ */
 export function isForcedProcedure(path: string): boolean {
-  return __DEV__ && state.kind === 'forced' && !BOOTSTRAP_PROCEDURES.has(path);
+  return (
+    __DEV__ &&
+    state.kind === 'forced' &&
+    !BOOTSTRAP_PROCEDURES.has(path) &&
+    (state.scope === null || state.scope.some(prefix => isWithin(prefix, path)))
+  );
+}
+
+/** True when `path` is `prefix` itself or a procedure below it (`prefix.`). */
+function isWithin(prefix: string, path: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}.`);
 }
 
 /** True from the first forced mode until the app restarts. */
@@ -274,9 +308,30 @@ function trpcQueryPath(queryKey: readonly unknown[]): string | null {
   return segments.join('.');
 }
 
-function isResettableQuery(query: Query): boolean {
+/**
+ * True for a tRPC query the mode resets: every non-bootstrap read, or only the
+ * ones a mode scope (`?only=`) holds, so a scoped mode leaves live rows cached.
+ * `scope` is passed in because `clear` resets every non-bootstrap read.
+ */
+function isResettableQuery(query: Query, scope: readonly string[] | null): boolean {
   const path = trpcQueryPath(query.queryKey);
-  return path !== null && !BOOTSTRAP_PROCEDURES.has(path);
+  return (
+    path !== null &&
+    !BOOTSTRAP_PROCEDURES.has(path) &&
+    (scope === null || scope.some(prefix => isWithin(prefix, path)))
+  );
+}
+
+/**
+ * The `only` prefixes of a link; null when the link forces every procedure,
+ * also for an `?only=` that names none (an empty scope would force nothing).
+ */
+function parseOnly(raw: string | null): readonly string[] | null {
+  const prefixes = (raw ?? '')
+    .split(',')
+    .map(prefix => prefix.trim())
+    .filter(prefix => prefix.length > 0);
+  return prefixes.length > 0 ? prefixes : null;
 }
 
 /**
@@ -292,11 +347,12 @@ export function applyForceStatePath(path: string, client: QueryClient): string |
     return undefined;
   }
   const name = match[1];
-  const next = new URLSearchParams(match[2] ?? '').get('next');
+  const params = new URLSearchParams(match[2] ?? '');
+  const next = params.get('next');
   if (name === CLEAR) {
     if (state.kind === 'forced') {
       setState({ kind: 'cleared' });
-      void client.resetQueries({ predicate: isResettableQuery });
+      void client.resetQueries({ predicate: query => isResettableQuery(query, null) });
       log('cleared; read cache writes stay held until the app restarts');
     }
     return next ?? HOME_LINK;
@@ -306,9 +362,11 @@ export function applyForceStatePath(path: string, client: QueryClient): string |
     log(`unknown mode ${name}`);
     return null;
   }
-  setState({ kind: 'forced', mode });
-  void client.resetQueries({ predicate: isResettableQuery });
-  log(`forced ${mode}`);
+  // Each link sets its own scope: a link without `only` forces everything again.
+  const scope = parseOnly(params.get('only'));
+  setState({ kind: 'forced', mode, scope });
+  void client.resetQueries({ predicate: query => isResettableQuery(query, scope) });
+  log(scope === null ? `forced ${mode}` : `forced ${mode} for ${scope.join(', ')}`);
   return next;
 }
 

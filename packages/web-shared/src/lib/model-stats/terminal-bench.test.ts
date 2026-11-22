@@ -203,6 +203,31 @@ describe('getTerminalBenchSummaries', () => {
       '[model-stats] terminal-bench summaries unavailable: snapshot unavailable; serving no benchmark summaries'
     );
   });
+
+  it('reports a repeated failure once, not once per request', async () => {
+    // The snapshot cache rethrows its recorded error during the retry cooldown, so every caller
+    // sees the same error object; an outage must not log one line per catalog request.
+    const outage = new Error('snapshot unavailable');
+    mockSnapshot.mockRejectedValue(outage);
+
+    await getTerminalBenchSummaries();
+    await getTerminalBenchSummaries();
+    await getTerminalBenchSummaries();
+
+    expect(mockSnapshot).toHaveBeenCalledTimes(3);
+    expect(mockWarn).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports each distinct failure', async () => {
+    mockSnapshot
+      .mockRejectedValueOnce(new Error('first outage'))
+      .mockRejectedValueOnce(new Error('second outage'));
+
+    await getTerminalBenchSummaries();
+    await getTerminalBenchSummaries();
+
+    expect(mockWarn).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('terminalBenchFor', () => {

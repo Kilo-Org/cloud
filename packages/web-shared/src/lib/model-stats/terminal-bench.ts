@@ -76,16 +76,29 @@ function summariesOf(snapshot: ModelStatsSnapshot): TerminalBenchSummaries {
   return summaries;
 }
 
+/**
+ * Reports one failure per failed load. During its cooldown the snapshot cache rethrows the recorded
+ * error on every call, so keying the warning on that error object keeps an outage to one line
+ * instead of one per catalog request.
+ */
+let reportedFailure: unknown = undefined;
+
+function reportLoadFailure(error: unknown): void {
+  if (reportedFailure === error) return;
+  reportedFailure = error;
+  const reason = (error instanceof Error ? error.message : String(error))
+    .replace(/\s+/g, ' ')
+    .trim();
+  warnExceptInTest(
+    `[model-stats] terminal-bench summaries unavailable: ${reason}; serving no benchmark summaries`
+  );
+}
+
 export async function getTerminalBenchSummaries({
   fromDb,
 }: { fromDb?: ModelStatsLoadClient } = {}): Promise<TerminalBenchSummaries> {
   const snapshot = await getModelStatsSnapshot({ fromDb }).catch((error: unknown) => {
-    const reason = (error instanceof Error ? error.message : String(error))
-      .replace(/\s+/g, ' ')
-      .trim();
-    warnExceptInTest(
-      `[model-stats] terminal-bench summaries unavailable: ${reason}; serving no benchmark summaries`
-    );
+    reportLoadFailure(error);
     return null;
   });
   return snapshot ? summariesOf(snapshot) : new Map();

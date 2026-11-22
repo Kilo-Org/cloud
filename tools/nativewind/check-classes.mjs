@@ -905,17 +905,19 @@ const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
 
 /**
  * The utility part of one class token, with any variant prefix and the token's
- * leading `!` removed. A variant (`md:`, `landscape:`, `ios:`) selects when the
- * utility applies and `!` only raises its specificity, so neither changes what
- * the utility does: every rule below reads the same inset a bare token writes —
- * the same way L12's detector sees a variant-prefixed `px-6`.
+ * important modifier removed. A variant (`md:`, `landscape:`, `ios:`) selects
+ * when the utility applies and the important modifier only raises its
+ * specificity, so neither changes what the utility does: every rule below
+ * reads the same inset a bare token writes — the same way L12's detector sees
+ * a variant-prefixed `px-6`. Tailwind writes that modifier on either side of
+ * the utility (`!px-6`, and `px-6!` from v4 on), so both are stripped.
  * `checkScrollPadding` reads `anyPadding` for the same reason L2's header
  * policy does: a prefixed `ios:px-4` insets the surface exactly as a bare
  * `px-4` does.
  */
 function utilityOf(token) {
   const segments = token.split(':');
-  return segments[segments.length - 1].replace(/^!/, '');
+  return segments[segments.length - 1].replace(/^!|!$/g, '');
 }
 
 /**

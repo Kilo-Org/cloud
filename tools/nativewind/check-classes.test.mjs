@@ -1644,6 +1644,14 @@ test('flags a horizontal inset wider than the page gutter', () => {
   assert.equal(variants.length, 2);
   assert.match(variants.join('\n'), /\[L12\] "px-8"/);
   assert.match(variants.join('\n'), /\[L12\] "-mx-6"/);
+  // The important modifier is written on either side of the utility and only
+  // raises its specificity, so both report the same inset; the diagnostic names
+  // the utility without the modifier.
+  const important = layoutProblems(SCREEN_FILE, screen('<View className="!px-6 px-6!" />'));
+  assert.equal(important.length, 2);
+  for (const problem of important) {
+    assert.match(problem, /\[L12\] "px-6"/);
+  }
   // Every shape of a wider inset is one decision against the gutter: an
   // all-side form and a half step are judged beside the side forms, and the
   // diagnostic keeps the utility the call site wrote.
@@ -1692,13 +1700,13 @@ test('accepts the gutter, a narrower inset and the modules that own one', () => 
 });
 
 test('accepts the gutter in both all-side forms beside an exempt margin and a narrower step', () => {
-  // The gutter as a padding both ways, a zero and an auto margin the rule
-  // exempts, a half step below the gutter, and the vertical utilities the
-  // family never held.
+  // The gutter as a padding both ways, the same gutter under the important
+  // modifier on either side, a zero and an auto margin the rule exempts, a half
+  // step below the gutter, and the vertical utilities the family never held.
   assert.deepEqual(
     layoutProblems(
       SCREEN_FILE,
-      screen('<View className="p-4 px-4 m-0 mx-auto px-3.5 gap-6 py-6 mt-6 pb-5" />')
+      screen('<View className="p-4 px-4 !px-4 px-4! m-0 mx-auto px-3.5 gap-6 py-6 mt-6 pb-5" />')
     ),
     []
   );

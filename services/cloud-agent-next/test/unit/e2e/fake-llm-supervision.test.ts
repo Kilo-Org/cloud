@@ -40,14 +40,21 @@ describe('bash directive fake scenario', () => {
     expect(body).toContain('"finish_reason":"tool_calls"');
   });
 
-  it('replies with the done text and no tool call once the tool result is present', async () => {
+  it('reports the tool result verbatim and no tool call once the result is present', async () => {
+    const refusal = 'Permission denied: git push --force';
     const response = await post([
-      { role: 'user', content: '__fake__:bash:probe2:printf hi' },
+      { role: 'user', content: '__fake__:bash:probe2:git push --force origin main' },
       { role: 'assistant', content: '' },
-      { role: 'tool', tool_call_id: 'bash_probe2', content: 'hi' },
+      { role: 'tool', tool_call_id: 'bash_probe2', content: refusal },
     ]);
     const body = await response.text();
-    expect(body).toContain('bash-done-probe2');
+    const chunks = body
+      .split('\n')
+      .filter(line => line.startsWith('data: ') && line !== 'data: [DONE]')
+      .map(line => JSON.parse(line.slice('data: '.length)));
+    const content = chunks.flatMap(chunk => chunk.choices?.[0]?.delta?.content ?? []).join('');
+    expect(content.startsWith('bash-result-probe2\n')).toBe(true);
+    expect(content).toContain(refusal);
     expect(body).not.toContain('tool_calls');
     expect(body).toContain('"finish_reason":"stop"');
   });

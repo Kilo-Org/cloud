@@ -1427,12 +1427,15 @@ function readToolResultBody(
 
 /**
  * `bash:<tag>:<command>` — one native `bash` call carrying the caller's command
- * verbatim, then a plain confirmation once the tool result comes back.
+ * verbatim, then the runtime's own verdict once the tool result comes back.
  *
  * The command is the rest of the trailing argument, so it may contain spaces,
  * colons and shell punctuation; only the appended `<environment_details>` block
  * is stripped. The tool call id is `bash_<tag>`, so a replay of the same request
- * sees its own result instead of running the command a second time.
+ * sees its own result instead of running the command a second time. The second
+ * turn echoes that result's text (bounded, so a huge output cannot bloat the
+ * transcript) after a `bash-result-<tag>` marker, which lets a driver read the
+ * sandbox's verdict straight out of the model transcript.
  */
 function bashScenario(args: string[], ctx: ScenarioContext): void {
   const parsed = /^([A-Za-z0-9_-]{1,64}):([\s\S]*)$/.exec(args[0] ?? '');
@@ -1449,9 +1452,19 @@ function bashScenario(args: string[], ctx: ScenarioContext): void {
   const id = `bash_${tag}`;
 
   if (hasToolResult(ctx.body, id)) {
+    const result =
+      isRecord(ctx.body) && Array.isArray(ctx.body.messages)
+        ? ctx.body.messages.find(
+            message => isRecord(message) && message.role === 'tool' && message.tool_call_id === id
+          )
+        : undefined;
+    const resultText = isRecord(result) ? toolResultContent(result.content) : '';
     writeChunk(
       ctx.emit,
-      makeChunk(ctx.id, ctx.model, { role: 'assistant', content: `bash-done-${tag}` })
+      makeChunk(ctx.id, ctx.model, {
+        role: 'assistant',
+        content: `bash-result-${tag}\n${resultText.slice(0, 4000)}`,
+      })
     );
     writeFinish(ctx.emit, ctx.id, ctx.model, 1);
     ctx.emit.end();

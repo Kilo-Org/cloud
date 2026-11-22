@@ -87,14 +87,11 @@ function postMutation(params: {
     ...(params.admitPrompt === undefined ? {} : { admitPrompt: params.admitPrompt }),
   };
   return handleKiloFacadeRequest({
-    request: new Request(
-      `http://worker.test/kilo/session/${kiloSessionId}/${params.path}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params.body),
-      }
-    ),
+    request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/${params.path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params.body),
+    }),
     env: params.env,
     userId: 'usr_1',
     authToken: 'validated-token',

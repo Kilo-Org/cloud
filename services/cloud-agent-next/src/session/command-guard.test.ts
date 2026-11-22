@@ -660,6 +660,10 @@ describe('security-remediation push command guard policy', () => {
       'git -C . branch -c a b',
       'git --no-pager switch -c x',
       'git switch -c release/1.2',
+      // A branch name that carries a subcommand word keeps its allow.
+      'git switch -c switch-fix',
+      'git switch -c fix/switch',
+      'git branch -c switch a',
       'git -C . switch -c release/1.2',
       'git --no-pager branch -c a b',
       'cp config.example.json config.test.json',

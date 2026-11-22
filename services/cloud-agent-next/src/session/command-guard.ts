@@ -604,15 +604,18 @@ const SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED = [
 // installed after those allows, so a command that carries an inline setting and
 // then a branch-creation form takes the setting's decision again. Each rule takes
 // a `*` wherever a separator run can sit, so a setting written with a tab or a
-// mixed run is included. A command whose argument text places `-c` before the
-// subcommand is refused too, because a rule cannot tell that text from a setting.
+// mixed run is included. Each rule also names the setting's own argument, a key
+// with a dot or a key with a value, so a branch name that merely carries a
+// subcommand word keeps the allow above.
 const SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED = [
-  'git*-c*switch*',
-  'git*-c*branch*',
+  'git*-c*.*switch*',
+  'git*-c*=*switch*',
+  'git*-c*.*branch*',
+  'git*-c*=*branch*',
   // The matcher rewrites a backslash to a slash and a shell removes it, so an
   // inline flag written with an escape reaches a rule as a slash before the `c`.
-  // The two rules above need the contiguous `-c`, so the escaped spelling is
-  // named here as well as in the deny set.
+  // The rules above need the contiguous `-c`, so the escaped spelling is named
+  // here as well as in the deny set.
   'git*-/c*',
 ];
 

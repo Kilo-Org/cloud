@@ -270,7 +270,7 @@ describe('security remediation launch contract', () => {
     // The policy refuses a command that carries a quote character, so the prompt
     // must name the file form of both commands it requires.
     expect(prompt).toContain('git commit -F <file>');
-    expect(prompt).toContain('gh pr create --title <title> --body-file <file>');
+    expect(prompt).toContain('gh pr create --fill --body-file <file> --draft');
   });
 });
 

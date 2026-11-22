@@ -592,10 +592,7 @@ const SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED = [
 // a `*` wherever a separator run can sit, so a setting written with a tab or a
 // mixed run is included. A command whose argument text places `-c` before the
 // subcommand is refused too, because a rule cannot tell that text from a setting.
-const SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED = [
-  'git*-c*switch*',
-  'git*-c*branch*',
-];
+const SECURITY_REMEDIATION_GIT_INLINE_DENIED_AFTER_ALLOWED = ['git*-c*switch*', 'git*-c*branch*'];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
   'git reset --hard',

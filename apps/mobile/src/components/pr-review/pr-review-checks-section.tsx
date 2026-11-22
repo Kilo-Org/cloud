@@ -17,6 +17,7 @@ import {
   PrReviewChecksStatusRow,
 } from '@/components/pr-review/pr-review-checks-status-row';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { RowGroup } from '@/components/ui/row-group';
@@ -29,6 +30,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type PrChecksModel, useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import {
+  isProviderPlatform,
   providerPrTermKey,
   providerViewOnLabel,
   useProviderPrWebUrl,
@@ -244,9 +246,28 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
   if (checks.isError) {
     const state = classifyPrReviewQueryState(checks.error);
     if (state.kind === 'not-found') {
-      // Section-level terminal: NOT_FOUND here means the ref has no
-      // checks endpoint access (rare; usually means the app isn't
-      // installed on the head repo). No retry — just the message.
+      // GitHub's NOT_FOUND here means the ref has no checks access (usually
+      // the app is not installed on the head repo), so it stays terminal.
+      // GitLab folds its connection failures into the same NOT_FOUND, and
+      // Bitbucket does the same for its workspace failures, so those scopes
+      // get the read retry plus the connection check instead of a dead end.
+      if (isProviderPlatform(queries.platform)) {
+        return (
+          <Section label={t('prReview.checks.title')}>
+            <Card key={CONTENT_CARD_KEY} className="gap-3">
+              <Text className="text-sm text-muted-foreground">
+                {t('prReview.terms.unavailableDescription')}
+              </Text>
+              <PrReviewUnavailableActions
+                onRetry={() => {
+                  checks.refetch();
+                }}
+                isRetrying={checks.isFetching}
+              />
+            </Card>
+          </Section>
+        );
+      }
       return (
         <Section label={t('prReview.checks.title')}>
           <Card key={CONTENT_CARD_KEY} className="gap-2">

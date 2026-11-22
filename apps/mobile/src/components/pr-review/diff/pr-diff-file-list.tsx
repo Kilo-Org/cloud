@@ -42,7 +42,11 @@ import { PrDiffFileListState } from '@/components/pr-review/diff/pr-diff-file-li
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
-import { providerPrRefKey, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import {
+  isProviderPlatform,
+  providerPrRefKey,
+  useProviderPrScope,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView } from '@/components/pr-review/diff/pr-diff-rows';
@@ -278,7 +282,7 @@ export function PrReviewFileList({
       <PrDiffFileListState
         state={firstPageErrorState}
         copy={copy}
-        isProviderScope={scope.ref.platform !== 'github'}
+        isProviderScope={isProviderPlatform(scope.ref.platform)}
         isRetrying={query.isFetching}
         onRetry={() => {
           void query.refetch();

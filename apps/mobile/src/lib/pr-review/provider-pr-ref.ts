@@ -384,6 +384,16 @@ export function providerPrCapabilities(platform: ProviderPrPlatform): ProviderRe
 }
 
 /**
+ * Whether this platform is a provider surface rather than GitHub. GitLab and
+ * Bitbucket fold their connection failures into the same NOT_FOUND a removed
+ * item produces, so their scopes offer recovery rows while GitHub keeps its
+ * terminal copy.
+ */
+export function isProviderPlatform(platform: ProviderPrPlatform): boolean {
+  return platform !== 'github';
+}
+
+/**
  * Bitbucket Cloud is organization-context only, so a scope without an
  * organization cannot be queried at all. GitHub and GitLab work personally.
  */

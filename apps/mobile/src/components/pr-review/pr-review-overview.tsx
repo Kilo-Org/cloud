@@ -34,6 +34,7 @@ import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import { isProviderPlatform } from '@/lib/pr-review/provider-pr-ref';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
@@ -68,7 +69,7 @@ export function PrReviewOverview({
   // GitHub-only affordances: the install/reconnect CTAs and the review-submit
   // sheet are GitHub App flows and GitHub-route siblings. On GitLab and
   // Bitbucket the same states render without a CTA that cannot work.
-  const isGitHub = queries.platform === 'github';
+  const isGitHub = !isProviderPlatform(queries.platform);
   const isMergeRequest = queries.platform === 'gitlab';
 
   const pr = useQuery(queries.overviewOptions());

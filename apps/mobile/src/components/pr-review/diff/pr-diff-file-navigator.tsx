@@ -48,7 +48,7 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { isProviderPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
@@ -237,7 +237,7 @@ export function PrDiffFileNavigator({
     // GitLab folds its connection failures into the same NOT_FOUND a deleted
     // merge request produces, so provider scopes offer the read retry and the
     // connection check instead of a dead end (GitHub keeps the terminal copy).
-    const isProviderScope = scope.ref.platform !== 'github';
+    const isProviderScope = isProviderPlatform(scope.ref.platform);
     body = (
       <CenteredState>
         <View className="items-center px-4">

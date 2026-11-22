@@ -16,6 +16,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import {
+  isProviderPlatform,
   providerPrRefLabel,
   providerPrTriple,
   useProviderPrScopeOrNull,
@@ -135,11 +136,16 @@ function NavigatorError({
     // GitLab folds its connection failures into the same NOT_FOUND a deleted
     // merge request produces, so provider scopes offer the read retry and the
     // connection check instead of a dead end (GitHub keeps the terminal copy).
+    // A null scope (no provider route above this sheet, i.e. the GitHub route)
+    // still resolves to the provider arm, matching the nullable comparison
+    // this replaced: the actions component renders nothing on a GitHub or
+    // absent scope, so the null case has no visible effect.
+    const isProviderScope = scope === null || isProviderPlatform(scope.ref.platform);
     return (
       <QueryError
         variant="not-found"
         action={
-          scope?.ref.platform !== 'github' ? (
+          isProviderScope ? (
             <PrReviewUnavailableActions onRetry={onRetry} isRetrying={isRetrying} />
           ) : undefined
         }

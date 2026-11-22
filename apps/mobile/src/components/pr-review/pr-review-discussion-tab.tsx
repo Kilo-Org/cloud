@@ -102,7 +102,11 @@ import {
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
-import { type ProviderPrPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import {
+  isProviderPlatform,
+  type ProviderPrPlatform,
+  useProviderPrScope,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding, useStyleSideInsets } from '@/lib/screen-insets';
@@ -480,7 +484,7 @@ export function PrReviewDiscussionTab({
     // GitLab folds its connection failures into the same NOT_FOUND a deleted
     // merge request produces, so provider scopes offer the read retry and the
     // connection check instead of a dead end (GitHub keeps the terminal copy).
-    const isProviderScope = ref.platform !== 'github';
+    const isProviderScope = isProviderPlatform(ref.platform);
     const unavailableMessage = t(DISCUSSION_UNAVAILABLE_MESSAGE[ref.platform]);
     return (
       <>

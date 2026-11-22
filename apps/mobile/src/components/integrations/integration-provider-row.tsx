@@ -98,6 +98,11 @@ export function IntegrationProviderRow({
   } else if (row.accountLabel) {
     subtitle = t('integrations.connectedTo', { account: row.accountLabel });
   }
+  // The row's one action is named with its provider, so a screen reader can tell
+  // four Connect cells apart. The catalog's list joiner keeps the two apart: a
+  // space or a sentence joiner glued a standalone verb onto the brand, which
+  // reads as a broken phrase in languages that attach a connector to it.
+  const namedAction = (action: string) => [label, action].join(t('common.listJoiner'));
   // The row's one action lives in its trailing cell: the contract allows one
   // primary action per screen, and a hub of four filled buttons read as four of
   // them. Connect is that cell's text action; a management action stays a
@@ -140,7 +145,7 @@ export function IntegrationProviderRow({
               size="sm"
               variant="outline"
               onPress={onOpenOnWeb}
-              accessibilityLabel={t('common.manageOnWeb')}
+              accessibilityLabel={namedAction(t('common.manageOnWeb'))}
             >
               <Text>{t('common.manageOnWeb')}</Text>
             </Button>
@@ -160,7 +165,7 @@ export function IntegrationProviderRow({
               variant="outline"
               loading={disconnecting}
               onPress={onDisconnect}
-              accessibilityLabel={t('integrations.disconnect')}
+              accessibilityLabel={namedAction(t('integrations.disconnect'))}
             >
               <Text>{t('integrations.disconnect')}</Text>
             </Button>
@@ -182,7 +187,7 @@ export function IntegrationProviderRow({
               variant="outline"
               loading={retryingConnection}
               onPress={onRetryConnection}
-              accessibilityLabel={t('common.retry')}
+              accessibilityLabel={namedAction(t('common.retry'))}
             >
               <Text>{t('common.retry')}</Text>
             </Button>
@@ -203,10 +208,7 @@ export function IntegrationProviderRow({
       tone: 'neutral',
       onPress: onConnect,
       disabled: connecting,
-      // The row's own title names the provider, so the cell names only the
-      // action it offers: appending the brand produced a broken phrase in
-      // languages that attach a connector to it.
-      accessibilityLabel: t('common.connect'),
+      accessibilityLabel: namedAction(t('common.connect')),
       accessibilityState: { disabled: connecting, busy: connecting },
     };
   }

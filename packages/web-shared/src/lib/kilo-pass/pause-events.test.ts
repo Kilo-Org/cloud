@@ -316,7 +316,7 @@ describe('getPausedMonthSet', () => {
     expect(result.size).toBe(0);
   });
 
-  test('rejects an unparseable fromIssueMonth instead of inventing months', async () => {
+  test('rejects an unparseable fromIssueMonth', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const subId = await insertTestSubscription({ kiloUserId: user.id });
 

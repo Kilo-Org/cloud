@@ -144,6 +144,16 @@ export type ChargeAttemptContext = {
   ja4?: string | null;
 };
 
+/** The payload both `enqueueChargeAttempted` and `reportChargeAttempted` accept. */
+export type ChargeAttemptedParams = {
+  /** A stable id, for example derived from the checkout session id, so a retry/reuse dedupes. */
+  eventId: string;
+  flow: CreditFlow;
+  userId: string;
+  orgId?: string | null;
+  amountCents: number;
+} & ChargeAttemptContext;
+
 /**
  * Enqueues one `charge.attempted` on the caller's transaction, with the caller's stable `eventId`.
  * A checkout hook that already holds a transaction (and knows the session id it is charging) uses
@@ -153,14 +163,7 @@ export type ChargeAttemptContext = {
  */
 export async function enqueueChargeAttempted(
   database: BouncerCreditEventOutboxTransaction,
-  params: {
-    /** A stable id, for example derived from the checkout session id, so a retry/reuse dedupes. */
-    eventId: string;
-    flow: CreditFlow;
-    userId: string;
-    orgId?: string | null;
-    amountCents: number;
-  } & ChargeAttemptContext
+  params: ChargeAttemptedParams
 ): Promise<void> {
   await enqueueCreditEvent(database, {
     type: 'charge.attempted',
@@ -190,12 +193,7 @@ export async function enqueueChargeAttempted(
  * use `enqueueChargeAttempted` directly instead, to avoid a second connection.
  */
 export async function reportChargeAttempted(
-  params: {
-    flow: CreditFlow;
-    userId: string;
-    orgId?: string | null;
-    amountCents: number;
-  } & ChargeAttemptContext
+  params: Omit<ChargeAttemptedParams, 'eventId'>
 ): Promise<void> {
   const eventId = randomUUID();
   // The check + insert run in one transaction so the user-row lock serializes with a concurrent

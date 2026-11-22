@@ -312,9 +312,7 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
     <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
       <LedgerLine
         title={mainTitle}
-        typeLabel={
-          purchase ? grantTypeLabel(t, purchase) : deductionTypeLabel(t, deduction.kind)
-        }
+        typeLabel={purchase ? grantTypeLabel(t, purchase) : deductionTypeLabel(t, deduction.kind)}
         amountMicrodollars={purchase ? purchase.amount_mUsd : deduction.amount_mUsd}
         date={purchase?.date ?? deduction.date}
       />

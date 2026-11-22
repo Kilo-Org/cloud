@@ -78,16 +78,18 @@ export function modelStatsLoadClient(fromDb?: ModelStatsLoadClient): ModelStatsL
   return fromDb ?? db;
 }
 
-/** Reports every failed load once per client, warm or cold, so an outage stays observable. */
+/**
+ * Reports every failed load once per client, warm or cold, so an outage stays observable. The
+ * message names what the cache did with that failure, because a cold failure serves nothing.
+ */
 function reportLoadFailure(state: CacheState, error: unknown): void {
   if (state.reportedError === error) return;
   state.reportedError = error;
   const reason = (error instanceof Error ? error.message : String(error))
     .replace(/\s+/g, ' ')
     .trim();
-  warnExceptInTest(
-    `[model-stats] snapshot unavailable: ${reason}; serving the last known-good snapshot`
-  );
+  const served = state.cached ? 'serving the last known-good snapshot' : 'serving no model stats';
+  warnExceptInTest(`[model-stats] snapshot unavailable: ${reason}; ${served}`);
 }
 
 export async function getModelStatsSnapshot({

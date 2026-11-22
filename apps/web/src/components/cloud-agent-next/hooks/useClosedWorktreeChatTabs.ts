@@ -26,7 +26,6 @@ type PendingAction = { id: number; action: TabAction };
 type Options = {
   organizationId: string | null;
   workspaces: readonly WorkspaceSummary[];
-  onChanged?: (worktreeIds: readonly string[]) => void | Promise<void>;
 };
 
 function cachedWorkspaces(data: WorkspaceCacheData | undefined): WorkspaceSummary[] {
@@ -71,7 +70,7 @@ function actionWorkspace(action: TabAction, workspaces: readonly WorkspaceSummar
 
 export function useClosedWorktreeChatTabs(
   storageKey: string | null,
-  { organizationId, workspaces, onChanged }: Options
+  { organizationId, workspaces }: Options
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -99,8 +98,8 @@ export function useClosedWorktreeChatTabs(
   const dispatched = useRef(new Set<number>());
   const activeMutations = useRef(new Map<string, number>());
   const writes = useRef(new Map<string, Promise<void>>());
-  const current = useRef({ workspaces, onChanged, scopeKey });
-  current.current = { workspaces, onChanged, scopeKey };
+  const current = useRef({ workspaces, scopeKey });
+  current.current = { workspaces, scopeKey };
   const [readyScopes, setReadyScopes] = useState<ReadonlySet<string>>(new Set());
   const importAttempts = useRef(new Set<string>());
   const imports = useRef(new Map<string, Promise<void>>());
@@ -131,9 +130,8 @@ export function useClosedWorktreeChatTabs(
           }
         }
       }
-      if (current.current.scopeKey === scopeKey) await current.current.onChanged?.(worktreeIds);
     },
-    [organizationId, queryClient, scopeKey, trpc]
+    [organizationId, queryClient, trpc]
   );
 
   const run = useCallback(

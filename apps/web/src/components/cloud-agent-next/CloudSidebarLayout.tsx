@@ -519,7 +519,6 @@ function CloudSidebarLayoutContent({
     waitingForPages,
     hasError: workspaceTabsError,
     retry: retryWorkspaceTabs,
-    refresh: refreshWorkspaceTabs,
   } = useWorkspaceChats({
     organizationId: organizationId ?? null,
     worktreeId: selectedWorktreeId,
@@ -546,7 +545,6 @@ function CloudSidebarLayoutContent({
     {
       organizationId: organizationId ?? null,
       workspaces: workspacesWithTabs,
-      onChanged: refreshWorkspaceTabs,
     }
   );
   const serverWorkspaceChats = useMemo(

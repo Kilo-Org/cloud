@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { skipToken, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useInfiniteQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -52,7 +52,6 @@ export function useWorkspaceChats({
   workspace: WorkspaceSummary | undefined;
 }) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const needsPages = Boolean(worktreeId && workspace?.chatTabsTruncated);
   const { data, fetchNextPage, hasNextPage, isError, isFetchNextPageError, isFetching, refetch } =
     useInfiniteQuery({
@@ -76,19 +75,6 @@ export function useWorkspaceChats({
     if (needsPages && previous?.key === key && previous.revision !== revision) void refetch();
   }, [key, needsPages, refetch, revision]);
 
-  const refresh = useCallback(
-    async (worktreeIds: readonly string[]) => {
-      if (!needsPages || !worktreeId || !worktreeIds.includes(worktreeId)) return;
-      await queryClient.invalidateQueries(
-        trpc.cliSessionsV2.workspaceChats.infiniteQueryFilter({
-          organizationId,
-          worktreeId,
-          limit: WORKSPACE_CHAT_PAGE_SIZE,
-        })
-      );
-    },
-    [needsPages, organizationId, queryClient, trpc, worktreeId]
-  );
   const waitingForPages = needsPages && (!data || hasNextPage);
   const workspaceWithTabs = useMemo(
     () =>
@@ -105,6 +91,5 @@ export function useWorkspaceChats({
     waitingForPages,
     hasError: needsPages && isError,
     retry,
-    refresh,
   };
 }

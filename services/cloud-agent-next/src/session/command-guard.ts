@@ -335,10 +335,7 @@ const SECURITY_REMEDIATION_PUSH_DENIED_SUFFIXES = [
   ' * +*',
   ' -f*',
   ' * -f*',
-  ...['d', 'f', 'n', 'q', 'u', 'v', '4', '6'].flatMap(lead => [
-    ` -${lead}f*`,
-    ` * -${lead}f*`,
-  ]),
+  ...['d', 'f', 'n', 'q', 'u', 'v', '4', '6'].flatMap(lead => [` -${lead}f*`, ` * -${lead}f*`]),
 ];
 
 const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = SECURITY_REMEDIATION_PUSH_HEADS.flatMap(head =>

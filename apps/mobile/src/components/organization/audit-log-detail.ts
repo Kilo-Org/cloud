@@ -83,9 +83,9 @@ const FIELD_KEYS = {
 const DEFAULT_MODEL_FIELD_KEY = 'organization.auditLog.detail.field.defaultModel';
 
 const PLATFORM_KEYS = {
-  github: 'organization.auditLog.detail.platform.github',
-  gitlab: 'organization.auditLog.detail.platform.gitlab',
-  bitbucket: 'organization.auditLog.detail.platform.bitbucket',
+  github: 'organization.auditLog.detail.brand.github',
+  gitlab: 'organization.auditLog.detail.brand.gitlab',
+  bitbucket: 'organization.auditLog.detail.brand.bitbucket',
 } as const satisfies Record<AuditPlatform, string>;
 
 const REGION_KEYS = {
@@ -108,11 +108,11 @@ const BROWSER_POLICY_KEYS = {
 } as const satisfies Record<AuditBrowserPolicy, string>;
 
 const INTEGRATION_KEYS = {
-  byok: 'organization.auditLog.detail.integration.byok',
-  discord: 'organization.auditLog.detail.integration.discord',
-  linear: 'organization.auditLog.detail.integration.linear',
-  slack: 'organization.auditLog.detail.integration.slack',
-  github: 'organization.auditLog.detail.integration.github',
+  byok: 'organization.auditLog.detail.brand.byok',
+  discord: 'organization.auditLog.detail.brand.discord',
+  linear: 'organization.auditLog.detail.brand.linear',
+  slack: 'organization.auditLog.detail.brand.slack',
+  github: 'organization.auditLog.detail.brand.github',
 } as const satisfies Record<AuditIntegration, string>;
 
 const GUARDRAIL_TARGET_KEYS = {

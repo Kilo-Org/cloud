@@ -100,7 +100,8 @@ describe('auditEntryDetail', () => {
       region: 'jp',
     });
     expect(both).toContain(i18n.t('organization.auditLog.detail.region.jp'));
-    expect(both).toContain(i18n.t('organization.auditLog.detail.enabled'));
+    // `openRouter: false` is the policy being off, so the row states that.
+    expect(both).toContain(i18n.t('organization.auditLog.detail.disabled'));
 
     const regionOnly = await renderIn('ja', { id: 'setting.advancedPolicies', region: 'au' });
     expect(regionOnly).toContain(i18n.t('organization.auditLog.detail.region.au'));

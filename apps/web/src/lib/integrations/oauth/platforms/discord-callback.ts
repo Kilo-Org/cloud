@@ -6,7 +6,9 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   DiscordGuildAlreadyConnectedError,
+  discardDiscordGuildRows,
   exchangeDiscordCode,
+  probeBotInGuild,
   releasePreviousDiscordGuild,
   type UpsertDiscordInstallationResult,
   upsertDiscordInstallation,
@@ -215,6 +217,48 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     // follows the connection rather than deciding it.
     if (installation.previousGuildId) {
       await releasePreviousDiscordGuild(owner, installation.previousGuildId);
+    }
+
+    // 9b. The write records the server the consent selected, but the bot's
+    // membership in it can be gone by now: another owner's connect can release a
+    // server it read as unclaimed before that consent's membership landed, and a
+    // manual kick ends it too. A row for a server without the bot cannot act, so
+    // it is discarded rather than left as a connection that is silently dead.
+    const recordedGuildId =
+      installation.integration.platform_installation_id ??
+      installation.integration.platform_account_id;
+    if (recordedGuildId) {
+      const presence = await probeBotInGuild(recordedGuildId);
+
+      if (presence.status === 'absent') {
+        const discarded = await discardDiscordGuildRows(owner, recordedGuildId);
+        captureException(new Error('Discord connect recorded a server without the bot'), {
+          tags: { source: 'discord_oauth', op: 'connect_membership_check' },
+          extra: { guildId: recordedGuildId, outcome: presence.status, discarded },
+        });
+
+        return NextResponse.redirect(
+          new URL(
+            buildIntegrationOAuthRedirectPathFromState(
+              PLATFORM.DISCORD,
+              state,
+              'error=bot_not_in_server'
+            ),
+            APP_URL
+          )
+        );
+      }
+
+      if (presence.status === 'unreachable') {
+        // The question is open, and a row the probe could not read is not
+        // evidence against the connection, so the connect succeeds and the
+        // outcome goes to operators.
+        captureMessage('Discord connect could not verify the bot is in the server', {
+          level: 'warning',
+          tags: { source: 'discord_oauth', op: 'connect_membership_check' },
+          extra: { guildId: recordedGuildId, outcome: presence.status, reason: presence.reason },
+        });
+      }
     }
 
     // 10. Redirect to success page

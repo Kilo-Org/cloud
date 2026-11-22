@@ -13,6 +13,9 @@ const mockUpdateReturning = jest.fn();
 const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 const mockDeleteWhere = jest.fn();
+/** The unlocked delete chain, used by the connect path's discard. */
+const mockDbDeleteWhere = jest.fn((_condition?: unknown) => ({ returning: mockDbDeleteReturning }));
+const mockDbDeleteReturning = jest.fn();
 const mockTxExecute = jest.fn();
 const mockTransaction = jest.fn();
 const mockSelect = jest.fn(() => ({
@@ -51,7 +54,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
       values: mockInsertValues,
     })),
     delete: jest.fn(() => ({
-      where: mockDeleteWhere,
+      where: mockDbDeleteWhere,
     })),
     // Accessed lazily: jest.mock factories hoist above the const declarations.
     get transaction() {
@@ -97,7 +100,9 @@ import {
   DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS,
   DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
   DISCORD_RELEASE_REMOVAL_TIMEOUT_MS,
+  discardDiscordGuildRows,
   postDiscordMessage,
+  probeBotInGuild,
   releasePreviousDiscordGuild,
   removeBotFromGuild,
   removeDiscordReaction,
@@ -893,5 +898,146 @@ describe('discord-service uninstall', () => {
     expect(
       3 * INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS + DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS
     ).toBeLessThan(INSTALLATION_LOCK_WAIT_MS);
+  });
+});
+
+describe('discord-service guild membership probe', () => {
+  const guildId = '123456789012345678';
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it.each([200, 204])('reports presence on a %i answer', async status => {
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(status === 204 ? null : '{}', { status }));
+
+    await expect(probeBotInGuild(guildId)).resolves.toEqual({ status: 'present' });
+
+    expect(fetchSpy).toHaveBeenCalledWith(`https://discord.com/api/v10/guilds/${guildId}`, {
+      headers: { Authorization: 'Bot bot-token' },
+      signal: expect.anything(),
+    });
+  });
+
+  it.each([403, 404])('reports absence on a %i answer', async status => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status }));
+
+    await expect(probeBotInGuild(guildId)).resolves.toEqual({ status: 'absent' });
+  });
+
+  it('reports a rejected token as unreachable', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
+
+    await expect(probeBotInGuild(guildId)).resolves.toEqual({
+      status: 'unreachable',
+      reason: 'rejected_token',
+    });
+  });
+
+  it.each([429, 500, 503])('reports a %i answer as unreachable', async status => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status }));
+
+    await expect(probeBotInGuild(guildId)).resolves.toEqual({
+      status: 'unreachable',
+      reason: 'response_error',
+    });
+  });
+
+  it('reports a transport failure as unreachable', async () => {
+    jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('socket hang up'));
+
+    await expect(probeBotInGuild(guildId)).resolves.toEqual({
+      status: 'unreachable',
+      reason: 'network',
+    });
+  });
+
+  it('reports a malformed server id as absent without a request', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(probeBotInGuild('guild/1')).resolves.toEqual({ status: 'absent' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('bounds the request with the timeout it is given', async () => {
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await probeBotInGuild(guildId, 1_234);
+
+    expect(timeoutSpy).toHaveBeenCalledWith(1_234);
+    expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBe(timeoutSpy.mock.results[0]?.value);
+  });
+});
+
+describe('discord-service guild row discard', () => {
+  const guildId = '123456789012345678';
+  const otherOwner = { type: 'user', id: 'user-2' } satisfies Owner;
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    mockDbDeleteWhere.mockClear();
+    mockDbDeleteReturning.mockReset();
+  });
+
+  it('names the owner and the server in the delete', async () => {
+    mockDbDeleteReturning.mockResolvedValue([{ id: 'integration-1' }]);
+
+    await expect(discardDiscordGuildRows(owner, guildId)).resolves.toBe(1);
+
+    const predicate = mockDbDeleteWhere.mock.calls[0]?.[0];
+    const rendered = new PgDialect().sqlToQuery(predicate as SQL);
+    // The server id appears once per identifier column the condition covers.
+    expect(rendered.params.filter(param => param === guildId)).toHaveLength(2);
+    expect(rendered.params).toContain(owner.id);
+    expect(rendered.params).not.toContain(otherOwner.id);
+    expect(rendered.sql).toContain('"platform_installation_id"');
+    expect(rendered.sql).toContain('"platform_account_id"');
+    expect(rendered.sql).toContain('"owned_by_user_id"');
+    expect(rendered.sql).toContain('"owned_by_organization_id"');
+  });
+
+  it('reports how many rows it removed', async () => {
+    mockDbDeleteReturning.mockResolvedValue([{ id: 'integration-1' }, { id: 'legacy-row' }]);
+
+    await expect(discardDiscordGuildRows(owner, guildId)).resolves.toBe(2);
+  });
+
+  it('reports no removal when the owner records no such row', async () => {
+    mockDbDeleteReturning.mockResolvedValue([]);
+
+    await expect(discardDiscordGuildRows(owner, guildId)).resolves.toBe(0);
+  });
+});
+
+describe('discord-service guild membership probe without a token', () => {
+  const guildId = '123456789012345678';
+
+  it('reports an unconfigured bot token as unreachable without a request', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      DISCORD_BOT_TOKEN: '',
+      DISCORD_CLIENT_ID: 'client-id',
+      DISCORD_CLIENT_SECRET: 'client-secret',
+    }));
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    try {
+      const { probeBotInGuild: probeWithoutToken } = await import('./discord-service');
+
+      await expect(probeWithoutToken(guildId)).resolves.toEqual({
+        status: 'unreachable',
+        reason: 'not_configured',
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      jest.dontMock('@kilocode/web-shared/lib/config.server');
+      jest.resetModules();
+      fetchSpy.mockRestore();
+    }
   });
 });

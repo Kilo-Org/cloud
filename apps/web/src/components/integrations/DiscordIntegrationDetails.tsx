@@ -14,6 +14,20 @@ import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
+
+const discordConnectionErrorMessages: Record<string, string> = {
+  bot_not_in_server:
+    'The Kilo bot is not in that Discord server, so nothing was saved. Connect again and add the bot to the server.',
+};
+
+function getDiscordConnectionErrorMessage(error: string): string {
+  return resolveConnectionErrorMessage(
+    discordConnectionErrorMessages,
+    error,
+    `Connection failed: ${error}`
+  );
+}
 
 type DiscordIntegrationDetailsProps = {
   organizationId?: string;
@@ -105,7 +119,7 @@ export function DiscordIntegrationDetails({
       toast.success('Discord connected successfully!');
     }
     if (error) {
-      toast.error(`Connection failed: ${error}`);
+      toast.error(getDiscordConnectionErrorMessage(error));
     }
   }, [success, error]);
 

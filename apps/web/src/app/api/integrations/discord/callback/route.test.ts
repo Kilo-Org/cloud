@@ -8,7 +8,9 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import {
   DiscordGuildAlreadyConnectedError,
+  discardDiscordGuildRows,
   exchangeDiscordCode,
+  probeBotInGuild,
   releasePreviousDiscordGuild,
   upsertDiscordInstallation,
 } from '@/lib/integrations/discord-service';
@@ -27,7 +29,9 @@ jest.mock('@/lib/integrations/discord-service', () => {
   class DiscordGuildAlreadyConnectedError extends Error {}
   return {
     DiscordGuildAlreadyConnectedError,
+    discardDiscordGuildRows: jest.fn(),
     exchangeDiscordCode: jest.fn(),
+    probeBotInGuild: jest.fn(),
     releasePreviousDiscordGuild: jest.fn(async () => undefined),
     upsertDiscordInstallation: jest.fn(),
   };
@@ -66,6 +70,8 @@ const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 const mockedExchangeDiscordCode = jest.mocked(exchangeDiscordCode);
 const mockedUpsertDiscordInstallation = jest.mocked(upsertDiscordInstallation);
 const mockedReleasePreviousDiscordGuild = jest.mocked(releasePreviousDiscordGuild);
+const mockedProbeBotInGuild = jest.mocked(probeBotInGuild);
+const mockedDiscardDiscordGuildRows = jest.mocked(discardDiscordGuildRows);
 const mockedConsumeProviderOAuthAttempt = jest.mocked(consumeProviderOAuthAttempt);
 const mockedWithWorkspaceInstallationLock = jest.mocked(withWorkspaceInstallationLock);
 const mockedCaptureMessage = jest.mocked(captureMessage);
@@ -133,9 +139,14 @@ describe('handleDiscordOAuthCallback', () => {
       guild: { id: GUILD_ID, name: 'Test Server', icon: null },
     });
     mockedUpsertDiscordInstallation.mockResolvedValue({
-      integration: {} as never,
+      integration: {
+        platform_installation_id: GUILD_ID,
+        platform_account_id: GUILD_ID,
+      } as never,
       previousGuildId: null,
     });
+    mockedProbeBotInGuild.mockResolvedValue({ status: 'present' });
+    mockedDiscardDiscordGuildRows.mockResolvedValue(1);
   });
 
   test('installs with a fresh provider-install state', async () => {
@@ -235,7 +246,10 @@ describe('handleDiscordOAuthCallback', () => {
 
   test('releases the server a rebind moved the connection away from', async () => {
     mockedUpsertDiscordInstallation.mockResolvedValue({
-      integration: {} as never,
+      integration: {
+        platform_installation_id: GUILD_ID,
+        platform_account_id: GUILD_ID,
+      } as never,
       previousGuildId: PREVIOUS_GUILD_ID,
     });
     const state = createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID, undefined, {
@@ -266,6 +280,87 @@ describe('handleDiscordOAuthCallback', () => {
 
     expectRedirectLocation(response, '/integrations/discord?success=installed');
     expect(mockedReleasePreviousDiscordGuild).not.toHaveBeenCalled();
+  });
+
+  test('keeps the row and redirects to success when the bot is in the recorded server', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(response, '/integrations/discord?success=installed');
+    expect(mockedProbeBotInGuild).toHaveBeenCalledWith(GUILD_ID);
+    expect(mockedDiscardDiscordGuildRows).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  test('discards the row and reports an absent bot after the write committed', async () => {
+    mockedProbeBotInGuild.mockResolvedValue({ status: 'absent' });
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(response, '/integrations/discord?error=bot_not_in_server');
+    expect(mockedDiscardDiscordGuildRows).toHaveBeenCalledWith(
+      { type: 'user', id: USER_ID },
+      GUILD_ID
+    );
+    expect(mockedDiscardDiscordGuildRows).toHaveBeenCalledTimes(1);
+    expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'discord_oauth', op: 'connect_membership_check' },
+      extra: { guildId: GUILD_ID, outcome: 'absent', discarded: 1 },
+    });
+  });
+
+  test('probes the server the connection records, not the one it replaced', async () => {
+    mockedUpsertDiscordInstallation.mockResolvedValue({
+      integration: {
+        platform_installation_id: GUILD_ID,
+        platform_account_id: GUILD_ID,
+      } as never,
+      previousGuildId: PREVIOUS_GUILD_ID,
+    });
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    await callDiscordCallback(makeRequest(state));
+
+    expect(mockedProbeBotInGuild).toHaveBeenCalledWith(GUILD_ID);
+    expect(mockedProbeBotInGuild).not.toHaveBeenCalledWith(PREVIOUS_GUILD_ID);
+    expect(mockedReleasePreviousDiscordGuild).toHaveBeenCalledWith(
+      { type: 'org', id: ORGANIZATION_ID },
+      PREVIOUS_GUILD_ID
+    );
+  });
+
+  test('keeps the row and succeeds when the probe cannot conclude', async () => {
+    mockedProbeBotInGuild.mockResolvedValue({ status: 'unreachable', reason: 'network' });
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(response, '/integrations/discord?success=installed');
+    expect(mockedDiscardDiscordGuildRows).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedCaptureMessage).toHaveBeenCalledWith(
+      'Discord connect could not verify the bot is in the server',
+      {
+        level: 'warning',
+        tags: { source: 'discord_oauth', op: 'connect_membership_check' },
+        extra: { guildId: GUILD_ID, outcome: 'unreachable', reason: 'network' },
+      }
+    );
   });
 
   test('reports a server connected to another account without a second install', async () => {

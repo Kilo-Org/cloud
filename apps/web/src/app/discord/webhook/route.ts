@@ -7,7 +7,9 @@ import { DISCORD_BOT_TOKEN, DISCORD_PUBLIC_KEY } from '@kilocode/web-shared/lib/
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { discordGatewayMessageRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { processDiscordBotMessage } from '@/lib/discord-bot';
+import { isPlatformIntegrationActive } from '@/lib/integrations/core/health';
 import {
+  getInstallationByGuildId,
   postDiscordMessage,
   addDiscordReaction,
   removeDiscordReaction,
@@ -135,6 +137,17 @@ async function processGatewayMessage(event: ForwardedGatewayEvent) {
 
   const { content, channel_id: channelId, guild_id: guildId, author, id: messageId } = message;
 
+  // A suspended connection must not react, reply, or start a session, so the
+  // status is resolved before any visible side effect.
+  const installation = await getInstallationByGuildId(guildId);
+  if (!installation || !isPlatformIntegrationActive(installation)) {
+    console.log('[DiscordBot:Webhook] Refused gateway message for inactive installation', {
+      guildId,
+      integrationStatus: installation?.integration_status ?? null,
+    });
+    return;
+  }
+
   const cleanedText = stripDiscordBotMention(content, event.botUserId);
 
   // Resolve user mentions to display names
@@ -155,6 +168,13 @@ async function processGatewayMessage(event: ForwardedGatewayEvent) {
 
   const responseTimeMs = Date.now() - startTime;
   console.log(`[DiscordBot:Webhook] Bot processing completed in ${responseTimeMs}ms`);
+
+  // Defence in depth: the bot re-checks the installation, and the status can
+  // change between the lookup above and the model call.
+  if (result.error === 'installation_not_active') {
+    console.log('[DiscordBot:Webhook] Skipped reply for inactive installation', { guildId });
+    return;
+  }
 
   // Post the response as a reply to the original message
   const responseWithDevInfo = result.response + getDevUserSuffix();

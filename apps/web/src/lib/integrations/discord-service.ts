@@ -570,6 +570,113 @@ export async function removeBotFromGuild(
 }
 
 /**
+ * Whether the bot is in one server, as the connect path needs it once the row
+ * that records the server has committed.
+ *
+ * `absent` is Discord's answer that the bot is not in the server, which is what
+ * a server the bot was never added to and a server the bot was kicked from both
+ * look like. `unreachable` names every answer that does not settle the question,
+ * so a caller keeps the connection instead of acting on an answer it never got.
+ */
+export type DiscordBotPresence =
+  | { status: 'present' }
+  | { status: 'absent' }
+  | {
+      status: 'unreachable';
+      reason: 'not_configured' | 'rejected_token' | 'network' | 'response_error';
+    };
+
+/** How long the connect's presence probe may take before it counts as unreachable. */
+const DISCORD_GUILD_PROBE_TIMEOUT_MS = 5_000;
+
+/**
+ * Read whether the bot is in `guildId` through `GET /guilds/{guild.id}`, the
+ * endpoint `testConnection` reads.
+ *
+ * On that GET a bot token gets 403 only for a guild the bot is not in, so 403
+ * and 404 both answer `absent`. A 401 means Discord rejects the token itself, and
+ * every other answer, including a throw, leaves the question open.
+ *
+ * `timeoutMs` bounds the request. The caller sits in the request path after the
+ * connection write, so a slow answer is reported as unreachable rather than held.
+ */
+export async function probeBotInGuild(
+  guildId: string,
+  timeoutMs = DISCORD_GUILD_PROBE_TIMEOUT_MS
+): Promise<DiscordBotPresence> {
+  if (!DISCORD_BOT_TOKEN) {
+    return { status: 'unreachable', reason: 'not_configured' };
+  }
+
+  let validatedGuildId: string;
+  try {
+    validatedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
+  } catch {
+    // A value that is not a snowflake names no Discord server, so the bot is not
+    // in it. That is the honest answer, and it is the actionable one: a row that
+    // records an impossible server is exactly the dead connection this probe
+    // exists to find.
+    return { status: 'absent' };
+  }
+
+  try {
+    const response = await fetch(buildDiscordApiUrl(['guilds', validatedGuildId]), {
+      headers: {
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (response.ok) {
+      return { status: 'present' };
+    }
+
+    // 403 is the answer for a guild this bot is not in, and 404 is an unknown
+    // guild, which the bot is not in either.
+    if (response.status === 403 || response.status === 404) {
+      return { status: 'absent' };
+    }
+
+    if (response.status === 401) {
+      return { status: 'unreachable', reason: 'rejected_token' };
+    }
+
+    return { status: 'unreachable', reason: 'response_error' };
+  } catch {
+    return { status: 'unreachable', reason: 'network' };
+  }
+}
+
+/**
+ * Delete this owner's rows that record `guildId` and report how many were
+ * removed.
+ *
+ * The connect path calls this once it has proven the bot is not in the server the
+ * row records: such a row describes a connection that cannot act, so it is
+ * discarded. The conditions are the disconnect's, so a legacy row that carries
+ * the server id only in `platform_account_id` goes with the canonical one. The
+ * owner conditions keep every other owner's row out of the delete.
+ */
+export async function discardDiscordGuildRows(
+  owner: Owner,
+  guildId: string,
+  database: typeof db | DrizzleTransaction = db
+): Promise<number> {
+  const deleted = await database
+    .delete(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.DISCORD),
+        recordsDiscordGuildCondition(guildId),
+        ...getOwnershipConditions(owner)
+      )
+    )
+    .returning({ id: platform_integrations.id });
+
+  return deleted.length;
+}
+
+/**
  * Release the server a connection moved away from.
  *
  * The connection records the selected server, so this removal keeps the bot's

@@ -522,6 +522,7 @@
       "receiptLabel": "رسید",
       "copyReceiptId": "کپی شناسهٔ رسید",
       "appealLabel": "درخواست تجدیدنظر",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "دریافت شد",
       "triageOpen": "در حال بررسی",
       "triageActioned": "تأیید شد",
@@ -539,13 +540,23 @@
       "nextStepInReview": "نتیجه در همین صفحه نمایش داده می‌شود و پس از تصمیم می‌توانید درخواست تجدیدنظر ارسال کنید.",
       "nextStepAppeal": "نتیجه درخواست تجدیدنظر در همین صفحه نمایش داده می‌شود.",
       "nextStepFinal": "تصمیم مربوط به درخواست تجدیدنظر قطعی است. امکان ارسال درخواست تجدیدنظر دیگری وجود ندارد.",
-      "viewReceipt": "مشاهده رسید"
+      "viewReceipt": "مشاهده رسید",
+      "targetLabel": "مورد گزارش‌شده",
+      "reasonLabel": "دلیل گزارش",
+      "targetMessage": "پاسخ هوش مصنوعی",
+      "targetComment": "نظر درخواست ادغام",
+      "targetUser": "کاربر",
+      "reasonHarmful": "محتوای مضر",
+      "reasonIllegal": "محتوای غیرقانونی",
+      "reasonHarassment": "آزار و اذیت",
+      "reasonSpam": "هرزنامه",
+      "reasonOther": "دلیل دیگر"
     },
     "reportReceipts": {
       "title": "گزارش‌ها",
       "rowSubtitle": "گزارش‌هایی که ثبت کرده‌اید و نتایج آن‌ها",
       "emptyTitle": "هنوز گزارشی ثبت نکرده‌اید",
-      "emptyDescription": "گزارش‌هایی که از یک نظر یا یک پاسخ هوش مصنوعی ثبت می‌کنید اینجا نمایش داده می‌شوند.",
+      "emptyDescription": "گزارش‌هایی که از نظر یک بحث درخواست ادغام یا از پاسخ هوش مصنوعی در نشست عامل ثبت می‌کنید، همراه با نتیجه‌شان اینجا نمایش داده می‌شوند.",
       "couldNotLoad": "گزارش‌های شما بارگذاری نشد",
       "capped": "جدیدترین گزارش‌های شما نمایش داده می‌شوند."
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "اتصال فعال است، اما این مورد هنوز قابل بارگذاری نیست.",
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
-      "gitlabReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
+      "reconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
       "bitbucketNotConnectedTitle": "Bitbucket متصل نیست",
+      "bitbucketAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را متصل کند.",
       "adminOnlyConnectDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
@@ -1296,6 +1308,7 @@
       "manageAccess": "مدیریت دسترسی",
       "bitbucketNoRepositoriesDescription": "در این فضای کاری Bitbucket مخزنی در دسترس نیست.",
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
+      "githubNoRepositoriesDescription": "دسترسی برنامهٔ Kilo در GitHub به مخزن‌ها را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
       "installGithubApp": "برنامه GitHub را روی مخازن نصب کنید",
       "installGithubAppDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازنی را بدهید که می‌خواهید بررسی شوند.",
       "repositoryAccess": "دسترسی به مخزن",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "این بررسی هنوز در جریان است. پس از پایان آن، یافته‌ها در این بخش نمایش داده می‌شوند.",
       "findingsEndedWithoutResults": "این بررسی پیش از ایجاد هر یافته‌ای به پایان رسید.",
       "serviceUnavailable": "اتصال به سرویس بررسی کد ممکن نشد. وقتی سرویس در دسترس بود، بررسی را دوباره انجام دهید.",
-      "reviewFailed": "بررسی ناموفق بود. لطفاً دوباره تلاش کنید.",
+      "reviewFailed": "بررسی ناموفق بود.",
       "showMore": "نمایش بیشتر",
       "created": "زمان ایجاد",
       "started": "زمان شروع",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} نشست",
       "sectionAccessibility": "{{title}}: {{displayCount}} نشست",
       "live": "زنده",
-      "updating": "در حال به‌روزرسانی"
+      "updating": "در حال به‌روزرسانی",
+      "retentionLimit": "جدیدترین نشست‌ها نمایش داده می‌شوند."
     },
     "sessionRow": {
       "deleteTitle": "نشست حذف شود؟",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "emptyReadOnlyTitle": "پیامی در این نشست وجود ندارد",
-      "renameAccessibility": "تغییر نام نشست: {{title}}",
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
       "historyTooLarge": "متن گفت‌وگوی این نشست برای بارگذاری بیش از حد بزرگ است.",
@@ -3082,6 +3095,12 @@
     "retryLoadingAccount": "تلاش مجدد برای بارگذاری حساب",
     "retryLoadingPrivacy": "تلاش مجدد برای بارگذاری گزینه‌های حریم خصوصی"
   },
+  "accountBlocked": {
+    "title": "حساب مسدود شده",
+    "description": "Kilo این حساب را مسدود کرده است و ورود دوباره آن را برطرف نمی‌کند. پشتیبانی می‌تواند بنا به درخواست مسدودیت را بررسی کند.",
+    "domainDescription": "Kilo حساب‌های روی این دامنه ایمیل را مسدود می‌کند و ورود دوباره آن را برطرف نمی‌کند. پشتیبانی می‌تواند بنا به درخواست دامنه را بررسی کند.",
+    "contactSupport": "تماس با پشتیبانی"
+  },
   "addCredits": {
     "cta": "افزودن اعتبار",
     "billingPage": "صفحه صورتحساب"
@@ -3154,8 +3173,7 @@
     "timeoutDescription": "درخواست پیش از تکمیل، منقضی شد. لطفاً دوباره تلاش کنید."
   },
   "screenHeader": {
-    "openMenu": "باز کردن منو",
-    "openMenuFor": "باز کردن منوی {{title}}"
+    "openMenu": "باز کردن منو"
   },
   "picker": {
     "optionsExpired": "گزینه‌ها منقضی شدند",
@@ -4688,6 +4706,7 @@
     "contextAll": "همه زمینه‌ها",
     "dismiss": "نادیده گرفتن گزارش",
     "dismissFailed": "فعلاً نادیده گرفتن این گزارش ممکن نشد. در پس‌زمینه دوباره تلاش می‌شود.",
+    "readMarkFailed": "این گزارش به‌عنوان خوانده‌شده علامت‌گذاری نشد. هنگام بارگذاری دوبارهٔ گزارش، دوباره تلاش می‌شود.",
     "offline": "آفلاین · گزارش ذخیره‌شده",
     "cached": "گزارش ذخیره‌شده · به‌روزرسانی در دسترس نیست",
     "summary": "خلاصه AI",
@@ -4707,6 +4726,9 @@
     "morningEnd": "گزارش در دسترس تا",
     "timeHint": "کارت خانه در پایان بازه گزارش، حتی به‌صورت آفلاین، وضعیت زنده را بازمی‌گرداند.",
     "invalidSchedule": "یک منطقه زمانی معتبر و یک بازه گزارش غیرخالی انتخاب کنید.",
+    "scheduleEmptyNight": "بازه گزارش خالی است. یک زمان آماده‌شدن دیرتر از شروع بازه انتخاب کنید.",
+    "scheduleEmptyMorning": "زمان آماده‌شدن و زمان در دسترس بودن تا یکسان هستند. انتخاب کنید گزارش چه مدت در دسترس بماند.",
+    "scheduleFullDay": "این دو بازه یک روز کامل را پوشش می‌دهند. بخشی از روز را خارج از گزارش بگذارید.",
     "notificationsHint": "برای هر گزارش زمان‌بندی‌شده یک اعلان کلی ارسال می‌شود. مستقل از خلاصه‌های پولی AI.",
     "notificationPermission": "برای دریافت گزارش، اعلان‌های فوری را روشن کنید.",
     "defaultModel": "استفاده از مدل پیش‌فرض Kilo",
@@ -4720,6 +4742,8 @@
     "estimateModelNotAllowed": "این مدل در این زمینه مجاز نیست. مدل دیگری انتخاب کنید.",
     "estimateSpendLimitTooLow": "حد خرج کردن را برای فعال شدن این خلاصه افزایش دهید.",
     "confirmPaid": "خلاصه‌های پولی برای {{context}} فعال شود؟",
+    "paidDisclosure_one": "تخمین {{estimate}}، حداکثر {{maximum}}، با محدودیت {{minutes}} دقیقه. حتی در صورت ناموفق بودن، هزینه دریافت می‌شود.",
+    "paidDisclosure_other": "تخمین {{estimate}}، حداکثر {{maximum}}، با محدودیت {{minutes}} دقیقه. حتی در صورت ناموفق بودن، هزینه دریافت می‌شود.",
     "paidDisclosure": "تخمین {{estimate}}، حداکثر {{maximum}}، با محدودیت {{minutes}} دقیقه. حتی در صورت ناموفق بودن، هزینه دریافت می‌شود.",
     "enable": "فعال‌سازی خلاصه‌های پولی",
     "allContexts": "گزارش‌های شخصی و سازمانی جدا از هم نگهداری می‌شوند.",
@@ -4759,7 +4783,7 @@
     "sourceActivity": "فعالیت بدون عنوان",
     "metadataFailureProvider": "خطای ارائهدهنده",
     "metadataFailureTool": "خطای ابزار",
-    "metadataFailureCancelled": "لغوشده",
+    "metadataStopped": "آخرین نوبت متوقف شد",
     "metadataFailureOther": "خطای نامشخص"
   },
   "systemSearch": {
@@ -4880,6 +4904,9 @@
       "runAsCreator": "اجرا با هویت من",
       "runAsCreatorDescription": "هر اجرا از حساب شما استفاده می‌کند، بنابراین سرآیند محرمانه لازم است.",
       "saveFailedTitle": "ذخیره تریگر ناموفق بود",
+      "nameTaken": "تریگری با نام «{{name}}» از قبل وجود دارد.",
+      "saveFailedRetry": "اتصال به سرور برقرار نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "saveFailedCheck": "مقادیر فرم را بررسی کنید و دوباره تلاش کنید.",
       "deleteTitle": "این تریگر حذف شود؟",
       "deleteMessage": "فراخوانی‌های {{name}} ناموفق خواهند شد. این کار قابل بازگشت نیست.",
       "deleteMessageScheduled": "اجراهای زمان‌بندی‌شدهٔ {{name}} متوقف می‌شوند. این کار قابل بازگشت نیست.",

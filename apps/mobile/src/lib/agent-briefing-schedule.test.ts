@@ -41,34 +41,44 @@ describe('briefingScheduleProblems', () => {
   };
 
   it('accepts a schedule the server accepts', () => {
-    expect(briefingScheduleProblems(valid)).toEqual({ timezone: false, times: false });
+    expect(briefingScheduleProblems(valid)).toEqual({ timezone: false, times: null });
   });
 
   it('flags an unknown time zone and keeps the periods valid', () => {
     expect(briefingScheduleProblems({ ...valid, timezone: 'Mitteleuropa/Berlin' })).toEqual({
       timezone: true,
-      times: false,
+      times: null,
     });
   });
 
-  it('flags a malformed wall clock', () => {
-    expect(briefingScheduleProblems({ ...valid, nightStart: '7:00' }).times).toBe(true);
-  });
-
-  it('flags empty periods', () => {
+  it('flags a malformed wall clock before any empty window', () => {
     expect(
-      briefingScheduleProblems({ ...valid, nightStart: '23:00', morningStart: '23:00' })
-    ).toEqual({ timezone: false, times: true });
+      briefingScheduleProblems({ ...valid, nightStart: '7:00', morningStart: '7:00' })
+    ).toEqual({ timezone: false, times: 'format' });
   });
 
-  it('flags periods that overlap into a full day or more', () => {
+  it('names the night window when it is empty', () => {
+    expect(briefingScheduleProblems({ ...valid, morningStart: '23:00' })).toEqual({
+      timezone: false,
+      times: 'emptyNight',
+    });
+  });
+
+  it('names the morning window when it is empty', () => {
+    expect(briefingScheduleProblems({ ...valid, morningEnd: '08:00' })).toEqual({
+      timezone: false,
+      times: 'emptyMorning',
+    });
+  });
+
+  it('flags periods that cover a full day', () => {
     expect(
       briefingScheduleProblems({
         ...valid,
         nightStart: '08:00',
         morningStart: '06:00',
         morningEnd: '09:00',
-      }).times
-    ).toBe(true);
+      })
+    ).toEqual({ timezone: false, times: 'fullDay' });
   });
 });

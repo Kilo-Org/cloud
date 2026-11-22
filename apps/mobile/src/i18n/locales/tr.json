@@ -522,12 +522,13 @@
       "receiptLabel": "Alındı",
       "copyReceiptId": "Alındı kimliğini kopyala",
       "appealLabel": "İtiraz",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Alındı",
       "triageOpen": "İnceleniyor",
       "triageActioned": "Haklı bulundu",
       "triageRejected": "Haklı bulunmadı",
       "appealNone": "Gönderilmedi",
-      "appealSubmitted": "İnceleniyor",
+      "appealSubmitted": "İtiraz inceleniyor",
       "appealAccepted": "Kabul edildi",
       "appealRejected": "Reddedildi",
       "appeal": "Bu karara itiraz et",
@@ -539,13 +540,23 @@
       "nextStepInReview": "Sonuç bu ekranda görünecek ve karar verildikten sonra itiraz edebilirsiniz.",
       "nextStepAppeal": "İtiraz sonucu bu ekranda görünecek.",
       "nextStepFinal": "İtiraz kararı kesindir. Başka itiraz gönderilemez.",
-      "viewReceipt": "Alındıyı görüntüle"
+      "viewReceipt": "Alındıyı görüntüle",
+      "targetLabel": "Bildirilen öğe",
+      "reasonLabel": "Bildirim nedeni",
+      "targetMessage": "Yapay zeka yanıtı",
+      "targetComment": "Çekme isteği yorumu",
+      "targetUser": "Kullanıcı",
+      "reasonHarmful": "Zararlı içerik",
+      "reasonIllegal": "Yasa dışı içerik",
+      "reasonHarassment": "Taciz",
+      "reasonSpam": "İstenmeyen içerik",
+      "reasonOther": "Diğer neden"
     },
     "reportReceipts": {
       "title": "Raporlar",
       "rowSubtitle": "Gönderdiğiniz raporlar ve sonuçları",
       "emptyTitle": "Henüz rapor yok",
-      "emptyDescription": "Bir yorumdan veya bir yapay zeka yanıtından gönderdiğiniz raporlar burada görünür.",
+      "emptyDescription": "Bir pull request tartışmasındaki yorumdan veya bir ajan oturumundaki yapay zeka yanıtından gönderdiğiniz raporlar, sonuçlarıyla birlikte burada görünür.",
       "couldNotLoad": "Raporlarınız yüklenemedi",
       "capped": "En son raporlarınız gösteriliyor."
     },
@@ -735,6 +746,7 @@
       "manageAccess": "Erişimi yönet",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket çalışma alanında kullanılabilir depo yok.",
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
+      "githubNoRepositoriesDescription": "Kilo GitHub uygulamasının depo erişim izinlerini kontrol et, ardından listeyi yenile.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
       "repositoryAccess": "depo erişimi",
@@ -829,7 +841,7 @@
       "findingsInProgress": "Bu inceleme hâlâ sürüyor. İnceleme tamamlandığında bulgular burada görünür.",
       "findingsEndedWithoutResults": "Bu inceleme, herhangi bir bulgu üretmeden sona erdi.",
       "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",
-      "reviewFailed": "İnceleme başarısız oldu. Lütfen tekrar dene.",
+      "reviewFailed": "İnceleme başarısız oldu.",
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",
       "retryReview": "İncelemeyi tekrar dene",
       "retryNeedsSettings": "Kod inceleyici kapalı veya ayarlarının ilgilenilmesi gerekiyor. Ayarları düzeltin, ardından bu incelemeyi tekrar deneyin.",
@@ -1602,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} oturum",
       "sectionAccessibility": "{{title}}: {{displayCount}} oturum",
       "live": "CANLI",
-      "updating": "Güncelleniyor"
+      "updating": "Güncelleniyor",
+      "retentionLimit": "En son oturumlar gösteriliyor."
     },
     "sessionRow": {
       "deleteTitle": "Oturum silinsin mi?",
@@ -1672,7 +1685,6 @@
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "emptyReadOnlyTitle": "Bu oturumda mesaj yok",
-      "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
@@ -2521,6 +2533,12 @@
     "retryLoadingAccount": "Hesabı yüklemeyi tekrar dene",
     "retryLoadingPrivacy": "Gizlilik tercihlerini yüklemeyi tekrar dene"
   },
+  "accountBlocked": {
+    "title": "Hesap engellendi",
+    "description": "Kilo bu hesabı engelledi ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine engeli inceleyebilir.",
+    "domainDescription": "Kilo bu e-posta alan adındaki hesapları engelliyor ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine alan adını inceleyebilir.",
+    "contactSupport": "Destekle iletişime geç"
+  },
   "addCredits": {
     "cta": "Kredi ekle",
     "billingPage": "faturalandırma sayfası"
@@ -2593,8 +2611,7 @@
     "timeoutDescription": "İstek tamamlanmadan zaman aşımına uğradı. Lütfen tekrar dene."
   },
   "screenHeader": {
-    "openMenu": "Menüyü aç",
-    "openMenuFor": "{{title}} için menüyü aç"
+    "openMenu": "Menüyü aç"
   },
   "picker": {
     "optionsExpired": "Seçeneklerin süresi doldu",
@@ -2879,8 +2896,9 @@
       "checkActiveConnection": "Bağlantı aktif, ancak bu öğe hâlâ yüklenemiyor.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
-      "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
+      "reconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
+      "bitbucketAdminOnlyDescription": "Bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "adminOnlyConnectDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
@@ -4688,6 +4706,7 @@
     "contextAll": "Tüm bağlamlar",
     "dismiss": "Raporu yok say",
     "dismissFailed": "Bu rapor henüz yok sayılamadı. Arka planda yeniden denenecek.",
+    "readMarkFailed": "Bu rapor okundu olarak işaretlenemedi. Rapor yeniden yüklendiğinde tekrar denenecek.",
     "offline": "Çevrimdışı · kayıtlı rapor",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
     "summary": "AI özeti",
@@ -4707,6 +4726,9 @@
     "morningEnd": "Raporun kullanılabileceği son saat",
     "timeHint": "Ana sayfa kartı, rapor aralığı bittiğinde çevrimdışı olsa bile canlı duruma döner.",
     "invalidSchedule": "Geçerli bir saat dilimi ve boş olmayan bir rapor aralığı seçin.",
+    "scheduleEmptyNight": "Rapor aralığı boş. Rapor aralığı başlangıcından daha geç bir rapor hazır olma saati seçin.",
+    "scheduleEmptyMorning": "Rapor hazır olma saati ile raporun kullanılabileceği son saat aynı. Raporun ne kadar süre kullanılabilir kalacağını seçin.",
+    "scheduleFullDay": "İki rapor aralığı tam bir günü kapsıyor. Günün bir kısmını rapor aralığı dışında bırakın.",
     "notificationsHint": "Planlanmış her rapor için tek bir genel bildirim. Ücretli AI özetlerinden bağımsızdır.",
     "notificationPermission": "Raporunuzu almak için anlık bildirimleri açın.",
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
@@ -4716,7 +4738,9 @@
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
     "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil. Modeli veya sınırları değiştirin ya da daha sonra tekrar deneyin.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
+    "paidDisclosure_one": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
     "paidDisclosure": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
+    "paidDisclosure_other": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
     "enable": "Ücretli özetleri etkinleştir",
     "allContexts": "Kişisel ve kuruluş raporları ayrı tutulur.",
     "emptyHistory": "Kayıtlı rapor yok",
@@ -4759,7 +4783,7 @@
     "sourceActivity": "Adsız etkinlik",
     "metadataFailureProvider": "sağlayıcı hatası",
     "metadataFailureTool": "araç hatası",
-    "metadataFailureCancelled": "İptal edildi",
+    "metadataStopped": "Son tur durduruldu",
     "metadataFailureOther": "belirtilmemiş hata"
   },
   "systemSearch": {
@@ -4880,6 +4904,9 @@
       "runAsCreator": "Benim adıma çalıştır",
       "runAsCreatorDescription": "Her çalıştırma hesabınızı kullanır, bu nedenle gizli başlık gerekir.",
       "saveFailedTitle": "Tetikleyici kaydedilemedi",
+      "nameTaken": "“{{name}}” adlı bir tetikleyici zaten var.",
+      "saveFailedRetry": "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+      "saveFailedCheck": "Formdaki değerleri kontrol edip tekrar deneyin.",
       "deleteTitle": "Bu tetikleyici silinsin mi?",
       "deleteMessage": "{{name}} adresine yapılan çağrılar başarısız olur. Bu işlem geri alınamaz.",
       "deleteMessageScheduled": "{{name}} tetikleyicisinin zamanlanmış çalıştırmaları durur. Bu işlem geri alınamaz.",

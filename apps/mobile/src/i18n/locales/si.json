@@ -522,12 +522,13 @@
       "receiptLabel": "රිසිට්පත",
       "copyReceiptId": "රිසිට්පතේ ID පිටපත් කරන්න",
       "appealLabel": "අභියාචනය",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ලැබුණි",
       "triageOpen": "සමාලෝචනය වෙමින් පවතී",
       "triageActioned": "තහවුරු කරන ලදී",
       "triageRejected": "තහවුරු නොකෙරිණි",
       "appealNone": "කිසිවක් ඉදිරිපත් කර නැත",
-      "appealSubmitted": "සමාලෝචනය වෙමින් පවතී",
+      "appealSubmitted": "අභියාචනය සමාලෝචනය වෙමින් පවතී",
       "appealAccepted": "පිළිගන්නා ලදී",
       "appealRejected": "ප්‍රතික්ෂේප කරන ලදී",
       "appeal": "මෙම තීරණයට එරෙහිව අභියාචනා කරන්න",
@@ -539,13 +540,23 @@
       "nextStepInReview": "ප්‍රතිඵලය මෙම තිරයේ දිස්වනු ඇති අතර, තීරණයක් ගත් පසු ඔබට අභියාචනා කළ හැක.",
       "nextStepAppeal": "අභියාචනයේ ප්‍රතිඵලය මෙම තිරයේ දිස්වනු ඇත.",
       "nextStepFinal": "අභියාචන තීරණය අවසාන ය. තවදුරටත් අභියාචනයක් ඉදිරිපත් කළ නොහැක.",
-      "viewReceipt": "රිසිට්පත බලන්න"
+      "viewReceipt": "රිසිට්පත බලන්න",
+      "targetLabel": "වාර්තා කළ අයිතමය",
+      "reasonLabel": "වාර්තාවට හේතුව",
+      "targetMessage": "AI පිළිතුර",
+      "targetComment": "පුල් ඉල්ලීම් අදහස",
+      "targetUser": "පරිශීලකයා",
+      "reasonHarmful": "හානිකර අන්තර්ගතය",
+      "reasonIllegal": "නීති විරෝධී අන්තර්ගතය",
+      "reasonHarassment": "හිරිහැර කිරීම",
+      "reasonSpam": "අනවශ්‍ය පණිවිඩ",
+      "reasonOther": "වෙනත් හේතුවක්"
     },
     "reportReceipts": {
       "title": "වාර්තා",
       "rowSubtitle": "ඔබ ඉදිරිපත් කළ වාර්තා සහ ඒවායේ ප්‍රතිඵල",
       "emptyTitle": "තවම වාර්තා නැත",
-      "emptyDescription": "ඔබ අදහසකින් හෝ AI ප්‍රතිචාරයකින් ඉදිරිපත් කරන වාර්තා මෙහි දිස්වේ.",
+      "emptyDescription": "ඔබ pull request සාකච්ඡාවක ඇති අදහසකින් හෝ නියෝජිත සැසියක AI පිළිතුරකින් ඉදිරිපත් කරන වාර්තා ඒවායේ ප්‍රතිඵලය සමඟ මෙහි දිස්වේ.",
       "couldNotLoad": "ඔබේ වාර්තා පූරණය කළ නොහැකි විය",
       "capped": "ඔබේ නවතම වාර්තා පෙන්වමින් පවතී."
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "සම්බන්ධතාව සක්‍රීයයි, නමුත් මෙම අයිතමය තවමත් පූරණය කළ නොහැක.",
       "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඉහත ගිණුම සංවිධානයකට මාරු කරන්න.",
       "bitbucketOrgOnlyNoOrganizationDescription": "මෙම ගිණුමට තවම සංවිධාන කිසිවක් නොමැත. සංවිධානයක් සෑදීමෙන් හෝ එකකට සම්බන්ධ වීමෙන් පසු Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කළ හැක.",
-      "gitlabReconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
+      "reconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "bitbucketNotConnectedTitle": "Bitbucket සම්බන්ධ වී නොමැත",
+      "bitbucketAdminOnlyDescription": "එය සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "adminOnlyConnectDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "contextLine": "{{organization}} සඳහා",
       "contextLinePersonal": "ඔබේ පෞද්ගලික ගිණුම සඳහා"
@@ -1296,6 +1308,7 @@
       "manageAccess": "ප්‍රවේශය කළමනාකරණය කරන්න",
       "bitbucketNoRepositoriesDescription": "මෙම Bitbucket වැඩබිමේ ගබඩා නොමැත.",
       "gitlabNoRepositoriesDescription": "GitLab හි තවත් කණ්ඩායම් හෝ ව්‍යාපෘති වෙත ප්‍රවේශ වීමට අවසර දීමට ඔබට සිදු විය හැක.",
+      "githubNoRepositoriesDescription": "Kilo GitHub යෙදුමට ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
       "installGithubApp": "ගබඩා සඳහා GitHub යෙදුම ස්ථාපනය කරන්න",
       "installGithubAppDescription": "සමාලෝචනය කිරීමට අවශ්‍ය ගබඩාවලට ප්‍රවේශ වීමට Kilo GitHub යෙදුමට අවසර දෙන්න.",
       "repositoryAccess": "ගබඩා ප්‍රවේශය",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "මෙම සමාලෝචනය තවමත් සිදු වෙමින් පවතී. එය අවසන් වන විට සොයාගැනීම් මෙහි දිස් වේ.",
       "findingsEndedWithoutResults": "මෙම සමාලෝචනය කිසිදු සොයාගැනීමක් නිපදවීමට පෙර අවසන් විය.",
       "serviceUnavailable": "කේත සමාලෝචන සේවාවට සම්බන්ධ විය නොහැකි විය. සේවාව ලබා ගත හැකි වූ විට සමාලෝචනය කිරීමට නැවත උත්සාහ කරන්න.",
-      "reviewFailed": "සමාලෝචනය අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "reviewFailed": "සමාලෝචනය අසාර්ථක විය.",
       "showMore": "තවත් පෙන්වන්න",
       "created": "සෑදූ දිනය",
       "started": "ආරම්භ කළ වේලාව",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} සැසි",
       "sectionAccessibility": "{{title}}: {{displayCount}} සැසි",
       "live": "සජීවී",
-      "updating": "යාවත්කාලීන වෙමින්"
+      "updating": "යාවත්කාලීන වෙමින්",
+      "retentionLimit": "ඔබේ නවතම සැසි පෙන්වයි."
     },
     "sessionRow": {
       "deleteTitle": "සැසිය මකන්නද?",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "අවසානය දක්වා පහළට අනුචලනය කරන්න",
       "emptyTitle": "තවම පණිවිඩ නැත",
       "emptyReadOnlyTitle": "මෙම සැසියේ පණිවිඩ නැත",
-      "renameAccessibility": "{{title}} සැසියේ නම වෙනස් කරන්න",
       "cloningSession": "සැසියේ පිටපතක් සාදමින්",
       "couldNotLoadThisSession": "මෙම සැසිය පූරණය කළ නොහැකි විය.",
       "historyTooLarge": "මෙම සැසියේ සටහන පූරණය කිරීමට බොහෝ විශාලයි.",
@@ -3082,6 +3095,12 @@
     "retryLoadingAccount": "ගිණුම පූරණය කිරීමට නැවත උත්සාහ කරන්න",
     "retryLoadingPrivacy": "රහස්‍යතා තේරීම් පූරණය කිරීමට නැවත උත්සාහ කරන්න"
   },
+  "accountBlocked": {
+    "title": "ගිණුම අවහිර කර ඇත",
+    "description": "Kilo මෙම ගිණුම අවහිර කර ඇති අතර නැවත පිවිසීමෙන් එය ඉවත් නොවේ. ඉල්ලීමක් කරන විට සහාය කණ්ඩායමට අවහිර කිරීම සමාලෝචනය කළ හැක.",
+    "domainDescription": "Kilo මෙම ඊමේල් වසමේ ගිණුම් අවහිර කර ඇති අතර නැවත පිවිසීමෙන් එය වෙනස් නොවේ. ඉල්ලීමක් කරන විට සහාය කණ්ඩායමට වසම සමාලෝචනය කළ හැක.",
+    "contactSupport": "සහාය කණ්ඩායම අමතන්න"
+  },
   "addCredits": {
     "cta": "ක්‍රෙඩිට් එක් කරන්න",
     "billingPage": "බිල්පත් පිටුව"
@@ -3154,8 +3173,7 @@
     "timeoutDescription": "ඉල්ලීම අවසන් වීමට පෙර කල් ගියේය. කරුණාකර නැවත උත්සාහ කරන්න."
   },
   "screenHeader": {
-    "openMenu": "මෙනුව විවෘත කරන්න",
-    "openMenuFor": "{{title}} සඳහා මෙනුව විවෘත කරන්න"
+    "openMenu": "මෙනුව විවෘත කරන්න"
   },
   "picker": {
     "optionsExpired": "විකල්ප කල් ඉකුත් විය",
@@ -4688,6 +4706,7 @@
     "contextAll": "සියලුම සන්දර්භ",
     "dismiss": "වාර්තාව ඉවතලන්න",
     "dismissFailed": "මෙම වාර්තාව ඉවතලීමට තවමත් නොහැකි විය. එය පසුබිමේ නැවත උත්සාහ කරනු ඇත.",
+    "readMarkFailed": "මෙම වාර්තාව කියවා ඇති ලෙස සලකුණු කළ නොහැකි විය. වාර්තාව නැවත පූරණය වූ විට එය නැවත උත්සාහ කරනු ඇත.",
     "offline": "නොබැඳි · සුරැකි වාර්තාව",
     "cached": "සුරැකි වාර්තාව · නැවුම් කළ නොහැක",
     "summary": "AI සාරාංශය",
@@ -4707,6 +4726,9 @@
     "morningEnd": "වාර්තාව ලබා ගත හැකි අවසාන වේලාව",
     "timeHint": "වාර්තා කාල පරාසය අවසන් වූ විට, නොබැඳිව සිටියද, Home කාඩ්පත සජීවී තත්ත්වය යළි පෙන්වයි.",
     "invalidSchedule": "වලංගු වේලා කලාපයක් සහ හිස් නොවන වාර්තා කාල පරාසයක් තෝරන්න.",
+    "scheduleEmptyNight": "වාර්තා කාල පරාසය හිස් ය. කාල පරාසයේ ආරම්භයට පසුව සූදානම් වන වේලාවක් තෝරන්න.",
+    "scheduleEmptyMorning": "සූදානම් වන වේලාව සහ ලබා ගත හැකි අවසාන වේලාව සමාන වේ. වාර්තාව කොපමණ කාලයක් ලබා ගත හැකිව පවතීද යන්න තෝරන්න.",
+    "scheduleFullDay": "කාල පරාස දෙක පූර්ණ දිනයක් ආවරණය කරයි. දිනයේ කොටසක් වාර්තාවෙන් පිටත තබන්න.",
     "notificationsHint": "කාලසටහන්ගත වාර්තාවකට එක් සාමාන්‍ය දැනුම්දීමක්. ගෙවන AI සාරාංශවලින් ස්වාධීනයි.",
     "notificationPermission": "ඔබේ වාර්තාව ලබා ගැනීමට push දැනුම්දීම් සක්‍රිය කරන්න.",
     "defaultModel": "Kilo හි පෙරනිමි මාදිලිය භාවිත කරන්න",
@@ -4716,7 +4738,9 @@
     "estimate": "ඇස්තමේන්තුව {{estimate}} · උපරිමය {{maximum}}",
     "estimateUnavailable": "මෙම සැකසුම් සඳහා ගෙවූ සාරාංශයක් ලබාගත නොහැක. ආකෘතිය හෝ සීමා වෙනස් කරන්න, නැතහොත් පසුව නැවත උත්සාහ කරන්න.",
     "confirmPaid": "{{context}} සඳහා ගෙවන සාරාංශ සක්‍රිය කරන්නද?",
+    "paidDisclosure_one": "ඇස්තමේන්තුව {{estimate}}, උපරිම {{maximum}}, මිනිත්තුව {{minutes}} සීමාවක් සමඟ. ජනනය අසාර්ථක වුවද ගාස්තු අය වේ.",
     "paidDisclosure": "ඇස්තමේන්තුව {{estimate}}, උපරිම {{maximum}}, මිනිත්තු {{minutes}} සීමාවක් සමඟ. ජනනය අසාර්ථක වුවද ගාස්තු අය වේ.",
+    "paidDisclosure_other": "ඇස්තමේන්තුව {{estimate}}, උපරිම {{maximum}}, මිනිත්තු {{minutes}} සීමාවක් සමඟ. ජනනය අසාර්ථක වුවද ගාස්තු අය වේ.",
     "enable": "ගෙවන සාරාංශ සක්‍රිය කරන්න",
     "allContexts": "පුද්ගලික සහ සංවිධාන වාර්තා වෙන් වෙන්ව පවතී.",
     "emptyHistory": "සුරැකි වාර්තා නැත",
@@ -4759,7 +4783,7 @@
     "sourceActivity": "ශීර්ෂයක් නොමැති ක්‍රියාකාරකම",
     "metadataFailureProvider": "සැපයුම්කරු දෝෂය",
     "metadataFailureTool": "මෙවලම් දෝෂය",
-    "metadataFailureCancelled": "අවලංගු කර ඇත",
+    "metadataStopped": "පසුගිය වටය නතර කරන ලදී",
     "metadataFailureOther": "නිශ්චිත නොවන දෝෂය"
   },
   "systemSearch": {
@@ -4880,6 +4904,9 @@
       "runAsCreator": "මා ලෙස ධාවනය කරන්න",
       "runAsCreatorDescription": "සෑම ධාවනයක්ම ඔබගේ ගිණුම භාවිත කරන බැවින් රහස් ශීර්ෂය අවශ්‍ය වේ෴",
       "saveFailedTitle": "ට්‍රිගර් සුරැකිය නොහැකි විය",
+      "nameTaken": "“{{name}}” නමින් ට්‍රිගර් එකක් දැනටමත් පවතී෴",
+      "saveFailedRetry": "සේවාදායකය වෙත ළඟා විය නොහැකි විය. ඔබගේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න෴",
+      "saveFailedCheck": "පෝරමයේ අගයන් පරීක්ෂා කර නැවත උත්සාහ කරන්න෴",
       "deleteTitle": "මෙම ට්‍රිගර් මකන්නද?",
       "deleteMessage": "{{name}} වෙත කරන ඇමතුම් අසාර්ථක වේ෴ මෙය ආපසු හැරවිය නොහැක෴",
       "deleteMessageScheduled": "{{name}} ට්‍රිගර් හි නියමිත ධාවනයන් නතර වේ෴ මෙය ආපසු හැරවිය නොහැක෴",

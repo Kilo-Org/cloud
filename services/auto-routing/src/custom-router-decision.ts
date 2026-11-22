@@ -21,7 +21,11 @@ import { CustomRouterError } from './caller-auth';
 import type { CustomRouterOwner } from './custom-router-store';
 import { customRouterDecisionScope } from './decision-cache';
 import type { DecisionRun, DecisionTarget } from './decide';
-import { contextProvablyTooSmall, satisfiesRequiredModalities } from './decision-engine';
+import {
+  contextProvablyTooSmall,
+  isCapabilityActive,
+  satisfiesRequiredModalities,
+} from './decision-engine';
 import { getModelCapabilities, type ModelCapabilities } from './model-capabilities';
 
 const CUSTOM_ROUTER_TABLE_CACHE_TTL_MS = 60_000;
@@ -217,10 +221,11 @@ export function customRouterDecision(
 }
 
 // Same capability rules as the decision engine, without its largest-context rescue: a
-// fallback entry that is inactive, lacks a required modality, or is provably too small fails.
+// fallback entry with no active capability row, that lacks a required modality, or that is
+// provably too small fails. Client and direct-BYOK entries carry their own active row.
 function fitsRequest(entry: CustomRouterEntry, run: DecisionRun): boolean {
   const caps = run.capabilities.get(customRouterCandidateModel(entry));
-  if (caps?.isActive === false) return false;
+  if (!isCapabilityActive(caps)) return false;
   if (run.constraints === undefined) return true;
   return (
     satisfiesRequiredModalities(caps, run.constraints) &&

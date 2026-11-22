@@ -84,6 +84,7 @@ export function SessionHistoryScreen() {
     storedIsPending,
     storedFetchedSinceMount,
     paging,
+    isRetentionLimited,
     handleRetry: retryHistory,
     handleRefetch,
     isSearching,
@@ -235,6 +236,7 @@ export function SessionHistoryScreen() {
       hasFreshHistory={storedFetchedSinceMount}
       isFetchingNextPage={paging.isFetchingNextPage}
       isFetchNextPageError={paging.isFetchNextPageError}
+      isRetentionLimited={isRetentionLimited}
       onRetryNextPage={handleRetryNextPage}
       refetch={handleRefetch}
       onRetry={handleRetry}

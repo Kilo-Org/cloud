@@ -522,14 +522,15 @@
       "receiptLabel": "Kuitti",
       "copyReceiptId": "Kopioi kuitin tunnus",
       "appealLabel": "Valitus",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Vastaanotettu",
       "triageOpen": "Käsittelyssä",
       "triageActioned": "Hyväksytty",
       "triageRejected": "Hylätty",
       "appealNone": "Ei tehty",
       "appealSubmitted": "Käsiteltävänä",
-      "appealAccepted": "Hyväksytty",
-      "appealRejected": "Hylätty",
+      "appealAccepted": "Valitus hyväksytty",
+      "appealRejected": "Valitus hylätty",
       "appeal": "Valita päätöksestä",
       "appealTitle": "Valitetaanko päätöksestä?",
       "appealMessage": "Valituksen voi tehdä vain kerran, eikä sitä voi perua.",
@@ -539,13 +540,23 @@
       "nextStepInReview": "Lopputulos näkyy tällä näytöllä, ja voit valittaa päätöksen jälkeen.",
       "nextStepAppeal": "Valituksen lopputulos näkyy tällä näytöllä.",
       "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
-      "viewReceipt": "Näytä kuitti"
+      "viewReceipt": "Näytä kuitti",
+      "targetLabel": "Ilmoitettu kohde",
+      "reasonLabel": "Ilmoituksen syy",
+      "targetMessage": "Tekoälyn vastaus",
+      "targetComment": "Muutospyynnön kommentti",
+      "targetUser": "Käyttäjä",
+      "reasonHarmful": "Haitallinen sisältö",
+      "reasonIllegal": "Laiton sisältö",
+      "reasonHarassment": "Häirintä",
+      "reasonSpam": "Roskaposti",
+      "reasonOther": "Muu syy"
     },
     "reportReceipts": {
       "title": "Ilmoitukset",
       "rowSubtitle": "Tekemäsi ilmoitukset ja niiden lopputulokset",
       "emptyTitle": "Ei vielä ilmoituksia",
-      "emptyDescription": "Kommentista tai tekoälyvastauksesta tekemäsi ilmoitukset näkyvät tässä.",
+      "emptyDescription": "Kommentista pull request -keskustelussa tai tekoälyvastauksesta agentin istunnossa tekemäsi ilmoitukset näkyvät tässä lopputuloksineen.",
       "couldNotLoad": "Ilmoituksiasi ei voitu ladata",
       "capped": "Näytetään uusimmat ilmoituksesi."
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "Yhteys on aktiivinen, mutta tätä kohdetta ei vieläkään voi ladata.",
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
-      "gitlabReconnectAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
+      "reconnectAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
       "bitbucketNotConnectedTitle": "Bitbucketia ei ole yhdistetty",
+      "bitbucketAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
       "adminOnlyConnectDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
       "contextLine": "{{organization}}-organisaatiolle",
       "contextLinePersonal": "Henkilökohtaiselle tilillesi"
@@ -1296,6 +1308,7 @@
       "manageAccess": "Hallinnoi käyttöoikeuksia",
       "bitbucketNoRepositoriesDescription": "Tässä Bitbucket-työtilassa ei ole saatavilla koodivarastoja.",
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
+      "githubNoRepositoriesDescription": "Tarkista Kilon GitHub-sovelluksen käyttöoikeudet koodivarastoihin ja päivitä sitten luettelo.",
       "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
       "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
       "repositoryAccess": "koodivaraston käyttöoikeus",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "Tämä katselmointi on vielä kesken. Havainnot näkyvät tässä, kun se valmistuu.",
       "findingsEndedWithoutResults": "Tämä katselmointi päättyi ennen kuin se tuotti havaintoja.",
       "serviceUnavailable": "Koodin katselmointipalveluun ei saatu yhteyttä. Yritä katselmointia uudelleen, kun palvelu on käytettävissä.",
-      "reviewFailed": "Katselmointi epäonnistui. Yritä uudelleen.",
+      "reviewFailed": "Katselmointi epäonnistui.",
       "showMore": "Näytä lisää",
       "created": "Luotu",
       "started": "Aloitettu",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} istuntoa",
       "sectionAccessibility": "{{title}}: {{displayCount}} istuntoa",
       "live": "REAALIAJASSA",
-      "updating": "Päivitetään"
+      "updating": "Päivitetään",
+      "retentionLimit": "Näytetään uusimmat istunnot."
     },
     "sessionRow": {
       "deleteTitle": "Poistetaanko istunto?",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei vielä viestejä",
       "emptyReadOnlyTitle": "Tässä istunnossa ei ole viestejä",
-      "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "historyTooLarge": "Tämän istunnon keskustelutallenne on liian suuri ladattavaksi.",
@@ -3082,6 +3095,12 @@
     "retryLoadingAccount": "Yritä ladata tili uudelleen",
     "retryLoadingPrivacy": "Yritä ladata yksityisyysasetukset uudelleen"
   },
+  "accountBlocked": {
+    "title": "Tili estetty",
+    "description": "Kilo esti tämän tilin, eikä uudelleenkirjautuminen poista estoa. Tuki voi tarkistaa eston pyynnöstä.",
+    "domainDescription": "Kilo estää tilit tällä sähköpostiverkkotunnuksella, eikä uudelleenkirjautuminen muuta sitä. Tuki voi tarkistaa sähköpostiverkkotunnuksen pyynnöstä.",
+    "contactSupport": "Ota yhteyttä tukeen"
+  },
   "addCredits": {
     "cta": "Lisää krediittejä",
     "billingPage": "laskutussivu"
@@ -3154,8 +3173,7 @@
     "timeoutDescription": "Pyyntö ei valmistunut ajassa. Yritä uudelleen."
   },
   "screenHeader": {
-    "openMenu": "Avaa valikko",
-    "openMenuFor": "Avaa valikko: {{title}}"
+    "openMenu": "Avaa valikko"
   },
   "picker": {
     "optionsExpired": "Vaihtoehdot vanhentuneet",
@@ -4688,6 +4706,7 @@
     "contextAll": "Kaikki kontekstit",
     "dismiss": "Sivuuta katsaus",
     "dismissFailed": "Tätä katsausta ei voitu vielä sivuuttaa. Yritämme uudelleen taustalla.",
+    "readMarkFailed": "Tätä katsausta ei voitu merkitä luetuksi. Yritämme uudelleen, kun katsaus latautuu uudelleen.",
     "offline": "Offline · tallennettu katsaus",
     "cached": "Tallennettu katsaus · päivitys ei käytettävissä",
     "summary": "AI-yhteenveto",
@@ -4707,6 +4726,9 @@
     "morningEnd": "Katsauksen saatavuus päättyy",
     "timeHint": "Kotikortti palauttaa reaaliaikaisen tilan, kun katsausikkuna päättyy, myös offline-tilassa.",
     "invalidSchedule": "Valitse kelvollinen aikavyöhyke ja ei-tyhjä katsausikkuna.",
+    "scheduleEmptyNight": "Katsausikkuna on tyhjä. Valitse valmiusaika, joka on ikkunan alkua myöhempi.",
+    "scheduleEmptyMorning": "Valmiusaika ja saatavuuden päättymisaika ovat samat. Valitse, kuinka kauan katsaus pysyy saatavilla.",
+    "scheduleFullDay": "Kaksi ikkunaa kattaa koko päivän. Jätä osa päivästä katsauksen ulkopuolelle.",
     "notificationsHint": "Yksi yleinen ilmoitus ajastettua katsausta kohden. Riippumaton maksullisista AI-yhteenvedoista.",
     "notificationPermission": "Ota push-ilmoitukset käyttöön saadaksesi katsauksesi.",
     "defaultModel": "Käytä Kilon oletusmallia",
@@ -4720,6 +4742,8 @@
     "estimateModelNotAllowed": "Tämä malli ei ole sallittu tässä kontekstissa. Valitse toinen malli.",
     "estimateSpendLimitTooLow": "Nosta kulurajaa salliaksesi tämän yhteenvedon.",
     "confirmPaid": "Otetaanko maksulliset yhteenvedot käyttöön kontekstissa {{context}}?",
+    "paidDisclosure_one": "Arvio {{estimate}}, enintään {{maximum}}, aikaraja {{minutes}} min. Veloitus tehdään, vaikka luonti epäonnistuisi.",
+    "paidDisclosure_other": "Arvio {{estimate}}, enintään {{maximum}}, aikaraja {{minutes}} min. Veloitus tehdään, vaikka luonti epäonnistuisi.",
     "paidDisclosure": "Arvio {{estimate}}, enintään {{maximum}}, aikaraja {{minutes}} min. Veloitus tehdään, vaikka luonti epäonnistuisi.",
     "enable": "Ota maksulliset yhteenvedot käyttöön",
     "allContexts": "Henkilökohtaiset ja organisaation katsaukset pidetään erillään.",
@@ -4759,7 +4783,7 @@
     "sourceActivity": "Nimetön aktiviteetti",
     "metadataFailureProvider": "palveluntarjoajan virhe",
     "metadataFailureTool": "työkalun virhe",
-    "metadataFailureCancelled": "Peruttu",
+    "metadataStopped": "Viimeisin vuoro pysäytettiin",
     "metadataFailureOther": "määrittämätön virhe"
   },
   "systemSearch": {
@@ -4880,6 +4904,9 @@
       "runAsCreator": "Suorita minuna",
       "runAsCreatorDescription": "Jokainen ajo käyttää tiliäsi, joten salainen otsake vaaditaan.",
       "saveFailedTitle": "Liipaisimen tallennus epäonnistui",
+      "nameTaken": "Liipaisin nimeltä ”{{name}}” on jo olemassa.",
+      "saveFailedRetry": "Palvelimeen ei saatu yhteyttä. Tarkista verkkoyhteys ja yritä uudelleen.",
+      "saveFailedCheck": "Tarkista lomakkeen tiedot ja yritä uudelleen.",
       "deleteTitle": "Poistetaanko tämä liipaisin?",
       "deleteMessage": "Kutsut kohteeseen {{name}} epäonnistuvat. Tätä ei voi kumota.",
       "deleteMessageScheduled": "Liipaisimen {{name}} ajastetut suoritukset pysähtyvät. Tätä ei voi kumota.",

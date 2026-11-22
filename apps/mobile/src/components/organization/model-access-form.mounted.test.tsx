@@ -314,15 +314,17 @@ function frameLayout(root: ReactTestInstance) {
   return node.props.onLayout as LayoutHandler;
 }
 
-/** The header block above the list, which the form measures itself. */
+/** The header block above the list, which the form measures itself: the inset
+ *  wrapper around the padded header content. */
 function headerLayout(root: ReactTestInstance) {
-  const node = root
+  const padded = root
     .findAllByType('View' as never)
     .find(candidate => candidate.props.className === 'gap-3 px-4 pt-3');
-  if (node === undefined) {
-    throw new Error('the form renders no header block');
+  const wrapper = padded?.parent ?? null;
+  if (wrapper === null || !('onLayout' in wrapper.props)) {
+    throw new Error('the form renders no header wrapper');
   }
-  return node.props.onLayout as LayoutHandler;
+  return wrapper.props.onLayout as LayoutHandler;
 }
 
 /** The pinned bar below the list, which the form measures itself. */

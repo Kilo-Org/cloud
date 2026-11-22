@@ -18,7 +18,7 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneWorkspaceFailureSubtype,
 } from '../../shared/control-plane-protocol.js';
-import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import {
   SessionCredentialUpgradeRequiredError,
   type SessionCredentialGrant,
@@ -136,7 +136,7 @@ function parseRouteState(value: string): RouteState {
 export function routeFromRow(db: RouteDatabase, row: RouteRow): RouteRecord {
   return {
     sessionId: row.session_id,
-    spec: controlPlaneRouteSpecSchema.parse(projectStoredRouteSpecSkills(JSON.parse(row.spec))),
+    spec: controlPlaneRouteSpecSchema.parse(projectStoredRouteSpec(JSON.parse(row.spec))),
     grant: row.grant === null ? null : readScopeGrant(db, row.grant),
     credentialSource:
       row.credential_source === null || row.credential_source === undefined

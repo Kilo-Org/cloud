@@ -139,7 +139,7 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
-import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import {
   worktreeBranchOperationResultSchema,
   type ControlPlaneWorktreeGitInput,
@@ -469,13 +469,14 @@ export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSession
 
 /**
  * A registration read back from storage carries the runtime skills written
- * under an earlier path rule; it keeps the entries the current rule accepts so
- * the session still loads its identity and spec. The registration that arrives
- * from the Worker is parsed with the strict schema above.
+ * under an earlier path rule and runtime agents whose slug the CLI owns; it
+ * keeps the entries the current rules accept so the session still loads its
+ * identity and spec. The registration that arrives from the Worker is parsed
+ * with the strict schema above.
  */
 const storedControlPlaneSessionRegistrationSchema = z.preprocess(raw => {
   if (typeof raw !== 'object' || raw === null || !('spec' in raw)) return raw;
-  return { ...raw, spec: projectStoredRouteSpecSkills(raw.spec) };
+  return { ...raw, spec: projectStoredRouteSpec(raw.spec) };
 }, controlPlaneSessionRegistrationSchema);
 
 function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {

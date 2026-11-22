@@ -523,12 +523,13 @@
       "receiptLabel": "Comprovant",
       "copyReceiptId": "Copia l'identificador del comprovant",
       "appealLabel": "Apel·lació",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Rebuda",
       "triageOpen": "En revisió",
       "triageActioned": "Estimada",
       "triageRejected": "Desestimada",
       "appealNone": "No se n'ha enviat cap",
-      "appealSubmitted": "En revisió",
+      "appealSubmitted": "Apel·lació en revisió",
       "appealAccepted": "Acceptada",
       "appealRejected": "Rebutjada",
       "appeal": "Apel·la aquesta decisió",
@@ -540,13 +541,23 @@
       "nextStepInReview": "El resultat apareixerà en aquesta pantalla i podràs apel·lar un cop presa la decisió.",
       "nextStepAppeal": "El resultat de la teva apel·lació apareixerà en aquesta pantalla.",
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
-      "viewReceipt": "Mostra el comprovant"
+      "viewReceipt": "Mostra el comprovant",
+      "targetLabel": "Element denunciat",
+      "reasonLabel": "Motiu de denúncia",
+      "targetMessage": "Resposta de l'IA",
+      "targetComment": "Comentari de la sol·licitud",
+      "targetUser": "Persona",
+      "reasonHarmful": "Contingut perjudicial",
+      "reasonIllegal": "Contingut il·legal",
+      "reasonHarassment": "Assetjament",
+      "reasonSpam": "Publicitat no desitjada",
+      "reasonOther": "Un altre motiu"
     },
     "reportReceipts": {
       "title": "Denúncies",
       "rowSubtitle": "Les denúncies que has presentat i els seus resultats",
       "emptyTitle": "Encara no hi ha denúncies",
-      "emptyDescription": "Les denúncies que presentis des d'un comentari o d'una resposta d'IA apareixeran aquí.",
+      "emptyDescription": "Les denúncies que presentis des d'un comentari en una discussió d'una pull request o des d'una resposta d'IA en una sessió d'agent apareixeran aquí amb el resultat.",
       "couldNotLoad": "No s'han pogut carregar les teves denúncies",
       "capped": "Es mostren les teves denúncies més recents."
     },
@@ -1019,8 +1030,9 @@
       "checkActiveConnection": "La connexió està activa, però encara no es pot carregar aquest element.",
       "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
-      "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
+      "reconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
       "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
+      "bitbucketAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que el connecti.",
       "adminOnlyConnectDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
@@ -1324,6 +1336,7 @@
       "manageAccess": "Gestiona l'accés",
       "bitbucketNoRepositoriesDescription": "No hi ha cap repositori disponible en aquest espai de treball de Bitbucket.",
       "gitlabNoRepositoriesDescription": "Pot ser que hagis de concedir accés a més grups o projectes a GitLab.",
+      "githubNoRepositoriesDescription": "Comprova que l'aplicació de Kilo per a GitHub tingui accés als repositoris i actualitza la llista.",
       "installGithubApp": "Instal·la l'aplicació de GitHub als repositoris",
       "installGithubAppDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris que vols revisar.",
       "repositoryAccess": "accés als repositoris",
@@ -1357,7 +1370,7 @@
       "findingsInProgress": "Aquesta revisió encara està en curs. Les incidències apareixeran aquí quan finalitzi.",
       "findingsEndedWithoutResults": "Aquesta revisió ha finalitzat abans de produir cap incidència.",
       "serviceUnavailable": "No s'ha pogut connectar amb el servei de revisió de codi. Torna a provar la revisió quan el servei estigui disponible.",
-      "reviewFailed": "La revisió ha fallat. Si us plau, torna-ho a provar.",
+      "reviewFailed": "La revisió ha fallat.",
       "showMore": "Mostra'n més",
       "created": "Data de creació",
       "started": "Data d'inici",
@@ -2210,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessions",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessions",
       "live": "EN DIRECTE",
-      "updating": "S'està actualitzant"
+      "updating": "S'està actualitzant",
+      "retentionLimit": "Es mostren les sessions més recents."
     },
     "sessionRow": {
       "deleteTitle": "Vols eliminar la sessió?",
@@ -2282,7 +2296,6 @@
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
       "emptyReadOnlyTitle": "No hi ha missatges en aquesta sessió",
-      "renameAccessibility": "Reanomena la sessió: {{title}}",
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "historyTooLarge": "La transcripció d'aquesta sessió és massa gran per carregar-la.",
@@ -3143,6 +3156,12 @@
     "retryLoadingAccount": "Torna a provar de carregar el compte",
     "retryLoadingPrivacy": "Torna a provar de carregar les opcions de privadesa"
   },
+  "accountBlocked": {
+    "title": "Compte bloquejat",
+    "description": "Kilo ha bloquejat aquest compte i tornar a iniciar sessió no el desbloquejarà. L'equip de suport pot revisar el bloqueig si ho sol·licites.",
+    "domainDescription": "Kilo no permet comptes en aquest domini de correu electrònic, i tornar a iniciar sessió no ho canviarà. L'equip de suport pot revisar el domini si ho sol·licites.",
+    "contactSupport": "Contacta amb l'equip de suport"
+  },
   "addCredits": {
     "cta": "Afegeix crèdits",
     "billingPage": "pàgina de facturació"
@@ -3215,8 +3234,7 @@
     "timeoutDescription": "La sol·licitud ha esgotat el temps d'espera. Torna-ho a provar."
   },
   "screenHeader": {
-    "openMenu": "Obre el menú",
-    "openMenuFor": "Obre el menú de {{title}}"
+    "openMenu": "Obre el menú"
   },
   "picker": {
     "optionsExpired": "Opcions caducades",
@@ -4772,6 +4790,7 @@
     "contextAll": "Tots els contextos",
     "dismiss": "Descarta l'informe",
     "dismissFailed": "Encara no s'ha pogut descartar aquest informe. Es torna a provar en segon pla.",
+    "readMarkFailed": "No s'ha pogut marcar aquest informe com a llegit. Es tornarà a provar quan es recarregui l'informe.",
     "offline": "Sense connexió · informe desat",
     "cached": "Informe desat · no es pot actualitzar",
     "summary": "Resum d'IA",
@@ -4791,6 +4810,9 @@
     "morningEnd": "Informe disponible fins a les",
     "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba la finestra de l'informe, fins i tot sense connexió.",
     "invalidSchedule": "Tria una zona horària vàlida i una finestra de l'informe no buida.",
+    "scheduleEmptyNight": "La finestra de l'informe és buida. Tria una hora de preparació posterior a l'inici de la finestra.",
+    "scheduleEmptyMorning": "L'hora de preparació i l'hora de fi de disponibilitat coincideixen. Tria quant de temps es manté disponible l'informe.",
+    "scheduleFullDay": "Les dues finestres cobreixen un dia complet. Deixa part del dia fora de l'informe.",
     "notificationsHint": "Una notificació genèrica per cada informe programat. Independent dels resums d'IA de pagament.",
     "notificationPermission": "Activa les notificacions push per rebre l'informe.",
     "defaultModel": "Usa el model per defecte de Kilo",
@@ -4800,6 +4822,9 @@
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració. Canvia el model o els límits, o torna-ho a provar més tard.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure_many": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure_other": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "enable": "Activa els resums de pagament",
     "allContexts": "Els informes personals i d'organització es mantenen separats.",
@@ -4847,7 +4872,7 @@
     "sourceActivity": "Activitat sense títol",
     "metadataFailureProvider": "error del proveïdor",
     "metadataFailureTool": "error d'eina",
-    "metadataFailureCancelled": "Cancel·lada",
+    "metadataStopped": "L'últim torn s'ha aturat",
     "metadataFailureOther": "error no especificat"
   },
   "systemSearch": {
@@ -4968,6 +4993,9 @@
       "runAsCreator": "Executa com a mi",
       "runAsCreatorDescription": "Cada execució utilitza el teu compte, així que la capçalera secreta és obligatòria.",
       "saveFailedTitle": "No s'ha pogut desar el disparador",
+      "nameTaken": "Ja existeix un disparador amb el nom «{{name}}».",
+      "saveFailedRetry": "No s'ha pogut contactar amb el servidor. Comprova la connexió i torna-ho a provar.",
+      "saveFailedCheck": "Comprova els valors del formulari i torna-ho a provar.",
       "deleteTitle": "Vols eliminar aquest disparador?",
       "deleteMessage": "Les crides a {{name}} fallaran. Això no es pot desfer.",
       "deleteMessageScheduled": "Les execucions programades del disparador {{name}} s'aturaran. Això no es pot desfer.",

@@ -76,6 +76,72 @@ describe('model access predicates', () => {
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(true);
   });
 
+  describe('virtual-provider routers', () => {
+    const ROUTER_MODEL = 'router/auto';
+    const routerOnly = lookup({ [ROUTER_MODEL]: ['virtual'] });
+
+    test('admits a virtual-only router when the allow list permits a real provider too', async () => {
+      const isAllowed = createAllowPredicateFromProviderAllowList(
+        undefined,
+        ['virtual', 'openai'],
+        routerOnly
+      );
+
+      await expect(isAllowed(ROUTER_MODEL)).resolves.toBe(true);
+    });
+
+    test('denies a virtual-only router when the allow list permits only the virtual provider', async () => {
+      const isAllowed = createAllowPredicateFromProviderAllowList(
+        undefined,
+        ['virtual'],
+        routerOnly
+      );
+
+      await expect(isAllowed(ROUTER_MODEL)).resolves.toBe(false);
+    });
+
+    test('denies a virtual-only router when the allow list omits the virtual provider', async () => {
+      const isAllowed = createAllowPredicateFromProviderAllowList(
+        undefined,
+        ['openai'],
+        routerOnly
+      );
+
+      await expect(isAllowed(ROUTER_MODEL)).resolves.toBe(false);
+    });
+
+    test('admits a virtual-only router in the snapshot without a provider allow list', async () => {
+      const isAllowed = createAllowPredicateFromProviderAllowList(
+        undefined,
+        undefined,
+        routerOnly,
+        true
+      );
+
+      await expect(isAllowed(ROUTER_MODEL)).resolves.toBe(true);
+    });
+
+    test('model deny list still wins over a permitted virtual router', async () => {
+      const isAllowed = createAllowPredicateFromProviderAllowList(
+        [ROUTER_MODEL],
+        ['virtual', 'openai'],
+        routerOnly
+      );
+
+      await expect(isAllowed(ROUTER_MODEL)).resolves.toBe(false);
+    });
+
+    test('does not widen a model served by a real provider and the virtual provider', async () => {
+      const isAllowed = createAllowPredicateFromProviderAllowList(
+        undefined,
+        ['openai'],
+        lookup({ 'openai/gpt-4o': ['openai', 'virtual'] })
+      );
+
+      await expect(isAllowed('openai/gpt-4o')).resolves.toBe(true);
+    });
+  });
+
   test('provider allow list denies models missing from the current snapshot', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['openai'], lookup({}));
 

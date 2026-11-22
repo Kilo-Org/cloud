@@ -525,12 +525,13 @@
       "receiptLabel": "Admháil",
       "copyReceiptId": "Cóipeáil aitheantas na hadmhála",
       "appealLabel": "Achomharc",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Faighte",
       "triageOpen": "Á athbhreithniú",
       "triageActioned": "Seasadh leis",
       "triageRejected": "Níor seasadh leis",
       "appealNone": "Níor cuireadh aon cheann isteach",
-      "appealSubmitted": "Á athbhreithniú",
+      "appealSubmitted": "Achomharc á athbhreithniú",
       "appealAccepted": "Glacadh leis",
       "appealRejected": "Diúltaíodh dó",
       "appeal": "Déan achomharc i gcoinne an chinnidh seo",
@@ -542,13 +543,23 @@
       "nextStepInReview": "Beidh an toradh le feiceáil ar an scáileán seo, agus is féidir leat achomharc a dhéanamh tar éis an chinnidh.",
       "nextStepAppeal": "Beidh toradh an achomhairc le feiceáil ar an scáileán seo.",
       "nextStepFinal": "Tá cinneadh an achomhairc críochnaitheach. Ní féidir aon achomharc breise a chur isteach.",
-      "viewReceipt": "Féach ar an admháil"
+      "viewReceipt": "Féach ar an admháil",
+      "targetLabel": "Mír a tuairiscíodh",
+      "reasonLabel": "Cúis na tuairisce",
+      "targetMessage": "Freagra intleachta saorga",
+      "targetComment": "Trácht ar iarratas",
+      "targetUser": "Úsáideoir",
+      "reasonHarmful": "Ábhar díobhálach",
+      "reasonIllegal": "Ábhar mídhleathach",
+      "reasonHarassment": "Ciapadh",
+      "reasonSpam": "Turscar",
+      "reasonOther": "Cúis eile"
     },
     "reportReceipts": {
       "title": "Tuairiscí",
       "rowSubtitle": "Na tuairiscí a chuir tú isteach agus a dtorthaí",
       "emptyTitle": "Níl aon tuairiscí ann fós",
-      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht nó ó fhreagra AI.",
+      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht i bplé ar iarratas tarraingthe nó ó fhreagra AI i seisiún gníomhaire, mar aon lena dtoradh.",
       "couldNotLoad": "Níorbh fhéidir do chuid tuairiscí a lódáil",
       "capped": "Ag taispeáint do chuid tuairiscí is déanaí."
     },
@@ -1057,8 +1068,9 @@
       "checkActiveConnection": "Tá an nasc gníomhach, ach ní féidir an mhír seo a lódáil fós.",
       "bitbucketOrgOnlyDescription": "Athraigh an cuntas thuas go heagraíocht chun iarratais tharraingthe Bitbucket na heagraíochta sin a athbhreithniú.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
-      "gitlabReconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
+      "reconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
       "bitbucketNotConnectedTitle": "Níl Bitbucket nasctha",
+      "bitbucketAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a cheangal.",
       "adminOnlyConnectDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
@@ -1380,6 +1392,7 @@
       "manageAccess": "Bainistigh rochtain",
       "bitbucketNoRepositoriesDescription": "Níl aon stór ar fáil sa spás oibre Bitbucket seo.",
       "gitlabNoRepositoriesDescription": "Seans go mbeidh ort rochtain ar thuilleadh grúpaí nó tionscadal a thabhairt ar GitLab.",
+      "githubNoRepositoriesDescription": "Seiceáil an rochtain atá ag aip GitHub Kilo ar na stórtha, ansin athnuaigh an liosta.",
       "installGithubApp": "Suiteáil an aip GitHub ar stórtha",
       "installGithubAppDescription": "Tabhair rochtain d'aip GitHub Kilo ar na stórtha ar mhaith leat go ndéanfaí athbhreithniú orthu.",
       "repositoryAccess": "rochtain ar stórtha",
@@ -1413,7 +1426,7 @@
       "findingsInProgress": "Tá an athbhreithniú seo ar siúl fós. Tiocfaidh na torthaí le feiceáil anseo nuair a bheidh sé críochnaithe.",
       "findingsEndedWithoutResults": "Críochnaíodh an athbhreithniú seo sular ndearnadh aon torthaí.",
       "serviceUnavailable": "Níorbh fhéidir ceangal leis an tseirbhís athbhreithnithe cóid. Bain triail as an athbhreithniú arís nuair a bheidh an tseirbhís ar fáil.",
-      "reviewFailed": "Theip ar an athbhreithniú. Bain triail eile as, le do thoil.",
+      "reviewFailed": "Theip ar an athbhreithniú.",
       "showMore": "Taispeáin níos mó",
       "created": "Cruthaithe",
       "started": "Tosaithe",
@@ -2304,7 +2317,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seisiún",
       "sectionAccessibility": "{{title}}: {{displayCount}} seisiún",
       "live": "BEO",
-      "updating": "Ag nuashonrú"
+      "updating": "Ag nuashonrú",
+      "retentionLimit": "Taispeántar do sheisiúin is déanaí."
     },
     "sessionRow": {
       "deleteTitle": "An scriosfar an seisiún?",
@@ -2380,7 +2394,6 @@
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
       "emptyReadOnlyTitle": "Níl aon teachtaireacht sa seisiún seo",
-      "renameAccessibility": "Athainmnigh seisiún: {{title}}",
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "historyTooLarge": "Tá tras-scríbhinn an tseisiúin seo rómhór le lódáil.",
@@ -3265,6 +3278,12 @@
     "retryLoadingAccount": "Bain triail as an gcuntas a lódáil arís",
     "retryLoadingPrivacy": "Bain triail as na roghanna príobháideachta a lódáil arís"
   },
+  "accountBlocked": {
+    "title": "Cuntas blocáilte",
+    "description": "Chuir Kilo bac ar an gcuntas seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an bac a athbhreithniú ar iarratas.",
+    "domainDescription": "Cuireann Kilo bac ar chuntais a bhaineann leis an bhfearann ríomhphoist seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an fearann a athbhreithniú ar iarratas.",
+    "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta"
+  },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",
     "billingPage": "leathanach billeála"
@@ -3337,8 +3356,7 @@
     "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },
   "screenHeader": {
-    "openMenu": "Oscail roghchlár",
-    "openMenuFor": "Oscail roghchlár do {{title}}"
+    "openMenu": "Oscail roghchlár"
   },
   "picker": {
     "optionsExpired": "Roghanna imithe in éag",
@@ -4940,6 +4958,7 @@
     "contextAll": "Gach comhthéacs",
     "dismiss": "Cuir an tuarascáil as an áireamh",
     "dismissFailed": "Ní féidir an túarascáil seo a chur as an áireamh go fóill. Déanfaidh sé iarracht arís sa chúlra.",
+    "readMarkFailed": "Níorbh fhéidir an túarascáil seo a mharcáil mar léite. Déanfaidh sé iarracht arís nuair a athlódálfar an túarascáil.",
     "offline": "As líne · tuarascáil shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
     "summary": "Achoimre AI",
@@ -4959,6 +4978,9 @@
     "morningEnd": "Tuarascáil ar fáil go dtí",
     "timeHint": "Athbhunaíonn cárta an Bhaile an stádas beo nuair a chríochnaíonn an fhuinneog tuarascála, fiú as líne.",
     "invalidSchedule": "Roghnaigh crios ama bailí agus fuinneog tuarascála nach bhfuil folamh.",
+    "scheduleEmptyNight": "Tá an fhuinneog tuarascála folamh. Roghnaigh am ullaimh níos déanaí ná tús na fuinneoige.",
+    "scheduleEmptyMorning": "Is ionann an t-am ullaimh agus an t-am ar fáil go dtí. Roghnaigh cé chomh fada a fhanann an tuarascáil ar fáil.",
+    "scheduleFullDay": "Clúdaíonn an dá fhuinneog lá iomlán. Fág cuid den lá lasmuigh den tuarascáil.",
     "notificationsHint": "Fógra ginearálta amháin in aghaidh gach tuarascála sceidealaithe. Neamhspleách ar achoimrí AI íoctha.",
     "notificationPermission": "Cumasaigh fógraí brú chun do thuarascáil a fháil.",
     "defaultModel": "Úsáid múnla réamhshocraithe Kilo",
@@ -4968,7 +4990,12 @@
     "estimate": "Meastachán {{estimate}} · uasmhéid {{maximum}}",
     "estimateUnavailable": "Níl achoimre íoctha ar fáil le haghaidh na socruithe seo. Athraigh an tsamhail nó na teorainneacha, nó déan iarracht eile ar ball.",
     "confirmPaid": "Cumasaigh achoimrí íoctha do {{context}}?",
-    "paidDisclosure": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméad. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_one": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméad. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_two": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_few": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_many": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_other": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
     "enable": "Cumasaigh achoimrí íoctha",
     "allContexts": "Coinnítear tuarascálacha pearsanta agus eagraíochta ar leith.",
     "emptyHistory": "Níl aon tuarascálacha sábháilte ann",
@@ -5023,7 +5050,7 @@
     "sourceActivity": "Gníomhaíocht gan teideal",
     "metadataFailureProvider": "earráid soláthraí",
     "metadataFailureTool": "earráid uirlise",
-    "metadataFailureCancelled": "Cealaithe",
+    "metadataStopped": "Stopadh an babhta deireanach",
     "metadataFailureOther": "earráid neamhshonraithe"
   },
   "systemSearch": {
@@ -5144,6 +5171,9 @@
       "runAsCreator": "Rith mar mise",
       "runAsCreatorDescription": "Úsáideann gach rith do chuntas, mar sin tá an ceanntásc rúnda riachtanach.",
       "saveFailedTitle": "Níorbh fhéidir an truicear a shábháil",
+      "nameTaken": "Tá truicear darb ainm “{{name}}” ann cheana.",
+      "saveFailedRetry": "Níorbh fhéidir teacht ar an bhfreastalaí. Seiceáil do nasc agus bain triail eile as.",
+      "saveFailedCheck": "Seiceáil na luachanna san fhoirm agus bain triail eile as.",
       "deleteTitle": "Scrios an truicear seo?",
       "deleteMessage": "Teipfidh glaonna chuig {{name}}. Ní féidir é seo a chealú.",
       "deleteMessageScheduled": "Stopfaidh ritheanna sceidealaithe an truicir {{name}}. Ní féidir é seo a chealú.",

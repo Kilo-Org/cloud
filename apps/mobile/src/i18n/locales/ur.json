@@ -522,6 +522,7 @@
       "receiptLabel": "رسید",
       "copyReceiptId": "رسید کی آئی ڈی کاپی کریں",
       "appealLabel": "اپیل",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "موصول ہو گئی",
       "triageOpen": "زیرِ جائزہ",
       "triageActioned": "برقرار رکھی گئی",
@@ -539,13 +540,23 @@
       "nextStepInReview": "نتیجہ اس اسکرین پر نظر آئے گا، اور فیصلے کے بعد آپ اپیل کر سکتے ہیں۔",
       "nextStepAppeal": "اپیل کا نتیجہ اس اسکرین پر نظر آئے گا۔",
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
-      "viewReceipt": "رسید دیکھیں"
+      "viewReceipt": "رسید دیکھیں",
+      "targetLabel": "رپورٹ شدہ چیز",
+      "reasonLabel": "رپورٹ کی وجہ",
+      "targetMessage": "اے آئی جواب",
+      "targetComment": "پل ریکویسٹ تبصرہ",
+      "targetUser": "شخص",
+      "reasonHarmful": "نقصان دہ مواد",
+      "reasonIllegal": "غیر قانونی مواد",
+      "reasonHarassment": "ہراسانی",
+      "reasonSpam": "ناخواستہ اشتہارات",
+      "reasonOther": "کوئی اور وجہ"
     },
     "reportReceipts": {
       "title": "رپورٹس",
       "rowSubtitle": "آپ کی جمع کرائی گئی رپورٹس اور ان کے نتائج",
       "emptyTitle": "ابھی کوئی رپورٹ نہیں",
-      "emptyDescription": "تبصرے یا AI جواب سے آپ کی جمع کرائی گئی رپورٹس یہاں نظر آئیں گی۔",
+      "emptyDescription": "پل ریکویسٹ مباحثے میں کسی تبصرے سے یا ایجنٹ سیشن میں اے آئی جواب سے جمع کرائی گئی رپورٹس اپنے نتیجے کے ساتھ یہاں نظر آئیں گی۔",
       "couldNotLoad": "آپ کی رپورٹس لوڈ نہیں ہو سکیں",
       "capped": "آپ کی حالیہ ترین رپورٹس دکھائی جا رہی ہیں۔"
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "کنکشن فعال ہے، لیکن یہ آئٹم ابھی بھی لوڈ نہیں ہو سکتا۔",
       "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
       "bitbucketOrgOnlyNoOrganizationDescription": "اس اکاؤنٹ کی ابھی تک کوئی تنظیم نہیں ہے۔ ایک تنظیم بنانے یا اس میں شامل ہونے پر آپ Bitbucket پل ریکویسٹس کا جائزہ لے سکتے ہیں۔",
-      "gitlabReconnectAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
+      "reconnectAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
       "bitbucketNotConnectedTitle": "Bitbucket منسلک نہیں ہے",
+      "bitbucketAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے منسلک کرنے کی درخواست کریں۔",
       "adminOnlyConnectDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
       "contextLine": "{{organization}} کے لیے",
       "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
@@ -1296,6 +1308,7 @@
       "manageAccess": "رسائی کا انتظام کریں",
       "bitbucketNoRepositoriesDescription": "اس Bitbucket ورک اسپیس میں کوئی ریپوزٹری دستیاب نہیں ہے۔",
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
+      "githubNoRepositoriesDescription": "چیک کریں کہ Kilo کی GitHub ایپ کو ریپوزٹریوں تک رسائی حاصل ہے، پھر فہرست تازہ کریں۔",
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo کی GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ کروانا چاہتے ہیں۔",
       "repositoryAccess": "ریپوزٹری تک رسائی",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "یہ جائزہ ابھی جاری ہے۔ مکمل ہونے پر مسائل یہاں نظر آئیں گے۔",
       "findingsEndedWithoutResults": "یہ جائزہ کوئی مسئلہ سامنے لانے سے پہلے ہی ختم ہو گیا۔",
       "serviceUnavailable": "کوڈ کے جائزے کی سروس سے رابطہ نہیں ہو سکا۔ سروس دستیاب ہونے پر جائزے کی دوبارہ کوشش کریں۔",
-      "reviewFailed": "جائزہ ناکام ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
+      "reviewFailed": "جائزہ ناکام ہو گیا۔",
       "showMore": "مزید دکھائیں",
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} سیشنز",
       "sectionAccessibility": "{{title}}: {{displayCount}} سیشنز",
       "live": "لائیو",
-      "updating": "اپ ڈیٹ ہو رہا ہے"
+      "updating": "اپ ڈیٹ ہو رہا ہے",
+      "retentionLimit": "آپ کے حالیہ ترین سیشنز دکھائے جا رہے ہیں۔"
     },
     "sessionRow": {
       "deleteTitle": "سیشن حذف کریں؟",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "آخر تک اسکرول کریں",
       "emptyTitle": "ابھی کوئی پیغام نہیں",
       "emptyReadOnlyTitle": "اس سیشن میں کوئی پیغام نہیں",
-      "renameAccessibility": "سیشن کا نام تبدیل کریں: {{title}}",
       "cloningSession": "سیشن کی نقل بن رہی ہے",
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا۔",
       "historyTooLarge": "اس سیشن کی نقل لوڈ کرنے کے لیے بہت بڑی ہے۔",
@@ -3082,6 +3095,12 @@
     "retryLoadingAccount": "اکاؤنٹ لوڈ کرنے کی دوبارہ کوشش کریں",
     "retryLoadingPrivacy": "رازداری کے اختیارات لوڈ کرنے کی دوبارہ کوشش کریں"
   },
+  "accountBlocked": {
+    "title": "اکاؤنٹ بلاک ہے",
+    "description": "Kilo نے یہ اکاؤنٹ بلاک کر دیا ہے، اور دوبارہ سائن ان کرنے سے یہ نہیں کھلے گا۔ درخواست پر معاونت کی ٹیم بلاک کا جائزہ لے سکتی ہے۔",
+    "domainDescription": "Kilo اس ای میل ڈومین پر اکاؤنٹس کو بلاک کرتا ہے، اور دوبارہ سائن ان کرنے سے یہ نہیں بدلے گا۔ درخواست پر معاونت کی ٹیم ڈومین کا جائزہ لے سکتی ہے۔",
+    "contactSupport": "معاونت کی ٹیم سے رابطہ کریں"
+  },
   "addCredits": {
     "cta": "کریڈٹس شامل کریں",
     "billingPage": "بلنگ کا صفحہ"
@@ -3154,8 +3173,7 @@
     "timeoutDescription": "درخواست مکمل ہونے سے پہلے وقت ختم ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔"
   },
   "screenHeader": {
-    "openMenu": "مینیو کھولیں",
-    "openMenuFor": "{{title}} کے لیے مینیو کھولیں"
+    "openMenu": "مینیو کھولیں"
   },
   "picker": {
     "optionsExpired": "اختیارات کی میعاد ختم ہو گئی",
@@ -4688,6 +4706,7 @@
     "contextAll": "تمام سیاقات",
     "dismiss": "بریفنگ نظر انداز کریں",
     "dismissFailed": "اس بریفنگ کو ابھی نظر انداز نہیں کیا جا سکا۔ پس منظر میں دوبارہ کوشش کی جائے گی۔",
+    "readMarkFailed": "اس بریفنگ کو بطور پڑھا ہوا نشان زد نہیں کیا جا سکا۔ بریفنگ دوبارہ لوڈ ہونے پر پھر کوشش کی جائے گی۔",
     "offline": "آف لائن · محفوظ شدہ بریفنگ",
     "cached": "محفوظ شدہ بریفنگ · ریفریش دستیاب نہیں",
     "summary": "AI خلاصہ",
@@ -4707,6 +4726,9 @@
     "morningEnd": "بریفنگ کی دستیابی کا اختتامی وقت",
     "timeHint": "بریفنگ کی مدت ختم ہونے پر ہوم کارڈ لائیو اسٹیٹس بحال کر دیتا ہے، آف لائن بھی۔",
     "invalidSchedule": "درست ٹائم زون اور بریفنگ کے لیے ایسی مدت منتخب کریں جس کا اختتام آغاز کے بعد ہو۔",
+    "scheduleEmptyNight": "بریفنگ کی مدت خالی ہے۔ بریفنگ کی مدت کے آغاز کے بعد تیار ہونے کا وقت منتخب کریں۔",
+    "scheduleEmptyMorning": "تیار ہونے کا وقت اور دستیابی کا اختتامی وقت ایک جیسے ہیں۔ منتخب کریں کہ بریفنگ کتنی دیر تک دستیاب رہے۔",
+    "scheduleFullDay": "دونوں مدتیں ایک پورا دن ڈھانپ لیتی ہیں۔ دن کا کچھ حصہ بریفنگ سے باہر رکھیں۔",
     "notificationsHint": "ہر شیڈول شدہ بریفنگ پر ایک عمومی اطلاع۔ ادائیگی والے AI خلاصوں سے آزاد۔",
     "notificationPermission": "اپنی بریفنگ وصول کرنے کے لیے پش اطلاعات فعال کریں۔",
     "defaultModel": "Kilo کا ڈیفالٹ ماڈل استعمال کریں",
@@ -4716,7 +4738,9 @@
     "estimate": "تخمینہ {{estimate}} · زیادہ سے زیادہ {{maximum}}",
     "estimateUnavailable": "ان ترتیبات کے لیے ادائیگی والا خلاصہ دستیاب نہیں ہے۔ ماڈل یا حدود تبدیل کریں، یا بعد میں دوبارہ کوشش کریں۔",
     "confirmPaid": "{{context}} کے لیے ادائیگی والے خلاصے فعال کریں؟",
+    "paidDisclosure_one": "تخمینہ {{estimate}}، زیادہ سے زیادہ {{maximum}}، {{minutes}} منٹ کی حد کے ساتھ۔ تیاری ناکام ہونے پر بھی چارجز لاگو ہوں گے۔",
     "paidDisclosure": "تخمینہ {{estimate}}، زیادہ سے زیادہ {{maximum}}، {{minutes}} منٹ کی حد کے ساتھ۔ تیاری ناکام ہونے پر بھی چارجز لاگو ہوں گے۔",
+    "paidDisclosure_other": "تخمینہ {{estimate}}، زیادہ سے زیادہ {{maximum}}، {{minutes}} منٹ کی حد کے ساتھ۔ تیاری ناکام ہونے پر بھی چارجز لاگو ہوں گے۔",
     "enable": "ادائیگی والے خلاصے فعال کریں",
     "allContexts": "ذاتی اور تنظیمی بریفنگز الگ الگ رہتی ہیں۔",
     "emptyHistory": "کوئی محفوظ شدہ بریفنگ نہیں",
@@ -4759,7 +4783,7 @@
     "sourceActivity": "بلا عنوان سرگرمی",
     "metadataFailureProvider": "پرووائیڈر کی خرابی",
     "metadataFailureTool": "ٹول کی خرابی",
-    "metadataFailureCancelled": "منسوخ",
+    "metadataStopped": "پچھلا ٹرن روک دیا گیا",
     "metadataFailureOther": "غیر متعین خرابی"
   },
   "systemSearch": {
@@ -4880,6 +4904,9 @@
       "runAsCreator": "میرے طور پر چلائیں",
       "runAsCreatorDescription": "ہر رن آپ کے اکاؤنٹ سے ہوتا ہے، اس لیے سیکرٹ ہیڈر لازمی ہے۔",
       "saveFailedTitle": "ٹرگر محفوظ نہیں ہو سکا",
+      "nameTaken": "“{{name}}” نام کا ٹرگر پہلے سے موجود ہے۔",
+      "saveFailedRetry": "سرور سے رابطہ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "saveFailedCheck": "فارم میں درج ویلیوز چیک کریں اور دوبارہ کوشش کریں۔",
       "deleteTitle": "یہ ٹرگر حذف کریں؟",
       "deleteMessage": "{{name}} کو کی جانے والی کالیں ناکام ہوں گی۔ اسے واپس نہیں کیا جا سکتا۔",
       "deleteMessageScheduled": "{{name}} ٹرگر کے شیڈول شدہ رنز رک جائیں گے۔ اسے واپس نہیں کیا جا سکتا۔",

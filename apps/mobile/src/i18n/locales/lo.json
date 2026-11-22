@@ -522,12 +522,13 @@
       "receiptLabel": "ໃບຮັບ",
       "copyReceiptId": "ຄັດລອກ ID ຂອງໃບຮັບ",
       "appealLabel": "ການອຸທອນ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ໄດ້ຮັບແລ້ວ",
       "triageOpen": "ກຳລັງກວດສອບ",
       "triageActioned": "ໄດ້ຮັບການຮັບຮອງ",
       "triageRejected": "ບໍ່ໄດ້ຮັບການຮັບຮອງ",
       "appealNone": "ບໍ່ໄດ້ສົ່ງ",
-      "appealSubmitted": "ກຳລັງກວດສອບ",
+      "appealSubmitted": "ການອຸທອນ ກຳລັງກວດສອບ",
       "appealAccepted": "ຍອມຮັບແລ້ວ",
       "appealRejected": "ປະຕິເສດແລ້ວ",
       "appeal": "ອຸທອນຄຳຕັດສິນນີ້",
@@ -539,13 +540,23 @@
       "nextStepInReview": "ຜົນຈະສະແດງຢູ່ໜ້າຈໍນີ້ ແລະ ທ່ານສາມາດອຸທອນໄດ້ຫຼັງຈາກມີຄຳຕັດສິນ.",
       "nextStepAppeal": "ຜົນຂອງການອຸທອນຈະສະແດງຢູ່ໜ້າຈໍນີ້.",
       "nextStepFinal": "ຄຳຕັດສິນການອຸທອນເປັນຂັ້ນສຸດທ້າຍ. ບໍ່ສາມາດຍື່ນອຸທອນໄດ້ອີກ.",
-      "viewReceipt": "ເບິ່ງໃບຮັບ"
+      "viewReceipt": "ເບິ່ງໃບຮັບ",
+      "targetLabel": "ສິ່ງທີ່ຖືກລາຍງານ",
+      "reasonLabel": "ເຫດຜົນຂອງການລາຍງານ",
+      "targetMessage": "ຄຳຕອບ AI",
+      "targetComment": "ຄຳເຫັນ PR",
+      "targetUser": "ຜູ້ໃຊ້",
+      "reasonHarmful": "ເນື້ອຫາອັນຕະລາຍ",
+      "reasonIllegal": "ເນື້ອຫາຜິດກົດໝາຍ",
+      "reasonHarassment": "ການລ່ວງລະເມີດ",
+      "reasonSpam": "ໂຄສະນາລົບກວນ",
+      "reasonOther": "ເຫດຜົນອື່ນ"
     },
     "reportReceipts": {
       "title": "ການລາຍງານ",
       "rowSubtitle": "ການລາຍງານທີ່ທ່ານໄດ້ຍື່ນ ແລະ ຜົນຂອງມັນ",
       "emptyTitle": "ຍັງບໍ່ມີການລາຍງານ",
-      "emptyDescription": "ການລາຍງານທີ່ທ່ານຍື່ນຈາກຄຳເຫັນ ຫຼື ຄຳຕອບຂອງ AI ຈະສະແດງຢູ່ນີ້.",
+      "emptyDescription": "ການລາຍງານທີ່ທ່ານຍື່ນຈາກຄຳເຫັນໃນການສົນທະນາໃນ pull request ຫຼື ຈາກຄຳຕອບ AI ໃນເຊດຊັນຂອງເອເຈນ ຈະສະແດງຢູ່ນີ້ ພ້ອມກັບຜົນຂອງມັນ.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການລາຍງານຂອງທ່ານໄດ້",
       "capped": "ກຳລັງສະແດງການລາຍງານລ່າສຸດຂອງທ່ານ."
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "ການເຊື່ອມຕໍ່ເຮັດວຽກຢູ່, ແຕ່ລາຍການນີ້ຍັງບໍ່ສາມາດໂຫຼດໄດ້.",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
-      "gitlabReconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
+      "reconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
       "bitbucketNotConnectedTitle": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket",
+      "bitbucketAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
       "adminOnlyConnectDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
       "contextLine": "ສຳລັບ {{organization}}",
       "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
@@ -1296,6 +1308,7 @@
       "manageAccess": "ຈັດການສິດເຂົ້າເຖິງ",
       "bitbucketNoRepositoriesDescription": "ບໍ່ມີຄັງໂຄ້ດທີ່ໃຊ້ໄດ້ໃນພື້ນທີ່ເຮັດວຽກ Bitbucket ນີ້.",
       "gitlabNoRepositoriesDescription": "ເຈົ້າອາດຕ້ອງໃຫ້ສິດເຂົ້າເຖິງກຸ່ມ ຫຼື ໂຄງການເພີ່ມໃນ GitLab.",
+      "githubNoRepositoriesDescription": "ກວດເບິ່ງສິດເຂົ້າເຖິງຄັງໂຄດຂອງແອັບ Kilo ໃນ GitHub ແລ້ວໂຫຼດໃໝ່.",
       "installGithubApp": "ຕິດຕັ້ງແອັບ GitHub ໃນຄັງໂຄ້ດ",
       "installGithubAppDescription": "ໃຫ້ສິດແອັບ GitHub ຂອງ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດທີ່ເຈົ້າຕ້ອງການໃຫ້ກວດທານ.",
       "repositoryAccess": "ສິດເຂົ້າເຖິງຄັງໂຄ້ດ",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "ການກວດທານນີ້ຍັງກຳລັງດຳເນີນການຢູ່. ຜົນລັບຈະປະກົດຂຶ້ນຢູ່ບ່ອນນີ້ເມື່ອມັນແລ້ວເສັດ.",
       "findingsEndedWithoutResults": "ການກວດທານນີ້ໄດ້ສິ້ນສຸດລົງກ່ອນທີ່ຈະມີຜົນລັບໃດໆ.",
       "serviceUnavailable": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບບໍລິການກວດທານໂຄດໄດ້. ລອງກວດທານໃໝ່ເມື່ອບໍລິການພ້ອມໃຊ້ງານ.",
-      "reviewFailed": "ການກວດທານລົ້ມເຫຼວ. ກະລຸນາລອງອີກຄັ້ງ.",
+      "reviewFailed": "ການກວດທານລົ້ມເຫຼວ.",
       "showMore": "ສະແດງເພີ່ມເຕີມ",
       "created": "ສ້າງເມື່ອ",
       "started": "ເລີ່ມເມື່ອ",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ເຊດຊັນ",
       "sectionAccessibility": "{{title}}: {{displayCount}} ເຊດຊັນ",
       "live": "ສົດ",
-      "updating": "ກຳລັງອັບເດດ"
+      "updating": "ກຳລັງອັບເດດ",
+      "retentionLimit": "ກຳລັງສະແດງເຊດຊັນທີ່ຜ່ານມາຫຼ້າສຸດ."
     },
     "sessionRow": {
       "deleteTitle": "ລຶບເຊດຊັນບໍ?",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "emptyReadOnlyTitle": "ບໍ່ມີຂໍ້ຄວາມໃນເຊດຊັນນີ້",
-      "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
       "cloningSession": "ກຳລັງສ້າງສຳເນົາເຊດຊັນ",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້ໄດ້.",
       "historyTooLarge": "ບົດບັນທຶກຂອງເຊດຊັນນີ້ໃຫຍ່ເກີນໄປ ບໍ່ສາມາດໂຫຼດໄດ້.",
@@ -3082,6 +3095,12 @@
     "retryLoadingAccount": "ລອງໂຫຼດບັນຊີອີກຄັ້ງ",
     "retryLoadingPrivacy": "ລອງໂຫຼດຕົວເລືອກຄວາມເປັນສ່ວນຕົວອີກຄັ້ງ"
   },
+  "accountBlocked": {
+    "title": "ບັນຊີຖືກບລັອກ",
+    "description": "Kilo ໄດ້ບລັອກບັນຊີນີ້ ແລະ ການເຂົ້າສູ່ລະບົບອີກຄັ້ງຈະບໍ່ປົດການບລັອກ. ຝ່າຍສະໜັບສະໜູນສາມາດກວດສອບການບລັອກຕາມການຮ້ອງຂໍ.",
+    "domainDescription": "Kilo ບໍ່ອະນຸຍາດໃຫ້ມີບັນຊີໃນໂດເມນອີເມວນີ້ ແລະ ການເຂົ້າສູ່ລະບົບອີກຄັ້ງຈະບໍ່ປ່ຽນແປງການບລັອກ. ຝ່າຍສະໜັບສະໜູນສາມາດກວດສອບໂດເມນຕາມການຮ້ອງຂໍ.",
+    "contactSupport": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
+  },
   "addCredits": {
     "cta": "ເຕີມເຄຣດິດ",
     "billingPage": "ໜ້າການຮຽກເກັບເງິນ"
@@ -3154,8 +3173,7 @@
     "timeoutDescription": "ຄຳຮ້ອງຂໍໃຊ້ເວລາເກີນກຳນົດໂດຍບໍ່ສຳເລັດ. ກະລຸນາລອງອີກຄັ້ງ."
   },
   "screenHeader": {
-    "openMenu": "ເປີດເມນູ",
-    "openMenuFor": "ເປີດເມນູສຳລັບ {{title}}"
+    "openMenu": "ເປີດເມນູ"
   },
   "picker": {
     "optionsExpired": "ຕົວເລືອກໝົດອາຍຸແລ້ວ",
@@ -4688,6 +4706,7 @@
     "contextAll": "ບໍລິບົດທັງໝົດ",
     "dismiss": "ລະເວັ້ນລາຍງານ",
     "dismissFailed": "ຍັງບໍ່ສາມາດລະເວັ້ນລາຍງານນີ້ໄດ້. ລະບົບຈະລອງໃໝ່ໃນພື້ນຫຼັງ.",
+    "readMarkFailed": "ຍັງບໍ່ສາມາດໝາຍລາຍງານນີ້ວ່າອ່ານແລ້ວໄດ້. ລະບົບຈະລອງໃໝ່ເມື່ອໂຫຼດລາຍງານນີ້ຄືນໃໝ່.",
     "offline": "ອອບລາຍ · ລາຍງານທີ່ບັນທຶກໄວ້",
     "cached": "ລາຍງານທີ່ບັນທຶກໄວ້ · ບໍ່ສາມາດໂຫຼດຄືນໃໝ່",
     "summary": "ສະຫຼຸບໂດຍ AI",
@@ -4707,6 +4726,9 @@
     "morningEnd": "ລາຍງານມີຈົນເຖິງ",
     "timeHint": "ບັດໜ້າຫຼັກຈະກັບມາສະແດງສະຖານະປັດຈຸບັນເມື່ອຊ່ວງເວລາຂອງລາຍງານສິ້ນສຸດ, ເຖິງແມ່ນອອບລາຍ.",
     "invalidSchedule": "ເລືອກເຂດເວລາທີ່ຖືກຕ້ອງ ແລະ ຊ່ວງເວລາຂອງລາຍງານທີ່ບໍ່ຫວ່າງ.",
+    "scheduleEmptyNight": "ຊ່ວງເວລາຂອງລາຍງານຫວ່າງເປົ່າ. ເລືອກເວລາພ້ອມທີ່ຊ້າກວ່າເວລາເລີ່ມຕົ້ນຂອງຊ່ວງເວລາ.",
+    "scheduleEmptyMorning": "ເວລາພ້ອມ ແລະ ເວລາມີຈົນເຖິງກົງກັນ. ເລືອກວ່າລາຍງານຈະມີຢູ່ດົນປານໃດ.",
+    "scheduleFullDay": "ສອງຊ່ວງເວລານີ້ກວມເອົາໜຶ່ງມື້ເຕັມ. ໃຫ້ບາງສ່ວນຂອງມື້ຢູ່ນອກລາຍງານ.",
     "notificationsHint": "ການແຈ້ງເຕືອນທົ່ວໄປໜຶ່ງຄັ້ງຕໍ່ລາຍງານທີ່ກຳນົດໄວ້. ບໍ່ຂຶ້ນກັບສະຫຼຸບ AI ແບບເສຍເງິນ.",
     "notificationPermission": "ເປີດການແຈ້ງເຕືອນແບບດັນ ເພື່ອຮັບລາຍງານຂອງທ່ານ.",
     "defaultModel": "ໃຊ້ໂມເດລເລີ່ມຕົ້ນຂອງ Kilo",
@@ -4716,7 +4738,9 @@
     "estimate": "ປະເມີນ {{estimate}} · ສູງສຸດ {{maximum}}",
     "estimateUnavailable": "ບໍ່ມີບົດສະຫຼຸບແບບຈ່າຍຄ່າສຳລັບການຕັ້ງຄ່າເຫຼົ່ານີ້. ປ່ຽນໂມເດລ ຫຼື ຂອບເຂດ, ຫຼື ລອງອີກຄັ້ງພາຍຫຼັງ.",
     "confirmPaid": "ເປີດສະຫຼຸບແບບເສຍເງິນສຳລັບ {{context}} ບໍ?",
+    "paidDisclosure_one": "ປະມານ {{estimate}}, ສູງສຸດ {{maximum}}, ຈຳກັດເວລາ {{minutes}} ນາທີ. ຈະມີຄ່າໃຊ້ຈ່າຍເຖິງແມ່ນການສ້າງລົ້ມເຫຼວ.",
     "paidDisclosure": "ປະມານ {{estimate}}, ສູງສຸດ {{maximum}}, ຈຳກັດເວລາ {{minutes}} ນາທີ. ຈະມີຄ່າໃຊ້ຈ່າຍເຖິງແມ່ນການສ້າງລົ້ມເຫຼວ.",
+    "paidDisclosure_other": "ປະມານ {{estimate}}, ສູງສຸດ {{maximum}}, ຈຳກັດເວລາ {{minutes}} ນາທີ. ຈະມີຄ່າໃຊ້ຈ່າຍເຖິງແມ່ນການສ້າງລົ້ມເຫຼວ.",
     "enable": "ເປີດສະຫຼຸບແບບເສຍເງິນ",
     "allContexts": "ລາຍງານສ່ວນຕົວ ແລະ ຂອງອົງກອນຖືກແຍກອອກຈາກກັນ.",
     "emptyHistory": "ບໍ່ມີລາຍງານທີ່ບັນທຶກໄວ້",
@@ -4755,7 +4779,7 @@
     "sourceActivity": "ກິດຈະກຳບໍ່ມີຊື່",
     "metadataFailureProvider": "ຂໍ້ຜິດພາດຈາກຜູ້ໃຫ້ບໍລິການ",
     "metadataFailureTool": "ຂໍ້ຜິດພາດຈາກເຄື່ອງມື",
-    "metadataFailureCancelled": "ຍົກເລີກແລ້ວ",
+    "metadataStopped": "ຄັ້ງຫຼ້າຖືກຢຸດ",
     "metadataFailureOther": "ຂໍ້ຜິດພາດທີ່ບໍ່ລະບຸ",
     "metadataPlan_one": "ແຜນ: ສຳເລັດ {{displayDone}} ຈາກ {{displayTotal}} ຂັ້ນຕອນ",
     "metadataFiles_one": "{{displayCount}} ໄຟລ໌ທີ່ປ່ຽນແປງ",
@@ -4880,6 +4904,9 @@
       "runAsCreator": "ຣັນໃນນາມຂ້ອຍ",
       "runAsCreatorDescription": "ທຸກການຣັນໃຊ້ບັນຊີຂອງທ່ານ ດັ່ງນັ້ນຈຶ່ງຕ້ອງມີຫົວຂໍ້ຄວາມລັບ.",
       "saveFailedTitle": "ບັນທຶກຕົວກະຕຸ້ນບໍ່ໄດ້",
+      "nameTaken": "ມີຕົວກະຕຸ້ນຊື່ “{{name}}” ຢູ່ແລ້ວ.",
+      "saveFailedRetry": "ຕິດຕໍ່ເຊີບເວີບໍ່ໄດ້. ກວດກາການເຊື່ອມຕໍ່ຂອງທ່ານ ແລ້ວລອງອີກຄັ້ງ.",
+      "saveFailedCheck": "ກວດກາຄ່າໃນແບບຟອມ ແລ້ວລອງອີກຄັ້ງ.",
       "deleteTitle": "ລຶບຕົວກະຕຸ້ນນີ້ບໍ?",
       "deleteMessage": "ການເອີ້ນຫາ {{name}} ຈະລົ້ມເຫຼວ. ບໍ່ສາມາດຍົກເລີກໄດ້.",
       "deleteMessageScheduled": "ການຣັນຕາມກຳນົດເວລາຂອງຕົວກະຕຸ້ນ {{name}} ຈະຢຸດ. ບໍ່ສາມາດຍົກເລີກໄດ້.",

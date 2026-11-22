@@ -523,12 +523,13 @@
       "receiptLabel": "Accusé de réception",
       "copyReceiptId": "Copier l'identifiant de l'accusé de réception",
       "appealLabel": "Recours",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel) : {{status}}",
       "triageReceived": "Reçu",
       "triageOpen": "En cours d'examen",
       "triageActioned": "Retenu",
       "triageRejected": "Non retenu",
       "appealNone": "Non déposé",
-      "appealSubmitted": "En cours d'examen",
+      "appealSubmitted": "Recours en cours d'examen",
       "appealAccepted": "Accepté",
       "appealRejected": "Refusé",
       "appeal": "Contester cette décision",
@@ -540,13 +541,23 @@
       "nextStepInReview": "Le résultat s'affichera sur cet écran, et vous pourrez déposer un recours après la décision.",
       "nextStepAppeal": "Le résultat du recours s'affichera sur cet écran.",
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
-      "viewReceipt": "Voir l'accusé de réception"
+      "viewReceipt": "Voir l'accusé de réception",
+      "targetLabel": "Élément signalé",
+      "reasonLabel": "Motif du signalement",
+      "targetMessage": "Réponse de l'IA",
+      "targetComment": "Commentaire de PR",
+      "targetUser": "Utilisateur",
+      "reasonHarmful": "Contenu préjudiciable",
+      "reasonIllegal": "Contenu illégal",
+      "reasonHarassment": "Harcèlement",
+      "reasonSpam": "Publicité non sollicitée",
+      "reasonOther": "Autre motif"
     },
     "reportReceipts": {
       "title": "Signalements",
       "rowSubtitle": "Signalements que vous avez déposés et leurs résultats",
       "emptyTitle": "Aucun signalement pour l'instant",
-      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire ou d'une réponse de l'IA apparaissent ici.",
+      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire dans une discussion de pull request, ou d'une réponse de l'IA dans une session d'agent, apparaissent ici avec leur résultat.",
       "couldNotLoad": "Impossible de charger vos signalements",
       "capped": "Affichage de vos signalements les plus récents."
     },
@@ -704,6 +715,7 @@
       "manageAccess": "Gérer l'accès",
       "bitbucketNoRepositoriesDescription": "Aucun dépôt n'est disponible dans cet espace de travail Bitbucket.",
       "gitlabNoRepositoriesDescription": "Vous devrez peut-être accorder l'accès à d'autres groupes ou projets sur GitLab.",
+      "githubNoRepositoriesDescription": "Vérifiez les droits d'accès de l'application Kilo aux dépôts GitHub, puis actualisez.",
       "installGithubApp": "Installer l'application GitHub sur les dépôts",
       "installGithubAppDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts dont vous souhaitez faire examiner le code.",
       "repositoryAccess": "accès au dépôt",
@@ -798,7 +810,7 @@
       "findingsInProgress": "Cette revue est toujours en cours. Les signalements apparaîtront ici une fois qu'elle sera terminée.",
       "findingsEndedWithoutResults": "Cette revue s'est terminée avant de produire le moindre signalement.",
       "serviceUnavailable": "Impossible de joindre le service de revue de code. Relancez la revue lorsque le service sera disponible.",
-      "reviewFailed": "La revue a échoué. Veuillez réessayer.",
+      "reviewFailed": "La revue a échoué.",
       "retryMessage": "Cela relancera la revue de code.",
       "retryReview": "Relancer la revue",
       "retryNeedsSettings": "L'agent de revue de code est désactivé ou ses paramètres nécessitent votre attention. Corrigez les paramètres, puis relancez cette revue.",
@@ -1591,7 +1603,6 @@
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
       "emptyReadOnlyTitle": "Aucun message dans cette session",
-      "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session",
       "historyTooLarge": "La transcription de cette session est trop volumineuse pour être chargée.",
@@ -2485,6 +2496,12 @@
     "translateSummaries": "Traduire les résumés",
     "autoExpandThinkingInactiveSubtitle": "Aucun effet tant que les détails de la réflexion sont masqués."
   },
+  "accountBlocked": {
+    "title": "Compte bloqué",
+    "description": "Kilo a bloqué ce compte, et une nouvelle connexion ne lèvera pas le blocage. L'assistance peut examiner le blocage sur demande.",
+    "domainDescription": "Kilo bloque les comptes sur ce domaine de messagerie, et une nouvelle connexion ne changera pas cela. L'assistance peut examiner le domaine sur demande.",
+    "contactSupport": "Contacter l'assistance"
+  },
   "addCredits": {
     "cta": "Ajouter des crédits",
     "billingPage": "page de facturation"
@@ -2553,8 +2570,7 @@
     "timeoutDescription": "La demande a mis trop de temps à aboutir. Réessayez."
   },
   "screenHeader": {
-    "openMenu": "Ouvrir le menu",
-    "openMenuFor": "Ouvrir le menu pour {{title}}"
+    "openMenu": "Ouvrir le menu"
   },
   "picker": {
     "optionsExpired": "Options indisponibles",
@@ -2801,7 +2817,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessions",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessions",
       "live": "EN DIRECT",
-      "updating": "Mise à jour en cours"
+      "updating": "Mise à jour en cours",
+      "retentionLimit": "Affichage des sessions les plus récentes."
     },
     "sessionRow": {
       "deleteTitle": "Supprimer la session ?",
@@ -2920,8 +2937,9 @@
       "checkActiveConnection": "La connexion est active, mais cet élément ne peut toujours pas être chargé.",
       "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
-      "gitlabReconnectAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
+      "reconnectAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
       "bitbucketNotConnectedTitle": "Bitbucket n'est pas connecté",
+      "bitbucketAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, un administrateur ou un responsable de la facturation de le connecter.",
       "adminOnlyConnectDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "contextLine": "Pour {{organization}}",
       "contextLinePersonal": "Pour votre compte personnel"
@@ -4772,6 +4790,7 @@
     "contextAll": "Tous les contextes",
     "dismiss": "Ignorer le briefing",
     "dismissFailed": "Impossible d’ignorer ce briefing pour l’instant. Une nouvelle tentative est effectuée en arrière-plan.",
+    "readMarkFailed": "Impossible de marquer ce briefing comme lu. Une nouvelle tentative aura lieu au rechargement du briefing.",
     "offline": "Hors ligne · briefing enregistré",
     "cached": "Briefing enregistré · actualisation indisponible",
     "summary": "Résumé IA",
@@ -4791,6 +4810,9 @@
     "morningEnd": "Briefing disponible jusqu’à",
     "timeHint": "La carte d’accueil rétablit le statut en direct à la fin de la fenêtre de briefing, même hors ligne.",
     "invalidSchedule": "Choisissez un fuseau horaire valide et une fenêtre de briefing non vide.",
+    "scheduleEmptyNight": "La fenêtre de briefing est vide. Choisissez une heure de disponibilité postérieure au début de la fenêtre.",
+    "scheduleEmptyMorning": "L’heure de disponibilité et l’heure de fin de disponibilité coïncident. Choisissez combien de temps le briefing reste disponible.",
+    "scheduleFullDay": "Les deux fenêtres couvrent une journée entière. Laissez une partie de la journée en dehors du briefing.",
     "notificationsHint": "Une notification générique par briefing planifié. Indépendante des résumés IA payants.",
     "notificationPermission": "Activez les notifications push pour recevoir votre briefing.",
     "defaultModel": "Utiliser le modèle par défaut de Kilo",
@@ -4805,6 +4827,9 @@
     "estimateSpendLimitTooLow": "Augmentez le plafond de dépenses pour autoriser ce résumé.",
     "confirmPaid": "Activer les résumés payants pour {{context}} ?",
     "paidDisclosure": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} min. Les frais s’appliquent même en cas d’échec.",
+    "paidDisclosure_one": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} min. Les frais s’appliquent même en cas d’échec.",
+    "paidDisclosure_many": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} min. Les frais s’appliquent même en cas d’échec.",
+    "paidDisclosure_other": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} min. Les frais s’appliquent même en cas d’échec.",
     "enable": "Activer les résumés payants",
     "allContexts": "Les briefings personnels et d’organisation restent séparés.",
     "emptyHistory": "Aucun briefing enregistré",
@@ -4847,7 +4872,7 @@
     "sourceActivity": "Activité sans titre",
     "metadataFailureProvider": "erreur du fournisseur",
     "metadataFailureTool": "erreur d'outil",
-    "metadataFailureCancelled": "Annulé",
+    "metadataStopped": "Dernier tour arrêté",
     "metadataFailureOther": "erreur non spécifiée"
   },
   "systemSearch": {
@@ -4968,6 +4993,9 @@
       "runAsCreator": "Exécuter en tant que moi",
       "runAsCreatorDescription": "Chaque exécution utilise votre compte, l’en-tête secret est donc requis.",
       "saveFailedTitle": "Impossible d’enregistrer le déclencheur",
+      "nameTaken": "Un déclencheur nommé « {{name}} » existe déjà.",
+      "saveFailedRetry": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+      "saveFailedCheck": "Vérifiez les valeurs du formulaire et réessayez.",
       "deleteTitle": "Supprimer ce déclencheur ?",
       "deleteMessage": "Les appels à {{name}} échoueront. Cette action est irréversible.",
       "deleteMessageScheduled": "Les exécutions planifiées de {{name}} s'arrêteront. Cette action est irréversible.",

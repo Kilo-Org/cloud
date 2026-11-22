@@ -524,13 +524,14 @@
       "receiptLabel": "Potvrzení",
       "copyReceiptId": "Kopírovat ID potvrzení",
       "appealLabel": "Odvolání",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Přijato",
       "triageOpen": "Posuzuje se",
       "triageActioned": "Uznáno",
       "triageRejected": "Neuznáno",
       "appealNone": "Nepodáno",
       "appealSubmitted": "Čeká na posouzení",
-      "appealAccepted": "Přijato",
+      "appealAccepted": "Odvolání přijato",
       "appealRejected": "Zamítnuto",
       "appeal": "Odvolat se proti rozhodnutí",
       "appealTitle": "Odvolat se proti rozhodnutí?",
@@ -541,13 +542,23 @@
       "nextStepInReview": "Výsledek se zobrazí na této obrazovce a po rozhodnutí se můžete odvolat.",
       "nextStepAppeal": "Výsledek vašeho odvolání se zobrazí na této obrazovce.",
       "nextStepFinal": "Rozhodnutí o odvolání je konečné. Další odvolání již nelze podat.",
-      "viewReceipt": "Zobrazit potvrzení"
+      "viewReceipt": "Zobrazit potvrzení",
+      "targetLabel": "Nahlášená položka",
+      "reasonLabel": "Důvod nahlášení",
+      "targetMessage": "Odpověď AI",
+      "targetComment": "Komentář v PR",
+      "targetUser": "Uživatel",
+      "reasonHarmful": "Škodlivý obsah",
+      "reasonIllegal": "Nezákonný obsah",
+      "reasonHarassment": "Obtěžování",
+      "reasonSpam": "Nevyžádaná reklama",
+      "reasonOther": "Jiný důvod"
     },
     "reportReceipts": {
       "title": "Nahlášení",
       "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
       "emptyTitle": "Zatím žádná nahlášení",
-      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "emptyDescription": "Nahlášení, která podáte z komentáře v diskuzi k pull requestu nebo z odpovědi AI v relaci agenta, se zde zobrazí včetně výsledku.",
       "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
       "capped": "Zobrazují se vaše nejnovější nahlášení."
     },
@@ -1038,8 +1049,9 @@
       "checkActiveConnection": "Připojení je aktivní, ale tuto položku pořád nejde načíst.",
       "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
-      "gitlabReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
+      "reconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
       "bitbucketNotConnectedTitle": "Bitbucket není připojen",
+      "bitbucketAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho připojil.",
       "adminOnlyConnectDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
@@ -1352,6 +1364,7 @@
       "manageAccess": "Spravovat přístup",
       "bitbucketNoRepositoriesDescription": "V tomto pracovním prostoru služby Bitbucket nejsou k dispozici žádné repozitáře.",
       "gitlabNoRepositoriesDescription": "Možná bude nutné udělit přístup k dalším skupinám nebo projektům na GitLabu.",
+      "githubNoRepositoriesDescription": "Zkontrolujte přístup aplikace Kilo k repozitářům ve službě GitHub a obnovte seznam.",
       "installGithubApp": "Instalace aplikace GitHub pro repozitáře",
       "installGithubAppDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům, které chcete nechat zkontrolovat.",
       "repositoryAccess": "přístup k repozitářům",
@@ -1385,7 +1398,7 @@
       "findingsInProgress": "Tato kontrola stále probíhá. Nálezy se zde zobrazí po jejím dokončení.",
       "findingsEndedWithoutResults": "Tato kontrola skončila dříve, než mohla vyprodukovat jakékoli nálezy.",
       "serviceUnavailable": "Nepodařilo se připojit ke službě kontroly kódu. Zopakujte kontrolu, až bude služba dostupná.",
-      "reviewFailed": "Kontrola selhala. Zkuste to prosím znovu.",
+      "reviewFailed": "Kontrola selhala.",
       "showMore": "Zobrazit více",
       "created": "Vytvořeno",
       "started": "Zahájeno",
@@ -2257,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} relace",
       "sectionAccessibility": "{{title}}: {{displayCount}} relace",
       "live": "ŽIVĚ",
-      "updating": "Aktualizace"
+      "updating": "Aktualizace",
+      "retentionLimit": "Zobrazují se nejnovější relace."
     },
     "sessionRow": {
       "deleteTitle": "Smazat relaci?",
@@ -2331,7 +2345,6 @@
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
       "emptyReadOnlyTitle": "Žádné zprávy v této relaci",
-      "renameAccessibility": "Přejmenovat relaci: {{title}}",
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
@@ -3204,6 +3217,12 @@
     "retryLoadingAccount": "Znovu načíst účet",
     "retryLoadingPrivacy": "Znovu načíst nastavení soukromí"
   },
+  "accountBlocked": {
+    "title": "Účet zablokován",
+    "description": "Kilo zablokovalo tento účet a nové přihlášení to nezruší. Podpora může blokaci na požádání přezkoumat.",
+    "domainDescription": "Kilo zablokovalo účty na této e-mailové doméně a nové přihlášení to nezruší. Podpora může doménu na požádání přezkoumat.",
+    "contactSupport": "Kontaktovat podporu"
+  },
   "addCredits": {
     "cta": "Dobít kredity",
     "billingPage": "stránka fakturace"
@@ -3276,8 +3295,7 @@
     "timeoutDescription": "Požadavek vypršel dříve, než se dokončil. Zkuste to prosím znovu."
   },
   "screenHeader": {
-    "openMenu": "Otevřít nabídku",
-    "openMenuFor": "Otevřít nabídku pro {{title}}"
+    "openMenu": "Otevřít nabídku"
   },
   "picker": {
     "optionsExpired": "Platnost možností vypršela",
@@ -4856,6 +4874,7 @@
     "contextAll": "Všechny kontexty",
     "dismiss": "Skrýt přehled",
     "dismissFailed": "Přehled se zatím nepodařilo skrýt. Pokus se automaticky opakuje na pozadí.",
+    "readMarkFailed": "Tento přehled se nepodařilo označit jako přečtený. Při příštím načtení přehledu se pokus zopakuje.",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
     "summary": "AI shrnutí",
@@ -4875,6 +4894,9 @@
     "morningEnd": "Přehled dostupný do",
     "timeHint": "Karta na domovské obrazovce obnoví živý stav po skončení období přehledu, i offline.",
     "invalidSchedule": "Zvolte platné časové pásmo a neprázdné období přehledu.",
+    "scheduleEmptyNight": "Okno přehledu je prázdné. Zvolte čas připravenosti později než začátek okna.",
+    "scheduleEmptyMorning": "Čas připravenosti a čas konce dostupnosti se shodují. Zvolte, jak dlouho přehled zůstane dostupný.",
+    "scheduleFullDay": "Obě okna pokrývají celý den. Nechte část dne mimo přehled.",
     "notificationsHint": "Jedno obecné oznámení na každý naplánovaný přehled. Nezávisí na placených AI shrnutích.",
     "notificationPermission": "Pro příjem přehledu zapněte push oznámení.",
     "defaultModel": "Použít výchozí model Kilo",
@@ -4884,6 +4906,10 @@
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné. Změňte model nebo limity, případně to zkuste později.",
     "confirmPaid": "Povolit placená shrnutí pro {{context}}?",
+    "paidDisclosure_one": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_few": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_many": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_other": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
     "paidDisclosure": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
     "enable": "Povolit placená shrnutí",
     "allContexts": "Osobní a organizační přehledy zůstávají oddělené.",
@@ -4935,7 +4961,7 @@
     "sourceActivity": "Aktivita bez názvu",
     "metadataFailureProvider": "chyba poskytovatele",
     "metadataFailureTool": "chyba nástroje",
-    "metadataFailureCancelled": "Zrušeno",
+    "metadataStopped": "Poslední tah byl zastaven",
     "metadataFailureOther": "nespecifikovaná chyba"
   },
   "systemSearch": {
@@ -5056,6 +5082,9 @@
       "runAsCreator": "Spouštět jako já",
       "runAsCreatorDescription": "Každé spuštění používá váš účet, takže je vyžadována tajná hlavička.",
       "saveFailedTitle": "Spouštěč se nepodařilo uložit",
+      "nameTaken": "Spouštěč s názvem „{{name}}“ už existuje.",
+      "saveFailedRetry": "Nepodařilo se spojit se serverem. Zkontrolujte připojení a zkuste to znovu.",
+      "saveFailedCheck": "Zkontrolujte hodnoty ve formuláři a zkuste to znovu.",
       "deleteTitle": "Smazat tento spouštěč?",
       "deleteMessage": "Volání na {{name}} selžou. Tuto akci nelze vrátit.",
       "deleteMessageScheduled": "Naplánované běhy {{name}} se zastaví. Tuto akci nelze vrátit.",

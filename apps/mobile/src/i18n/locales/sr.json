@@ -523,6 +523,7 @@
       "receiptLabel": "Potvrda",
       "copyReceiptId": "Kopiraj ID potvrde",
       "appealLabel": "Žalba",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Primljeno",
       "triageOpen": "U razmatranju",
       "triageActioned": "Usvojeno",
@@ -540,13 +541,23 @@
       "nextStepInReview": "Ishod će biti prikazan na ovom ekranu, a žalbu možete podneti nakon odluke.",
       "nextStepAppeal": "Ishod žalbe će biti prikazan na ovom ekranu.",
       "nextStepFinal": "Odluka po žalbi je konačna. Žalba se više ne može podneti.",
-      "viewReceipt": "Prikaži potvrdu"
+      "viewReceipt": "Prikaži potvrdu",
+      "targetLabel": "Prijavljena stavka",
+      "reasonLabel": "Razlog prijave",
+      "targetMessage": "AI odgovor",
+      "targetComment": "Komentar u zahtevu",
+      "targetUser": "Osoba",
+      "reasonHarmful": "Štetan sadržaj",
+      "reasonIllegal": "Nezakonit sadržaj",
+      "reasonHarassment": "Uznemiravanje",
+      "reasonSpam": "Neželjena pošta",
+      "reasonOther": "Drugi razlog"
     },
     "reportReceipts": {
       "title": "Prijave",
       "rowSubtitle": "Prijave koje ste podneli i njihovi ishodi",
       "emptyTitle": "Još nema prijava",
-      "emptyDescription": "Prijave koje podnesete iz komentara ili AI odgovora prikazuju se ovde.",
+      "emptyDescription": "Prijave koje podnesete iz komentara u diskusiji o pull requestu ili iz AI odgovora u sesiji agenta prikazuju se ovde zajedno sa ishodom.",
       "couldNotLoad": "Nije moguće učitati vaše prijave",
       "capped": "Prikazane su vaše najnovije prijave."
     },
@@ -1019,8 +1030,9 @@
       "checkActiveConnection": "Veza je aktivna, ali ova stavka i dalje ne može da se učita.",
       "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
-      "gitlabReconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
+      "reconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
+      "bitbucketAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga poveže.",
       "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
@@ -1324,6 +1336,7 @@
       "manageAccess": "Upravljaj pristupom",
       "bitbucketNoRepositoriesDescription": "Nema dostupnih repozitorijuma u ovom Bitbucket radnom prostoru.",
       "gitlabNoRepositoriesDescription": "Možda treba da odobriš pristup za više grupa ili projekata na GitLab-u.",
+      "githubNoRepositoriesDescription": "Proveri da li aplikacija Kilo GitHub ima pristup repozitorijumima, pa osveži spisak.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorijume",
       "installGithubAppDescription": "Dodeli Kilo GitHub aplikaciji pristup repozitorijumima koje želiš da pregleda.",
       "repositoryAccess": "pristup repozitorijumu",
@@ -1357,7 +1370,7 @@
       "findingsInProgress": "Ovaj pregled je još u toku. Nalazi će se pojaviti ovde kada se završi.",
       "findingsEndedWithoutResults": "Ovaj pregled se završio pre nego što je dao bilo kakve nalaze.",
       "serviceUnavailable": "Nije moguće povezati se sa uslugom za pregled koda. Ponovi pregled kada usluga bude dostupna.",
-      "reviewFailed": "Pregled nije uspeo. Molimo te, pokušaj ponovo.",
+      "reviewFailed": "Pregled nije uspeo.",
       "showMore": "Prikaži više",
       "created": "Kreirano",
       "started": "Započeto",
@@ -2210,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesija",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesija",
       "live": "UŽIVO",
-      "updating": "Ažuriranje"
+      "updating": "Ažuriranje",
+      "retentionLimit": "Prikazuju se najnovije sesije."
     },
     "sessionRow": {
       "deleteTitle": "Obrisati sesiju?",
@@ -2282,7 +2296,6 @@
       "scrollToBottom": "Pomeri se na dno",
       "emptyTitle": "Još nema poruka",
       "emptyReadOnlyTitle": "U ovoj sesiji nema poruka",
-      "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Učitavanje ove sesije nije uspelo.",
       "historyTooLarge": "Pepis ove sesije je prevelik za učitavanje.",
@@ -3143,6 +3156,12 @@
     "retryLoadingAccount": "Ponovo pokušaj da učitaš nalog",
     "retryLoadingPrivacy": "Ponovo pokušaj da učitaš podešavanja privatnosti"
   },
+  "accountBlocked": {
+    "title": "Nalog je blokiran",
+    "description": "Kilo je blokirao ovaj nalog i ponovna prijava to neće ukloniti. Podrška može na zahtev pregledati blokadu.",
+    "domainDescription": "Kilo blokira naloge na ovom imejl domenu i ponovna prijava to neće promeniti. Podrška može na zahtev pregledati domen.",
+    "contactSupport": "Kontaktiraj podršku"
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stranica za naplatu"
@@ -3215,8 +3234,7 @@
     "timeoutDescription": "Zahtev nije završen na vreme. Pokušaj ponovo."
   },
   "screenHeader": {
-    "openMenu": "Otvori meni",
-    "openMenuFor": "Otvori meni za {{title}}"
+    "openMenu": "Otvori meni"
   },
   "picker": {
     "optionsExpired": "Opcije više ne važe",
@@ -4772,6 +4790,7 @@
     "contextAll": "Svi konteksti",
     "dismiss": "Odbaci izveštaj",
     "dismissFailed": "Odbacivanje izveštaja za sada nije uspelo. Pokušaće se ponovo u pozadini.",
+    "readMarkFailed": "Nije bilo moguće označiti ovaj izveštaj kao pročitan. Pokušaće se ponovo kada se izveštaj ponovo učita.",
     "offline": "Van mreže · sačuvan izveštaj",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
     "summary": "AI rezime",
@@ -4791,6 +4810,9 @@
     "morningEnd": "Izveštaj dostupan do",
     "timeHint": "Kartica na početnom ekranu vraća status uživo kada se period izveštaja završi, čak i van mreže.",
     "invalidSchedule": "Izaberite važeću vremensku zonu i neprazan period izveštaja.",
+    "scheduleEmptyNight": "Period izveštaja je prazan. Izaberite vreme kada je izveštaj spreman kasnije od početka perioda.",
+    "scheduleEmptyMorning": "Vreme kada je izveštaj spreman i vreme do kada je dostupan se poklapaju. Izaberite koliko dugo izveštaj ostaje dostupan.",
+    "scheduleFullDay": "Dva perioda pokrivaju ceo dan. Ostavite deo dana van perioda izveštaja.",
     "notificationsHint": "Jedno opšte obaveštenje po zakazanom izveštaju. Nezavisno od plaćenih AI rezimea.",
     "notificationPermission": "Uključite push obaveštenja da biste primili izveštaj.",
     "defaultModel": "Koristi Kilo podrazumevani model",
@@ -4800,7 +4822,10 @@
     "estimate": "Procena {{estimate}} · najviše {{maximum}}",
     "estimateUnavailable": "Plaćeni rezime nije dostupan za ova podešavanja. Promenite model ili ograničenja, ili pokušajte ponovo kasnije.",
     "confirmPaid": "Omogućiti plaćene rezimee za {{context}}?",
-    "paidDisclosure": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata važi i ako generisanje ne uspe.",
+    "paidDisclosure_one": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minut. Naplata važi i ako generisanje ne uspe.",
+    "paidDisclosure_few": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minuta. Naplata važi i ako generisanje ne uspe.",
+    "paidDisclosure": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minuta. Naplata važi i ako generisanje ne uspe.",
+    "paidDisclosure_other": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minuta. Naplata važi i ako generisanje ne uspe.",
     "enable": "Omogući plaćene rezimee",
     "allContexts": "Lični i organizacioni izveštaji ostaju odvojeni.",
     "emptyHistory": "Nema sačuvanih izveštaja",
@@ -4847,7 +4872,7 @@
     "sourceActivity": "Aktivnost bez naslova",
     "metadataFailureProvider": "greška provajdera",
     "metadataFailureTool": "greška alata",
-    "metadataFailureCancelled": "otkazano",
+    "metadataStopped": "Poslednji potez je zaustavljen",
     "metadataFailureOther": "neodređena greška"
   },
   "systemSearch": {
@@ -4968,6 +4993,9 @@
       "runAsCreator": "Pokreni u moje ime",
       "runAsCreatorDescription": "Svako pokretanje koristi vaš nalog, pa je tajno zaglavlje obavezno.",
       "saveFailedTitle": "Čuvanje okidača nije uspelo",
+      "nameTaken": "Okidač sa nazivom „{{name}}“ već postoji.",
+      "saveFailedRetry": "Nije moguće doći do servera. Proverite vezu i pokušajte ponovo.",
+      "saveFailedCheck": "Proverite vrednosti u obrascu i pokušajte ponovo.",
       "deleteTitle": "Obrisati ovaj okidač?",
       "deleteMessage": "Pozivi na {{name}} neće uspeti. Ovo se ne može poništiti.",
       "deleteMessageScheduled": "Zakazana pokretanja okidača {{name}} se zaustavljaju. Ovo se ne može poništiti.",

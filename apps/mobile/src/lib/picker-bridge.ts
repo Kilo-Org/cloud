@@ -30,6 +30,8 @@ export type ModelPickerBridge = {
   selectionScope: ModelPickerSelectionScope;
   isSelectionCurrent: (scope: ModelPickerSelectionScope) => boolean;
   onSelect: (selection: ModelPickerSelection) => void;
+  /** Refetches the catalog the picker lists; the zero-row state offers it as Retry. */
+  retryCatalog?: () => void;
 };
 
 export function areModelPickerSelectionScopesEqual(

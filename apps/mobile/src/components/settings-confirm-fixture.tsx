@@ -89,7 +89,7 @@ export function SettingsConfirmFixture() {
   }
 
   return (
-    <View testID="settings-confirm-fixture" className="flex-1 gap-4 p-5">
+    <View testID="settings-confirm-fixture" className="flex-1 gap-4 p-4">
       <Text accessibilityRole="header" className="text-lg font-semibold">
         Destructive settings confirmation
       </Text>

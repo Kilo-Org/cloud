@@ -524,12 +524,13 @@
       "receiptLabel": "Potwierdzenie",
       "copyReceiptId": "Skopiuj identyfikator potwierdzenia",
       "appealLabel": "Odwołanie",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Otrzymano",
       "triageOpen": "W trakcie rozpatrywania",
       "triageActioned": "Uwzględniono",
       "triageRejected": "Nie uwzględniono",
       "appealNone": "Nie złożono",
-      "appealSubmitted": "W trakcie rozpatrywania",
+      "appealSubmitted": "Odwołanie w trakcie rozpatrywania",
       "appealAccepted": "Przyjęte",
       "appealRejected": "Odrzucone",
       "appeal": "Odwołaj się od tej decyzji",
@@ -541,13 +542,23 @@
       "nextStepInReview": "Wynik pojawi się na tym ekranie, a od decyzji można się odwołać.",
       "nextStepAppeal": "Wynik odwołania pojawi się na tym ekranie.",
       "nextStepFinal": "Decyzja w sprawie odwołania jest ostateczna. Nie można złożyć kolejnego odwołania.",
-      "viewReceipt": "Wyświetl potwierdzenie"
+      "viewReceipt": "Wyświetl potwierdzenie",
+      "targetLabel": "Zgłoszony element",
+      "reasonLabel": "Powód zgłoszenia",
+      "targetMessage": "Odpowiedź AI",
+      "targetComment": "Komentarz w PR",
+      "targetUser": "Użytkownik",
+      "reasonHarmful": "Szkodliwe treści",
+      "reasonIllegal": "Nielegalne treści",
+      "reasonHarassment": "Nękanie",
+      "reasonSpam": "Niechciane reklamy",
+      "reasonOther": "Inny powód"
     },
     "reportReceipts": {
       "title": "Zgłoszenia",
       "rowSubtitle": "Zgłoszenia, które złożyłeś, i ich wyniki",
       "emptyTitle": "Nie masz jeszcze zgłoszeń",
-      "emptyDescription": "Zgłoszenia złożone z komentarza lub odpowiedzi AI pojawiają się tutaj.",
+      "emptyDescription": "Zgłoszenia złożone z komentarza w dyskusji o pull requeście lub z odpowiedzi AI w sesji agenta pojawiają się tutaj wraz z ich wynikiem.",
       "couldNotLoad": "Nie udało się wczytać twoich zgłoszeń",
       "capped": "Wyświetlane są twoje najnowsze zgłoszenia."
     },
@@ -739,6 +750,7 @@
       "manageAccess": "Zarządzaj dostępem",
       "bitbucketNoRepositoriesDescription": "W tym obszarze roboczym Bitbucket nie ma dostępnych repozytoriów.",
       "gitlabNoRepositoriesDescription": "Może być konieczne przyznanie dostępu do większej liczby grup lub projektów w serwisie GitLab.",
+      "githubNoRepositoriesDescription": "Sprawdź, czy aplikacja Kilo w GitHub ma do nich dostęp, a następnie odśwież listę.",
       "installGithubApp": "Zainstaluj aplikację GitHub dla repozytoriów",
       "installGithubAppDescription": "Przyznaj aplikacji Kilo w serwisie GitHub dostęp do repozytoriów, które chcesz poddać przeglądowi.",
       "repositoryAccess": "dostęp do repozytorium",
@@ -833,7 +845,7 @@
       "findingsInProgress": "Ten przegląd jest jeszcze w toku. Wyniki pojawią się tutaj po jego zakończeniu.",
       "findingsEndedWithoutResults": "Ten przegląd zakończył się przedwcześnie, nie generując żadnych wyników.",
       "serviceUnavailable": "Nie udało się połączyć z usługą przeglądu kodu. Ponów przegląd, gdy usługa będzie dostępna.",
-      "reviewFailed": "Przegląd się nie powiódł. Spróbuj ponownie.",
+      "reviewFailed": "Przegląd się nie powiódł.",
       "retryMessage": "Spowoduje to ponowne uruchomienie przeglądu kodu.",
       "retryReview": "Ponów przegląd",
       "retryNeedsSettings": "Asystent przeglądu kodu jest wyłączony albo jego ustawienia wymagają uwagi. Popraw ustawienia, a następnie ponów ten przegląd.",
@@ -1644,7 +1656,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesji",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesji",
       "live": "NA ŻYWO",
-      "updating": "Aktualizowanie"
+      "updating": "Aktualizowanie",
+      "retentionLimit": "Wyświetlane są najnowsze sesje."
     },
     "sessionRow": {
       "deleteTitle": "Usunąć sesję?",
@@ -1718,7 +1731,6 @@
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
       "emptyReadOnlyTitle": "Brak wiadomości w tej sesji",
-      "renameAccessibility": "Zmień nazwę sesji: {{title}}",
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
       "historyTooLarge": "Zapis tej sesji jest zbyt duży, żeby go wczytać.",
@@ -2591,6 +2603,12 @@
     "retryLoadingAccount": "Ponów wczytywanie konta",
     "retryLoadingPrivacy": "Ponów wczytywanie ustawień prywatności"
   },
+  "accountBlocked": {
+    "title": "Konto zablokowane",
+    "description": "Kilo zablokował to konto, a ponowne zalogowanie nie zdejmie blokady. Pomoc techniczna może na życzenie sprawdzić blokadę.",
+    "domainDescription": "Kilo zablokował konta na tej domenie e-mail, a ponowne zalogowanie nie zdejmie blokady. Pomoc techniczna może na życzenie sprawdzić domenę.",
+    "contactSupport": "Skontaktuj się z pomocą techniczną"
+  },
   "addCredits": {
     "cta": "Doładuj konto",
     "billingPage": "strona rozliczeń"
@@ -2663,8 +2681,7 @@
     "timeoutDescription": "Serwer nie odpowiada wystarczająco szybko. Spróbuj ponownie."
   },
   "screenHeader": {
-    "openMenu": "Otwórz menu",
-    "openMenuFor": "Otwórz menu dla {{title}}"
+    "openMenu": "Otwórz menu"
   },
   "picker": {
     "optionsExpired": "Opcje są już nieaktualne",
@@ -2961,8 +2978,9 @@
       "checkActiveConnection": "Połączenie jest aktywne, ale nadal nie można wczytać tego elementu.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
-      "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
+      "reconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
       "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
+      "bitbucketAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby go połączyć.",
       "adminOnlyConnectDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
@@ -4856,6 +4874,7 @@
     "contextAll": "Wszystkie konteksty",
     "dismiss": "Odrzuć raport",
     "dismissFailed": "Nie udało się jeszcze odrzucić tego raportu. Zostanie to ponowione w tle.",
+    "readMarkFailed": "Nie udało się oznaczyć tego raportu jako przeczytany. Spróbujemy ponownie przy następnym wczytaniu raportu.",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
     "summary": "Podsumowanie AI",
@@ -4875,6 +4894,9 @@
     "morningEnd": "Raport dostępny do",
     "timeHint": "Karta na ekranie głównym wraca do bieżącego stanu po zakończeniu okna raportu, nawet offline.",
     "invalidSchedule": "Wybierz prawidłową strefę czasową oraz niepuste okno raportu.",
+    "scheduleEmptyNight": "Okno raportu jest puste. Wybierz czas gotowości późniejszy niż początek okna.",
+    "scheduleEmptyMorning": "Czas gotowości i czas dostępności są takie same. Wybierz, jak długo raport pozostaje dostępny.",
+    "scheduleFullDay": "Oba okna obejmują cały dzień. Pozostaw część dnia poza raportem.",
     "notificationsHint": "Jedno ogólne powiadomienie na zaplanowany raport. Niezależne od płatnych podsumowań AI.",
     "notificationPermission": "Włącz powiadomienia push, aby otrzymywać raport.",
     "defaultModel": "Użyj domyślnego modelu Kilo",
@@ -4884,7 +4906,11 @@
     "estimate": "Szacunek {{estimate}} · maksymalnie {{maximum}}",
     "estimateUnavailable": "Płatne podsumowanie nie jest dostępne dla tych ustawień. Zmień model lub limity albo spróbuj ponownie później.",
     "confirmPaid": "Włączyć płatne podsumowania dla {{context}}?",
-    "paidDisclosure": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit {{minutes}} min. Opłata obowiązuje nawet w razie niepowodzenia.",
+    "paidDisclosure_one": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit: {{minutes}} minuta. Opłata obowiązuje nawet w razie niepowodzenia.",
+    "paidDisclosure_few": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit: {{minutes}} minuty. Opłata obowiązuje nawet w razie niepowodzenia.",
+    "paidDisclosure_many": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit: {{minutes}} minut. Opłata obowiązuje nawet w razie niepowodzenia.",
+    "paidDisclosure": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit: {{minutes}} minuty. Opłata obowiązuje nawet w razie niepowodzenia.",
+    "paidDisclosure_other": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit: {{minutes}} minuty. Opłata obowiązuje nawet w razie niepowodzenia.",
     "enable": "Włącz płatne podsumowania",
     "allContexts": "Raporty osobiste i organizacji pozostają oddzielne.",
     "emptyHistory": "Brak zapisanych raportów",
@@ -4935,7 +4961,7 @@
     "sourceActivity": "Aktywność bez tytułu",
     "metadataFailureProvider": "błąd dostawcy",
     "metadataFailureTool": "błąd narzędzia",
-    "metadataFailureCancelled": "Anulowano",
+    "metadataStopped": "Ostatnia tura zatrzymana",
     "metadataFailureOther": "nieokreślony błąd"
   },
   "systemSearch": {
@@ -5056,6 +5082,9 @@
       "runAsCreator": "Uruchamiaj jako ja",
       "runAsCreatorDescription": "Każde uruchomienie używa Twojego konta, więc nagłówek z sekretem jest wymagany.",
       "saveFailedTitle": "Nie udało się zapisać wyzwalacza",
+      "nameTaken": "Wyzwalacz o nazwie „{{name}}” już istnieje.",
+      "saveFailedRetry": "Nie udało się połączyć z serwerem. Sprawdź połączenie i spróbuj ponownie.",
+      "saveFailedCheck": "Sprawdź wartości w formularzu i spróbuj ponownie.",
       "deleteTitle": "Usunąć ten wyzwalacz?",
       "deleteMessage": "Wywołania do {{name}} będą kończyć się niepowodzeniem. Tej operacji nie można cofnąć.",
       "deleteMessageScheduled": "Zaplanowane uruchomienia wyzwalacza {{name}} zostaną zatrzymane. Tej operacji nie można cofnąć.",

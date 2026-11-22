@@ -522,13 +522,14 @@
       "receiptLabel": "Dëftesa",
       "copyReceiptId": "Kopjo ID-në e dëftesës",
       "appealLabel": "Apelimi",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "U mor",
       "triageOpen": "Në shqyrtim",
       "triageActioned": "U pranua",
       "triageRejected": "Nuk u pranua",
       "appealNone": "Asnjë i dërguar",
-      "appealSubmitted": "Në shqyrtim",
-      "appealAccepted": "U pranua",
+      "appealSubmitted": "Apelimi në shqyrtim",
+      "appealAccepted": "Apelimi u pranua",
       "appealRejected": "U refuzua",
       "appeal": "Apelo këtë vendim",
       "appealTitle": "Të apelohet ky vendim?",
@@ -539,13 +540,23 @@
       "nextStepInReview": "Rezultati do të shfaqet në këtë ekran dhe mund të apelosh pas një vendimi.",
       "nextStepAppeal": "Rezultati i apelimit do të shfaqet në këtë ekran.",
       "nextStepFinal": "Vendimi i apelimit është përfundimtar. Nuk mund të dërgohet asnjë apelim tjetër.",
-      "viewReceipt": "Shiko dëftesën"
+      "viewReceipt": "Shiko dëftesën",
+      "targetLabel": "Elementi i raportuar",
+      "reasonLabel": "Arsyeja e raportimit",
+      "targetMessage": "Përgjigje e asistentit",
+      "targetComment": "Koment në kërkesë",
+      "targetUser": "Përdorues",
+      "reasonHarmful": "Përmbajtje e dëmshme",
+      "reasonIllegal": "Përmbajtje e paligjshme",
+      "reasonHarassment": "Ngacmim",
+      "reasonSpam": "Reklama të padëshiruara",
+      "reasonOther": "Arsye tjetër"
     },
     "reportReceipts": {
       "title": "Raportet",
       "rowSubtitle": "Raportet që ke paraqitur dhe rezultatet e tyre",
       "emptyTitle": "Nuk ka raporte ende",
-      "emptyDescription": "Raportet që paraqit nga një koment ose një përgjigje AI shfaqen këtu.",
+      "emptyDescription": "Raportet që paraqit nga një koment në një diskutim pull request-i ose nga një përgjigje e asistentit në një seancë agjenti shfaqen këtu së bashku me rezultatin.",
       "couldNotLoad": "Raportet e tua nuk mund të ngarkoheshin",
       "capped": "Po shfaqen raportet e tua më të fundit."
     },
@@ -1000,8 +1011,9 @@
       "checkActiveConnection": "Lidhja është aktive, por ky element ende nuk mund të ngarkohet.",
       "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
-      "gitlabReconnectAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
+      "reconnectAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
       "bitbucketNotConnectedTitle": "Bitbucket nuk është i lidhur",
+      "bitbucketAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta lidhë atë.",
       "adminOnlyConnectDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
       "contextLine": "Për {{organization}}",
       "contextLinePersonal": "Për llogarinë personale"
@@ -1296,6 +1308,7 @@
       "manageAccess": "Menaxho qasjen",
       "bitbucketNoRepositoriesDescription": "Asnjë depo nuk është e disponueshme në këtë hapësirë pune Bitbucket.",
       "gitlabNoRepositoriesDescription": "Mund të të duhet të japësh qasje në më shumë grupe ose projekte në GitLab.",
+      "githubNoRepositoriesDescription": "Kontrollo qasjen në depo për aplikacionin Kilo në GitHub, pastaj rifresko.",
       "installGithubApp": "Instalo aplikacionin GitHub në depot",
       "installGithubAppDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot që dëshiron të shqyrtohen.",
       "repositoryAccess": "qasja në depot",
@@ -1329,7 +1342,7 @@
       "findingsInProgress": "Ky shqyrtim është ende në zhvillim. Gjetjet shfaqen këtu kur ai të përfundojë.",
       "findingsEndedWithoutResults": "Ky shqyrtim përfundoi përpara se të jepte ndonjë gjetje.",
       "serviceUnavailable": "Nuk u arrit lidhja me shërbimin e shqyrtimit të kodit. Riprovo shqyrtimin kur shërbimi të jetë i disponueshëm.",
-      "reviewFailed": "Shqyrtimi dështoi. Provo përsëri.",
+      "reviewFailed": "Shqyrtimi dështoi.",
       "showMore": "Shfaq më shumë",
       "created": "Krijuar",
       "started": "Filluar",
@@ -2163,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seanca",
       "sectionAccessibility": "{{title}}: {{displayCount}} seanca",
       "live": "DREJTPËRDREJT",
-      "updating": "Po përditësohet"
+      "updating": "Po përditësohet",
+      "retentionLimit": "Po shfaqen seancat më të fundit."
     },
     "sessionRow": {
       "deleteTitle": "Të fshihet seanca?",
@@ -2233,7 +2247,6 @@
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende nuk ka mesazhe",
       "emptyReadOnlyTitle": "Nuk ka mesazhe në këtë seancë",
-      "renameAccessibility": "Riemërto seancën: {{title}}",
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
       "historyTooLarge": "Transkripti i kësaj seance është shumë i madh për t'u ngarkuar.",
@@ -3082,6 +3095,12 @@
     "retryLoadingAccount": "Riprovo ngarkimin e llogarisë",
     "retryLoadingPrivacy": "Riprovo ngarkimin e zgjedhjeve të privatësisë"
   },
+  "accountBlocked": {
+    "title": "Llogaria e bllokuar",
+    "description": "Kilo bllokoi këtë llogari dhe një hyrje e re nuk e heq bllokimin. Mbështetja mund ta shqyrtojë bllokimin me kërkesë.",
+    "domainDescription": "Kilo bllokon llogaritë në këtë domen emaili dhe një hyrje e re nuk do ta ndryshojë këtë. Mbështetja mund ta shqyrtojë domenin me kërkesë.",
+    "contactSupport": "Kontakto mbështetjen"
+  },
   "addCredits": {
     "cta": "Shto kredite",
     "billingPage": "faqja e faturimit"
@@ -3154,8 +3173,7 @@
     "timeoutDescription": "Kërkesa skadoi përpara se të përfundonte. Provo përsëri."
   },
   "screenHeader": {
-    "openMenu": "Hap menunë",
-    "openMenuFor": "Hap menunë për {{title}}"
+    "openMenu": "Hap menunë"
   },
   "picker": {
     "optionsExpired": "Opsionet skaduan",
@@ -4688,6 +4706,7 @@
     "contextAll": "Të gjithë kontekstet",
     "dismiss": "Hidh poshtë raportin",
     "dismissFailed": "Raporti nuk u hodh dot poshtë akoma. Provon përsëri në sfond.",
+    "readMarkFailed": "Ky raport nuk u shënua dot si i lexuar. Do të provojë përsëri kur raporti të ringarkohet.",
     "offline": "Jashtë linje · raport i ruajtur",
     "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
     "summary": "Përmbledhje AI",
@@ -4707,6 +4726,9 @@
     "morningEnd": "Raporti i disponueshëm deri në",
     "timeHint": "Karta Kreu rikthen statusin live kur mbaron dritarja kohore e raportit, edhe jashtë linje.",
     "invalidSchedule": "Zgjidh një zonë kohore të vlefshme dhe një dritare kohore jo boshe për raportin.",
+    "scheduleEmptyNight": "Dritarja kohore e raportit është boshe. Zgjidh një kohë gatishmërie më të vonë se fillimi i dritares.",
+    "scheduleEmptyMorning": "Koha e gatishmërisë dhe koha deri në të cilën raporti është i disponueshëm përputhen. Zgjidh sa kohë raporti mbetet i disponueshëm.",
+    "scheduleFullDay": "Dy dritaret kohore mbulojnë një ditë të plotë. Lër një pjesë të ditës jashtë dritares kohore të raportit.",
     "notificationsHint": "Një njoftim i përgjithshëm për çdo raport të planifikuar. I pavarur nga përmbledhjet AI me pagesë.",
     "notificationPermission": "Aktivizo njoftimet push për të marrë raportin.",
     "defaultModel": "Përdor modelin e parazgjedhur të Kilo",
@@ -4716,7 +4738,9 @@
     "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
     "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime. Ndrysho modelin ose kufijtë, ose provo përsëri më vonë.",
     "confirmPaid": "Të aktivizohen përmbledhjet me pagesë për {{context}}?",
-    "paidDisclosure": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} min. Tarifat zbatohen edhe nëse gjenerimi dështon.",
+    "paidDisclosure_one": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} minutë. Tarifat zbatohen edhe nëse gjenerimi dështon.",
+    "paidDisclosure": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} minuta. Tarifat zbatohen edhe nëse gjenerimi dështon.",
+    "paidDisclosure_other": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} minuta. Tarifat zbatohen edhe nëse gjenerimi dështon.",
     "enable": "Aktivizo përmbledhjet me pagesë",
     "allContexts": "Raportet personale dhe të organizatës mbahen të ndara.",
     "emptyHistory": "Nuk ka raporte të ruajtura",
@@ -4759,7 +4783,7 @@
     "sourceActivity": "Aktivitet pa titull",
     "metadataFailureProvider": "gabim i ofruesit",
     "metadataFailureTool": "gabim i mjetit",
-    "metadataFailureCancelled": "Anuluar",
+    "metadataStopped": "Raundi i fundit u ndal",
     "metadataFailureOther": "gabim i paspecifikuar"
   },
   "systemSearch": {
@@ -4880,6 +4904,9 @@
       "runAsCreator": "Ekzekuto si unë",
       "runAsCreatorDescription": "Çdo ekzekutim përdor llogarinë tënde, prandaj kërkohet koka sekrete.",
       "saveFailedTitle": "Shkaktari nuk mund të ruhej",
+      "nameTaken": "Një shkaktar me emrin „{{name}}“ ekziston tashmë.",
+      "saveFailedRetry": "Nuk arritëm dot te serveri. Kontrollo lidhjen dhe provo përsëri.",
+      "saveFailedCheck": "Kontrollo vlerat në formular dhe provo përsëri.",
       "deleteTitle": "Ta fshij këtë shkaktar?",
       "deleteMessage": "Thirrjet drejtuar {{name}} do të dështojnë. Ky veprim nuk mund të zhbëhet.",
       "deleteMessageScheduled": "Ekzekutimet e planifikuara të {{name}} do të ndalojnë. Ky veprim nuk mund të zhbëhet.",

@@ -69,6 +69,21 @@ type ConfigureRowProps = {
    * visible text.
    */
   accessibilityLabel?: string;
+  /**
+   * Where the press lives. A row whose trailing node is a control of its own (a
+   * switch) passes `content`, so the trailing control owns its own touch and
+   * its own accessible node. The content press then needs
+   * `contentAccessibilityLabel` to stay reachable, because `RowFrame` hides a
+   * `content` press from assistive technology without it.
+   */
+  pressTarget?: 'row' | 'content';
+  /**
+   * The content press's spoken name. A `content` press is hidden from assistive
+   * technology without one, so a row that hands the press to its content names
+   * the surface that press opens.
+   */
+  contentAccessibilityLabel?: string;
+  contentAccessibilityHint?: string;
   trailing?: ReactNode;
   /**
    * The trailing cell must be delivered at the platform touch target in a
@@ -99,6 +114,9 @@ export function ConfigureRow({
   onPress,
   disabled,
   accessibilityLabel,
+  pressTarget,
+  contentAccessibilityLabel,
+  contentAccessibilityHint,
   trailing,
   trailingIsTarget,
   className,
@@ -174,6 +192,9 @@ export function ConfigureRow({
       trailing={rowTrailing}
       stack={stack}
       onPress={onPress}
+      pressTarget={pressTarget}
+      contentAccessibilityLabel={contentAccessibilityLabel}
+      contentAccessibilityHint={contentAccessibilityHint}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       disabled={disabled}

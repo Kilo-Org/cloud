@@ -186,32 +186,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     return true;
   }
 
-  async function refreshAuthAndReconnect(expectedGeneration: number) {
-    if (!config.refreshAuth || paused) {
-      return;
-    }
-
-    preconnectRefreshes += 1;
-
-    try {
-      await config.refreshAuth();
-      if (destroyed || intentionalDisconnect || expectedGeneration !== generation) {
-        return;
-      }
-      authRefreshAttempted = true;
-      connectInternal(0, expectedGeneration, true);
-    } catch (err) {
-      console.error('[Connection] Failed to refresh auth:', err);
-      if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
-      config.onUnexpectedDisconnect?.();
-      scheduleReconnect(reconnectAttempt, expectedGeneration);
-    } finally {
-      if (expectedGeneration === generation) {
-        preconnectRefreshes -= 1;
-      }
-    }
-  }
-
   // One resume can arrive from several triggers at once (NetInfo online, a
   // visibility resume, a BFCache restore). The first starts the refresh; the
   // rest join it, so one resume costs one ticket refresh and one socket.
@@ -221,6 +195,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     startedAt: number;
     /** Cleared once this attempt gives its gate back, so it can never release another's. */
     holdingGate: boolean;
+    /** What started this refresh. An auth-classified close owns a stricter failure policy. */
+    trigger: 'resume' | 'auth-close';
   };
   let inflightRefresh: RefreshAttempt | null = null;
 
@@ -234,7 +210,20 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       if (config.refreshAuth) {
         try {
           await config.refreshAuth();
-        } catch {
+        } catch (err) {
+          if (entry.trigger === 'auth-close') {
+            // An auth-classified close must not open a socket with the ticket
+            // that just failed auth. Report the loss and retry with backoff.
+            console.error('[Connection] Failed to refresh auth:', err);
+            if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+            // An abandoned attempt does not own the connection state any more:
+            // reporting its loss or spending the retry budget would disturb the
+            // socket the attempt that replaced it is opening or holding.
+            if (!entry.holdingGate || inflightRefresh !== entry) return;
+            config.onUnexpectedDisconnect?.();
+            scheduleReconnect(reconnectAttempt, expectedGeneration);
+            return;
+          }
           // Continue with existing auth — the old ticket might still work
         }
         if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
@@ -242,6 +231,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         // its ticket, so opening a socket here would replace the socket that
         // attempt is opening.
         if (!entry.holdingGate || inflightRefresh !== entry) return;
+        // An auth-classified close spends its one refresh before it checks the
+        // socket, so a second auth close stops retrying instead of refreshing
+        // again.
+        if (entry.trigger === 'auth-close') authRefreshAttempted = true;
         // The async refresh gap can let the in-flight socket finish its
         // handshake and receive its first message. If it did, there is nothing
         // to replace — reconnecting would close a healthy socket and open a
@@ -279,7 +272,11 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
-  function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
+  function refreshAndConnect(
+    expectedGeneration: number,
+    attempt = 0,
+    trigger: 'resume' | 'auth-close' = 'resume'
+  ): Promise<void> {
     if (paused) return Promise.resolve();
 
     const joined = inflightRefresh;
@@ -291,6 +288,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       joined.generation === expectedGeneration &&
       Date.now() - joined.startedAt < REFRESH_JOIN_DEADLINE_MS
     ) {
+      // An auth-classified close that joins a pending refresh needs that
+      // refresh's auth failure policy: a failed ticket must still stop the
+      // socket open and consume the `authRefreshAttempted` loop bound.
+      if (trigger === 'auth-close') joined.trigger = 'auth-close';
       return joined.promise;
     }
     abandonInflightRefresh();
@@ -300,6 +301,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       promise: Promise.resolve(),
       startedAt: Date.now(),
       holdingGate: true,
+      trigger,
     };
     preconnectRefreshes += 1;
     inflightRefresh = entry;
@@ -451,7 +453,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       if (isAuthFailure && !authRefreshAttempted && config.refreshAuth) {
         notifyReplacingConnection();
         if (!isConnectionReplacementAllowed(expectedGeneration)) return;
-        void refreshAuthAndReconnect(expectedGeneration);
+        void refreshAndConnect(expectedGeneration, 0, 'auth-close');
         return;
       }
 

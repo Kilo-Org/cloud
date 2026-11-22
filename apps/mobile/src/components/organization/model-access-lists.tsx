@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { StateSurface } from '@/components/centered-state-surface';
 import { Button } from '@/components/ui/button';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { SearchX } from '@/components/ui/icons';
@@ -22,11 +23,19 @@ import {
   toggleModel,
   toggleProvider,
 } from '@/lib/organization/model-access';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
-/** The list's trailing gap only: the form's pinned footer owns the bottom edge. */
-const LIST_CONTENT_STYLE = { paddingBottom: TAB_SCREEN_TRAILING_GAP } satisfies ViewStyle;
+/**
+ * The list's trailing gap only: the form's pinned footer owns the bottom edge.
+ * The container grows to the viewport, so the centred empty state takes the band
+ * the list still shows instead of its own height below the header.
+ */
+const LIST_CONTENT_STYLE = {
+  flexGrow: 1,
+  paddingBottom: TAB_SCREEN_TRAILING_GAP,
+} satisfies ViewStyle;
 
 /** The search field and filter row both lists carry above their rows. */
 function ListHeader({
@@ -69,8 +78,16 @@ function ListHeader({
 }
 
 function NoMatch({ label }: Readonly<{ label: string }>) {
-  // The list's content container carries the page gutter, so the state adds none.
-  return <EmptyState icon={SearchX} title={label} inset="none" className="bg-background py-8" />;
+  // The list's content container hands the state its band, and the screen's
+  // pinned footer owns the bottom edge, so the state nests a surface with no
+  // reserve of its own. A surface that reserved again would pin the centred
+  // state above a band it cannot fit.
+  return (
+    <StateSurface className="flex-1" bottomInset={0}>
+      {/* The content container carries the page gutter, so the state adds none. */}
+      <EmptyState icon={SearchX} title={label} inset="none" />
+    </StateSurface>
+  );
 }
 
 /**
@@ -97,6 +114,9 @@ export function ProviderAllowList({
 }>) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
+  // The window's side insets ride on the list's own style, so a row never sits
+  // under a landscape display cutout.
+  const sideInsetStyle = useSideInsetMarginStyle();
   // A row is searchable by its slug and by the name it shows, so a query typed
   // from either answer finds it.
   const shown = providers.filter(provider => matchesSearch([provider, names[provider]], search));
@@ -141,7 +161,7 @@ export function ProviderAllowList({
       data={shown}
       keyExtractor={provider => provider}
       renderItem={renderItem}
-      style={listStyle}
+      style={{ ...listStyle, ...sideInsetStyle }}
       contentContainerClassName="px-4"
       contentContainerStyle={LIST_CONTENT_STYLE}
       keyboardShouldPersistTaps="handled"
@@ -204,6 +224,9 @@ export function ModelDenyList({
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [deniedOnly, setDeniedOnly] = useState(false);
+  // The window's side insets ride on the list's own style, so a row never sits
+  // under a landscape display cutout.
+  const sideInsetStyle = useSideInsetMarginStyle();
   const shown = models.filter(
     model =>
       matchesSearch([model.name, model.id], search) &&
@@ -246,7 +269,7 @@ export function ModelDenyList({
       data={shown}
       keyExtractor={model => model.id}
       renderItem={renderItem}
-      style={listStyle}
+      style={{ ...listStyle, ...sideInsetStyle }}
       contentContainerClassName="px-4"
       contentContainerStyle={LIST_CONTENT_STYLE}
       keyboardShouldPersistTaps="handled"

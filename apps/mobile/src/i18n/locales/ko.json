@@ -522,12 +522,13 @@
       "receiptLabel": "접수증",
       "copyReceiptId": "접수증 ID 복사",
       "appealLabel": "이의 제기",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "접수됨",
       "triageOpen": "검토 중",
       "triageActioned": "조치됨",
       "triageRejected": "조치 안 됨",
       "appealNone": "제출되지 않음",
-      "appealSubmitted": "검토 중",
+      "appealSubmitted": "이의 제기 검토 중",
       "appealAccepted": "수락됨",
       "appealRejected": "거절됨",
       "appeal": "이 결정에 이의 제기",
@@ -539,13 +540,23 @@
       "nextStepInReview": "결과는 이 화면에 표시되며, 결정 후 이의를 제기할 수 있습니다.",
       "nextStepAppeal": "이의 제기 결과는 이 화면에 표시됩니다.",
       "nextStepFinal": "이의 제기 결정은 최종입니다. 더 이상 이의를 제기할 수 없습니다.",
-      "viewReceipt": "접수증 보기"
+      "viewReceipt": "접수증 보기",
+      "targetLabel": "신고 대상",
+      "reasonLabel": "신고 사유",
+      "targetMessage": "AI 응답",
+      "targetComment": "풀 리퀘스트 댓글",
+      "targetUser": "사용자",
+      "reasonHarmful": "유해 콘텐츠",
+      "reasonIllegal": "불법 콘텐츠",
+      "reasonHarassment": "괴롭힘",
+      "reasonSpam": "스팸",
+      "reasonOther": "기타 사유"
     },
     "reportReceipts": {
       "title": "신고 내역",
       "rowSubtitle": "접수한 신고와 그 결과",
       "emptyTitle": "아직 신고 내역이 없습니다",
-      "emptyDescription": "댓글이나 AI 응답에서 접수한 신고가 여기에 표시됩니다.",
+      "emptyDescription": "풀 리퀘스트 토론의 댓글이나 에이전트 세션의 AI 응답에서 접수한 신고가 결과와 함께 여기에 표시됩니다.",
       "couldNotLoad": "신고 내역을 불러올 수 없습니다",
       "capped": "최근 신고 내역만 표시됩니다."
     },
@@ -735,6 +746,7 @@
       "manageAccess": "접근 권한 관리",
       "bitbucketNoRepositoriesDescription": "이 Bitbucket 작업 영역에 사용 가능한 저장소가 없습니다.",
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
+      "githubNoRepositoriesDescription": "Kilo GitHub 앱의 저장소 접근 권한을 확인한 후 새로고침하세요.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
       "repositoryAccess": "저장소 접근 권한",
@@ -829,7 +841,7 @@
       "findingsInProgress": "이 리뷰는 아직 진행 중입니다. 완료되면 발견된 문제가 여기에 표시됩니다.",
       "findingsEndedWithoutResults": "이 리뷰는 발견된 문제가 만들어지기 전에 종료되었습니다.",
       "serviceUnavailable": "코드 리뷰 서비스에 연결할 수 없습니다. 서비스를 사용할 수 있게 되면 리뷰를 다시 시도해 주세요.",
-      "reviewFailed": "리뷰에 실패했습니다. 다시 시도해 주세요.",
+      "reviewFailed": "리뷰에 실패했습니다.",
       "retryMessage": "코드 리뷰가 다시 실행됩니다.",
       "retryReview": "리뷰 다시 시도",
       "retryNeedsSettings": "코드 리뷰어가 꺼져 있거나 설정을 확인해야 합니다. 설정을 수정한 다음 이 리뷰를 다시 시도하세요.",
@@ -1602,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: 세션 {{displayCount}}개",
       "sectionAccessibility": "{{title}}: 세션 {{displayCount}}개",
       "live": "실시간",
-      "updating": "업데이트 중"
+      "updating": "업데이트 중",
+      "retentionLimit": "최근 세션을 표시합니다."
     },
     "sessionRow": {
       "deleteTitle": "세션을 삭제할까요?",
@@ -1672,7 +1685,6 @@
       "scrollToBottom": "맨 아래로 스크롤",
       "emptyTitle": "아직 메시지가 없습니다",
       "emptyReadOnlyTitle": "이 세션에는 메시지가 없습니다",
-      "renameAccessibility": "세션 이름 변경: {{title}}",
       "cloningSession": "세션 복제 중",
       "couldNotLoadThisSession": "이 세션을 불러오지 못했습니다.",
       "historyTooLarge": "이 세션의 기록이 너무 커서 불러올 수 없습니다.",
@@ -2521,6 +2533,12 @@
     "retryLoadingAccount": "계정 정보 불러오기 다시 시도",
     "retryLoadingPrivacy": "개인정보 보호 설정 불러오기 다시 시도"
   },
+  "accountBlocked": {
+    "title": "계정이 차단되었습니다",
+    "description": "Kilo가 이 계정을 차단했으며 다시 로그인해도 차단이 해제되지 않습니다. 지원팀은 요청 시 차단을 검토할 수 있습니다.",
+    "domainDescription": "Kilo가 이 이메일 도메인의 계정을 차단하며 다시 로그인해도 차단이 해제되지 않습니다. 지원팀은 요청 시 도메인을 검토할 수 있습니다.",
+    "contactSupport": "지원팀에 문의"
+  },
   "addCredits": {
     "cta": "크레딧 충전",
     "billingPage": "결제 페이지"
@@ -2593,8 +2611,7 @@
     "timeoutDescription": "요청 시간이 초과되었습니다. 다시 시도하세요."
   },
   "screenHeader": {
-    "openMenu": "메뉴 열기",
-    "openMenuFor": "{{title}} 메뉴 열기"
+    "openMenu": "메뉴 열기"
   },
   "picker": {
     "optionsExpired": "선택 항목 만료",
@@ -2879,8 +2896,9 @@
       "checkActiveConnection": "연결은 활성 상태이지만 이 항목은 여전히 불러올 수 없습니다.",
       "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
       "bitbucketOrgOnlyNoOrganizationDescription": "이 계정에는 아직 조직이 없습니다. 조직을 만들거나 참여하면 Bitbucket 풀 리퀘스트를 검토할 수 있습니다.",
-      "gitlabReconnectAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 다시 연결해 달라고 요청하세요.",
+      "reconnectAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 다시 연결해 달라고 요청하세요.",
       "bitbucketNotConnectedTitle": "Bitbucket이 연결되지 않았습니다",
+      "bitbucketAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 연결을 요청하세요.",
       "adminOnlyConnectDescription": "조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
       "contextLine": "{{organization}}용",
       "contextLinePersonal": "개인용"
@@ -4688,6 +4706,7 @@
     "contextAll": "모든 컨텍스트",
     "dismiss": "브리핑 무시",
     "dismissFailed": "아직 이 브리핑을 무시하지 못했습니다. 백그라운드에서 다시 시도합니다.",
+    "readMarkFailed": "이 브리핑을 읽음으로 표시하지 못했습니다. 브리핑이 다시 로드되면 다시 시도합니다.",
     "offline": "오프라인 · 저장된 브리핑",
     "cached": "저장된 브리핑 · 새로고침 불가",
     "summary": "AI 요약",
@@ -4707,6 +4726,9 @@
     "morningEnd": "브리핑 제공 종료 시각",
     "timeHint": "브리핑 기간이 끝나면 오프라인 상태에서도 홈 카드가 실시간 상태로 돌아갑니다.",
     "invalidSchedule": "유효한 시간대와 비어 있지 않은 브리핑 기간을 선택하세요.",
+    "scheduleEmptyNight": "브리핑 기간이 비어 있습니다. 브리핑 기간 시작 이후의 준비 완료 시각을 선택하세요.",
+    "scheduleEmptyMorning": "브리핑 준비 완료 시각과 브리핑 제공 종료 시각이 같습니다. 브리핑을 얼마나 오래 제공할지 선택하세요.",
+    "scheduleFullDay": "두 브리핑 기간이 하루 전체를 차지합니다. 하루 중 일부는 브리핑 기간 밖으로 남겨 두세요.",
     "notificationsHint": "예약된 브리핑마다 일반 알림을 한 번 보냅니다. 유료 AI 요약과는 별개입니다.",
     "notificationPermission": "브리핑을 받으려면 푸시 알림을 켜세요.",
     "defaultModel": "Kilo 기본 모델 사용",
@@ -4716,7 +4738,9 @@
     "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
     "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다. 모델이나 한도를 변경하거나 나중에 다시 시도하세요.",
     "confirmPaid": "{{context}}에 유료 요약을 사용하시겠습니까?",
+    "paidDisclosure_one": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "paidDisclosure": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
+    "paidDisclosure_other": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "enable": "유료 요약 사용",
     "allContexts": "개인 및 조직 브리핑은 별도로 유지됩니다.",
     "emptyHistory": "저장된 브리핑 없음",
@@ -4755,7 +4779,7 @@
     "sourceActivity": "제목 없는 활동",
     "metadataFailureProvider": "프로바이더 오류",
     "metadataFailureTool": "도구 오류",
-    "metadataFailureCancelled": "취소됨",
+    "metadataStopped": "지난 턴 중단됨",
     "metadataFailureOther": "기타 오류",
     "metadataPlan_one": "계획: {{displayTotal}}단계 중 {{displayDone}}단계 완료",
     "metadataFiles_one": "{{displayCount}}개 파일 변경됨",
@@ -4880,6 +4904,9 @@
       "runAsCreator": "내 계정으로 실행",
       "runAsCreatorDescription": "모든 실행에서 내 계정을 사용하므로 시크릿 헤더가 필요합니다.",
       "saveFailedTitle": "트리거를 저장하지 못했습니다",
+      "nameTaken": "“{{name}}” 트리거가 이미 있습니다.",
+      "saveFailedRetry": "서버에 연결하지 못했습니다. 연결 상태를 확인한 후 다시 시도하세요.",
+      "saveFailedCheck": "양식의 값을 확인한 후 다시 시도하세요.",
       "deleteTitle": "이 트리거를 삭제할까요?",
       "deleteMessage": "{{name}}에 대한 호출이 실패합니다. 이 작업은 되돌릴 수 없습니다.",
       "deleteMessageScheduled": "{{name}} 트리거의 예약된 실행이 중지됩니다. 이 작업은 되돌릴 수 없습니다.",

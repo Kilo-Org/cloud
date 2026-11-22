@@ -9,10 +9,13 @@ import type { SeedResult } from '../index';
 export const usage = '<email>';
 
 /**
- * One list row per triage state the Reports list shows: `received` (the state a
- * fresh report starts in), `actioned`, and `rejected` with an appeal filed, so
- * the list carries both an ordinary row and an appealed one. Each row mirrors
- * the input the app really writes — the AI-response report
+ * Four list rows for the Reports list: `received` twice (the state a fresh
+ * report starts in), `actioned`, and `rejected` with an appeal filed. The two
+ * `received` rows are filed at the same age, so they land on the same day, and
+ * they differ in kind and reason — an AI-response report and a PR discussion
+ * report — so a screen that names the reported item can be told apart from one
+ * that does not. Each row mirrors the input the app really writes — the
+ * AI-response report
  * (`buildReportAiResponseInput`) files `ai_output`/`message` with the owning
  * model and session, the PR discussion report
  * (`comment-moderation.tsx`) files `pr_discussion_content`/`comment`, both with
@@ -30,6 +33,20 @@ const FIXTURE_REPORTS = [
     modelId: '~deepseek/deepseek-flash-latest',
     sessionId: 'ses_000000000006ReportFixture',
     reason: 'other',
+    triageStatus: 'received',
+    appealStatus: 'none',
+    ageHours: 1,
+  },
+  {
+    id: '3f6b9c25-8a4e-45d2-9f31-6c0a71e2b804',
+    receiptId: '51b3d7c2-9f04-4e6a-a3b8-2d0c5f9e4a04',
+    label: 'receivedCommentReceiptId',
+    surface: 'pr_discussion_content',
+    targetKind: 'comment',
+    targetId: '71900000000000003',
+    modelId: null,
+    sessionId: null,
+    reason: 'spam',
     triageStatus: 'received',
     appealStatus: 'none',
     ageHours: 1,
@@ -68,7 +85,9 @@ const HOUR_MS = 60 * 60 * 1000;
 const REPORT_PLATFORM = 'mobile';
 
 function printUsage(): void {
-  console.log('Seed the report receipts list for one local user, one row per triage state.');
+  console.log(
+    'Seed the report receipts list for one local user: four rows, two sharing a status and a day.'
+  );
   console.log('');
   console.log(`Usage: pnpm dev:seed app:mobile-report-receipts ${usage}`);
   console.log('');
@@ -165,7 +184,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .where(eq(content_moderation_reports.kilo_user_id, user.id));
 
   console.log(
-    'This fixture represents: one reader whose reports list holds one row per triage state, the oldest one appealed.'
+    'This fixture represents: one reader whose reports list holds four rows, the oldest one appealed and two of them filed the same day in the same received state.'
   );
 
   return {

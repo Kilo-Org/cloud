@@ -9,13 +9,13 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
-  VIRTUAL_PROVIDER,
-  withoutVirtualProvider,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import {
+  getEligibleProviderRoutes,
   getModelInferenceProviders,
   isModelRestrictionExempt,
   type CustomLlmGrantee,
@@ -64,9 +64,13 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationModelDenyList = organizationRestrictionsEnabled
     ? (context.organization.settings.model_deny_list ?? []).map(normalizeModelId)
     : [];
-  const organizationProviderCeiling = organizationRestrictionsEnabled
-    ? context.organization.settings.provider_allow_list
-    : undefined;
+  // An absent list means no ceiling; a present one, empty or not, is enforced as
+  // written. Both forms are compared in the catalog's canonical slug form.
+  const configuredProviderAllowList = context.organization.settings.provider_allow_list;
+  const organizationProviderCeiling =
+    organizationRestrictionsEnabled && configuredProviderAllowList !== undefined
+      ? normalizeInferenceProviderIds(configuredProviderAllowList)
+      : undefined;
   // `organizationModelDenyList` and `organizationProviderCeiling` set the default
   // model and provider access for organization members. Group policies set the
   // access of their own members. Organization admins manage both.
@@ -117,26 +121,12 @@ export function evaluateEffectiveModelAccessPolicy(
         selectedPolicies.flatMap(policy => policy.data.model_allow_list.map(normalizeModelId))
       ),
       providerAllowList: new Set(
-        selectedPolicies.flatMap(policy => policy.data.provider_allow_list)
+        normalizeInferenceProviderIds(
+          selectedPolicies.flatMap(policy => policy.data.provider_allow_list)
+        )
       ),
     },
   };
-}
-
-/**
- * Routers listed under the snapshot-only virtual provider pick a real provider
- * per request. Allowing `virtual` lets them route to every real provider that
- * the same allow list permits; without one, they have nowhere to route.
- */
-function getEligibleProviderRoutes(
-  modelProviders: ReadonlySet<string>,
-  allowedProviders: ReadonlySet<string>
-): Set<string> {
-  if (modelProviders.has(VIRTUAL_PROVIDER.slug) && allowedProviders.has(VIRTUAL_PROVIDER.slug)) {
-    const realProviders = withoutVirtualProvider([...allowedProviders]);
-    return new Set(realProviders.length > 0 ? [VIRTUAL_PROVIDER.slug, ...realProviders] : []);
-  }
-  return new Set([...modelProviders].filter(provider => allowedProviders.has(provider)));
 }
 
 export async function getEffectiveModelDecision(
@@ -246,6 +236,9 @@ export function allowsInferenceProviderUserByok(decision: EffectiveModelDecision
  * a catalog-mode direct BYOK key serves it. The key's provider is the only route, whichever
  * providers the snapshot lists for the model, so provider allow-lists and grants are checked
  * against it alone. A policy that requires the model in the current snapshot still does.
+ *
+ * `providerSlug` may be the snapshot's own slug, which is stored verbatim, so it is
+ * normalized here before it joins the canonical lookup set.
  */
 export async function isModelAllowedForProviderKey(
   policy: EffectiveOrganizationModelPolicy,
@@ -253,8 +246,9 @@ export async function isModelAllowedForProviderKey(
   providerSlug: string,
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): Promise<boolean> {
+  const canonicalProviderSlug = normalizeInferenceProviderId(providerSlug);
   const decision = await getEffectiveModelDecision(policy, modelId, async lookupModelId =>
-    (await providerLookup(lookupModelId)).size > 0 ? new Set([providerSlug]) : new Set()
+    (await providerLookup(lookupModelId)).size > 0 ? new Set([canonicalProviderSlug]) : new Set()
   );
   return decision.allowed;
 }
@@ -268,7 +262,8 @@ export async function isModelRouteAllowed(
   const decision = await getEffectiveModelDecision(policy, modelId, providerLookup);
   return (
     decision.allowed &&
-    (!decision.eligibleProviderRoutes || decision.eligibleProviderRoutes.has(providerSlug))
+    (!decision.eligibleProviderRoutes ||
+      decision.eligibleProviderRoutes.has(normalizeInferenceProviderId(providerSlug)))
   );
 }
 
@@ -372,11 +367,7 @@ export function normalizeModelAccessPolicy(
       model_allow_list: [
         ...new Set(policy.data.model_allow_list.map(value => normalizeModelId(value.trim()))),
       ].sort(),
-      provider_allow_list: [
-        ...new Set(
-          policy.data.provider_allow_list.map(value => normalizeInferenceProviderId(value.trim()))
-        ),
-      ].sort(),
+      provider_allow_list: normalizeInferenceProviderIds(policy.data.provider_allow_list).sort(),
     },
   };
 }

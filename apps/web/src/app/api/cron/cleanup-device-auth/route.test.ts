@@ -9,6 +9,7 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 
 jest.mock('@/lib/device-auth/device-auth', () => ({ cleanupExpiredDeviceAuthRequests: jest.fn() }));
 jest.mock('@/lib/auth/native-admission', () => ({ cleanupExpiredAdmissionChallenges: jest.fn() }));
+jest.mock('@/lib/auth/pending-link', () => ({ cleanupExpiredPendingAuthLinks: jest.fn() }));
 jest.mock('@/lib/auth/device-sessions', () => ({
   cleanupExpiredDeviceRefreshTokens: jest.fn(),
 }));
@@ -31,6 +32,7 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
+import { cleanupExpiredPendingAuthLinks } from '@/lib/auth/pending-link';
 import { cleanupExpiredDeviceRefreshTokens } from '@/lib/auth/device-sessions';
 import { cleanupExpiredPasskeyRows } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
@@ -49,6 +51,7 @@ describe('GET /api/cron/cleanup-device-auth', () => {
     jest.mocked(cleanupExpiredDeviceAuthRequests).mockResolvedValue(2);
     jest.mocked(cleanupExpiredDeviceRefreshTokens).mockResolvedValue(7);
     jest.mocked(cleanupExpiredAdmissionChallenges).mockResolvedValue(1);
+    jest.mocked(cleanupExpiredPendingAuthLinks).mockResolvedValue(11);
     jest
       .mocked(cleanupExpiredPasskeyRows)
       .mockResolvedValue({ challenges: 5, tickets: 6, managementAuthorizations: 2 });
@@ -69,6 +72,7 @@ describe('GET /api/cron/cleanup-device-auth', () => {
       deleted_device_auth_request_count: 2,
       deleted_refresh_token_count: 7,
       deleted_admission_challenge_count: 1,
+      deleted_pending_auth_link_count: 11,
       deleted_passkey_challenge_count: 5,
       deleted_passkey_sign_in_ticket_count: 6,
       deleted_passkey_management_authorization_count: 2,

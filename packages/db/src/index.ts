@@ -37,7 +37,12 @@ export {
   type OrphanVolumeContextProtections,
   type OrphanVolumeSubscriptionContext,
 } from './kiloclaw-orphan-volume';
-export { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
+export {
+  computeDatabaseUrl,
+  getDatabaseClientConfig,
+  postgresConnectionTarget,
+  type PostgresConnectionTarget,
+} from './database-url';
 export {
   createOrFindSecurityAgentCommandByOperationKey,
   createSecurityAgentCommand,

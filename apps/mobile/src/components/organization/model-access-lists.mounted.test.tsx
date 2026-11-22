@@ -1,29 +1,34 @@
-import { createElement } from 'react';
+import { createElement, Fragment } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
+import { TAB_SCREEN_TRAILING_GAP } from '@/components/tab-screen';
 
-import { ProviderAllowList } from './model-access-lists';
+import { ModelDenyList, ProviderAllowList } from './model-access-lists';
 
 // FlashList renders through callbacks, so a host-string mock would drop both the
 // rows and the empty state. This mock mirrors the real list: the header always,
 // the rows through `renderItem`, and the empty component only when data is empty.
+// The two style props are forwarded so a test reads the style and content
+// reservations the component sets.
 vi.mock('@shopify/flash-list', async () => {
   // `vi.mock` factories hoist above this file's imports, so `react` is loaded
   // from inside the factory; a static import would not be defined yet.
   const React = await import('react');
   return {
     FlashList: (props: {
-      data: readonly string[];
-      renderItem?: (info: { item: string; index: number }) => React.ReactNode;
+      data: readonly unknown[];
+      renderItem?: (info: { item: unknown; index: number }) => React.ReactNode;
       ListHeaderComponent?: React.ReactNode;
       ListEmptyComponent?: React.ReactNode;
+      style?: unknown;
+      contentContainerStyle?: unknown;
     }) =>
       React.createElement(
         'FlashList',
-        null,
+        { style: props.style, contentContainerStyle: props.contentContainerStyle },
         props.ListHeaderComponent,
         ...props.data.map((item, index) => props.renderItem?.({ item, index })),
         props.data.length === 0 ? props.ListEmptyComponent : null
@@ -32,9 +37,10 @@ vi.mock('@shopify/flash-list', async () => {
 });
 vi.mock('react-native', () => ({ View: 'View' }));
 // The lists keep only the tab screen's trailing gap. The pinned footer above
-// them owns the bottom band, so no tab-bar clearance is involved, and no
-// assertion here reads the gap.
+// them owns the bottom band, so no tab-bar clearance is involved.
 vi.mock('@/components/tab-screen', () => ({ TAB_SCREEN_TRAILING_GAP: 16 }));
+// The window's side insets are the platform's, not this suite's subject.
+vi.mock('@/lib/screen-insets', () => ({ useSideInsetMarginStyle: () => undefined }));
 // The search field is driven through its own `onChangeText`, the query the
 // component keeps in state; the field's own layout has its own suite.
 vi.mock('@/components/ui/search-field', () => ({ SearchField: 'SearchField' }));
@@ -48,6 +54,9 @@ vi.mock('@/components/ui/row-group', () => ({
   rowGroupPosition: () => 'only',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The no-match state nests a surface so it can drop the reserve the screen's
+// surface carries; the host string keeps that prop readable in the tree.
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 
 const DRAFT = { providerAllowList: [], modelDenyList: [] };
 
@@ -65,6 +74,40 @@ async function mount(providers: readonly string[], names: Readonly<Record<string
   );
   renderer = view.renderer;
   return view.renderer.root;
+}
+
+const DENY_MODELS = [{ id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' }];
+
+/** Both lists of the Providers and models tab, as the form renders them. */
+async function mountBothLists() {
+  const view = await renderWithProviders(
+    createElement(
+      Fragment,
+      null,
+      createElement(ProviderAllowList, {
+        providers: ['anthropic'],
+        names: {},
+        draft: DRAFT,
+        onChange: () => undefined,
+        disabled: false,
+      }),
+      createElement(ModelDenyList, {
+        models: DENY_MODELS,
+        draft: DRAFT,
+        onChange: () => undefined,
+        disabled: false,
+      })
+    )
+  );
+  renderer = view.renderer;
+  return view.renderer.root;
+}
+
+/** The content-container style each list sets on its rows. */
+function listContentStyles(root: ReactTestRenderer['root']) {
+  return root
+    .findAll(node => Object.is(node.type, 'FlashList'))
+    .map(node => node.props.contentContainerStyle);
 }
 
 function typeQuery(root: ReactTestRenderer['root'], text: string) {
@@ -194,5 +237,19 @@ describe('ProviderAllowList rows', () => {
     typeQuery(root, 'router');
 
     expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: undefined }]);
+  });
+});
+
+// The pinned footer above the lists owns the bottom band, so each list's content
+// keeps only the trailing gap and grows to the viewport: a centred empty state
+// then takes the band the list shows instead of its own height below the header.
+describe('Model access list content', () => {
+  it('keeps the trailing gap on both lists and grows them to the viewport', async () => {
+    const root = await mountBothLists();
+
+    expect(listContentStyles(root)).toEqual([
+      { flexGrow: 1, paddingBottom: TAB_SCREEN_TRAILING_GAP },
+      { flexGrow: 1, paddingBottom: TAB_SCREEN_TRAILING_GAP },
+    ]);
   });
 });

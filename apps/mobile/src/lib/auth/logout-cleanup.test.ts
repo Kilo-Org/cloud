@@ -58,6 +58,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
 
 import * as Sentry from '@sentry/react-native';
 import * as SecureStore from 'expo-secure-store';
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 
 import {
   type LogoutCleanupRecord,
@@ -210,7 +211,10 @@ describe('runLogoutCleanup', () => {
     await expect(runLogoutCleanup()).resolves.toBeUndefined();
 
     expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
-    expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledWith({ token: 'push-1' });
+    expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledWith(
+      { token: 'push-1' },
+      { signal: expect.any(AbortSignal) }
+    );
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
@@ -231,6 +235,28 @@ describe('runLogoutCleanup', () => {
     await runLogoutCleanup();
 
     expect(calls).toEqual(['activity', 'revoke']);
+  });
+
+  it('unregisters the device push token before the revoke ends its auth', async () => {
+    pushOutcome('token');
+    const calls: string[] = [];
+    trpcMock.unregisterPushToken.mutate.mockImplementation(async () => {
+      calls.push('push');
+      await Promise.resolve();
+      return { success: true };
+    });
+    trpcMock.revokeCurrentDeviceSession.mutate.mockImplementation(async () => {
+      calls.push('revoke');
+      await Promise.resolve();
+      return { outcome: 'revoked' };
+    });
+
+    await runLogoutCleanup();
+
+    // The revoke is the last authenticated call: a delete after it can only
+    // be refused, and an account that cannot sign back in never retries.
+    expect(calls).toEqual(['push', 'revoke']);
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
   it('treats a fulfilled no_identifiable_session revoke as done', async () => {
@@ -362,6 +388,37 @@ describe('runLogoutCleanup', () => {
       needsActivityUnregister: true,
       activityTokens: ['activity-token-1'],
     });
+  });
+
+  it('keeps the push token for retry when the push half-budget stalls the unregister', async () => {
+    seedRecords([]);
+    pushOutcome('token');
+    trpcMock.unregisterPushToken.mutate.mockReturnValue(new Promise<never>(() => undefined));
+
+    vi.useFakeTimers();
+    try {
+      const run = runLogoutCleanup();
+      // Let the chain reach the stalled unregister before spending the budget.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledTimes(1);
+      expect(trpcMock.revokeCurrentDeviceSession.mutate).not.toHaveBeenCalled();
+
+      // The push step is abandoned at half the pair's budget, so the revoke
+      // still gets its own attempt on the budget that is left.
+      await vi.advanceTimersByTimeAsync(Math.floor(CONTROL_PLANE_DEADLINE_MS / 2));
+      expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS);
+      await expect(run).resolves.toBeUndefined();
+
+      expect(await storedRecordFor('u1')).toMatchObject({
+        userId: 'u1',
+        pushTokens: ['push-1'],
+        pushLookupPending: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('still resolves when a record write fails and reports it to Sentry', async () => {

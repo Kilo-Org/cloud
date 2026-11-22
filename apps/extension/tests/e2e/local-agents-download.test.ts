@@ -1119,3 +1119,174 @@ test('a drop that carries local file paths needs the upload approval', async () 
     await fixture.close();
   }
 });
+
+test('the no-permission fallback refuses the same click and names the grant', async () => {
+  test.setTimeout(120_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  // The shipped manifest keeps `downloads` optional, so this copy loads without it: `chrome.downloads` is undefined and
+  // The runtime has no event to hold an item with. What is left is the response that would become a file.
+  const launch = await launchRealDownloadBrowser({ grantPermissions: [] });
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(false) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'No permission E2E session',
+    });
+
+    const navigated = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}/page` },
+      grants
+    );
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
+
+    const target = await downloadRef(session, grants);
+    const guardedAt = fixture.hits();
+    const guarded = await session.callTool(
+      'browser_click',
+      { element: 'Download report', target },
+      grants
+    );
+
+    // The click ran and its attachment response was failed before a byte landed, so the refusal names the file the
+    // Model would have reported and asks for the grant instead. No token is offered: without the permission there is
+    // No guard an approval could switch off, so a token here would be one nobody could ever spend.
+    expect(guarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    expect(guarded.kind === 'error' ? guarded.message : '').toContain(
+      'optional Downloads permission'
+    );
+    expect(guarded.kind === 'error' ? guarded.stepToken : 'a step token').toBeUndefined();
+    const items = z
+      .array(permissionItemSchema)
+      .parse(guarded.kind === 'error' ? guarded.items : []);
+    expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
+
+    // The route counts its own hits, so the request reaching it is the click's and not a spec-side assumption.
+    await expect.poll(() => fixture.hits(), { timeout: 20_000 }).toBeGreaterThan(guardedAt);
+    await expectNothingSaved(downloadsPath);
+
+    // The launch really lacks the permission: nothing in this spec promoted it, and the state is the browser's own.
+    expect(await sidePanel.evaluate('typeof chrome.downloads')).toBe('undefined');
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+  }
+});
+
+test('a drop naming an absent local file is still the upload step, and the page receives nothing', async () => {
+  test.setTimeout(120_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}${DROP_PAGE_PATH}`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}${DROP_PAGE_PATH}`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Absent drop upload E2E session',
+    });
+
+    const navigated = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${DROP_PAGE_PATH}` },
+      grants
+    );
+
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
+
+    // The page is the only witness to what a drop really handed it: the fixture reports names, so the file's byte
+    // Count and whether those bytes can be read at all are recorded here, before any drop exists to reach this page.
+    await agentPage.evaluate(`
+      document.querySelector('#zone').addEventListener('drop', event => {
+        const files = Array.from(event.dataTransfer?.files ?? []);
+        window.__droppedFiles = files.map(file => ({ name: file.name, size: file.size }));
+        window.__droppedReads = Promise.all(
+          files.map(file => file.text().then(() => 'readable', error => String(error)))
+        );
+      });
+    `);
+
+    // The guard decides the call before the tool runs, so a path that is not on disk is classified the same way a
+    // Readable one is: the upload approval is what the call needs, and no read of the paths happens first.
+    const args = {
+      element: 'Drop zone',
+      paths: ['/nonexistent/absent-proof.txt'],
+      target: '#zone',
+    };
+    const guarded = await session.callTool('browser_drop', args, grants);
+
+    expect(guarded).toMatchObject({ code: -32_010, kind: 'error' });
+    const items = z
+      .array(permissionItemSchema)
+      .parse(guarded.kind === 'error' ? guarded.items : []);
+
+    expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'uploading a file' }]);
+    const token = guarded.kind === 'error' ? (guarded.stepToken ?? '') : '';
+
+    expect(token).not.toBe('');
+    // Refused before the tool: the page's own handler never ran, so it reported no drop.
+    await expect.poll(() => fixture.dropReceived(), { timeout: 5000 }).toStrictEqual([]);
+
+    // The approval buys the step, and the tool answers as it always does — it dispatched a drag the browser accepted.
+    // Nothing was delivered: the file the page was handed holds no bytes and cannot be read, so the page's report of
+    // Its name is a name alone. The assertions below are what that file turned out to be, not what the answer claimed.
+    const approved = await session.callTool('browser_drop', args, grants, [token]);
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    expect(approved.kind === 'result' ? approved.text : '').toContain('1 file(s)');
+
+    const handed = z
+      .array(z.object({ name: z.string(), size: z.number() }))
+      .parse(await agentPage.evaluate('window.__droppedFiles'));
+
+    expect(handed).toStrictEqual([{ name: 'absent-proof.txt', size: 0 }]);
+    const reads = z.array(z.string()).parse(await agentPage.evaluate('window.__droppedReads'));
+
+    expect(reads).toStrictEqual([expect.stringContaining('NotFoundError')]);
+    // The page ran and named the file the browser described, with no contents behind it.
+    expect(fixture.dropReceived()).toStrictEqual([['absent-proof.txt']]);
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+  }
+});

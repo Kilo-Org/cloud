@@ -1300,9 +1300,22 @@ export async function unsuspendIntegrationForOwner(
  * suspended; `isPlatformIntegrationSuspended` reads the status or `suspended_at`
  * and the health predicates require both to agree. This expression writes the
  * three columns as one state, so a row always answers the same question the same
- * way. A locally disconnected association keeps its status and its suspension:
- * that record is what marks the disconnect, and the connect path clears
+ * way.
+ *
+ * A writer that records a fresh authorization records the association as active
+ * with no suspension: `integration_status`, `suspended_at` and `suspended_by`
+ * move together, so a row that answers active never carries a suspension record.
+ * Slack, Linear and GitLab already record the same state on re-authorization,
+ * and one writer operation keeps every platform's answer identical.
+ *
+ * A locally disconnected association keeps its status and its suspension: that
+ * record is what marks the disconnect, and the connect path clears
  * `github_disconnected_at` in the same write as it reactivates the association.
+ * For GitHub, the provider's own lifecycle is not carried here: it is recorded
+ * on the canonical installation row by `observeGitHubInstallationLifecycle`,
+ * runtime authorization reads it there as well, and
+ * `connectVerifiedGitHubInstallation` refuses to write while that installation is
+ * suspended.
  */
 export function reactivatedIntegrationSetSql() {
   const reactivated = sql`${platform_integrations.github_disconnected_at} IS NULL`;

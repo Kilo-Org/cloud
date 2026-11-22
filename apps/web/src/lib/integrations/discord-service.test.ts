@@ -726,7 +726,7 @@ describe('discord-service uninstall', () => {
     expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 
-  it('keeps the association when Discord rejects the bot token', async () => {
+  it('keeps the association and records the removal reason on a 401 answer', async () => {
     mockLimit.mockResolvedValue([buildDiscordIntegration()]);
     mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
@@ -736,6 +736,29 @@ describe('discord-service uninstall', () => {
       message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
     });
     expect(mockDeleteWhere).not.toHaveBeenCalled();
+    // The owner's message names no cause, so the event carries the server and
+    // the reason for the support step.
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'discord_disconnect', op: 'guild_removal_unavailable' },
+      extra: { guildId, reason: 'rejected_token' },
+    });
+  });
+
+  it('keeps the association and records the removal reason on a 403 answer', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 403 }));
+
+    await expect(uninstallApp(owner)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+    });
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'discord_disconnect', op: 'guild_removal_unavailable' },
+      extra: { guildId, reason: 'forbidden' },
+    });
   });
 
   it('keeps the association when the server cannot be identified', async () => {

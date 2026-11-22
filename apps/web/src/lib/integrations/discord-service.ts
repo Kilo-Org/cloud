@@ -951,6 +951,15 @@ export async function uninstallApp(owner: Owner) {
     const { removal } = outcome;
 
     if (removal.status === 'unavailable') {
+      // The owner's message names no cause, so the event carries the server
+      // and the reason, and the support step reads both from one record.
+      captureException(
+        new Error(`Discord disconnect could not remove the bot: ${removal.reason}`),
+        {
+          tags: { source: 'discord_disconnect', op: 'guild_removal_unavailable' },
+          extra: { guildId, reason: removal.reason },
+        }
+      );
       throw new TRPCError({
         code: 'SERVICE_UNAVAILABLE',
         message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,

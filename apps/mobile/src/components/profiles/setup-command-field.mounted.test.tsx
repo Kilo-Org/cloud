@@ -9,6 +9,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
 
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
+import { INPUT_FRAME_CLASS } from '@/components/ui/input-frame';
+
 import { SetupCommandField } from './setup-command-field';
 
 const copy = vi.hoisted(() => ({ placeholder: 'e.g. pnpm install' }));
@@ -20,7 +23,7 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/form-field-label', () => ({ FormFieldLabel: 'FormFieldLabel' }));
-vi.mock('@/components/ui/input', () => ({ INPUT_BOX_SHAPE_CLASS: 'rounded-md' }));
+vi.mock('@/components/ui/input', () => ({ INPUT_BOX_SHAPE_CLASS: 'min-h-[44px] pl-3 pr-3' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The catalog copy is checked by tools/i18n; this stub only has to hand the
@@ -92,5 +95,34 @@ describe('<SetupCommandField>', () => {
       textAlign: 'left',
       fontVariant: ['no-common-ligatures', 'no-discretionary-ligatures', 'no-contextual'],
     });
+  });
+
+  it('draws the read-only box on the shared input frame', () => {
+    // The box is the same preview surface a read-only single-line field uses:
+    // it composes the shared frame token instead of restating its chrome, so a
+    // change to the frame reaches this row too.
+    act(() => {
+      renderer = TestRenderer.create(
+        <SetupCommandField
+          command="pnpm install --frozen-lockfile"
+          label="Command"
+          readOnly
+          onChangeText={noop}
+        />
+      );
+    });
+    const value = renderer?.root.findByType('SelectableText');
+    const classes = String(value?.parent?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(INPUT_FRAME_CLASS.split(' ')));
+    // Nothing is restated beside the token: the box is the shape, the frame and
+    // its own centering, so a literal copy of the frame's chrome cannot creep
+    // back in and drift from `INPUT_FRAME_CLASS`.
+    expect(classes).toEqual([
+      ...INPUT_BOX_SHAPE_CLASS.split(' '),
+      ...INPUT_FRAME_CLASS.split(' '),
+      'justify-center',
+      'py-2.5',
+    ]);
   });
 });

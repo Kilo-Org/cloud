@@ -6,7 +6,13 @@ import { PatchToolCard, PatchToolCardBody } from './patch-tool-card';
 import * as React from 'react';
 import type * as ReactI18next from 'react-i18next';
 
-vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+// `SelectableText` renders its read-only `TextInput` on iOS only; the walker
+// below invokes it directly, so the mock names the platform the assertions read.
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  View: 'View',
+  TextInput: 'TextInput',
+}));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {

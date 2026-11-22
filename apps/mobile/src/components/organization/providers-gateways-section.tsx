@@ -72,34 +72,43 @@ export function GatewaySettingsSection({
   const [regionPickerOpen, setRegionPickerOpen] = useState(false);
   const region: RegionChoice = settings?.data_region ?? 'global';
 
+  // Every state of this tab keeps the same column: the loaded body below takes
+  // the inset on its own frame, so the failure, pending and unavailable states
+  // take it here rather than jumping sideways when the settings arrive.
   if (isError && settings == null) {
     return (
-      <QueryError
-        className="bg-background"
-        message={t('organizationModelAccess.loadError')}
-        onRetry={onRetry}
-        isRetrying={isFetching}
-      />
+      <View className="flex-1" style={sideInsetStyle}>
+        <QueryError
+          className="bg-background"
+          message={t('organizationModelAccess.loadError')}
+          onRetry={onRetry}
+          isRetrying={isFetching}
+        />
+      </View>
     );
   }
 
   if (settings == null) {
     return (
-      <View className="gap-3 px-4 pt-3">
-        <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
+      <View style={sideInsetStyle}>
+        <View className="gap-3 px-4 pt-3">
+          <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
+        </View>
       </View>
     );
   }
 
   if (!settings.available) {
     return (
-      <EmptyState
-        placement="top"
-        inset="gutter"
-        className="bg-background pt-4"
-        icon={Settings2}
-        title={t('organizationModelAccess.gatewaysUnavailable')}
-      />
+      <View className="flex-1" style={sideInsetStyle}>
+        <EmptyState
+          placement="top"
+          inset="gutter"
+          className="bg-background pt-4"
+          icon={Settings2}
+          title={t('organizationModelAccess.gatewaysUnavailable')}
+        />
+      </View>
     );
   }
 

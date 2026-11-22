@@ -115,6 +115,10 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   // or write a file by name. A command that matches no rule resolves to a
   // prompt, and a code-review session rejects every prompt, so a utility whose
   // only permitted forms cannot be written as a rule keeps no allow rule.
+  // `sort` writes the file named by its output option, so that option is refused
+  // for the same reason the write tools' targets are.
+  'sort *-o*',
+  'sort *--output*',
   'find *-exec*',
   'find *-ok*',
   'find *-delete*',
@@ -378,27 +382,27 @@ const SECURITY_REMEDIATION_PUSH_HEAD = 'git*push';
 // backslash before git runs the command, so a word split by an escape reaches a
 // rule as a slash inside the word. The subcommand words that carry a push or a
 // configuration write are a fixed list, so every split position of each is named
-// here, once for one escape in the word and once for two escapes in the same
-// word; nothing outside that list can split a word into one of them. A word that
-// carries three or more escapes stays outside these rules.
-const SECURITY_REMEDIATION_SPLITTABLE_WORDS = [
-  'git',
-  'push',
-  'send-pack',
-  'receive-pack',
-  'config',
-] as const;
+// here, for every combination of positions a slash can occupy; nothing outside
+// that list can split a word into one of them.
+// `receive-pack` is left out: the plain push runs it rather than the agent, and
+// enumerating every split position of a twelve-letter word costs more rules than
+// the map can carry. `git*send-pack*` and every split of `send-pack` remain.
+const SECURITY_REMEDIATION_SPLITTABLE_WORDS = ['git', 'push', 'send-pack', 'config'] as const;
 
+// Every split count: the shell removes each escape, and the matcher rewrites the
+// backslash that carried it to a slash, so one rule per position of the word is
+// not enough. The set enumerates all subsets of the word's positions, so a word
+// carries the slash at any combination of its letters.
 const SECURITY_REMEDIATION_SPLIT_WORD_DENIED_PATTERNS =
   SECURITY_REMEDIATION_SPLITTABLE_WORDS.flatMap(word => {
     const splits: string[] = [];
-    for (let first = 1; first < word.length; first += 1) {
-      splits.push(`${word.slice(0, first)}/${word.slice(first)}`);
-    }
-    for (let first = 1; first < word.length - 1; first += 1) {
-      for (let second = first + 1; second < word.length; second += 1) {
-        splits.push(`${word.slice(0, first)}/${word.slice(first, second)}/${word.slice(second)}`);
+    for (let mask = 1; mask < 1 << (word.length - 1); mask += 1) {
+      let split = word.slice(0, 1);
+      for (let index = 1; index < word.length; index += 1) {
+        if ((mask & (1 << (index - 1))) !== 0) split += '/';
+        split += word.slice(index, index + 1);
       }
+      splits.push(split);
     }
     // A split of the command word itself must stay anchored to the command
     // start, or the rule would refuse any path that happens to contain those
@@ -435,11 +439,17 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
 // glob spelling a shell would resolve to the same directory.
 const SECURITY_REMEDIATION_GIT_DIR_SPELLINGS = ['.git', '.g?t', '.g*t'];
 
-// The allowed programs that take the file they write as an argument. The
-// general-purpose programs this policy also admits are handled separately: the
-// search options that run another program or write a named file are refused
-// below, and a program run from inside one of them stays outside a text rule.
-const SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS = ['cp', 'mv', 'sed'];
+// The separator between the directory and its file, written as one path
+// component, a run of slashes, and the same with a dot segment. A shell resolves
+// each to the directory itself.
+const SECURITY_REMEDIATION_GIT_DIR_SEPARATORS = ['/', '//', '///', '/./', '//./', '/.//', '/././'];
+
+// The allowed programs that take the file they write as an argument. `uniq`
+// writes its second argument. The general-purpose programs this policy also
+// admits are handled separately: the search options that run another program or
+// write a named file are refused below, `sort` has its own output option rule,
+// and a program run from inside one of them stays outside a text rule.
+const SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS = ['cp', 'mv', 'sed', 'uniq'];
 
 // A shell joins adjacent quoted pieces into one argument, so the file name can
 // carry a quote at any boundary between its letters and the shell still writes
@@ -520,11 +530,18 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // each quote character, and the three rules below then cover the same names
   // plus a quote before the name or inside it. A name that carries two quote
   // pairs at once stays outside these rules.
-  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [
-    `*${spelling}/c*`,
-    `*${spelling}/"c*`,
-    `*${spelling}/'c*`,
-  ]),
+  // A repeated or dot separator reaches the same file, so each spelling is
+  // named with a run of slashes and with dot segments between the directory and
+  // the file name. The run is enumerated rather than taken as a `*`, because a
+  // wildcard there would also reach a file inside a directory whose name merely
+  // starts with the same characters.
+  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling =>
+    SECURITY_REMEDIATION_GIT_DIR_SEPARATORS.flatMap(separator => [
+      `*${spelling}${separator}c*`,
+      `*${spelling}${separator}"c*`,
+      `*${spelling}${separator}'c*`,
+    ])
+  ),
   // A `cd` node is never evaluated, so a write whose target is the bare name
   // cannot be classified by its directory. These rules refuse that target by
   // name, at the cost of refusing a legitimate write to a file or directory
@@ -563,6 +580,10 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git*-?* config * *?',
   // The allowed search programs run another program or write a named file
   // through these options, so each is refused, as the review policy already does.
+  // `sort` writes the file named by its output option, so that option is refused
+  // for the same reason the write tools' targets are.
+  'sort *-o*',
+  'sort *--output*',
   'find *-exec*',
   'find *-execdir*',
   'find *-ok*',

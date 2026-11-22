@@ -51,9 +51,9 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
  *   500 { error: 'INTERNAL_ERROR' } — admission provider or key-persistence
  *         infrastructure error; the old token stays valid and the client
  *         retries on its next launch
- *   500 (no JSON body) — the limiter itself could not be consulted. The shared
- *         check reports the rule and rethrows, so the framework answers; the
- *         old token stays valid and the client retries on its next launch
+ *   500 (no JSON body) — the limiter could not be consulted and its client
+ *         threw, so the framework answers rather than this handler; the old
+ *         token stays valid and the client retries on its next launch
  */
 export const POST = withRestTiming('/api/auth/native/exchange', async (request: Request) => {
   // Counted first, so the admission gate and attestation verification run

@@ -94,8 +94,6 @@ type AgentSessionListContentProps = {
   isPaused: boolean;
   /** Re-issues the paused read; it resolves only after reconnect, so it is not awaited. */
   onRetryPaused: () => void;
-  /** True while a retry the read actually started is in flight. */
-  isPausedRetrying: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
   searchQuery: string;
   /** Retires exactly the narrowing input the pressed clear control names. */
@@ -126,7 +124,6 @@ export function AgentSessionListContent({
   isRetrying,
   isPaused,
   onRetryPaused,
-  isPausedRetrying,
   searchQuery,
   onClearAction,
   onCreateSession,
@@ -470,7 +467,7 @@ export function AgentSessionListContent({
     return (
       <View className="flex-1">
         {updatingStatus}
-        <QueryError variant="offline" onRetry={onRetryPaused} isRetrying={isPausedRetrying} />
+        <QueryError variant="offline" onRetry={onRetryPaused} />
       </View>
     );
   }

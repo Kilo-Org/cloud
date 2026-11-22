@@ -206,7 +206,6 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     isRetrying: false,
     isPaused: false,
     onRetryPaused: () => undefined,
-    isPausedRetrying: false,
     searchQuery: '',
     onClearAction: () => undefined,
     onCreateSession: () => undefined,
@@ -570,14 +569,6 @@ describe('AgentSessionListContent liveness', () => {
       (card.props.onRetry as () => void)();
     });
     expect(onRetryPaused).toHaveBeenCalledOnce();
-  });
-
-  it('reports the retry in flight while a started retry runs', () => {
-    // The busy state belongs to a retry the read actually started; a paused
-    // wait is not a busy spinner.
-    const renderer = mount(contentProps({ isPaused: true, isPausedRetrying: true }));
-    const [card] = renderer.root.findAllByType(QueryError);
-    expect(card?.props.isRetrying).toBe(true);
   });
 
   it('keeps stale history behind pull recovery feedback and its timeout', async () => {

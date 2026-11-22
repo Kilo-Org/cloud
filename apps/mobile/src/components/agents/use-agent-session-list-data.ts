@@ -45,7 +45,6 @@ export function useAgentSessionListData(options: {
     storedIsError,
     storedIsPending,
     storedIsPaused,
-    storedIsFetching,
     storedFetchedSinceMount,
     hasNextPage,
     isFetchingNextPage,
@@ -77,16 +76,17 @@ export function useAgentSessionListData(options: {
     organizationId,
     enabled: ready,
   });
-  // A paused read (offline, and no page of its own cached) is neither loading
-  // nor errored: it never settles until the network returns, so the body owes
-  // the person the offline state with a retry instead of skeletons that never
-  // land (or the unfiltered list painting under a paused search). Rows an
-  // earlier answer already delivered keep rendering: they are real answers,
-  // and the app-wide offline banner speaks for the connection.
-  const pausedSearch = search.isPaused && search.dateGroups.length === 0;
-  const pausedStored = storedIsPaused && storedSessions.length === 0;
+  // A paused read with no page of its own shouldered yet (`isPending`) is
+  // neither loading nor errored: it never settles until the network returns, so
+  // the body owes the person the offline state with a retry instead of
+  // skeletons that never land (or the unfiltered list painting under a paused
+  // search). A paused refetch over an answer already delivered keeps that
+  // answer, empty or not: an empty history keeps its New session action and a
+  // zero-match search keeps its Clear actions, and the app-wide offline banner
+  // speaks for the connection.
+  const pausedSearch = search.isPaused && search.isPending;
+  const pausedStored = storedIsPaused && storedIsPending;
   const contentIsPaused = isSearching ? pausedSearch : pausedStored;
-  const drivingIsFetching = isSearching ? search.isFetching : storedIsFetching;
   const handlePausedRetry = useCallback(() => {
     // Fire-and-forget: a paused refetch settles only after reconnect, so the
     // caller must not hold a busy state across it.
@@ -196,7 +196,6 @@ export function useAgentSessionListData(options: {
     projectOptions,
     contentIsError,
     contentIsPaused,
-    isPausedRetrying: drivingIsFetching && !contentIsPaused,
     sections,
   };
 }

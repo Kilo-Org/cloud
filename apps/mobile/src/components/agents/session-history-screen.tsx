@@ -93,7 +93,6 @@ export function SessionHistoryScreen() {
     projectOptions,
     contentIsError,
     contentIsPaused,
-    isPausedRetrying,
     sections,
   } = useAgentSessionListData({
     organizationId,
@@ -254,7 +253,6 @@ export function SessionHistoryScreen() {
       isRetrying={isRetrying}
       isPaused={contentIsPaused}
       onRetryPaused={handlePausedRetry}
-      isPausedRetrying={isPausedRetrying}
       onClearAction={handleClearAction}
       onCreateSession={handleCreateSession}
     />

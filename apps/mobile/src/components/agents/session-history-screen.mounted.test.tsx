@@ -959,7 +959,6 @@ describe('SessionHistoryScreen', () => {
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.isPaused).toBe(true);
     expect(content.props.isLoading).toBe(false);
-    expect(content.props.isPausedRetrying).toBe(false);
     // The paused search has no page of its own, so the stored groups are still
     // handed down (an earlier answer keeps rendering); the offline surface is
     // what owns the body above them.
@@ -969,6 +968,24 @@ describe('SessionHistoryScreen', () => {
       (content.props.onRetryPaused as () => void)();
     });
     expect(searchRefetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: a paused read only owns the body when it has no page of its own
+  // to show. A settled empty history whose refetch is paused already answered —
+  // "nothing here" — so it keeps its empty body and New session action, and the
+  // app-wide offline banner speaks for the connection.
+  it('keeps a settled empty history when its refetch is paused', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = false;
+    listState.storedIsPaused = true;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isPaused).toBe(false);
+    expect(content.props.isLoading).toBe(false);
+    expect(content.props.hasAnySessions).toBe(false);
   });
 
   it('shows the settled empty state once the request completes with no rows', async () => {

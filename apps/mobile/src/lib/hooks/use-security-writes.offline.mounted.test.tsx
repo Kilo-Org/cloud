@@ -114,9 +114,7 @@ type Probe = {
   startAnalysis: ((vars: { findingId: string }) => Promise<unknown>) | null;
   startRemediation: ((vars: { findingId: string }) => Promise<unknown>) | null;
   retryRemediation: ((vars: { findingId: string }) => Promise<unknown>) | null;
-  cancelRemediation:
-    | ((vars: { attemptId: string; findingId: string }) => Promise<unknown>)
-    | null;
+  cancelRemediation: ((vars: { attemptId: string; findingId: string }) => Promise<unknown>) | null;
   removeFindings: ((repoFullName: string) => Promise<unknown>) | null;
   analysisKey: readonly unknown[];
   dismissPending: boolean;
@@ -343,8 +341,7 @@ describe('Security Agent finding writes while the device is offline', () => {
     failWith(new TypeError('Network request failed'));
     let rolledBack: unknown = null;
     const { failure } = await runOfflineWrite(
-      probe =>
-        probe.cancelRemediation?.({ attemptId: 'attempt-1', findingId: FINDING_ID }) ?? null,
+      probe => probe.cancelRemediation?.({ attemptId: 'attempt-1', findingId: FINDING_ID }) ?? null,
       probe => probe.cancelPending,
       {
         // The cancel stamps `cancellationRequestedAt` before the request, so the

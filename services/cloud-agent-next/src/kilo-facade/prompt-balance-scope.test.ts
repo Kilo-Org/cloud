@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as BalanceValidationModule from '../balance-validation.js';
 import type * as ModelPreflightModule from '../session/model-preflight.js';
 import type * as SessionAccessModule from '../session-access.js';
+import type * as LoggerModule from '../logger.js';
 import type { DurableAdmissionAck } from '../execution/types.js';
 import type { KiloFacadeRequestDeps } from './user-kilo-facade.js';
 import type { Env } from '../types';
@@ -12,12 +13,34 @@ const {
   validateBalanceOnlyMock,
   preflightSessionRuntimeMock,
   preflightExistingPromptModelMock,
+  loggerWarnMock,
+  loggerWithFieldsMock,
 } = vi.hoisted(() => ({
   requireCurrentSessionAccessMock: vi.fn(),
   validateBalanceOnlyMock: vi.fn(),
   preflightSessionRuntimeMock: vi.fn(),
   preflightExistingPromptModelMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
+  loggerWithFieldsMock: vi.fn(),
 }));
+
+vi.mock('../logger.js', async importOriginal => {
+  const logger = {
+    withFields: loggerWithFieldsMock,
+    warn: loggerWarnMock,
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    log: vi.fn(),
+    setTags: vi.fn(),
+    getTags: vi.fn(() => ({})),
+  };
+  loggerWithFieldsMock.mockReturnValue(logger);
+  return {
+    ...(await importOriginal<typeof LoggerModule>()),
+    logger,
+  };
+});
 
 vi.mock('../session-access.js', async importOriginal => ({
   ...(await importOriginal<typeof SessionAccessModule>()),
@@ -292,5 +315,84 @@ describe('prompt payer scope', () => {
     });
     expect(validateBalanceOnly).not.toHaveBeenCalled();
     expect(admitPrompt).not.toHaveBeenCalled();
+  });
+
+  it('repeats one failed payer read and then admits against the resolved payer', async () => {
+    const env = envStub();
+    const admitPrompt = vi.fn().mockResolvedValue(QUEUED_ADMISSION);
+    requireCurrentSessionAccessMock
+      .mockRejectedValueOnce(
+        new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session access is temporarily unavailable',
+          cause: new Error('connect ECONNREFUSED'),
+        })
+      )
+      .mockResolvedValue({ kiloSessionId, organizationId: 'org-funded' });
+
+    const response = await postMutation({
+      env,
+      path: 'prompt_async',
+      body: PROMPT_BODY,
+      admitPrompt,
+    });
+
+    expect(response.status).toBe(204);
+    expect(requireCurrentSessionAccess).toHaveBeenCalledTimes(2);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('validated-token', 'org-funded', env);
+    expect(admitPrompt).toHaveBeenCalledOnce();
+    expect(loggerWarnMock).not.toHaveBeenCalled();
+  });
+
+  it('reports once and admits nothing when the payer read fails on every attempt', async () => {
+    const env = envStub();
+    const admitPrompt = vi.fn();
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session access is temporarily unavailable',
+        cause: new Error('connect ECONNREFUSED 10.0.0.1:5432'),
+      })
+    );
+
+    const response = await postMutation({
+      env,
+      path: 'prompt_async',
+      body: PROMPT_BODY,
+      admitPrompt,
+    });
+
+    expect(response.status).toBe(503);
+    expect(requireCurrentSessionAccess).toHaveBeenCalledTimes(2);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+    expect(admitPrompt).not.toHaveBeenCalled();
+    expect(loggerWithFieldsMock).toHaveBeenCalledOnce();
+    expect(loggerWithFieldsMock).toHaveBeenCalledWith({
+      cloudAgentSessionId: workspaceSessionId,
+      userId: 'usr_1',
+      error: 'Error: connect ECONNREFUSED 10.0.0.1:5432',
+    });
+    expect(loggerWarnMock).toHaveBeenCalledOnce();
+    expect(loggerWarnMock).toHaveBeenCalledWith('Prompt payer scope read failed');
+  });
+
+  it('does not repeat a denied payer scope and records nothing', async () => {
+    const env = envStub();
+    const admitPrompt = vi.fn();
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+    );
+
+    const response = await postMutation({
+      env,
+      path: 'prompt_async',
+      body: PROMPT_BODY,
+      admitPrompt,
+    });
+
+    expect(response.status).toBe(404);
+    expect(requireCurrentSessionAccess).toHaveBeenCalledOnce();
+    expect(loggerWithFieldsMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).not.toHaveBeenCalled();
   });
 });

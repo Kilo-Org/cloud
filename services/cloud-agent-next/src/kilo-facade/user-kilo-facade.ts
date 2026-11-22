@@ -575,11 +575,57 @@ function promptPayerScopeFailure(error: unknown): BalanceOnlyResult {
   };
 }
 
+/** The payer read is repeated within this attempt count before it reports a failure. */
+const PROMPT_PAYER_SCOPE_READ_ATTEMPTS = 2;
+/** Pause between attempts. */
+const PROMPT_PAYER_SCOPE_RETRY_MS = 50;
+
+/**
+ * Reads the payer scope, repeating a failed read within the attempt bound.
+ */
+async function readPromptPayerScope(params: {
+  env: Env;
+  userId: string;
+  cloudAgentSessionId: string;
+}): Promise<string | null> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const { organizationId } = await requireCurrentSessionAccess({
+        env: params.env,
+        kiloUserId: params.userId,
+        cloudAgentSessionId: params.cloudAgentSessionId,
+      });
+      return organizationId;
+    } catch (error) {
+      if (error instanceof TRPCError && error.code === 'FORBIDDEN') throw error;
+      if (attempt >= PROMPT_PAYER_SCOPE_READ_ATTEMPTS) throw error;
+      const wait = Promise.withResolvers<void>();
+      setTimeout(wait.resolve, PROMPT_PAYER_SCOPE_RETRY_MS);
+      await wait.promise;
+    }
+  }
+}
+
+/** Records the final failure once, with the identifiers and the underlying error text. */
+function logPromptPayerScopeFailure(
+  error: unknown,
+  params: { userId: string; cloudAgentSessionId: string }
+): void {
+  const cause = error instanceof TRPCError ? error.cause : undefined;
+  logger
+    .withFields({
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      userId: params.userId,
+      error: cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause ?? error),
+    })
+    .warn('Prompt payer scope read failed');
+}
+
 /**
  * Resolves the payer from the stored session ownership record, the same source
  * the tRPC balance middleware uses, so a facade prompt and a tRPC prompt check
- * one payer. A scope that cannot be read fails the gate closed; the caller may
- * retry a 503.
+ * one payer. A failed read is repeated within a bound; a read that still fails
+ * answers closed, is recorded once, and the caller may retry.
  */
 async function defaultValidatePromptBalance(params: {
   env: Env;
@@ -589,12 +635,19 @@ async function defaultValidatePromptBalance(params: {
 }): Promise<BalanceOnlyResult> {
   let organizationId: string | null;
   try {
-    ({ organizationId } = await requireCurrentSessionAccess({
+    organizationId = await readPromptPayerScope({
       env: params.env,
-      kiloUserId: params.userId,
+      userId: params.userId,
       cloudAgentSessionId: params.cloudAgentSessionId,
-    }));
+    });
   } catch (error) {
+    // A denial answers as a missing session and is not recorded.
+    if (!(error instanceof TRPCError && error.code === 'FORBIDDEN')) {
+      logPromptPayerScopeFailure(error, {
+        userId: params.userId,
+        cloudAgentSessionId: params.cloudAgentSessionId,
+      });
+    }
     return promptPayerScopeFailure(error);
   }
   return validateBalanceOnly(params.authToken, organizationId ?? undefined, params.env);

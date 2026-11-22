@@ -29,7 +29,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
+import { ingestItems, ingestMeta, sessions, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import { MAX_INGEST_ITEM_BYTES, CLONE_WINDOW_MAX_BYTES } from '../util/ingest-limits';
 import type { IngestBatch } from '../types/session-sync';
@@ -2502,10 +2502,29 @@ export class SessionIngestDO extends DurableObject<Env> {
     );
   }
 
-  /** True when this object holds any item row or meta row. */
+  /**
+   * True when this object holds any row in any data table. The reset deletes the
+   * whole database irreversibly, so every table the schema defines is checked;
+   * only the migrator's bookkeeping table is excluded because it is not data.
+   */
   private hasAnyData(): boolean {
     if (this.hasItemRow()) return true;
-    return this.db.select({ key: ingestMeta.key }).from(ingestMeta).limit(1).get() !== undefined;
+    if (this.db.select({ key: ingestMeta.key }).from(ingestMeta).limit(1).get() !== undefined) {
+      return true;
+    }
+    if (
+      this.db.select({ session_id: sessions.session_id }).from(sessions).limit(1).get() !==
+      undefined
+    ) {
+      return true;
+    }
+    return (
+      this.db
+        .select({ identity: agentNotificationDispatch.identity })
+        .from(agentNotificationDispatch)
+        .limit(1)
+        .get() !== undefined
+    );
   }
 
   /**

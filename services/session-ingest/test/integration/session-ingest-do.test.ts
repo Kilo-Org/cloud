@@ -4976,4 +4976,72 @@ describe('SessionIngestDO raw row export', () => {
       'message/msg_kept',
     ]);
   });
+
+  it('never resets an object that holds only a session row', async () => {
+    const suffix = crypto.randomUUID().replaceAll('-', '');
+    const kiloUserId = `usr_raw_export_session_${suffix}`;
+    const sessionId = `ses_${suffix.slice(0, 26)}`;
+    const stub = getStub(kiloUserId, sessionId);
+
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.sql.exec("INSERT INTO sessions (session_id) VALUES ('legacy-session')");
+    });
+
+    const lines = parseNdjson(
+      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
+    );
+    expect(lines).toEqual([{ t: 'end', rows: 0 }]);
+
+    const rows = await runInDurableObject(stub, (_instance, state) => [
+      ...state.storage.sql.exec<{ session_id: string }>('SELECT session_id FROM sessions'),
+    ]);
+    expect(rows).toEqual([{ session_id: 'legacy-session' }]);
+  });
+
+  it('never resets an object that holds only a dispatch row', async () => {
+    const suffix = crypto.randomUUID().replaceAll('-', '');
+    const kiloUserId = `usr_raw_export_dispatch_${suffix}`;
+    const sessionId = `ses_${suffix.slice(0, 26)}`;
+    const stub = getStub(kiloUserId, sessionId);
+
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.sql.exec(
+        "INSERT INTO agent_notification_dispatch (identity, state, created_at) VALUES ('agent_notification/notification-1', 'pending', 1)"
+      );
+    });
+
+    const lines = parseNdjson(
+      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
+    );
+    expect(lines).toEqual([{ t: 'end', rows: 0 }]);
+
+    const rows = await runInDurableObject(stub, (_instance, state) => [
+      ...state.storage.sql.exec<{ identity: string }>(
+        'SELECT identity FROM agent_notification_dispatch'
+      ),
+    ]);
+    expect(rows).toEqual([{ identity: 'agent_notification/notification-1' }]);
+  });
+
+  it('stands the reset alarm down for an object that gained only a session row', async () => {
+    const suffix = crypto.randomUUID().replaceAll('-', '');
+    const kiloUserId = `usr_raw_export_session_alarm_${suffix}`;
+    const sessionId = `ses_${suffix.slice(0, 26)}`;
+    const stub = getStub(kiloUserId, sessionId);
+
+    const lines = parseNdjson(
+      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
+    );
+    expect(lines).toEqual([{ t: 'end', rows: 0, empty_cleanup_scheduled: true }]);
+
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.sql.exec("INSERT INTO sessions (session_id) VALUES ('legacy-session')");
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+
+    const rows = await runInDurableObject(stub, (_instance, state) => [
+      ...state.storage.sql.exec<{ session_id: string }>('SELECT session_id FROM sessions'),
+    ]);
+    expect(rows).toEqual([{ session_id: 'legacy-session' }]);
+  });
 });

@@ -372,6 +372,29 @@ const SECURITY_REMEDIATION_PUSH_HEAD = 'git*push';
 // A shell joins adjacent quoted pieces into one argument, so quoting changes how
 // one token is read and cannot be bounded by counting its pieces. A push whose
 // text carries either quote is therefore refused rather than classified.
+// The matcher normalizes a backslash to a slash, and a shell removes that
+// backslash before git runs the command, so a word split by an escape reaches a
+// rule as a slash inside the word. The subcommand words that carry a push or a
+// configuration write are a fixed list, so every split position of each is named
+// here; nothing outside that list can split a word into one of them.
+const SECURITY_REMEDIATION_SPLITTABLE_WORDS = [
+  'git',
+  'push',
+  'send-pack',
+  'receive-pack',
+  'config',
+] as const;
+
+const SECURITY_REMEDIATION_SPLIT_WORD_DENIED_PATTERNS =
+  SECURITY_REMEDIATION_SPLITTABLE_WORDS.flatMap(word =>
+    Array.from({ length: word.length - 1 }, (_, index) => {
+      const split = `${word.slice(0, index + 1)}/${word.slice(index + 1)}`;
+      // A split inside `git` itself would name the command root, so that one
+      // position keeps the generic head.
+      return split.startsWith('git/') ? '*git/*' : `*${split}*`;
+    })
+  );
+
 const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}* -*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*\t-*`,
@@ -386,16 +409,16 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}*/-*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*/+*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*/\n*`,
-  // The matcher normalizes a backslash to a slash in the subcommand word too, so
-  // a word split by a continuation reaches this rule as a slash before the end of
-  // the word.
-  'git pu/s*',
-  'git pus/h*',
+  // A continuation joins the command for the shell, and after normalization it
+  // is a slash before a newline at whatever offset it sits, so one rule covers
+  // every split position.
+  'git*/\n*',
   // The transport commands carry the same refspec and force options as the push
   // subcommand, and the plain push runs them, so the reachable push forms stay
   // the two plain subcommand forms below.
   'git*send-pack*',
   'git*receive-pack*',
+  ...SECURITY_REMEDIATION_SPLIT_WORD_DENIED_PATTERNS,
 ];
 
 // The repository's own directory name, written once as text and once for each
@@ -486,6 +509,12 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   ]),
   'git config *include*',
   'git -?* config *include*',
+  // A configuration read names one key and a write names the key and its value,
+  // so the write form is one rule whatever the key is called or however it is
+  // cased. The final `?` keeps the rule from ending in ` *`, which the builder
+  // would compile as an optional group that also matches the read form.
+  'git*config * *?',
+  'git*-?* config * *?',
   // The allowed search programs run another program or write a named file
   // through these options, so each is refused, as the review policy already does.
   'find *-exec*',

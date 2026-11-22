@@ -10,10 +10,7 @@ import {
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import {
-  normalizeInferenceProviderId,
-  normalizeInferenceProviderIds,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   VIRTUAL_PROVIDER,
   withoutVirtualProvider,

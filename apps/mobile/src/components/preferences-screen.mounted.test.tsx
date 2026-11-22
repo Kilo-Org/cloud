@@ -68,6 +68,9 @@ function settingsTargetAncestors(node: ReactTestInstance): ReactTestInstance[] {
   }
   return ancestors;
 }
+
+type SettingsTargetProps = { item: { id: string }; targetIds?: readonly string[] };
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('__DEV__', false);
@@ -180,13 +183,12 @@ describe('PreferencesScreen hub', () => {
     }
     const [controlTarget] = settingsTargetAncestors(control);
     expect(controlTarget, 'the appearance control renders without a SettingsTarget').toBeDefined();
+    const controlProps = controlTarget?.props as SettingsTargetProps | undefined;
     const options = control.props.options as { label: string }[];
     for (const option of options) {
       const setting = sourceByLabel.get(option.label);
       expect(setting, `"${option.label}" is not in the hub source`).toBeDefined();
-      expect([controlTarget?.props.item.id, ...(controlTarget?.props.targetIds ?? [])]).toContain(
-        setting?.id
-      );
+      expect([controlProps?.item.id, ...(controlProps?.targetIds ?? [])]).toContain(setting?.id);
     }
 
     // Nothing the index publishes is invisible: the navigation rows, the three
@@ -204,13 +206,13 @@ describe('PreferencesScreen hub', () => {
       new Set(source.settings.map(setting => i18n.t(setting.label)))
     );
 
-    const renderedIds = renderer.root
-      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
-      .flatMap(node => {
-        const item = node.props.item;
-        const aliases = (node.props.targetIds ?? []) as readonly string[];
-        return [item.id, ...aliases];
-      });
+    const renderedIds: string[] = [];
+    for (const target of renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'SettingsTarget'
+    )) {
+      const props = target.props as SettingsTargetProps;
+      renderedIds.push(props.item.id, ...(props.targetIds ?? []));
+    }
 
     expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
   });

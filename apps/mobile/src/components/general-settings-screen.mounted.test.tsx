@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { GeneralSettingsScreen } from '@/components/general-settings-screen';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
-import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
+import { expectRenderedSettingsTargets } from '@/test/settings-search-targets';
 
 vi.hoisted(() => {
   vi.stubGlobal('__DEV__', false);
@@ -402,18 +402,7 @@ describe('GeneralSettingsScreen', () => {
   });
 
   it('renders a search target for every indexed General row', async () => {
-    const renderer = await mountGeneral();
-    const source = PREFERENCE_SETTINGS_SOURCES.find(
-      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/general'
-    );
-    if (!source) {
-      throw new Error('general settings source missing');
-    }
-
-    const renderedIds = renderer.renderer.root
-      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
-      .map(node => node.props.item.id);
-
-    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
+    const { renderer } = await mountGeneral();
+    expectRenderedSettingsTargets(renderer, '/(app)/(tabs)/(3_profile)/general');
   });
 });

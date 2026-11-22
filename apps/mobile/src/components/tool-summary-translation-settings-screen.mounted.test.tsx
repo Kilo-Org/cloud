@@ -10,8 +10,8 @@ import {
 } from '@/components/tool-summary-translation-settings-screen.mounted.test-helpers';
 import { ToolSummaryTranslationSettingsScreen } from '@/components/tool-summary-translation-settings-screen';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
-import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { expectRenderedSettingsTargets } from '@/test/settings-search-targets';
 
 type PickerParams = {
   options: { id: string; name: string }[];
@@ -202,67 +202,48 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     expect(findQueryErrors(renderer)).toHaveLength(0);
   });
 
-  it('shows the error state with a working retry and keeps the switch enabled', async () => {
-    preference.enabled = true;
-    const refetch = vi.fn<() => void>();
-    modelsState.models = [];
-    modelsState.isError = true;
-    modelsState.refetch = refetch;
-    const renderer = await mountScreen();
+  it.each([
+    {
+      isError: true,
+      expected: { variant: 'server', title: 'Could not load models' },
+    },
+    {
+      isError: false,
+      expected: { title: 'No models available' },
+    },
+  ])(
+    'shows the query state with a working retry and keeps the switch enabled',
+    async ({ isError, expected }) => {
+      preference.enabled = true;
+      const refetch = vi.fn<() => void>();
+      modelsState.models = [];
+      modelsState.isError = isError;
+      modelsState.refetch = refetch;
+      const renderer = await mountScreen();
 
-    // The row is disabled and carries no failure copy: the state block below is
-    // the single message, so the same failure is never read twice.
-    expect(findConfigureRow(renderer, 'Model').props).toMatchObject({
-      subtitle: '—',
-      disabled: true,
-    });
-    expect(findPreferenceRow(renderer).props.disabled).toBe(false);
+      // The row is disabled and carries no failure copy: the state block below
+      // is the single message, so the same failure is never read twice.
+      expect(findConfigureRow(renderer, 'Model').props).toMatchObject({
+        subtitle: '—',
+        disabled: true,
+      });
+      expect(findPreferenceRow(renderer).props.disabled).toBe(false);
 
-    const [errorState] = findQueryErrors(renderer);
-    if (!errorState) {
-      throw new Error('QueryError not found');
+      const [stateNode] = findQueryErrors(renderer);
+      if (!stateNode) {
+        throw new Error('QueryError not found');
+      }
+      expect(stateNode.props).toMatchObject({
+        placement: 'top',
+        isRetrying: false,
+        ...expected,
+      });
+      act(() => {
+        (stateNode.props.onRetry as () => void)();
+      });
+      expect(refetch).toHaveBeenCalledTimes(1);
     }
-    expect(errorState.props).toMatchObject({
-      variant: 'server',
-      placement: 'top',
-      title: 'Could not load models',
-      isRetrying: false,
-    });
-    act(() => {
-      (errorState.props.onRetry as () => void)();
-    });
-    expect(refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows the empty state with a working retry and keeps the switch enabled', async () => {
-    preference.enabled = true;
-    const refetch = vi.fn<() => void>();
-    modelsState.models = [];
-    modelsState.refetch = refetch;
-    const renderer = await mountScreen();
-
-    // The row is disabled and carries no failure copy: the state block below is
-    // the single message, so the same failure is never read twice.
-    expect(findConfigureRow(renderer, 'Model').props).toMatchObject({
-      subtitle: '—',
-      disabled: true,
-    });
-    expect(findPreferenceRow(renderer).props.disabled).toBe(false);
-
-    const [emptyState] = findQueryErrors(renderer);
-    if (!emptyState) {
-      throw new Error('QueryError not found');
-    }
-    expect(emptyState.props).toMatchObject({
-      placement: 'top',
-      title: 'No models available',
-      isRetrying: false,
-    });
-    act(() => {
-      (emptyState.props.onRetry as () => void)();
-    });
-    expect(refetch).toHaveBeenCalledTimes(1);
-  });
+  );
 
   it('opens the model picker with the stored value and writes the picked model', async () => {
     preference.enabled = true;
@@ -355,18 +336,9 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
   });
 
   it('renders a search target for every indexed translation row', async () => {
-    const renderer = await mountScreen();
-    const source = PREFERENCE_SETTINGS_SOURCES.find(
-      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/tool-summary-translation'
+    expectRenderedSettingsTargets(
+      await mountScreen(),
+      '/(app)/(tabs)/(3_profile)/tool-summary-translation'
     );
-    if (!source) {
-      throw new Error('tool summary translation source missing');
-    }
-
-    const renderedIds = renderer.root
-      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
-      .map(node => node.props.item.id);
-
-    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
   });
 });

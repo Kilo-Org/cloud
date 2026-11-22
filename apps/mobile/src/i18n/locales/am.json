@@ -2177,7 +2177,7 @@
       "sectionAccessibility": "{{title}}: {{displayCount}} ክፍለ ጊዜዎች",
       "live": "ቀጥታ",
       "updating": "በማዘመን ላይ",
-      "retentionLimit": "የቅርብ ጊዜ ክፈለ ጊዜዎችዎን በማሳየት ላይ።"
+      "retentionLimit": "የቅርብ ጊዜ ክፍለ ጊዜዎችዎን በማሳየት ላይ።"
     },
     "sessionRow": {
       "deleteTitle": "ክፍለ ጊዜው ይሰረዝ?",

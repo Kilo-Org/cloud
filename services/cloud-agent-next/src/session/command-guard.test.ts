@@ -587,6 +587,11 @@ describe('security-remediation push command guard policy', () => {
       // A branch name that carries a dot, behind a global option, is refused
       // too, because a rule cannot tell that argument from a key.
       'git -C . switch -c release/1.2',
+      // The directory spelling of the configuration target, with a repeated or
+      // a dot separator. The shell resolves both to the same file.
+      'echo "[alias]" >> .git//config',
+      'cp /tmp/evil .git//config',
+      'mv /tmp/evil .git/./config',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }

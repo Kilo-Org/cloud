@@ -9,13 +9,19 @@ import {
   HOST_PAGE,
   SCRIPT_FILE_NAME,
 } from '../../../mobile/src/components/agents/markdown-mermaid-host';
+import { darkPieThemeVariables } from '../../../mobile/src/components/agents/mermaid-pie-theme';
 
 const IMAGE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="blue"/></svg>';
 const DATA_IMAGE = `data:image/svg+xml;base64,${Buffer.from(IMAGE_SVG).toString('base64')}`;
 
 type HostWindow = typeof window & {
-  kiloRenderDiagram: (diagram: { source: string; dark: boolean; background: string }) => void;
+  kiloRenderDiagram: (diagram: {
+    source: string;
+    dark: boolean;
+    background: string;
+    themeVariables?: Record<string, string>;
+  }) => void;
   ReactNativeWebView: { postMessage: (message: string) => void };
   diagramMessages: Array<{ kind: string; height?: number; source?: string }>;
   policyViolations: Array<{ directive: string; blockedURI: string }>;
@@ -207,6 +213,62 @@ test('renders a data image shape', async ({ page, host }) => {
       elements.map(element => element.getAttribute('href') ?? element.getAttribute('xlink:href'))
     )
   ).toEqual([DATA_IMAGE]);
+  expect(host.requests).toEqual([]);
+});
+
+// The page applies `themeVariables` to `mermaid.initialize`, which is the branch
+// that makes a pie slice visible: without it Mermaid's dark theme paints the
+// first slice and its legend swatch near the page colour. This case renders the
+// real page and reads the fills back, so a dropped spread or a map passed under
+// the wrong key fails here instead of regressing silently.
+test('applies the dark pie theme to the rendered slices and legend', async ({ page, host }) => {
+  const variables = darkPieThemeVariables();
+  await page.evaluate(themeVariables => {
+    (window as HostWindow).kiloRenderDiagram({
+      source: 'pie title Status\n  "Working" : 3\n  "Idle" : 5',
+      dark: true,
+      background: '#0E0E10',
+      themeVariables,
+    });
+  }, variables);
+  await expectRenderedDiagram(page);
+
+  // Slices paint in descending value, so "Idle" (5) takes pie1 and "Working" (3)
+  // takes pie2. The legend keeps the diagram's own order, so a swatch is matched
+  // to its slice by label, not by index. The renderer writes the swatch as a
+  // style, which the browser normalises to `rgb(...)`, so both reads are
+  // compared as colours rather than as strings.
+  const readback = await page.evaluate(() => {
+    const toHex = (value: string) => {
+      const probe = document.createElement('span');
+      probe.style.color = value;
+      document.body.append(probe);
+      const computed = getComputedStyle(probe).color;
+      probe.remove();
+      const parts = /(\d+)\D+(\d+)\D+(\d+)/.exec(computed);
+      return parts === null
+        ? computed
+        : `#${[parts[1], parts[2], parts[3]]
+            .map(channel => Number(channel).toString(16).padStart(2, '0'))
+            .join('')
+            .toUpperCase()}`;
+    };
+    return {
+      sliceFills: [...document.querySelectorAll('#d path.pieCircle')].map(slice =>
+        toHex(slice.getAttribute('fill') ?? '')
+      ),
+      swatches: [...document.querySelectorAll('#d g.legend')].map(entry => ({
+        label: entry.querySelector('text')?.textContent ?? '',
+        fill: toHex((entry.querySelector('rect') as SVGElement | null)?.style.fill ?? ''),
+      })),
+    };
+  });
+
+  expect(readback.sliceFills).toEqual([variables.pie1, variables.pie2]);
+  expect(readback.swatches).toEqual([
+    { label: 'Working', fill: variables.pie2 },
+    { label: 'Idle', fill: variables.pie1 },
+  ]);
   expect(host.requests).toEqual([]);
 });
 

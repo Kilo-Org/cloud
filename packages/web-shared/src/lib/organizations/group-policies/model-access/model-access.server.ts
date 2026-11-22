@@ -73,7 +73,7 @@ export function evaluateEffectiveModelAccessPolicy(
     policyRevision: context.policyRevision,
     customLlmGrantee: {
       organizationId: context.organization.id,
-      groupIds: context.groupIds,
+      groupIds: context.groups.map(group => group.id),
     },
   };
   if (!organizationRestrictionsEnabled) {
@@ -85,8 +85,8 @@ export function evaluateEffectiveModelAccessPolicy(
   }
 
   const defaultPolicy = context.defaultPolicies.find(policy => policy.type === 'model_access');
-  const groupPolicies = context.groupPolicies
-    .flat()
+  const groupPolicies = context.groups
+    .flatMap(group => group.policies)
     .filter(policy => policy.type === 'model_access');
   const includeOrganizationBaseline =
     !defaultPolicy ||

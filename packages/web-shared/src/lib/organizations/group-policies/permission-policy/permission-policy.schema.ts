@@ -66,6 +66,12 @@ export const OrganizationPermissionPolicySchema = OrganizationGroupAgentPermissi
 
 export type OrganizationPermissionPolicy = z.infer<typeof OrganizationPermissionPolicySchema>;
 
+export function isOrganizationPermissionPolicyType(
+  type: string
+): type is z.infer<typeof OrganizationPermissionPolicyTypeSchema> {
+  return OrganizationPermissionPolicyTypeSchema.safeParse(type).success;
+}
+
 export const permissionPolicyEnvelope = z.strictObject({
   schema_version: z.literal(1),
   organization_id: z.guid(),

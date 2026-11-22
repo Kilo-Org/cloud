@@ -6614,9 +6614,9 @@ describe('Enkrypt input guardrail', () => {
     const otherGroupId = '00000000-0000-4000-8000-0000000000a2';
 
     function memberOf(groupIds: string[]) {
-      jest
-        .mocked(getOrganizationGroupPolicyContext)
-        .mockResolvedValueOnce({ groupIds } as unknown as OrganizationGroupPolicyContext);
+      jest.mocked(getOrganizationGroupPolicyContext).mockResolvedValueOnce({
+        groups: groupIds.map(id => ({ id, policies: [] })),
+      } as unknown as OrganizationGroupPolicyContext);
     }
 
     it('makes no Enkrypt call for a member outside the group', async () => {

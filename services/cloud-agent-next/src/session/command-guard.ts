@@ -470,6 +470,12 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
     `${tool} * c?nfig`,
     `${tool} * "con"*`,
     `${tool} * 'con'*`,
+    // The whole target quoted.
+    `${tool} * "config"*`,
+    `${tool} * 'config'*`,
+    `${tool} * "confi?"*`,
+    `${tool} * 'confi?'*`,
+    `${tool} * "con?ig"*`,
   ]),
   // The subcommand form compares a key without regard to case, so a rule names
   // the upper-case spelling as well as the lower-case one. The `include` key

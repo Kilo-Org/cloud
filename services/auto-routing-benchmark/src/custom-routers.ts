@@ -639,6 +639,17 @@ export async function assembleCustomRouterTable(
       ...clientEntries.flatMap(c => c.summaries),
     ],
     perCaseResults: [...platformCasesOut, ...linkedEntries.flatMap(c => c.cases), ...clientCases],
+    // The deployed build fed case rows in entry-resolution order, so a variant tie resolves to
+    // the catalog's first declared variant. Reproduce that order instead of sorting by name:
+    // a pool whose served candidates never moved must not gain a different effort.
+    casePairOrder: [
+      ...platformReady.map(ready => ({
+        model: ready.entry.model,
+        variant: ready.measured.variant,
+      })),
+      ...linkedEntries.map(linked => linked.ready.entry),
+      ...clientEntries.map(client => client.ready.entry),
+    ],
     complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
   });
   return {

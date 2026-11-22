@@ -1,7 +1,6 @@
 {
   "_provenance": {
     "commit": "0487d998b60cbea224bf7ed69d5f6b6353b93de4",
-    "pool": ["vendor/aaa", "vendor/variants", "vendor/zzz"],
     "generator": "services/auto-routing-benchmark/scripts/render-deployed-custom-table.ts"
   },
   "table": {
@@ -175,6 +174,252 @@
           "variant": null
         }
       ]
+    }
+  },
+  "effort": {
+    "pool": ["vendor/aaa", "vendor/variants", "vendor/variants-rev", "vendor/zzz"],
+    "table": {
+      "version": "registry-98f93c27",
+      "minAccuracy": 0.7,
+      "accuracyNoiseBand": 0.05,
+      "switchCostFactor": 3,
+      "bestAccuracySwitchThreshold": 0.05,
+      "productionTokenProfile": null,
+      "effortByComplexity": {
+        "implementation/code_generation": {
+          "vendor/aaa": {
+            "low": null,
+            "medium": null,
+            "high": null
+          },
+          "vendor/variants": {
+            "low": "high",
+            "medium": "high",
+            "high": "high"
+          },
+          "vendor/variants-rev": {
+            "low": "low",
+            "medium": "high",
+            "high": "low"
+          },
+          "vendor/zzz": {
+            "low": null,
+            "medium": null,
+            "high": null
+          }
+        },
+        "planning_design/technical_planning": {
+          "vendor/aaa": {
+            "low": null,
+            "medium": null,
+            "high": null
+          },
+          "vendor/variants": {
+            "low": "high",
+            "medium": "high",
+            "high": "high"
+          },
+          "vendor/variants-rev": {
+            "low": "high",
+            "medium": "high",
+            "high": "high"
+          },
+          "vendor/zzz": {
+            "low": null,
+            "medium": null,
+            "high": null
+          }
+        }
+      },
+      "switchHorizonTurns": null,
+      "lowConfidenceThreshold": null,
+      "source": "benchmark",
+      "routes": {
+        "implementation/code_generation": [
+          {
+            "model": "vendor/aaa",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": null
+          },
+          {
+            "model": "vendor/variants",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": "high"
+          },
+          {
+            "model": "vendor/variants",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": "low"
+          },
+          {
+            "model": "vendor/variants-rev",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": "high"
+          },
+          {
+            "model": "vendor/variants-rev",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": "low"
+          },
+          {
+            "model": "vendor/zzz",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": null
+          }
+        ],
+        "planning_design/technical_planning": [
+          {
+            "model": "vendor/aaa",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": null
+          },
+          {
+            "model": "vendor/variants",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": "high"
+          },
+          {
+            "model": "vendor/variants",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": "low"
+          },
+          {
+            "model": "vendor/variants-rev",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": "high"
+          },
+          {
+            "model": "vendor/variants-rev",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": "low"
+          },
+          {
+            "model": "vendor/zzz",
+            "accuracy": 0.9,
+            "cases": 20,
+            "avgCostUsd": 0.001,
+            "meetsThreshold": true,
+            "pricing": {
+              "promptUsdPerToken": 0.000001,
+              "completionUsdPerToken": 0.000002,
+              "cacheReadUsdPerToken": null
+            },
+            "estimatedRequestCostUsd": 0.001,
+            "p50LatencyMs": 800,
+            "variant": null
+          }
+        ]
+      }
     }
   }
 }

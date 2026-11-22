@@ -337,13 +337,43 @@ function canonicalSummaryOrder(
 }
 
 /**
- * Order case results as the deployed projection emitted them: by measured pair,
- * then case id and repetition (`case_results` primary key order).
+ * Order case results as the deployed projection emitted them.
+ *
+ * The deployed assembly handed `buildEffortByComplexity` the case rows in entry-resolution order:
+ * each pool entry contributed its catalog's variant list in declaration order, and the reader
+ * returned one pair per measured row. A tied variant pair therefore resolved to the variant the
+ * catalog declared first, which is not the same as the variant name that sorts first. Sorting by
+ * identity alone would silently change `effortByComplexity` for a pool whose served candidates
+ * never moved, so pairs follow `order` — the caller's resolved pair sequence — and case ids and
+ * repetitions within a pair follow `case_results` primary-key order.
+ *
+ * `order` is a property of the resolved entries, not of the caller's array: a pair it does not
+ * name sorts after the named ones by its own key, so no input ordering can decide a tie.
  */
-function canonicalCaseOrder(pairs: OfflineSweep['pairs']): OfflineSweep['pairs'] {
+function canonicalCaseOrder(
+  pairs: OfflineSweep['pairs'],
+  order?: readonly BenchmarkPair[]
+): OfflineSweep['pairs'] {
+  const position = new Map<string, number>();
+  for (const pair of order ?? []) {
+    const key = benchmarkPairKey(pair);
+    if (!position.has(key)) position.set(key, position.size);
+  }
+  const last = Number.MAX_SAFE_INTEGER;
   return pairs
-    .map(pair => ({ pair, key: `${pair.model}\u0000${pair.variant ?? ''}` }))
-    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map((pair, index) => {
+      const key = benchmarkPairKey(pair);
+      return { pair, index, key, rank: position.get(key) ?? last };
+    })
+    .sort((a, b) =>
+      a.rank !== b.rank
+        ? a.rank - b.rank
+        : a.key !== b.key
+          ? a.key < b.key
+            ? -1
+            : 1
+          : a.index - b.index
+    )
     .map(({ pair }) => ({
       ...pair,
       results: [...pair.results].sort((a, b) =>
@@ -374,6 +404,12 @@ export function buildCustomRoutingTable(params: {
   lowConfidenceThreshold?: number | null;
   prices?: ReadonlyMap<string, CandidatePricing | null>;
   perCaseResults?: OfflineSweep['pairs'];
+  /**
+   * The measured pairs in entry-resolution order, which is what the deployed assembly fed the
+   * effort builder. Ties between variants of one model resolve to the first pair here, so this
+   * sequence — not the case-array order and not variant-name order — decides `effortByComplexity`.
+   */
+  casePairOrder?: readonly BenchmarkPair[];
   complexityLabels?: ComplexityLabels;
   /** Ready profiles with provenance run ids. */
   readyEntries: readonly {
@@ -436,7 +472,7 @@ export function buildCustomRoutingTable(params: {
     params.perCaseResults && params.complexityLabels
       ? buildEffortByComplexity(
           routes,
-          canonicalCaseOrder(params.perCaseResults),
+          canonicalCaseOrder(params.perCaseResults, params.casePairOrder),
           params.complexityLabels,
           minAccuracy,
           params.productionTokenProfile ?? null,

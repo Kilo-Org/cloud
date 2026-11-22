@@ -3,12 +3,19 @@
  * 0487d998b60cbea224bf7ed69d5f6b6353b93de4) published, and proves the builder no
  * longer lets a caller's row order decide tied candidates.
  *
- * The golden file `test/fixtures/custom-table-deployed-0487d998.json` is not
- * hand-written: it was rendered from the deployed code through the full
- * `assembleCustomRouterTable` path (catalog fetch, DB readers, builder) over the
- * SAME seeded SQLite fixture this test uses, whose rows are inserted in a fixed
- * shuffled order so no table is stored in primary-key order. Regenerate it on a
- * VM from a checkout of this repository:
+ * Two documents are pinned from that one golden file, both rendered through the
+ * full `assembleCustomRouterTable` path (catalog fetch, DB readers, builder) over
+ * a seeded SQLite fixture whose rows are inserted in a fixed shuffled order so no
+ * table is stored in primary-key order:
+ *
+ *   - `table`: `CANONICAL_POOL` over `FIXTURE_PAIRS`, the routes/order golden.
+ *   - `effort`: `EFFORT_POOL` over `EFFORT_PAIRS`, whose models declare their
+ *     catalog variants in both orders. A tie between two variants of one model
+ *     must resolve to the variant the catalog declares FIRST, which is what the
+ *     deployed build published; resolving it by variant-name order flips it while
+ *     every served route stays identical, so `routes` alone cannot catch it.
+ *
+ * Regenerate the golden on a VM from a checkout of this repository:
  *
  *   git archive 0487d998 services/auto-routing-benchmark packages/auto-routing-contracts \
  *     | tar -x -C <scratch>            # deployed source tree
@@ -30,6 +37,8 @@ import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import {
   CANONICAL_POOL,
   DEPLOYED_COMMIT,
+  EFFORT_PAIRS,
+  EFFORT_POOL,
   FIXTURE_COMPLEXITY_LABELS,
   FIXTURE_CONFIG,
   FIXTURE_SOURCE,
@@ -50,8 +59,11 @@ const GOLDEN_PATH = decodeURIComponent(
 );
 
 type Golden = {
-  _provenance: { commit: string; pool: readonly string[] };
+  _provenance: { commit: string; generator: string };
+  /** The routes/order golden for `CANONICAL_POOL`. */
   table: unknown;
+  /** The `effortByComplexity` golden for a pool whose variant declaration order is not sorted. */
+  effort: { pool: readonly string[]; table: unknown };
 };
 
 const golden: Golden = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8'));
@@ -160,5 +172,55 @@ describe('assembled custom table matches the deployed build', () => {
       );
       expect(JSON.stringify(withoutGeneratedAt(table))).toBe(JSON.stringify(golden.table));
     }
+  });
+});
+
+describe('effort resolution matches the deployed build', () => {
+  // A tie between two variants of one model resolves to the variant the pool entry's catalog
+  // declares first. The deployed build fed the effort builder one pair per resolved variant in
+  // that declaration order; a variant-name sort resolves the same tie to the other variant while
+  // every served route stays byte-identical. `vendor/variants-rev` declares `low` before `high`,
+  // so it is the shape that separates the two rules.
+  async function render(pool: readonly string[], pairs: typeof EFFORT_PAIRS) {
+    const sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    seedCustomTableFixture(sqlite, pairs);
+    const { table } = await assembleCustomRouterTable(
+      sqliteD1(sqlite),
+      FIXTURE_CONFIG,
+      fixtureContext(pool),
+      FIXTURE_SOURCE
+    );
+    expect(table).not.toBeNull();
+    return withoutGeneratedAt(table) as {
+      routes: Record<string, Array<{ model: string; variant: string | null }>>;
+      effortByComplexity: Record<string, Record<string, Record<string, string | null>>>;
+    };
+  }
+
+  it('renders the deployed effort golden byte for byte', async () => {
+    const table = await render(EFFORT_POOL, EFFORT_PAIRS);
+    expect(JSON.stringify(table)).toBe(JSON.stringify(golden.effort.table));
+  });
+
+  it('resolves a variant tie to the variant the catalog declares first', async () => {
+    const table = await render(EFFORT_POOL, EFFORT_PAIRS);
+    // The deployed build published `low` for this model: its catalog lists `low` first, even
+    // though `high` sorts first.
+    expect(
+      table.effortByComplexity['implementation/code_generation']?.['vendor/variants-rev']
+    ).toEqual({ low: 'low', medium: 'high', high: 'low' });
+    // The other declaration order resolves the opposite way, so this is not a constant.
+    expect(table.effortByComplexity['implementation/code_generation']?.['vendor/variants']).toEqual(
+      { low: 'high', medium: 'high', high: 'high' }
+    );
+  });
+
+  it('serves both variants of the tied model regardless of which one wins the effort tie', async () => {
+    const table = await render(EFFORT_POOL, EFFORT_PAIRS);
+    const served = table.routes['implementation/code_generation']
+      ?.filter(candidate => candidate.model === 'vendor/variants-rev')
+      .map(candidate => candidate.variant);
+    expect(served).toEqual(['high', 'low']);
   });
 });

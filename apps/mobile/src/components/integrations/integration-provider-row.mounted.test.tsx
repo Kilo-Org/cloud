@@ -249,17 +249,18 @@ describe('IntegrationProviderRow action cell', () => {
     expect(calls.connect).not.toHaveBeenCalled();
   });
 
-  it.each<[IntegrationScope, string | undefined, boolean, string]>([
+  it.each<[IntegrationScope, string | undefined, boolean]>([
     // Personal scope belongs to the viewer, so the settled row offers Disconnect:
     // the placeholder reserves that compact `sm` frame and marks the line.
-    ['personal', undefined, true, TEXT_ACTION_SKELETON_CLASS],
+    ['personal', undefined, true],
     // A plain organization member may not disconnect, so every settled branch
     // resolves to no cell: the placeholder takes the row's 27pt content band.
-    ['organization', 'member', false, TEXT_ACTION_PENDING_BAND_CLASS],
+    ['organization', 'member', false],
   ])(
     'holds the action cell while the connections read has not landed (%s)',
-    async (scope, role, trailingIsTarget, skeletonClass) => {
+    async (scope, role, withCell) => {
       const root = renderRow({ row: integrationRow({ actionPending: true }), scope, role });
+      const skeletonClass = withCell ? TEXT_ACTION_SKELETON_CLASS : TEXT_ACTION_PENDING_BAND_CLASS;
 
       expect(controls(root)).toHaveLength(0);
       expect(root.findAllByType('Skeleton')).toHaveLength(1);
@@ -268,12 +269,11 @@ describe('IntegrationProviderRow action cell', () => {
       // would reserve 31.5pt. A cell that lands is the compact button, so its
       // placeholder holds that same height; a row that settles with no cell
       // holds the content band instead: `48 - 2 * 10.5 = 27pt`.
-      expect(await compiledBoxHeight(skeletonClass)).toBe(
-        trailingIsTarget ? await compiledBoxHeight(COMPACT_BUTTON_CLASS) : 27
-      );
+      const settled = withCell ? await compiledBoxHeight(COMPACT_BUTTON_CLASS) : 27;
+      expect(await compiledBoxHeight(skeletonClass)).toBe(settled);
       // Only a row that will host a cell marks its stacked line: a stacked frame
       // hosts the cell at the target so Android delivers its reach.
-      expect(sharedRow(root).props.trailingIsTarget).toBe(trailingIsTarget);
+      expect(sharedRow(root).props.trailingIsTarget).toBe(withCell);
     }
   );
 

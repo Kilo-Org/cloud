@@ -1,12 +1,13 @@
 /**
  * What the row under the file-name field shows, and how the preview inside it is
- * cut. The row is reserved at one line of the catalog's preview copy, so the
- * preview must stay inside that one line; the preview carries the only new
- * information on the line, so it is cut in the middle rather than at its tail,
- * which would hide the end of the name a save writes. These cases pin one
- * preview line cut in the middle plus its one-line reserve, and the rule the
- * name field states as its own error while the fold leaves nothing to store,
- * with Done dimmed for it.
+ * cut. The row exists only while a save would store a different slug, so every
+ * other state leaves the section gap between the name field and the content
+ * label untouched; the preview carries the only new information on that row, so
+ * it is cut in the middle rather than at its tail, which would hide the end of
+ * the name a save writes. These cases pin one mounted preview line cut in the
+ * middle and its absence in the other states, and the rule the name field states
+ * as its own error while the fold leaves nothing to store, with Done dimmed for
+ * it.
  */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -128,41 +129,45 @@ describe('InstructionFormSheet file-name line', () => {
       name: 'release-notes-for-the-nightly-dependency-upgrade-reviewer-with-extra-words',
     });
     const line = findAll(renderer.root, 'Text').filter(node => node.props.children === previewCopy);
-    // The reserve and the painted preview: exactly the two nodes the row spends
-    // on its one line.
-    expect(line).toHaveLength(2);
-
-    const painted = line.filter(node => node.props.ellipsizeMode === 'middle');
-    expect(painted).toHaveLength(1);
-    expect(painted[0]?.props.numberOfLines).toBe(1);
+    // Exactly the one node the row spends on its single line.
+    expect(line).toHaveLength(1);
+    expect(line[0]?.props.ellipsizeMode).toBe('middle');
+    expect(line[0]?.props.numberOfLines).toBe(1);
 
     unmount();
   });
 
-  it('reserves the row at one text line of the preview copy in every state', async () => {
+  it('mounts the preview row only for a name a save would rewrite', async () => {
     const { renderer, unmount } = await mountSheet();
 
-    // Blank, a name that saves as typed, and a name with nothing left after the
-    // fold: all three keep the same one-line reserve, and the reserve always
-    // carries the preview sentence rather than the longer rule.
-    const states: readonly (readonly [typed: string, slug: string])[] = [
-      ['', ''],
-      ['release-notes', ''],
+    // Only a name a save would rewrite gets a row. Every other state renders no
+    // preview and no placeholder, so the gap between the name field's own error
+    // and the content label stays the form's section gap.
+    const states: readonly (readonly [typed: string, slug: string | null])[] = [
+      ['', null],
+      ['release-notes', null],
+      ['पुणे कार्यालय नियम', null],
       ['Release Notes', 'release-notes'],
-      ['पुणे कार्यालय नियम', ''],
     ];
     for (const [typed, slug] of states) {
       typeName(renderer.root, typed);
 
-      const reserve = findAll(renderer.root, 'Text').filter(
-        node => node.props.pointerEvents === 'none' && node.props.importantForAccessibility
+      // The preview row is the one single-line, middle-cut line under the
+      // field. A blank name, a name that saves as typed and an unusable name
+      // render none of it, so no blank line separates the field from the label
+      // below.
+      const rows = findAll(renderer.root, 'Text').filter(
+        node => node.props.ellipsizeMode === 'middle'
       );
-      expect(reserve).toHaveLength(1);
-      expect(reserve[0]?.props.numberOfLines).toBe(1);
-      expect(reserve[0]?.props.className).toContain('opacity-0');
-      expect(reserve[0]?.props.children).toBe(
-        i18n.t('profiles.instructionNamePreview', { name: slug })
-      );
+      if (slug === null) {
+        expect(rows).toHaveLength(0);
+      } else {
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.props.numberOfLines).toBe(1);
+        expect(rows[0]?.props.children).toBe(
+          i18n.t('profiles.instructionNamePreview', { name: slug })
+        );
+      }
     }
 
     unmount();

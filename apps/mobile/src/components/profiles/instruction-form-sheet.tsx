@@ -57,53 +57,26 @@ type InstructionFormSheetProps = Readonly<{
 }>;
 
 type InstructionNameHintLineProps = Readonly<{
-  hint: InstructionNameHint;
+  slug: string;
 }>;
 
 /**
- * The line under the name field: the slug a save will store, in one line. The
- * row is reserved at exactly one line of this catalog's preview copy, with a
- * transparent copy in native layout, so the content field below never moves
- * while the name is typed and the row keeps no second line when it has nothing
- * to show. The rule a name must follow is the name field's own error while the
- * fold leaves nothing to store, so it is not stated here.
+ * The line under the name field: the slug a save will store, in one line. It is
+ * mounted only while there is such a slug, so every state without one leaves
+ * the section gap between the name field and the content label exactly as wide
+ * as the form's own. The preview carries the only information on the line, so
+ * it stays one line and its ellipsis sits in the middle, the app's treatment for
+ * an identifier: both ends of the stored file name stay readable, including in
+ * the catalogs that put the slug last. The rule a name must follow is the name
+ * field's own error while the fold leaves nothing to store, so it is not stated
+ * here.
  */
-function InstructionNameHintLine({ hint }: InstructionNameHintLineProps) {
+function InstructionNameHintLine({ slug }: InstructionNameHintLineProps) {
   const { t } = useTranslation();
-  // The sentence the row paints. A name that is blank or already a slug has no
-  // preview to paint, so the reserve carries the same catalog sentence with no
-  // name folded into it: one line of this catalog's copy either way.
-  const preview = t('profiles.instructionNamePreview', {
-    name: hint.kind === 'preview' ? hint.slug : '',
-  });
   return (
-    <View>
-      {/* The preview sentence holds the row's height in native layout, invisible
-          and cut to one line, so the row is one text line in every state and
-          every script: the reserved height is the catalog's own copy, not a
-          number of wrapped lines. A long slug cannot grow it, and no state
-          leaves a second empty line between the field and the label below. */}
-      <Text
-        className="text-xs opacity-0"
-        numberOfLines={1}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        pointerEvents="none"
-      >
-        {preview}
-      </Text>
-      {hint.kind === 'preview' ? (
-        <View className="absolute inset-x-0 top-0">
-          {/* The preview carries the only information on the line, so it stays
-              one line and its ellipsis sits in the middle, the app's treatment
-              for an identifier: both ends of the stored file name stay
-              readable, including in the catalogs that put the slug last. */}
-          <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
-            {preview}
-          </Text>
-        </View>
-      ) : null}
-    </View>
+    <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
+      {t('profiles.instructionNamePreview', { name: slug })}
+    </Text>
   );
 }
 
@@ -272,14 +245,16 @@ export function InstructionFormSheet({
             }
           }}
         />
-        {/* The one preview line under the name field, always mounted at one text
-            line of this catalog's preview copy, so the content field never moves
-            while a name is typed and no state leaves a second empty line. A name
-            that is blank or saves as typed leaves the row blank instead of
-            removing it. The rule is the field's own error, not this row's. */}
-        <View className="-mt-2">
-          <InstructionNameHintLine hint={nameHint} />
-        </View>
+        {/* The preview line under the name field, mounted only while a save
+            would store another slug. A blank name, a name that saves as typed
+            and a name the fold cannot use all render nothing here, so the gap
+            between this field's own error and the content label is the form's
+            section gap in every state instead of a blank reserved line. */}
+        {nameHint.kind === 'preview' ? (
+          <View className="-mt-2">
+            <InstructionNameHintLine slug={nameHint.slug} />
+          </View>
+        ) : null}
         <FormField
           label={t('profiles.instructionContentLabel')}
           defaultValue={contentRef.current}

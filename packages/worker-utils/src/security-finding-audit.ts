@@ -469,6 +469,18 @@ const DISALLOWED_AUDIT_JSON_KEY_PHRASES = [
   'credential',
   'headers',
   'raw_error',
+  'passphrase',
+  'api_key',
+  'api_keys',
+  'private_key',
+  'private_keys',
+  'access_key',
+  'access_keys',
+  'signing_key',
+  'signing_keys',
+  'encryption_key',
+  'encryption_keys',
+  'pat',
 ] as const;
 
 const DISALLOWED_AUDIT_JSON_KEY_PATTERN = new RegExp(
@@ -480,6 +492,10 @@ const DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS: Record<string, true> = {};
 for (const phrase of DISALLOWED_AUDIT_JSON_KEY_PHRASES) {
   DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[phrase.replace(/_/g, '')] = true;
 }
+
+// A key built only from these tokens carries no qualifier. A qualified name
+// such as `dedupeKey` states what the key identifies and stays accepted.
+const BARE_AUDIT_JSON_KEY_TOKENS: Record<string, true> = { key: true, keys: true };
 
 function auditJsonKeyTokens(key: string): string[] {
   return key
@@ -496,6 +512,9 @@ function isDisallowedAuditJsonKey(key: string): boolean {
   if (DISALLOWED_AUDIT_JSON_KEY_PATTERN.test(key)) return true;
 
   const tokens = auditJsonKeyTokens(key);
+  if (tokens.length > 0 && tokens.every(token => BARE_AUDIT_JSON_KEY_TOKENS[token] === true)) {
+    return true;
+  }
   for (let index = 0; index < tokens.length; index += 1) {
     const single = DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[tokens[index]] === true;
     const pair =

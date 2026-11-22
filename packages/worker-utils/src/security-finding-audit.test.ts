@@ -241,6 +241,35 @@ describe('security finding audit contract', () => {
       'ssoToken',
       'accessToken2',
       'Cookie2Jar',
+      'apiKey',
+      'api_key',
+      'api-key',
+      'X-Api-Key',
+      'API_KEY',
+      'apikey',
+      'apiKeys',
+      'privateKey',
+      'private_key',
+      'private-key',
+      'privatekey',
+      'privateKeys',
+      'accessKey',
+      'access_key',
+      'accessKeys',
+      'signingKey',
+      'signing_key',
+      'encryptionKey',
+      'encryption_key',
+      'userPassphrase',
+      'passphrase',
+      'githubPat',
+      'github_pat',
+      'patToken',
+      'pat',
+      'key',
+      'keys',
+      'key_key',
+      'Key',
     ];
 
     for (const key of disallowedKeys) {
@@ -285,6 +314,35 @@ describe('security finding audit contract', () => {
 
     expect(() =>
       buildSecurityFindingAuditLogValues({ ...baseInput, metadata: { access2Token: 'abc' } })
+    ).toThrow(/Audit JSON field is not allowed/);
+  });
+
+  it('accepts qualified compound field names', () => {
+    const allowedKeys = [
+      'findingKey',
+      'dedupeKey',
+      'keyId',
+      'keyCount',
+      'keyName',
+      'keyPath',
+      'publicKey',
+      'keyboard',
+      'monkey',
+      'patch',
+      'patchVersion',
+      'pattern',
+      'keystore',
+      'compat',
+    ];
+
+    for (const key of allowedKeys) {
+      expect(
+        buildSecurityFindingAuditLogValues({ ...baseInput, metadata: { [key]: 'value' } })
+      ).toBeDefined();
+    }
+
+    expect(() =>
+      buildSecurityFindingAuditLogValues({ ...baseInput, metadata: { nested: { key: 'value' } } })
     ).toThrow(/Audit JSON field is not allowed/);
   });
 

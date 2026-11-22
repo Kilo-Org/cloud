@@ -23,6 +23,12 @@ export type TerminalBenchSummaries = ReadonlyMap<string, TerminalBenchSummary>;
  * The terminal-bench view is derived from the model-stats snapshot, so one cached read and
  * `invalidateModelStatsCache` govern it together with the enkrypt publication.
  * `customLlmIds` holds lowercased custom LLM ids, whose results are never published.
+ *
+ * The summaries are not gated on `isModelStatsSnapshotFresh`, unlike the enkrypt publication. An
+ * enkrypt score carries a verification record and its own freshness stamps, so serving it from a
+ * superseded generation would publish a freshness claim the data no longer supports. These two
+ * numbers carry no such claim: they annotate a catalog entry for display, and a failed reload keeps
+ * serving the last known-good scores rather than stripping every entry's benchmark data.
  */
 export function summarizeTerminalBench(
   entries: readonly ModelStatsCacheEntry[],

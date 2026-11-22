@@ -64,31 +64,45 @@ type InstructionNameHintLineProps = Readonly<{
 
 /**
  * The one line under the name field: the slug a save will store, or the rule a
- * name must follow when the fold leaves nothing to store. It renders nothing
- * for a name that saves as typed, and it stays quiet while the field's own
- * error states the same sentence, so the rule is never read twice. The rule
- * goes through `AccessibleStatus`, so a reader using a screen reader hears it
- * while typing instead of at Save.
+ * name must follow when the fold leaves nothing to store. The row keeps one
+ * text line's height in every state, with no copy or a transparent copy, so the
+ * content field below never moves while the name is typed. The rule goes
+ * through `AccessibleStatus`, so a reader using a screen reader hears it while
+ * typing instead of at Save, and it stays quiet while the field's own error
+ * already states the same sentence.
  */
 function InstructionNameHintLine({ hint, nameError }: InstructionNameHintLineProps) {
   const { t } = useTranslation();
-  if (hint.kind === 'preview') {
-    return (
-      <Text variant="muted" className="text-xs">
-        {t('profiles.instructionNamePreview', { name: hint.slug })}
+  const shown = hint.kind === 'preview' || (hint.kind === 'rule' && nameError === undefined);
+  return (
+    <View>
+      {/* The reserved copy is the longest of the two shown lines and stays
+          mounted, so the row's height never depends on which line shows. */}
+      <Text
+        className="w-full shrink-0 text-xs opacity-0"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
+      >
+        {t('profiles.instructionNameInvalid')}
       </Text>
-    );
-  }
-  if (hint.kind === 'rule' && nameError === undefined) {
-    return (
-      <AccessibleStatus
-        message={t('profiles.instructionNameInvalid')}
-        tone="status"
-        className="text-xs"
-      />
-    );
-  }
-  return null;
+      {shown ? (
+        <View className="absolute inset-x-0 top-0">
+          {hint.kind === 'preview' ? (
+            <Text variant="muted" className="text-xs">
+              {t('profiles.instructionNamePreview', { name: hint.slug })}
+            </Text>
+          ) : (
+            <AccessibleStatus
+              message={t('profiles.instructionNameInvalid')}
+              tone="status"
+              className="text-xs"
+            />
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 /**
@@ -239,23 +253,13 @@ export function InstructionFormSheet({
             }
           }}
         />
-        {/* One reserved line under the name field, always mounted: a hint that
-            comes and goes must not push the content field down while the person
-            types. A hidden full-width copy of the longer copy holds the height,
-            and the shown line draws over it. The rule is not repeated while the
-            field's own error already says the same sentence. */}
+        {/* One line under the name field, always mounted and always one line
+            tall, so the content field never moves while a name is typed. A
+            name that saves as typed leaves the row empty instead of removing
+            it. The rule is not repeated while the field's own error already
+            says the same sentence. */}
         <View className="-mt-2">
-          <View
-            className="flex-row opacity-0"
-            pointerEvents="none"
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Text className="w-full shrink-0 text-xs">{t('profiles.instructionNameInvalid')}</Text>
-          </View>
-          <View className="absolute inset-x-0 top-0">
-            <InstructionNameHintLine hint={nameHint} nameError={nameError} />
-          </View>
+          <InstructionNameHintLine hint={nameHint} nameError={nameError} />
         </View>
         <FormField
           label={t('profiles.instructionContentLabel')}

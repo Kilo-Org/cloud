@@ -8,13 +8,27 @@ export type RetirementNoteModel = Readonly<{
 }>;
 
 /** A preferred model created within the last week. */
-export function isNewModel(
-  model: RetirementNoteModel,
-  preferredIndex: number,
-  now = Date.now()
-): boolean {
+function isNewModel(model: RetirementNoteModel, preferredIndex: number, now = Date.now()): boolean {
   const ageDays = (now / 1_000 - model.created) / (24 * 3600);
   return preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
+}
+
+/** The marker an entry's name carries, decided by `nameMarkerFor`. */
+export type NameMarker = 'states-a-fact' | 'new' | 'retirement';
+
+/**
+ * Which marker a catalog entry's name carries: a name that already states a fact in parentheses
+ * keeps it and carries no other marker, a preferred entry created in the last week carries
+ * `(new)`, and every other entry is the one a retirement date may mark.
+ */
+export function nameMarkerFor(
+  model: RetirementNoteModel,
+  preferredIndex: number,
+  nowMs: number = Date.now()
+): NameMarker {
+  if (model.name.endsWith(')')) return 'states-a-fact';
+  if (isNewModel(model, preferredIndex, nowMs)) return 'new';
+  return 'retirement';
 }
 
 /**
@@ -22,9 +36,8 @@ export function isNewModel(
  * note does not apply. Every client receives that shape, so an `expiration_date` that carries a
  * time still reaches them as its UTC day.
  *
- * The guards keep the note's precedence over the `(new)` marker, as the composed name had it: an
- * entry that already states a fact in its name (it ends with `)`) or reads as new carries no
- * date. `retires_on` therefore needs no ordering of its own on a client.
+ * Only the `retirement` branch of `nameMarkerFor` is dated; an entry whose name states a fact or
+ * that reads as new carries no date, so `retires_on` needs no ordering of its own on a client.
  */
 export function retirementDate(
   model: RetirementNoteModel,
@@ -32,8 +45,7 @@ export function retirementDate(
   now: Date = new Date()
 ): string | undefined {
   if (!model.expiration_date) return undefined;
-  if (model.name.endsWith(')')) return undefined;
-  if (isNewModel(model, preferredIndex, now.getTime())) return undefined;
+  if (nameMarkerFor(model, preferredIndex, now.getTime()) !== 'retirement') return undefined;
   const expirationDate = new Date(model.expiration_date);
   if (!Number.isFinite(expirationDate.getTime())) return undefined;
   if (expirationDate > addMonths(now, 1)) return undefined;

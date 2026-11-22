@@ -82,20 +82,12 @@ import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/contex
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
-import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useNavigationTheme } from '@/lib/hooks/use-navigation-theme';
-import {
-  applyThemePreference,
-  preloadThemePreference,
-  useThemePreference,
-} from '@/lib/hooks/use-theme-preference';
+import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
 import { clearDirectionAttemptAsync } from '@/i18n/direction-attempt';
 import { retryLanguageStartupDirectionAsync } from '@/i18n/startup-direction-run';
-import {
-  preloadLanguagePreference,
-  useLanguagePreference,
-} from '@/lib/hooks/use-language-preference';
+import { useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import { useLanguageStartupPreparation } from '@/lib/hooks/use-language-startup-preparation';
 import {
@@ -199,9 +191,6 @@ captureLaunchDeepLink();
 // pending deep-link slot the layout already consumes.
 captureSystemSearchLaunch();
 prefetchCurrentUser();
-preloadThemePreference();
-preloadHideBalancePreference();
-preloadLanguagePreference();
 preloadStartupFonts();
 
 function RootLayoutNav({

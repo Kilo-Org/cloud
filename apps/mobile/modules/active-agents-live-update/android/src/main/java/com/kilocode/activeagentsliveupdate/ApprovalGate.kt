@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -30,8 +31,11 @@ internal object ApprovalGate {
     val intent = Intent(context, ActiveAgentsApprovalActivity::class.java)
     // A session card answers its own session and the exact request it shows;
     // the aggregate card passes neither, and the headless body reads the
-    // recorded ask for that case.
+    // recorded ask for that case. The data URI names the session on the action
+    // record, so each session's Approve intent is its own record; the aggregate
+    // card passes no session and keeps its single record.
     if (sessionId != null) {
+      intent.data = Uri.parse(SessionNotificationIdentity.sessionData(sessionId))
       intent.putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
       intent.putExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
     }
@@ -51,6 +55,21 @@ internal object ApprovalGate {
       intent(context, sessionId, approvalKey),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
+
+  /**
+   * Cancel the Approve record of one card. The record is found by the same
+   * request code and intent `pendingIntent` built it from, and `FLAG_NO_CREATE`
+   * answers null instead of making one, so a card that was never posted leaves
+   * nothing behind.
+   */
+  fun cancel(context: Context, requestCode: Int, sessionId: String?, approvalKey: String?) {
+    PendingIntent.getActivity(
+      context,
+      requestCode,
+      intent(context, sessionId, approvalKey),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
+  }
 
   /**
    * The Approve action. From API 31 the platform holds the tap until the device

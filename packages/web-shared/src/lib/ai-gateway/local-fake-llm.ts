@@ -5,7 +5,7 @@ import {
 import { buildDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 
 export const LOCAL_FAKE_LLM_API_KEY = 'local-fake-llm';
 
@@ -56,7 +56,7 @@ export function isLocalFakeLlmEnabled(): boolean {
   return getLocalFakeBaseUrl() !== null;
 }
 
-export function getLocalFakeDeterministicCatalogEntry(): OpenRouterModel | null {
+export function getLocalFakeDeterministicCatalogEntry(): OpenRouterCatalogModel | null {
   if (!isLocalFakeLlmEnabled()) return null;
   return {
     id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
@@ -88,8 +88,8 @@ export function getLocalFakeDeterministicCatalogEntry(): OpenRouterModel | null 
 }
 
 export function appendLocalFakeDeterministicCatalogModels(
-  models: OpenRouterModel[]
-): OpenRouterModel[] {
+  models: OpenRouterCatalogModel[]
+): OpenRouterCatalogModel[] {
   const entry = getLocalFakeDeterministicCatalogEntry();
   if (!entry || models.some(model => model.id === entry.id)) {
     return models;

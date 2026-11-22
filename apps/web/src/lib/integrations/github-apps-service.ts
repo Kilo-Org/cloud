@@ -32,6 +32,10 @@ import {
 } from '@/lib/integrations/platforms/github/adapter';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  forgeFixtureInstallationIds,
+  GitHubAppInstallationProtectedError,
+} from '@/lib/integrations/platforms/github/protected-installation';
 
 /**
  * List all integrations for an owner
@@ -59,10 +63,14 @@ export async function listIntegrations(owner: Owner) {
 export async function listNativelyUninstallableIds(
   integrations: readonly PlatformIntegration[]
 ): Promise<Set<string>> {
+  // A forge fixture installation takes the whole local fixture app offline when
+  // deleted, so it is never offered as natively uninstallable.
+  const protectedInstallationIds = forgeFixtureInstallationIds();
   const candidates = integrations.filter(
     integration =>
       integration.github_connection_role === 'workflow' &&
-      integration.platform_installation_id != null
+      integration.platform_installation_id != null &&
+      !protectedInstallationIds.includes(integration.platform_installation_id)
   );
   const installationIds = [
     ...new Set(candidates.map(integration => integration.platform_installation_id as string)),
@@ -207,6 +215,9 @@ export async function uninstallApp(
       },
     });
   } catch (error) {
+    if (error instanceof GitHubAppInstallationProtectedError) {
+      throw new TRPCError({ code: 'CONFLICT', message: error.message, cause: error });
+    }
     if (error instanceof Error && error.message.includes('disconnected locally')) {
       throw new TRPCError({
         code: 'CONFLICT',

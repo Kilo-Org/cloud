@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ModelStats, Organization } from '@kilocode/db/schema';
 import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
 import type {
-  OpenRouterModel,
+  OpenRouterCatalogModel,
   OpenRouterModelsResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type {
@@ -64,9 +64,9 @@ const mockInferenceProviderUserByok = jest.fn(
   async (modelId: string, _providers: readonly string[]) =>
     INFERENCE_PROVIDER_BYOK_MODELS.has(modelId)
 );
-const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
+const mockByok = jest.fn<Promise<OpenRouterCatalogModel[]>, [string]>();
 const mockCustom = jest.fn<
-  Promise<OpenRouterModel[]>,
+  Promise<OpenRouterCatalogModel[]>,
   [string, readonly string[], string | null]
 >();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
@@ -78,17 +78,17 @@ const mockDirectByokCatalogModelIds = jest.fn(
     mockCatalogModelIds
 );
 const mockCatalogAvailability = jest.fn(
-  (models: OpenRouterModel[], _catalogModelIds: ReadonlySet<string>) => models
+  (models: OpenRouterCatalogModel[], _catalogModelIds: ReadonlySet<string>) => models
 );
 const mockAvailability = jest.fn(
   async (
-    models: OpenRouterModel[],
+    models: OpenRouterCatalogModel[],
     _providers: string[],
     _getAllowedProviders?: (modelId: string) => ReadonlySet<string> | undefined
   ) => models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
 );
-const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
-const mockTagClaude = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
+const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterCatalogModel[]) => models);
+const mockTagClaude = jest.fn(async (_owner: unknown, models: OpenRouterCatalogModel[]) => models);
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   requireCustomLlmsById: async () => new Map(),
@@ -175,7 +175,10 @@ const verification = { checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) 
 const subject: OrganizationPolicySubject = { type: 'member', kiloUserId: 'fixture-user' };
 const terminalBench = { overallScore: 0.7, avgAttemptCostUsd: 12 };
 
-function catalogModel(id: string, overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
+function catalogModel(
+  id: string,
+  overrides: Partial<OpenRouterCatalogModel> = {}
+): OpenRouterCatalogModel {
   return {
     id,
     name: id,
@@ -256,19 +259,21 @@ beforeEach(async () => {
   mockAutoEnabled = false;
   mockContext = {
     organization: organization(),
-    groupIds: ['fixture-group'],
     defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
-    groupPolicies: [
-      [
-        {
-          type: 'model_access',
-          data: {
-            mode: 'selected',
-            model_allow_list: ['provider/allowed'],
-            provider_allow_list: [],
+    groups: [
+      {
+        id: 'fixture-group',
+        policies: [
+          {
+            type: 'model_access',
+            data: {
+              mode: 'selected',
+              model_allow_list: ['provider/allowed'],
+              provider_allow_list: [],
+            },
           },
-        },
-      ],
+        ],
+      },
     ],
     policyRevision: 7,
   };
@@ -544,7 +549,7 @@ describe('organization model producer publication', () => {
   });
 
   it('tags the member ChatGPT connection and skips the default-access subject', async () => {
-    mockTagChatGpt.mockImplementation(async (_owner, models: OpenRouterModel[]) =>
+    mockTagChatGpt.mockImplementation(async (_owner, models: OpenRouterCatalogModel[]) =>
       models.map(model =>
         model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
       )
@@ -569,7 +574,7 @@ describe('organization model producer publication', () => {
 
   it('marks a shared-services list only from the shared-services ChatGPT connection', async () => {
     const connected = { member: true, sharedServices: false };
-    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterModel[]) => {
+    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterCatalogModel[]) => {
       const isShared =
         typeof owner === 'object' &&
         owner !== null &&
@@ -617,17 +622,17 @@ describe('organization model producer publication', () => {
   });
 
   it('tags Claude billing models on the list the ChatGPT tagger returned', async () => {
-    const tagIds = (ids: string[]) => async (_owner: unknown, models: OpenRouterModel[]) =>
+    const tagIds = (ids: string[]) => async (_owner: unknown, models: OpenRouterCatalogModel[]) =>
       models.map(model =>
         ids.includes(model.id) ? { ...model, hasUserByokAvailable: true, isFree: false } : model
       );
-    const chatGptResults: OpenRouterModel[][] = [];
-    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterModel[]) => {
+    const chatGptResults: OpenRouterCatalogModel[][] = [];
+    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterCatalogModel[]) => {
       const tagged = await tagIds(['provider/training'])(owner, models);
       chatGptResults.push(tagged);
       return tagged;
     });
-    mockTagClaude.mockImplementation(async (owner, models: OpenRouterModel[]) =>
+    mockTagClaude.mockImplementation(async (owner, models: OpenRouterCatalogModel[]) =>
       tagIds(['morph-byok/private'])(owner, models)
     );
 

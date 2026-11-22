@@ -20,6 +20,11 @@ import {
 export type VercelOnlyModel = {
   /** The OpenRouter-style ID that routes to the Vercel model. */
   id: string;
+  /**
+   * The listing name: the vendor-prefixed `storedModel.name`, or `storedModel.name` when no vendor
+   * prefix applies.
+   */
+  name: string;
   storedModel: GatewayModelWithEndpoints;
   contextWindow: number;
   modalities: NonNullable<GatewayModel['modalities']>;
@@ -32,10 +37,10 @@ function getModelPrefix(modelId: string): string | undefined {
 }
 
 /** OpenRouter names start with the vendor, as in `Qwen: Qwen3 Max`. */
-export function getVendorNamesByModelPrefix(
+function getVendorNamesByModelPrefix(
   openRouterModels: Iterable<{ id: string; name: string }>
-): ReadonlyMap<string | undefined, string> {
-  const vendorNames = new Map<string | undefined, string>();
+): ReadonlyMap<string, string> {
+  const vendorNames = new Map<string, string>();
   for (const { id, name } of openRouterModels) {
     const prefix = getModelPrefix(id);
     const separatorIndex = name.indexOf(': ');
@@ -46,11 +51,12 @@ export function getVendorNamesByModelPrefix(
   return vendorNames;
 }
 
-export function getVercelOnlyModelName(
-  { id, storedModel }: VercelOnlyModel,
-  vendorNames: ReadonlyMap<string | undefined, string>
+function getVercelOnlyModelName(
+  { id, storedModel }: { id: string; storedModel: GatewayModelWithEndpoints },
+  vendorNames: ReadonlyMap<string, string>
 ): string {
-  const vendorName = vendorNames.get(getModelPrefix(id));
+  const prefix = getModelPrefix(id);
+  const vendorName = prefix === undefined ? undefined : vendorNames.get(prefix);
   return vendorName ? `${vendorName}: ${storedModel.name}` : storedModel.name;
 }
 
@@ -59,10 +65,10 @@ export function getVercelOnlyModelName(
  * that route back to them. Models Vercel's list does not describe well enough to list are left out.
  *
  * Vercel sometimes serves a model under a different ID than OpenRouter, so no OpenRouter ID maps to
- * it. When `openRouterModels` is given, a model is also left out if the name it would be listed with
- * equals, exactly, the name of one of the models in `listedOpenRouterModels`, which defaults to
- * `openRouterModels`. `openRouterModels` also supplies the vendor names. Without it, only the IDs
- * are compared.
+ * it. A model is also left out if the name it would be listed with equals, exactly, the name of one
+ * of the models in `listedOpenRouterModels`, which defaults to `openRouterModels`. Omitting
+ * `openRouterModels` removes the vendor prefix from the compared and displayed name, while the
+ * comparison itself still runs whenever `listedOpenRouterModels` yields any names.
  */
 export function findVercelOnlyModels({
   openRouterModelIds,
@@ -96,8 +102,10 @@ export function findVercelOnlyModels({
     const id = mapVercelModelIdToOpenRouter(storedModel.id, overrides);
     // The proxy lowercases requested model IDs before routing.
     if (!id || id !== id.toLowerCase()) return [];
-    const model = { id, storedModel, contextWindow: context_window, modalities, pricing };
-    return listedNames.has(getVercelOnlyModelName(model, vendorNames)) ? [] : [model];
+    const name = getVercelOnlyModelName({ id, storedModel }, vendorNames);
+    return listedNames.has(name)
+      ? []
+      : [{ id, name, storedModel, contextWindow: context_window, modalities, pricing }];
   });
 }
 

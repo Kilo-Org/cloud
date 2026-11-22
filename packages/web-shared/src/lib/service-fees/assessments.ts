@@ -13,6 +13,12 @@ import {
   type ServiceFeeFlow,
   type ServiceFeeOutcome,
 } from '@kilocode/web-shared/lib/service-fees/types';
+import {
+  ISO_CURRENCY_PATTERN,
+  assertNonNegativeSafeInteger,
+  isServiceFeeFailureCode,
+  toIsoTimestamp,
+} from '@kilocode/web-shared/lib/service-fees/values';
 
 export const SERVICE_FEE_TERMINAL_OMITTED_OUTCOMES = [
   'exempt',
@@ -164,27 +170,10 @@ export type PreparedServiceFeeDecision = {
   metadata: ServiceFeeAssessmentMetadata;
 };
 
-const FAILURE_CODE_PATTERN = /^[a-z][a-z0-9_]{0,99}$/;
-const ISO_CURRENCY_PATTERN = /^[a-z]{3}$/;
-
-function assertNonNegativeSafeInteger(value: number, label: string): void {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
-    throw new Error(`${label} must be a non-negative safe integer`);
-  }
-}
-
 function assertNonEmptyAssessmentKey(assessmentKey: string): void {
   if (typeof assessmentKey !== 'string' || assessmentKey.trim().length === 0) {
     throw new Error('assessmentKey must be a nonempty string');
   }
-}
-
-export function toServiceFeeTimestamp(value: Date | string): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error('service fee timestamp is invalid');
-  }
-  return date.toISOString();
 }
 
 export function sanitizeServiceFeeAssessmentMetadata(
@@ -205,7 +194,7 @@ export function sanitizeServiceFeeAssessmentMetadata(
 
 export function assertServiceFeeFailureCode(failureCode: string, assessmentKey = ''): string {
   const trimmed = failureCode.trim();
-  if (!FAILURE_CODE_PATTERN.test(trimmed)) {
+  if (!isServiceFeeFailureCode(trimmed)) {
     throw new ServiceFeeAssessmentConflictError(
       assessmentKey,
       'invalid_failure_code',
@@ -336,7 +325,7 @@ export async function prepareServiceFeeAssessmentDecision(
 
   const owner = getServiceFeeOwner(input.flow, input);
   const currency = normalizeCurrency(input.currency);
-  const eligibilityCreatedAt = toServiceFeeTimestamp(input.eligibilityCreatedAt);
+  const eligibilityCreatedAt = toIsoTimestamp(input.eligibilityCreatedAt);
   const createdUnixSeconds = Math.floor(input.eligibilityCreatedAt.getTime() / 1000);
   const stripeCustomerId = input.stripeCustomerId?.trim() ? input.stripeCustomerId.trim() : null;
   const kiloUserId = owner.kind === 'personal' ? owner.kiloUserId : (owner.kiloUserId ?? null);
@@ -451,7 +440,7 @@ function buildNewAssessmentRecord(params: {
   stripeIds?: ServiceFeeStripeIds;
   now: Date;
 }): ServiceFeeAssessmentRecord {
-  const nowIso = toServiceFeeTimestamp(params.now);
+  const nowIso = toIsoTimestamp(params.now);
   const stripeIds = params.stripeIds ?? {};
   return {
     assessmentKey: params.decision.assessmentKey,
@@ -567,7 +556,7 @@ async function mergePreparedAssessment(
     ...mergedIds,
     kiloUserId,
     outcome: existing.outcome === 'pending' ? decision.outcome : existing.outcome,
-    updatedAt: toServiceFeeTimestamp(now),
+    updatedAt: toIsoTimestamp(now),
   });
 }
 
@@ -580,7 +569,7 @@ export async function markServiceFeeAssessmentCharged(params: {
 }): Promise<ServiceFeeAssessmentRecord> {
   assertNonEmptyAssessmentKey(params.assessmentKey);
   assertNonNegativeSafeInteger(params.chargedFeeMinor, 'chargedFeeMinor');
-  const nowIso = toServiceFeeTimestamp(params.now ?? new Date());
+  const nowIso = toIsoTimestamp(params.now ?? new Date());
 
   return params.store.transact(async store => {
     const existing = requireAssessment(
@@ -639,7 +628,7 @@ export async function markServiceFeeAssessmentMissed(params: {
 }): Promise<ServiceFeeAssessmentRecord> {
   assertNonEmptyAssessmentKey(params.assessmentKey);
   const failureCode = assertServiceFeeFailureCode(params.failureCode, params.assessmentKey);
-  const nowIso = toServiceFeeTimestamp(params.now ?? new Date());
+  const nowIso = toIsoTimestamp(params.now ?? new Date());
 
   return params.store.transact(async store => {
     const existing = requireAssessment(
@@ -687,7 +676,7 @@ export async function linkServiceFeeAssessmentStripeIds(params: {
   now?: Date;
 }): Promise<ServiceFeeAssessmentRecord> {
   assertNonEmptyAssessmentKey(params.assessmentKey);
-  const nowIso = toServiceFeeTimestamp(params.now ?? new Date());
+  const nowIso = toIsoTimestamp(params.now ?? new Date());
 
   return params.store.transact(async store => {
     const existing = requireAssessment(
@@ -718,8 +707,8 @@ export async function settleServiceFeeAssessment(params: {
   if (params.chargedFeeMinor !== undefined) {
     assertNonNegativeSafeInteger(params.chargedFeeMinor, 'chargedFeeMinor');
   }
-  const settledAt = toServiceFeeTimestamp(params.settledAt);
-  const nowIso = toServiceFeeTimestamp(params.now ?? new Date());
+  const settledAt = toIsoTimestamp(params.settledAt);
+  const nowIso = toIsoTimestamp(params.now ?? new Date());
 
   return params.store.transact(async store => {
     const existing = requireAssessment(
@@ -828,7 +817,7 @@ export async function observeServiceFeeAssessmentRefunds(params: {
   if (params.refundedGrossMinor !== undefined) {
     assertNonNegativeSafeInteger(params.refundedGrossMinor, 'refundedGrossMinor');
   }
-  const nowIso = toServiceFeeTimestamp(params.now ?? new Date());
+  const nowIso = toIsoTimestamp(params.now ?? new Date());
 
   return params.store.transact(async store => {
     const existing = requireAssessment(
@@ -916,7 +905,7 @@ export async function observeServiceFeeAssessmentDispute(params: {
 }): Promise<ServiceFeeAssessmentRecord> {
   assertNonEmptyAssessmentKey(params.assessmentKey);
   assertNonNegativeSafeInteger(params.disputedFeeMinor, 'disputedFeeMinor');
-  const nowIso = toServiceFeeTimestamp(params.now ?? new Date());
+  const nowIso = toIsoTimestamp(params.now ?? new Date());
 
   return params.store.transact(async store => {
     const existing = requireAssessment(

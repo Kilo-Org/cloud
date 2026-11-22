@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Aurkitutako segurtasun-arazo berria ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritikoa",
+      "high": "Altua",
+      "medium": "Ertaina",
+      "low": "Baxua"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA abisua"
     },

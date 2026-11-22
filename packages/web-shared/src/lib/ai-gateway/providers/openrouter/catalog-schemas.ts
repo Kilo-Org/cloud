@@ -66,6 +66,9 @@ const OpenRouterModelSchema = z.object({
     .optional(),
   enkrypt: EnkryptPublishedBenchmarkSchema.optional(),
   opencode: OpenCodeSettingsSchema.optional(),
+  // OpenRouter has been seen to send this as an object (`{ name, slug }`) rather than a string, and
+  // the whole catalogue is parsed as one document, so an unparseable field would reject every model
+  // in the response. Absent is the safe reading: every consumer optional-chains `alias_target?.slug`.
   alias_target: z.string().optional().catch(undefined),
   inference_provider_ids: z.array(z.string()).optional(),
   /**
@@ -112,5 +115,5 @@ export const OpenRouterModelsResponseSchema = z.object({
 
 export type OpenRouterProvider = z.infer<typeof OpenRouterProviderSchema>;
 export type OpenRouterProvidersResponse = z.infer<typeof OpenRouterProvidersResponseSchema>;
-export type OpenRouterModel = z.infer<typeof OpenRouterModelSchema>;
+export type OpenRouterCatalogModel = z.infer<typeof OpenRouterModelSchema>;
 export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSchema>;

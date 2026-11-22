@@ -7,7 +7,9 @@ import { createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { textActionTargetClass, textActionTargetDp } from '@/lib/a11y/tap-target';
 import { act, type ReactTestRenderer } from '@/test/renderer';
+import { compiledDimensions } from '@/test/native-dimensions';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { BitbucketConnectForm } from './bitbucket-connect-form';
@@ -17,7 +19,13 @@ const mutations = vi.hoisted(() => ({
   replace: vi.fn<(vars: { integrationId: string; accessToken: string }) => Promise<unknown>>(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+// The form asks the shared tap-target helpers for the platform's target, so the
+// mock carries the platform the helpers read.
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  View: 'View',
+}));
 vi.mock('@/lib/hooks/use-bitbucket', () => ({
   useConnectBitbucket: () => ({ mutateAsync: mutations.connect }),
   useReplaceBitbucketToken: () => ({ mutateAsync: mutations.replace }),
@@ -41,6 +49,15 @@ function submitButton(root: ReactTestRenderer['root']) {
   const button = found.at(-1);
   if (!button) {
     throw new Error('missing submit button');
+  }
+  return button;
+}
+
+/** The token-minting link above the field: the form's other button. */
+function openInBrowserButton(root: ReactTestRenderer['root']) {
+  const button = root.findAll(node => Object.is(node.type, BUTTON)).at(0);
+  if (!button) {
+    throw new Error('missing open-in-browser button');
   }
   return button;
 }
@@ -121,6 +138,25 @@ describe('BitbucketConnectForm', () => {
     expect(descriptionReconnect).not.toBe(firstConnectDescription);
     expect(rendersText(root, descriptionReconnect)).toBe(true);
     expect(rendersText(root, firstConnectDescription)).toBe(false);
+  });
+
+  it('gives the token-minting link the platform touch target', async () => {
+    // The compact outline button renders its `sm` 36pt frame, which the audit
+    // reads on the control's own node; the link carries the platform target
+    // instead, so a tap on the sentence beside it does not miss the control.
+    const { root } = await mount(null);
+    const link = openInBrowserButton(root);
+
+    expect(link.props.className).toBe(textActionTargetClass());
+    // It sits in the form's `gap-5` column, not in a row whose content band its
+    // height would blow out, so it takes no overhang cancel.
+    expect(link.props.style).toBeUndefined();
+
+    const declarations = (await compiledDimensions(link.props.className as string)) as {
+      minHeight?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { minHeight: number };
+    expect(box.minHeight).toBe(textActionTargetDp());
   });
 
   it('connects the pasted token and hands the sheet its dismissal', async () => {

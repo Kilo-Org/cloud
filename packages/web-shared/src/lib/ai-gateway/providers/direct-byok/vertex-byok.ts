@@ -4,7 +4,7 @@ import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/ant
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/byok/direct-vertex-credentials';
 import type {
   DirectByokModel,
   DirectByokProvider,

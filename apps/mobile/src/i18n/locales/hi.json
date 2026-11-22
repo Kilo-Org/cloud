@@ -309,6 +309,7 @@
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
+    "availableToSpendInOrganization": "इस संगठन में खर्च करने के लिए उपलब्ध",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",
@@ -1024,7 +1025,9 @@
       "unavailablePersonallySwitchAction": "संगठन बदलें",
       "unavailableOrganizationTitle": "काउंसिल समीक्षा उपलब्ध नहीं है",
       "unavailableForOrganization": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। इस संगठन के पास यह अभी नहीं है।",
-      "unavailableForOrganizationNeutral": "इस संगठन के लिए काउंसिल समीक्षा अभी उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें।",
+      "unavailablePlanCheck": "काउंसिल समीक्षा इस संगठन की योजना की जाँच नहीं कर सकी। दोबारा जाँचने के लिए फिर से कोशिश करें।",
+      "unavailableFlagRollout": "काउंसिल समीक्षा इस संगठन के लिए अभी उपलब्ध नहीं है। इसे पाने के लिए ऐप को नवीनतम संस्करण में अपडेट करें।",
+      "unavailableForOrganizationMember": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। संगठन का मालिक योजना बदल सकता है।",
       "unavailableOnBitbucket": "काउंसिल समीक्षा Bitbucket रिपॉज़िटरी के लिए उपलब्ध नहीं है।",
       "noRepositories": "अभी तक कोई रिपॉज़िटरी नहीं चुनी गई है। पहले रिपॉज़िटरी सेटिंग में रिपॉज़िटरी चुनें।",
       "specialists": "विशेषज्ञ",
@@ -1959,7 +1962,7 @@
       "searchPlaceholder": "रिपॉज़िटरी खोजें…",
       "noMatches": "कोई मिलान नहीं",
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
-      "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है।",
+      "noRepositoriesDescription": "रिपॉज़िटरी लोड करने के लिए GitHub या GitLab जोड़ें।",
       "accessibility": "रिपॉज़िटरी: {{label}}",
       "loading": "लोड हो रहा है…",
       "platformBitbucket": "Bitbucket"
@@ -4400,6 +4403,7 @@
       "promptPlaceholder": "तुम एक …",
       "tools": "औजार",
       "wholeToolRule": "यह एजेंट एक साथ सभी औजारों पर एक नियम लागू करता है: {{rule}}। ये स्विच केवल-पढ़ने योग्य हैं।",
+      "toolRule": "संग्रहित नियम: {{rule}}",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकर में दिखाया गया है",
       "visibilitySubagent": "सबएजेंट — केवल दूसरों से कॉल करने योग्य",
@@ -4507,7 +4511,7 @@
       "activityUnavailable": "क्रेडिट गतिविधि लोड नहीं हो सकी।",
       "appStoreReceipt": "App Store की रसीद",
       "deductionFallback": "क्रेडिट कटौती",
-      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहां दिखेंगे।",
+      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहाँ दिखेंगे।",
       "emptyTitle": "कोई क्रेडिट इतिहास नहीं",
       "expiredGrant": "समय समाप्त: {{description}}",
       "googlePlayReceipt": "Google Play की रसीद",
@@ -4797,7 +4801,7 @@
     "connectFailed": "कनेक्शन पेज नहीं खोला जा सका"
   },
   "invoices": {
-    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
+    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहाँ दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
     "personalPeriod": "पिछले 12 महीने"
   },
   "cloudAgent": {

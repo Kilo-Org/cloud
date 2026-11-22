@@ -1,19 +1,18 @@
 import type { CreditTransaction } from '@kilocode/db/schema';
 import { credit_transactions as creditTransactionsTable, organizations } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and, gt, isNull, isNotNull, inArray, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   computeExpiration,
   earliestUnexpiredExpiry,
+  ORGANIZATION_CREDIT_ACTOR,
   reconcileCreditExpirationsInTransaction,
   type CreditOwner,
   type ExpiringTransaction,
   type EntityForExpiration,
 } from '@kilocode/db/credit-expiration';
-
-type DbOrTx = typeof db | DrizzleTransaction;
 
 export type CreditTransactionForBlocks = ExpiringTransaction &
   Pick<CreditTransaction, 'credit_category' | 'original_transaction_id' | 'created_at'>;
@@ -53,38 +52,88 @@ const expiringLotColumns = {
   is_free: creditTransactionsTable.is_free,
 };
 
-export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx = db) {
+/** Which column names the owner of a credit lot: a user, or the organization that pays for it. */
+type CreditLotOwnerColumn = 'kilo_user_id' | 'organization_id';
+
+/**
+ * The closed-lot lookup and the open-lot rule that every credit-lot read shares.
+ *
+ * A lot is closed when a negative row with a closing category points at it through
+ * `original_transaction_id`. The lookup stays inside a `LIMIT 1` lateral join, so the owner and
+ * category filters are evaluated per outer row against that row's own closure rather than as a
+ * global set.
+ *
+ * The owner column and the closing categories stay parameters: the user read accepts all closing
+ * categories, while `fetchExpiringTransactionsForOrganization` keeps the narrower rule that
+ * creditExpirationOrg.test.ts pins. That difference is intentional and is stated at each call site.
+ */
+function openCreditLotRead(
+  fromDb: DrizzleConnection,
+  owner: { column: CreditLotOwnerColumn; value: string; closedCategories: readonly string[] }
+) {
   const closures = alias(creditTransactionsTable, 'closures');
-  // LIMIT keeps owner and category filters outside the unique-link lookup.
+  // LIMIT keeps owner and category filters outside the unique-link lookup. The projected owner column
+  // keeps this call site's own name in the SQL, so the joined row reads like the outer table's owner.
   const expiredCredits = fromDb
     .select({
       original_transaction_id: closures.original_transaction_id,
-      kilo_user_id: closures.kilo_user_id,
+      owner: closures[owner.column],
       credit_category: closures.credit_category,
     })
     .from(closures)
     .where(eq(closures.original_transaction_id, creditTransactionsTable.id))
     .limit(1)
     .as('expired_credits');
+
+  return {
+    expiredCredits,
+    // A closure counts only for its owner and for a category that closes a lot.
+    closureOfOwner: and(
+      eq(expiredCredits.owner, owner.value),
+      inArray(expiredCredits.credit_category, [...owner.closedCategories])
+    ),
+    // The rule that decides whether the outer lot is still open.
+    openLot: isNull(expiredCredits.original_transaction_id),
+  };
+}
+
+export async function fetchExpiringTransactions(userId: string, fromDb: DrizzleConnection = db) {
+  const { expiredCredits, closureOfOwner, openLot } = openCreditLotRead(fromDb, {
+    column: 'kilo_user_id',
+    value: userId,
+    closedCategories: EXPIRED_CREDIT_CATEGORIES,
+  });
   return await fromDb
     .select(expiringLotColumns)
     .from(creditTransactionsTable)
-    .leftJoinLateral(
-      expiredCredits,
-      and(
-        eq(expiredCredits.kilo_user_id, userId),
-        inArray(expiredCredits.credit_category, [...EXPIRED_CREDIT_CATEGORIES])
-      )
-    )
+    .leftJoinLateral(expiredCredits, closureOfOwner)
     .where(
       and(
         eq(creditTransactionsTable.kilo_user_id, userId),
         gt(creditTransactionsTable.amount_microdollars, 0),
         isNotNull(creditTransactionsTable.expiry_date),
-        isNull(expiredCredits.original_transaction_id),
+        openLot,
+        // A lot the user bought for an organization is not the user's own expiring credit.
         isNull(creditTransactionsTable.organization_id)
       )
     );
+}
+
+/**
+ * The public state projection: a reconciled or freshly read entity becomes a `CreditExpirationState`.
+ * Every caller that returns state to the cron, the admin routes or the batch map uses this mapping,
+ * so the field set cannot drift between them.
+ */
+function toCreditExpirationState(state: {
+  microdollars_used: number;
+  total_microdollars_acquired: number;
+  next_credit_expiration_at: string | null;
+}): CreditExpirationState {
+  return {
+    microdollars_used: state.microdollars_used,
+    total_microdollars_acquired: state.total_microdollars_acquired,
+    next_credit_expiration_at: state.next_credit_expiration_at,
+  };
 }
 
 async function reconcileForEntity(
@@ -99,11 +148,7 @@ async function reconcileForEntity(
       now,
       { onlyIfDue: !options.force }
     );
-    return {
-      microdollars_used: state.microdollars_used,
-      total_microdollars_acquired: state.total_microdollars_acquired,
-      next_credit_expiration_at: state.next_credit_expiration_at,
-    };
+    return toCreditExpirationState(state);
   });
 }
 
@@ -132,7 +177,12 @@ export function computeNextExpirationAmount(
 ): number | null {
   if (!nextExpirationAt) return null;
 
-  const result = computeExpiration(transactions, entity, new Date(nextExpirationAt), 'system');
+  const result = computeExpiration(
+    transactions,
+    entity,
+    new Date(nextExpirationAt),
+    ORGANIZATION_CREDIT_ACTOR
+  );
 
   const totalExpiring = result.newTransactions.reduce(
     (sum, t) => sum + -(t.amount_microdollars ?? 0),
@@ -144,36 +194,25 @@ export function computeNextExpirationAmount(
 
 export async function fetchExpiringTransactionsForOrganization(
   organizationId: string,
-  fromDb: DbOrTx = db
+  fromDb: DrizzleConnection = db
 ) {
-  const closures = alias(creditTransactionsTable, 'closures');
-  const expiredCredits = fromDb
-    .select({
-      original_transaction_id: closures.original_transaction_id,
-      organization_id: closures.organization_id,
-      credit_category: closures.credit_category,
-    })
-    .from(closures)
-    .where(eq(closures.original_transaction_id, creditTransactionsTable.id))
-    .limit(1)
-    .as('expired_credits');
-
+  // This read keeps the narrower organization rule: only Kilo's own expiration row closes a lot here,
+  // while the user read above and the batch loader accept the orb categories too.
+  const { expiredCredits, closureOfOwner, openLot } = openCreditLotRead(fromDb, {
+    column: 'organization_id',
+    value: organizationId,
+    closedCategories: ORGANIZATION_EXPIRED_CREDIT_CATEGORIES,
+  });
   return await fromDb
     .select({ ...expiringLotColumns, kilo_user_id: creditTransactionsTable.kilo_user_id })
     .from(creditTransactionsTable)
-    .leftJoinLateral(
-      expiredCredits,
-      and(
-        eq(expiredCredits.organization_id, organizationId),
-        inArray(expiredCredits.credit_category, [...ORGANIZATION_EXPIRED_CREDIT_CATEGORIES])
-      )
-    )
+    .leftJoinLateral(expiredCredits, closureOfOwner)
     .where(
       and(
         eq(creditTransactionsTable.organization_id, organizationId),
         isNotNull(creditTransactionsTable.expiry_date),
         gt(creditTransactionsTable.amount_microdollars, 0),
-        isNull(expiredCredits.original_transaction_id)
+        openLot
       )
     );
 }
@@ -260,12 +299,11 @@ export async function processOrganizationExpirationsBatch(
     openTransactions,
     transaction => transaction.organization_id
   );
-  const prepared = organizationIds.flatMap(organizationId => {
-    const org = organizationsById.get(organizationId);
-    if (!org) return [];
-
-    const transactions = transactionsByOrganizationId.get(organizationId) ?? [];
-    const expirationResult = computeExpiration(transactions, org, now, 'system');
+  // Iterating the map's own values keeps insertion order and makes every entry defined, so the
+  // mapper needs no miss guard.
+  const prepared = [...organizationsById.values()].flatMap(org => {
+    const transactions = transactionsByOrganizationId.get(org.id) ?? [];
+    const expirationResult = computeExpiration(transactions, org, now, ORGANIZATION_CREDIT_ACTOR);
     const expiredTransactionIds = new Set(
       expirationResult.newTransactions.map(transaction => transaction.original_transaction_id)
     );
@@ -371,16 +409,7 @@ export async function processOrganizationExpirationsBatch(
       .from(organizations)
       .where(inArray(organizations.id, organizationIds));
 
-    return new Map(
-      currentOrganizations.map(org => [
-        org.id,
-        {
-          microdollars_used: org.microdollars_used,
-          total_microdollars_acquired: org.total_microdollars_acquired,
-          next_credit_expiration_at: org.next_credit_expiration_at,
-        },
-      ])
-    );
+    return new Map(currentOrganizations.map(org => [org.id, toCreditExpirationState(org)]));
   });
 
   const retrySnapshots = prepared.flatMap(item => {

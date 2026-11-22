@@ -53,15 +53,22 @@ export type GlanceableFixture = {
   /** Minutes since the last successful confirmation. */
   checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];
+  /**
+   * The row ids the tray rows carry, positionally; an unlisted position falls
+   * back to `glanceable-fixture-${index}`.
+   */
+  sessionIds?: readonly string[];
   actionFeedback?: Exclude<GlanceableActionFeedback, null>;
   /**
-   * Follow one row with a session card. `approvalKey` adds the key a server
-   * push carries for a permission wait; `finish` follows the row while it
-   * works, then reports it finished; `card` applies the richer facts a server
+   * Follow rows with a session card, one card each. `approvalKey` adds the key
+   * a server push carries for a permission wait; `finish` follows the row while
+   * it works, then reports it finished; `card` applies the richer facts a server
    * push carries (the step, the plan, the diff, the outcome, the stop reason).
+   * Those three apply to a single index only: several indices follow each row as
+   * it stands, with no content and no finish.
    */
   follow?: {
-    index: number;
+    index: number | readonly number[];
     approvalKey?: boolean;
     finish?: boolean;
     card?: SessionCardFacts;

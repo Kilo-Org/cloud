@@ -21,10 +21,6 @@ const store = createSecureStorePreference<boolean>({
   serialize: value => (value ? 'true' : 'false'),
 });
 
-// Warm the disk read at module scope so the tool list an agent is given sees
-// the persisted value without waiting for a React mount.
-store.preload();
-
 export function isSettingsToolsEnabled(): boolean {
   return store.getRequested();
 }

@@ -20,6 +20,17 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   findCustomRouter: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  getEnhancedOpenRouterModels: jest.fn(),
+}));
+
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => ({
+    getProviderSlugsForModel: jest.fn(async () => new Set(['moonshotai'])),
+  })
+);
+
 import type * as AutoModelResolution from './resolution';
 import {
   AUTO_SMALL_TARGET_MODELS,
@@ -39,6 +50,7 @@ import type {
 import type { CustomRouterResolution } from './custom-router';
 import type * as CustomRouters from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
 const { resolveAutoModel, applyResolvedAutoModel } =
   jest.requireActual<typeof AutoModelResolution>('./resolution');
@@ -1001,6 +1013,45 @@ describe('resolveAutoModel — Organization Auto branch', () => {
     expect(result).toEqual({
       kind: 'organization_auto_configuration_error',
       message: 'Organization Auto cannot target itself.',
+    });
+  });
+
+  it('validates the route target against the US replica', async () => {
+    const { getEnhancedOpenRouterModels: mockedGetEnhancedOpenRouterModels } = jest.requireMock<{
+      getEnhancedOpenRouterModels: jest.Mock<
+        (options: { countryCode: string | null; fromDb?: object }) => Promise<unknown>
+      >;
+    }>('@kilocode/web-shared/lib/ai-gateway/providers/openrouter');
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+      data: [{ id: 'moonshotai/kimi-k2.6' }],
+    } as never);
+
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: { routes: {}, fallback_model: 'moonshotai/kimi-k2.6' },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: 'moonshotai/kimi-k2.6' },
+      routingTarget: 'moonshotai/kimi-k2.6',
+    });
+    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith({
+      countryCode: null,
+      fromDb: readDb,
     });
   });
 });

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nýr öryggisfundur ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Bráðalvarlegt",
+      "high": "Hátt",
+      "medium": "Miðlungs",
+      "low": "Lágt"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA-viðvörun"
     },

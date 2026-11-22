@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -12,25 +11,30 @@ import {
   decryptOpenAiChatGptConnection,
   healthyOpenAiChatGptConnection,
   markOpenAiChatGptConnectionErrored,
-  openAiChatGptOwnerWhere,
   openAiChatGptOwnerKey,
   readOpenAiChatGptConnectionRow,
-  serializeOpenAiChatGptConnection,
+  writeOpenAiChatGptConnection,
   type OpenAiChatGptDatabase,
   type OpenAiChatGptOwner,
 } from './store';
 import type { OpenAiChatGptConnection } from './types';
 
-/**
+/*
  * Refreshes the delegated OpenAI access token for a "Sign in with ChatGPT"
- * connection. The stored access token is returned unchanged while it has more
- * than `REFRESH_WINDOW_SECONDS` left; otherwise the refresh request runs under
- * a row lock that is held for that one request, so one refresh happens per
- * connection even across concurrent instances, and neither a retry, its backoff
- * sleep, nor a stalled token endpoint keeps the lock or a pool connection open.
+ * connection. An unexpired stored access token is served while it has more than
+ * `OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS` left, and also while OpenAI's
+ * `earliest_refresh_at` says the refresh window has not opened; an expired
+ * token is never served. Otherwise the refresh request runs under a row lock
+ * that is held for that one request, so one refresh happens per connection even
+ * across concurrent instances, and neither a retry, its backoff sleep, nor a
+ * stalled token endpoint keeps the lock or a pool connection open.
  *
- * Nothing here ever logs, returns or embeds a token or the client secret in an
- * exception message: only the OAuth error code and the user id are logged.
+ * Nothing here ever logs, returns or embeds a token, a refresh token or the
+ * client secret in an exception message. A failed refresh logs only the failure
+ * reason and the connection-owner key from `openAiChatGptOwnerKey(owner)`: the
+ * member's user id with their organization id (or `personal`), or
+ * `shared-services:<organizationId>` for a shared-services connection. The
+ * `logRefreshFailure` doc describes the code-plus-owner line it writes.
  */
 
 /** Refresh this many seconds before the access token actually expires. */
@@ -316,10 +320,7 @@ async function attemptRefresh(
         token_type: readStringField(body, 'token_type') ?? connection.token_type,
       });
 
-      await tx
-        .update(openai_chatgpt_connections)
-        .set({ encrypted_connection: serializeOpenAiChatGptConnection(updated), is_enabled: true })
-        .where(openAiChatGptOwnerWhere(owner));
+      await writeOpenAiChatGptConnection(tx, owner, updated);
 
       return { kind: 'access_token', accessToken };
     }

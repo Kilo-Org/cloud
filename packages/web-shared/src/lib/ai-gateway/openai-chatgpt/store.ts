@@ -236,6 +236,20 @@ export function serializeOpenAiChatGptConnection(
 }
 
 /**
+ * The payload columns a write of the owner's connection sets: the healthy
+ * payload, encrypted, on an enabled row. One definition so a reconnect and a
+ * token rotation cannot drift apart in which columns they leave alone.
+ */
+function connectionWriteColumns(connection: OpenAiChatGptConnection) {
+  return {
+    encrypted_connection: serializeOpenAiChatGptConnection(
+      healthyOpenAiChatGptConnection(connection)
+    ),
+    is_enabled: true,
+  };
+}
+
+/**
  * The stored payload alone, without the row's `is_enabled`. The status and
  * reconnect-message path reads it: a disabled row must still report the stored
  * status. Routing must use `getOpenAiChatGptStoredConnection` instead, because
@@ -309,6 +323,25 @@ async function getStoredConnection(
 }
 
 /**
+ * Writes the owner's connection payload over the owner's row. The caller's
+ * connection is used on purpose, so a refresh can write inside the transaction
+ * that already holds the `SELECT ... FOR UPDATE` row lock. The write touches
+ * only the payload and `is_enabled`: the usage-limit columns and `created_by`
+ * are left alone, so a reconnect's connector and recorded limit survive a token
+ * rotation.
+ */
+export async function writeOpenAiChatGptConnection(
+  fromDb: OpenAiChatGptDatabase,
+  owner: OpenAiChatGptOwner,
+  connection: OpenAiChatGptConnection
+): Promise<void> {
+  await fromDb
+    .update(openai_chatgpt_connections)
+    .set(connectionWriteColumns(connection))
+    .where(openAiChatGptOwnerWhere(owner));
+}
+
+/**
  * Inserts or replaces the owner's connection. The upsert targets the owner's
  * unique index, so reconnecting never leaves a second row behind. The row is
  * always left enabled and connected with any previous error state cleared.
@@ -319,15 +352,13 @@ export async function saveOpenAiChatGptConnection(
   connection: OpenAiChatGptConnection,
   createdBy: string
 ): Promise<void> {
-  const stored = healthyOpenAiChatGptConnection(connection);
-  const encrypted_connection = serializeOpenAiChatGptConnection(stored);
+  const columns = connectionWriteColumns(connection);
   const shape = openAiChatGptOwnerShape(owner);
   // The shared-services row records the connecting person in `created_by`; its
   // reads never match on `kilo_user_id`.
   const values = {
     ...shape.identity(createdBy),
-    encrypted_connection,
-    is_enabled: true,
+    ...columns,
     created_by: createdBy,
     ...NO_USAGE_LIMIT,
   };
@@ -346,7 +377,7 @@ export async function saveOpenAiChatGptConnection(
       set: {
         kilo_user_id: values.kilo_user_id,
         created_by: values.created_by,
-        encrypted_connection,
+        encrypted_connection: columns.encrypted_connection,
         is_enabled: true,
         ...NO_USAGE_LIMIT,
       },

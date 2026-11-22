@@ -680,6 +680,7 @@
     "needsInputAction": {
       "approved": "Żądanie zatwierdzone",
       "replied": "Odpowiedź wysłana",
+      "empty": "Wpisz odpowiedź i ją wyślij.",
       "failed": "Nie udało się odpowiedzieć. Dotknij ponownie, aby spróbować.",
       "unavailable": "To żądanie już nie oczekuje."
     }

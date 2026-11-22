@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "So‘rov tasdiqlandi",
       "replied": "Javob yuborildi",
+      "empty": "Javob yozing, so‘ngra yuboring.",
       "failed": "Javob berilmadi. Qayta urinish uchun yana bosing.",
       "unavailable": "Bu so‘rov endi kutmaydi."
     }

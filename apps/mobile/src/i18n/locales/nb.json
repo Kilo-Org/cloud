@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Forespørsel godkjent",
       "replied": "Svar sendt",
+      "empty": "Skriv et svar og send det.",
       "failed": "Kunne ikke svare. Trykk på nytt for å prøve igjen.",
       "unavailable": "Denne forespørselen venter ikke lenger."
     }

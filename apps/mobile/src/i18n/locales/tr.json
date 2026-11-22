@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "İstek onaylandı",
       "replied": "Yanıt gönderildi",
+      "empty": "Bir yanıt yazın, ardından gönderin.",
       "failed": "Yanıtlanamadı. Yeniden denemek için tekrar dokunun.",
       "unavailable": "Bu istek artık beklemiyor."
     }

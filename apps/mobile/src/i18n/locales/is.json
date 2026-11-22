@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Beiðni samþykkt",
       "replied": "Svar sent",
+      "empty": "Skrifaðu svar og sendu það.",
       "failed": "Ekki tókst að svara. Ýttu aftur til að reyna aftur.",
       "unavailable": "Þessi beiðni bíður ekki lengur."
     }

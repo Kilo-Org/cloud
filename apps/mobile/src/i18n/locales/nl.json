@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "Verzoek goedgekeurd",
       "replied": "Antwoord verzonden",
+      "empty": "Typ een antwoord en verstuur het daarna.",
       "failed": "Kon niet antwoorden. Tik nogmaals om het opnieuw te proberen.",
       "unavailable": "Dit verzoek wacht niet langer."
     }

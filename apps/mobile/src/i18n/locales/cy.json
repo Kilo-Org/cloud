@@ -1350,6 +1350,7 @@
     "needsInputAction": {
       "approved": "Cais wedi’i gymeradwyo",
       "replied": "Anfonwyd yr ymateb",
+      "empty": "Ysgrifennwch ateb ac yna ei anfon.",
       "failed": "Methwyd ag ateb. Tapwch eto i roi cynnig arall.",
       "unavailable": "Nid yw’r cais hwn yn aros mwyach."
     }

@@ -1322,6 +1322,7 @@
     "needsInputAction": {
       "approved": "Tá an t-iarratas ceadaithe",
       "replied": "Tá an freagra seolta",
+      "empty": "Scríobh freagra agus ansin seol é.",
       "failed": "Níorbh fhéidir freagra a thabhairt. Tapáil arís chun iarracht eile a dhéanamh.",
       "unavailable": "Níl an t-iarratas seo ag fanacht a thuilleadh."
     }

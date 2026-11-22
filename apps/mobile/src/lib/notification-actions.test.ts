@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   clearLastNotificationResponse: vi.fn(),
   runNeedsInputInteraction: vi.fn(),
   refreshGlanceableSurfacesFromTray: vi.fn(),
+  rememberNeedsInputReplyDraft: vi.fn(),
   captureException: vi.fn(),
 }));
 
@@ -58,6 +59,16 @@ vi.mock('./glanceable/approve-front-agent', () => ({
   refreshGlanceableSurfacesFromTray: mocks.refreshGlanceableSurfacesFromTray,
 }));
 
+// The draft slot is process memory the composer reads on arrival; the suite
+// records the handoff and needs no real slot. Every export is listed so the
+// whole module graph resolves.
+vi.mock('@/lib/needs-input-reply-draft', () => ({
+  rememberNeedsInputReplyDraft: mocks.rememberNeedsInputReplyDraft,
+  takeNeedsInputReplyDraft: vi.fn(() => null),
+  clearNeedsInputReplyDraft: vi.fn(),
+  _resetNeedsInputReplyDraftForTests: vi.fn(),
+}));
+
 vi.mock('@sentry/react-native', () => ({
   captureException: mocks.captureException,
 }));
@@ -69,6 +80,7 @@ type RaiseData = {
   attentionKind: 'permission' | 'question';
   prUrl?: string;
   organizationId?: string;
+  answerDraft?: string;
 };
 
 function raiseData(overrides: Partial<RaiseData> = {}): RaiseData {
@@ -132,6 +144,7 @@ beforeEach(() => {
   mocks.clearLastNotificationResponse.mockReset();
   mocks.runNeedsInputInteraction.mockReset();
   mocks.refreshGlanceableSurfacesFromTray.mockReset().mockResolvedValue(undefined);
+  mocks.rememberNeedsInputReplyDraft.mockReset();
   mocks.captureException.mockReset();
 });
 
@@ -264,6 +277,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
         title: 'Fix the bug',
         body: 'Request approved',
         data: raiseData(),
+        sound: false,
       },
       trigger: { channelId: 'needs-input' },
     });
@@ -307,6 +321,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
         title: 'Fix the bug',
         body: "Couldn't answer. Tap again to retry.",
         data: raiseData(),
+        sound: false,
         categoryIdentifier: 'kilo-needs-input:permission',
         interruptionLevel: 'timeSensitive',
       },
@@ -327,9 +342,113 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
         title: 'Fix the bug',
         body: 'This request is no longer waiting.',
         data: raiseData(),
+        sound: false,
       },
       trigger: { channelId: 'needs-input' },
     });
+  });
+
+  it('replaces with the empty-answer body and keeps the actions when nothing was sent', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('empty');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: '   ',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith({
+      identifier: 'needs-input:ses_1',
+      content: {
+        title: 'Fix the bug',
+        body: 'Add an answer, then send.',
+        data: raiseData(),
+        sound: false,
+        categoryIdentifier: 'kilo-needs-input:permission',
+      },
+      trigger: { channelId: 'needs-input' },
+    });
+    // A non-answer must not break through Focus, and the raise is still open.
+    expect(mocks.refreshGlanceableSurfacesFromTray).not.toHaveBeenCalled();
+  });
+
+  it('keeps the typed reply in the failed result payload and out of its body', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith({
+      identifier: 'needs-input:ses_1',
+      content: {
+        title: 'Fix the bug',
+        body: "Couldn't answer. Tap again to retry.",
+        data: raiseData({ answerDraft: 'ship it' }),
+        sound: false,
+        categoryIdentifier: 'kilo-needs-input:permission',
+        interruptionLevel: 'timeSensitive',
+      },
+      trigger: { channelId: 'needs-input' },
+    });
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { body: string } },
+    ];
+    expect(request.content.body).not.toContain('ship it');
+  });
+
+  it('posts no reply draft for a failed approve', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { data: RaiseData } },
+    ];
+    expect(request.content.data).toEqual(raiseData());
+  });
+
+  it('posts no reply draft once the answer was sent', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { data: RaiseData } },
+    ];
+    expect(request.content.data).toEqual(raiseData());
+  });
+
+  it('caps the reply draft at the length the payload admits', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    const long = 'a'.repeat(2500);
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: long,
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { data: RaiseData } },
+    ];
+    expect(request.content.data.answerDraft).toBe('a'.repeat(2000));
   });
 
   it('resolves the runner through the lazy entry-point load when deps omit it', async () => {
@@ -897,6 +1016,53 @@ describe('handleNeedsInputNotificationResponse — open PR and open session', ()
     );
 
     expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+  });
+});
+
+describe('handleNeedsInputNotificationResponse — reply draft handoff', () => {
+  const drafted = raiseData({ answerDraft: 'Use the staging bucket.' });
+
+  it('hands the parked reply to the session when the body is tapped', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: drafted,
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.rememberNeedsInputReplyDraft).toHaveBeenCalledWith(
+      'ses_1',
+      'Use the staging bucket.'
+    );
+    // The draft never replaces the navigation the tap stashes.
+    expect(getPendingDeepLinkSnapshot()).toBe('/(app)/agent-chat/ses_1?via=push');
+  });
+
+  it.each([NEEDS_INPUT_ACTION_IDS.openSession, NEEDS_INPUT_ACTION_IDS.openPr])(
+    'hands the parked reply to the session for %s',
+    async actionIdentifier => {
+      await handleNeedsInputNotificationResponse(
+        raiseResponse({ actionIdentifier, data: drafted }),
+        { runInteraction: mocks.runNeedsInputInteraction }
+      );
+
+      expect(mocks.rememberNeedsInputReplyDraft).toHaveBeenCalledWith(
+        'ses_1',
+        'Use the staging bucket.'
+      );
+    }
+  );
+
+  it('hands nothing when the notification carries no reply draft', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.rememberNeedsInputReplyDraft).not.toHaveBeenCalled();
   });
 });
 

@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "请求已批准",
       "replied": "回复已发送",
+      "empty": "请先填写回答，再发送。",
       "failed": "无法回答。再次点按即可重试。",
       "unavailable": "该请求已不再等待。"
     }

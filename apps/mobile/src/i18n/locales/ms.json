@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Permintaan diluluskan",
       "replied": "Balasan dihantar",
+      "empty": "Tulis balasan kemudian hantar.",
       "failed": "Tidak dapat menjawab. Ketik semula untuk mencuba lagi.",
       "unavailable": "Permintaan ini tidak lagi menunggu."
     }

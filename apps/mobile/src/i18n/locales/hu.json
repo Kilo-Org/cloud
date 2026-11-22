@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Kérelem jóváhagyva",
       "replied": "Válasz elküldve",
+      "empty": "Írj egy választ, majd küldd el.",
       "failed": "Nem sikerült válaszolni. Koppints újra az újrapróbálkozáshoz.",
       "unavailable": "Ez a kérelem már nem várakozik."
     }

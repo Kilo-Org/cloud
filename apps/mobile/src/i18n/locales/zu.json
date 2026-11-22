@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Isicelo sigunyaziwe",
       "replied": "Impendulo ithunyelwe",
+      "empty": "Faka impendulo, bese uyithumela.",
       "failed": "Ayikwazanga ukuphendula. Thepha kabusha ukuze uzame kabusha.",
       "unavailable": "Lesi sicelo asisalindile."
     }

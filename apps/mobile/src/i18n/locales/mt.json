@@ -1322,6 +1322,7 @@
     "needsInputAction": {
       "approved": "It-talba ġiet approvata",
       "replied": "Ir-risposta ntbagħtet",
+      "empty": "Ikteb tweġiba u mbagħad ibgħatha.",
       "failed": "Ma rnexxiex twieġeb. Miss biex terġa’ tipprova.",
       "unavailable": "Din it-talba ma tistennix aktar."
     }

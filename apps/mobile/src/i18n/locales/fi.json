@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Pyyntö hyväksytty",
       "replied": "Vastaus lähetetty",
+      "empty": "Kirjoita vastaus ja lähetä se.",
       "failed": "Vastaaminen ei onnistunut. Yritä uudelleen napauttamalla.",
       "unavailable": "Tämä pyyntö ei ole enää odottamassa."
     }

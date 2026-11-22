@@ -32,6 +32,7 @@ import {
   type SessionSnapshotPageOutcome,
   type SessionStatusIndicator,
   type StandalonePermission,
+  type StandaloneQuestion,
   type StoredMessage,
   type ToolPart,
   type UnreadablePermissionState,
@@ -102,6 +103,11 @@ import { i18n } from '@/i18n';
 import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
+import {
+  _resetNeedsInputReplyDraftForTests,
+  peekNeedsInputReplyDraft,
+  rememberNeedsInputReplyDraft,
+} from '@/lib/needs-input-reply-draft';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
@@ -1050,6 +1056,7 @@ beforeEach(() => {
   scopeReads.profiles.length = 0;
   scopeReads.modes.length = 0;
   scopeReads.catalogModels = [];
+  _resetNeedsInputReplyDraftForTests();
   vi.mocked(createAndNavigateAgentSession).mockReset();
   vi.mocked(restartAgentSession).mockReset();
 });
@@ -6731,5 +6738,70 @@ describe('session detail compute polling', () => {
     computePolling.focusedAndActive = false;
     await mountDetails();
     expect(computeReadArgs.calls.at(-1)?.poll).toBe(false);
+  });
+});
+
+describe('session detail needs-input reply draft', () => {
+  const QUESTION: StandaloneQuestion = {
+    requestId: 'question-1',
+    questions: [
+      {
+        question: 'How should the agent proceed?',
+        header: 'Agent needs input',
+        options: [{ label: 'Continue', description: '' }],
+        multiple: false,
+        custom: true,
+      },
+    ],
+  };
+
+  function cardNodes(renderer: ReactTestRenderer): ReactTestInstance[] {
+    return renderer.root.findAll(node => Object.is(node.type, 'QuestionCard'));
+  }
+
+  async function mountQuestion() {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<StandaloneQuestion | null, [StandaloneQuestion | null], unknown>(
+        view.manager.atoms.activeQuestion,
+        QUESTION
+      );
+    });
+    await waitFor(() => cardNodes(view.renderer).length > 0);
+    return view;
+  }
+
+  // A reply typed into the needs-input notification waits in memory for this
+  // session. The card offers it, so the person does not type it again.
+  it('offers a reply remembered before the question reached the screen', async () => {
+    rememberNeedsInputReplyDraft(ROOT_ID, 'ship it');
+
+    const view = await mountQuestion();
+
+    expect(cardNodes(view.renderer)[0]?.props.initialAnswer).toBe('ship it');
+    // One remember produces one offer.
+    expect(peekNeedsInputReplyDraft(ROOT_ID)).toBeNull();
+  });
+
+  // The real flow: the chat screen is already on top showing the question when
+  // the tap lands, so no route param and no mount changes. Only the slot's own
+  // change reaches the card.
+  it('offers a reply remembered while the question is already on screen', async () => {
+    const view = await mountQuestion();
+    expect(cardNodes(view.renderer)[0]?.props.initialAnswer).toBeNull();
+
+    act(() => {
+      rememberNeedsInputReplyDraft(ROOT_ID, 'hold the release');
+    });
+    await waitFor(() => cardNodes(view.renderer)[0]?.props.initialAnswer === 'hold the release');
+
+    expect(cardNodes(view.renderer)[0]?.props.initialAnswer).toBe('hold the release');
+    expect(peekNeedsInputReplyDraft(ROOT_ID)).toBeNull();
+  });
+
+  it('leaves the card unseeded when the session holds no remembered reply', async () => {
+    const view = await mountQuestion();
+
+    expect(cardNodes(view.renderer)[0]?.props.initialAnswer).toBeNull();
   });
 });

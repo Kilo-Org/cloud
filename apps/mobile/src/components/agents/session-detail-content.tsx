@@ -250,6 +250,11 @@ import {
   useSessionHeaderBack,
 } from '@/lib/navigation/back-to-agents-sessions';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
+import {
+  clearNeedsInputReplyDraft,
+  peekNeedsInputReplyDraft,
+  subscribeNeedsInputReplyDraft,
+} from '@/lib/needs-input-reply-draft';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -438,6 +443,41 @@ export function SessionDetailContent({
   const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
   const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
   const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
+  // An answer typed into the needs-input notification waits in a memory slot for
+  // this session. Offer it to the card once, and only while a question is on
+  // screen: offering it any earlier would spend the answer on a screen that may
+  // never show the card. The subscription carries the case a route push cannot:
+  // a tap on the result while this screen is already on top changes no route
+  // param, so nothing remounts. A different raise clears the offer, so the card
+  // is never seeded with the previous question's text.
+  const [replyDraft, setReplyDraft] = useState<{
+    sessionId: KiloSessionId;
+    requestId: string;
+    text: string;
+  } | null>(null);
+  const activeQuestionRequestId = activeQuestion?.requestId ?? null;
+  useEffect(() => {
+    const offer = () => {
+      if (activeQuestionRequestId === null) {
+        return;
+      }
+      const text = peekNeedsInputReplyDraft(sessionId);
+      if (text === null) {
+        return;
+      }
+      // Store before clearing: the slot holds one answer, so one remember
+      // produces one card seed.
+      setReplyDraft({ sessionId, requestId: activeQuestionRequestId, text });
+      clearNeedsInputReplyDraft(sessionId);
+    };
+    setReplyDraft(previous =>
+      previous?.sessionId === sessionId && previous.requestId === activeQuestionRequestId
+        ? previous
+        : null
+    );
+    offer();
+    return subscribeNeedsInputReplyDraft(offer);
+  }, [activeQuestionRequestId, sessionId]);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
     fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
@@ -3277,6 +3317,12 @@ export function SessionDetailContent({
               requestId={activeQuestion.requestId}
               submissionError={questionSubmissionError}
               pendingCount={blockingRequestCount}
+              initialAnswer={
+                replyDraft?.sessionId === sessionId &&
+                replyDraft.requestId === activeQuestion.requestId
+                  ? replyDraft.text
+                  : null
+              }
             />
           ) : null}
 

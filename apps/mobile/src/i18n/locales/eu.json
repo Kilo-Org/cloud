@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Eskaera onartu da",
       "replied": "Erantzuna bidali da",
+      "empty": "Idatzi erantzun bat eta gero bidali.",
       "failed": "Ezin izan da erantzun. Ukitu berriro saiatzeko.",
       "unavailable": "Eskaera honek jada ez du itxaroten."
     }

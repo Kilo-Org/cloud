@@ -645,6 +645,7 @@
     "needsInputAction": {
       "approved": "Richiesta approvata",
       "replied": "Risposta inviata",
+      "empty": "Scrivi una risposta e poi inviala.",
       "failed": "Impossibile rispondere. Tocca di nuovo per riprovare.",
       "unavailable": "Questa richiesta non è più in attesa."
     }

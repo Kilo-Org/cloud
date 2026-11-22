@@ -324,6 +324,24 @@ describe('pushDataSchema cloud_agent_session', () => {
     };
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });
+
+  it('round-trips the answerDraft of an undelivered inline reply', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'question',
+      answerDraft: 'Use the staging bucket for the export.',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('parses a session without an answerDraft and keeps the field absent', () => {
+    const payload = { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' };
+    const parsed = pushDataSchema.parse(payload);
+    expect(parsed).toEqual(payload);
+    expect('answerDraft' in parsed).toBe(false);
+  });
 });
 
 describe('pushDataSchema unknown type', () => {

@@ -111,6 +111,11 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // the session belongs to. Optional so a push from an older producer in a
     // rolling deploy still validates; absent means Personal.
     organizationId: nonEmptyStringSchema.optional(),
+    // The answer text someone typed into the notification's inline Reply when
+    // that reply could not be delivered. Only an app-posted result
+    // notification sets it; no server producer does, so its presence never
+    // changes what the push means.
+    answerDraft: nonEmptyStringSchema.optional(),
   }),
   z.object({
     type: z.literal('agent_briefing'),

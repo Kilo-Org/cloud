@@ -1330,6 +1330,7 @@
     "needsInputAction": {
       "approved": "Request approved",
       "replied": "Reply sent",
+      "empty": "Add an answer, then send.",
       "failed": "Couldn't answer. Tap again to retry.",
       "unavailable": "This request is no longer waiting."
     }

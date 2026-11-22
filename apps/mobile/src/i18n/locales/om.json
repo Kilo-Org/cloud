@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Gaaffiin mirkanaa’eera",
       "replied": "Deebbiin ergameera",
+      "empty": "Deebii barreessi, sana booda ergi.",
       "failed": "Deebuu kennuu hin dandeenye. Yaaluuf irra deebi’i cuqaasi.",
       "unavailable": "Gaaffiin kun eegamaa hin oolu."
     }

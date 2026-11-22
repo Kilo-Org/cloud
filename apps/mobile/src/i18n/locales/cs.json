@@ -1294,6 +1294,7 @@
     "needsInputAction": {
       "approved": "Žádost schválena",
       "replied": "Odpověď odeslána",
+      "empty": "Napište odpověď a poté ji odešlete.",
       "failed": "Odpovědět se nepodařilo. Klepnutím to zkuste znovu.",
       "unavailable": "Tato žádost už nečeká."
     }

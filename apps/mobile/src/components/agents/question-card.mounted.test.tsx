@@ -71,27 +71,43 @@ const DESCRIBED = makeQuestion({ description: 'Deploy to production' });
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
+type CardProps = {
+  questions: Question[];
+  onAnswer: (answers: string[][]) => void;
+  initialAnswer?: string | null;
+};
+
 async function renderCard(
   questions: Question[],
-  onAnswer: (answers: string[][]) => void = () => undefined
+  onAnswer: (answers: string[][]) => void = () => undefined,
+  initialAnswer: string | null = null
 ): Promise<Renderer> {
   const holder: { current?: Renderer } = {};
   await act(async () => {
     await Promise.resolve();
-    holder.current = TestRenderer.create(
-      createElement(QuestionCard, {
-        questions,
-        onAnswer,
-        onReject: () => undefined,
-        requestId: 'question-req-1',
-      })
-    );
+    holder.current = TestRenderer.create(cardElement({ questions, onAnswer, initialAnswer }));
   });
   const renderer = holder.current;
   if (renderer === undefined) {
     throw new Error('renderer was not created');
   }
   return renderer;
+}
+
+function cardElement({ questions, onAnswer, initialAnswer }: CardProps) {
+  return createElement(QuestionCard, {
+    questions,
+    onAnswer,
+    onReject: () => undefined,
+    requestId: 'question-req-1',
+    initialAnswer,
+  });
+}
+
+function updateCard(renderer: Renderer, props: CardProps): void {
+  act(() => {
+    renderer.update(cardElement(props));
+  });
 }
 
 const CUSTOM_OPTION = 'Type your own answer';
@@ -344,5 +360,85 @@ describe('QuestionCard custom answer box', () => {
     typeCustomText(renderer.root, 'deploy staging');
 
     expect(className()).toContain('border-primary bg-primary');
+  });
+});
+
+describe('QuestionCard remembered reply answer', () => {
+  // An answer typed into a notification reply arrives as the first question's
+  // custom answer: the card offers it the way typing does, so the person can
+  // send it without retyping.
+  it('shows the remembered answer as the chosen custom answer and sends it', async () => {
+    let submitted: string[][] = [];
+    const renderer = await renderCard(
+      makeQuestion(),
+      answers => {
+        submitted = answers;
+      },
+      'ship it'
+    );
+
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('ship it');
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+    expect(submitAction(renderer.root).props.disabled).toBe(false);
+
+    press(submitAction(renderer.root));
+    expect(submitted).toEqual([['ship it']]);
+  });
+
+  it('marks the custom answer chosen for a multi-choice question too', async () => {
+    const renderer = await renderCard(makeQuestion({ multiple: true }), undefined, 'ship it');
+
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+  });
+
+  it('leaves the field empty when the screen offers no answer', async () => {
+    const renderer = await renderCard(makeQuestion(), undefined, null);
+
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('');
+    expect(customChoiceChecked(renderer.root)).toBe(false);
+  });
+
+  it('applies an answer that arrives after an empty field mounted', async () => {
+    const questions = makeQuestion();
+    const onAnswer = () => undefined;
+    const renderer = await renderCard(questions, onAnswer);
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('');
+
+    updateCard(renderer, { questions, onAnswer, initialAnswer: 'ship it' });
+
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('ship it');
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+  });
+
+  it('never overrides the text the person typed before an answer arrives', async () => {
+    let submitted: string[][] = [];
+    const questions = makeQuestion();
+    const onAnswer = (answers: string[][]) => {
+      submitted = answers;
+    };
+    const renderer = await renderCard(questions, onAnswer);
+
+    typeCustomText(renderer.root, 'deploy staging');
+    updateCard(renderer, { questions, onAnswer, initialAnswer: 'ship it' });
+
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('');
+    press(submitAction(renderer.root));
+    expect(submitted).toEqual([['deploy staging']]);
+  });
+
+  it('does not seed a question that takes no custom answer', async () => {
+    let submitted: string[][] = [];
+    const renderer = await renderCard(
+      makeQuestion({ custom: false }),
+      answers => {
+        submitted = answers;
+      },
+      'ship it'
+    );
+
+    expect(customInput(renderer.root)).toBeUndefined();
+    // Nothing is answered by the seed, so the card's submit stays disabled.
+    expect(submitAction(renderer.root).props.disabled).toBe(true);
+    expect(submitted).toEqual([]);
   });
 });

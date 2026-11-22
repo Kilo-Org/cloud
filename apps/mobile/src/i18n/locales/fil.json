@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Aprubado ang kahilingan",
       "replied": "Naipadala ang sagot",
+      "empty": "Maglagay ng sagot at pagkatapos ay ipadala ito.",
       "failed": "Hindi nasagot. I-tap muli para subukang muli.",
       "unavailable": "Hindi na naghihintay ang kahilingang ito."
     }

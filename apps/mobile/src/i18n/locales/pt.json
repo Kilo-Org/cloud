@@ -1294,6 +1294,7 @@
     "needsInputAction": {
       "approved": "Pedido aprovado",
       "replied": "Resposta enviada",
+      "empty": "Escreva uma resposta e envie-a de seguida.",
       "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
       "unavailable": "Este pedido já não está à espera."
     }

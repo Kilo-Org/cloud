@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Taotlus kiideti heaks",
       "replied": "Vastus on saadetud",
+      "empty": "Kirjuta vastus, seejärel saada see.",
       "failed": "Vastamine ei õnnestunud. Uuesti proovimiseks puuduta uuesti.",
       "unavailable": "See taotlus ei ole enam ootel."
     }

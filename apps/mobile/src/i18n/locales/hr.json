@@ -1266,6 +1266,7 @@
     "needsInputAction": {
       "approved": "Zahtjev je odobren",
       "replied": "Odgovor je poslan",
+      "empty": "Napišite odgovor i zatim ga pošaljite.",
       "failed": "Nije uspjelo odgovoriti. Dodirnite ponovo da biste pokušali.",
       "unavailable": "Ovaj zahtjev više ne čeka."
     }

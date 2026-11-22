@@ -179,7 +179,7 @@ function workspacePages(workspaces: WorkspaceSummary[]) {
   };
 }
 
-function chatPages() {
+function chatPages(nextCursor: string | null = null) {
   return {
     pages: [
       {
@@ -192,7 +192,7 @@ function chatPages() {
             updatedAt: TIME,
           },
         ],
-        nextCursor: null,
+        nextCursor,
         marker: 'chat-page',
       },
     ],
@@ -739,8 +739,11 @@ describe('useSidebarLiveUpdates', () => {
       worktreeId: WORKTREE_B,
     });
     const initialData = { cliSessions: [loadedSession()] };
-    const newerData = { results: [{ ...loadedSession(), status_updated_at: NEWER }] };
-    const unrelatedData = chatPages();
+    const newerData = {
+      results: [{ ...loadedSession(), status_updated_at: NEWER }],
+      marker: 'cached',
+    };
+    const unrelatedData = { ...chatPages(), marker: 'cached' };
     unrelatedData.pages[0].chats[0].sessionId = 'ses_other';
     const fetches = [
       startDeferredFetch(initialKey, initialData),
@@ -764,9 +767,9 @@ describe('useSidebarLiveUpdates', () => {
       organizationId: ORGANIZATION,
       worktreeId: WORKTREE_A,
     });
-    const firstPage = { ...chatPages().pages[0], nextCursor: 'next' };
+    const firstPage = chatPages('next').pages[0];
     const nextPage = { ...chatPages().pages[0], chats: [], marker: 'next-page' };
-    const next = Promise.withResolvers<typeof nextPage>();
+    const next = Promise.withResolvers<typeof firstPage>();
     const queryFn = jest.fn(() => next.promise);
     const observer = new InfiniteQueryObserver(queryClient, {
       queryKey,

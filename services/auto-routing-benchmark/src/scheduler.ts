@@ -135,7 +135,38 @@ export async function saveSchedulerOverrides(
 
 export const SCHEDULER_ACTIVE_LEASE_MS = 20 * 60_000;
 export const SCHEDULER_QUEUE_LEASE_MS = 30 * 60_000;
-export const SCHEDULER_MAX_ATTEMPTS = 6;
+/**
+ * Automatic attempts one block of a USER pool may use. The runner never replays a user
+ * generation on its own, so this only bounds how often an errored block is re-admitted
+ * through the queue; it keeps the six attempts it has always had.
+ */
+export const SCHEDULER_MAX_USER_ATTEMPTS = 6;
+/**
+ * Automatic attempts one block of a PLATFORM pool may use: the first run plus one
+ * automatic retry, counted on the chunk's own `attempts` across every automatic path
+ * (chunk deferral, lease reclaim and the in-process empty-output retry). Once both are
+ * spent the block fails into the ordinary failure path, and only the manual
+ * "Requeue retryable" CTA admits it again.
+ */
+export const SCHEDULER_MAX_PLATFORM_ATTEMPTS = 2;
+
+/** True for a chunk of a user pool's run; every other chunk belongs to a platform pool. */
+function chunkIsUserSql(alias: string): string {
+  return `EXISTS (
+  SELECT 1 FROM benchmark_runs AS run
+  WHERE run.id = ${alias}.run_id AND run.purpose = 'user')`;
+}
+
+/**
+ * The automatic attempt cap of a block, in SQL, for the statements that decide a chunk's
+ * fate from its own row. Reading the cap from the owning run's purpose keeps every automatic
+ * path in one policy without a second column: `attempts` is the block's single persistent
+ * counter.
+ */
+function chunkAttemptCapSql(alias: string): string {
+  return `(CASE WHEN ${chunkIsUserSql(alias)} THEN ${SCHEDULER_MAX_USER_ATTEMPTS} ELSE ${SCHEDULER_MAX_PLATFORM_ATTEMPTS} END)`;
+}
+
 /**
  * A provider throttle is not a chunk failure, so it refunds the claim's attempt and
  * counts here instead. With 15–300 second backoff, the budget gives a throttled chunk
@@ -594,6 +625,7 @@ export async function claimScheduledChunks(
               UPDATE scheduler_chunks SET status = 'queued', token = ?1, slot = ?2,
                 lease_until = ?3, attempts = attempts + 1
               WHERE id = ?4 AND status = 'pending'
+                AND attempts < ${chunkAttemptCapSql('scheduler_chunks')}
                 AND EXISTS (SELECT 1 FROM scheduler_dispatch_lock WHERE id = 1 AND token = ?1)
               RETURNING *
             `)
@@ -601,6 +633,8 @@ export async function claimScheduledChunks(
           )
         );
         for (const result of results) {
+          // Only rows this statement actually transitioned count: a chunk at its attempt cap
+          // matches nothing, so it never blocks the rest of the pass from being claimed.
           claimed += result.results.length;
           claims.push(...result.results);
         }
@@ -664,18 +698,58 @@ export async function finishChunk(db: D1Database, id: string, token: string): Pr
     .run();
 }
 
+/**
+ * Returns a chunk to the queue, failing it instead once its block has spent every automatic
+ * attempt. The budget comes from the owning run's purpose, so a platform block stops after
+ * its one retry and a user block keeps the six it has always had.
+ *
+ * It reports which of the two happened, because that decision is made against the row's
+ * current `attempts` — never a claim object read before this invocation spent an attempt of
+ * its own (the in-process retry).
+ */
 export async function deferChunk(
   db: D1Database,
   id: string,
   token: string,
   availableAt: number,
   onlyQueued = false
+): Promise<'deferred' | 'failed'> {
+  const row = await db
+    .prepare(`UPDATE scheduler_chunks SET status = CASE WHEN attempts >= ${chunkAttemptCapSql('scheduler_chunks')} THEN 'failed' ELSE 'pending' END,
+    available_at = ?, slot = NULL, token = NULL, lease_until = 0
+    WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND (? = 0 OR status = 'queued')
+    RETURNING status`)
+    .bind(availableAt, id, token, onlyQueued ? 1 : 0)
+    .first<{ status: string }>();
+  return row?.status === 'failed' ? 'failed' : 'deferred';
+}
+
+/**
+ * Returns a chunk to the queue for a wait in which this invocation made no model call: a
+ * lost claim, another executor's generation, unreachable infrastructure, or a launch-fence
+ * refusal.
+ *
+ * A platform block gives the claim's attempt back in the same statement, because its budget
+ * counts executions of the model only — with a two-attempt cap, charging a wait would fail a
+ * block that never ran. A user block keeps the counted semantics it has always had: here
+ * this behaves exactly like {@link deferChunk}, so user runs are unchanged.
+ */
+export async function deferNoModelCallChunk(
+  db: D1Database,
+  id: string,
+  token: string,
+  availableAt: number,
+  onlyQueued = false
 ): Promise<void> {
+  const refund = `(CASE WHEN ${chunkIsUserSql('scheduler_chunks')} THEN 0 ELSE 1 END)`;
   await db
-    .prepare(`UPDATE scheduler_chunks SET status = CASE WHEN attempts >= ? THEN 'failed' ELSE 'pending' END,
+    .prepare(`UPDATE scheduler_chunks SET
+    status = CASE WHEN attempts - ${refund} >= ${chunkAttemptCapSql('scheduler_chunks')}
+      THEN 'failed' ELSE 'pending' END,
+    attempts = MAX(attempts - ${refund}, 0),
     available_at = ?, slot = NULL, token = NULL, lease_until = 0
     WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND (? = 0 OR status = 'queued')`)
-    .bind(SCHEDULER_MAX_ATTEMPTS, availableAt, id, token, onlyQueued ? 1 : 0)
+    .bind(availableAt, id, token, onlyQueued ? 1 : 0)
     .run();
 }
 
@@ -869,10 +943,10 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
           AND model = scheduler_chunks.model AND variant = scheduler_chunks.variant AND rep = scheduler_chunks.rep
       ) THEN 'failed' WHEN EXISTS (
         SELECT 1 FROM benchmark_runs WHERE id = scheduler_chunks.run_id AND status != 'running'
-      ) THEN 'completed' WHEN attempts >= ? THEN 'failed' ELSE 'pending' END,
+      ) THEN 'completed' WHEN attempts >= ${chunkAttemptCapSql('scheduler_chunks')} THEN 'failed' ELSE 'pending' END,
       slot = NULL, token = NULL, lease_until = 0
       WHERE status IN ('queued', 'active') AND lease_until <= ?`)
-      .bind(SCHEDULER_MAX_ATTEMPTS, now),
+      .bind(now),
     db.prepare(SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL),
     db.prepare(SCHEDULER_PRUNE_EXECUTIONS_SQL).bind(pruneBefore),
     db.prepare(SCHEDULER_PRUNE_CHUNKS_SQL).bind(pruneBefore),
@@ -1095,6 +1169,52 @@ export function restartPaidCaseStatement(
       key.attemptStartedAt ?? null,
       now
     );
+}
+
+/** The owned-claim guard a retry's ledger restart and its attempt spend share. */
+function retryGuardSql(): string {
+  return `EXISTS (
+        SELECT 1 FROM scheduler_executions AS execution
+        WHERE execution.run_id = scheduler_chunks.run_id
+          AND execution.model = scheduler_chunks.model
+          AND execution.variant = scheduler_chunks.variant
+          AND execution.rep = scheduler_chunks.rep
+          AND execution.token = scheduler_chunks.token
+      )
+      AND EXISTS (
+        SELECT 1 FROM benchmark_runs
+        WHERE id = scheduler_chunks.run_id AND status = 'running'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM run_lane_failures AS failure
+        WHERE failure.run_id = scheduler_chunks.run_id AND failure.model = scheduler_chunks.model
+          AND failure.variant = scheduler_chunks.variant AND failure.rep = scheduler_chunks.rep
+      )`;
+}
+
+/**
+ * Spends one further automatic attempt of a block for a retry the same invocation is about
+ * to make (the platform empty-output retry). It is the same counter the scheduler spends on
+ * every claim and deferral, so a claim plus this retry can never exceed the run's cap: the
+ * statement reports zero changes once the block has spent its automatic attempts, and the
+ * caller then keeps the attempt it already measured instead of paying again.
+ *
+ * Its guard is the one the retry's ledger restart uses (our own active claim, a live run, a
+ * lane that has not dead-lettered, and this claim's ledger row), so an attempt is never
+ * spent on a retry the ledger would refuse.
+ */
+export function consumeRetryAttemptStatement(
+  db: D1Database,
+  id: string,
+  token: string,
+  now: number
+): D1PreparedStatement {
+  return db
+    .prepare(`UPDATE scheduler_chunks SET attempts = attempts + 1
+    WHERE id = ? AND token = ? AND status = 'active' AND lease_until > ?
+      AND attempts + 1 <= ${chunkAttemptCapSql('scheduler_chunks')}
+      AND ${retryGuardSql()}`)
+    .bind(id, token, now);
 }
 
 export async function restartPaidCase(

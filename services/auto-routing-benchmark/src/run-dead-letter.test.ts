@@ -106,7 +106,7 @@ beforeEach(() => {
   schedulerRun.mockResolvedValue({ meta: { changes: 0 } });
   queueSend.mockResolvedValue(undefined);
   vi.mocked(getChunk).mockResolvedValue(claim);
-  vi.mocked(deferChunk).mockResolvedValue(undefined);
+  vi.mocked(deferChunk).mockResolvedValue('deferred');
   vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
   vi.mocked(scheduleRunChunks).mockResolvedValue(true);

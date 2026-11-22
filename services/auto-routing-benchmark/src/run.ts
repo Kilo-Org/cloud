@@ -186,6 +186,7 @@ import {
 import {
   acquireInitializationLease,
   restartPaidCaseStatement,
+  consumeRetryAttemptStatement,
   claimScheduledChunks,
   clearUnbilledCase,
   getPaidCasePromptRevision,
@@ -193,6 +194,7 @@ import {
   cooldownModel,
   deferCatalogChunk,
   deferChunk,
+  deferNoModelCallChunk,
   deferThrottledChunk,
   failChunk,
   failScheduledEntryStatements,
@@ -210,7 +212,6 @@ import {
   scheduleRunChunks,
   schedulerBackoffSeconds,
   startChunk,
-  SCHEDULER_MAX_ATTEMPTS,
   SCHEDULER_MAX_CATALOG_DEFERRALS,
   SCHEDULER_MAX_THROTTLE_DEFERRALS,
   type SchedulerClaim,
@@ -1761,7 +1762,8 @@ async function dispatchClaims(env: Env, config: SchedulerConfig): Promise<number
       });
     } catch (error) {
       for (const unsent of claims.slice(index)) {
-        await deferChunk(env.BENCH_DB, unsent.id, unsent.token, Date.now());
+        // The claim never reached a worker, so no execution happened on it.
+        await deferNoModelCallChunk(env.BENCH_DB, unsent.id, unsent.token, Date.now());
       }
       throw error;
     }
@@ -2608,6 +2610,36 @@ async function failDeadLaneAndPaidLinks(
   ]);
 }
 
+/**
+ * Records the lane death of a block whose chunk row is already terminal and queues recovery
+ * for its output. Both terminal paths use it: an ambiguity that can no longer deliver, and an
+ * ordinary failure that spent the block's last automatic attempt.
+ */
+async function recordTerminalChunk(
+  env: Env,
+  claim: SchedulerClaim,
+  failureClass: BenchmarkProfileFailureClass
+): Promise<void> {
+  await recordLaneFailure(env.BENCH_DB, {
+    runId: claim.run_id,
+    model: claim.model,
+    variant: claim.variant,
+    rep: claim.rep,
+    chunk: claim.chunk,
+    shard: 0,
+    failureClass,
+  });
+  for (const caseId of z.array(z.string()).parse(JSON.parse(claim.case_ids))) {
+    await queueOutputRecovery(env, {
+      runId: claim.run_id,
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId,
+    });
+  }
+}
+
 async function processScheduledChunk(env: Env, id: string, token: string): Promise<void> {
   const claim = await getChunk(env.BENCH_DB, id, token);
   if (!claim) return;
@@ -2711,22 +2743,24 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
       );
       await failDeadLaneAndPaidLinks(env, claim, 'unsupported', error.reason, 'unsupported');
     } else if (error instanceof ChunkClaimLostError) {
-      await deferChunk(env.BENCH_DB, id, token, Date.now());
+      // No execution of ours ran: the claim is released without spending an attempt.
+      await deferNoModelCallChunk(env.BENCH_DB, id, token, Date.now());
     } else if (error instanceof PaidCaseAttachedError) {
       // Another funded generation owns this case run. Nothing was inferred, so the chunk
       // waits out a short backoff and re-reads the fence; the owner's result is adopted
-      // when it lands and no attempt is consumed by the waiting.
+      // when it lands. Nothing reached the model, so the wait spends no attempt.
       const delaySeconds = schedulerBackoffSeconds(1);
-      await deferChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
+      await deferNoModelCallChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
       await env.BENCH_QUEUE.send(
         { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
         { delaySeconds }
       );
     } else if (error instanceof BenchmarkInfraUnavailableError) {
       // Infrastructure, not the model or the payer: back the lane off and re-enter normal
-      // admission. No lane failure, no catalog cooldown, no profile attempt.
+      // admission. No lane failure, no catalog cooldown, no profile attempt, and no
+      // automatic attempt spent (the gateway was never reached).
       const delaySeconds = schedulerBackoffSeconds(1);
-      await deferChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
+      await deferNoModelCallChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
       await env.BENCH_QUEUE.send(
         { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
         { delaySeconds }
@@ -2734,8 +2768,13 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
     } else if (error instanceof BenchmarkCaseNotStartedError) {
       // The launch fence refused the paid start: no provider request and no subprocess.
       // The lane takes a normal backoff and re-admits through the fence; this is never
-      // counted as an attempt and never replayed as the user's paid start.
-      await deferChunk(env.BENCH_DB, id, token, Date.now() + schedulerBackoffSeconds(1) * 1000);
+      // replayed as the user's paid start. No provider request ran, so it spends no attempt.
+      await deferNoModelCallChunk(
+        env.BENCH_DB,
+        id,
+        token,
+        Date.now() + schedulerBackoffSeconds(1) * 1000
+      );
       await env.BENCH_QUEUE.send(
         { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
         { delaySeconds: schedulerBackoffSeconds(1) }
@@ -2778,44 +2817,36 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
         { delaySeconds }
       );
-    } else if (
-      error instanceof AmbiguousBenchmarkExecutionError ||
-      claim.attempts >= SCHEDULER_MAX_ATTEMPTS
-    ) {
+    } else if (error instanceof AmbiguousBenchmarkExecutionError) {
       await failChunk(env.BENCH_DB, id, token);
-      await recordLaneFailure(env.BENCH_DB, {
-        runId: claim.run_id,
-        model: claim.model,
-        variant: claim.variant,
-        rep: claim.rep,
-        chunk: claim.chunk,
-        shard: 0,
-        failureClass: LANE_FAILURE_CLASS_BY_WAIT_REASON[reason],
-      });
-      for (const caseId of z.array(z.string()).parse(JSON.parse(claim.case_ids))) {
-        await queueOutputRecovery(env, {
-          runId: claim.run_id,
-          model: claim.model,
-          variant: claim.variant,
-          rep: claim.rep,
-          caseId,
-        });
-      }
+      await recordTerminalChunk(env, claim, LANE_FAILURE_CLASS_BY_WAIT_REASON[reason]);
     } else {
       const delaySeconds = schedulerBackoffSeconds(claim.attempts);
-      await deferChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
+      // The block's fate is decided from the row's own counter inside the statement, so a
+      // platform block whose last automatic attempt just happened fails here instead of
+      // being deferred again, and the manual CTA is what admits it after that.
+      const outcome = await deferChunk(
+        env.BENCH_DB,
+        id,
+        token,
+        Date.now() + delaySeconds * 1000
+      );
       if (error instanceof BenchmarkThrottleError) {
         await cooldownModel(env.BENCH_DB, claim.model, Date.now() + delaySeconds * 1000);
       }
-      await env.BENCH_QUEUE.send(
-        {
-          runId: claim.run_id,
-          kind: 'decider',
-          model: claim.model,
-          schedulerWake: true,
-        },
-        { delaySeconds }
-      );
+      if (outcome === 'failed') {
+        await recordTerminalChunk(env, claim, LANE_FAILURE_CLASS_BY_WAIT_REASON[reason]);
+      } else {
+        await env.BENCH_QUEUE.send(
+          {
+            runId: claim.run_id,
+            kind: 'decider',
+            model: claim.model,
+            schedulerWake: true,
+          },
+          { delaySeconds }
+        );
+      }
     }
     console.warn(
       JSON.stringify({
@@ -3740,6 +3771,20 @@ async function processDeciderJob(
           return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
         startedAt = Math.max(Date.now(), startedAt + 1);
+        // The retry spends the block's last automatic attempt first: `attempts` is the same
+        // counter the scheduler spends on every claim and deferral, so a platform block can
+        // never exceed its cap through this in-process path either. The spend is committed
+        // before the ledger moves, so a refusal (the block already used both attempts) leaves
+        // the measured first answer standing instead of paying for a call nobody budgeted.
+        const consumed = await consumeRetryAttemptStatement(
+          env.BENCH_DB,
+          claim.id,
+          claim.token,
+          Date.now()
+        ).run();
+        if ((consumed.meta.changes ?? 0) === 0) {
+          return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
+        }
         // The retry's start must move in the ledger and on the canonical fence in the same
         // transaction: RunnerCancel's live check compares `benchmark_case_runs.started_at`
         // to ISO(attemptStartedAt), so a ledger-only move would refuse every retry.

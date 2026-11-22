@@ -243,6 +243,18 @@ run after partial text but before any billed answer. A CLI process killed by a s
 its first event gets the same single retry as an empty completion; a timeout, a kill after
 events, or an invalid-request rejection stays a measured failure.
 
+An automatic attempt is one execution of a block (a scheduler chunk) that reaches the model,
+paid or not. A platform block may use two: the first run plus one automatic retry, counted on
+the chunk's own `attempts` column across every automatic path — the chunk deferral, the
+lease-expiry reclaim, the claim itself, and the in-process empty-output retry (which spends
+the same column before it pays). Once both are spent the block fails into the ordinary failure
+path, so only the manual "Requeue retryable" requeue admits it again. A wait that made no
+model call — a lost claim, another executor's generation, a launch-fence refusal or an
+unreachable gateway — returns the attempt, so only executions that reached the model are
+counted. Unbilled throttle and catalog-load deferrals already refund their attempt and count
+their own budgets instead. A user block keeps its six automatic attempts and is never replayed
+in-process, as before.
+
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
 It keeps its slot, so the wait cannot oversubscribe the model or slot caps, and its
 claim is redelivered every 30 seconds to recheck. The wait ends when the output arrives,

@@ -12,6 +12,7 @@ import {
   clearUnbilledCase,
   cooldownModel,
   deferChunk,
+  deferNoModelCallChunk,
   deferThrottledChunk,
   finishChunk,
   failScheduledEntry,
@@ -29,7 +30,8 @@ import {
   SCHEDULER_LANE_HEADS_SQL,
   SCHEDULER_LIVE_SQL,
   SCHEDULER_MATERIALIZED_LANES_SQL,
-  SCHEDULER_MAX_ATTEMPTS,
+  SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+  SCHEDULER_MAX_USER_ATTEMPTS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_PRUNE_CHUNKS_SQL,
   SCHEDULER_PRUNE_EXECUTIONS_SQL,
@@ -866,7 +868,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
       chunkSize: 1,
     });
     const config = schedulerConfig('{"slots":1}');
-    const throttles = SCHEDULER_MAX_ATTEMPTS + 2;
+    const throttles = SCHEDULER_MAX_USER_ATTEMPTS + 2;
     for (let throttle = 1; throttle <= throttles; throttle++) {
       const [claim] = await claimMany(db, config, 1, `throttle-${throttle}`, NOW + throttle);
       if (!claim) throw new Error(`Expected throttled claim ${throttle}`);
@@ -886,7 +888,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(storedChunks(sqlite)[0]).toEqual(stored);
   });
 
-  it('fails exhausted leases without allowing another claim or retaining a slot', async () => {
+  it('fails a platform lease reclaim at the second attempt, never a third claim', async () => {
     insertRun(sqlite, 'exhausted');
     await scheduleRunChunks(db, {
       runId: 'exhausted',
@@ -897,23 +899,118 @@ describe('scheduler (production migrations and real SQLite)', () => {
     });
     let now = NOW;
     const config = schedulerConfig('{"slots":1}');
-    for (let attempt = 1; attempt <= SCHEDULER_MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_PLATFORM_ATTEMPTS; attempt++) {
       const [claim] = await claimMany(db, config, 1, `attempt-${attempt}`, now);
       if (!claim) throw new Error(`Expected claim attempt ${attempt}`);
       expect(claim.attempts).toBe(attempt);
       now += SCHEDULER_QUEUE_LEASE_MS;
       const failed = await recoverChunks(db, now);
-      expect(failed).toHaveLength(attempt === SCHEDULER_MAX_ATTEMPTS ? 1 : 0);
+      expect(failed).toHaveLength(attempt === SCHEDULER_MAX_PLATFORM_ATTEMPTS ? 1 : 0);
     }
     expect(storedChunks(sqlite)[0]).toMatchObject({
       status: 'failed',
       slot: null,
       token: null,
       lease_until: 0,
-      attempts: SCHEDULER_MAX_ATTEMPTS,
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
     });
     expect(await claimMany(db, config, 4, 'after-exhaustion', now)).toEqual([]);
     expect(liveChunks(sqlite)).toEqual([]);
+  });
+
+  it('keeps a user block on six lease attempts, as it always had', async () => {
+    insertRun(sqlite, 'user-exhausted', { purpose: 'user' });
+    await scheduleRunChunks(db, {
+      runId: 'user-exhausted',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    let now = NOW;
+    const config = schedulerConfig('{"slots":1}');
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_USER_ATTEMPTS; attempt++) {
+      const [claim] = await claimMany(db, config, 1, `user-attempt-${attempt}`, now);
+      if (!claim) throw new Error(`Expected user claim attempt ${attempt}`);
+      expect(claim.attempts).toBe(attempt);
+      now += SCHEDULER_QUEUE_LEASE_MS;
+      const failed = await recoverChunks(db, now);
+      expect(failed).toHaveLength(attempt === SCHEDULER_MAX_USER_ATTEMPTS ? 1 : 0);
+    }
+    expect(storedChunks(sqlite)[0]).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_USER_ATTEMPTS,
+    });
+  });
+
+  it('fails a platform block on its second ordinary deferral', async () => {
+    insertRun(sqlite, 'platform-defer');
+    await scheduleRunChunks(db, {
+      runId: 'platform-defer',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const outcomes: string[] = [];
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_PLATFORM_ATTEMPTS; attempt++) {
+      const [claim] = await claimMany(db, config, 1, `platform-defer-${attempt}`, NOW + attempt);
+      if (!claim) throw new Error(`Expected platform claim ${attempt}`);
+      outcomes.push(await deferChunk(db, claim.id, claim.token, NOW + attempt));
+    }
+    // The first deferral returns the block to the queue; the second spends its last attempt
+    // and fails it, so no third claim exists to make a third model call.
+    expect(outcomes).toEqual(['deferred', 'failed']);
+    expect(storedChunks(sqlite)[0]).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+    });
+    expect(await claimMany(db, config, 2, 'after-platform-failure', NOW + 10)).toEqual([]);
+  });
+
+  it('keeps a user block deferring through all six attempts, as before', async () => {
+    insertRun(sqlite, 'user-defer', { purpose: 'user' });
+    await scheduleRunChunks(db, {
+      runId: 'user-defer',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const outcomes: string[] = [];
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_USER_ATTEMPTS; attempt++) {
+      const [claim] = await claimMany(db, config, 1, `user-defer-${attempt}`, NOW + attempt);
+      if (!claim) throw new Error(`Expected user claim ${attempt}`);
+      outcomes.push(await deferChunk(db, claim.id, claim.token, NOW + attempt));
+    }
+    // Six attempts, then the same sixth-attempt failure the old shared budget produced: a
+    // user block's deferral behaviour is unchanged.
+    expect(outcomes).toEqual([
+      ...Array(SCHEDULER_MAX_USER_ATTEMPTS - 1).fill('deferred'),
+      'failed',
+    ]);
+    expect(storedChunks(sqlite)[0]).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_USER_ATTEMPTS,
+    });
+  });
+
+  it('does not spend a platform attempt on a wait that never reached the model', async () => {
+    insertRun(sqlite, 'platform-wait');
+    await scheduleRunChunks(db, {
+      runId: 'platform-wait',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'wait-claim');
+    if (!claim) throw new Error('Expected a claim');
+    await deferNoModelCallChunk(db, claim.id, claim.token, NOW);
+    expect(storedChunk(sqlite, claim.id)).toMatchObject({ status: 'pending', attempts: 0 });
   });
 
   it('persists the paid-case guard across connection restart, lease recovery and token replacement', async () => {
@@ -1296,7 +1393,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     });
     sqlite
       .prepare("UPDATE scheduler_chunks SET status = 'failed', attempts = ?")
-      .run(SCHEDULER_MAX_ATTEMPTS);
+      .run(SCHEDULER_MAX_PLATFORM_ATTEMPTS);
     const recordFailure = sqlite.prepare(`
       INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, failed_at)
       VALUES ('failed-lanes', 'shared/model', ?, ?, 0, ?)

@@ -1926,6 +1926,47 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
   });
 
+  // The Worker validates `operationKey` with `max(128)` (`services/security-sync/src/index.ts`),
+  // and a key it rejects is a 400 the ledger treats as a definitive pre-acceptance rejection.
+  // Each release step re-derives from the base identity, so the length is bounded by the intent
+  // name and the chain depth does not add to it.
+  it('keeps every admitted key inside the Worker input bound, whatever the chain has walked', async () => {
+    mockGetOperation.mockResolvedValue(ledgerRow({ status: 'failed' }));
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      source: 'dependabot',
+      severity: 'high',
+    });
+    mockSubmitManualFindingDismissal.mockResolvedValue({
+      ...accepted,
+      messageId: 'dismiss-message-123',
+    });
+
+    await createHandlers().triggerSync.handler({
+      ctx: context,
+      input: { repoFullName: 'kilo/repo' },
+    });
+    await createHandlers().dismissFinding.handler({
+      ctx: context,
+      input: { findingId, reason: 'not_used' },
+    });
+
+    const syncKey = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    const dismissKey = mockAdmitOperation.mock.calls[1]?.[1] as { operationKey: string };
+    expect(syncKey.operationKey).toHaveLength(91);
+    expect(dismissKey.operationKey).toHaveLength(95);
+    for (const admitted of [syncKey, dismissKey]) {
+      expect(admitted.operationKey.length).toBeLessThanOrEqual(128);
+    }
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: syncKey.operationKey })
+    );
+    expect(mockSubmitManualFindingDismissal).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: dismissKey.operationKey })
+    );
+  });
+
   it('replays a settled manual sync without re-submitting or re-tracking', async () => {
     mockAdmitOperation.mockResolvedValue({
       admission: 'duplicate_settled',

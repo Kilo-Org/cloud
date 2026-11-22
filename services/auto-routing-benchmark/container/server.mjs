@@ -5,8 +5,9 @@
 //
 // The Kilo user token is passed in the request body and injected only as a
 // child-process env var (KILO_AUTH_CONTENT). It is never written to disk and
-// never logged. Every captured child stream this server returns or delivers has
-// each occurrence of the token replaced with '[redacted]'.
+// never logged. Every captured child stream this server returns or delivers
+// keeps whole lines only: a cap drops the line it cut, and every remaining value
+// is returned with the placeholder.
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -266,12 +267,12 @@ function redactToken(text, kiloToken) {
     : text;
 }
 
-// When a cap ends the retained text, that edge drops up to one less than the credential
-// length, so the way the retained text is cut holds no more than a complete value.
-function dropEdgeFragment(text, kiloToken, edge) {
-  if (typeof kiloToken !== 'string' || kiloToken.length === 0) return text;
-  const keep = Math.max(0, text.length - (kiloToken.length - 1));
-  return edge === 'end' ? text.slice(0, keep) : text.slice(text.length - keep);
+// A cap ends inside a line, so a capped edge keeps whole lines only and drops the line
+// the cap cut.
+function dropCutLine(text, edge) {
+  const cut = edge === 'end' ? text.lastIndexOf('\n') : text.indexOf('\n');
+  if (cut === -1) return '';
+  return edge === 'end' ? text.slice(0, cut + 1) : text.slice(cut + 1);
 }
 
 async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) {
@@ -315,10 +316,8 @@ async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) 
       finished = true;
       clearTimeout(killTimer);
       clearTimeout(finishTimer);
-      const retainedStdout = stdoutTruncated ? dropEdgeFragment(stdout, kiloToken, 'end') : stdout;
-      const retainedStderr = stderrTruncated
-        ? dropEdgeFragment(stderrTail, kiloToken, 'start')
-        : stderrTail;
+      const retainedStdout = stdoutTruncated ? dropCutLine(stdout, 'end') : stdout;
+      const retainedStderr = stderrTruncated ? dropCutLine(stderrTail, 'start') : stderrTail;
       resolve({
         exitCode,
         stdoutLines: retainedStdout

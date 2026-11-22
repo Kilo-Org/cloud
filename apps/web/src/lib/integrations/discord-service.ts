@@ -532,8 +532,20 @@ export async function removeBotFromGuild(guildId: string | null): Promise<Discor
  * memberships matching it. Call it once the write that records the new server has
  * committed: it never throws, because a release that does not settle is reported
  * to operators rather than reported as a failed connection.
+ *
+ * The previous server is released only while it is still unclaimed. A server
+ * that another owner has since recorded belongs to that connection, so it is
+ * left alone.
  */
-export async function releasePreviousDiscordGuild(previousGuildId: string): Promise<void> {
+export async function releasePreviousDiscordGuild(
+  owner: Owner,
+  previousGuildId: string
+): Promise<void> {
+  const recordedByAnotherOwner = await getConflictingDiscordInstallation(owner, previousGuildId);
+  if (recordedByAnotherOwner) {
+    return;
+  }
+
   const removal = await removeBotFromGuild(previousGuildId);
 
   if (removal.status === 'left' || removal.status === 'already_absent') {

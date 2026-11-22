@@ -214,7 +214,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     // server it replaced. This runs after the write has committed, so the release
     // follows the connection rather than deciding it.
     if (installation.previousGuildId) {
-      await releasePreviousDiscordGuild(installation.previousGuildId);
+      await releasePreviousDiscordGuild(owner, installation.previousGuildId);
     }
 
     // 10. Redirect to success page

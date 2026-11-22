@@ -348,10 +348,23 @@ describe('discord-service rebind result', () => {
 
 describe('discord-service previous guild release', () => {
   const guildId = '111111111111111111';
+  const otherOwner = { type: 'user', id: 'user-2' } satisfies Owner;
 
   beforeEach(() => {
     jest.restoreAllMocks();
     mockCaptureException.mockReset();
+    mockLimit.mockReset();
+    mockLimit.mockResolvedValue([]);
+  });
+
+  it('leaves a server another owner records alone', async () => {
+    mockLimit.mockResolvedValueOnce([buildDiscordIntegration({ owned_by_user_id: otherOwner.id })]);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(releasePreviousDiscordGuild(owner, guildId)).resolves.toBeUndefined();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it.each([204, 404])('leaves the server without reporting a %i answer', async status => {
@@ -359,7 +372,7 @@ describe('discord-service previous guild release', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(null, { status }));
 
-    await expect(releasePreviousDiscordGuild(guildId)).resolves.toBeUndefined();
+    await expect(releasePreviousDiscordGuild(owner, guildId)).resolves.toBeUndefined();
 
     expect(fetchSpy).toHaveBeenCalledWith(
       `https://discord.com/api/v10/users/%40me/guilds/${guildId}`,
@@ -377,7 +390,7 @@ describe('discord-service previous guild release', () => {
   ] as const)('reports a %i answer without throwing', async (status, reason) => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status }));
 
-    await expect(releasePreviousDiscordGuild(guildId)).resolves.toBeUndefined();
+    await expect(releasePreviousDiscordGuild(owner, guildId)).resolves.toBeUndefined();
 
     expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { source: 'discord_oauth', op: 'release_previous_guild' },
@@ -388,7 +401,7 @@ describe('discord-service previous guild release', () => {
   it('reports an unusable bot token without throwing', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
 
-    await expect(releasePreviousDiscordGuild(guildId)).resolves.toBeUndefined();
+    await expect(releasePreviousDiscordGuild(owner, guildId)).resolves.toBeUndefined();
 
     expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { source: 'discord_oauth', op: 'release_previous_guild' },

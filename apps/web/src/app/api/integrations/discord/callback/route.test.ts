@@ -249,7 +249,10 @@ describe('handleDiscordOAuthCallback', () => {
       response,
       `/organizations/${ORGANIZATION_ID}/integrations/discord?success=installed`
     );
-    expect(mockedReleasePreviousDiscordGuild).toHaveBeenCalledWith(PREVIOUS_GUILD_ID);
+    expect(mockedReleasePreviousDiscordGuild).toHaveBeenCalledWith(
+      { type: 'org', id: ORGANIZATION_ID },
+      PREVIOUS_GUILD_ID
+    );
     expect(mockedReleasePreviousDiscordGuild).toHaveBeenCalledTimes(1);
   });
 

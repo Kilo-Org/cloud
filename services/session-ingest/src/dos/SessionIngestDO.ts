@@ -448,6 +448,14 @@ export type IngestResult =
 /** How many of the newest message rows to inspect when pairing an idle transition with the assistant turn that just finished. */
 const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
 
+/**
+ * Rows one raw-export page asks SQLite for, and the most bytes one pull emits.
+ * A row can hold a whole inline body (up to `MAX_INGEST_ITEM_BYTES`), so the byte
+ * cap — not the row count — is what keeps a pull's allocation bounded.
+ */
+const RAW_EXPORT_PAGE_ROWS = 200;
+const RAW_EXPORT_PAGE_MAX_BYTES = 4 * 1024 * 1024;
+
 type PartExcerptRow = {
   id: number;
   ingested_at: number | null;
@@ -2456,6 +2464,99 @@ export class SessionIngestDO extends DurableObject<Env> {
     return { rows: window, nextCursor, done };
   }
 
+  /**
+   * Stream every row this session stores, as NDJSON, for an authorised export.
+   *
+   * Read-only by construction — the method only selects — so it is safe against a
+   * live session and adds nothing to a Durable Object that holds no rows. Rows
+   * arrive in `(ingested_at, id)` order, the same order the clone and metrics
+   * readers use, so a partially received file can be resumed and merged without a
+   * second sort. `item_data` is the body exactly as stored: a body offloaded at
+   * ingest is `{}` beside its `item_data_r2_key`, and that key is the whole
+   * resolution rule — the consumer reads the object directly. The stream
+   * deliberately does not fetch those objects itself: a session can hold many
+   * offloaded bodies and each fetch would spend the Durable Object's subrequest
+   * budget, while the caller already streams R2.
+   *
+   * The three line kinds are `meta` (one per `ingest_meta` row, emitted first),
+   * `row` (one per `ingest_items` row) and a final `end` carrying the row count.
+   */
+  async exportSessionRowsStream(): Promise<ReadableStream<Uint8Array>> {
+    const db = this.db;
+    const encoder = new TextEncoder();
+    let cursor: IngestOrderCursor | null = null;
+    let metaSent = false;
+    let rows = 0;
+
+    return new ReadableStream<Uint8Array>({
+      pull: controller => {
+        if (!metaSent) {
+          metaSent = true;
+          for (const row of db
+            .select({ key: ingestMeta.key, value: ingestMeta.value })
+            .from(ingestMeta)
+            .all()) {
+            controller.enqueue(
+              encoder.encode(ndjsonLine({ t: 'meta', key: row.key, value: row.value }))
+            );
+          }
+        }
+
+        const page = db
+          .select({
+            id: ingestItems.id,
+            item_id: ingestItems.item_id,
+            item_type: ingestItems.item_type,
+            item_data: ingestItems.item_data,
+            item_data_r2_key: ingestItems.item_data_r2_key,
+            ingested_at: ingestItems.ingested_at,
+            cost_usd: ingestItems.cost_usd,
+          })
+          .from(ingestItems)
+          .where(cursor === null ? undefined : afterIngestOrderCursor(cursor))
+          .orderBy(ingestItems.ingested_at, ingestItems.id)
+          .limit(RAW_EXPORT_PAGE_ROWS)
+          .all();
+
+        let bytes = 0;
+        let taken = 0;
+        for (const row of page) {
+          const line = encoder.encode(
+            ndjsonLine({
+              t: 'row',
+              id: row.id,
+              item_id: row.item_id,
+              item_type: row.item_type,
+              item_data: row.item_data,
+              item_data_r2_key: row.item_data_r2_key,
+              ingested_at: row.ingested_at,
+              cost_usd: row.cost_usd,
+            })
+          );
+          // Always carry the first row of a page so one oversized body cannot
+          // stall the cursor; the byte cap only trims the rest of the page, and
+          // the next pull re-reads the trimmed rows from the same cursor.
+          if (taken > 0 && bytes + line.byteLength > RAW_EXPORT_PAGE_MAX_BYTES) break;
+          controller.enqueue(line);
+          bytes += line.byteLength;
+          taken += 1;
+        }
+
+        if (taken > 0) {
+          cursor = ingestOrderCursor(page[taken - 1]);
+          rows += taken;
+        }
+
+        // Short page and every fetched row emitted: nothing follows, so close
+        // with the end line. A trimmed page keeps the stream open.
+        if (page.length < RAW_EXPORT_PAGE_ROWS && taken === page.length) {
+          controller.enqueue(encoder.encode(ndjsonLine({ t: 'end', rows })));
+          controller.close();
+        }
+      },
+    });
+  }
+
   /** True when this session holds a `message` row with exactly this message ID. */
   hasMessageItem(messageId: string): boolean {
     const row = this.db
@@ -2720,6 +2821,11 @@ export class SessionIngestDO extends DurableObject<Env> {
 }
 
 type ItemDataRef = Pick<typeof ingestItems.$inferSelect, 'item_data' | 'item_data_r2_key'>;
+
+/** One NDJSON line, newline included, with JSON escaping left to the serializer. */
+function ndjsonLine(value: Record<string, unknown>): string {
+  return `${JSON.stringify(value)}\n`;
+}
 
 async function enqueueItemData(
   controller: ReadableStreamDefaultController<Uint8Array>,

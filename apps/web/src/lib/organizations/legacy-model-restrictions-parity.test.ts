@@ -124,7 +124,7 @@ describe('legacy organization restrictions with no groups or policies', () => {
       'allowed/model': true,
       'blocked-provider/model': false,
       'unknown-routes/model': false,
-      // `virtual` permits no real provider here, so the router has nowhere to route.
+      // The allow list omits `virtual`, so the router's only provider is unlisted.
       'router/auto': false,
     });
 

@@ -5037,6 +5037,8 @@
       "autoCommit": "A módosítások véglegesítése a futás befejezésekor",
       "condenseOnComplete": "A kontextus tömörítése a futás befejezésekor",
       "activeTitle": "Trigger aktív",
+      "activeSwitchA11y": "Aktív trigger: {{name}}",
+      "copyLinkA11y": "Hivatkozás másolása: {{name}}",
       "activeDescription": "A szüneteltetett webhookok 404-gyel válaszolnak.",
       "runAsCreator": "Futtatás a saját fiókommal",
       "runAsCreatorDescription": "Minden futás az Ön fiókját használja, ezért a titkos fejléc kötelező.",

@@ -5037,6 +5037,8 @@
       "autoCommit": "Ṣe àkójọ àwọn àyípadà nígbà tí ìṣiṣẹ́ bá parí",
       "condenseOnComplete": "Ṣe àkópọ̀ àyíká ọ̀rọ̀ nígbà tí ìṣiṣẹ́ bá parí",
       "activeTitle": "Ìmúṣiṣẹ́ ń ṣiṣẹ́",
+      "activeSwitchA11y": "Ìmúṣiṣẹ́ ń ṣiṣẹ́: {{name}}",
+      "copyLinkA11y": "Da ìjápọ̀ kọ fún {{name}}",
       "activeDescription": "Àwọn wẹ́ẹ̀bùhóòkù tí a dá dúró máa ń dáhùn pẹ̀lú 404.",
       "runAsCreator": "Ṣiṣẹ́ gẹ́gẹ́ bí èmi",
       "runAsCreatorDescription": "Ìṣiṣẹ́ kọ̀ọ̀kan máa ń lo àkọọ́lẹ̀ rẹ, nítorí náà àkọlé àṣírí pọn dandan.",

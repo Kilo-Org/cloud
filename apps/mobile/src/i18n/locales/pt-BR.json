@@ -5225,6 +5225,8 @@
       "autoCommit": "Confirmar alterações ao final da execução",
       "condenseOnComplete": "Condensar o contexto quando a execução terminar",
       "activeTitle": "Gatilho ativo",
+      "activeSwitchA11y": "Gatilho ativo: {{name}}",
+      "copyLinkA11y": "Copiar link de {{name}}",
       "activeDescription": "Webhooks pausados respondem com 404.",
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Toda execução usa sua conta, então o cabeçalho secreto é obrigatório.",

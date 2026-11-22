@@ -5037,6 +5037,8 @@
       "autoCommit": "Sjekk inn endringer når kjøringen er ferdig",
       "condenseOnComplete": "Komprimer konteksten når kjøringen er ferdig",
       "activeTitle": "Triggeren er aktiv",
+      "activeSwitchA11y": "Aktiv trigger: {{name}}",
+      "copyLinkA11y": "Kopier lenke for {{name}}",
       "activeDescription": "Pausede webhooker svarer med 404.",
       "runAsCreator": "Kjør som meg",
       "runAsCreatorDescription": "Hver kjøring bruker kontoen din, så hemmelighetsheaderen er påkrevd.",

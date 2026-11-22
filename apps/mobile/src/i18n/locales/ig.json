@@ -5037,6 +5037,8 @@
       "autoCommit": "Tinye mgbanwe mgbe ọsọ ahụ gwụchara",
       "condenseOnComplete": "Chịkọta ọnọdụ mgbe ọsọ ahụ gwụchara",
       "activeTitle": "Ihe mkpalite na-arụ ọrụ",
+      "activeSwitchA11y": "Ihe mkpalite na-arụ ọrụ: {{name}}",
+      "copyLinkA11y": "Detuo njikọ maka {{name}}",
       "activeDescription": "Webhook ndị akwụsịtụrụ na-aza 404.",
       "runAsCreator": "Gbaa dị ka m",
       "runAsCreatorDescription": "Ọsọ ọ bụla na-eji akaụntụ gị, yabụ isi nzuzo dị mkpa.",

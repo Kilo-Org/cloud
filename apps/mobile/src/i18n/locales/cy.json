@@ -5413,6 +5413,8 @@
       "autoCommit": "Cyflwyno newidiadau pan fydd y rhediad yn gorffen",
       "condenseOnComplete": "Cywasgu’r cyd-destun pan fydd y rhediad yn gorffen",
       "activeTitle": "Sbardun yn weithredol",
+      "activeSwitchA11y": "Sbardun gweithredol: {{name}}",
+      "copyLinkA11y": "Copïo dolen ar gyfer {{name}}",
       "activeDescription": "Mae bachynnau gwe wedi’u seibio yn ateb â 404.",
       "runAsCreator": "Rhedeg fel fi",
       "runAsCreatorDescription": "Mae pob rhediad yn defnyddio’ch cyfrif, felly mae’r pennawd cyfrinachol yn ofynnol.",

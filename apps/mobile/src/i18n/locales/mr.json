@@ -5037,6 +5037,8 @@
       "autoCommit": "रन पूर्ण झाल्यावर बदल कमिट करा",
       "condenseOnComplete": "रन पूर्ण झाल्यावर संदर्भ संक्षिप्त करा",
       "activeTitle": "ट्रिगर सक्रिय",
+      "activeSwitchA11y": "ट्रिगर सक्रिय: {{name}}",
+      "copyLinkA11y": "{{name}} साठी लिंक कॉपी करा",
       "activeDescription": "थांबवलेले वेबहूक 404 ने उत्तर देतात.",
       "runAsCreator": "माझ्या रूपात चालवा",
       "runAsCreatorDescription": "प्रत्येक रन तुमचे खाते वापरते, त्यामुळे सीक्रेट हेडर आवश्यक आहे.",

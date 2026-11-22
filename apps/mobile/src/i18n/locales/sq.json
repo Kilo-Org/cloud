@@ -5037,6 +5037,8 @@
       "autoCommit": "Regjistro ndryshimet kur përfundon ekzekutimi",
       "condenseOnComplete": "Përmblidh kontekstin kur përfundon ekzekutimi",
       "activeTitle": "Shkaktari aktiv",
+      "activeSwitchA11y": "Shkaktari aktiv: {{name}}",
+      "copyLinkA11y": "Kopjo lidhjen për {{name}}",
       "activeDescription": "Webhook-et e pezulluara përgjigjen me 404.",
       "runAsCreator": "Ekzekuto si unë",
       "runAsCreatorDescription": "Çdo ekzekutim përdor llogarinë tënde, prandaj kërkohet koka sekrete.",

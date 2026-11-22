@@ -5037,6 +5037,8 @@
       "autoCommit": "Ishga tushirish tugagach oʻzgarishlarni qayd etish",
       "condenseOnComplete": "Ishga tushirish tugagach kontekstni ixchamlash",
       "activeTitle": "Ishga tushirgich faol",
+      "activeSwitchA11y": "Faol ishga tushirgich: {{name}}",
+      "copyLinkA11y": "{{name}} uchun havolani nusxalash",
       "activeDescription": "Toʻxtatilgan vebhooklar 404 bilan javob beradi.",
       "runAsCreator": "Men nomimdan ishga tushirish",
       "runAsCreatorDescription": "Har bir ishga tushirish hisobingizdan foydalanadi, shuning uchun maxfiy sarlavha majburiy.",

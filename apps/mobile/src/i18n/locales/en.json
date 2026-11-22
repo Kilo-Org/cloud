@@ -5037,6 +5037,8 @@
       "autoCommit": "Commit changes when the run finishes",
       "condenseOnComplete": "Condense the context when the run finishes",
       "activeTitle": "Trigger active",
+      "activeSwitchA11y": "Trigger active: {{name}}",
+      "copyLinkA11y": "Copy link for {{name}}",
       "activeDescription": "Paused webhooks answer with 404.",
       "runAsCreator": "Run as me",
       "runAsCreatorDescription": "Every run uses your account, so the secret header is required.",

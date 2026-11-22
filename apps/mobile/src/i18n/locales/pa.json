@@ -5037,6 +5037,8 @@
       "autoCommit": "ਰਨ ਮੁਕਣ ਉੱਤੇ ਬਦਲਾਅ ਕਮਿਟ ਕਰੋ",
       "condenseOnComplete": "ਰਨ ਮੁਕਣ ਉੱਤੇ ਸੰਦਰਭ ਨੂੰ ਸੰਖੇਪ ਕਰੋ",
       "activeTitle": "ਟ੍ਰਿਗਰ ਸਕਿਰਿਆਸ਼ੀਲ",
+      "activeSwitchA11y": "ਟ੍ਰਿਗਰ ਸਕਿਰਿਆਸ਼ੀਲ: {{name}}",
+      "copyLinkA11y": "{{name}} ਲਈ ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
       "activeDescription": "ਰੋਕੇ ਗਏ ਵੈਬਹੁੱਕ 404 ਨਾਲ ਜਵਾਬ ਦਿੰਦੇ ਹਨ।",
       "runAsCreator": "ਮੇਰੇ ਵਜੋਂ ਚਲਾਓ",
       "runAsCreatorDescription": "ਹਰ ਰਨ ਤੁਹਾਡੇ ਖਾਤੇ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ, ਇਸ ਲਈ ਗੁਪਤ ਹੈਡਰ ਲਾਜ਼ਮੀ ਹੈ।",

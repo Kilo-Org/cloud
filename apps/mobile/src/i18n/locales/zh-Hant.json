@@ -5037,6 +5037,8 @@
       "autoCommit": "執行完成時提交變更",
       "condenseOnComplete": "執行完成時精簡內容脈絡",
       "activeTitle": "觸發器已啟用",
+      "activeSwitchA11y": "觸發器已啟用：{{name}}",
+      "copyLinkA11y": "複製 {{name}} 的連結",
       "activeDescription": "暫停的網路鉤子會回應 404。",
       "runAsCreator": "以我的身分執行",
       "runAsCreatorDescription": "每次執行都會使用你的帳戶，因此必須提供密鑰標頭。",

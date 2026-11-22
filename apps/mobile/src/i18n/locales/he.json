@@ -5131,6 +5131,8 @@
       "autoCommit": "בצעו קומיט לשינויים כשההרצה מסתיימת",
       "condenseOnComplete": "כווצו את ההקשר כשההרצה מסתיימת",
       "activeTitle": "הטריגר פעיל",
+      "activeSwitchA11y": "טריגר פעיל: {{name}}",
+      "copyLinkA11y": "העתקת קישור עבור {{name}}",
       "activeDescription": "וובהוקים מושהים מחזירים 404.",
       "runAsCreator": "הרצה בשמי",
       "runAsCreatorDescription": "כל הרצה משתמשת בחשבון שלך, לכן כותרת הסוד נדרשת.",

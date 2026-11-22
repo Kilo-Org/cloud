@@ -5037,6 +5037,8 @@
       "autoCommit": "Checka in ändringar när körningen är klar",
       "condenseOnComplete": "Komprimera kontexten när körningen är klar",
       "activeTitle": "Utlösare aktiv",
+      "activeSwitchA11y": "Utlösare aktiv: {{name}}",
+      "copyLinkA11y": "Kopiera länk för {{name}}",
       "activeDescription": "Pausade webhooks svarar med 404.",
       "runAsCreator": "Kör som jag",
       "runAsCreatorDescription": "Varje körning använder ditt konto, så det hemliga sidhuvudet krävs.",

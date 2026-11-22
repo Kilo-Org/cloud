@@ -5037,6 +5037,8 @@
       "autoCommit": "Vista breytingar þegar keyrslu lýkur",
       "condenseOnComplete": "Þjappa samhenginu þegar keyrslu lýkur",
       "activeTitle": "Kveikja virk",
+      "activeSwitchA11y": "Virk kveikja: {{name}}",
+      "copyLinkA11y": "Afrita tengil: {{name}}",
       "activeDescription": "Vefkrókar sem eru í bið svara með 404.",
       "runAsCreator": "Keyra sem ég",
       "runAsCreatorDescription": "Sérhver keyrsla notar reikninginn þinn, svo leyndarhausinn er nauðsynlegur.",

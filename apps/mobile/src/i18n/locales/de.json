@@ -5037,6 +5037,8 @@
       "autoCommit": "Änderungen festschreiben, wenn der Lauf endet",
       "condenseOnComplete": "Kontext verdichten, wenn der Lauf endet",
       "activeTitle": "Auslöser aktiv",
+      "activeSwitchA11y": "Auslöser aktiv: {{name}}",
+      "copyLinkA11y": "Link für {{name}} kopieren",
       "activeDescription": "Pausierte Webhooks antworten mit 404.",
       "runAsCreator": "In meinem Namen ausführen",
       "runAsCreatorDescription": "Jeder Lauf verwendet dein Konto, daher ist der geheime Header erforderlich.",

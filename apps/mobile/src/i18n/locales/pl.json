@@ -5225,6 +5225,8 @@
       "autoCommit": "Zatwierdź zmiany po zakończeniu uruchomienia",
       "condenseOnComplete": "Skondensuj kontekst po zakończeniu uruchomienia",
       "activeTitle": "Wyzwalacz aktywny",
+      "activeSwitchA11y": "Wyzwalacz aktywny: {{name}}",
+      "copyLinkA11y": "Kopiuj link: {{name}}",
       "activeDescription": "Wstrzymane webhooki odpowiadają kodem 404.",
       "runAsCreator": "Uruchamiaj jako ja",
       "runAsCreatorDescription": "Każde uruchomienie używa Twojego konta, więc nagłówek z sekretem jest wymagany.",

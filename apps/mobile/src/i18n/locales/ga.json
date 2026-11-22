@@ -5319,6 +5319,8 @@
       "autoCommit": "Tiomantaigh athruithe nuair a chríochnaíonn an rith",
       "condenseOnComplete": "Dlúthaigh an comhthéacs nuair a chríochnaíonn an rith",
       "activeTitle": "Truicear gníomhach",
+      "activeSwitchA11y": "Truicear gníomhach: {{name}}",
+      "copyLinkA11y": "Cóipeáil an nasc: {{name}}",
       "activeDescription": "Freagraíonn crúcaí gréasáin atá ar sos le 404.",
       "runAsCreator": "Rith mar mise",
       "runAsCreatorDescription": "Úsáideann gach rith do chuntas, mar sin tá an ceanntásc rúnda riachtanach.",

@@ -5037,6 +5037,8 @@
       "autoCommit": "Kaydi isbeddellada marka socodku dhammaado",
       "condenseOnComplete": "Soo koob macnaha guud marka socodku dhammaado",
       "activeTitle": "Kiciye firfircoon",
+      "activeSwitchA11y": "Kiciye firfircoon: {{name}}",
+      "copyLinkA11y": "Nuqul ka samee xiriiriyaha {{name}}",
       "activeDescription": "Wicitaannada web ee la hakiyay waxay ku jawaabaan 404.",
       "runAsCreator": "U soco sidayda",
       "runAsCreatorDescription": "Socod kastaa wuxuu isticmaalaa akoonkaaga, sidaas darteed madaxa sirta waa loo baahan yahay.",

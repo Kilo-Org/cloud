@@ -5037,6 +5037,8 @@
       "autoCommit": "Komit perubahan saat eksekusi selesai",
       "condenseOnComplete": "Ringkas konteks saat eksekusi selesai",
       "activeTitle": "Pemicu aktif",
+      "activeSwitchA11y": "Pemicu aktif: {{name}}",
+      "copyLinkA11y": "Salin tautan untuk {{name}}",
       "activeDescription": "Webhook yang dijeda akan menjawab dengan 404.",
       "runAsCreator": "Jalankan sebagai saya",
       "runAsCreatorDescription": "Setiap eksekusi menggunakan akun Anda, sehingga header rahasia wajib diisi.",

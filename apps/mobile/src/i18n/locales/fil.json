@@ -5037,6 +5037,8 @@
       "autoCommit": "I-commit ang mga pagbabago kapag natapos ang pagtakbo",
       "condenseOnComplete": "Paikliin ang konteksto kapag natapos ang pagtakbo",
       "activeTitle": "Aktibo ang pampapagana",
+      "activeSwitchA11y": "Aktibong pampapagana: {{name}}",
+      "copyLinkA11y": "Kopyahin ang link para sa {{name}}",
       "activeDescription": "Ang mga nakapahingang webhook ay tumutugon ng 404.",
       "runAsCreator": "Patakbuhin bilang ako",
       "runAsCreatorDescription": "Ginagamit ng bawat pagtakbo ang iyong kuwenta, kaya kailangan ang sekretong header.",

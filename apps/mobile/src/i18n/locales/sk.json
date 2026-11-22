@@ -5225,6 +5225,8 @@
       "autoCommit": "Commitnúť zmeny po dokončení spustenia",
       "condenseOnComplete": "Zhustiť kontext po dokončení spustenia",
       "activeTitle": "Spúšťač je aktívny",
+      "activeSwitchA11y": "Aktívny spúšťač: {{name}}",
+      "copyLinkA11y": "Kopírovať odkaz pre {{name}}",
       "activeDescription": "Pozastavené webhooky odpovedajú 404.",
       "runAsCreator": "Spustiť ako ja",
       "runAsCreatorDescription": "Každé spustenie používa váš účet, preto je tajná hlavička povinná.",

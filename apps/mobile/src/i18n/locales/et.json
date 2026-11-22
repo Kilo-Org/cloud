@@ -5037,6 +5037,8 @@
       "autoCommit": "Kinnita muudatused, kui käivitus lõpeb",
       "condenseOnComplete": "Tihenda kontekst, kui käivitus lõpeb",
       "activeTitle": "Päästik aktiivne",
+      "activeSwitchA11y": "Päästik aktiivne: {{name}}",
+      "copyLinkA11y": "Kopeeri link: {{name}}",
       "activeDescription": "Peatatud veebihaagid vastavad 404-ga.",
       "runAsCreator": "Käivita minuna",
       "runAsCreatorDescription": "Iga käivitus kasutab sinu kontot, seega on salajane päis nõutav.",

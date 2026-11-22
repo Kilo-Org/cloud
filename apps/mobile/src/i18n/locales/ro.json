@@ -5131,6 +5131,8 @@
       "autoCommit": "Comite modificările când rularea se încheie",
       "condenseOnComplete": "Condensează contextul când rularea se încheie",
       "activeTitle": "Declanșator activ",
+      "activeSwitchA11y": "Declanșator activ: {{name}}",
+      "copyLinkA11y": "Copiază linkul pentru {{name}}",
       "activeDescription": "Webhook-urile în pauză răspund cu 404.",
       "runAsCreator": "Rulează ca mine",
       "runAsCreatorDescription": "Fiecare rulare folosește contul tău, deci antetul secret este obligatoriu.",

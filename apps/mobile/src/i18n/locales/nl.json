@@ -5037,6 +5037,8 @@
       "autoCommit": "Wijzigingen committen wanneer de uitvoering eindigt",
       "condenseOnComplete": "De context inkorten wanneer de uitvoering eindigt",
       "activeTitle": "Trigger actief",
+      "activeSwitchA11y": "Trigger actief: {{name}}",
+      "copyLinkA11y": "Link kopiëren voor {{name}}",
       "activeDescription": "Gepauzeerde webhooks reageren met 404.",
       "runAsCreator": "Uitvoeren als mij",
       "runAsCreatorDescription": "Elke uitvoering gebruikt je account, dus de geheime header is vereist.",

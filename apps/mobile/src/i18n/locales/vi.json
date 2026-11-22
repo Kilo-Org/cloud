@@ -5037,6 +5037,8 @@
       "autoCommit": "Commit thay đổi khi lần chạy kết thúc",
       "condenseOnComplete": "Cô đọng ngữ cảnh khi lần chạy kết thúc",
       "activeTitle": "Trình kích hoạt đang hoạt động",
+      "activeSwitchA11y": "Trình kích hoạt đang hoạt động: {{name}}",
+      "copyLinkA11y": "Sao chép liên kết cho {{name}}",
       "activeDescription": "Webhook bị tạm dừng sẽ trả về 404.",
       "runAsCreator": "Chạy dưới danh nghĩa tôi",
       "runAsCreatorDescription": "Mỗi lần chạy đều dùng tài khoản của bạn, nên bắt buộc phải có tiêu đề bí mật.",

@@ -5037,6 +5037,8 @@
       "autoCommit": "Whakapūmau i ngā huringa ina mutu te rerenga",
       "condenseOnComplete": "Whakarāpopoto i te horopaki ina mutu te rerenga",
       "activeTitle": "Kaiwhakaara hohe",
+      "activeSwitchA11y": "Kaiwhakaara hohe: {{name}}",
+      "copyLinkA11y": "Tāruatia te hononga mō {{name}}",
       "activeDescription": "Ka whakautu ngā hononga tukutuku kua whakatahi me te 404.",
       "runAsCreator": "Rere hei ahau",
       "runAsCreatorDescription": "Ka whakamahi ia rerenga i tō pūkete, nō reira me whai pane muna.",

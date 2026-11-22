@@ -5037,6 +5037,8 @@
       "autoCommit": "Gcina izinguquko lapho ukusebenza kuphela",
       "condenseOnComplete": "Fingqa umongo lapho ukusebenza kuphela",
       "activeTitle": "Isibangeli siyasebenza",
+      "activeSwitchA11y": "Isibangeli siyasebenza: {{name}}",
+      "copyLinkA11y": "Kopisha isixhumanisi sesibangeli: {{name}}",
       "activeDescription": "Ama-webhook amisiwe aphendula nge-404.",
       "runAsCreator": "Sebenza njengami",
       "runAsCreatorDescription": "Ukusebenza konke kusebenzisa i-akhawunti yakho, ngakho iheda eyimfihlo iyadingeka.",

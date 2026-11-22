@@ -5037,6 +5037,8 @@
       "autoCommit": "Ataovy voatahiry ny fanovana rehefa vita ny fanatanterahana.",
       "condenseOnComplete": "Ahena ny tontolon-kevitra rehefa vita ny fanatanterahana.",
       "activeTitle": "Mavitrika ny fanentanana",
+      "activeSwitchA11y": "Fanentanana mavitrika: {{name}}",
+      "copyLinkA11y": "Adikao ny rohy ho an'ny {{name}}",
       "activeDescription": "Ny fiantsoana mijanona dia mamaly 404.",
       "runAsCreator": "Hihazakazaka amin'ny anarako",
       "runAsCreatorDescription": "Ny fanatanterahana rehetra dia mampiasa ny kaontinao, noho izany dia ilaina ny lohateny miafina.",

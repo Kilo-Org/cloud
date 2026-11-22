@@ -5413,6 +5413,8 @@
       "autoCommit": "تثبيت التغييرات عند انتهاء التشغيل",
       "condenseOnComplete": "تكثيف السياق عند انتهاء التشغيل",
       "activeTitle": "المشغل نشط",
+      "activeSwitchA11y": "المشغل نشط: {{name}}",
+      "copyLinkA11y": "نسخ الرابط للمشغل {{name}}",
       "activeDescription": "ترد الويب هوكات الموقوفة بالرمز 404.",
       "runAsCreator": "التشغيل باسمي",
       "runAsCreatorDescription": "يستخدم كل تشغيل حسابك، لذا تكون ترويسة السر مطلوبة.",

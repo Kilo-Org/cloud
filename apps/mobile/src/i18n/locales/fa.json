@@ -5037,6 +5037,8 @@
       "autoCommit": "تغییرات را پس از پایان اجرا ثبت کنید.",
       "condenseOnComplete": "پس از پایان اجرا زمینه را فشرده کنید.",
       "activeTitle": "تریگر فعال",
+      "activeSwitchA11y": "تریگر فعال: {{name}}",
+      "copyLinkA11y": "کپی پیوند برای {{name}}",
       "activeDescription": "وب‌هوک‌های متوقف‌شده با 404 پاسخ می‌دهند.",
       "runAsCreator": "اجرا با هویت من",
       "runAsCreatorDescription": "هر اجرا از حساب شما استفاده می‌کند، بنابراین سرآیند محرمانه لازم است.",

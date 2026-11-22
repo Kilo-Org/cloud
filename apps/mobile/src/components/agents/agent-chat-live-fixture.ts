@@ -202,7 +202,7 @@ function fixed<T>(value: T) {
  * `permission-failed` holds the pending-permission screen too, but the first
  * answer to the bash ask fails like a transient transport error, so the card
  * shows its retryable failure branch, and a later answer — the Retry tap —
- * succeeds. `pending-unreadable-question` holds the running transcript with a
+ * succeeds. `pending-unreadable-question` holds the idle transcript with a
  * question request this app could not read: the notice names the wait and the
  * CLI as the place to answer it, and no answer card is drawn.
  */
@@ -221,8 +221,9 @@ export function createAgentChatFixtureManager(
   state: AgentChatFixtureState = 'idle'
 ): SessionManager {
   const waitingForPermission = state === 'pending-permission' || state === 'permission-failed';
-  // The unreadable question keeps the running transcript: the CLI still holds
-  // the request, so no answer card exists and the notice is the whole surface.
+  // The unreadable question keeps the idle transcript: the CLI still holds the
+  // request, so no answer card exists, the composer stays available, and the
+  // notice is the only difference this state adds.
   const unreadableQuestions: readonly UnreadableQuestionState[] =
     state === 'pending-unreadable-question' ? [{ requestId: 'que_designGateUnreadable' }] : [];
   // The first answer to the ask must fail like a transient transport error, and
@@ -230,7 +231,7 @@ export function createAgentChatFixtureManager(
   // manager and every other fixture state shares the idle no-op below.
   let failedAnswerAttempts = 0;
   const failOnceThenAllow = state === 'permission-failed';
-  const streaming = state !== 'idle';
+  const streaming = state !== 'idle' && state !== 'pending-unreadable-question';
   const messages: StoredMessage[] = streaming
     ? [opening, answer, EMOJI_ANSWER, BLOCKED_BASH_COMMAND]
     : [opening, answer, EMOJI_ANSWER, refused];

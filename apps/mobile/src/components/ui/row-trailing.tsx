@@ -107,13 +107,15 @@ export type RowTrailingSpec =
       kind: 'node';
       node: ReactNode;
       /**
-       * The node is a control whose own box is the platform target — the
-       * Integrations hub's outline buttons, which carry
-       * `textActionTargetClass` and cancel its overhang with
-       * `textActionBoxStyle`. A stacked frame must host such a node at the
-       * target, or Android delivers its touches through the wrapper's 27pt
-       * band (`rowTargetHostClass`); the flat frame ignores this, because the
-       * node then overhangs the frame's own padding inside the row's bounds.
+       * The cell occupies the platform target in a stacked row: either a
+       * control that carries the target on its own node — the Integrations
+       * hub's outline buttons, which take `textActionTargetClass` and cancel
+       * its overhang with `textActionBoxStyle` — or the placeholder that
+       * reserves the same space so the row does not move when the real cell
+       * lands. A stacked frame must host such a cell at the target, or Android
+       * delivers its touches through the wrapper's 27pt band
+       * (`rowTargetHostClass`); the flat frame ignores this, because the cell
+       * then overhangs the frame's own padding inside the row's bounds.
        */
       target?: boolean;
     }>

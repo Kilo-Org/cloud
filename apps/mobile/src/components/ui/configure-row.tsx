@@ -71,7 +71,9 @@ type ConfigureRowProps = {
   accessibilityLabel?: string;
   trailing?: ReactNode;
   /**
-   * The trailing node is a control whose own box is the platform touch target.
+   * The trailing cell occupies the platform touch target in a stacked row:
+   * either a control whose own box is that target, or the placeholder that
+   * reserves the same space so the row does not move when the real cell lands.
    * A stacked frame must host it (see `rowTargetHostClass`), because a touch is
    * delivered only inside an ancestor view; the flat frame needs nothing.
    */

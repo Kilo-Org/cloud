@@ -110,10 +110,17 @@ export function IntegrationProviderRow({
   let action: RowTrailingSpec | undefined = undefined;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
-    // not landed, so the row holds the button's space instead of guessing. The
-    // placeholder takes the band the action's overhang leaves, so the row keeps
-    // the height it settles at.
-    action = { kind: 'node', node: <Skeleton className={TEXT_ACTION_SKELETON_CLASS} /> };
+    // not landed, so the row holds the button's space instead of guessing.
+    // The placeholder takes the band the action's overhang leaves, so the row keeps
+    // the height it settles at. It also reserves the target on a stacked row: the
+    // settled cell below carries the platform target there, and a stacked line
+    // sized to the flat band alone would grow when that cell lands. The flat frame
+    // ignores the mark, so the band still holds where the row does not stack.
+    action = {
+      kind: 'node',
+      target: true,
+      node: <Skeleton className={TEXT_ACTION_SKELETON_CLASS} />,
+    };
   } else if (row.installed && row.webManaged) {
     action = canDisconnect
       ? {
@@ -217,10 +224,13 @@ export function IntegrationProviderRow({
       subtitle={subtitle}
       subtitleNumberOfLines={1}
       trailing={action === undefined ? undefined : renderRowTrailing(action)}
-      // The outline cells carry the platform target on their own node, so a
-      // stacked frame must host them at the target (the pending placeholder
-      // does not, and takes the band it settles on).
-      trailingIsTarget={action?.kind === 'node' && action.target === true}
+      // The cell occupies the platform target in a stacked row, so a stacked
+      // frame must host it at the target: an outline cell carries the target on
+      // its own node, a text action (Connect) carries it on its pressable, and
+      // the pending placeholder reserves that same line.
+      trailingIsTarget={
+        action?.kind === 'action' || (action?.kind === 'node' && action.target === true)
+      }
       onPress={opensProviderPage ? onOpenOnWeb : undefined}
       accessibilityLabel={opensProviderPage ? blockedRowName : undefined}
     />

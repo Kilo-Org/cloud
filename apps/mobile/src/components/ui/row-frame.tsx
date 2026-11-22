@@ -275,11 +275,12 @@ export function RowFrame({
     }
     if (stack) {
       // The line lays its cells out on the row's 27pt content band, so a
-      // trailing control that carries the platform target on its own node
-      // would be delivered through this wrapper's band, not the row's padded
-      // bounds: Android delivers a touch only inside every ancestor view. A
-      // spec that marks its node as such (`target`) takes the host at the
-      // target, which grows this line to the target in the stacked
+      // trailing cell that occupies the platform target in this presentation —
+      // a control carrying it on its own node, or the placeholder that reserves
+      // the same space — would be delivered through this wrapper's band, not
+      // the row's padded bounds: Android delivers a touch only inside every
+      // ancestor view. A spec that marks its cell as such (`target`) takes the
+      // host at the target, which grows this line to the target in the stacked
       // presentation only (`rowTargetHostClass`).
       const trailingClass =
         trailing?.kind === 'node' && trailing.target === true

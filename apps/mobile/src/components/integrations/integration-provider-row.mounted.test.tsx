@@ -249,10 +249,30 @@ describe('IntegrationProviderRow action cell', () => {
     // row does not shrink when the read lands.
     expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(TEXT_ACTION_SKELETON_CLASS);
     expect(TEXT_ACTION_SKELETON_CLASS).toContain('h-[27px]');
-    // The placeholder is not a control, so a stacked frame keeps the plain
-    // wrapper: the host would take the target back out of the height the
-    // placeholder exists to hold.
-    expect(sharedRow(root).props.trailingIsTarget).toBe(false);
+    // The placeholder is not a control, but it must hold the same stacked line
+    // the settled target takes: the real cell carries the platform target on a
+    // stacked row, and a line sized to the flat band alone would grow when the
+    // read lands. The flat frame ignores the mark, so the band the placeholder
+    // exists for still holds where the row does not stack.
+    expect(sharedRow(root).props.trailingIsTarget).toBe(true);
+  });
+
+  it('gives the stacked row the host for its Connect cell too', () => {
+    // A row that offers Connect uses the text-action variant, whose pressable
+    // already carries the platform target (`textActionTargetClass`). A stacked
+    // frame wraps every trailing cell in the row's 27pt line, so the cell needs
+    // the same host the outline buttons take, or Android delivers its touches
+    // through that band and the target it renders is unreachable.
+    const root = renderRow({ row: integrationRow({ installed: false }), scope: 'personal' });
+
+    expect(sharedRow(root).props.trailingIsTarget).toBe(true);
+    const [connect] = controls(root);
+    if (!connect) {
+      throw new Error('the uninstalled row rendered no action');
+    }
+    expect(String(connect.props.className).split(' ')).toEqual(
+      expect.arrayContaining(textActionTargetClass().split(' '))
+    );
   });
 
   // The outline buttons rendered their `sm` 36pt frame, a box a control-size

@@ -2657,24 +2657,6 @@ describe('createServiceState', () => {
       });
     });
 
-    it('bounds a subject of 80 characters to 72 and marks the cut', () => {
-      const state = createServiceState(makeConfig());
-
-      state.process({
-        type: 'autocommit_completed',
-        success: true,
-        ...localCommit,
-        commitMessage: 'x'.repeat(80),
-      });
-
-      expect(state.getStatus()).toEqual({
-        type: 'autocommit',
-        step: 'completed',
-        message: `aaaaaaa · ${'x'.repeat(72)}…`,
-        commitHash: localCommit.commitHash,
-      });
-    });
-
     it('never ends the cut subject inside an emoji family sequence', () => {
       const state = createServiceState(makeConfig());
 
@@ -2708,14 +2690,14 @@ describe('createServiceState', () => {
         type: 'autocommit_completed',
         success: true,
         ...localCommit,
-        commitMessage: '🇵🇱'.repeat(50),
+        commitMessage: 'a' + '🇵🇱'.repeat(50),
       });
 
       const status = state.getStatus();
       expect(status).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: `aaaaaaa · ${'🇵🇱'.repeat(36)}…`,
+        message: `aaaaaaa · a${'🇵🇱'.repeat(35)}…`,
         commitHash: localCommit.commitHash,
       });
       if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
@@ -2733,6 +2715,28 @@ describe('createServiceState', () => {
         regionalIndicators += 1;
       }
       expect(regionalIndicators % 2).toBe(0);
+    });
+
+    it('drops a joiner that would strand the first dropped code point', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...localCommit,
+        commitMessage: 'x'.repeat(72) + '\u200d' + 'y',
+      });
+
+      const status = state.getStatus();
+      expect(status).toEqual({
+        type: 'autocommit',
+        step: 'completed',
+        message: `aaaaaaa · ${'x'.repeat(71)}…`,
+        commitHash: localCommit.commitHash,
+      });
+      if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
+      const kept = Array.from(status.message.slice(0, -1)).map(char => char.codePointAt(0) ?? 0);
+      expect(kept[kept.length - 1] ?? 0).not.toBe(0x200d);
     });
 
     it('shows the short hash alone when the message is empty', () => {

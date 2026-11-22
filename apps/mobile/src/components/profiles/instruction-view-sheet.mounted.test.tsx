@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { InstructionViewSheet } from '@/components/profiles/instruction-view-sheet';
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -60,7 +61,7 @@ describe('InstructionViewSheet', () => {
     const { renderer, unmount } = await mountSheet({ name: LONG_NAME, content: CONTENT });
 
     const path = findAll(renderer.root, 'Text').find(
-      node => node.props.children === `.kilocode/rules/${LONG_NAME}.md`
+      node => node.props.children === isolateLtrBidiText(`.kilocode/rules/${LONG_NAME}.md`)
     );
     expect(path).toBeDefined();
 

@@ -7,6 +7,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { codeFieldTextStyle } from '@/lib/rtl-text';
 
@@ -43,6 +44,9 @@ export function InstructionViewSheet({
   }
   const nameLabel = t('profiles.instructionNameLabel');
   const contentLabel = t('profiles.instructionContentLabel');
+  // A storage path reads position by position, so it keeps its left-to-right
+  // direction inside a right-to-left interface; the leading dot is neutral.
+  const rulesPath = `.kilocode/rules/${instruction.name}.md`;
 
   return (
     <SessionPageSheet visible dismissible onClose={onClose}>
@@ -68,7 +72,7 @@ export function InstructionViewSheet({
           >
             {instruction.name}
           </SelectableText>
-          <Text variant="caption">{`.kilocode/rules/${instruction.name}.md`}</Text>
+          <Text variant="caption">{isolateLtrBidiText(rulesPath)}</Text>
         </View>
         <View className="gap-1.5">
           <FormFieldLabel label={contentLabel} />

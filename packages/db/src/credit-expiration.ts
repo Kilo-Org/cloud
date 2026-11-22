@@ -10,9 +10,9 @@ import { alias } from 'drizzle-orm/pg-core';
 
 /**
  * The columns the expiration computation reads, declared once. The loader
- * projection and `ExpiringTransaction` both derive from this map, so a column
- * cannot be selected without being readable by the calculator, or dropped from
- * the query without a type error.
+ * projection and `ExpiringTransaction` both derive from this map: a required
+ * column cannot leave the projection without a type error, and the optional-key
+ * list cannot name a column the map does not select.
  */
 const expiringTransactionColumns = {
   id: creditTransactionsTable.id,

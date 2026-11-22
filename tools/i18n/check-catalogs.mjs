@@ -173,6 +173,10 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
+  [
+    '{{values}}',
+    'two format-only sentences a key builds from its parts: the list of advanced-policy changes an audit row scanned, versus the joined pair of counted clauses a review-agent secret rotation reports',
+  ],
 ]);
 
 /**
@@ -362,6 +366,10 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'organization.auditLog.detail.region.au',
   'organization.auditLog.detail.region.jp',
   'organization.auditLog.detail.reviewAgentPlatform',
+  // The rotation sentence is format only: the renderer joins two counted
+  // clauses, each translated in this catalog, so `{{values}}` reads the same in
+  // every language on purpose.
+  'organization.auditLog.detail.reviewAgentSecretRotated',
   'organization.auditLog.detail.role.owner',
   'organization.auditLog.detail.role.admin',
   'organization.auditLog.detail.role.billing_manager',
@@ -456,6 +464,10 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
     '{{count}} agents': 'Catalan spells the plural agents the same way',
     '{{count}} secret': 'Catalan spells secret the same way in the singular',
     '{{count}} secrets': 'Catalan spells the plural secrets the same way',
+    '{{displayCount}} error':
+      'Catalan spells the noun "error" identically in the singular (DIEC: l\'error), so the counted one form matches',
+    '{{displayCount}} errors':
+      'Catalan plurals "error" as "errors", which is spelled identically to English, so the counted base and other forms match',
   },
   cs: {
     '{{count}} agent':
@@ -488,6 +500,10 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
   },
   eu: {
     token: 'Basque "token" is a loaned root (plural "tokenak"), so the one-category value matches',
+  },
+  es: {
+    '{{displayCount}} error':
+      'Spanish spells the noun "error" identically in the singular (RAE: el error), so the counted one form matches; the plural (errores) and the many form (de errores) are translated',
   },
   fi: {
     token: 'Finnish keeps the nominative singular token unchanged; its partitive is tokenia',

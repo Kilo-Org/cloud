@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite covers the whole audit-detail vocabulary: the coverage walk over every event id and the payload samples beside it belong with the assertions, so a new id cannot be proved in one file and forgotten in another. */
 // The detail line's contract: a stored event renders in the reader's language,
 // never as the server's English sentence; a value the reader compares stays in
 // its own direction; and a row with no structured event, or an event whose name
@@ -13,7 +14,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { AUDIT_DETAIL_IDS, type AuditDetail } from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';
-import { isolateLtrBidiText } from '@/lib/bidi';
+import { isolateBidiText, isolateLtrBidiText } from '@/lib/bidi';
+import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { auditEntryDetail } from './audit-log-detail';
 
 const t = i18n.t.bind(i18n);
@@ -22,6 +24,27 @@ const t = i18n.t.bind(i18n);
 async function renderIn(language: string, detail: AuditDetail | null): Promise<string | undefined> {
   await i18n.changeLanguage(language);
   return auditEntryDetail(t, language, detail);
+}
+
+/**
+ * One counted form as the shipped catalog writes it, with the count passed the
+ * way the renderer passes it. The key names the plural category explicitly, so a
+ * catalog missing that form fails here rather than falling back, and every
+ * expectation comes from the catalogs through `i18n.t` instead of repeating a
+ * translation.
+ */
+function form(
+  language: string,
+  key: string,
+  values: { count: number } & Record<string, string | number>
+) {
+  const { count, ...rest } = values;
+  return i18n.t(`organization.auditLog.detail.${key}`, {
+    lng: language,
+    count,
+    displayCount: formatNumber(count, language),
+    ...rest,
+  });
 }
 
 afterEach(async () => {
@@ -172,10 +195,103 @@ describe('auditEntryDetail', () => {
     expect(regionOnly).not.toContain(i18n.t('organization.auditLog.detail.enabled'));
   });
 
+  it('states the allowed origins a browser-control save carried', async () => {
+    const withOrigins = await renderIn('en', {
+      id: 'setting.browserControl',
+      policy: 'allow',
+      origins: ['https://a.example', 'https://b.example'],
+    });
+    expect(withOrigins).toContain('https://a.example');
+    expect(withOrigins).toContain('https://b.example');
+    expect(withOrigins).toContain(i18n.t('organization.auditLog.detail.browserPolicyAllow'));
+
+    // A row that carried no origins names the policy alone, as before.
+    const policyOnly = await renderIn('en', { id: 'setting.browserControl', policy: 'allow' });
+    expect(policyOnly).toBe(i18n.t('organization.auditLog.detail.browserPolicyAllow'));
+  });
+
+  it('reads a group member count through the groups screen plural family', async () => {
+    const one = await renderIn('en', { id: 'group.members', name: 'Support', count: 1 });
+    expect(one).toContain('1 member');
+    expect(one).not.toContain('1 members');
+
+    const many = await renderIn('en', { id: 'group.members', name: 'Support', count: 3 });
+    expect(many).toContain('3 members');
+  });
+
+  // The row hands i18next the count and the reader's formatted number, so the
+  // category comes from the language and the words from that catalog. English
+  // ships one/other, Arabic few at 3 and many at 11, Polish few at 3 and many at
+  // 5, and every expected sentence is that catalog's own form. Each row is its
+  // own case because the shared instance changes language per render.
+  const PLURAL_ROWS = [
+    ['en', 1, 'one'],
+    ['en', 2, 'other'],
+    ['ar', 3, 'few'],
+    ['ar', 11, 'many'],
+    ['pl', 3, 'few'],
+    ['pl', 5, 'many'],
+  ] as const;
+
+  it.each(PLURAL_ROWS)(
+    'counts a group sentence in %s’s own plural category at %i',
+    async (language, count, category) => {
+      expect(await renderIn(language, { id: 'group.memberGroups', count })).toBe(
+        form(language, `groupMemberGroups_${category}`, { count })
+      );
+      // The category the language selected is the one this row names, so a
+      // family whose forms were all alike would still have to match the catalog.
+      expect(new Intl.PluralRules(language).select(count)).toBe(category);
+    }
+  );
+
+  it('reads a different sentence for every count the reader’s rules separate', () => {
+    const sentences = new Set(
+      PLURAL_ROWS.map(([language, count, category]) =>
+        form(language, `groupMemberGroups_${category}`, { count })
+      )
+    );
+    expect(sentences.size).toBe(PLURAL_ROWS.length);
+  });
+
+  it('counts the address line and the distributed amount through their families', async () => {
+    // The row isolates the address itself and formats the amount itself, so the
+    // expectation carries the isolate and the money shape the row produces.
+    const email = 'ada@example.com';
+    expect(await renderIn('en', { id: 'group.memberGroups', email, count: 1 })).toBe(
+      form('en', 'groupMemberGroupsOf_one', { count: 1, email: isolateBidiText(email) })
+    );
+    const amount = formatPrefixedMoney(10, 'en');
+    expect(await renderIn('en', { id: 'funds.distributed', amount: 10, count: 1 })).toBe(
+      form('en', 'fundsDistributed_one', { count: 1, amount })
+    );
+    expect(await renderIn('en', { id: 'funds.distributed', amount: 10, count: 4 })).toBe(
+      form('en', 'fundsDistributed_other', { count: 4, amount })
+    );
+  });
+
+  it('counts both clauses of a rotation, each in its own plural form', async () => {
+    // Two counts in one row, and i18next resolves a form from one count per key,
+    // so each count is its own family and the row joins their sentences.
+    const rendered = await renderIn('en', {
+      id: 'reviewAgent.secretRotated',
+      updated: 1,
+      errors: 2,
+    });
+    const updated = form('en', 'reviewAgentSecretsUpdated_one', { count: 1 });
+    const failed = form('en', 'reviewAgentSecretsFailed_other', { count: 2 });
+    expect(rendered).toBe(formatList([updated, failed], 'en'));
+    // Neither count renders its sibling's sentence.
+    expect(updated).not.toBe(form('en', 'reviewAgentSecretsUpdated_other', { count: 3 }));
+    expect(failed).not.toBe(form('en', 'reviewAgentSecretsFailed_one', { count: 1 }));
+  });
+
   it('has a template for every event id the shared contract defines', () => {
-    // The renderer's map is keyed by `AuditDetail['id']`, so a union member
-    // without a case fails the type check. This asserts the runtime half: each
-    // id either renders a line or is one of the ids that deliberately does not.
+    // The renderer's table is keyed by `AuditDetail['id']`, so an entry that is
+    // misspelled or typed against another member fails the type check. Entries
+    // are optional — some ids render no sentence — so this test is what proves
+    // every id is classified: each id either renders a line or is one of the
+    // ids that deliberately does not.
     // Ids whose own event name already states the event, and ids whose one
     // sentence needs a value this sample does not carry (a set or a clear has
     // only one arm, a removed link has no policy to name, and a catalog-model
@@ -259,7 +375,11 @@ function detailSample(): Record<string, AuditDetail> {
       emails: ['a@b.test'],
     },
     'setting.recommendationsDigest': { id: 'setting.recommendationsDigest', enabled: true },
-    'setting.browserControl': { id: 'setting.browserControl', policy: 'allow' },
+    'setting.browserControl': {
+      id: 'setting.browserControl',
+      policy: 'allow',
+      origins: ['https://example.test'],
+    },
     'setting.accessLists': { id: 'setting.accessLists' },
     'setting.name': { id: 'setting.name', previous: 'A', next: 'B' },
     'setting.byokPriorities': { id: 'setting.byokPriorities' },

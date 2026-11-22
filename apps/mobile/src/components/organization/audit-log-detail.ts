@@ -7,7 +7,7 @@ import {
 import { type TFunction } from 'i18next';
 
 import { isolateBidiText, isolateLtrBidiText } from '@/lib/bidi';
-import { formatList, formatPrefixedMoney } from '@/lib/format';
+import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 
 /**
  * The row's detail line in the reader's language, from the structured event the
@@ -67,8 +67,12 @@ type Render = Readonly<{
 /**
  * The table: one sentence per event id.
  *
- * Declared as a map over the union's own ids, so a member without an entry is a
- * type error and the compiler proves the list is complete.
+ * Members stay optional because some ids deliberately render no sentence. The
+ * mapped type still makes every union id a declared member and every member's
+ * parameter exactly its own detail variant, so the compiler rejects a
+ * misspelled id or a wrongly typed entry; that every id is classified (rendered
+ * or deliberately bare) is what the coverage test in `audit-log-detail.test.ts`
+ * proves.
  */
 type AuditTemplates = {
   readonly [K in AuditDetail['id']]?: (
@@ -155,8 +159,10 @@ const DEFAULT_BEHAVIOR_KEYS = {
 /**
  * One `Render` per stored shape.
  *
- * The map is keyed by `AuditDetail['id']`, so adding a member to the union fails
- * the type check here until its template exists.
+ * The map is keyed by `AuditDetail['id']`, so each entry agrees with the union:
+ * a misspelled id or a wrongly typed detail is a type error. An entry is
+ * optional because some ids render no sentence, so coverage of every id is
+ * proven by the test, not by this annotation.
  */
 function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefined {
   const { t, locale, isolated, list, state, change } = tools;
@@ -238,17 +244,30 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
       key: 'organization.auditLog.detail.groupIdentity',
       values: { name: isolated(d.name) },
     }),
+    // The count reads from the groups screen's plural family, so one member is
+    // singular in every catalog rather than a flat "1 members".
     'group.members': d => ({
       key: 'organization.auditLog.detail.groupMembers',
-      values: { name: isolated(d.name), count: d.count },
+      values: {
+        name: isolated(d.name),
+        members: t('organization.groups.memberCount', {
+          count: d.count,
+          displayCount: formatNumber(d.count, locale),
+        }),
+      },
     }),
-    'group.memberGroups': d =>
-      d.email === undefined
-        ? { key: 'organization.auditLog.detail.groupMemberGroups', values: { count: d.count } }
+    // The count reads from this sentence's own plural family, so one group is
+    // singular in every catalog rather than a flat "1 groups", and the figure
+    // itself is the reader's own numerals.
+    'group.memberGroups': d => {
+      const values = { count: d.count, displayCount: formatNumber(d.count, locale) };
+      return d.email === undefined
+        ? { key: 'organization.auditLog.detail.groupMemberGroups', values }
         : {
             key: 'organization.auditLog.detail.groupMemberGroupsOf',
-            values: { count: d.count, email: isolated(d.email) },
-          },
+            values: { ...values, email: isolated(d.email) },
+          };
+    },
     'group.policySet': d => ({
       key: 'organization.auditLog.detail.groupPolicySet',
       values: { name: isolated(d.name), policy: isolated(d.policyType) },
@@ -336,7 +355,11 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
     }),
     'funds.distributed': d => ({
       key: 'organization.auditLog.detail.fundsDistributed',
-      values: { amount: usd(d.amount, locale), count: d.count },
+      values: {
+        amount: usd(d.amount, locale),
+        count: d.count,
+        displayCount: formatNumber(d.count, locale),
+      },
     }),
     'funds.received': d => ({
       key: 'organization.auditLog.detail.fundsReceived',
@@ -357,9 +380,23 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
             key: 'organization.auditLog.detail.reviewAgentConfigStyle',
             values: { platform: t(PLATFORM_KEYS[d.platform]), style: isolated(d.style) },
           },
+    // Two counts in one sentence, and i18next selects a plural form from one
+    // count per key, so each count is its own family and the sentence joins the
+    // two finished clauses in the reader's own list conjunction.
     'reviewAgent.secretRotated': d => ({
       key: 'organization.auditLog.detail.reviewAgentSecretRotated',
-      values: { updated: d.updated, errors: d.errors },
+      values: {
+        values: list([
+          t('organization.auditLog.detail.reviewAgentSecretsUpdated', {
+            count: d.updated,
+            displayCount: formatNumber(d.updated, locale),
+          }),
+          t('organization.auditLog.detail.reviewAgentSecretsFailed', {
+            count: d.errors,
+            displayCount: formatNumber(d.errors, locale),
+          }),
+        ]),
+      },
     }),
 
     'setting.advancedPolicies': d => {
@@ -425,13 +462,22 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
       key: 'organization.auditLog.detail.settingRecommendationsDigest',
       values: { state: state(d.enabled) },
     }),
-    // The sentence names the policy alone. The allowed origins stay in the
-    // stored payload for a future row that can show them; computing a value no
-    // catalog interpolates would be dead work.
-    'setting.browserControl': d => ({
-      key: 'organization.auditLog.detail.settingBrowserControl',
-      values: { policy: t(BROWSER_POLICY_KEYS[d.policy]) },
-    }),
+    // A save can move the allowed origins while leaving the policy alone, so a
+    // row that carries origins states them; naming only the policy would hide
+    // the change. A row without origins keeps the policy alone.
+    'setting.browserControl': d =>
+      d.origins !== undefined && d.origins.length > 0
+        ? {
+            key: 'organization.auditLog.detail.settingBrowserControlOrigins',
+            values: {
+              policy: t(BROWSER_POLICY_KEYS[d.policy]),
+              origins: list(d.origins.map(value => isolated(value))),
+            },
+          }
+        : {
+            key: 'organization.auditLog.detail.settingBrowserControl',
+            values: { policy: t(BROWSER_POLICY_KEYS[d.policy]) },
+          },
     // The event name above the row already says what these three carry.
     'setting.accessLists': () => undefined,
     'setting.name': d => ({
@@ -517,7 +563,8 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
 
   // One lookup per event. The cast is the join the union cannot express on its
   // own: `detail.id` selects an entry, and that entry's parameter is exactly
-  // `detail`. `AuditTemplates` above is what proves a member has an entry.
+  // `detail`. `AuditTemplates` above checks each entry against the union; that
+  // every id has one is the coverage test's job.
   const template = templates[detail.id] as
     | ((detail: AuditDetail) => Render | undefined)
     | undefined;

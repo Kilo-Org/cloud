@@ -1977,6 +1977,29 @@ export async function anonymizeCloudUserData(
         details: sql`case when ${organization_audit_logs.details} is null then null else ${organization_audit_logs.details} - 'email' end`,
       })
       .where(eq(sql`${organization_audit_logs.details}->>'email'`, address));
+
+    // The same address can sit in a detail's `emails` list rather than in its
+    // `email` field: `setting.minimumBalanceAlert` stores the alert's recipients
+    // as an array. Those rows are selected by containment — the list holds the
+    // address — and the list is rebuilt without it. Every other detail key
+    // survives, and an emptied list is written as `[]` so the detail still
+    // parses; a null detail is left null.
+    await tx.execute(sql`
+      UPDATE organization_audit_logs
+      SET details = ${organization_audit_logs.details} || jsonb_build_object(
+        'emails',
+        COALESCE(
+          (
+            SELECT jsonb_agg(entry.recipient)
+            FROM jsonb_array_elements_text(${organization_audit_logs.details}->'emails') AS entry(recipient)
+            WHERE entry.recipient <> ${address}::text
+          ),
+          '[]'::jsonb
+        )
+      )
+      WHERE jsonb_typeof(${organization_audit_logs.details}->'emails') = 'array'
+        AND ${organization_audit_logs.details}->'emails' ? ${address}::text
+    `);
   }
 
   await tx

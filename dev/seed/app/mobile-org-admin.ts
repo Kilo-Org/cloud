@@ -256,7 +256,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         message: row.message,
         details: row.details,
       })
-      .onConflictDoNothing();
+      // A database seeded before the detail column keeps these rows with no
+      // detail line. Rerunning the seed refreshes the stored detail (and the
+      // message and action, which carry the fixture's addresses) instead of
+      // leaving the stale row in place.
+      .onConflictDoUpdate({
+        target: organization_audit_logs.id,
+        set: { details: row.details, message: row.message, action: row.action },
+      });
   }
 
   console.log(

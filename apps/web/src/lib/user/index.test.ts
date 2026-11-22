@@ -5435,14 +5435,32 @@ describe('User', () => {
         details: { id: 'invite.sent', email: otherUser.google_user_email, role: 'member' },
       });
 
+      // A detail whose address sits in an array rather than a scalar field: the
+      // minimum-balance alert stores its recipients as `emails`. The deleted
+      // member's entry goes; the other member's stays.
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.settings.change',
+        actor_id: otherUser.id,
+        actor_email: otherUser.google_user_email,
+        actor_name: otherUser.google_user_name,
+        message: 'Minimum balance alert enabled',
+        details: {
+          id: 'setting.minimumBalanceAlert',
+          enabled: true,
+          threshold: 10,
+          emails: [user.google_user_email, otherUser.google_user_email],
+        },
+      });
+
       await softDeleteUser(user.id);
 
       const logs = await db
         .select()
         .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.actor_id, user.id));
-      expect(logs).toHaveLength(2);
-      for (const log of logs) {
+        .where(eq(organization_audit_logs.organization_id, orgId));
+      expect(logs).toHaveLength(3);
+      for (const log of logs.filter(entry => entry.actor_id === user.id)) {
         expect(log.actor_email).toBeNull();
         expect(log.actor_name).toBeNull();
         expect(log.actor_id).toBe(user.id); // actor_id preserved for reference
@@ -5458,6 +5476,16 @@ describe('User', () => {
         id: 'invite.sent',
         email: otherUser.google_user_email,
         role: 'member',
+      });
+      // The array field is scrubbed too, and every other detail key survives.
+      const [alert] = logs.filter(
+        log => log.action === 'organization.settings.change' && log.actor_id === otherUser.id
+      );
+      expect(alert.details).toEqual({
+        id: 'setting.minimumBalanceAlert',
+        enabled: true,
+        threshold: 10,
+        emails: [otherUser.google_user_email],
       });
     });
 

@@ -18,9 +18,11 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   fetchGitHubBranches,
   fetchGitHubRepositories,
+} from '@/lib/integrations/platforms/github/adapter';
+import {
   GITHUB_LISTING_BUDGET_MESSAGE,
   GitHubListingBudgetExceededError,
-} from '@/lib/integrations/platforms/github/adapter';
+} from '@/lib/integrations/platforms/github/listing-budget';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,

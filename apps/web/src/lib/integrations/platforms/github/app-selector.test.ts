@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import {
+  GITHUB_LISTING_TIMEOUT_MS,
+  GitHubListingBudgetExceededError,
+  MAX_GITHUB_LISTING_BYTES,
+} from './listing-budget';
 
 const mockListInstallationsForAuthenticatedUser =
   jest.fn<
     (_params: {
       per_page: number;
       page: number;
-    }) => Promise<{ data: { total_count: number; installations: Array<{ id: number }> } }>
+      request: { signal: AbortSignal };
+    }) => Promise<{
+      data: { total_count: number; installations: Array<{ id: number; padding?: string }> };
+    }>
   >();
 
 jest.mock(
@@ -34,7 +42,7 @@ beforeAll(async () => {
 
 const INSTALLATION_ID = 98765;
 
-function mockPage(installations: Array<{ id: number }>, totalCount: number) {
+function mockPage(installations: Array<{ id: number; padding?: string }>, totalCount: number) {
   mockListInstallationsForAuthenticatedUser.mockResolvedValueOnce({
     data: {
       total_count: totalCount,
@@ -42,6 +50,8 @@ function mockPage(installations: Array<{ id: number }>, totalCount: number) {
     },
   });
 }
+
+const SIGNAL = { signal: expect.any(AbortSignal) };
 
 describe('assertUserAdministersInstallation', () => {
   beforeEach(() => {
@@ -61,6 +71,7 @@ describe('assertUserAdministersInstallation', () => {
     expect(mockListInstallationsForAuthenticatedUser).toHaveBeenCalledWith({
       per_page: 100,
       page: 1,
+      request: SIGNAL,
     });
   });
 
@@ -82,10 +93,12 @@ describe('assertUserAdministersInstallation', () => {
     expect(mockListInstallationsForAuthenticatedUser).toHaveBeenNthCalledWith(1, {
       per_page: 100,
       page: 1,
+      request: SIGNAL,
     });
     expect(mockListInstallationsForAuthenticatedUser).toHaveBeenNthCalledWith(2, {
       per_page: 100,
       page: 2,
+      request: SIGNAL,
     });
   });
 
@@ -121,5 +134,79 @@ describe('assertUserAdministersInstallation', () => {
         installationId: INSTALLATION_ID,
       })
     ).rejects.toThrow('Bad credentials');
+  });
+
+  test('enforces MAX_GITHUB_PAGINATION_PAGES', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({ id: 10000 + i }));
+    mockListInstallationsForAuthenticatedUser.mockResolvedValue({
+      data: { total_count: 1_000_000, installations: fullPage },
+    });
+
+    const thrown: unknown = await assertUserAdministersInstallation({
+      accessToken: 'test-token',
+      installationId: INSTALLATION_ID,
+    }).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
+    );
+    expect(mockListInstallationsForAuthenticatedUser).toHaveBeenCalledTimes(100);
+  });
+
+  test('enforces MAX_GITHUB_LISTING_BYTES', async () => {
+    const padding = 'x'.repeat(MAX_GITHUB_LISTING_BYTES);
+    mockPage([{ id: INSTALLATION_ID, padding }], 1);
+
+    const thrown: unknown = await assertUserAdministersInstallation({
+      accessToken: 'test-token',
+      installationId: INSTALLATION_ID,
+    }).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      `GitHub pagination limit exceeded: installation administration listing returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockListInstallationsForAuthenticatedUser).toHaveBeenCalledTimes(1);
+  });
+
+  test('enforces GITHUB_LISTING_TIMEOUT_MS', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockListInstallationsForAuthenticatedUser.mockImplementation(
+        (params: { request: { signal: AbortSignal } }) => {
+          const { signal } = params.request;
+          signals.push(signal);
+          const { promise, reject } = Promise.withResolvers<never>();
+          const abort = () => reject(signal.reason);
+          if (signal.aborted) {
+            abort();
+            return promise;
+          }
+          signal.addEventListener('abort', abort, { once: true });
+          return promise;
+        }
+      );
+
+      const walk = assertUserAdministersInstallation({
+        accessToken: 'test-token',
+        installationId: INSTALLATION_ID,
+      });
+      const settled = walk.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: installation administration listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(signals).toHaveLength(1);
+      expect(signals[0].aborted).toBe(true);
+      expect(signals[0].reason.name).toBe('AbortError');
+      expect(signals[0].reason.cause).toBeInstanceOf(GitHubListingBudgetExceededError);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

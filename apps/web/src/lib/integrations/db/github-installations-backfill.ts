@@ -2,6 +2,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { lockGitHubInstallationIdentity, type DbTransaction } from './github-installations';
 
 const installationIdPattern = /^[1-9][0-9]*$/;
 
@@ -83,31 +84,33 @@ export async function backfillGitHubInstallations(
       continue;
     }
     const appType = row.github_app_type ?? 'standard';
-    const peers = await db
-      .select({ id: platform_integrations.id })
-      .from(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.platform, 'github'),
-          eq(platform_integrations.integration_type, 'app'),
-          eq(platform_integrations.platform_installation_id, installationId),
-          eq(platform_integrations.integration_status, 'active'),
-          isNull(platform_integrations.github_disconnected_at),
-          isNull(platform_integrations.suspended_at),
-          isNull(platform_integrations.auth_invalid_at),
-          sql`NOT (COALESCE(${platform_integrations.metadata}, '{}'::jsonb) ? 'github_dedup')`,
-          appType === 'standard'
-            ? sql`(${platform_integrations.github_app_type} = 'standard' OR ${platform_integrations.github_app_type} IS NULL)`
-            : eq(platform_integrations.github_app_type, appType)
+    // One snapshot for the peer set, the link and the role claim, under the identity lock.
+    await db.transaction(async (tx: DbTransaction) => {
+      await lockGitHubInstallationIdentity(tx, appType, installationId);
+      const peers = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, 'github'),
+            eq(platform_integrations.integration_type, 'app'),
+            eq(platform_integrations.platform_installation_id, installationId),
+            eq(platform_integrations.integration_status, 'active'),
+            isNull(platform_integrations.github_disconnected_at),
+            isNull(platform_integrations.suspended_at),
+            isNull(platform_integrations.auth_invalid_at),
+            sql`NOT (COALESCE(${platform_integrations.metadata}, '{}'::jsonb) ? 'github_dedup')`,
+            appType === 'standard'
+              ? sql`(${platform_integrations.github_app_type} = 'standard' OR ${platform_integrations.github_app_type} IS NULL)`
+              : eq(platform_integrations.github_app_type, appType)
+          )
         )
-      )
-      .limit(2);
-    if (peers.length !== 1 || peers[0]?.id !== row.id) {
-      result.skipped++;
-      result.skippedAmbiguous++;
-      continue;
-    }
-    await db.transaction(async tx => {
+        .limit(2);
+      if (peers.length !== 1 || peers[0]?.id !== row.id) {
+        result.skipped++;
+        result.skippedAmbiguous++;
+        return;
+      }
       const inserted = await tx
         .insert(github_app_installations)
         .values({

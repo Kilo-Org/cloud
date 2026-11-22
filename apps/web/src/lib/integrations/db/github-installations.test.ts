@@ -47,6 +47,7 @@ import {
   connectVerifiedGitHubInstallation,
   GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS,
   getGitHubInstallationDeliveryStatus,
+  lockGitHubInstallationIdentity,
   materializeGitHubInstallationIdentity,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
@@ -56,7 +57,10 @@ import {
   updateGitHubInstallationRepositories,
   updateGitHubInstallationAccountIdentity,
 } from './github-installations';
-import { backfillGitHubInstallations } from './github-installations-backfill';
+import {
+  backfillGitHubInstallations,
+  type GitHubInstallationBackfillResult,
+} from './github-installations-backfill';
 import { assertGitHubInstallationRuntimeAuthorized } from '../github/runtime-authorization';
 import { upsertAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { getPlatformIntegration } from '../../bot/platform-helpers';
@@ -3667,6 +3671,79 @@ describe('GitHub installation persistence', () => {
       github_connection_role: null,
     });
     await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
+  });
+
+  test('serializes the backfill with another writer of the same installation', async () => {
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: ownerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '990011',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        github_installation_id: null,
+        repository_access: 'all',
+      })
+      .returning();
+    const lockHeld = Promise.withResolvers<number>();
+    const releaseHolder = Promise.withResolvers<void>();
+    const holder = db.transaction(async tx => {
+      await lockGitHubInstallationIdentity(tx, 'standard', '990011');
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      lockHeld.resolve(backend.rows[0]!.pid);
+      await releaseHolder.promise;
+    });
+    let backfill: Promise<GitHubInstallationBackfillResult> | undefined;
+    let observationError: unknown;
+    try {
+      const holderPid = await lockHeld.promise;
+      backfill = backfillGitHubInstallations();
+      let blocked = false;
+      for (let attempt = 0; attempt < 2000 && !blocked; attempt += 1) {
+        const waiting = await db.execute(sql`
+          SELECT 1 FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND wait_event_type = 'Lock'
+            AND ${holderPid} = ANY(pg_blocking_pids(pid))`);
+        blocked = waiting.rows.length > 0;
+      }
+      if (!blocked) {
+        const activity = await db.execute<{
+          pid: number;
+          state: string | null;
+          wait_event_type: string | null;
+          query: string | null;
+        }>(sql`
+          SELECT pid, state, wait_event_type, left(query, 120) AS query
+          FROM pg_stat_activity
+          WHERE datname = current_database()`);
+        throw new Error(
+          `Backfill did not queue on the installation lock: ${JSON.stringify(activity.rows)}`
+        );
+      }
+    } catch (error) {
+      observationError = error;
+    } finally {
+      releaseHolder.resolve();
+    }
+    await holder;
+    const result = backfill ? await backfill : undefined;
+    if (observationError) throw observationError;
+    if (!result) throw new Error('Backfill did not start');
+
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({ github_installation_id: expect.any(String) });
+    await expect(
+      db
+        .select()
+        .from(github_app_installations)
+        .where(eq(github_app_installations.installation_id, '990011'))
+    ).resolves.toHaveLength(1);
+    expect(result).toMatchObject({ linked: 1 });
   });
 });
 

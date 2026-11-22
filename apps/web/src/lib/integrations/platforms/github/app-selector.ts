@@ -1,6 +1,11 @@
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { Octokit } from '@octokit/rest';
+import {
+  checkGitHubPaginationBounds,
+  GitHubListingBudget,
+  withListingDeadline,
+} from './listing-budget';
 
 /**
  * Type of GitHub App to use
@@ -96,24 +101,39 @@ export async function assertUserAdministersInstallation(params: {
 
   const octokit = new Octokit({ auth: accessToken });
 
-  let page = 1;
   const perPage = 100;
+  const context = 'installation administration listing';
+  const budget = new GitHubListingBudget(context);
 
-  while (true) {
-    const { data } = await octokit.rest.apps.listInstallationsForAuthenticatedUser({
-      per_page: perPage,
-      page,
-    });
+  try {
+    let page = 1;
+    let itemCount = 0;
 
-    for (const installation of data.installations) {
-      if (installation.id === targetId) {
-        return true;
+    while (true) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.rest.apps.listInstallationsForAuthenticatedUser({
+          per_page: perPage,
+          page,
+          request: { signal: budget.signal },
+        })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
+
+      for (const installation of data.installations) {
+        if (installation.id === targetId) {
+          return true;
+        }
       }
+
+      itemCount += data.installations.length;
+      const isLastPage = data.installations.length < perPage;
+      if (!isLastPage) page++;
+      checkGitHubPaginationBounds(page, itemCount, context);
+      if (isLastPage) break;
     }
 
-    if (data.installations.length < perPage) break;
-    page++;
+    return false;
+  } finally {
+    budget.dispose();
   }
-
-  return false;
 }

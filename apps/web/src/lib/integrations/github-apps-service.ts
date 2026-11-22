@@ -24,12 +24,14 @@ import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
   fetchGitHubRepositories,
-  GITHUB_LISTING_BUDGET_MESSAGE,
-  GitHubListingBudgetExceededError,
   GitHubRateLimitError,
   isGitHubRateLimitError,
   toGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
+import {
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 

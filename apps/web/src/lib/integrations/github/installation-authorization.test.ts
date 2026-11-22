@@ -1,10 +1,19 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type { discoverAuthorizedGitHubInstallations as DiscoverAuthorizedGitHubInstallations } from './installation-authorization';
 import type { verifyGitHubInstallationAuthorization as VerifyGitHubInstallationAuthorization } from './installation-authorization';
+import {
+  GITHUB_LISTING_TIMEOUT_MS,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
 
 const getAuthenticated = jest.fn<() => Promise<{ data: { id: number; login: string } }>>();
 const listMemberships = jest.fn<
-  () => Promise<{
+  (_params: {
+    page: number;
+    per_page: number;
+    state: 'active';
+    request: { signal: AbortSignal };
+  }) => Promise<{
     data: Array<{
       state: string;
       role: string;
@@ -13,7 +22,7 @@ const listMemberships = jest.fn<
   }>
 >();
 const listInstallations = jest.fn<
-  () => Promise<{
+  (_params: { page: number; per_page: number; request: { signal: AbortSignal } }) => Promise<{
     data: {
       installations: Array<{
         id: number;
@@ -187,5 +196,101 @@ describe('discoverAuthorizedGitHubInstallations', () => {
       })
     );
     expect(console.log).toHaveBeenCalledTimes(2);
+  });
+
+  test('pages through two installations pages', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      id: 1000 + index,
+      app_id: 7,
+      account: { id: 500 + index, login: `org-${index}`, type: 'Organization' },
+    }));
+    listInstallations
+      .mockResolvedValueOnce(installationPage(firstPage))
+      .mockResolvedValueOnce(
+        installationPage([
+          { id: 44, app_id: 7, account: { id: 99, login: 'allowed', type: 'Organization' } },
+        ])
+      );
+
+    const result = await discoverAuthorizedGitHubInstallations({
+      accessToken: 'token',
+      githubAppType: 'standard',
+      expectedAppId: '7',
+    });
+
+    expect(result.candidates).toEqual([
+      {
+        installationId: '44',
+        accountId: '99',
+        accountLogin: 'allowed',
+        accountType: 'Organization',
+      },
+    ]);
+    expect(listInstallations).toHaveBeenCalledTimes(2);
+    for (const [params] of listInstallations.mock.calls) {
+      expect(params.request.signal).toBeInstanceOf(AbortSignal);
+    }
+    expect(listInstallations.mock.calls[0][0].page).toBe(1);
+    expect(listInstallations.mock.calls[1][0].page).toBe(2);
+  });
+
+  test('stops at the page limit', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, index) => ({
+      id: 1000 + index,
+      app_id: 7,
+      account: { id: 500 + index, login: `org-${index}`, type: 'Organization' },
+    }));
+    listInstallations.mockResolvedValue(installationPage(fullPage));
+
+    const thrown: unknown = await discoverAuthorizedGitHubInstallations({
+      accessToken: 'token',
+      githubAppType: 'standard',
+      expectedAppId: '7',
+    }).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
+    );
+    expect(listInstallations).toHaveBeenCalledTimes(100);
+  });
+
+  test('stops at the time limit', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      listInstallations.mockImplementation(
+        (params: { request: { signal: AbortSignal } }) => {
+          const { signal } = params.request;
+          signals.push(signal);
+          const { promise, reject } = Promise.withResolvers<never>();
+          const abort = () => reject(signal.reason);
+          if (signal.aborted) {
+            abort();
+            return promise;
+          }
+          signal.addEventListener('abort', abort, { once: true });
+          return promise;
+        }
+      );
+
+      const discovery = discoverAuthorizedGitHubInstallations({
+        accessToken: 'token',
+        githubAppType: 'standard',
+        expectedAppId: '7',
+      });
+      const settled = discovery.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: installation administration listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(signals).toHaveLength(1);
+      expect(signals[0].aborted).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

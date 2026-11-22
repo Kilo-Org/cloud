@@ -53,14 +53,16 @@ import {
   fetchGitHubRepositories,
   fetchPullRequestByNumber,
   getCollaboratorPermissionLevel,
-  GITHUB_LISTING_TIMEOUT_MS,
   GitHubCredentialRejectionError,
-  GitHubListingBudgetExceededError,
   GitHubRateLimitError,
   isGitHubCredentialRejection,
-  MAX_GITHUB_LISTING_BYTES,
   toGitHubRateLimitError,
 } from './adapter';
+import {
+  GITHUB_LISTING_TIMEOUT_MS,
+  GitHubListingBudgetExceededError,
+  MAX_GITHUB_LISTING_BYTES,
+} from './listing-budget';
 import { verifySessionPullRequestLink } from './pr-link-identity';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';

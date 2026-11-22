@@ -1,6 +1,6 @@
 export const ISO_CURRENCY_PATTERN = /^[a-z]{3}$/;
 
-export const SERVICE_FEE_FAILURE_CODE_PATTERN = /^[a-z][a-z0-9_]{0,99}$/;
+const SERVICE_FEE_FAILURE_CODE_PATTERN = /^[a-z][a-z0-9_]{0,99}$/;
 
 /** Trimmed text, or null when the value is not a string or trims to nothing. */
 export function trimToNull(value: string | null | undefined): string | null {

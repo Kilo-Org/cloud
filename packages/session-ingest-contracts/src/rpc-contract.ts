@@ -969,7 +969,7 @@ const sdkPartBaseShape = {
   // Native v2 display parts retain the identity shared by history and live replay.
   id: z.union([
     partIdSchema,
-    createIdSchema('msg_', 'native display part IDs').regex(/_[0-9]{6}(?:_summary|_file_[0-9]+)?$/),
+    storedMessageIdSchema.startsWith('msg_').regex(/_[0-9]{6}(?:_summary|_file_[0-9]+)?$/),
   ]),
   /** Same stored-session rule as the stored messages. */
   sessionID: storedSessionIdSchema,

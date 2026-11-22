@@ -124,7 +124,9 @@ export function RepoPickerSheet({
         variant="server"
         placement="top"
         inset="gutter"
-        title={t('profiles.loadFailed')}
+        // This sheet lists repositories, so a failed load names the repository
+        // list, not the profiles `profiles.loadFailed` describes.
+        title={t('common.couldNotLoadRepositories')}
         onRetry={onRetry}
       />
     );

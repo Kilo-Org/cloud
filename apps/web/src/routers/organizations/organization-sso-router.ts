@@ -296,11 +296,7 @@ export const organizationSsoRouter = createTRPCRouter({
         actor_email: opts.ctx.user.google_user_email,
         actor_id: opts.ctx.user.id,
         actor_name: opts.ctx.user.google_user_name,
-        details: {
-          id: 'sso.domainSet',
-          domain: ssoDomain,
-          ...(organization.ssoDomain ? { previous: organization.ssoDomain } : {}),
-        },
+        details: { id: 'sso.domainSet', domain: ssoDomain },
         message: `Set SSO domain to ${ssoDomain}`,
         organization_id: organizationId,
         tx,

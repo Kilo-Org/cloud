@@ -1378,6 +1378,31 @@ describe('sensitive steps', () => {
     expect(result).toMatchObject({ ok: true, sensitiveToken: { element: 'e12', need, token } });
   });
 
+  it('hands back the reason a redeemed approval was issued for', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-g' });
+    const args = { target: 'e12', text: 'hunter2' };
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      element: 'e12',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.download,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_type',
+    });
+
+    const result = await run(
+      { args, probe: passwordProbe, stepTokens: [token], toolName: 'browser_type' },
+      tokens
+    );
+
+    // The runtime reads this to tell a download's own approval from one that buys only its step.
+    expect(result).toMatchObject({
+      ok: true,
+      sensitiveToken: { reason: SENSITIVE_REASON.download },
+    });
+  });
+
   it('leaves an ordinary text field alone', async () => {
     const result = await run({
       args: { target: 'e12', text: 'igor@example.com' },

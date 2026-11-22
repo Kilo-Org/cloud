@@ -64,12 +64,14 @@ export type AgentPreflight =
       readonly origin: string;
       /**
        * The approval this call redeemed, when it was a sensitive step: the matched token, the element
-       * the sensitive classification ran on, and the one file the approval buys when it names one.
+       * the sensitive classification ran on, the one file the approval buys when it names one, and the
+       * reason it was issued for, so the caller can tell a step approval from a download approval.
        */
       readonly sensitiveToken?:
         | {
             readonly element?: string | undefined;
             readonly need?: StepTokenNeed | undefined;
+            readonly reason?: string | undefined;
             readonly token: string;
           }
         | undefined;
@@ -797,7 +799,12 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
         class: 'act',
         ok: true,
         origin,
-        sensitiveToken: { element: sensitive.element, need: take.need, token },
+        sensitiveToken: {
+          element: sensitive.element,
+          need: take.need,
+          reason: take.reason,
+          token,
+        },
         targetOriginFrame,
       };
     }

@@ -3393,9 +3393,15 @@ export const createBrowserRuntime = ({
             return { kind: 'none' };
           }
 
-          return gateApproval.need === undefined
-            ? { kind: 'step' }
-            : { kind: 'file', need: gateApproval.need };
+          if (gateApproval.need !== undefined) {
+            return { kind: 'file', need: gateApproval.need };
+          }
+
+          // An approval with no url is still a download's own when it was issued for a download: it exempts the one
+          // File its step starts. Any other approval buys the step alone.
+          return gateApproval.reason === SENSITIVE_REASON.download
+            ? { kind: 'unbounded' }
+            : { kind: 'step' };
         };
 
         let redeemed: RedeemedApproval = redeemedFromGate();

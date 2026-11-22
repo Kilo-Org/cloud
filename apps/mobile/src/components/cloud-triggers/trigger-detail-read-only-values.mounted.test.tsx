@@ -116,7 +116,9 @@ async function mount(): Promise<ReactTestRenderer['root']> {
 /** The value one read-only row renders, found by its label. */
 function rowValue(root: ReactTestRenderer['root'], label: string): unknown {
   const rows = root.findAll(node => Object.is(node.type, KV_ROW) && node.props.label === label);
-  if (rows.length !== 1) throw new Error(`expected one ${label} row, found ${rows.length}`);
+  if (rows.length !== 1) {
+    throw new Error(`expected one ${label} row, found ${rows.length}`);
+  }
   return rows[0]?.props.value;
 }
 

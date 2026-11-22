@@ -1,5 +1,3 @@
-#!/usr/bin/env bun
-
 /**
  * Enforces the "no padded markdown tables" rule from AGENTS.md.
  *

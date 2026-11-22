@@ -62,7 +62,7 @@ export function PrReviewUnavailableActions({
   isRetrying: boolean;
   /**
    * `embedded` when the surrounding body already shows its own primary action:
-   * an outlined retry above a ghost connection check, with no margin of its own.
+   * both controls on the outlined face, with no margin of its own.
    */
   presentation?: 'surface' | 'embedded';
 }>) {

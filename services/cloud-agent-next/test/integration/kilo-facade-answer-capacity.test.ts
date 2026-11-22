@@ -7,6 +7,7 @@ import { generateSandboxId } from '../../src/sandbox-id.js';
 import { createMessageId } from '../../src/session/message-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import { FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import {
   clearTestSessionIngestState,
@@ -16,7 +17,10 @@ import { waitFor } from './wait-for.js';
 
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 
-const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
+// The test worker's `env` loses the DO export class; assert the binding once,
+// named, so `sessions` is typed where it is used.
+const testEnv = env as unknown as { SANDBOX_SESSION: SessionNamespace };
+const sessions = testEnv.SANDBOX_SESSION;
 
 const USER_ID = 'user_answer_capacity';
 const ORG_ID = '11111111-2222-4333-8444-555555555555';
@@ -90,7 +94,7 @@ function metadata(input: { sandboxId: string }) {
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId, kilocodeToken: 'test-token' },
+    auth: { kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'git', url: 'https://github.com/acme/widgets.git', platform: 'github' },
     workspace: {
@@ -144,12 +148,9 @@ function clearFacadeRoots(): Promise<void> {
   });
 }
 
-function answerUrl(): string {
-  return `http://worker.test/kilo-test/kilo/question/q_1/reply?userId=${USER_ID}&directory=${encodeURIComponent(publicDirectory)}`;
-}
-
 function postAnswer(): Promise<Response> {
-  return SELF.fetch(answerUrl(), {
+  const url = `http://worker.test/kilo-test/kilo/question/q_1/reply?userId=${USER_ID}&directory=${encodeURIComponent(publicDirectory)}`;
+  return SELF.fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ answers: [['Blue']] }),
@@ -166,10 +167,6 @@ async function fillQueueAndAsk(stub: DurableObjectStub<SandboxSessionV2>): Promi
   }
   await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
   return sent;
-}
-
-function messageStates(states: readonly string[], expected: string): boolean {
-  return states.every(state => state === expected);
 }
 
 afterEach(async () => {
@@ -239,7 +236,7 @@ describe('facade answer capacity', { timeout: 30_000 }, () => {
       });
       const drained = await stub.getSession();
       if (drained.type !== 'found') throw new Error('Session disappeared');
-      expect(messageStates(drained.messages.map(message => message.state), 'queued')).toBe(false);
+      expect(drained.messages.some(message => message.state === 'queued')).toBe(false);
       expect(drained.messages.some(message => message.state === 'accepted')).toBe(false);
 
       // The retry reaches the payer preflight because the interaction is pending.

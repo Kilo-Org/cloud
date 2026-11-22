@@ -6,19 +6,22 @@ import { fetchSessionMetadata } from '../../session/metadata.js';
 import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
+import { answerWithAdmission } from '../../session/answer-admission.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import type { ControlPlaneAnswerReply } from '../../shared/control-plane-protocol.js';
 import { withDORetry } from '../../utils/do-retry.js';
 
 /**
- * Forwards one question/permission reply to the control-plane Session DO and
- * projects its dispatch result onto the public `{success}` contract. The DO
- * reports `sent` only when the reply reached the live turn or was admitted as a
- * continuation, so `not_connected` is the public `success: false`.
+ * Forwards one question/permission reply through the shared answer admission.
+ * A live turn answers inside its own paid turn. An answer that would become a
+ * new turn passes the balance and model preflight first, so a refusal reaches
+ * the client as the same error the prompt mutation returns, and the pending
+ * interaction stays answerable.
  */
 async function answerControlPlane(
   env: Env,
   userId: string,
+  authToken: string | undefined,
   sessionId: SessionId,
   reply: ControlPlaneAnswerReply
 ): Promise<{ success: boolean }> {
@@ -26,12 +29,29 @@ async function answerControlPlane(
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
-  const dispatch = await withDORetry(
-    () => getSandboxSessionStub(env, userId, sessionId),
-    current => current.answer({ sessionId, reply }),
-    'answer'
-  );
-  return { success: dispatch === 'sent' };
+  const outcome = await answerWithAdmission({
+    env,
+    userId,
+    ...(authToken === undefined ? {} : { authToken }),
+    cloudAgentSessionId: sessionId,
+    reply,
+  });
+  switch (outcome.outcome) {
+    case 'sent':
+      return { success: true };
+    case 'not_pending':
+      return { success: false };
+    case 'unavailable':
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Durable prompt admission is unavailable',
+      });
+    case 'balance':
+      throw new TRPCError({
+        code: outcome.status === 402 ? 'PAYMENT_REQUIRED' : 'INTERNAL_SERVER_ERROR',
+        message: outcome.message,
+      });
+  }
 }
 
 export function createSessionQuestionHandlers() {
@@ -56,7 +76,7 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, sessionId, {
+            const result = await answerControlPlane(env, userId, ctx.authToken, sessionId, {
               action: 'answer',
               questionId: input.questionId,
               answers: input.answers,
@@ -96,7 +116,7 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, sessionId, {
+            const result = await answerControlPlane(env, userId, ctx.authToken, sessionId, {
               action: 'reject',
               questionId: input.questionId,
             });
@@ -137,7 +157,7 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, sessionId, {
+            const result = await answerControlPlane(env, userId, ctx.authToken, sessionId, {
               action: 'permission',
               permissionId: input.permissionId,
               response: input.response,

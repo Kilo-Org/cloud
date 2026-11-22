@@ -169,6 +169,49 @@ describe('answerQuestion', () => {
     expect(secondAnswer).toHaveBeenCalledTimes(1);
   });
 
+  it('reports a refused settled answer as the payer balance error', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    const answer = vi.fn().mockResolvedValue({
+      result: 'continuation',
+      intent: {
+        messageId: 'msg_answer_1',
+        turn: { type: 'prompt', prompt: 'yes' },
+        agent: { mode: 'code', model: 'test/model' },
+      },
+    });
+    const sandboxSessions = {
+      idFromName: vi.fn((name: string) => name),
+      get: vi.fn(() => ({ answer })),
+    };
+    const context = {
+      userId: 'user_owner',
+      authToken: 'test-auth-token',
+      request: new Request('https://worker.test/trpc'),
+      env: {
+        CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+        SANDBOX_SESSION: sandboxSessions,
+      },
+    } as unknown as TRPCContext;
+    const caller = router.createCaller(context);
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ balance: 0, isDepleted: true })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(
+        caller.answerQuestion({ sessionId: SESSION_ID, questionId: 'q_1', answers: [['yes']] })
+      ).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
+      // The balance read used the caller's own bearer.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [balanceInput, balanceInit] = fetchMock.mock.calls[0];
+      const balanceUrl = balanceInput instanceof Request ? balanceInput.url : String(balanceInput);
+      expect(balanceUrl).toContain('/balance');
+      expect(new Headers(balanceInit?.headers).get('Authorization')).toBe('Bearer test-auth-token');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('rejects a legacy session before reading metadata or resolving its DO', async () => {
     const harness = setup();
     requireCurrentSessionAccessMock.mockResolvedValue({

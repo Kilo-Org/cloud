@@ -103,6 +103,7 @@ import type {
 import {
   CONTROL_PLANE_SETUP_EVENTS,
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
+  controlPlaneAdmitAnswerPayloadSchema,
   controlPlaneAnswerPayloadSchema,
   controlPlaneCredentialSourceSchema,
   controlPlaneEventsNotificationSchema,
@@ -116,8 +117,10 @@ import {
   controlPlaneWorkspaceStoppedPayloadSchema,
   type ControlPlaneAnswerPayload,
   type ControlPlaneAnswerReply,
+  type ControlPlaneAdmitAnswerPayload,
   type ControlPlaneCancelWorkspacePayload,
   type ControlPlaneCancelWorkspaceResult,
+  type ControlPlaneContinuationAdmissionResult,
   type ControlPlaneControlResult,
   type ControlPlaneDeliverPayload,
   type ControlPlaneDeliverResult,
@@ -194,7 +197,7 @@ import {
   type SessionMessage,
   type SessionMessageState,
 } from './messages.js';
-import { answerMessageIntent } from './answers.js';
+import { answerMessageIntent, sameContinuationIntent } from './answers.js';
 import { messageFailureText } from './failure-messages.js';
 import {
   createControlPlaneWorktreeChanges,
@@ -2158,10 +2161,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         if (result === 'sent') await this.resolvePendingInteraction(parsed.reply);
         return result;
       }
-      // The asking turn already settled: the answer becomes a new message that
-      // continues the chat (spec §5), admitted through the send path. Only a
-      // question/permission this session still waits on may do so, so a retry,
-      // an unknown id or an already-answered one cannot admit another turn.
+      // The asking turn already settled: the answer would become a new message
+      // that continues the chat (spec §5). A new message costs a turn, so this
+      // call only builds the intent; the Worker runs the same balance and model
+      // preflight every prompt mutation runs, then admits it through
+      // `admitAnswerContinuation`. Only a question/permission this session still
+      // waits on may do so, so a retry, an unknown id or an already-answered one
+      // cannot admit another turn.
       const intent = answerMessageIntent(
         this.messages,
         parsed.reply,
@@ -2169,8 +2175,48 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.metadata?.agent?.model
       );
       if (intent === null) return 'not_connected';
-      const admitted = await this.admitMessage(intent);
-      if (admitted === 'queue-full') return 'not_connected';
+      return { result: 'continuation', intent };
+    });
+  }
+
+  /**
+   * Admits the continuation a settled answer preflighted. The caller returns the
+   * exact intent `answer` produced; this call rebuilds it and refuses when the
+   * session moved on, so the admitted turn is always the one that passed the
+   * preflight. A replay of the same message id resolves nothing twice, and a live
+   * turn that appeared since the preflight owns the answer instead.
+   */
+  async admitAnswerContinuation(
+    payload: ControlPlaneAdmitAnswerPayload
+  ): Promise<ControlPlaneContinuationAdmissionResult> {
+    await this.initialized;
+    if (this.registration === null) return 'not_connected';
+    const parsed = controlPlaneAdmitAnswerPayloadSchema.parse(payload);
+    return this.enqueue(async () => {
+      const target = pendingInteractionTarget(parsed.reply);
+      const existing = this.messages.find(message => message.messageId === parsed.intent.messageId);
+      if (existing !== undefined) {
+        // A retried admit replays; a colliding different intent is refused.
+        if (!sameContinuationIntent(existing.intent, parsed.intent)) return 'not_connected';
+        if (this.hasPendingInteraction(target.collection, target.id)) {
+          await this.resolvePendingInteraction(parsed.reply);
+        }
+        return 'sent';
+      }
+      // The preflighted intent is the only one admitted: rebuild it from this
+      // session's current state and refuse when either side moved on.
+      const rebuilt = answerMessageIntent(
+        this.messages,
+        parsed.reply,
+        parsed.intent.messageId,
+        this.metadata?.agent?.model
+      );
+      if (rebuilt === null || !sameContinuationIntent(rebuilt, parsed.intent)) {
+        return 'not_connected';
+      }
+      if (!this.hasPendingInteraction(target.collection, target.id)) return 'not_connected';
+      if (this.messages.some(message => message.state === 'accepted')) return 'not_connected';
+      if ((await this.admitMessage(parsed.intent)) === 'queue-full') return 'not_connected';
       await this.resolvePendingInteraction(parsed.reply);
       return 'sent';
     });

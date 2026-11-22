@@ -587,10 +587,19 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
       });
 
       const promptsBefore = pair.recording.prompts.length;
+      const continuation = await pair.stubA.answer({
+        sessionId: pair.sessionA,
+        reply: { action: 'answer', questionId: 'q_1', answers: [['Option A']] },
+      });
+      // The answer call only builds the new turn: the caller runs the balance
+      // and model preflight, then admits exactly this intent.
+      expect(continuation).toMatchObject({ result: 'continuation' });
+      if (typeof continuation === 'string') throw new Error('expected a continuation');
       await expect(
-        pair.stubA.answer({
+        pair.stubA.admitAnswerContinuation({
           sessionId: pair.sessionA,
           reply: { action: 'answer', questionId: 'q_1', answers: [['Option A']] },
+          intent: continuation.intent,
         })
       ).resolves.toBe('sent');
 
@@ -654,10 +663,16 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
 
     // Ask, answer once (admitted), then repeat with the resolved id.
     await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+    const continuation = await stub.answer({
+      sessionId,
+      reply: { action: 'answer', questionId: 'q_1', answers: [['yes']] },
+    });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
     await expect(
-      stub.answer({
+      stub.admitAnswerContinuation({
         sessionId,
         reply: { action: 'answer', questionId: 'q_1', answers: [['yes']] },
+        intent: continuation.intent,
       })
     ).resolves.toBe('sent');
     await expect(
@@ -674,6 +689,91 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
       questions: [],
       permissions: [],
     });
+  });
+
+  it('keeps a settled answer pending until its preflighted intent is admitted', async () => {
+    const { sessionId, stub } = await registerOnlySession();
+    await stub.send(promptPayload(messageId(), 'start'));
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+
+    const reply = { action: 'answer' as const, questionId: 'q_1', answers: [['yes']] };
+    const continuation = await stub.answer({ sessionId, reply });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
+
+    // Building the continuation admits nothing and resolves nothing: the caller
+    // may still refuse it in the preflight.
+    await expect(stub.getPendingInteractions()).resolves.toMatchObject({
+      questions: [{ id: 'q_1' }],
+    });
+    const afterAnswer = await stub.getSession();
+    if (afterAnswer.type !== 'found') throw new Error('session disappeared');
+    expect(
+      afterAnswer.messages.some(message => message.messageId === continuation.intent.messageId)
+    ).toBe(false);
+
+    await expect(
+      stub.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+    ).resolves.toBe('sent');
+    await expect(stub.getPendingInteractions()).resolves.toEqual({
+      questions: [],
+      permissions: [],
+    });
+  });
+
+  it('refuses an admit whose intent the session no longer produces', async () => {
+    const { sessionId, stub } = await registerOnlySession();
+    await stub.send(promptPayload(messageId(), 'start'));
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+    const reply = { action: 'answer' as const, questionId: 'q_1', answers: [['yes']] };
+    const continuation = await stub.answer({ sessionId, reply });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
+
+    // A different answer for the same turn is not the intent that was preflighted.
+    await expect(
+      stub.admitAnswerContinuation({
+        sessionId,
+        reply: { action: 'answer', questionId: 'q_1', answers: [['no']] },
+        intent: continuation.intent,
+      })
+    ).resolves.toBe('not_connected');
+    await expect(stub.getPendingInteractions()).resolves.toMatchObject({
+      questions: [{ id: 'q_1' }],
+    });
+
+    // The preflighted intent is admitted once; a replay resolves nothing twice.
+    await expect(
+      stub.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+    ).resolves.toBe('sent');
+    await expect(
+      stub.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+    ).resolves.toBe('sent');
+    const snapshot = await stub.getSession();
+    if (snapshot.type !== 'found') throw new Error('session disappeared');
+    expect(
+      snapshot.messages.filter(message => message.messageId === continuation.intent.messageId)
+    ).toHaveLength(1);
+  });
+
+  it('forwards a settled continuation to the live turn that took it over', async () => {
+    const { sessionId, stub, peer } = await registerOnlySession();
+    await stub.send(promptPayload(messageId(), 'start'));
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+    const reply = { action: 'answer' as const, questionId: 'q_1', answers: [['yes']] };
+    const continuation = await stub.answer({ sessionId, reply });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
+
+    // The route goes ready and the queued turn becomes the live one.
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload(messageId(), 'second'));
+    await expect(
+      stub.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+    ).resolves.toBe('not_connected');
+    // The live turn owns the answer, so no continuation was queued.
+    const snapshot = await stub.getSession();
+    if (snapshot.type !== 'found') throw new Error('session disappeared');
+    expect(
+      snapshot.messages.some(message => message.messageId === continuation.intent.messageId)
+    ).toBe(false);
   });
 
   it('projects questions and permissions and resolves each through getPendingInteractions', async () => {
@@ -712,10 +812,18 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     await stub.onEvents({
       events: [{ type: 'question.asked', properties: { id: 'q_1' } }],
     });
+    const continuation = await stub.answer({
+      sessionId,
+      reply: { action: 'answer', questionId: 'q_1', answers: [['go']] },
+    });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
+    // The command carries no model, so the continuation takes the metadata model.
+    expect(continuation.intent.agent.model).toBe('test/model');
     await expect(
-      stub.answer({
+      stub.admitAnswerContinuation({
         sessionId,
         reply: { action: 'answer', questionId: 'q_1', answers: [['go']] },
+        intent: continuation.intent,
       })
     ).resolves.toBe('sent');
 

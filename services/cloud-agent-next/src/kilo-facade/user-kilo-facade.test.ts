@@ -2964,7 +2964,7 @@ describe('hosted native routes', () => {
   });
 
   it('answers a hosted question through the Session DO, which owns the route identity', async () => {
-    const answer = vi.fn(async () => 'delivered' as const);
+    const answer = vi.fn(async () => 'sent' as const);
     const env = envStub();
     const sandboxGet = vi.fn(() => ({ answer }));
     vi.mocked(env.SANDBOX_SESSION).get = sandboxGet as never;
@@ -2998,6 +2998,86 @@ describe('hosted native routes', () => {
       deps: hostedDeps(),
     });
     expect(response.status).toBe(409);
+  });
+
+  it('refuses a settled answer with the payer balance failure and keeps it answerable', async () => {
+    const env = envStub();
+    const continuation = {
+      messageId: 'msg_answer_1',
+      turn: { type: 'prompt' as const, prompt: 'Blue' },
+      agent: { mode: 'code', model: 'test/model' },
+    };
+    const answer = vi.fn(async () => ({ result: 'continuation' as const, intent: continuation }));
+    vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({ answer })) as never;
+    const validatePromptBalance = vi.fn(async () => ({
+      success: false as const,
+      status: 402 as const,
+      message: 'Insufficient credits: $1 minimum required',
+    }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['Blue']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      authToken: 'caller-bearer',
+      deps: hostedDeps({ validatePromptBalance }),
+    });
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_BALANCE_VALIDATION_FAILED',
+    });
+    // The preflight ran on the caller's own identity, before any admission.
+    expect(validatePromptBalance).toHaveBeenCalledWith(
+      expect.objectContaining({ authToken: 'caller-bearer', userId: 'usr_1' })
+    );
+  });
+
+  it('refuses a settled answer it cannot preflight when the caller has no bearer', async () => {
+    const env = envStub();
+    const answer = vi.fn(async () => ({
+      result: 'continuation' as const,
+      intent: {
+        messageId: 'msg_answer_2',
+        turn: { type: 'prompt' as const, prompt: 'Blue' },
+        agent: { mode: 'code', model: 'test/model' },
+      },
+    }));
+    vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({ answer })) as never;
+    const validatePromptBalance = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['Blue']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      deps: hostedDeps({ validatePromptBalance }),
+    });
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_FACADE_UNAVAILABLE' });
+    expect(validatePromptBalance).not.toHaveBeenCalled();
+  });
+
+  it('answers a live turn without reading the balance', async () => {
+    const env = envStub();
+    vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({
+      answer: vi.fn(async () => 'sent' as const),
+    })) as never;
+    const validatePromptBalance = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_live/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['Blue']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      authToken: 'caller-bearer',
+      deps: hostedDeps({ validatePromptBalance }),
+    });
+    expect(response.status).toBe(200);
+    expect(validatePromptBalance).not.toHaveBeenCalled();
   });
 
   it.each([{ mode: 'code', model: 'anthropic/test' }, { model: 'anthropic/test' }])(

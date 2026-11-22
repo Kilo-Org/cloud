@@ -26,6 +26,7 @@ import { getPgDb } from '../db/pg.js';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
+import { answerWithAdmission, type AnswerAdmissionOutcome } from '../session/answer-admission.js';
 import {
   buildControlPlaneMessagePayload,
   ControlPlaneMessageInputError,
@@ -40,7 +41,6 @@ import type {
 import type {
   ControlPlaneAnswerReply,
   ControlPlaneControlResult,
-  ControlPlaneDispatchResult,
 } from '../shared/control-plane-protocol.js';
 import { createMessageId } from '../session/message-id.js';
 import { interruptControlSession } from '../router/control-plane-session.js';
@@ -1193,8 +1193,10 @@ export async function handleKiloFacadeRequest(params: {
       request,
       env,
       userId,
+      authToken,
       cloudAgentSessionId: session.cloudAgentSessionId,
       route: collectionNativeRoute,
+      deps,
     });
   }
   if (collectionNativeRoute !== null) {
@@ -1238,8 +1240,10 @@ export async function handleKiloFacadeRequest(params: {
       request,
       env,
       userId,
+      authToken,
       cloudAgentSessionId: root.cloudAgentSessionId,
       route: sessionNativeRoute,
+      deps,
     });
   }
 
@@ -1474,29 +1478,37 @@ async function answerOwnedNativeInteraction(params: {
   request: Request;
   env: Env;
   userId: string;
+  authToken?: string;
   cloudAgentSessionId: string;
   route: Extract<NativeSessionRoute, { kind: 'answering' }>;
+  deps?: KiloFacadeRequestDeps;
 }): Promise<Response> {
   const body = await parseNativeAnswerBody(params.request, params.route);
   if (!body.ok) return facadeError(body.status, body.code, body.message);
   return answerHostedNativeInteraction({
     env: params.env,
     userId: params.userId,
+    ...(params.authToken === undefined ? {} : { authToken: params.authToken }),
     cloudAgentSessionId: params.cloudAgentSessionId,
     reply: body.reply,
+    ...(params.deps === undefined ? {} : { deps: params.deps }),
   });
 }
 
 /**
  * Questions and permissions route through the Session DO's answer path, which
  * names the route itself and validates membership of the pending set. A stale
- * runtime id or a sibling attachment therefore cannot answer anything.
+ * runtime id or a sibling attachment therefore cannot answer anything. An
+ * answer that would become a new turn is preflighted here, with the caller's
+ * verified bearer, exactly like a prompt.
  */
 async function answerHostedNativeInteraction(params: {
   env: Env;
   userId: string;
+  authToken?: string;
   cloudAgentSessionId: string;
   reply: Extract<NativeSessionRoute, { kind: 'answering' }>['reply'];
+  deps?: KiloFacadeRequestDeps;
 }): Promise<Response> {
   const payload: ControlPlaneAnswerReply =
     params.reply.action === 'question.reply'
@@ -1508,19 +1520,33 @@ async function answerHostedNativeInteraction(params: {
             permissionId: params.reply.permissionId,
             response: params.reply.response,
           };
-  const result = await withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneDispatchResult>(
-    () => getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId),
-    stub => stub.answer({ sessionId: params.cloudAgentSessionId, reply: payload }),
-    'answer'
-  );
-  if (result === 'not_connected') {
-    return facadeError(
-      409,
-      'KILO_INTERACTION_UNAVAILABLE',
-      'The session does not wait on this interaction'
-    );
+  let outcome: AnswerAdmissionOutcome;
+  try {
+    outcome = await answerWithAdmission({
+      env: params.env,
+      userId: params.userId,
+      ...(params.authToken === undefined ? {} : { authToken: params.authToken }),
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      reply: payload,
+      ...(params.deps?.validatePromptBalance === undefined
+        ? {}
+        : { deps: { validatePromptBalance: params.deps.validatePromptBalance } }),
+    });
+  } catch (error) {
+    return promptPreflightError(error);
   }
-  return Response.json(true);
+  if (outcome.outcome === 'sent') return Response.json(true);
+  if (outcome.outcome === 'balance') {
+    return facadeError(outcome.status, 'KILO_BALANCE_VALIDATION_FAILED', outcome.message);
+  }
+  if (outcome.outcome === 'unavailable') {
+    return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Durable prompt admission is unavailable');
+  }
+  return facadeError(
+    409,
+    'KILO_INTERACTION_UNAVAILABLE',
+    'The session does not wait on this interaction'
+  );
 }
 
 /**

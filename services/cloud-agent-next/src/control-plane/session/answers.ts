@@ -34,6 +34,34 @@ export function answerPromptText(reply: ControlPlaneAnswerReply): string | null 
 }
 
 /**
+ * Whether two continuation intents are the same admitted turn. The Worker
+ * preflights the intent `answer` produced and returns it to the DO for
+ * admission, so the DO compares that intent with the one this session's current
+ * state produces before it writes anything.
+ */
+export function sameContinuationIntent(
+  left: ControlPlanePromptPayload,
+  right: ControlPlanePromptPayload
+): boolean {
+  if (left.messageId !== right.messageId) return false;
+  if (left.turn.type !== right.turn.type) return false;
+  if (left.turn.type === 'prompt') {
+    if (right.turn.type !== 'prompt') return false;
+    if (left.turn.prompt !== right.turn.prompt) return false;
+  } else {
+    if (right.turn.type !== 'command') return false;
+    if (left.turn.command !== right.turn.command) return false;
+    if (left.turn.arguments !== right.turn.arguments) return false;
+  }
+  if (left.agent.mode !== right.agent.mode || left.agent.model !== right.agent.model) return false;
+  if (left.agent.variant !== right.agent.variant) return false;
+  return (
+    left.finalization?.autoCommit === right.finalization?.autoCommit &&
+    left.finalization?.condenseOnComplete === right.finalization?.condenseOnComplete
+  );
+}
+
+/**
  * Spec §5: an answer for a turn that already settled becomes a new message. The
  * new message continues the session's last turn, so it reuses that intent's
  * agent, model and finalization and only its content is the answer. A command

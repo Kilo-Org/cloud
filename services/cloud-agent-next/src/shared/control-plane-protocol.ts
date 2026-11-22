@@ -1067,7 +1067,33 @@ export const controlPlaneAnswerPayloadSchema = z
   })
   .strict();
 
-export const controlPlaneDispatchResultSchema = z.enum(['sent', 'not_connected']);
+/**
+ * A settled answer is not admitted by the answer call. The answer returns the
+ * continuation intent, the Worker runs the same balance and model preflight a
+ * prompt runs, then this payload admits exactly that intent under the message id
+ * the caller preflighted.
+ */
+export const controlPlaneAdmitAnswerPayloadSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    reply: controlPlaneAnswerReplySchema,
+    intent: controlPlanePromptPayloadSchema,
+  })
+  .strict();
+
+export const controlPlaneContinuationAdmissionResultSchema = z.enum(['sent', 'not_connected']);
+
+export const controlPlaneDispatchResultSchema = z.union([
+  z.literal('sent'),
+  z.literal('not_connected'),
+  z
+    .object({
+      result: z.literal('continuation'),
+      /** The new turn the settled answer would become, not yet admitted. */
+      intent: controlPlanePromptPayloadSchema,
+    })
+    .strict(),
+]);
 
 export const controlPlaneStatusResultSchema = z
   .object({
@@ -1820,6 +1846,10 @@ export type ControlPlaneSessionRefPayload = z.infer<typeof controlPlaneSessionRe
 export type ControlPlaneReleasePayload = z.infer<typeof controlPlaneReleasePayloadSchema>;
 export type ControlPlaneAnswerReply = z.infer<typeof controlPlaneAnswerReplySchema>;
 export type ControlPlaneAnswerPayload = z.infer<typeof controlPlaneAnswerPayloadSchema>;
+export type ControlPlaneAdmitAnswerPayload = z.infer<typeof controlPlaneAdmitAnswerPayloadSchema>;
+export type ControlPlaneContinuationAdmissionResult = z.infer<
+  typeof controlPlaneContinuationAdmissionResultSchema
+>;
 export type ControlPlaneDispatchResult = z.infer<typeof controlPlaneDispatchResultSchema>;
 export type ControlPlaneStatusResult = z.infer<typeof controlPlaneStatusResultSchema>;
 export type ControlPlaneSessionCredentialsPayload = z.infer<

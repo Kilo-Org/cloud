@@ -1140,8 +1140,7 @@ export const controlPlaneDispatchResultSchema = z.union([
  * again. Callers must keep the interaction and offer a retry. `invalid` means
  * the reply itself carries nothing to send (an empty question selection), so
  * the interaction still waits and the same reply can be replaced by a real
- * answer; it is not the terminal result. `abort` keeps reporting
- * `ControlPlaneDispatchResult`, because an abort has nothing to retry.
+ * answer; it is not the terminal result.
  */
 export const controlPlaneAnswerResultSchema = z.union([
   controlPlaneDispatchResultSchema,

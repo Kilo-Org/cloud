@@ -1,10 +1,6 @@
 import { type QueryErrorVariant } from '@/components/query-error';
-import {
-  isPermissionDeniedError,
-  isTerminalTrpcCode,
-  readTrpcErrorField,
-  trpcErrorVariant,
-} from '@/lib/trpc-error';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
+import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 
 /** How the Overview presents a failed profile read. */
 export type ProfileOverviewErrorView = {
@@ -16,39 +12,31 @@ export type ProfileOverviewErrorView = {
    * led here is stale. The list is refreshed so the dead row leaves it.
    */
   staleRow: boolean;
+  /** An added line under the variant's own description, or null. */
+  descriptionKey: 'organization.boundary.accessDeniedDescription' | null;
 };
 
 type Connectivity = 'offline' | 'online' | 'unknown';
 
 /**
- * Classify a failed `agentProfiles.get`. The error code wins over connectivity:
- * a request the server answered (NOT_FOUND, a denied permission) cannot be
- * fixed by retrying, however the device reports its network. Only an error
- * without a code — an aborted or refused request — is judged by connectivity,
- * where a confirmed-offline device gets the connectivity copy and everything
- * else the generic server variant, both with Retry.
+ * Classify a failed `agentProfiles.get`. The precedence lives in the shared
+ * section selector ({@link selectProfileReadErrorView}) so the Overview and the
+ * profile-editor section reads cannot disagree: a coded verdict wins over
+ * connectivity, and only an error without a tRPC envelope is judged by
+ * connectivity. This function adds the Overview's own extra: a stale-row flag,
+ * which only the Profiles list row that led here can carry.
  */
 export function selectProfileOverviewErrorView(
   error: unknown,
   connectivity: Connectivity
 ): ProfileOverviewErrorView {
-  const code = readTrpcErrorField(error, 'code');
-  if (code === 'NOT_FOUND') {
-    return { variant: 'not-found', showRetry: false, staleRow: true };
-  }
-  if (isPermissionDeniedError(error)) {
-    return { variant: 'permission', showRetry: false, staleRow: false };
-  }
-  if (isTerminalTrpcCode(code)) {
-    // Any other terminal refusal (a malformed id in a deep link, an
-    // unprocessable read) means the same thing to the reader: this profile
-    // cannot be opened. The not-found copy states that without the server
-    // variant's "please try again", which no control offers.
-    return { variant: 'not-found', showRetry: false, staleRow: false };
-  }
+  const read = selectProfileReadErrorView({ error, connectivity });
   return {
-    variant: connectivity === 'offline' ? 'offline' : trpcErrorVariant(error),
-    showRetry: true,
-    staleRow: false,
+    // Only the fields the Overview renders: the load-failure title is decided
+    // by the screen itself, so the selector's `titleKey` is not carried here.
+    variant: read.variant,
+    showRetry: read.showRetry,
+    descriptionKey: read.descriptionKey,
+    staleRow: isTrpcClientError(error) && readTrpcErrorField(error, 'code') === 'NOT_FOUND',
   };
 }

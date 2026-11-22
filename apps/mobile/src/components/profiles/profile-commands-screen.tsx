@@ -283,6 +283,7 @@ export function ProfileCommandsScreen({
         variant={readError.variant}
         placement="top"
         title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
         onRetry={readError.showRetry ? () => void commandsQuery.refetch() : undefined}
         isRetrying={commandsQuery.isRefetching}
       />

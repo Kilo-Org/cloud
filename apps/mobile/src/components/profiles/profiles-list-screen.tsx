@@ -162,6 +162,7 @@ export function ProfilesListScreen({
             placement="top"
             className="pt-0"
             title={listError.titleKey ? t(listError.titleKey) : undefined}
+            message={listError.descriptionKey ? t(listError.descriptionKey) : undefined}
             onRetry={listError.showRetry ? () => void refetch() : undefined}
             isRetrying={isRefetching}
           />

@@ -22,7 +22,12 @@ type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private
 type TestProfile = { id: string; name: string; isDefault: boolean };
 
 /** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
-type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+};
 
 // The picker row for a private repository carries its privacy in the
 // accessible name, so it is matched by that name, never the bare full name.
@@ -211,7 +216,42 @@ describe('RepoBindingsScreen', () => {
     const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
     expect(queryError.variant).toBe('permission');
     expect(queryError.title).toBeUndefined();
+    // The permission title already says access was denied, so the added line
+    // names who can grant it instead of repeating the title.
+    expect(queryError.message).toBe('Ask an organization owner or admin to grant you access.');
     expect(queryError.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('forbidden: the header offers no create control on a terminal read failure', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The screen is not showing this profile's bindings at all, so it must not
+    // offer to add one from the header.
+    expect(
+      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'Add default')
+    ).toBe(false);
+    expect(findOne(renderer.root, 'ScreenHeader').props.children).toBeUndefined();
+
+    unmount();
+  });
+
+  it('happy: the header offers the create control when the read succeeds', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(
+      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'Add default')
+    ).toBe(true);
+    expect(findOne(renderer.root, 'ScreenHeader').props.children).toBeDefined();
 
     unmount();
   });

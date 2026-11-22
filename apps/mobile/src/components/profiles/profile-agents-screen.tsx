@@ -150,6 +150,7 @@ export function ProfileAgentsScreen({
         variant={readError.variant}
         placement="top"
         title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
         onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
         isRetrying={profileQuery.isRefetching}
       />

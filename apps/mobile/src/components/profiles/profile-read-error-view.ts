@@ -9,8 +9,17 @@
 // name the state instead of reporting a server fault and offering a Retry that
 // cannot work. A terminal refusal that is not an access outcome reads as
 // unavailable, because the not-found copy says so and the server copy would ask
-// for a retry no control offers. A confirmed-offline device is a connectivity
-// failure, not a server one, and stays retryable.
+// for a retry no control offers.
+//
+// The precedence is fixed, in this order:
+//
+// 1. A coded tRPC verdict wins. The server answered, so no retry can change the
+//    answer, and the answer is not a connectivity problem however the device
+//    reports its network. Only an error with no tRPC envelope is judged by
+//    connectivity.
+// 2. A confirmed-offline device is then a connectivity failure, not a server
+//    one, and stays retryable.
+// 3. Everything else is the variant the shared helpers report, retryable.
 //
 // The variant and retry decision reuse the shared tRPC helpers, so these reads
 // and the organization Members list classify an error the same way.
@@ -18,6 +27,7 @@
 import { type QueryErrorVariant } from '@/components/query-error';
 import { type BannerState } from '@/lib/offline-banner-state';
 import {
+  isPermissionDeniedError,
   isTerminalTrpcCode,
   isTrpcClientError,
   readTrpcErrorField,
@@ -29,37 +39,61 @@ export type ProfileReadErrorView = {
   showRetry: boolean;
   /** The read's own load-failure title, or null to use the variant's copy. */
   titleKey: 'profiles.loadFailed' | null;
+  /** An added line under the variant's own description, or null. */
+  descriptionKey: 'organization.boundary.accessDeniedDescription' | null;
 };
 
 export function selectProfileReadErrorView({
   error,
   connectivity,
 }: Readonly<{ error: unknown; connectivity: BannerState }>): ProfileReadErrorView {
-  if (connectivity === 'offline') {
-    // The read may recover as soon as the connection returns, and the error
-    // body says nothing about the request itself.
-    return { variant: 'offline', showRetry: true, titleKey: 'profiles.loadFailed' };
-  }
   const envelope = isTrpcClientError(error);
-  const code = readTrpcErrorField(error, 'code');
+  const code = envelope ? readTrpcErrorField(error, 'code') : undefined;
+  // A coded verdict comes first: the server answered, so Retry cannot change
+  // the answer, and the answer is not a connectivity problem however the device
+  // reports its network.
+  if (isTerminalTrpcCode(code)) {
+    if (isPermissionDeniedError(error)) {
+      // The permission title already says access was denied, so the variant's
+      // own description would repeat it. The added line names who can act.
+      return {
+        variant: 'permission',
+        showRetry: false,
+        titleKey: null,
+        descriptionKey: 'organization.boundary.accessDeniedDescription',
+      };
+    }
+    // A terminal refusal that is not an access outcome (a malformed id in a deep
+    // link, an unprocessable read) means this profile cannot be opened. The
+    // not-found copy states that; the server copy would ask for a retry no
+    // control offers.
+    return { variant: 'not-found', showRetry: false, titleKey: null, descriptionKey: null };
+  }
+  // Only an error with no coded verdict reaches connectivity: the read may
+  // recover as soon as the connection returns, and the error body says nothing
+  // about the request itself.
+  if (connectivity === 'offline') {
+    return {
+      variant: 'offline',
+      showRetry: true,
+      titleKey: 'profiles.loadFailed',
+      descriptionKey: null,
+    };
+  }
   // Only a tRPC client error carries a server verdict: a non-tRPC error whose
   // bare top-level `code` happens to look terminal or access-like (a domain or
   // transport code) proved nothing about the request, so it stays retryable and
   // keeps the neutral copy. A client deadline is the one non-envelope failure
   // with its own reading, and it stays retryable too.
-  const terminal = envelope && isTerminalTrpcCode(code);
   const reported = trpcErrorVariant(error);
   const answered = envelope || reported === 'timeout' ? reported : 'server';
-  // A terminal refusal that is not an access outcome (a malformed id in a deep
-  // link, an unprocessable read) means this profile cannot be opened. The
-  // not-found copy states that; the server copy would ask for a retry no
-  // control offers.
-  const variant = terminal && answered === 'server' ? 'not-found' : answered;
   return {
-    variant,
-    showRetry: !terminal,
+    variant: answered,
+    showRetry: true,
     // A permission or not-found state has its own title and description; the
-    // read's "couldn't load" title would describe the wrong cause.
-    titleKey: variant === 'server' ? 'profiles.loadFailed' : null,
+    // read's "couldn't load" title would describe the wrong cause. A slow
+    // response keeps the variant's own copy.
+    titleKey: answered === 'server' ? 'profiles.loadFailed' : null,
+    descriptionKey: null,
   };
 }

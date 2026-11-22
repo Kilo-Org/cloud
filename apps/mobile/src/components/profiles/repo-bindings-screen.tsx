@@ -91,6 +91,9 @@ export function RepoBindingsScreen({
   // (`ensureOrganizationManageAccess`), so the screen withholds those controls
   // instead of offering a write that comes back rejected.
   const canManage = profilePermission === 'allowed';
+  // A terminal read failure means the screen is not showing this profile's
+  // bindings at all, so the header must not offer to add one.
+  const readErrorTerminal = bindingsQuery.isError && !readError.showRetry;
 
   const [isAdding, setIsAdding] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<RepoOption | null>(null);
@@ -202,7 +205,7 @@ export function RepoBindingsScreen({
         title={t('profiles.repoBindings.title')}
         backFallback={backFallback}
         headerRight={
-          canManage ? (
+          canManage && !readErrorTerminal ? (
             <IconButton
               accessibilityLabel={t('profiles.repoBindings.add')}
               onPress={() => {
@@ -237,6 +240,7 @@ export function RepoBindingsScreen({
               variant={readError.variant}
               placement="top"
               title={readError.titleKey ? t(readError.titleKey) : undefined}
+              message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
               onRetry={readError.showRetry ? () => void bindingsQuery.refetch() : undefined}
               isRetrying={bindingsQuery.isRefetching}
             />

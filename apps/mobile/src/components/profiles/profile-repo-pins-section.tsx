@@ -123,6 +123,7 @@ export function ProfileRepoPinsSection({
         variant={readError.variant}
         placement="top"
         title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
         onRetry={readError.showRetry ? () => void bindingsQuery.refetch() : undefined}
         isRetrying={bindingsQuery.isRefetching}
       />

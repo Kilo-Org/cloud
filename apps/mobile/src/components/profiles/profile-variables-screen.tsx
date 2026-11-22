@@ -209,6 +209,7 @@ export function ProfileVariablesScreen({
         variant={readError.variant}
         placement="top"
         title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
         onRetry={readError.showRetry ? () => void varsQuery.refetch() : undefined}
         isRetrying={varsQuery.isRefetching}
       />

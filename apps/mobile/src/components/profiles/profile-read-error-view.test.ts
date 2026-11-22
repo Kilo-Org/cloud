@@ -13,21 +13,36 @@ describe('selectProfileReadErrorView', () => {
     code => {
       expect(
         selectProfileReadErrorView({ error: makeTrpcError(code), connectivity: 'online' })
-      ).toEqual({ variant: 'permission', showRetry: false, titleKey: null });
+      ).toEqual({
+        variant: 'permission',
+        showRetry: false,
+        titleKey: null,
+        descriptionKey: 'organization.boundary.accessDeniedDescription',
+      });
     }
   );
 
   it('names NOT_FOUND as missing and offers no retry', () => {
     expect(
       selectProfileReadErrorView({ error: makeTrpcError('NOT_FOUND'), connectivity: 'unknown' })
-    ).toEqual({ variant: 'not-found', showRetry: false, titleKey: null });
+    ).toEqual({
+      variant: 'not-found',
+      showRetry: false,
+      titleKey: null,
+      descriptionKey: null,
+    });
   });
 
   it('names a terminal refusal that is not an access outcome as missing', () => {
     for (const code of ['BAD_REQUEST', 'UNPROCESSABLE_CONTENT']) {
       expect(
         selectProfileReadErrorView({ error: makeTrpcError(code), connectivity: 'unknown' })
-      ).toEqual({ variant: 'not-found', showRetry: false, titleKey: null });
+      ).toEqual({
+        variant: 'not-found',
+        showRetry: false,
+        titleKey: null,
+        descriptionKey: null,
+      });
     }
   });
 
@@ -37,6 +52,7 @@ describe('selectProfileReadErrorView', () => {
         variant: 'server',
         showRetry: true,
         titleKey: 'profiles.loadFailed',
+        descriptionKey: null,
       });
     }
   });
@@ -47,7 +63,12 @@ describe('selectProfileReadErrorView', () => {
         error: new RequestDeadlineError(15_000),
         connectivity: 'online',
       })
-    ).toEqual({ variant: 'timeout', showRetry: true, titleKey: null });
+    ).toEqual({
+      variant: 'timeout',
+      showRetry: true,
+      titleKey: null,
+      descriptionKey: null,
+    });
     expect(
       selectProfileReadErrorView({
         error: Object.assign(new Error('aborted'), {
@@ -55,7 +76,12 @@ describe('selectProfileReadErrorView', () => {
         }),
         connectivity: 'unknown',
       })
-    ).toEqual({ variant: 'timeout', showRetry: true, titleKey: null });
+    ).toEqual({
+      variant: 'timeout',
+      showRetry: true,
+      titleKey: null,
+      descriptionKey: null,
+    });
   });
 
   it('keeps a non-tRPC error with a bare terminal code retryable under the server copy', () => {
@@ -64,16 +90,47 @@ describe('selectProfileReadErrorView', () => {
         variant: 'server',
         showRetry: true,
         titleKey: 'profiles.loadFailed',
+        descriptionKey: null,
       });
     }
   });
 
-  it('treats a confirmed-offline device as connectivity even for a terminal code', () => {
+  it('keeps a coded refusal when the device reports offline: the server answered', () => {
     expect(
       selectProfileReadErrorView({
         error: makeTrpcError('UNAUTHORIZED'),
         connectivity: 'offline',
       })
-    ).toEqual({ variant: 'offline', showRetry: true, titleKey: 'profiles.loadFailed' });
+    ).toEqual({
+      variant: 'permission',
+      showRetry: false,
+      titleKey: null,
+      descriptionKey: 'organization.boundary.accessDeniedDescription',
+    });
+  });
+
+  it('keeps NOT_FOUND when the device reports offline: the server answered', () => {
+    expect(
+      selectProfileReadErrorView({ error: makeTrpcError('NOT_FOUND'), connectivity: 'offline' })
+    ).toEqual({
+      variant: 'not-found',
+      showRetry: false,
+      titleKey: null,
+      descriptionKey: null,
+    });
+  });
+
+  it('judges an error without a tRPC envelope by connectivity', () => {
+    expect(
+      selectProfileReadErrorView({
+        error: new Error('network request failed'),
+        connectivity: 'offline',
+      })
+    ).toEqual({
+      variant: 'offline',
+      showRetry: true,
+      titleKey: 'profiles.loadFailed',
+      descriptionKey: null,
+    });
   });
 });

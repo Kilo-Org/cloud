@@ -24,7 +24,12 @@ import { resetFormDraftsForTests } from '@/lib/form-draft';
 import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP } from '@/lib/a11y/tap-target';
 
 /** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
-type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+};
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -185,6 +190,9 @@ describe('ProfileCommandsScreen', () => {
     const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
     expect(queryError.variant).toBe('permission');
     expect(queryError.title).toBeUndefined();
+    // The variant's own description would repeat the title, so the screen adds
+    // the line that names who can grant access.
+    expect(queryError.message).toBe('Ask an organization owner or admin to grant you access.');
     expect(queryError.onRetry).toBeUndefined();
 
     unmount();
@@ -202,6 +210,9 @@ describe('ProfileCommandsScreen', () => {
     const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
     expect(queryError.variant).toBe('server');
     expect(queryError.title).toBe("Couldn't load profiles");
+    // The server variant's own description already says what to do, so the
+    // screen adds no second sentence.
+    expect(queryError.message).toBeUndefined();
     expect(typeof queryError.onRetry).toBe('function');
     act(() => {
       queryError.onRetry?.();

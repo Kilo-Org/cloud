@@ -29,6 +29,9 @@ type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
 
 const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
+  // When set, the recent-repositories query returns exactly these git URLs, so
+  // a test can prove that source apart from the rows the list renders.
+  recentRepositoryGitUrls: null as string[] | null,
   isSearching: false,
   // Mirrors the hook's restorePending: the saved search has not reached the
   // search state yet, so the body must load instead of claiming a result.
@@ -310,6 +313,13 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
     },
     useRecentAgentRepositories: (options: Parameters<typeof useRecentAgentRepositories>[0]) => {
       listState.repositoryQuery(options);
+      if (listState.recentRepositoryGitUrls !== null) {
+        return {
+          data: {
+            repositories: listState.recentRepositoryGitUrls.map(gitUrl => ({ gitUrl })),
+          },
+        };
+      }
       // The hook asks for repositories updated in the last 30 days, so an older
       // session's repository never reaches the recent set. A session without
       // `updated_at` counts as recent, which keeps the other tests unchanged.
@@ -448,6 +458,7 @@ describe('SessionHistoryScreen', () => {
     keyboardState.clear();
     keyboardLift.setHeight(0);
     listState.storedSessions = [];
+    listState.recentRepositoryGitUrls = null;
     listState.isSearching = false;
     listState.isError = false;
     listState.storedIsPending = false;
@@ -556,13 +567,10 @@ describe('SessionHistoryScreen', () => {
       'https://github.com/kilo/delta.git',
       'https://github.com/kilo/epsilon.git',
     ];
+    // The recent-repositories query is the only option source here: no rendered
+    // row names four of these repositories.
+    listState.recentRepositoryGitUrls = gitUrls;
     listState.storedSessions = [
-      ...gitUrls.map((git_url, index) => ({
-        session_id: `s${index}`,
-        organization_id: null,
-        git_url,
-        created_on_platform: 'cloud-agent',
-      })),
       // The same repository again: the sheet must not render a duplicate row.
       {
         session_id: 'alpha-again',

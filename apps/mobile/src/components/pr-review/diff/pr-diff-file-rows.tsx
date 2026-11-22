@@ -16,6 +16,7 @@ import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP,
   LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
   ROW_FRAME_CONTENT_PRESS_CLASS,
 } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
@@ -234,8 +235,10 @@ export function PatchMissingRow({
           accessibilityLabel={t('prReview.fileRows.openDiffOnProvider', { provider })}
           // The shared caption-line action box: it lifts the link's own node to
           // the control-size floor, and its negative margin keeps the row's
-          // height unchanged.
+          // height unchanged. The matching hit slop reaches the 44 dp touch
+          // target the design gate measures.
           className={cn(LINE_ACTION_BOX_CLASS, 'mt-2 flex-row items-center gap-1.5 self-start')}
+          hitSlop={LINE_ACTION_HIT_SLOP}
         >
           <Link2 size={14} color={colors.info} />
           {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}

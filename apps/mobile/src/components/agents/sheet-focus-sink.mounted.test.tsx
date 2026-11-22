@@ -37,6 +37,9 @@ describe('SheetFocusSink', () => {
     }
     const props: Record<string, unknown> = sink.props;
     expect(props.selectable).toBe(true);
+    // `selectable` also makes the native text view clickable, so the sink has to
+    // refuse the touch or it becomes a hit target inside the sheet.
+    expect(props.pointerEvents).toBe('none');
     // A transparent one-pixel box out of the content flow: nothing to see, and
     // no layout the sheet's content could inherit.
     expect((props.className as string).split(' ')).toEqual(

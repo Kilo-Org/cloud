@@ -15,8 +15,10 @@ import { Text } from '@/components/ui/text';
  * The sink is that place. It must be `selectable` rather than a plain focusable
  * `View`: a sheet window opens in touch mode, and only a focusable-in-touch-mode
  * node takes the focus there. It paints nothing — fully transparent, one pixel,
- * out of flow — and it is hidden from assistive readers with the two flags each
- * platform reads, so it never becomes a focus stop a screen reader announces.
+ * out of flow — takes no touch (`setTextIsSelectable` also makes a text view
+ * clickable, which `pointerEvents` turns off), and is hidden from assistive
+ * readers with the two flags each platform reads, so it never becomes a focus
+ * stop a screen reader announces.
  *
  * Render it once, before the sheet's content.
  */
@@ -24,6 +26,7 @@ export function SheetFocusSink() {
   return (
     <Text
       selectable
+      pointerEvents="none"
       aria-hidden
       importantForAccessibility="no-hide-descendants"
       allowFontScaling={false}

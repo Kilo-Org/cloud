@@ -103,4 +103,51 @@ class SessionNotificationIdentityTest {
     // different records, so none of the offsets can answer another's record.
     assertEquals(codes.size, codes.toSet().size)
   }
+
+  @Test
+  fun `each ask of one session names its own record`() {
+    // Two asks of one session answer different requests, so their records must
+    // differ: otherwise the newer ask rewrites the record the older card shows.
+    val sessionId = "ses_01JQ8ZK4M2XW3T7YB6NCV0000"
+    val firstAsk = SessionNotificationIdentity.askData(sessionId, ASK_ONE)
+    val secondAsk = SessionNotificationIdentity.askData(sessionId, ASK_TWO)
+    assertNotEquals(firstAsk, secondAsk)
+    // A different session's identical ask is a different record too.
+    assertNotEquals(
+      firstAsk,
+      SessionNotificationIdentity.askData("ses_01JQ8ZK4M2XW3T7YB6NCV2662", ASK_ONE)
+    )
+  }
+
+  @Test
+  fun `an ask's record keeps the session's prefix and encodes the ask`() {
+    val sessionId = "ses_01JQ8ZK4M2XW3T7YB6NCV0000"
+    val ask = SessionNotificationIdentity.askData(sessionId, "a/b?c#d e")
+    assertTrue(ask.startsWith(SessionNotificationIdentity.sessionData(sessionId) + "/ask/"))
+    assertTrue(ask.endsWith("a%2Fb%3Fc%23d%20e"))
+    // The percent-encoded ask keeps every separator out of the URI's path, so
+    // an ask can never compose another ask's record.
+    assertTrue(ask.substringAfter("/ask/").none { it == '/' || it == '?' || it == '#' || it == ' ' })
+  }
+
+  @Test
+  fun `the same ask is stable, and a session with no ask keeps the session's record`() {
+    val sessionId = "ses_01JQ8ZK4M2XW3T7YB6NCV0000"
+    assertEquals(
+      SessionNotificationIdentity.askData(sessionId, ASK_ONE),
+      SessionNotificationIdentity.askData(sessionId, ASK_ONE)
+    )
+    // A session card with no ask keeps the session's own record, which the Open,
+    // Dismiss and quiet intents name, so the two can never be the same record.
+    assertNotEquals(
+      SessionNotificationIdentity.sessionData(sessionId),
+      SessionNotificationIdentity.askData(sessionId, ASK_ONE)
+    )
+  }
+
+  private companion object {
+    /** The SHA-256 hex an ask is named by, as the JS side sends it. */
+    const val ASK_ONE = "9f2c1d"
+    const val ASK_TWO = "4a7b83"
+  }
 }

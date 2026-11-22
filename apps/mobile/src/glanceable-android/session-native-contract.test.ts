@@ -225,10 +225,11 @@ describe('SessionNotifications', () => {
 
 describe('a post that does not land leaves the card answering the request it shows', () => {
   const post = body(NOTIFICATIONS, 'fun post(');
+  const abandon = body(NOTIFICATIONS, 'private fun abandonPost(');
 
   it('reads the previous ask before it writes the stored card', () => {
-    // A failed post leaves the previous card in the shade, so the facts that
-    // describe it must be read before this call overwrites them.
+    // A post that does not land leaves the previous card in the shade, so the
+    // facts that describe it must be read before this call overwrites them.
     const read = post.indexOf('val previousApprovalKey = approvalKeyOf(previousJson)');
     const write = post.indexOf('putString(KEY_PREFIX + card.sessionId, stored.toString())');
     expect(read, 'post must read the previous ask').toBeGreaterThan(-1);
@@ -236,15 +237,32 @@ describe('a post that does not land leaves the card answering the request it sho
     expect(read).toBeLessThan(write);
   });
 
+  it('treats a post the system dropped as one that did not land', () => {
+    // `notify` answers nothing and drops a post on a channel the user disabled.
+    // Without this read the success path runs while the previous card is still
+    // the one in the shade.
+    const notify = post.indexOf('manager(context).notify(');
+    const read = post.indexOf('if (!isPosted(context, card.sessionId)) {');
+    expect(notify, 'post must post the card').toBeGreaterThan(-1);
+    expect(read, 'post must confirm the card is in the shade').toBeGreaterThan(notify);
+    expect(post.slice(read)).toContain('abandonPost(context, card, previousJson, previousApprovalKey)');
+    expect(body(NOTIFICATIONS, 'private fun isPosted(')).toContain(
+      'it.tag == SessionNotificationIdentity.tag(sessionId)'
+    );
+  });
+
   it('puts the previous stored card back inside the catch a failed post falls into', () => {
     const guard = post.indexOf('} catch (error: Throwable) {');
-    const restore = post.indexOf('restoreStored(context, card.sessionId, previousJson)');
-    const rethrow = post.indexOf('throw error');
+    const rethrow = post.indexOf('throw error', guard);
     expect(guard, 'post must guard its own post').toBeGreaterThan(-1);
-    expect(restore, 'the catch must put the previous card back').toBeGreaterThan(-1);
-    expect(rethrow, 'the catch must rethrow').toBeGreaterThan(-1);
-    expect(restore).toBeGreaterThan(guard);
-    expect(restore).toBeLessThan(rethrow);
+    expect(rethrow, 'the catch must rethrow').toBeGreaterThan(guard);
+    // The catch is the second caller: the drop branch above it handles a post
+    // the system discarded without throwing.
+    const catchBody = post.slice(guard, rethrow);
+    expect(catchBody, 'the catch must abandon the post').toContain(
+      'abandonPost(context, card, previousJson, previousApprovalKey)'
+    );
+    expect(abandon).toContain('restoreStored(context, card.sessionId, previousJson)');
     const restoreStored = body(NOTIFICATIONS, 'private fun restoreStored(');
     expect(restoreStored).toContain('editor.putString(KEY_PREFIX + sessionId, previousJson)');
     expect(restoreStored, 'no predecessor leaves nothing stored').toContain(
@@ -252,28 +270,36 @@ describe('a post that does not land leaves the card answering the request it sho
     );
   });
 
-  it('drops the newer record in the catch and retires the superseded one after the post', () => {
-    // The record of the ask this call built is unreferenced when the card never
-    // landed; the record of the ask the surviving card shows is the one that
-    // must stay, so the superseded one is retired only once the post landed.
-    const guard = post.indexOf('} catch (error: Throwable) {');
-    const rethrow = post.indexOf('throw error', guard);
-    expect(guard).toBeGreaterThan(-1);
-    expect(rethrow).toBeGreaterThan(guard);
-    const dropped = post.indexOf(
-      'ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, card.approvalKey)'
+  it('drops a newer ask only when it differs from the one the card shows', () => {
+    // A re-post of the same ask must leave that ask's record alone: it is the one
+    // the card in the shade is serving.
+    expect(abandon).toMatch(
+      /if \(card\.approvalKey != null && card\.approvalKey != previousApprovalKey\) \{\s+ApprovalGate\.cancel\(context, APPROVE_REQUEST_CODE, card\.sessionId, card\.approvalKey\)/
     );
-    expect(dropped, 'the catch must drop the record of the newer ask').toBeGreaterThan(-1);
-    expect(dropped).toBeGreaterThan(guard);
-    expect(dropped).toBeLessThan(rethrow);
+  });
 
-    const retired = post.indexOf(
-      'ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, previousApprovalKey)'
-    );
+  it('retires the superseded ask only after the card is posted, and records it first', () => {
     const notify = post.indexOf('manager(context).notify(');
+    const sweep = post.indexOf('sweepRetiring(context, card.sessionId)');
+    const retire = post.indexOf('retire(context, card.sessionId, previousApprovalKey)');
     expect(notify, 'post must post the card').toBeGreaterThan(-1);
-    expect(retired, 'the superseded ask must be retired').toBeGreaterThan(-1);
-    expect(retired).toBeGreaterThan(notify);
+    expect(sweep, 'post must sweep an ask a crash left recorded').toBeGreaterThan(notify);
+    expect(retire, 'the superseded ask must be retired').toBeGreaterThan(sweep);
+    // The record names the ask before cancelling it, so a crash between the two
+    // steps leaves it for the next post or teardown.
+    const retireBody = body(NOTIFICATIONS, 'private fun retire(');
+    const record = retireBody.indexOf('keys -> keys + approvalKey');
+    const cancel = retireBody.indexOf('ApprovalGate.cancel(');
+    expect(record, 'retire must record the ask first').toBeGreaterThan(-1);
+    expect(cancel).toBeGreaterThan(record);
+    expect(retireBody.slice(cancel)).toContain('keys -> keys - approvalKey');
+  });
+
+  it('retires an ask a crash left recorded from the teardown too', () => {
+    expect(body(NOTIFICATIONS, 'fun cancel(')).toContain(
+      'sweepRetiring(context, sessionId)'
+    );
+    expect(NOTIFICATIONS).toContain('private const val RETIRING_PREFIX = "retiring:"');
   });
 
   it('arms no quiet moment on the failure path', () => {

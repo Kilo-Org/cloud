@@ -12,6 +12,7 @@ import android.os.Build
 import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 /**
@@ -44,6 +45,8 @@ import org.json.JSONObject
 internal object SessionNotifications {
   private const val STORE = "active_agents_session_notifications"
   private const val KEY_PREFIX = "session:"
+  /** Superseded asks of one session that a later pass still has to retire. */
+  private const val RETIRING_PREFIX = "retiring:"
   private const val CHANNEL_ID = "followed-sessions-lock-screen"
 
   private fun state(context: Context) =
@@ -104,6 +107,9 @@ internal object SessionNotifications {
       .commitOrReport("Cannot forget the cancelled session card")
     alarms(context).cancel(quietIntent(context, sessionId, 0))
     cancelActions(context, sessionId, card)
+    // A superseded ask a crash left recorded is not named by the card, so the
+    // teardown retires it from its own record.
+    sweepRetiring(context, sessionId)
     cancelLegacy(context, sessionId, card)
   }
 
@@ -274,23 +280,104 @@ internal object SessionNotifications {
         SessionNotificationIdentity.NOTIFICATION_ID,
         builder.build()
       )
-    } catch (error: Throwable) {
-      // The post did not land: the previous card is still in the shade, so put
-      // back the facts that describe it and drop the record of a newer ask,
-      // which no card shows. A record for the ask the surviving card shows is
-      // left alone, and no quiet moment is armed for a card that is not there.
-      restoreStored(context, card.sessionId, previousJson)
-      if (card.approvalKey != null && card.approvalKey != previousApprovalKey) {
-        ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, card.approvalKey)
+      // `notify` answers nothing, and it drops a post whose channel the user
+      // disabled instead of throwing. A card that is not in the shade leaves the
+      // previous card there, so this post did not land either.
+      if (!isPosted(context, card.sessionId)) {
+        abandonPost(context, card, previousJson, previousApprovalKey)
+        return
       }
+    } catch (error: Throwable) {
+      abandonPost(context, card, previousJson, previousApprovalKey)
       throw error
     }
-    // The post landed: retire the superseded ask's record, then arm the quiet
-    // moment, so the card in the shade and the stored card name one ask.
+    // The post landed: record the superseded ask before retiring it, so a
+    // process that dies between these two steps cannot leave its record behind
+    // with nothing left to name it.
+    sweepRetiring(context, card.sessionId)
     if (previousApprovalKey != null && previousApprovalKey != card.approvalKey) {
-      ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, previousApprovalKey)
+      retire(context, card.sessionId, previousApprovalKey)
     }
     scheduleQuiet(context, card, nowMs)
+  }
+
+  /**
+   * The post did not land: the previous card is still in the shade, so put back
+   * the facts that describe it and drop the record of a newer ask, which no card
+   * shows. A record for the ask the surviving card shows is left alone, and no
+   * quiet moment is armed for a card that is not there.
+   */
+  private fun abandonPost(
+    context: Context,
+    card: SessionNotificationCard,
+    previousJson: String?,
+    previousApprovalKey: String?
+  ) {
+    restoreStored(context, card.sessionId, previousJson)
+    if (card.approvalKey != null && card.approvalKey != previousApprovalKey) {
+      ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, card.approvalKey)
+    }
+  }
+
+  /**
+   * Is this session's card in the shade? A tag-and-id pair names it, so the read
+   * cannot match another session's card.
+   */
+  private fun isPosted(context: Context, sessionId: String): Boolean =
+    manager(context).activeNotifications.any {
+      it.tag == SessionNotificationIdentity.tag(sessionId) &&
+        it.id == SessionNotificationIdentity.NOTIFICATION_ID
+    }
+
+  /**
+   * Retire one superseded ask's record, naming it in the persisted set first: a
+   * crash between the two steps then leaves the ask for the next post or teardown
+   * to sweep, instead of a record nothing names again.
+   */
+  private fun retire(context: Context, sessionId: String, approvalKey: String) {
+    updateRetiring(context, sessionId) { keys -> keys + approvalKey }
+    ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, approvalKey)
+    updateRetiring(context, sessionId) { keys -> keys - approvalKey }
+  }
+
+  /** Cancel every record a superseded ask left named for this session. */
+  private fun sweepRetiring(context: Context, sessionId: String) {
+    val keys = retiring(context, sessionId)
+    if (keys.isEmpty()) {
+      return
+    }
+    for (key in keys) {
+      ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, key)
+    }
+    updateRetiring(context, sessionId) { emptySet() }
+  }
+
+  /** The superseded asks of one session that a later pass still has to retire. */
+  private fun retiring(context: Context, sessionId: String): Set<String> {
+    val raw = state(context).getString(RETIRING_PREFIX + sessionId, null) ?: return emptySet()
+    return try {
+      val array = JSONArray(raw)
+      (0 until array.length()).map(array::getString).toSet()
+    } catch (error: JSONException) {
+      // A record that cannot be read names nothing to cancel; the teardown still
+      // retires the identities a card carries.
+      emptySet()
+    }
+  }
+
+  private fun updateRetiring(
+    context: Context,
+    sessionId: String,
+    change: (Set<String>) -> Set<String>
+  ) {
+    val keys = change(retiring(context, sessionId))
+    val editor = state(context).edit()
+    if (keys.isEmpty()) {
+      editor.remove(RETIRING_PREFIX + sessionId)
+    } else {
+      editor.putString(RETIRING_PREFIX + sessionId, JSONArray(keys.toList()).toString())
+    }
+    editor.commitOrReport("Cannot record the retired session ask")
   }
 
   /**

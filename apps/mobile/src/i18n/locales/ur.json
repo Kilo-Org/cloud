@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
+      "deniedManagedByOwner": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے {{organization}} کے کسی مالک سے کہیں۔",
+      "deniedConnectRole": "صرف {{organization}} کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+      "deniedReconnectRole": "{{organization}} کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
       "managedOnWebTitle": "ویب پر منظم کیا جاتا ہے",
       "managedOnWebShort": "یہ کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
       "managedOnWebRepositories": "{{organization}} کے لیے ریپوزٹریز کمپیوٹر سے ویب پر منتخب کریں۔",

@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} નું Bitbucket કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
+      "deniedManagedByOwner": "તમે ન બદલી શકો એવું કનેક્શન બદલવા માટે {{organization}}ના માલિકને કહો.",
+      "deniedConnectRole": "માત્ર {{organization}}ના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તેને જોડી શકે છે.",
+      "deniedReconnectRole": "તેને ફરી જોડવા માટે {{organization}}ના માલિક, એડમિન અથવા બિલિંગ મેનેજરને વિનંતી કરો.",
       "managedOnWebTitle": "વેબ પર મેનેજ કરવામાં આવે છે",
       "managedOnWebShort": "આ કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
       "managedOnWebRepositories": "કમ્પ્યુટર પરથી વેબ પર {{organization}} માટે રિપોઝિટરીઝ પસંદ કરો.",

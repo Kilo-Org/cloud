@@ -1507,6 +1507,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
+      "deniedManagedByOwner": "Peça a um proprietário de {{organization}} para alterar a conexão que não consegue alterar.",
+      "deniedConnectRole": "Apenas os proprietários, os administradores e os gestores de faturação de {{organization}} o podem ligar.",
+      "deniedReconnectRole": "Peça a um proprietário, administrador ou gestor de faturação de {{organization}} que a volte a ligar.",
       "managedOnWebTitle": "Gerida na Web",
       "managedOnWebShort": "Esta ligação é gerida na Web, a partir de um computador.",
       "managedOnWebRepositories": "Escolhe os repositórios de {{organization}} na Web, a partir de um computador.",

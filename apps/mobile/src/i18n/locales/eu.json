@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
+      "deniedManagedByOwner": "Eskatu {{organization}}-ren jabe bati aldatu ezin duzun konexioa alda dezan.",
+      "deniedConnectRole": "{{organization}}-ko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+      "deniedReconnectRole": "Eskatu {{organization}}-ko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
       "managedOnWebTitle": "Webean kudeatzen da",
       "managedOnWebShort": "Konexio hau webean kudeatzen da, ordenagailu batetik.",
       "managedOnWebRepositories": "Aukeratu {{organization}}-ren biltegiak webean, ordenagailu batetik.",

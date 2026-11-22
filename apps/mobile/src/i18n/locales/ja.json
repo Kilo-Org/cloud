@@ -755,6 +755,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
+      "deniedManagedByOwner": "変更できない接続については、{{organization}}のオーナーに変更を依頼してください。",
+      "deniedConnectRole": "接続できるのは{{organization}}のオーナー、管理者、請求管理者のみです。",
+      "deniedReconnectRole": "{{organization}}のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "managedOnWebTitle": "Webで管理されています",
       "managedOnWebShort": "この接続は、パソコンからWebで管理されています。",
       "managedOnWebRepositories": "{{organization}}のリポジトリを、パソコンからWebで選択してください。",

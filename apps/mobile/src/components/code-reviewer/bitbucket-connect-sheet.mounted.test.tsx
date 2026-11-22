@@ -129,7 +129,27 @@ describe('BitbucketConnectSheet', () => {
 
     expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
-    expect(denied?.props.description).toBe(i18n.t('integrations.managedByOwner'));
+    // The owner sentence names the organization whose connection the reader
+    // has to have changed for them.
+    expect(denied?.props.description).toBe(
+      i18n.t('codeReviewer.bitbucketConnect.deniedManagedByOwner', { organization: 'Acme' })
+    );
+  });
+
+  it('asks an owner to reconnect when a member cannot replace an existing token', async () => {
+    state.role = 'member';
+    state.readiness.integrationId = 'bitbucket-2';
+    state.status.data = { method: 'workspace_access_token', integrationId: 'bitbucket-2' };
+    const root = await mount();
+
+    // Replacing a token is a different trio's action from connecting one, and
+    // the sentence names the organization either way.
+    expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
+    const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
+    expect(denied?.props.description).toBe(
+      i18n.t('codeReviewer.bitbucketConnect.deniedReconnectRole', { organization: 'Acme' })
+    );
+    expect(denied?.props.action).toBeUndefined();
   });
 
   it('names the lapsed plan under the role in its own line when a member cannot connect', async () => {
@@ -147,7 +167,10 @@ describe('BitbucketConnectSheet', () => {
     // key: the shared ended-plan sentence keeps the "then try again" clause for
     // the surfaces with no control.
     expect(await descriptionBlocks(denied?.props.description as ReactNode)).toEqual([
-      { text: i18n.t('prReview.connect.adminOnlyConnectDescription'), variant: 'muted' },
+      {
+        text: i18n.t('codeReviewer.bitbucketConnect.deniedConnectRole', { organization: 'Acme' }),
+        variant: 'muted',
+      },
       { text: i18n.t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'), variant: 'muted' },
     ]);
     // The plan is the blocker the reader cannot clear by role, so the denial
@@ -178,7 +201,9 @@ describe('BitbucketConnectSheet', () => {
     // sentence — a second block would name a blocker this state does not have —
     // and a retry changes nothing, so the denial offers no control.
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
-    expect(denied?.props.description).toBe(i18n.t('prReview.connect.adminOnlyConnectDescription'));
+    expect(denied?.props.description).toBe(
+      i18n.t('codeReviewer.bitbucketConnect.deniedConnectRole', { organization: 'Acme' })
+    );
     expect(denied?.props.action).toBeUndefined();
   });
 
@@ -189,7 +214,12 @@ describe('BitbucketConnectSheet', () => {
     const root = await mount();
 
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
-    expect(denied?.props.description).toBe(i18n.t('integrations.managedByOwner'));
+    // A connection only the web page can change is a different refusal from a
+    // lapsed plan this reader could wait out, so the plan adds no second line.
+    expect(denied?.props.description).toBe(
+      i18n.t('codeReviewer.bitbucketConnect.deniedManagedByOwner', { organization: 'Acme' })
+    );
+    expect(denied?.props.action).toBeUndefined();
   });
 
   it('still asks when a background read replaces the form while a token is typed', async () => {

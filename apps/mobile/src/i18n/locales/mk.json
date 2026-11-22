@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Врската со Bitbucket на {{organization}} се управува преку веб од компјутер.",
+      "deniedManagedByOwner": "Побарајте од сопственик на {{organization}} да ја промени врската што не можете да ја промените.",
+      "deniedConnectRole": "Само сопствениците на {{organization}}, администраторите и одговорните за наплата можат да го поврзат.",
+      "deniedReconnectRole": "Побарајте од Сопственик, Администратор или Одговорен за наплата на {{organization}} да ја поврзат повторно.",
       "managedOnWebTitle": "Се управува преку веб",
       "managedOnWebShort": "Оваа врска се управува преку веб од компјутер.",
       "managedOnWebRepositories": "Избери ги репозиториумите за {{organization}} преку веб од компјутер.",

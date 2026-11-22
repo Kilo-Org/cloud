@@ -527,7 +527,7 @@
       "triageActioned": "举报成立",
       "triageRejected": "举报不成立",
       "appealNone": "未提交",
-      "appealSubmitted": "审核中",
+      "appealSubmitted": "申诉审核中",
       "appealAccepted": "已通过",
       "appealRejected": "已驳回",
       "appeal": "对此决定提出申诉",

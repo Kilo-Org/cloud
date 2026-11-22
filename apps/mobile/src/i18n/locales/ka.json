@@ -528,7 +528,7 @@
       "triageRejected": "არ დაკმაყოფილდა",
       "appealNone": "არ არის გაგზავნილი",
       "appealSubmitted": "განხილვაშია",
-      "appealAccepted": "დაკმაყოფილდა",
+      "appealAccepted": "გასაჩივრება დაკმაყოფილდა",
       "appealRejected": "უარყოფილია",
       "appeal": "ამ გადაწყვეტილების გასაჩივრება",
       "appealTitle": "ამ გადაწყვეტილების გასაჩივრება?",

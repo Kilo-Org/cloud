@@ -4804,6 +4804,9 @@
     "morningEnd": "הדוח זמין עד",
     "timeHint": "כרטיס הבית חוזר לסטטוס חי בסוף חלון הדוח, גם במצב לא מקוון.",
     "invalidSchedule": "יש לבחור אזור זמן תקין וחלון דוח לא ריק.",
+    "scheduleEmptyNight": "חלון הדוח ריק. יש לבחור זמן מוכנות מאוחר מתחילת החלון.",
+    "scheduleEmptyMorning": "זמן המוכנות וזמן הזמינות תואמים. יש לבחור כמה זמן הדוח יישאר זמין.",
+    "scheduleFullDay": "שני החלונות מכסים יום שלם. יש להשאיר חלק מהיום מחוץ לדוח.",
     "notificationsHint": "התראה כללית אחת לכל דוח מתוזמן. לא תלויה בסיכומי AI בתשלום.",
     "notificationPermission": "יש להפעיל התראות דחיפה כדי לקבל את הדוח.",
     "defaultModel": "שימוש במודל ברירת המחדל של Kilo",
@@ -4813,6 +4816,9 @@
     "estimate": "הערכת עלות {{estimate}} · מקסימום {{maximum}}",
     "estimateUnavailable": "סיכום בתשלום אינו זמין עבור הגדרות אלה. יש לשנות את המודל או המגבלות, או לנסות שוב מאוחר יותר.",
     "confirmPaid": "להפעיל סיכומים בתשלום עבור {{context}}?",
+    "paidDisclosure_one": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
+    "paidDisclosure_two": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
+    "paidDisclosure_other": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
     "paidDisclosure": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
     "enable": "הפעלת סיכומים בתשלום",
     "allContexts": "דוחות אישיים ודוחות ארגון נשמרים בנפרד.",
@@ -4860,7 +4866,7 @@
     "sourceActivity": "פעילות ללא שם",
     "metadataFailureProvider": "שגיאת ספק",
     "metadataFailureTool": "שגיאת כלי",
-    "metadataFailureCancelled": "בוטל",
+    "metadataStopped": "הסבב האחרון הופסק",
     "metadataFailureOther": "שגיאה לא צוינה"
   },
   "systemSearch": {

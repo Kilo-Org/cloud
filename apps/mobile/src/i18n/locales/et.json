@@ -4720,6 +4720,9 @@
     "morningEnd": "Ülevaade saadaval kuni",
     "timeHint": "Avakuva kaart taastab reaalajas oleku, kui ülevaatevahemik lõpeb, isegi võrguühenduseta.",
     "invalidSchedule": "Vali kehtiv ajavöönd ja mittetühi ülevaatevahemik.",
+    "scheduleEmptyNight": "Ülevaatevahemik on tühi. Vali valmimisaeg, mis on hiljem kui vahemiku algus.",
+    "scheduleEmptyMorning": "Valmimisaeg ja kättesaadavuse lõppaeg kattuvad. Vali, kui kaua ülevaade saadaval püsib.",
+    "scheduleFullDay": "Kaks vahemikku katavad terve päeva. Jäta osa päevast ülevaatest välja.",
     "notificationsHint": "Üks üldine teavitus iga ajastatud ülevaate kohta. Ei sõltu tasulistest AI kokkuvõtetest.",
     "notificationPermission": "Ülevaate saamiseks lülita sisse push-teavitused.",
     "defaultModel": "Kasuta Kilo vaikemudelit",
@@ -4733,6 +4736,8 @@
     "estimateModelNotAllowed": "See mudel pole selles kontekstis lubatud. Vali teine mudel.",
     "estimateSpendLimitTooLow": "Kulupiirangu tõstmisel saaks selle kokkuvõtte lubada.",
     "confirmPaid": "Kas lubada tasulised kokkuvõtted kontekstis {{context}}?",
+    "paidDisclosure_one": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} min pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
+    "paidDisclosure_other": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} min pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
     "paidDisclosure": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} min pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
     "enable": "Luba tasulised kokkuvõtted",
     "allContexts": "Isiklikud ja organisatsiooni ülevaated hoitakse eraldi.",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Pealkirjata tegevus",
     "metadataFailureProvider": "pakkuja viga",
     "metadataFailureTool": "tööriista viga",
-    "metadataFailureCancelled": "Tühistatud",
+    "metadataStopped": "Viimane voor peatati",
     "metadataFailureOther": "täpsustamata viga"
   },
   "systemSearch": {

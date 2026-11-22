@@ -4804,6 +4804,9 @@
     "morningEnd": "Briefing disponible jusqu’à",
     "timeHint": "La carte d’accueil rétablit le statut en direct à la fin de la fenêtre de briefing, même hors ligne.",
     "invalidSchedule": "Choisissez un fuseau horaire valide et une fenêtre de briefing non vide.",
+    "scheduleEmptyNight": "La fenêtre de briefing est vide. Choisissez une heure de disponibilité postérieure au début de la fenêtre.",
+    "scheduleEmptyMorning": "L’heure de disponibilité et l’heure de fin de disponibilité coïncident. Choisissez combien de temps le briefing reste disponible.",
+    "scheduleFullDay": "Les deux fenêtres couvrent une journée entière. Laissez une partie de la journée en dehors du briefing.",
     "notificationsHint": "Une notification générique par briefing planifié. Indépendante des résumés IA payants.",
     "notificationPermission": "Activez les notifications push pour recevoir votre briefing.",
     "defaultModel": "Utiliser le modèle par défaut de Kilo",
@@ -4818,6 +4821,9 @@
     "estimateSpendLimitTooLow": "Augmentez le plafond de dépenses pour autoriser ce résumé.",
     "confirmPaid": "Activer les résumés payants pour {{context}} ?",
     "paidDisclosure": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} min. Les frais s’appliquent même en cas d’échec.",
+    "paidDisclosure_one": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} min. Les frais s’appliquent même en cas d’échec.",
+    "paidDisclosure_many": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} min. Les frais s’appliquent même en cas d’échec.",
+    "paidDisclosure_other": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} min. Les frais s’appliquent même en cas d’échec.",
     "enable": "Activer les résumés payants",
     "allContexts": "Les briefings personnels et d’organisation restent séparés.",
     "emptyHistory": "Aucun briefing enregistré",
@@ -4860,7 +4866,7 @@
     "sourceActivity": "Activité sans titre",
     "metadataFailureProvider": "erreur du fournisseur",
     "metadataFailureTool": "erreur d'outil",
-    "metadataFailureCancelled": "Annulé",
+    "metadataStopped": "Dernier tour arrêté",
     "metadataFailureOther": "erreur non spécifiée"
   },
   "systemSearch": {

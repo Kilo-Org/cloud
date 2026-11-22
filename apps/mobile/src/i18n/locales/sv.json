@@ -4720,6 +4720,9 @@
     "morningEnd": "Rapport tillgänglig till",
     "timeHint": "Hem-kortet återgår till livestatus när rapportperioden slutar, även offline.",
     "invalidSchedule": "Välj en giltig tidszon och en rapportperiod som inte är tom.",
+    "scheduleEmptyNight": "Rapportperioden är tom. Välj en tid då rapporten är klar som infaller senare än periodens början.",
+    "scheduleEmptyMorning": "Tiden då rapporten är klar och tiden den är tillgänglig till sammanfaller. Välj hur länge rapporten ska vara tillgänglig.",
+    "scheduleFullDay": "De två perioderna täcker ett helt dygn. Lämna en del av dygnet utanför rapporten.",
     "notificationsHint": "En allmän avisering per schemalagd rapport. Oberoende av betalda AI-sammanfattningar.",
     "notificationPermission": "Aktivera push-notiser för att få din rapport.",
     "defaultModel": "Använd Kilos standardmodell",
@@ -4729,7 +4732,9 @@
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar. Ändra modellen eller gränserna, eller försök igen senare.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
+    "paidDisclosure_one": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
     "paidDisclosure": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
+    "paidDisclosure_other": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
     "enable": "Aktivera betalda sammanfattningar",
     "allContexts": "Personliga rapporter och organisationsrapporter hålls åtskilda.",
     "emptyHistory": "Inga sparade rapporter",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Namnlös aktivitet",
     "metadataFailureProvider": "leverantörsfel",
     "metadataFailureTool": "verktygsfel",
-    "metadataFailureCancelled": "Avbruten",
+    "metadataStopped": "Förra omgången stoppades",
     "metadataFailureOther": "ospecificerat fel"
   },
   "systemSearch": {

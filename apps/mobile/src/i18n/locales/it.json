@@ -4804,6 +4804,9 @@
     "morningEnd": "Briefing disponibile fino alle",
     "timeHint": "La scheda Home ripristina lo stato live al termine della finestra di briefing, anche offline.",
     "invalidSchedule": "Scegli un fuso orario valido e una finestra di briefing non vuota.",
+    "scheduleEmptyNight": "La finestra di briefing è vuota. Scegli un orario di disponibilità successivo all'inizio della finestra.",
+    "scheduleEmptyMorning": "L'orario di disponibilità e l'orario di fine disponibilità coincidono. Scegli per quanto tempo il briefing resta disponibile.",
+    "scheduleFullDay": "Le due finestre coprono un giorno intero. Lascia parte della giornata al di fuori del briefing.",
     "notificationsHint": "Una notifica generica per ogni briefing programmato. Indipendente dai riepiloghi AI a pagamento.",
     "notificationPermission": "Attiva le notifiche push per ricevere il tuo briefing.",
     "defaultModel": "Usa il modello predefinito di Kilo",
@@ -4813,6 +4816,9 @@
     "estimate": "Stima {{estimate}} · massimo {{maximum}}",
     "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni. Modifica il modello o i limiti, oppure riprova più tardi.",
     "confirmPaid": "Attivare i riepiloghi a pagamento per {{context}}?",
+    "paidDisclosure_one": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
+    "paidDisclosure_many": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
+    "paidDisclosure_other": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
     "paidDisclosure": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
     "enable": "Attiva riepiloghi a pagamento",
     "allContexts": "I briefing personali e dell'organizzazione restano separati.",
@@ -4860,7 +4866,7 @@
     "sourceActivity": "Attività senza titolo",
     "metadataFailureProvider": "errore del provider",
     "metadataFailureTool": "errore dello strumento",
-    "metadataFailureCancelled": "Annullata",
+    "metadataStopped": "Ultimo turno interrotto",
     "metadataFailureOther": "errore non specificato"
   },
   "systemSearch": {

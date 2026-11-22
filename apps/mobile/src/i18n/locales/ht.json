@@ -4720,6 +4720,9 @@
     "morningEnd": "Rapò a disponib jiska",
     "timeHint": "Kat Akèy la remete estati an dirèk lè fenèt rapò a fini, menm hò liy.",
     "invalidSchedule": "Chwazi yon fizo orè valid ak yon fenèt rapò ki pa vid.",
+    "scheduleEmptyNight": "Fenèt rapò a vid. Chwazi yon lè pare ki pi ta pase kòmansman fenèt la.",
+    "scheduleEmptyMorning": "Lè pare a ak lè disponib jiska a egal. Chwazi konbyen tan rapò a rete disponib.",
+    "scheduleFullDay": "De fenèt yo kouvri yon jounen konplè. Kite yon pati nan jounen an deyò rapò a.",
     "notificationsHint": "Yon sèl notifikasyon jeneral pou chak rapò pwograme. Li pa depann de rezime AI peye yo.",
     "notificationPermission": "Aktive notifikasyon push pou w resevwa rapò ou.",
     "defaultModel": "Sèvi ak modèl Kilo pa defo a",
@@ -4729,6 +4732,8 @@
     "estimate": "Estime {{estimate}} · maksimòm {{maximum}}",
     "estimateUnavailable": "Pa gen rezime ki pou peye ki disponib pou paramèt sa yo. Chanje modèl la oswa limit yo, oswa eseye ankò pita.",
     "confirmPaid": "Aktive rezime peye pou {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estime, jiska {{maximum}}, ak yon limit {{minutes}} minit. Frè yo aplike menm si jenerasyon an echwe.",
+    "paidDisclosure_other": "{{estimate}} estime, jiska {{maximum}}, ak yon limit {{minutes}} minit. Frè yo aplike menm si jenerasyon an echwe.",
     "paidDisclosure": "{{estimate}} estime, jiska {{maximum}}, ak yon limit {{minutes}} minit. Frè yo aplike menm si jenerasyon an echwe.",
     "enable": "Aktive rezime peye",
     "allContexts": "Rapò pèsonèl ak rapò òganizasyon rete separe.",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Aktivite san tit",
     "metadataFailureProvider": "erè founisè",
     "metadataFailureTool": "erè zouti",
-    "metadataFailureCancelled": "Anile",
+    "metadataStopped": "Dènye tou a te kanpe",
     "metadataFailureOther": "erè ki pa presize"
   },
   "systemSearch": {

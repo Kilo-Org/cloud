@@ -4720,6 +4720,9 @@
     "morningEnd": "Briefing tilgængelig indtil",
     "timeHint": "Hjem-kortet viser live-status igen, når briefingvinduet slutter, også offline.",
     "invalidSchedule": "Vælg en gyldig tidszone og et ikke-tomt briefingvindue.",
+    "scheduleEmptyNight": "Briefingvinduet er tomt. Vælg et klartidspunkt senere end vinduets start.",
+    "scheduleEmptyMorning": "Klartidspunktet og tidspunktet for tilgængelighedens udløb er ens. Vælg, hvor længe briefingen forbliver tilgængelig.",
+    "scheduleFullDay": "De to briefingvinduer dækker et helt døgn. Lad en del af døgnet ligge uden for briefingen.",
     "notificationsHint": "Én generisk notifikation pr. planlagt briefing. Uafhængigt af betalte AI-resuméer.",
     "notificationPermission": "Slå push-notifikationer til for at modtage din briefing.",
     "defaultModel": "Brug Kilos standardmodel",
@@ -4733,6 +4736,8 @@
     "estimateModelNotAllowed": "Denne model er ikke tilladt i denne kontekst. Vælg en anden model.",
     "estimateSpendLimitTooLow": "Hæv forbrugsgrænsen for at tillade denne opsummering.",
     "confirmPaid": "Slå betalte resuméer til for {{context}}?",
+    "paidDisclosure_one": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} min. Der opkræves betaling, selv hvis genereringen mislykkes.",
+    "paidDisclosure_other": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} min. Der opkræves betaling, selv hvis genereringen mislykkes.",
     "paidDisclosure": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} min. Der opkræves betaling, selv hvis genereringen mislykkes.",
     "enable": "Slå betalte resuméer til",
     "allContexts": "Personlige briefinger og organisationsbriefinger holdes adskilt.",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Aktivitet uden titel",
     "metadataFailureProvider": "udbyderfejl",
     "metadataFailureTool": "værktøjsfejl",
-    "metadataFailureCancelled": "Annulleret",
+    "metadataStopped": "Seneste kørsel blev stoppet",
     "metadataFailureOther": "uspecificeret fejl"
   },
   "systemSearch": {

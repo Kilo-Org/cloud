@@ -4720,6 +4720,9 @@
     "morningEnd": "Ripoti inapatikana hadi",
     "timeHint": "Kadi ya Mwanzo hurejesha hali ya sasa wakati kipindi cha ripoti kinapoisha, hata nje ya mtandao.",
     "invalidSchedule": "Chagua saa za eneo sahihi na kipindi cha ripoti kisichokuwa tupu.",
+    "scheduleEmptyNight": "Kipindi cha ripoti ni tupu. Chagua saa ya tayari baadaye kuliko mwanzo wa kipindi.",
+    "scheduleEmptyMorning": "Saa ya tayari na saa ya mwisho wa upatikanaji zinalingana. Chagua muda ambao ripoti inabaki inapatikana.",
+    "scheduleFullDay": "Vipindi viwili vinajumuisha siku nzima. Acha sehemu ya siku nje ya ripoti.",
     "notificationsHint": "Arifa moja ya jumla kwa kila ripoti iliyoratibiwa. Haitegemei muhtasari wa AI wa kulipia.",
     "notificationPermission": "Washa arifa za push ili kupokea ripoti yako.",
     "defaultModel": "Tumia modeli chaguomsingi ya Kilo",
@@ -4729,7 +4732,9 @@
     "estimate": "Makadirio {{estimate}} · kiwango cha juu {{maximum}}",
     "estimateUnavailable": "Muhtasari wenye malipo haupatikani kwa mipangilio hii. Badilisha modeli au mipaka, au ujaribu tena baadaye.",
     "confirmPaid": "Washa muhtasari wa kulipia kwa {{context}}?",
+    "paidDisclosure_one": "Makadirio {{estimate}}, hadi {{maximum}}, na kikomo cha dakika {{minutes}}. Malipo yanatozwa hata utengenezaji ukishindwa.",
     "paidDisclosure": "Makadirio {{estimate}}, hadi {{maximum}}, na kikomo cha dakika {{minutes}}. Malipo yanatozwa hata utengenezaji ukishindwa.",
+    "paidDisclosure_other": "Makadirio {{estimate}}, hadi {{maximum}}, na kikomo cha dakika {{minutes}}. Malipo yanatozwa hata utengenezaji ukishindwa.",
     "enable": "Washa muhtasari wa kulipia",
     "allContexts": "Ripoti za binafsi na za shirika hubaki tofauti.",
     "emptyHistory": "Hakuna ripoti zilizohifadhiwa",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Shughuli isiyo na jina",
     "metadataFailureProvider": "hitilafu ya mtoa huduma",
     "metadataFailureTool": "hitilafu ya zana",
-    "metadataFailureCancelled": "Imeghairiwa",
+    "metadataStopped": "Zamu ya mwisho ilisimamishwa",
     "metadataFailureOther": "hitilafu isiyojulikana"
   },
   "systemSearch": {

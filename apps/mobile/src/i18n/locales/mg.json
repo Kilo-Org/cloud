@@ -4720,6 +4720,9 @@
     "morningEnd": "Tatitra azo hatramin'ny",
     "timeHint": "Averin'ny karatra Fandraisana ny sata ankehitriny rehefa tapitra ny fe-potoana tatitra, na tsy misy tambajotra aza.",
     "invalidSchedule": "Misafidiana faritra ora marina sy fe-potoana tatitra tsy foana.",
+    "scheduleEmptyNight": "Foana ny fe-potoana tatitra. Misafidiana fotoana vonona aoriana noho ny fanombohan'ny fe-potoana tatitra.",
+    "scheduleEmptyMorning": "Mitovy ny fotoana vonona sy ny fotoana azo hatramin'ny. Misafidiana ny faharetana mbola azo ny tatitra.",
+    "scheduleFullDay": "Mandrakotra andro feno ny fe-potoana roa. Avelao ivelan'ny tatitra ny ampahany amin'ny andro.",
     "notificationsHint": "Fampandrenesana tsotra iray isaky ny tatitra voalahatra. Tsy miankina amin'ny famintinana AI andoavana.",
     "notificationPermission": "Alefaso ny fampandrenesana push mba handraisana ny tatitrao.",
     "defaultModel": "Ampiasao ny modely default an'i Kilo",
@@ -4729,7 +4732,9 @@
     "estimate": "Vinavina {{estimate}} · ambony indrindra {{maximum}}",
     "estimateUnavailable": "Tsy misy famintinana andoavam-bola ho an'ireto fandrindrana ireto. Ovay ny maodely na ny fetra, na andramo indray any aoriana.",
     "confirmPaid": "Alefa ve ny famintinana andoavana ho an'i {{context}}?",
+    "paidDisclosure_one": "Tombana {{estimate}}, hatramin'ny {{maximum}}, miaraka amin'ny fetra {{minutes}} minitra. Misy sarany na dia tsy mahomby aza ny famoronana.",
     "paidDisclosure": "Tombana {{estimate}}, hatramin'ny {{maximum}}, miaraka amin'ny fetra {{minutes}} minitra. Misy sarany na dia tsy mahomby aza ny famoronana.",
+    "paidDisclosure_other": "Tombana {{estimate}}, hatramin'ny {{maximum}}, miaraka amin'ny fetra {{minutes}} minitra. Misy sarany na dia tsy mahomby aza ny famoronana.",
     "enable": "Alefaso ny famintinana andoavana",
     "allContexts": "Misaraka ny tatitra manokana sy ny an'ny fikambanana.",
     "emptyHistory": "Tsy misy tatitra voatahiry",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Hetsika tsy misy lohateny",
     "metadataFailureProvider": "fahadisoan'ny mpanome tolotra",
     "metadataFailureTool": "fahadisoan'ny fitaovana",
-    "metadataFailureCancelled": "Nofoanana",
+    "metadataStopped": "Natsahatra ny fihodinana farany",
     "metadataFailureOther": "fahadisoana tsy voafaritra"
   },
   "systemSearch": {

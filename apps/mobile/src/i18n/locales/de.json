@@ -4720,6 +4720,9 @@
     "morningEnd": "Briefing verfügbar bis",
     "timeHint": "Die Startseiten-Karte zeigt nach Ende des Briefing-Zeitraums wieder den Live-Status, auch offline.",
     "invalidSchedule": "Wähle eine gültige Zeitzone und einen nicht leeren Briefing-Zeitraum.",
+    "scheduleEmptyNight": "Der Briefing-Zeitraum ist leer. Wähle eine Bereitschaftszeit nach dem Beginn des Zeitraums.",
+    "scheduleEmptyMorning": "Die Bereitschaftszeit und die Verfügbar-bis-Zeit stimmen überein. Wähle, wie lange das Briefing verfügbar bleibt.",
+    "scheduleFullDay": "Die beiden Zeitfenster decken einen ganzen Tag ab. Lass einen Teil des Tages außerhalb des Briefings.",
     "notificationsHint": "Eine allgemeine Benachrichtigung pro geplantem Briefing. Unabhängig von kostenpflichtigen AI-Zusammenfassungen.",
     "notificationPermission": "Aktiviere Push-Benachrichtigungen, um dein Briefing zu erhalten.",
     "defaultModel": "Standardmodell von Kilo verwenden",
@@ -4733,6 +4736,8 @@
     "estimateModelNotAllowed": "Dieses Modell ist in diesem Kontext nicht zugelassen. Wähle ein anderes Modell.",
     "estimateSpendLimitTooLow": "Erhöhe die Ausgabengrenze, um diese Zusammenfassung zu ermöglichen.",
     "confirmPaid": "Kostenpflichtige Zusammenfassungen für {{context}} aktivieren?",
+    "paidDisclosure_one": "Geschätzt {{estimate}}, bis zu {{maximum}}, mit einem Limit von {{minutes}} Min. Kosten fallen auch an, wenn die Erstellung fehlschlägt.",
+    "paidDisclosure_other": "Geschätzt {{estimate}}, bis zu {{maximum}}, mit einem Limit von {{minutes}} Min. Kosten fallen auch an, wenn die Erstellung fehlschlägt.",
     "paidDisclosure": "Geschätzt {{estimate}}, bis zu {{maximum}}, mit einem Limit von {{minutes}} Min. Kosten fallen auch an, wenn die Erstellung fehlschlägt.",
     "enable": "Kostenpflichtige Zusammenfassungen aktivieren",
     "allContexts": "Persönliche und Organisations-Briefings bleiben getrennt.",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Unbenannte Aktivität",
     "metadataFailureProvider": "Anbieterfehler",
     "metadataFailureTool": "Tool-Fehler",
-    "metadataFailureCancelled": "Abgebrochen",
+    "metadataStopped": "Letzter Durchlauf gestoppt",
     "metadataFailureOther": "Unspezifischer Fehler"
   },
   "systemSearch": {

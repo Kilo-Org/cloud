@@ -4804,6 +4804,9 @@
     "morningEnd": "Informe disponible fins a les",
     "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba la finestra de l'informe, fins i tot sense connexió.",
     "invalidSchedule": "Tria una zona horària vàlida i una finestra de l'informe no buida.",
+    "scheduleEmptyNight": "La finestra de l'informe és buida. Tria una hora de preparació posterior a l'inici de la finestra.",
+    "scheduleEmptyMorning": "L'hora de preparació i l'hora de fi de disponibilitat coincideixen. Tria quant de temps es manté disponible l'informe.",
+    "scheduleFullDay": "Les dues finestres cobreixen un dia complet. Deixa part del dia fora de l'informe.",
     "notificationsHint": "Una notificació genèrica per cada informe programat. Independent dels resums d'IA de pagament.",
     "notificationPermission": "Activa les notificacions push per rebre l'informe.",
     "defaultModel": "Usa el model per defecte de Kilo",
@@ -4813,6 +4816,9 @@
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració. Canvia el model o els límits, o torna-ho a provar més tard.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure_many": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure_other": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "enable": "Activa els resums de pagament",
     "allContexts": "Els informes personals i d'organització es mantenen separats.",
@@ -4860,7 +4866,7 @@
     "sourceActivity": "Activitat sense títol",
     "metadataFailureProvider": "error del proveïdor",
     "metadataFailureTool": "error d'eina",
-    "metadataFailureCancelled": "Cancel·lada",
+    "metadataStopped": "L'últim torn s'ha aturat",
     "metadataFailureOther": "error no especificat"
   },
   "systemSearch": {

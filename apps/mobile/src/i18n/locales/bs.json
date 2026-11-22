@@ -4804,6 +4804,9 @@
     "morningEnd": "Izvještaj dostupan do",
     "timeHint": "Kartica na početnoj vraća trenutni status kada period izvještaja završi, čak i van mreže.",
     "invalidSchedule": "Odaberite važeću vremensku zonu i neprazan period izvještaja.",
+    "scheduleEmptyNight": "Period izvještaja je prazan. Odaberite vrijeme spremnosti kasnije od početka perioda.",
+    "scheduleEmptyMorning": "Vrijeme spremnosti i vrijeme do kojeg je izvještaj dostupan se poklapaju. Odaberite koliko dugo izvještaj ostaje dostupan.",
+    "scheduleFullDay": "Dva perioda pokrivaju cijeli dan. Ostavite dio dana izvan izvještaja.",
     "notificationsHint": "Jedna opća obavijest po zakazanom izvještaju. Neovisno o plaćenim AI sažecima.",
     "notificationPermission": "Uključite push obavijesti da biste primali izvještaj.",
     "defaultModel": "Koristi zadani Kilo model",
@@ -4813,6 +4816,9 @@
     "estimate": "Procjena {{estimate}} · maksimalno {{maximum}}",
     "estimateUnavailable": "Plaćeni sažetak nije dostupan za ove postavke. Promijenite model ili ograničenja, ili pokušajte kasnije.",
     "confirmPaid": "Omogućiti plaćene sažetke za {{context}}?",
+    "paidDisclosure_one": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata se vrši čak i ako generisanje ne uspije.",
+    "paidDisclosure_few": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata se vrši čak i ako generisanje ne uspije.",
+    "paidDisclosure_other": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata se vrši čak i ako generisanje ne uspije.",
     "paidDisclosure": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata se vrši čak i ako generisanje ne uspije.",
     "enable": "Omogući plaćene sažetke",
     "allContexts": "Lični i organizacijski izvještaji ostaju odvojeni.",
@@ -4860,7 +4866,7 @@
     "sourceActivity": "Aktivnost bez naslova",
     "metadataFailureProvider": "greška provajdera",
     "metadataFailureTool": "greška alata",
-    "metadataFailureCancelled": "Otkazano",
+    "metadataStopped": "Posljednji krug je zaustavljen",
     "metadataFailureOther": "nespecificirana greška"
   },
   "systemSearch": {

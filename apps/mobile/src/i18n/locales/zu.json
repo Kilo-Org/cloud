@@ -4720,6 +4720,9 @@
     "morningEnd": "Umbiko utholakala kuze kube",
     "timeHint": "Ikhadi Lasekhaya libuyisela isimo samanje uma isikhathi sombiko siphela, ngisho kungaxhunyiwe.",
     "invalidSchedule": "Khetha izoni yesikhathi evumelekile kanye nesikhathi sombiko esinobude obungaphezu kukaziro.",
+    "scheduleEmptyNight": "Isikhathi sombiko asinabude. Khetha isikhathi lapho umbiko ulungile khona, ngemva kwesikhathi sokuqala sombiko.",
+    "scheduleEmptyMorning": "Isikhathi lapho umbiko ulungile khona nesikhathi umbiko utholakala kuze kube ngaso kuyafana. Khetha ukuthi umbiko uhlale utholakala isikhathi esingakanani.",
+    "scheduleFullDay": "Izikhathi ezimbili zombiko zihlanganisa usuku oluphelele. Shiya ingxenye yosuku ngaphandle kombiko.",
     "notificationsHint": "Isaziso esisodwa esijwayelekile ngombiko ngamunye ohleliwe. Asincikile ezifinyezweni ze-AI ezikhokhelwayo.",
     "notificationPermission": "Vula izaziso ze-push ukuze uthole umbiko wakho.",
     "defaultModel": "Sebenzisa imodeli ezenzakalelayo ye-Kilo",
@@ -4729,7 +4732,9 @@
     "estimate": "Kulinganiselwe {{estimate}} · okuphezulu kakhulu {{maximum}}",
     "estimateUnavailable": "Isifinyezo esikhokhelwayo asitholakali kulezi zilungiselelo. Shintsha imodeli noma imikhawulo, noma zama futhi emva kwesikhathi.",
     "confirmPaid": "Vula izifinyezo ezikhokhelwayo ze-{{context}}?",
+    "paidDisclosure_one": "Kulinganiselwa ku-{{estimate}}, kuze kufike ku-{{maximum}}, nomkhawulo weminithi engu-{{minutes}}. Izindleko ziyasebenza ngisho noma ukukhiqiza kwehluleka.",
     "paidDisclosure": "Kulinganiselwa ku-{{estimate}}, kuze kufike ku-{{maximum}}, nomkhawulo wamaminithi angu-{{minutes}}. Izindleko ziyasebenza ngisho noma ukukhiqiza kwehluleka.",
+    "paidDisclosure_other": "Kulinganiselwa ku-{{estimate}}, kuze kufike ku-{{maximum}}, nomkhawulo wamaminithi angu-{{minutes}}. Izindleko ziyasebenza ngisho noma ukukhiqiza kwehluleka.",
     "enable": "Vula izifinyezo ezikhokhelwayo",
     "allContexts": "Imibiko yomuntu siqu neyenhlangano ihlala ihlukene.",
     "emptyHistory": "Ayikho imibiko elondoloziwe",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Umsebenzi ongenasihloko",
     "metadataFailureProvider": "iphutha lomhlinzeki",
     "metadataFailureTool": "iphutha lethuluzi",
-    "metadataFailureCancelled": "Kukhanseliwe",
+    "metadataStopped": "Umjikelezo wokugcina umisiwe",
     "metadataFailureOther": "iphutha elingacacisiwe"
   },
   "systemSearch": {

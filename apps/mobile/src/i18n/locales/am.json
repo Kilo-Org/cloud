@@ -4720,6 +4720,9 @@
     "morningEnd": "ሪፖርቱ የሚገኝበት የመጨረሻ ሰዓት",
     "timeHint": "የሪፖርት ጊዜ ሲያበቃ የመነሻ ካርዱ ከመስመር ውጭም ቢሆን የቀጥታ ሁኔታን ይመልሳል።",
     "invalidSchedule": "ትክክለኛ የሰዓት ሰቅ እና ባዶ ያልሆነ የሪፖርት ጊዜ ይምረጡ።",
+    "scheduleEmptyNight": "የሪፖርት ጊዜው ባዶ ነው። ከጊዜው መጀመሪያ በኋላ ያለ ዝግጁ ሰዓት ይምረጡ።",
+    "scheduleEmptyMorning": "ዝግጁ ሰዓቱ እና እስከሚገኝበት ሰዓቱ አንድ ናቸው። ሪፖርቱ ምን ያህል ጊዜ እንዲገኝ ይምረጡ።",
+    "scheduleFullDay": "ሁለቱ የሪፖርት ጊዜዎች ሙሉ ቀንን ይሸፍናሉ። የቀኑን አንድ ክፍል ከሪፖርቱ ውጭ ይተዉ።",
     "notificationsHint": "ለእያንዳንዱ የመርሃ ግብር ሪፖርት አንድ አጠቃላይ ማሳወቂያ። ከሚከፈልባቸው AI ማጠቃለያዎች ነጻ ነው።",
     "notificationPermission": "ሪፖርትዎን ለመቀበል የፑሽ ማሳወቂያዎችን ያንቁ።",
     "defaultModel": "የKiloን ነባሪ ሞዴል ተጠቀም",
@@ -4729,6 +4732,8 @@
     "estimate": "ግምት {{estimate}} · ከፍተኛ {{maximum}}",
     "estimateUnavailable": "ለእነዚህ ቅንብሮች የክፍያ ማጠቃለያ አይገኝም። ሞዴሉን ወይም ወሰኖችን ይቀይሩ፣ ወይም በኋላ ላይ እንደገና ይሞክሩ።",
     "confirmPaid": "ለ{{context}} የሚከፈልባቸው ማጠቃለያዎች ይንቁ?",
+    "paidDisclosure_one": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
+    "paidDisclosure_other": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
     "paidDisclosure": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
     "enable": "የሚከፈልባቸው ማጠቃለያዎችን አንቃ",
     "allContexts": "የግል እና የድርጅት ሪፖርቶች ተለይተው ይቀመጣሉ።",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "ርዕስ የሌለው እንቅስቃሴ",
     "metadataFailureProvider": "የአቅራቢ ስህተት",
     "metadataFailureTool": "የመሣሪያ ስህተት",
-    "metadataFailureCancelled": "ተሰርዟል",
+    "metadataStopped": "የመጨረሻው ዙር ተቆመ",
     "metadataFailureOther": "ያልተገለጸ ስህተት"
   },
   "systemSearch": {

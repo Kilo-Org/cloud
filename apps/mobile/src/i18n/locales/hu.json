@@ -4720,6 +4720,9 @@
     "morningEnd": "A jelentés elérhető eddig",
     "timeHint": "A Kezdőlap kártyája az időablak végén visszaáll élő állapotra, offline is.",
     "invalidSchedule": "Válassz érvényes időzónát és egy nem üres időablakot.",
+    "scheduleEmptyNight": "A jelentés időablaka üres. Válassz az időablak kezdeténél későbbi kész időpontot.",
+    "scheduleEmptyMorning": "A kész időpont és az elérhető eddig időpont megegyezik. Válaszd ki, mennyi ideig marad elérhető a jelentés.",
+    "scheduleFullDay": "A két időablak egy teljes napot lefed. Hagyd a nap egy részét a jelentésen kívül.",
     "notificationsHint": "Egy általános értesítés ütemezett jelentésenként. Független a fizetős AI-összefoglalóktól.",
     "notificationPermission": "A jelentés fogadásához kapcsold be a push-értesítéseket.",
     "defaultModel": "A Kilo alapértelmezett modelljének használata",
@@ -4729,6 +4732,8 @@
     "estimate": "Becsült {{estimate}} · legfeljebb {{maximum}}",
     "estimateUnavailable": "Fizetett összefoglaló nem elérhető ezekkel a beállításokkal. Változtasd meg a modellt vagy a korlátokat, vagy próbáld újra később.",
     "confirmPaid": "Engedélyezed a fizetős összefoglalókat ehhez: {{context}}?",
+    "paidDisclosure_one": "Becsült költség {{estimate}}, legfeljebb {{maximum}}, {{minutes}} perces korláttal. A díj sikertelen generálás esetén is felszámításra kerül.",
+    "paidDisclosure_other": "Becsült költség {{estimate}}, legfeljebb {{maximum}}, {{minutes}} perces korláttal. A díj sikertelen generálás esetén is felszámításra kerül.",
     "paidDisclosure": "Becsült költség {{estimate}}, legfeljebb {{maximum}}, {{minutes}} perces korláttal. A díj sikertelen generálás esetén is felszámításra kerül.",
     "enable": "Fizetős összefoglalók engedélyezése",
     "allContexts": "A személyes és a szervezeti jelentések külön maradnak.",
@@ -4772,7 +4777,7 @@
     "sourceActivity": "Névtelen tevékenység",
     "metadataFailureProvider": "szolgáltatói hiba",
     "metadataFailureTool": "eszközhiba",
-    "metadataFailureCancelled": "Megszakítva",
+    "metadataStopped": "Az utolsó kör leállítva",
     "metadataFailureOther": "meghatározatlan hiba"
   },
   "systemSearch": {

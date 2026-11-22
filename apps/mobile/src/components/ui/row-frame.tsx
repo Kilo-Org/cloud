@@ -94,11 +94,14 @@ type RowFrameProps = Readonly<{
   onPress?: () => void;
   /**
    * Where the press lives. `row` (the default) makes the whole row the control.
-   * `content` presses only the leading cell and the text, so a trailing control
-   * (a switch) owns its own touch and its own accessible node. A `content` press
-   * is hidden from assistive technology unless `contentAccessibilityLabel`
-   * names it, so without that label the trailing control must carry the row's
-   * name itself (a preference row passes its title to the switch).
+   * `content` presses the leading cell and the text beside a trailing control,
+   * so a trailing control (a switch) owns its own touch and its own accessible
+   * node. A stacked row keeps the stack's shape: the leading cell and that
+   * control share the top line, and the press owns the text under them, so a
+   * long title still takes the row's full width. A `content` press is hidden
+   * from assistive technology unless `contentAccessibilityLabel` names it, so
+   * without that label the trailing control must carry the row's name itself (a
+   * preference row passes its title to the switch).
    */
   pressTarget?: 'row' | 'content';
   /**
@@ -255,6 +258,17 @@ export function RowFrame({
       : cn(ROW_FRAME_COLUMN_CLASS, className);
 
   /**
+   * A stack's top line: the leading cell and the trailing cell above the text,
+   * so a long title takes the row's full width instead of sharing it with them.
+   */
+  const stackLine = (
+    <View className={cn('w-full', ROW_FRAME_LINE_CLASS)}>
+      {leadingNode}
+      {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
+    </View>
+  );
+
+  /**
    * The row's own line, in the order the caller's shape asks for. A footer
    * closes the column below it, so the line keeps the leading cell, the text
    * column and the trailing cell side by side. A stack puts the leading cell and
@@ -276,10 +290,7 @@ export function RowFrame({
     if (stack) {
       return (
         <>
-          <View className={cn('w-full', ROW_FRAME_LINE_CLASS)}>
-            {leadingNode}
-            {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
-          </View>
+          {stackLine}
           {textBlock}
         </>
       );
@@ -317,24 +328,42 @@ export function RowFrame({
       accessibilityHint: contentAccessibilityHint,
       accessibilityState: contentOwnsName ? { disabled } : undefined,
     };
+    // A footer closes the row's own line below the whole row, and a row with no
+    // text has nothing to put under the top line, so only a stack with text
+    // moves the press there. The press takes the bottom padding itself, so its
+    // node clears the 28 dp floor on a one-line title, but it cancels nothing:
+    // a press that reached to the frame's bottom edge lay under the next
+    // sibling's trailing control and took touches meant for it.
+    const stacksContentPress = stack && footer === undefined && hasText;
+    const contentPressClass = stacksContentPress
+      ? 'w-full pb-3'
+      : cn(
+          'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
+          ROW_FRAME_CONTENT_PRESS_CLASS
+        );
     const contentPress = (
       <Pressable
         {...contentProps}
-        className={cn(
-          'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
-          ROW_FRAME_CONTENT_PRESS_CLASS,
-          !disabled && 'active:opacity-70'
-        )}
+        className={cn(contentPressClass, !disabled && 'active:opacity-70')}
       >
-        {leadingNode}
+        {stacksContentPress ? null : leadingNode}
         {textBlock}
       </Pressable>
     );
     if (footer === undefined) {
       return (
         <View testID={testID} className={frameClass} onLayout={onLayout}>
-          {contentPress}
-          {trailingNode}
+          {stacksContentPress ? (
+            <>
+              {stackLine}
+              {contentPress}
+            </>
+          ) : (
+            <>
+              {contentPress}
+              {trailingNode}
+            </>
+          )}
         </View>
       );
     }

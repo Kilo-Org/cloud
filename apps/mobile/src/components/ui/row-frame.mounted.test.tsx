@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { Workflow } from '@/components/ui/icons';
+
 import { ROW_FRAME_CONTENT_PRESS_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 
 import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS, RowFrame } from './row-frame';
@@ -15,6 +17,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/ui/icon-tile', () => ({ IconTile: 'IconTile' }));
+vi.mock('@/components/ui/icons', () => ({ Workflow: 'Workflow' }));
 vi.mock('@/components/ui/row-check', () => ({ RowCheck: 'RowCheck' }));
 vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
@@ -206,6 +209,43 @@ describe('RowFrame interaction', () => {
     // The switch is the frame's child, not a child of the content press.
     expect(content.findAllByType('Switch' as never)).toHaveLength(0);
     expect(root.findAllByType('Switch' as never)).toHaveLength(1);
+  });
+
+  it('keeps a stacked content press under the top line, beside the switch', () => {
+    const root = renderFrame({
+      title: 'nightly-build',
+      icon: Workflow,
+      onPress: () => undefined,
+      pressTarget: 'content',
+      stack: true,
+      testID: 'trigger-1',
+      trailing: { kind: 'switch', value: true, onValueChange: () => undefined },
+    });
+    const frame = frameOf(root);
+    const content = pressableOf(root);
+
+    // The stack's own line holds the tile and the switch, and the text follows
+    // under it — the shape a whole-row press renders when it stacks.
+    expect(classesOf(frame)).toEqual(expect.arrayContaining(['gap-2', 'py-3']));
+    expect(classesOf(frame)).not.toContain('flex-row');
+    expect(
+      frame
+        .findAll(node => ['IconTile', 'Switch', 'Text'].includes(String(node.type)))
+        .map(node => node.type)
+    ).toEqual(['IconTile', 'Switch', 'Text']);
+    // The press owns that text alone, so a tap on the switch reaches the switch.
+    expect(content.findAllByType('IconTile' as never)).toHaveLength(0);
+    expect(content.findAllByType('Switch' as never)).toHaveLength(0);
+    expect(root.findAllByType('Switch' as never)).toHaveLength(1);
+    expect(classesOf(content)).toContain('w-full');
+    expect(classesOf(content)).not.toContain(ROW_TARGET_CLASS);
+
+    // The press stays out of the accessibility tree exactly as it does beside
+    // the row, so the switch remains the row's one focus stop.
+    expect(content.props.accessible).toBe(false);
+    expect(content.props.focusable).toBe(false);
+    expect(content.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(content.props.accessibilityElementsHidden).toBe(true);
   });
 });
 

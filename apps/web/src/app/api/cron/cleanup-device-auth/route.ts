@@ -7,6 +7,7 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
+import { cleanupExpiredPendingAuthLinks } from '@/lib/auth/pending-link';
 import { cleanupExpiredDeviceRefreshTokens } from '@/lib/auth/device-sessions';
 import { cleanupExpiredPasskeyRows } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
@@ -53,6 +54,12 @@ export async function GET(request: Request) {
     const challengesDeleted = await cleanupExpiredAdmissionChallenges();
     sentryLogger('cron', 'info')(`Cleaned up ${challengesDeleted} expired admission challenges`);
 
+    const pendingAuthLinksDeleted = await cleanupExpiredPendingAuthLinks();
+    sentryLogger(
+      'cron',
+      'info'
+    )(`Cleaned up ${pendingAuthLinksDeleted} expired pending auth links`);
+
     const passkeyRowsDeleted = await cleanupExpiredPasskeyRows();
     sentryLogger(
       'cron',
@@ -96,6 +103,7 @@ export async function GET(request: Request) {
         deleted_device_auth_request_count: deletedCount,
         deleted_refresh_token_count: refreshTokensDeleted,
         deleted_admission_challenge_count: challengesDeleted,
+        deleted_pending_auth_link_count: pendingAuthLinksDeleted,
         deleted_passkey_challenge_count: passkeyRowsDeleted.challenges,
         deleted_passkey_sign_in_ticket_count: passkeyRowsDeleted.tickets,
         deleted_passkey_management_authorization_count: passkeyRowsDeleted.managementAuthorizations,
@@ -112,6 +120,7 @@ export async function GET(request: Request) {
       deletedCount,
       refreshTokensDeleted,
       challengesDeleted,
+      pendingAuthLinksDeleted,
       passkeyChallengesDeleted: passkeyRowsDeleted.challenges,
       passkeySignInTicketsDeleted: passkeyRowsDeleted.tickets,
       passkeyManagementAuthorizationsDeleted: passkeyRowsDeleted.managementAuthorizations,

@@ -458,6 +458,13 @@ describe('security-remediation push command guard policy', () => {
       'git -C . push origin +main',
       'git -C . push -f origin main',
       'git -C . push +main',
+      'git  push --force',
+      'git   push -f',
+      'git push  --force',
+      'git\tpush --force',
+      'git push\t--force',
+      'git -C . push  -f',
+      'git  -C .  push --force',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
@@ -472,6 +479,9 @@ describe('security-remediation push command guard policy', () => {
       'git -C . push origin main',
       'git --no-pager push origin main',
       'git push origin feature/fix-the-thing',
+      'git push origin a-b',
+      'git push origin my-branch-name',
+      'git push origin HEAD:refs/heads/a-b',
       'git push origin feature/force-fix',
       'git push origin a+b',
       'git push origin :old',

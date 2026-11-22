@@ -324,21 +324,36 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 // argument token. So the requirement is stated as one rule per position: a push
 // that carries an option, and a push that carries a `+` refspec.
 //
+// A shell hands git the command after its own word splitting, so a run of
+// spaces or a tab is one separator. Each run of one to three separators keeps a
+// rule, which is where a rule can accept more than one character, and the
+// separator is written literally so a rule never reads one character of an
+// argument as a separator.
+//
 // A global option before the subcommand is spelled `git -…`. A subcommand
-// cannot start with a dash, so the second head names a global option and cannot
-// reach an argument.
+// cannot start with a dash, so that head names a global option and cannot reach
+// an argument.
 //
 // The denies are installed after the `git push` allow, and the last matching
 // rule decides. A ref that is deleted by name, with `--delete` or with an empty
 // source in the refspec, is not a rewrite; the plain empty-source form carries
 // no option, so these rules keep it.
-const SECURITY_REMEDIATION_PUSH_HEADS = ['git push', 'git -?* push'];
+const SECURITY_REMEDIATION_PUSH_SEPARATORS = [' ', '  ', '   ', '\t'];
 
-const SECURITY_REMEDIATION_PUSH_DENIED_SUFFIXES = [' -*', ' * -*', ' +*', ' * +*'];
+const SECURITY_REMEDIATION_PUSH_HEADS = SECURITY_REMEDIATION_PUSH_SEPARATORS.flatMap(separator => [
+  `git${separator}push`,
+  `git -?*${separator}push`,
+  `git${separator}-?* push`,
+]);
 
-const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = SECURITY_REMEDIATION_PUSH_HEADS.flatMap(head =>
-  SECURITY_REMEDIATION_PUSH_DENIED_SUFFIXES.map(suffix => head + suffix)
-);
+const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = SECURITY_REMEDIATION_PUSH_HEADS.flatMap(head => [
+  ...SECURITY_REMEDIATION_PUSH_SEPARATORS.flatMap(separator => [
+    `${head}${separator}-*`,
+    `${head} *${separator}-*`,
+  ]),
+  `${head} +*`,
+  `${head} * +*`,
+]);
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
   'git reset --hard',

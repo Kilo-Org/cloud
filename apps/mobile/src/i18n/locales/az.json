@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Ən aşağıya sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
       "emptyReadOnlyTitle": "Bu sessiyada mesaj yoxdur",
-      "renameAccessibility": "Sessiyanın adını dəyiş: {{title}}",
       "cloningSession": "Sessiya klonlanır",
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
       "historyTooLarge": "Bu sessiyanın transkripti yükləmək üçün çox böyükdür.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Sorğu tamamlanmazdan əvvəl vaxtı bitdi. Yenidən cəhd et."
   },
   "screenHeader": {
-    "openMenu": "Menyunu aç",
-    "openMenuFor": "{{title}} üçün menyunu aç"
+    "openMenu": "Menyunu aç"
   },
   "picker": {
     "optionsExpired": "Seçimlərin müddəti bitib",

@@ -2393,7 +2393,6 @@
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
       "emptyReadOnlyTitle": "L-ebda messaġġ f'din is-sessjoni",
-      "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
       "historyTooLarge": "It-transkrizzjoni ta' din is-sessjoni hija kbira wisq biex titgħabba.",
@@ -3350,8 +3349,7 @@
     "timeoutDescription": "It-talba ma tlestietx fiż-żmien tagħha. Jekk jogħġbok erġa' pprova."
   },
   "screenHeader": {
-    "openMenu": "Iftaħ il-menu",
-    "openMenuFor": "Iftaħ il-menu għal {{title}}"
+    "openMenu": "Iftaħ il-menu"
   },
   "picker": {
     "optionsExpired": "L-għażliet skadew",

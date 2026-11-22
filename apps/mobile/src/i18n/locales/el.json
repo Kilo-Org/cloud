@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Μετάβαση στο κάτω μέρος",
       "emptyTitle": "Δεν υπάρχουν ακόμα μηνύματα",
       "emptyReadOnlyTitle": "Δεν υπάρχουν μηνύματα σε αυτή τη συνεδρία",
-      "renameAccessibility": "Μετονομασία συνεδρίας: {{title}}",
       "cloningSession": "Κλωνοποίηση συνεδρίας…",
       "couldNotLoadThisSession": "Δεν ήταν δυνατή η φόρτωση αυτής της συνεδρίας.",
       "historyTooLarge": "Η μεταγραφή αυτής της συνεδρίας είναι πολύ μεγάλη για φόρτωση.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Το αίτημα έληξε πριν ολοκληρωθεί. Δοκίμασε ξανά."
   },
   "screenHeader": {
-    "openMenu": "Άνοιγμα μενού",
-    "openMenuFor": "Άνοιγμα μενού για {{title}}"
+    "openMenu": "Άνοιγμα μενού"
   },
   "picker": {
     "optionsExpired": "Οι επιλογές έληξαν",

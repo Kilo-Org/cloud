@@ -1684,7 +1684,6 @@
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "emptyReadOnlyTitle": "Phiên này không có tin nhắn",
-      "renameAccessibility": "Đổi tên phiên: {{title}}",
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
       "historyTooLarge": "Kết xuất của phiên này quá lớn để tải.",
@@ -2605,8 +2604,7 @@
     "timeoutDescription": "Yêu cầu đã quá thời gian chờ. Vui lòng thử lại."
   },
   "screenHeader": {
-    "openMenu": "Mở trình đơn",
-    "openMenuFor": "Mở trình đơn cho {{title}}"
+    "openMenu": "Mở trình đơn"
   },
   "picker": {
     "optionsExpired": "Tùy chọn đã hết hạn",

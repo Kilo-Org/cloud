@@ -1603,7 +1603,6 @@
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
       "emptyReadOnlyTitle": "Aucun message dans cette session",
-      "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session",
       "historyTooLarge": "La transcription de cette session est trop volumineuse pour être chargée.",
@@ -2565,8 +2564,7 @@
     "timeoutDescription": "La demande a mis trop de temps à aboutir. Réessayez."
   },
   "screenHeader": {
-    "openMenu": "Ouvrir le menu",
-    "openMenuFor": "Ouvrir le menu pour {{title}}"
+    "openMenu": "Ouvrir le menu"
   },
   "picker": {
     "optionsExpired": "Options indisponibles",

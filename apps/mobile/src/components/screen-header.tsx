@@ -434,14 +434,15 @@ type ScreenHeaderProps = {
   backFallback?: Href;
   onTitlePress?: () => void;
   /**
-   * Accessibility hint for the pressable title: the action it opens. The title
-   * stays first wherever it is announced, so a reader hears which screen it is
-   * on before the action: iOS reads this as the hint, and Android — where
-   * React Native maps the hint to the node's tooltip rather than to its
-   * content description (the rule `ConfigureRow` documents) — hears it as the
-   * second half of the announced name. Defaults to the generic open-menu copy.
-   * Detail screens (e.g. session rename) supply a verb that describes their
-   * action, not "open menu".
+   * Accessibility hint for the pressable title: the action it opens, named on
+   * its own. The copy must not repeat the title, because on Android the title
+   * is spoken first and this copy follows it in one utterance, so a title in
+   * the copy would be heard twice ("Sessions, Open menu for Sessions"). iOS
+   * reads this as the hint, and Android — where React Native maps the hint to
+   * the node's tooltip rather than to its content description (the rule
+   * `ConfigureRow` documents) — hears it as the second half of the announced
+   * name. Defaults to `screenHeader.openMenu`. Detail screens (e.g. session
+   * rename) supply a verb that describes their action, not "open menu".
    */
   onTitlePressAccessibilityHint?: string;
   backIcon?: 'back' | 'close';
@@ -770,11 +771,10 @@ export function ScreenHeader({
   // touch area is the same box in both directions.
   const titleHitSlop = { top: 13, bottom: 13 };
 
-  // What pressing the title does. It names the title it opens, or falls back to
-  // the generic menu copy for a header with no text title.
-  const titlePressHint =
-    onTitlePressAccessibilityHint ??
-    (title ? t('screenHeader.openMenuFor', { title }) : t('screenHeader.openMenu'));
+  // What pressing the title does. The copy names the action only, never the
+  // title: on Android it is spoken after the title in the same utterance, so a
+  // title in the copy would be announced twice.
+  const titlePressHint = onTitlePressAccessibilityHint ?? t('screenHeader.openMenu');
 
   // The announced name of the pressable title. The title stays first so a
   // reader hears which screen it is on before the action. iOS reads the action

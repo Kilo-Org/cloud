@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Ең төменге айналдыру",
       "emptyTitle": "Әзірге хабарламалар жоқ",
       "emptyReadOnlyTitle": "Бұл сессияда хабарламалар жоқ",
-      "renameAccessibility": "Сессия атауын өзгерту: {{title}}",
       "cloningSession": "Сессия көшірмесі жасалуда",
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады.",
       "historyTooLarge": "Бұл сессияның жазбасы жүктеуге тым үлкен.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Сұраныс аяқталмай уақыты бітті. Қайталап көріңіз."
   },
   "screenHeader": {
-    "openMenu": "Мәзірді ашу",
-    "openMenuFor": "{{title}} мәзірін ашу"
+    "openMenu": "Мәзірді ашу"
   },
   "picker": {
     "optionsExpired": "Таңдау нұсқалары ескірген",

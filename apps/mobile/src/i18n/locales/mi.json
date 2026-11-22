@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Panuku ki raro rawa",
       "emptyTitle": "Kāore anō he karere",
       "emptyReadOnlyTitle": "Kāore he karere i tēnei wātū",
-      "renameAccessibility": "Whakaingoatia anō te wātū: {{title}}",
       "cloningSession": "Kei te tārua i te wātū",
       "couldNotLoadThisSession": "Kāore i taea te uta i tēnei wātū",
       "historyTooLarge": "He rahi rawa te tuhinga kōrero o tēnei wātū kāore e taea te uta.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Kua pau te wā o te tono i mua i tōna otinga. Whakamātau anō."
   },
   "screenHeader": {
-    "openMenu": "Whakatuwheratia te tahua",
-    "openMenuFor": "Whakatuwheratia te tahua mō {{title}}"
+    "openMenu": "Whakatuwheratia te tahua"
   },
   "picker": {
     "optionsExpired": "Kua pau ngā kōwhiringa",

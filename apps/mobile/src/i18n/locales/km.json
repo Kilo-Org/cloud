@@ -2246,7 +2246,6 @@
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
       "emptyReadOnlyTitle": "មិនមានសារនៅក្នុងវគ្គនេះទេ",
-      "renameAccessibility": "ប្តូរឈ្មោះវគ្គ: {{title}}",
       "cloningSession": "កំពុងចម្លងវគ្គ",
       "couldNotLoadThisSession": "មិនអាចផ្ទុកវគ្គនេះបានទេ",
       "historyTooLarge": "កំណត់ត្រាវគ្គនេះធំពេកមិនអាចផ្ទុកបានទេ។",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "សំណើបានហួសពេលមុននឹងបញ្ចប់។ សូមព្យាយាមម្តងទៀត។"
   },
   "screenHeader": {
-    "openMenu": "បើកម៉ឺនុយ",
-    "openMenuFor": "បើកម៉ឺនុយសម្រាប់ {{title}}"
+    "openMenu": "បើកម៉ឺនុយ"
   },
   "picker": {
     "optionsExpired": "ជម្រើសបានផុតកំណត់",

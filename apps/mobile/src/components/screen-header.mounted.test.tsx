@@ -1008,14 +1008,16 @@ describe('ScreenHeader mounted', () => {
     }
   );
 
-  it('announces the title first and its action second', () => {
-    // iOS reads the action from the hint beside the name. Android's hint is
-    // only a tooltip (`ConfigureRow` documents the same rule), so its name
-    // carries the action after the title.
+  it('announces the title once and its action once', () => {
+    // The action copy names only the action: Android speaks it after the title
+    // in one utterance, so any title inside the copy is heard twice. iOS reads
+    // the action from the hint beside the name; Android's hint is only a
+    // tooltip (`ConfigureRow` documents the same rule), so its name carries the
+    // action after the title.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
     const title = findTitlePressable(renderer.root);
     expect(title.props.accessibilityLabel).toBe('Sessions');
-    expect(title.props.accessibilityHint).toBe('Open menu for Sessions');
+    expect(title.props.accessibilityHint).toBe('Open menu');
 
     const customRenderer = renderHeader({
       title: 'Sessions',
@@ -1029,8 +1031,8 @@ describe('ScreenHeader mounted', () => {
     platform.OS = 'android';
     const android = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
     const androidTitle = findTitlePressable(android.root);
-    expect(androidTitle.props.accessibilityLabel).toBe('Sessions, Open menu for Sessions');
-    expect(androidTitle.props.accessibilityHint).toBe('Open menu for Sessions');
+    expect(androidTitle.props.accessibilityLabel).toBe('Sessions, Open menu');
+    expect(androidTitle.props.accessibilityHint).toBe('Open menu');
 
     const androidCustom = renderHeader({
       title: 'Sessions',

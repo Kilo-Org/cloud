@@ -2393,7 +2393,6 @@
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
       "emptyReadOnlyTitle": "Níl aon teachtaireacht sa seisiún seo",
-      "renameAccessibility": "Athainmnigh seisiún: {{title}}",
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "historyTooLarge": "Tá tras-scríbhinn an tseisiúin seo rómhór le lódáil.",
@@ -3350,8 +3349,7 @@
     "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },
   "screenHeader": {
-    "openMenu": "Oscail roghchlár",
-    "openMenuFor": "Oscail roghchlár do {{title}}"
+    "openMenu": "Oscail roghchlár"
   },
   "picker": {
     "optionsExpired": "Roghanna imithe in éag",

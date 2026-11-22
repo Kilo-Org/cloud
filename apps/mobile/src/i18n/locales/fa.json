@@ -2246,7 +2246,6 @@
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "emptyReadOnlyTitle": "پیامی در این نشست وجود ندارد",
-      "renameAccessibility": "تغییر نام نشست: {{title}}",
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
       "historyTooLarge": "متن گفت‌وگوی این نشست برای بارگذاری بیش از حد بزرگ است.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "درخواست پیش از تکمیل، منقضی شد. لطفاً دوباره تلاش کنید."
   },
   "screenHeader": {
-    "openMenu": "باز کردن منو",
-    "openMenuFor": "باز کردن منوی {{title}}"
+    "openMenu": "باز کردن منو"
   },
   "picker": {
     "optionsExpired": "گزینه‌ها منقضی شدند",

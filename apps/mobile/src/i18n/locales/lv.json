@@ -2295,7 +2295,6 @@
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
       "emptyReadOnlyTitle": "Šajā sesijā nav ziņojumu",
-      "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
       "cloningSession": "Klonē sesiju…",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
       "historyTooLarge": "Šīs sesijas ieraksts ir pārāk liels, lai to ielādētu.",
@@ -3228,8 +3227,7 @@
     "timeoutDescription": "Pieprasījums tika pārtraukts, jo netika pabeigts laikā. Lūdzu, mēģini vēlreiz."
   },
   "screenHeader": {
-    "openMenu": "Atvērt izvēlni",
-    "openMenuFor": "Atvērt {{title}} izvēlni"
+    "openMenu": "Atvērt izvēlni"
   },
   "picker": {
     "optionsExpired": "Izvēles vairs nav pieejamas",

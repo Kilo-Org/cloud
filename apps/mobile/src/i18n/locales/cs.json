@@ -2344,7 +2344,6 @@
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
       "emptyReadOnlyTitle": "Žádné zprávy v této relaci",
-      "renameAccessibility": "Přejmenovat relaci: {{title}}",
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
@@ -3289,8 +3288,7 @@
     "timeoutDescription": "Požadavek vypršel dříve, než se dokončil. Zkuste to prosím znovu."
   },
   "screenHeader": {
-    "openMenu": "Otevřít nabídku",
-    "openMenuFor": "Otevřít nabídku pro {{title}}"
+    "openMenu": "Otevřít nabídku"
   },
   "picker": {
     "optionsExpired": "Platnost možností vypršela",

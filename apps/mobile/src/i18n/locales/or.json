@@ -2246,7 +2246,6 @@
       "scrollToBottom": "ସବୁଠାରୁ ତଳକୁ ସ୍କ୍ରୋଲ୍ କରନ୍ତୁ",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
       "emptyReadOnlyTitle": "ଏହି ସେସନରେ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
-      "renameAccessibility": "{{title}} ସେସନର ନାମ ବଦଳାନ୍ତୁ",
       "cloningSession": "ସେସନର ନକଲ ତିଆରି ହେଉଛି",
       "couldNotLoadThisSession": "ଏହି ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "historyTooLarge": "ଏହି ସେସନ୍ ର ଲିପିବଦ୍ଧ ବିବରଣୀ ଲୋଡ୍ ପାଇଁ ଅତ୍ୟଧିକ ବଡ଼।",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "ଅନୁରୋଧ ସମୟ ପୂର୍ବରୁ ସମାପ୍ତ ହୋଇଯାଇଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   },
   "screenHeader": {
-    "openMenu": "ମେନୁ ଖୋଲନ୍ତୁ",
-    "openMenuFor": "{{title}} ପାଇଁ ମେନୁ ଖୋଲନ୍ତୁ"
+    "openMenu": "ମେନୁ ଖୋଲନ୍ତୁ"
   },
   "picker": {
     "optionsExpired": "ବିକଳ୍ପଗୁଡ଼ିକର ମିଆଦ ଶେଷ",

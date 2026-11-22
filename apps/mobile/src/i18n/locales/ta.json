@@ -2246,7 +2246,6 @@
       "scrollToBottom": "கடைசிக்குச் செல்லவும்",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
       "emptyReadOnlyTitle": "இந்த அமர்வில் செய்திகள் இல்லை",
-      "renameAccessibility": "{{title}} அமர்வின் பெயரை மாற்றவும்",
       "cloningSession": "அமர்வு நகலாக்கப்படுகிறது",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை.",
       "historyTooLarge": "இந்த அமர்வின் பதிவேடு ஏற்ற முடியாற்படி மிகப் பெரிது.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "கோரிக்கை நிறைவடையும் முன் நேரம் காலாவதியானது. மீண்டும் முயற்சிக்கவும்."
   },
   "screenHeader": {
-    "openMenu": "மெனுவைத் திறக்கவும்",
-    "openMenuFor": "{{title}}-க்கான மெனுவைத் திறக்கவும்"
+    "openMenu": "மெனுவைத் திறக்கவும்"
   },
   "picker": {
     "optionsExpired": "விருப்பங்கள் காலாவதியாகின",

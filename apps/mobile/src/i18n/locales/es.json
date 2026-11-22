@@ -1707,7 +1707,6 @@
       "scrollToBottom": "Desplazarse al final",
       "emptyTitle": "Aún no hay mensajes",
       "emptyReadOnlyTitle": "Esta sesión no tiene mensajes",
-      "renameAccessibility": "Cambiar nombre de la sesión: {{title}}",
       "cloningSession": "Clonando sesión",
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
       "historyTooLarge": "La transcripción de esta sesión es demasiado grande para cargarla.",
@@ -2640,8 +2639,7 @@
     "timeoutDescription": "La solicitud se agotó antes de completarse. Inténtalo de nuevo."
   },
   "screenHeader": {
-    "openMenu": "Abrir menú",
-    "openMenuFor": "Abrir menú de {{title}}"
+    "openMenu": "Abrir menú"
   },
   "picker": {
     "optionsExpired": "Opciones caducadas",

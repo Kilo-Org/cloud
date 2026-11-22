@@ -2248,7 +2248,6 @@
       "scrollToBottom": "చివరి వరకు స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
       "emptyReadOnlyTitle": "ఈ సెషన్‌లో సందేశాలు లేవు",
-      "renameAccessibility": "{{title}} సెషన్ పేరు మార్చండి",
       "cloningSession": "సెషన్‌ను క్లోన్ చేస్తోంది",
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయాము.",
       "historyTooLarge": "ఈ సెషన్ ట్రాన్స్క్రిప్ట్ లోడ్ చేయడానికి చాలా పెద్దది.",
@@ -3169,8 +3168,7 @@
     "timeoutDescription": "అభ్యర్థన పూర్తయ్యేలోపు సమయం ముగిసిపోయింది. దయచేసి మళ్లీ ప్రయత్నించండి."
   },
   "screenHeader": {
-    "openMenu": "మెనూను తెరవండి",
-    "openMenuFor": "{{title}} మెనూను తెరవండి"
+    "openMenu": "మెనూను తెరవండి"
   },
   "picker": {
     "optionsExpired": "ఎంపికల గడువు ముగిసింది",

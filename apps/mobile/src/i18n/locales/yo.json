@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
       "emptyReadOnlyTitle": "Kò sí ìfiránṣẹ́ nínú ìgbà iṣẹ́ yìí",
-      "renameAccessibility": "Yí orúkọ ìgbà iṣẹ́ padà: {{title}}",
       "cloningSession": "Ń ṣe àdàkọ ìgbà iṣẹ́",
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
       "historyTooLarge": "Ìgbésílẹ̀ ìgbà iṣẹ́ yìí tóbí jù lọ láti lè gbé wọlé.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Ìbéèrè náà kò parí rí kí àkókò rẹ̀ tó tán. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "screenHeader": {
-    "openMenu": "Ṣí àkójọ àṣàyàn",
-    "openMenuFor": "Ṣí àkójọ àṣàyàn fún {{title}}"
+    "openMenu": "Ṣí àkójọ àṣàyàn"
   },
   "picker": {
     "optionsExpired": "Àwọn àṣàyàn ti dópin",

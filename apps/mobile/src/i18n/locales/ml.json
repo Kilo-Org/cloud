@@ -2246,7 +2246,6 @@
       "scrollToBottom": "ഏറ്റവും താഴേക്ക് സ്ക്രോൾ ചെയ്യുക",
       "emptyTitle": "ഇതുവരെ സന്ദേശങ്ങളൊന്നുമില്ല",
       "emptyReadOnlyTitle": "ഈ സെഷനിൽ സന്ദേശങ്ങളില്ല",
-      "renameAccessibility": "{{title}} എന്ന സെഷന്റെ പേര് മാറ്റുക",
       "cloningSession": "സെഷൻ ക്ലോൺ ചെയ്യുന്നു",
       "couldNotLoadThisSession": "ഈ സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "historyTooLarge": "ഈ സെഷന്റെ ട്രാൻസ്ക്രിപ്റ്റ് ലോഡ് ചെയ്യാൻ വളരെ വലുതാണ്.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "പൂർത്തിയാകുന്നതിന് മുമ്പ് തന്നെ അഭ്യർത്ഥന കാലഹരണപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക."
   },
   "screenHeader": {
-    "openMenu": "മെനു തുറക്കുക",
-    "openMenuFor": "{{title}}-നുള്ള മെനു തുറക്കുക"
+    "openMenu": "മെനു തുറക്കുക"
   },
   "picker": {
     "optionsExpired": "ഓപ്ഷനുകൾ കാലഹരണപ്പെട്ടു",

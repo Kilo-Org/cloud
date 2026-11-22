@@ -2246,7 +2246,6 @@
       "scrollToBottom": "शेवटपर्यंत स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
       "emptyReadOnlyTitle": "या सत्रात संदेश नाहीत",
-      "renameAccessibility": "{{title}} या सत्राचे नाव बदला",
       "cloningSession": "सत्राची प्रत तयार होत आहे",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",
       "historyTooLarge": "या सत्राची ट्रान्सक्रिप्ट लोड करण्यासाठी खूप मोठी आहे.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "विनंती पूर्ण होण्यापूर्वी वेळ संपली. कृपया पुन्हा प्रयत्न करा."
   },
   "screenHeader": {
-    "openMenu": "मेनू उघडा",
-    "openMenuFor": "{{title}} साठी मेनू उघडा"
+    "openMenu": "मेनू उघडा"
   },
   "picker": {
     "optionsExpired": "पर्याय कालबाह्य झाले",

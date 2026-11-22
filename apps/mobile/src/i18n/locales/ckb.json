@@ -2246,7 +2246,6 @@
       "scrollToBottom": "چوون بۆ کۆتایی",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
       "emptyReadOnlyTitle": "هیچ پەیامێک لەم سێشنەدا نییە",
-      "renameAccessibility": "گۆڕینی ناوی سێشن: {{title}}",
       "cloningSession": "سێشنەکە کۆپی دەکرێت",
       "couldNotLoadThisSession": "نەتوانرا ئەم سێشنە بار بکرێت.",
       "historyTooLarge": "نوسینی ئەم سێشنە زۆر گەورەیە بۆ بارکردن.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "داواکارییەکە پێش تەواوبوونی ماوەکەی تەواو بوو. تکایە دووبارە هەوڵ بدە."
   },
   "screenHeader": {
-    "openMenu": "مێنۆ بکەرەوە",
-    "openMenuFor": "مێنۆی {{title}} بکەرەوە"
+    "openMenu": "مێنۆ بکەرەوە"
   },
   "picker": {
     "optionsExpired": "بەسەرچوونی بژاردەکان",

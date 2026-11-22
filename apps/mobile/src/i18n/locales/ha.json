@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
       "emptyReadOnlyTitle": "Babu saƙonni a wannan zaman",
-      "renameAccessibility": "Canza sunan zaman: {{title}}",
       "cloningSession": "Ana yin kwafin zaman",
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
       "historyTooLarge": "Rubutun wannan zaman ya yi girma don a loda shi.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "An ƙare lokacin buƙatar kafin ta kammala. Sake gwadawa."
   },
   "screenHeader": {
-    "openMenu": "Buɗe jerin zaɓuɓɓuka",
-    "openMenuFor": "Buɗe jerin zaɓuɓɓukan {{title}}"
+    "openMenu": "Buɗe jerin zaɓuɓɓuka"
   },
   "picker": {
     "optionsExpired": "Zaɓuɓɓukan sun ƙare",

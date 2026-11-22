@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Mikorisa hatrany ambany",
       "emptyTitle": "Mbola tsy misy hafatra",
       "emptyReadOnlyTitle": "Tsy misy hafatra ao amin'ity fotoam-piasana ity",
-      "renameAccessibility": "Ovao ny anaran'ny fotoam-piasana: {{title}}",
       "cloningSession": "Mamorona dika mitovy amin'ny fotoam-piasana",
       "couldNotLoadThisSession": "Tsy voaray ity fotoam-piasana ity.",
       "historyTooLarge": "Lava loatra ny firaketan'ity fotoam-piasana ity havoaka.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Nitsahatra ny fangatahana alohan'ny hahavita azy. Andramo indray azafady."
   },
   "screenHeader": {
-    "openMenu": "Sokafy ny menio",
-    "openMenuFor": "Sokafy ny menio ho an'ny {{title}}"
+    "openMenu": "Sokafy ny menio"
   },
   "picker": {
     "optionsExpired": "Lany daty ny safidy",

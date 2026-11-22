@@ -2246,7 +2246,6 @@
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
       "emptyReadOnlyTitle": "ไม่มีข้อความในเซสชันนี้",
-      "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",
       "cloningSession": "กำลังคัดลอกเซสชัน",
       "couldNotLoadThisSession": "ไม่สามารถโหลดเซสชันนี้ได้",
       "historyTooLarge": "บันทึกการสนทนาของเซสชันนี้ใหญ่เกินกว่าจะโหลดได้",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "คำขอใช้เวลานานเกินกำหนด กรุณาลองอีกครั้ง"
   },
   "screenHeader": {
-    "openMenu": "เปิดเมนู",
-    "openMenuFor": "เปิดเมนูสำหรับ {{title}}"
+    "openMenu": "เปิดเมนู"
   },
   "picker": {
     "optionsExpired": "ตัวเลือกหมดอายุแล้ว",

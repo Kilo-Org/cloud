@@ -1684,7 +1684,6 @@
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
       "emptyReadOnlyTitle": "Keine Nachrichten in dieser Sitzung",
-      "renameAccessibility": "Sitzung umbenennen: {{title}}",
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
       "historyTooLarge": "Das Protokoll dieser Sitzung ist zum Laden zu groß.",
@@ -2605,8 +2604,7 @@
     "timeoutDescription": "Die Anfrage wurde nicht rechtzeitig abgeschlossen. Bitte versuche es erneut."
   },
   "screenHeader": {
-    "openMenu": "Menü öffnen",
-    "openMenuFor": "Menü für {{title}} öffnen"
+    "openMenu": "Menü öffnen"
   },
   "picker": {
     "optionsExpired": "Auswahl nicht mehr gültig",

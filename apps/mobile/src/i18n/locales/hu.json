@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
       "emptyReadOnlyTitle": "Nincs üzenet ebben a munkamenetben",
-      "renameAccessibility": "Munkamenet átnevezése: {{title}}",
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
       "historyTooLarge": "Ez a munkamenet leirata túl nagy a betöltéshez.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "A kérés túllépte az időkorlátot, mielőtt befejeződött volna. Próbáld újra."
   },
   "screenHeader": {
-    "openMenu": "Menü megnyitása",
-    "openMenuFor": "{{title}} menüjének megnyitása"
+    "openMenu": "Menü megnyitása"
   },
   "picker": {
     "optionsExpired": "A választható lehetőségek lejártak",

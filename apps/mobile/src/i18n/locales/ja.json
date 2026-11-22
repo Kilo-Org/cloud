@@ -1684,7 +1684,6 @@
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "emptyReadOnlyTitle": "このセッションにメッセージはありません",
-      "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "historyTooLarge": "このセッションの履歴は大きすぎて読み込めません。",
@@ -2605,8 +2604,7 @@
     "timeoutDescription": "リクエストが完了する前にタイムアウトしました。もう一度お試しください。"
   },
   "screenHeader": {
-    "openMenu": "メニューを開く",
-    "openMenuFor": "{{title}}のメニューを開く"
+    "openMenu": "メニューを開く"
   },
   "picker": {
     "optionsExpired": "選択肢の有効期限が切れました",

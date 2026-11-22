@@ -2295,7 +2295,6 @@
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Još nema poruka",
       "emptyReadOnlyTitle": "U ovoj sesiji nema poruka",
-      "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
       "historyTooLarge": "Prijepis ove sesije je prevelik za učitavanje.",
@@ -3228,8 +3227,7 @@
     "timeoutDescription": "Zahtjev je istekao prije nego što je završio. Pokušaj ponovo."
   },
   "screenHeader": {
-    "openMenu": "Otvori izbornik",
-    "openMenuFor": "Otvori izbornik za {{title}}"
+    "openMenu": "Otvori izbornik"
   },
   "picker": {
     "optionsExpired": "Opcije više nisu dostupne",

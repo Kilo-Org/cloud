@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
       "emptyReadOnlyTitle": "Saio honetan ez dago mezurik",
-      "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
       "historyTooLarge": "Saio honen transkripzioa kargatzeko handiegia da.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Eskaera amaitu aurretik iraungi da. Saiatu berriro."
   },
   "screenHeader": {
-    "openMenu": "Ireki menua",
-    "openMenuFor": "Ireki {{title}}-ren menua"
+    "openMenu": "Ireki menua"
   },
   "picker": {
     "optionsExpired": "Aukerak iraungita",

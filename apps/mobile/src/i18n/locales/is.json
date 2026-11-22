@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
       "emptyReadOnlyTitle": "Engin skilaboð í þessari lotu",
-      "renameAccessibility": "Endurnefna lotu: {{title}}",
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
       "historyTooLarge": "Spjallslóð þessarar lotu er of stór til að hlaða.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Beiðnin rann út á tíma áður en hún kláraðist. Reyndu aftur."
   },
   "screenHeader": {
-    "openMenu": "Opna valmynd",
-    "openMenuFor": "Opna valmynd fyrir {{title}}"
+    "openMenu": "Opna valmynd"
   },
   "picker": {
     "optionsExpired": "Valkostir útrunnir",

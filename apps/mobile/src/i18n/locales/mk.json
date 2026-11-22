@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Движи се до крајот",
       "emptyTitle": "Сè уште нема пораки",
       "emptyReadOnlyTitle": "Нема пораки во оваа сесија",
-      "renameAccessibility": "Преименувај ја сесијата: {{title}}",
       "cloningSession": "Клонирање на сесијата",
       "couldNotLoadThisSession": "Не успеа вчитувањето на оваа сесија.",
       "historyTooLarge": "Записот на оваа сесија е премногу голем за вчитување.",
@@ -3167,8 +3166,7 @@
     "timeoutDescription": "Барањето истече пред да заврши. Обиди се повторно."
   },
   "screenHeader": {
-    "openMenu": "Отвори мени",
-    "openMenuFor": "Отвори мени за {{title}}"
+    "openMenu": "Отвори мени"
   },
   "picker": {
     "optionsExpired": "Опциите веќе не важат",

@@ -1684,7 +1684,6 @@
       "transcriptAccessibility": "सत्र की बातचीत का रिकॉर्ड",
       "emptyTitle": "अभी कोई संदेश नहीं",
       "emptyReadOnlyTitle": "इस सत्र में कोई संदेश नहीं",
-      "renameAccessibility": "सत्र का नाम बदलें: {{title}}",
       "cloningSession": "सत्र क्लोन किया जा रहा है",
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका।",
       "historyTooLarge": "इस सत्र का ट्रांसक्रिप्ट लोड करने के लिए बहुत बड़ा है।",
@@ -2605,8 +2604,7 @@
     "timeoutDescription": "अनुरोध पूरा होने से पहले ही समय समाप्त हो गया। कृपया फिर से कोशिश करें।"
   },
   "screenHeader": {
-    "openMenu": "मेनू खोलें",
-    "openMenuFor": "{{title}} के लिए मेनू खोलें"
+    "openMenu": "मेनू खोलें"
   },
   "picker": {
     "optionsExpired": "विकल्प अब मान्य नहीं हैं",

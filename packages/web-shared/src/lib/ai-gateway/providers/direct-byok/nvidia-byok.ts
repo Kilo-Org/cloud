@@ -6,8 +6,10 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'nvidia-byok';
+
 export default {
-  id: 'nvidia-byok',
+  id,
   openrouter_inference_provider_id: 'nvidia',
   models_dev_id: 'nvidia',
   ...apiKeyUpstream({
@@ -26,5 +28,5 @@ export default {
     delete request.body.safety_identifier;
     delete request.body.prompt_cache_key;
   },
-  models: cachedDirectByokModelList('nvidia-byok'),
+  models: cachedDirectByokModelList(id),
 } satisfies DirectByokProvider;

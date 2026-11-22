@@ -7,6 +7,7 @@
       "spendAlert": "Sinu kulutused vajavad tähelepanu",
       "securityFinding": "Turbetuvastus vajab tähelepanu",
       "securityUpdate": "Turvakontrollil on uuendus",
+      "agentBriefing": "Sinu agendi ülevaade on valmis",
       "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus"
     }
   },

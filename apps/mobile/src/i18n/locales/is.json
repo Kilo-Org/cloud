@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} lotur",
       "sectionAccessibility": "{{title}}: {{displayCount}} lotur",
       "live": "Í RAUNTÍMA",
-      "updating": "Uppfæri"
+      "updating": "Uppfæri",
+      "retentionLimit": "Nýjustu loturnar eru sýndar."
     },
     "sessionRow": {
       "deleteTitle": "Eyða lotu?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
       "emptyReadOnlyTitle": "Engin skilaboð í þessari lotu",
-      "renameAccessibility": "Endurnefna lotu: {{title}}",
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
       "historyTooLarge": "Spjallslóð þessarar lotu er of stór til að hlaða.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Reyna aftur að hlaða reikningnum",
     "retryLoadingPrivacy": "Reyna aftur að hlaða persónuverndarvalkostum"
   },
+  "accountBlocked": {
+    "title": "Reikningur lokaður",
+    "description": "Kilo hefur lokað þessum reikningi og ný innskráning opnar hann ekki. Þjónustuver getur farið yfir lokunina sé þess óskað.",
+    "domainDescription": "Kilo lokar fyrir reikninga á þessu tölvupóstsléni og ný innskráning breytir því ekki. Þjónustuver getur farið yfir lénið sé þess óskað.",
+    "contactSupport": "Hafa samband við þjónustuver"
+  },
   "addCredits": {
     "cta": "Bæta við inneign",
     "billingPage": "innheimtusíðu"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Beiðnin rann út á tíma áður en hún kláraðist. Reyndu aftur."
   },
   "screenHeader": {
-    "openMenu": "Opna valmynd",
-    "openMenuFor": "Opna valmynd fyrir {{title}}"
+    "openMenu": "Opna valmynd"
   },
   "picker": {
     "optionsExpired": "Valkostir útrunnir",
@@ -4093,6 +4098,7 @@
         "network": "Niðurhalið kláraðist ekki. Athugaðu tenginguna þína og reyndu aftur.",
         "invalidFile": "Niðurhalaða skráin er ekki líkan sem þetta forrit getur keyrt, svo henni var eytt.",
         "checksum": "Niðurhalaða skráin passar ekki við uppgefna gátsummu sína, svo henni var eytt. Reyndu að hlaða henni niður aftur.",
+        "unreadable": "Þetta tæki gat ekki athugað niðurhaluðu skrána, svo henni var eytt. Reyndu að hlaða henni niður aftur.",
         "writeFailed": "Þetta tæki gat ekki vistað líkanið. Reyndu að hlaða því niður aftur."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Öll samhengi",
     "dismiss": "Vísa yfirliti frá",
     "dismissFailed": "Tókst ekki að vísa yfirlitinu frá eins og er. Það reynir aftur í bakgrunni.",
+    "readMarkFailed": "Tókst ekki að merkja þetta yfirlit sem lesið. Það reynir aftur þegar yfirlitið hleðst aftur.",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistað yfirlit · ekki hægt að uppfæra",
     "summary": "AI samantekt",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Yfirlit tiltækt til",
     "timeHint": "Heimaspjaldið sýnir aftur rauntímastöðu þegar yfirlitsglugganum lýkur, jafnvel án tengingar.",
     "invalidSchedule": "Veldu gilt tímabelti og yfirlitsglugga sem er ekki tómur.",
+    "scheduleEmptyNight": "Yfirlitsglugginn er tómur. Veldu tilbúinn tíma sem er síðar en upphaf gluggans.",
+    "scheduleEmptyMorning": "Tilbúinn tími og tíminn sem er í boði til stemma saman. Veldu hversu lengi yfirlitið helst í boði.",
+    "scheduleFullDay": "Gluggarnir tveir ná yfir heilan dag. Skildu eftir hluta dagsins utan yfirlitsins.",
     "notificationsHint": "Ein almenn tilkynning fyrir hvert áætlað yfirlit. Óháð greiddum AI samantektum.",
     "notificationPermission": "Kveiktu á push-tilkynningum til að fá yfirlitið þitt.",
     "defaultModel": "Nota sjálfgefið líkan Kilo",
@@ -4736,6 +4746,8 @@
     "estimate": "Áætlun {{estimate}} · hámark {{maximum}}",
     "estimateUnavailable": "Greidd samantekt er ekki tiltæk fyrir þessar stillingar. Breyttu líkaninu eða hámarkinu, eða reyndu aftur síðar.",
     "confirmPaid": "Virkja greiddar samantektir fyrir {{context}}?",
+    "paidDisclosure_one": "Áætlað {{estimate}}, allt að {{maximum}}, með {{minutes}} mín. hámarki. Kostnaður gildir þótt vinnsla mistakist.",
+    "paidDisclosure_other": "Áætlað {{estimate}}, allt að {{maximum}}, með {{minutes}} mín. hámarki. Kostnaður gildir þótt vinnsla mistakist.",
     "paidDisclosure": "Áætlað {{estimate}}, allt að {{maximum}}, með {{minutes}} mín. hámarki. Kostnaður gildir þótt vinnsla mistakist.",
     "enable": "Virkja greiddar samantektir",
     "allContexts": "Persónuleg yfirlit og yfirlit skipulagsheilda eru aðskilin.",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Ónefnd virkni",
     "metadataFailureProvider": "villa hjá þjónustuveitanda",
     "metadataFailureTool": "villa í verkfæri",
-    "metadataFailureCancelled": "Hætt við",
+    "metadataStopped": "Síðasta umferð var stöðvuð",
     "metadataFailureOther": "ótilgreind villa"
   },
   "systemSearch": {

@@ -2270,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sej",
       "sectionAccessibility": "{{title}}: {{displayCount}} sej",
       "live": "V ŽIVO",
-      "updating": "Posodabljanje"
+      "updating": "Posodabljanje",
+      "retentionLimit": "Prikazane so najnovejše seje."
     },
     "sessionRow": {
       "deleteTitle": "Izbrišem sejo?",
@@ -2344,7 +2345,6 @@
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
       "emptyReadOnlyTitle": "V tej seji ni sporočil",
-      "renameAccessibility": "Preimenuj sejo: {{title}}",
       "cloningSession": "Kloniranje seje",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "historyTooLarge": "Zapis te seje je prevelik za nalaganje.",
@@ -3217,6 +3217,12 @@
     "retryLoadingAccount": "Poskusi znova naložiti račun",
     "retryLoadingPrivacy": "Poskusi znova naložiti nastavitve zasebnosti"
   },
+  "accountBlocked": {
+    "title": "Račun blokiran",
+    "description": "Kilo je blokiral ta račun in nova prijava blokade ne bo odpravila. Podpora lahko blokado na zahtevo pregleda.",
+    "domainDescription": "Kilo ne dovoljuje računov na tej e-poštni domeni in ponovna prijava tega ne bo spremenila. Podpora lahko domeno na zahtevo pregleda.",
+    "contactSupport": "Obrni se na podporo"
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stran za obračunavanje"
@@ -3289,8 +3295,7 @@
     "timeoutDescription": "Odgovora strežnika nismo prejeli pravočasno. Poskusi znova."
   },
   "screenHeader": {
-    "openMenu": "Odpri meni",
-    "openMenuFor": "Odpri meni za {{title}}"
+    "openMenu": "Odpri meni"
   },
   "picker": {
     "optionsExpired": "Možnosti niso več veljavne",
@@ -4241,6 +4246,7 @@
         "network": "Prenos se ni dokončal. Preverite povezavo in poskusite znova.",
         "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena.",
         "checksum": "Prenesena datoteka se ne ujema z objavljeno kontrolno vsoto, zato je bila odstranjena. Poskusite znova prenesti.",
+        "unreadable": "Ta naprava ni mogla preveriti prenesene datoteke, zato je bila odstranjena. Poskusite znova prenesti.",
         "writeFailed": "Ta naprava ni mogla shraniti modela. Poskusite znova prenesti."
       }
     },
@@ -4876,6 +4882,7 @@
     "contextAll": "Vsi konteksti",
     "dismiss": "Zavrzi poročilo",
     "dismissFailed": "Poročila še ni mogoče zavreči. Ponovni poskus bo izveden v ozadju.",
+    "readMarkFailed": "Tega poročila ni bilo mogoče označiti kot prebrano. Ponovni poskus bo izveden ob ponovnem nalaganju poročila.",
     "offline": "Brez povezave · shranjeno poročilo",
     "cached": "Shranjeno poročilo · osvežitev ni na voljo",
     "summary": "AI povzetek",
@@ -4895,6 +4902,9 @@
     "morningEnd": "Poročilo na voljo do",
     "timeHint": "Kartica Domov obnovi trenutno stanje, ko se časovno obdobje poročila konča, tudi brez povezave.",
     "invalidSchedule": "Izberite veljaven časovni pas in neprazno časovno obdobje poročila.",
+    "scheduleEmptyNight": "Časovno obdobje poročila je prazno. Izberite čas priprave, ki je poznejši od začetka časovnega obdobja.",
+    "scheduleEmptyMorning": "Čas priprave in čas, do katerega je poročilo na voljo, se ujemata. Izberite, kako dolgo naj bo poročilo na voljo.",
+    "scheduleFullDay": "Obe obdobji pokrivata cel dan. Pustite del dneva zunaj časovnega obdobja poročila.",
     "notificationsHint": "Eno splošno obvestilo na načrtovano poročilo. Neodvisno od plačljivih AI povzetkov.",
     "notificationPermission": "Za prejemanje poročila vklopite potisna obvestila.",
     "defaultModel": "Uporabi privzeti model Kilo",
@@ -4904,7 +4914,11 @@
     "estimate": "Ocena {{estimate}} · največ {{maximum}}",
     "estimateUnavailable": "Plačljiv povzetek za te nastavitve ni na voljo. Spremenite model ali omejitve, ali pa poskusite znova pozneje.",
     "confirmPaid": "Omogočiti plačljive povzetke za {{context}}?",
-    "paidDisclosure": "Ocena {{estimate}}, največ {{maximum}}, z omejitvijo {{minutes}} min. Stroški nastanejo tudi, če ustvarjanje ne uspe.",
+    "paidDisclosure_one": "Ocena {{estimate}}, največ {{maximum}}, z omejitvijo {{minutes}} minuta. Stroški nastanejo tudi, če ustvarjanje ne uspe.",
+    "paidDisclosure_two": "Ocena {{estimate}}, največ {{maximum}}, z omejitvijo {{minutes}} minuti. Stroški nastanejo tudi, če ustvarjanje ne uspe.",
+    "paidDisclosure_few": "Ocena {{estimate}}, največ {{maximum}}, z omejitvijo {{minutes}} minute. Stroški nastanejo tudi, če ustvarjanje ne uspe.",
+    "paidDisclosure": "Ocena {{estimate}}, največ {{maximum}}, z omejitvijo {{minutes}} minut. Stroški nastanejo tudi, če ustvarjanje ne uspe.",
+    "paidDisclosure_other": "Ocena {{estimate}}, največ {{maximum}}, z omejitvijo {{minutes}} minut. Stroški nastanejo tudi, če ustvarjanje ne uspe.",
     "enable": "Omogoči plačljive povzetke",
     "allContexts": "Osebna in organizacijska poročila ostanejo ločena.",
     "emptyHistory": "Ni shranjenih poročil",
@@ -4955,7 +4969,7 @@
     "sourceActivity": "Aktivnost brez naslova",
     "metadataFailureProvider": "napaka ponudnika",
     "metadataFailureTool": "napaka orodja",
-    "metadataFailureCancelled": "Preklicano",
+    "metadataStopped": "Zadnji krog je bil ustavljen",
     "metadataFailureOther": "nedoločena napaka"
   },
   "systemSearch": {

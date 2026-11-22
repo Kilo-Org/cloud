@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} økter",
       "sectionAccessibility": "{{title}}: {{displayCount}} økter",
       "live": "SANNTID",
-      "updating": "Oppdaterer"
+      "updating": "Oppdaterer",
+      "retentionLimit": "Viser de nyeste øktene."
     },
     "sessionRow": {
       "deleteTitle": "Slette økt?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",
       "emptyReadOnlyTitle": "Ingen meldinger i denne økten",
-      "renameAccessibility": "Gi økten nytt navn: {{title}}",
       "cloningSession": "Kloner økten",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
       "historyTooLarge": "Øktens logg er for stor til å laste inn.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Prøv å laste inn kontoen på nytt",
     "retryLoadingPrivacy": "Prøv å laste inn personvernvalgene på nytt"
   },
+  "accountBlocked": {
+    "title": "Kontoen er blokkert",
+    "description": "Kilo har blokkert denne kontoen, og det hjelper ikke å logge inn på nytt. Kundestøtten kan gjennomgå blokkeringen på forespørsel.",
+    "domainDescription": "Kilo blokkerer kontoer på dette e-postdomenet, og det endrer seg ikke om du logger inn på nytt. Kundestøtten kan gjennomgå domenet på forespørsel.",
+    "contactSupport": "Kontakt kundestøtte"
+  },
   "addCredits": {
     "cta": "Fyll på kreditter",
     "billingPage": "faktureringsside"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Forespørselen tok for lang tid og ble avbrutt. Prøv igjen."
   },
   "screenHeader": {
-    "openMenu": "Åpne meny",
-    "openMenuFor": "Åpne meny for {{title}}"
+    "openMenu": "Åpne meny"
   },
   "picker": {
     "optionsExpired": "Valgene er utløpt",
@@ -4093,6 +4098,7 @@
         "network": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen, og prøv igjen.",
         "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet.",
         "checksum": "Den nedlastede filen samsvarer ikke med den publiserte kontrollsummen, så den ble fjernet. Prøv nedlastingen på nytt.",
+        "unreadable": "Denne enheten kunne ikke kontrollere den nedlastede filen, så den ble fjernet. Prøv nedlastingen på nytt.",
         "writeFailed": "Denne enheten kunne ikke lagre modellen. Prøv nedlastingen på nytt."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Alle kontekster",
     "dismiss": "Avvis brief",
     "dismissFailed": "Klarte ikke å avvise denne briefen ennå. Forsøket gjentas i bakgrunnen.",
+    "readMarkFailed": "Klarte ikke å merke denne briefen som lest. Forsøket gjentas når briefen lastes på nytt.",
     "offline": "Frakoblet · lagret brief",
     "cached": "Lagret brief · kan ikke oppdateres",
     "summary": "AI-sammendrag",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Briefen er tilgjengelig til",
     "timeHint": "Hjem-kortet viser live-status igjen når briefvinduet slutter, også frakoblet.",
     "invalidSchedule": "Velg en gyldig tidssone og et briefvindu som ikke er tomt.",
+    "scheduleEmptyNight": "Briefvinduet er tomt. Velg et tidspunkt for når briefen er klar som er senere enn vinduets start.",
+    "scheduleEmptyMorning": "Tidspunktet for når briefen er klar, er det samme som tidspunktet den er tilgjengelig til. Velg hvor lenge briefen skal være tilgjengelig.",
+    "scheduleFullDay": "De to vinduene dekker et helt døgn. La en del av døgnet være utenfor briefen.",
     "notificationsHint": "Ett generelt varsel per planlagt brief. Uavhengig av betalte AI-sammendrag.",
     "notificationPermission": "Slå på push-varsler for å motta briefen.",
     "defaultModel": "Bruk Kilos standardmodell",
@@ -4736,7 +4746,9 @@
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "En betalt oppsummering er ikke tilgjengelig for disse innstillingene. Endre modellen eller grensene, eller prøv igjen senere.",
     "confirmPaid": "Slå på betalte sammendrag for {{context}}?",
-    "paidDisclosure": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} min. Kostnader påløper selv om genereringen mislykkes.",
+    "paidDisclosure_one": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} minutt. Kostnader påløper selv om genereringen mislykkes.",
+    "paidDisclosure": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} minutter. Kostnader påløper selv om genereringen mislykkes.",
+    "paidDisclosure_other": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} minutter. Kostnader påløper selv om genereringen mislykkes.",
     "enable": "Slå på betalte sammendrag",
     "allContexts": "Personlige briefer og organisasjonsbriefer holdes atskilt.",
     "emptyHistory": "Ingen lagrede briefer",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Aktivitet uten navn",
     "metadataFailureProvider": "leverandørfeil",
     "metadataFailureTool": "verktøyfeil",
-    "metadataFailureCancelled": "Avbrutt",
+    "metadataStopped": "Forrige kjøring ble stoppet",
     "metadataFailureOther": "uspesifisert feil"
   },
   "systemSearch": {

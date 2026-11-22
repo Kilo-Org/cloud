@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 个会话",
       "sectionAccessibility": "{{title}}：{{displayCount}} 个会话",
       "live": "实时",
-      "updating": "正在更新"
+      "updating": "正在更新",
+      "retentionLimit": "仅显示最近的历史会话。"
     },
     "sessionRow": {
       "deleteTitle": "删除会话？",
@@ -1684,7 +1685,6 @@
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "emptyReadOnlyTitle": "此会话中无消息",
-      "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
       "historyTooLarge": "此会话的对话记录过大，无法加载。",
@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "重新加载账号信息",
     "retryLoadingPrivacy": "重新加载隐私选项"
   },
+  "accountBlocked": {
+    "title": "账号已被封禁",
+    "description": "Kilo 已封禁此账号，重新登录也不会解除封禁。如有请求，技术支持可以复核封禁。",
+    "domainDescription": "Kilo 已封禁此邮箱域名上的账号，重新登录也不会解除封禁。如有请求，技术支持可以复核此域名。",
+    "contactSupport": "联系技术支持"
+  },
   "addCredits": {
     "cta": "充值额度",
     "billingPage": "账单页面"
@@ -2605,8 +2611,7 @@
     "timeoutDescription": "请求超时，未能完成。请重试。"
   },
   "screenHeader": {
-    "openMenu": "打开菜单",
-    "openMenuFor": "打开 {{title}} 的菜单"
+    "openMenu": "打开菜单"
   },
   "picker": {
     "optionsExpired": "选项已过期",
@@ -4093,6 +4098,7 @@
         "network": "下载未完成。请检查你的网络连接后重试。",
         "invalidFile": "下载的文件不是此应用可以运行的模型，因此已被移除。",
         "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。",
+        "unreadable": "此设备无法检查下载的文件，因此已被移除。请重试下载。",
         "writeFailed": "此设备无法保存该模型。请重试下载。"
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "所有使用情境",
     "dismiss": "忽略简报",
     "dismissFailed": "暂时无法忽略此简报。将在后台自动重试。",
+    "readMarkFailed": "暂时无法将此简报标记为已读。将在简报重新加载时自动重试。",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的简报 · 无法刷新",
     "summary": "AI 摘要",
@@ -4727,6 +4734,9 @@
     "morningEnd": "简报可用至",
     "timeHint": "简报时段结束时，首页卡片将恢复显示实时状态，离线时也是如此。",
     "invalidSchedule": "请选择有效时区，并设置不为空的简报时段。",
+    "scheduleEmptyNight": "简报时段为空。请选择晚于时段开始时间的简报就绪时间。",
+    "scheduleEmptyMorning": "简报就绪时间与简报可用截止时间相同。请选择简报保持可用的时长。",
+    "scheduleFullDay": "两个时段覆盖了一整天。请让一天中的部分时间处于简报时段之外。",
     "notificationsHint": "每个定时简报发送一条通用通知。与付费 AI 摘要无关。",
     "notificationPermission": "开启推送通知以接收你的简报。",
     "defaultModel": "使用 Kilo 默认模型",
@@ -4736,7 +4746,9 @@
     "estimate": "预估 {{estimate}} · 最高 {{maximum}}",
     "estimateUnavailable": "这些设置下无法获取付费摘要。请更换模型或调整限制，或稍后重试。",
     "confirmPaid": "为 {{context}} 启用付费摘要？",
+    "paidDisclosure_one": "预计 {{estimate}}，最多 {{maximum}}，时间上限 {{minutes}} 分钟。即使生成失败也会收费。",
     "paidDisclosure": "预计 {{estimate}}，最多 {{maximum}}，时间上限 {{minutes}} 分钟。即使生成失败也会收费。",
+    "paidDisclosure_other": "预计 {{estimate}}，最多 {{maximum}}，时间上限 {{minutes}} 分钟。即使生成失败也会收费。",
     "enable": "启用付费摘要",
     "allContexts": "个人和组织简报相互独立。",
     "emptyHistory": "没有已保存的简报",
@@ -4775,7 +4787,7 @@
     "sourceActivity": "未命名活动",
     "metadataFailureProvider": "提供商错误",
     "metadataFailureTool": "工具错误",
-    "metadataFailureCancelled": "已取消",
+    "metadataStopped": "上一轮已停止",
     "metadataFailureOther": "未指定错误",
     "metadataPlan_one": "计划：已完成 {{displayDone}}/{{displayTotal}} 步",
     "metadataFiles_one": "{{displayCount}} 个文件已更改",

@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} zama",
       "sectionAccessibility": "{{title}}: {{displayCount}} zama",
       "live": "KAI TSAYE",
-      "updating": "Ana sabuntawa"
+      "updating": "Ana sabuntawa",
+      "retentionLimit": "Ana nuna zaman ku na baya-bayan nan."
     },
     "sessionRow": {
       "deleteTitle": "Share zaman?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
       "emptyReadOnlyTitle": "Babu saƙonni a wannan zaman",
-      "renameAccessibility": "Canza sunan zaman: {{title}}",
       "cloningSession": "Ana yin kwafin zaman",
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
       "historyTooLarge": "Rubutun wannan zaman ya yi girma don a loda shi.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Sake gwada loda asusun",
     "retryLoadingPrivacy": "Sake gwada loda zaɓuɓɓukan sirri"
   },
+  "accountBlocked": {
+    "title": "An toshe asusu",
+    "description": "Kilo ya toshe wannan asusu, kuma sake shiga ba zai buɗe shi ba. Masu tallafi na iya duba toshewar idan an buƙata.",
+    "domainDescription": "Kilo ya toshe asusu a wannan yankin imel, kuma sake shiga ba zai canza hakan ba. Masu tallafi na iya duba yankin idan an buƙata.",
+    "contactSupport": "Tuntuɓi masu tallafi"
+  },
   "addCredits": {
     "cta": "Ƙara kuɗin amfani",
     "billingPage": "shafin biyan kuɗi"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "An ƙare lokacin buƙatar kafin ta kammala. Sake gwadawa."
   },
   "screenHeader": {
-    "openMenu": "Buɗe jerin zaɓuɓɓuka",
-    "openMenuFor": "Buɗe jerin zaɓuɓɓukan {{title}}"
+    "openMenu": "Buɗe jerin zaɓuɓɓuka"
   },
   "picker": {
     "optionsExpired": "Zaɓuɓɓukan sun ƙare",
@@ -4093,6 +4098,7 @@
         "network": "Saukarwar ba ta kammala ba. Duba haɗin ka sannan ka sake gwadawa.",
         "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi.",
         "checksum": "Fayil ɗin da aka sauke bai yi daidai da checksum ɗinsa da aka wallafa ba, don haka an cire shi. Sake gwada saukewa.",
+        "unreadable": "Wannan na'urar ba ta iya duba fayil ɗin da aka sauke ba, don haka an cire shi. Sake gwada saukewa.",
         "writeFailed": "Wannan na'urar ba ta iya adana samfurin ba. Ka sake gwada saukewa."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Dukkan mahalloli",
     "dismiss": "Yi watsi da rahoto",
     "dismissFailed": "Ba a iya yin watsi da wannan rahoton ba tukuna. Ana sake gwadawa a bayan fage.",
+    "readMarkFailed": "Ba a iya yi wa wannan rahoton alama a matsayin an karanta shi ba. Za a sake gwadawa lokacin da rahoton ya sake lodawa.",
     "offline": "Ba intanet · rahoton da aka adana",
     "cached": "Rahoton da aka adana · ba za a iya sabuntawa ba",
     "summary": "Taƙaitawar AI",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Rahoto yana samuwa har zuwa",
     "timeHint": "Katin Gida zai dawo da matsayi kai tsaye idan lokacin rahoto ya ƙare, ko da babu intanet.",
     "invalidSchedule": "Zaɓi ingantaccen yankin lokaci da lokacin rahoto wanda ba fanko ba.",
+    "scheduleEmptyNight": "Lokacin rahoton fanko ne. Zaɓi lokacin shirye bayan farkon lokacin rahoton.",
+    "scheduleEmptyMorning": "Lokacin shirye da lokacin samuwa har zuwa sun yi daidai. Zaɓi tsawon lokacin da rahoton zai kasance yana samuwa.",
+    "scheduleFullDay": "Lokutan biyu sun rufe cikakkiyar rana. Bar wani ɓangare na ranar a wajen rahoton.",
     "notificationsHint": "Sanarwa ɗaya ta gama-gari ga kowane rahoton da aka tsara. Ba ta da alaƙa da taƙaitawar AI ta biya.",
     "notificationPermission": "Kunna sanarwar push don karɓar rahotonka.",
     "defaultModel": "Yi amfani da model na asali na Kilo",
@@ -4736,7 +4746,9 @@
     "estimate": "Kimanin {{estimate}} · iyaka mafi girma {{maximum}}",
     "estimateUnavailable": "Ba a samun taƙaitawar da ake biya don waɗannan saituna. Canza samfurin ko iyakoki, ko kuma sake gwadawa bayan ɗan lokaci.",
     "confirmPaid": "Kunna taƙaitawa ta biya don {{context}}?",
-    "paidDisclosure": "Ƙiyasin {{estimate}}, har zuwa {{maximum}}, tare da iyakar minti {{minutes}}. Ana caji ko da ƙirƙira ta gaza.",
+    "paidDisclosure_one": "Ƙiyasin {{estimate}}, har zuwa {{maximum}}, tare da iyakar minti {{minutes}}. Ana caji ko da ƙirƙira ta gaza.",
+    "paidDisclosure_other": "Ƙiyasin {{estimate}}, har zuwa {{maximum}}, tare da iyakar mintuna {{minutes}}. Ana caji ko da ƙirƙira ta gaza.",
+    "paidDisclosure": "Ƙiyasin {{estimate}}, har zuwa {{maximum}}, tare da iyakar mintuna {{minutes}}. Ana caji ko da ƙirƙira ta gaza.",
     "enable": "Kunna taƙaitawa ta biya",
     "allContexts": "Rahotanninka na kanka da na ƙungiya suna zama daban.",
     "emptyHistory": "Babu rahotanni da aka adana",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Aiki mara take",
     "metadataFailureProvider": "kuskuren mai bayarwa",
     "metadataFailureTool": "kuskuren kayan aiki",
-    "metadataFailureCancelled": "An soke",
+    "metadataStopped": "An dakatar da turmako na ƙarshe",
     "metadataFailureOther": "kuskure mara bayani"
   },
   "systemSearch": {

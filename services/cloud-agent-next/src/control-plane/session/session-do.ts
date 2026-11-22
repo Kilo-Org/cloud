@@ -31,6 +31,7 @@ import {
 } from './list-status.js';
 import { createNativeLiveSummary, type NativeLiveSummary } from './native-live-summary.js';
 import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
+import { readConversationSource } from './conversation-history.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -2800,6 +2801,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       ),
       ...(info.success && info.data.title !== undefined ? { title: info.data.title } : {}),
     };
+  }
+
+  async getSessionHistorySource(expectedRootKiloSessionId: string): Promise<'v1' | 'v2' | null> {
+    await this.initialized;
+    const rootKiloSessionId = this.registration?.spec.kiloSessionId;
+    if (rootKiloSessionId !== undefined && rootKiloSessionId !== expectedRootKiloSessionId)
+      return null;
+    // Legacy ingest history remains readable without a DO registration; the facade resolves ownership first.
+    return (
+      readConversationSource({
+        queries: this.eventQueries,
+        kiloSessionId: expectedRootKiloSessionId,
+      })?.version ?? 'v1'
+    );
   }
 
   async getSessionMessagesPage(

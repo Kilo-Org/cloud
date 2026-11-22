@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessiya",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessiya",
       "live": "JONLI",
-      "updating": "Yangilanmoqda"
+      "updating": "Yangilanmoqda",
+      "retentionLimit": "Eng so'nggi sessiyalaringiz ko'rsatilmoqda."
     },
     "sessionRow": {
       "deleteTitle": "Sessiya o'chirilsinmi?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
       "emptyReadOnlyTitle": "Bu sessiyada xabarlar yo'q",
-      "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "historyTooLarge": "Bu sessiya transkripti yuklash uchun juda katta.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Hisobni qayta yuklash",
     "retryLoadingPrivacy": "Maxfiylik sozlamalarini qayta yuklash"
   },
+  "accountBlocked": {
+    "title": "Hisob bloklangan",
+    "description": "Kilo bu hisobni bloklagan va qayta kirish blokni olib tashlamaydi. Yordam xizmati so'rov bo'yicha blokni ko'rib chiqishi mumkin.",
+    "domainDescription": "Kilo bu elektron pochta domenidagi hisoblarni bloklaydi va qayta kirish buni o'zgartirmaydi. Yordam xizmati so'rov bo'yicha domenni ko'rib chiqishi mumkin.",
+    "contactSupport": "Yordam xizmatiga murojaat qilish"
+  },
   "addCredits": {
     "cta": "Kreditlar qo'shish",
     "billingPage": "to'lov sahifasi"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "So'rov tugashidan oldin vaqt tugadi. Iltimos, qayta urinib ko'ring."
   },
   "screenHeader": {
-    "openMenu": "Menyuni ochish",
-    "openMenuFor": "{{title}} uchun menyuni ochish"
+    "openMenu": "Menyuni ochish"
   },
   "picker": {
     "optionsExpired": "Variantlar eskirgan",
@@ -4093,6 +4098,7 @@
         "network": "Yuklab olish tugallanmadi. Ulanishni tekshirib, qayta urinib ko‘ring.",
         "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi.",
         "checksum": "Yuklab olingan fayl e’lon qilingan nazorat summasiga mos kelmaydi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring.",
+        "unreadable": "Bu qurilma yuklab olingan faylni tekshira olmadi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring.",
         "writeFailed": "Bu qurilma modelni saqlay olmadi. Qayta yuklab olib ko‘ring."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Barcha kontekstlar",
     "dismiss": "Brifingni e’tiborsiz qoldirish",
     "dismissFailed": "Brifingni hozircha e’tiborsiz qoldirib bo‘lmadi. U fonda qayta urinadi.",
+    "readMarkFailed": "Brifingni o‘qilgan deb belgilab bo‘lmadi. Brifing qayta yuklanganda u yana urinib ko‘radi.",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan brifing · yangilab bo‘lmaydi",
     "summary": "AI xulosasi",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Brifing mavjud bo‘ladigan oxirgi vaqt",
     "timeHint": "Brifing davri tugaganda Bosh sahifa kartasi oflaynda ham jonli holatni tiklaydi.",
     "invalidSchedule": "To‘g‘ri vaqt mintaqasini va bo‘sh bo‘lmagan brifing davrini tanlang.",
+    "scheduleEmptyNight": "Brifing davri bo‘sh. Tayyor bo‘ladigan vaqtni brifing davri boshlanishidan keyinroq tanlang.",
+    "scheduleEmptyMorning": "Tayyor bo‘ladigan vaqt va mavjud bo‘ladigan oxirgi vaqt bir xil. Brifing qancha vaqt mavjud bo‘lishini tanlang.",
+    "scheduleFullDay": "Ikkala davr butun kunni qamrab oladi. Kunning bir qismini brifingdan tashqarida qoldiring.",
     "notificationsHint": "Har bir rejalashtirilgan brifing uchun bitta umumiy bildirishnoma. Pullik AI xulosalariga bog‘liq emas.",
     "notificationPermission": "Brifingni olish uchun push-bildirishnomalarni yoqing.",
     "defaultModel": "Kilo standart modelidan foydalanish",
@@ -4736,7 +4746,9 @@
     "estimate": "Taxminiy hisob {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu sozlamalar uchun pullik xulosa mavjud emas. Modelni yoki chegaralarni o‘zgartiring, yoki keyinroq qayta urinib ko‘ring.",
     "confirmPaid": "{{context}} uchun pullik xulosalar yoqilsinmi?",
+    "paidDisclosure_one": "Taxminan {{estimate}}, ko‘pi bilan {{maximum}}, {{minutes}} daqiqa cheklov bilan. Yaratish muvaffaqiyatsiz bo‘lsa ham to‘lov olinadi.",
     "paidDisclosure": "Taxminan {{estimate}}, ko‘pi bilan {{maximum}}, {{minutes}} daqiqa cheklov bilan. Yaratish muvaffaqiyatsiz bo‘lsa ham to‘lov olinadi.",
+    "paidDisclosure_other": "Taxminan {{estimate}}, ko‘pi bilan {{maximum}}, {{minutes}} daqiqa cheklov bilan. Yaratish muvaffaqiyatsiz bo‘lsa ham to‘lov olinadi.",
     "enable": "Pullik xulosalarni yoqish",
     "allContexts": "Shaxsiy va tashkilot brifinglari alohida saqlanadi.",
     "emptyHistory": "Saqlangan brifinglar yo‘q",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Nomsiz faoliyat",
     "metadataFailureProvider": "provayder xatosi",
     "metadataFailureTool": "vosita xatosi",
-    "metadataFailureCancelled": "Bekor qilindi",
+    "metadataStopped": "Oxirgi navbat to‘xtatildi",
     "metadataFailureOther": "aniqlanmagan xato"
   },
   "systemSearch": {

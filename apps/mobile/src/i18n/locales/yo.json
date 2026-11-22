@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
       "sectionAccessibility": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
       "live": "LỌ́WỌ́LỌ́WỌ́",
-      "updating": "Ń ṣe ìmúdójúìwọ̀n"
+      "updating": "Ń ṣe ìmúdójúìwọ̀n",
+      "retentionLimit": "Ń ṣàfihàn àwọn ìgbà iṣẹ́ tuntun jùlọ rẹ."
     },
     "sessionRow": {
       "deleteTitle": "Pa ìgbà iṣẹ́ rẹ́?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
       "emptyReadOnlyTitle": "Kò sí ìfiránṣẹ́ nínú ìgbà iṣẹ́ yìí",
-      "renameAccessibility": "Yí orúkọ ìgbà iṣẹ́ padà: {{title}}",
       "cloningSession": "Ń ṣe àdàkọ ìgbà iṣẹ́",
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
       "historyTooLarge": "Ìgbésílẹ̀ ìgbà iṣẹ́ yìí tóbí jù lọ láti lè gbé wọlé.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Tún gbìyànjú láti ṣàkójọ àkọọ́lẹ̀",
     "retryLoadingPrivacy": "Tún gbìyànjú láti ṣàkójọ àwọn àṣàyàn ìpamọ́"
   },
+  "accountBlocked": {
+    "title": "Àkọọ́lẹ̀ rẹ ti dí",
+    "description": "Kilo ti dí àkọọ́lẹ̀ yìí, àti wíwọlé lẹ́ẹ̀kan sí i kò ní yọ ìdí náà kúrò. Ẹgbẹ́ ìrànlọ́wọ́ lè yẹ̀wò ìdí náà tí a bá béèrè.",
+    "domainDescription": "Kilo kò gba àwọn àkọọ́lẹ̀ lórí dómèènì ímeèlì yìí, àti wíwọlé lẹ́ẹ̀kan sí i kò ní yọ ìdínà náà kúrò. Ẹgbẹ́ ìrànlọ́wọ́ lè yẹ̀wò dómèènì náà tí a bá béèrè.",
+    "contactSupport": "Kàn sí ẹgbẹ́ ìrànlọ́wọ́"
+  },
   "addCredits": {
     "cta": "Fi kirẹ́dítì kún un",
     "billingPage": "ojú ìwé ìsanwó"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Ìbéèrè náà kò parí rí kí àkókò rẹ̀ tó tán. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "screenHeader": {
-    "openMenu": "Ṣí àkójọ àṣàyàn",
-    "openMenuFor": "Ṣí àkójọ àṣàyàn fún {{title}}"
+    "openMenu": "Ṣí àkójọ àṣàyàn"
   },
   "picker": {
     "optionsExpired": "Àwọn àṣàyàn ti dópin",
@@ -4093,6 +4098,7 @@
         "network": "Gbígbà sílẹ̀ kò parí. Yẹ ìsopọ̀ rẹ wò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
         "invalidFile": "Fáìlì tí a gbà sílẹ̀ kì í ṣe awoṣe tí app yìí lè ṣiṣẹ́, nítorí náà a yọ ọ́ kúrò.",
         "checksum": "Fáìlì tí a gbà sílẹ̀ kò bá checksum rẹ̀ tí a tẹ̀ jáde mu, nítorí náà a yọ ọ́ kúrò. Tún gbìyànjú láti gbà á sílẹ̀.",
+        "unreadable": "Ẹ̀rọ yìí kò lè yẹ fáìlì tí a gbà sílẹ̀ wò, nítorí náà a yọ ọ́ kúrò. Tún gbìyànjú láti gbà á sílẹ̀.",
         "writeFailed": "Ẹ̀rọ yìí kò lè fipamọ́ awoṣe náà. Tún gbìyànjú láti gbà á sílẹ̀."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Gbogbo àyíká",
     "dismiss": "Yọ ìròyìn kúrò",
     "dismissFailed": "Kì í ṣeé yọ ìròyìn yìí kúrò ṣẹ́ṣẹ́. Ọ́ máa tún gbìyànjú fúnra rẹ̀.",
+    "readMarkFailed": "A kò lè sàmì sí ìròyìn yìí pé a ti kà á. Yóò tún gbìyànjú nígbà tí ìròyìn bá tún gbé wọlé.",
     "offline": "Kò sí lórí ayélujára · ìròyìn tí a fipamọ́",
     "cached": "Ìròyìn tí a fipamọ́ · kò ṣeé sọ di tuntun",
     "summary": "Àkópọ̀ AI",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Ìròyìn wà títí dé",
     "timeHint": "Káàdì Ilé yóò dá ipò lọ́wọ́lọ́wọ́ padà nígbà tí àkókò ìròyìn bá parí, kódà láìsí ayélujára.",
     "invalidSchedule": "Yan àgbègbè àkókò tó tọ́ àti àkókò ìròyìn tí kò ṣófo.",
+    "scheduleEmptyNight": "Àkókò ìròyìn ṣófo. Yan àkókò tí ìròyìn máa ṣetán tó pẹ́ ju ìbẹ̀rẹ̀ àkókò ìròyìn lọ.",
+    "scheduleEmptyMorning": "Àkókò tí ìròyìn máa ṣetán àti àkókò tí ìròyìn wà títí dé dọ́gba. Yan ìwọ̀n àkókò tí ìròyìn yóò máa wà.",
+    "scheduleFullDay": "Àwọn àkókò méjì náà bo odidi ọjọ́ kan. Fi apá kan ọjọ́ náà síta kúrò nínú ìròyìn.",
     "notificationsHint": "Ìfitónilétí gbogbogbò kan ṣoṣo fún ìròyìn kọ̀ọ̀kan tí a ṣètò. Kò sinmi lórí àkópọ̀ AI olówó.",
     "notificationPermission": "Mú ìfitónilétí ẹ̀rọ ṣiṣẹ́ láti gba ìròyìn rẹ.",
     "defaultModel": "Lo àwòṣe àìyípadà Kilo",
@@ -4736,7 +4746,9 @@
     "estimate": "Ìsirò {{estimate}} · ti ó pọ̀jù {{maximum}}",
     "estimateUnavailable": "Àkópọ̀ tí a sanwó fún kò sí fún àwọn ètò yìí. Yí àwòṣe dà tàbí àwọn ààlà dà, tàbí gbìyànjú mọ̀ ní àmọ̀jú.",
     "confirmPaid": "Mú àkópọ̀ olówó ṣiṣẹ́ fún {{context}}?",
+    "paidDisclosure_one": "Ìdíyelé {{estimate}}, títí dé {{maximum}}, pẹ̀lú òpin ìṣẹ́jú {{minutes}}. A ó gba owó kódà tí ìṣẹ̀dá bá kùnà.",
     "paidDisclosure": "Ìdíyelé {{estimate}}, títí dé {{maximum}}, pẹ̀lú òpin ìṣẹ́jú {{minutes}}. A ó gba owó kódà tí ìṣẹ̀dá bá kùnà.",
+    "paidDisclosure_other": "Ìdíyelé {{estimate}}, títí dé {{maximum}}, pẹ̀lú òpin ìṣẹ́jú {{minutes}}. A ó gba owó kódà tí ìṣẹ̀dá bá kùnà.",
     "enable": "Mú àkópọ̀ olówó ṣiṣẹ́",
     "allContexts": "Àwọn ìròyìn ti ara ẹni àti ti àjọ wà lọ́tọ̀ọ̀tọ̀.",
     "emptyHistory": "Kò sí ìròyìn tí a fi pamọ́",
@@ -4775,7 +4787,7 @@
     "sourceActivity": "Ìgbéṣe tí kò ní àkọlé",
     "metadataFailureProvider": "àṣìṣe olùpèsè",
     "metadataFailureTool": "àṣìṣe irinṣẹ́",
-    "metadataFailureCancelled": "A ti fagilé",
+    "metadataStopped": "Ìyí tó kẹ́yìn dáwọ́ dúró",
     "metadataFailureOther": "àṣìṣe àìmọ̀",
     "metadataPlan_one": "Ètò: {{displayDone}} nínú {{displayTotal}} ìgbésẹ̀ ti parí",
     "metadataFiles_one": "{{displayCount}} fáìlì ti yí padà",

@@ -90,6 +90,7 @@ vi.mock('@shopify/flash-list', () => ({
     refreshControl,
     refreshing,
     onRefresh,
+    contentContainerStyle,
   }: {
     data: readonly unknown[];
     renderItem: (info: { item: unknown; index: number }) => ReactNode;
@@ -98,12 +99,13 @@ vi.mock('@shopify/flash-list', () => ({
     refreshControl?: ReactNode;
     refreshing?: boolean;
     onRefresh?: () => void;
+    contentContainerStyle?: unknown;
   }) =>
     createElement(
       'FlashList',
       // The screen forwards the pair, not the element: FlashList owns the
       // control from `refreshing`/`onRefresh`, like the sibling history list.
-      { onEndReached, refreshControl, refreshing, onRefresh },
+      { onEndReached, refreshControl, refreshing, onRefresh, contentContainerStyle },
       ...data.map((item, index) =>
         createElement(Fragment, { key: index }, renderItem({ item, index }))
       ),
@@ -199,6 +201,7 @@ const EMPTY_STATE = 'EmptyState' as ElementType;
 const QUERY_ERROR = 'QueryError' as ElementType;
 const RETRY = 'Retry' as ElementType;
 const FLASH_LIST = 'FlashList' as ElementType;
+const SCROLL_VIEW = 'ScrollView' as ElementType;
 
 /** Rows per page: the server's default page size, and what the screen asks for. */
 const PAGE_ROWS = 30;
@@ -464,6 +467,33 @@ describe('ReportReceiptsScreen', () => {
 
     expect(root.findAll(node => Object.is(node.type, ROW_SKELETON))).toHaveLength(3);
     expect(rows(root)).toHaveLength(0);
+  });
+
+  it('keeps the skeleton and the settled rows on one inset, so the card does not move', async () => {
+    // The skeleton reserves the loaded geometry: a body that insets the rows by
+    // a different amount makes them jump sideways the moment the page lands.
+    state.isPending = true;
+    const loadingRoot = await mount();
+    const skeletonInset = mustExist(
+      loadingRoot.findAll(node => Object.is(node.type, SCROLL_VIEW))[0],
+      'the skeleton scroller'
+    ).props.contentContainerStyle as Record<string, number>;
+
+    // `mount` keeps only the last tree for `afterEach` to unmount, so the
+    // skeleton stays mounted with its own client unless this case drops it.
+    unload();
+
+    state.isPending = false;
+    state.pages = [pageOf(1, false)];
+    const settledRoot = await mount();
+    const listInset = mustExist(
+      settledRoot.findAll(node => Object.is(node.type, FLASH_LIST))[0],
+      'the settled list'
+    ).props.contentContainerStyle as Record<string, number>;
+
+    expect(listInset).toEqual(skeletonInset);
+    // And that one inset is the app's 14 dp page gutter, not a list-local pad.
+    expect(listInset).toEqual({ paddingHorizontal: 14, paddingTop: 14 });
   });
 
   it('states that no report was filed yet when the first page is empty', async () => {

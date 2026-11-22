@@ -2171,12 +2171,13 @@
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም።",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
-      "pastSessions": "ያለፉ ክፈለ ጊዜዎች",
+      "pastSessions": "ያለፉ ክፍለ ጊዜዎች",
       "sectionAccessibility_one": "{{title}}: {{displayCount}} ክፍለ ጊዜ",
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ክፍለ ጊዜዎች",
       "sectionAccessibility": "{{title}}: {{displayCount}} ክፍለ ጊዜዎች",
       "live": "ቀጥታ",
-      "updating": "በማዘመን ላይ"
+      "updating": "በማዘመን ላይ",
+      "retentionLimit": "የቅርብ ጊዜ ክፍለ ጊዜዎችዎን በማሳየት ላይ።"
     },
     "sessionRow": {
       "deleteTitle": "ክፍለ ጊዜው ይሰረዝ?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
       "emptyReadOnlyTitle": "በዚህ ክፍለ ጊዜ ውስጥ ምንም መልእክቶች የሉም",
-      "renameAccessibility": "የክፍለ ጊዜውን ስም ይቀይሩ፦ {{title}}",
       "cloningSession": "የክፍለ ጊዜውን ቅጂ በመፍጠር ላይ",
       "couldNotLoadThisSession": "ይህን ክፍለ ጊዜ መጫን አልተቻለም።",
       "historyTooLarge": "የዚህ ክፍለ ጊዜ ጽሑፍ ለመጫን በጣም ትልቅ ነው።",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "መለያውን ለመጫን እንደገና ሞክር",
     "retryLoadingPrivacy": "የግላዊነት ምርጫዎችን ለመጫን እንደገና ሞክር"
   },
+  "accountBlocked": {
+    "title": "መለያ ታግዷል",
+    "description": "Kilo ይህን መለያ ታግዷል፤ እንደገና መግባት ግን አያነሳውም። የድጋፍ ቡድኑ በጥያቄ መሰረት እገዳውን መገምገም ይችላል።",
+    "domainDescription": "Kilo በዚህ የኢሜይል ጎራ ላይ መለያዎችን አይፈቅድም፤ እንደገና መግባት ግን አይለውጠውም። የድጋፍ ቡድኑ በጥያቄ መሰረት ጎራውን መገምገም ይችላል።",
+    "contactSupport": "የድጋፍ ቡድኑን አግኝ"
+  },
   "addCredits": {
     "cta": "ክሬዲት ያክሉ",
     "billingPage": "የክፍያ ገጽ"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "ጥያቄው ከመጠናቀቁ በፊት ጊዜው አልቋል። እባክዎ እንደገና ይሞክሩ።"
   },
   "screenHeader": {
-    "openMenu": "ምናሌ ይክፈቱ",
-    "openMenuFor": "ለ{{title}} ምናሌ ይክፈቱ"
+    "openMenu": "ምናሌ ይክፈቱ"
   },
   "picker": {
     "optionsExpired": "የአማራጮቹ ጊዜ አልፏል",
@@ -4093,6 +4098,7 @@
         "network": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
         "invalidFile": "የወረደው ፋይል ይህ መተግበሪያ ሊያሂደው የሚችለው ሞዴል አይደለም፤ ስለዚህ ተሰርዟል።",
         "checksum": "የወረደው ፋይል ከታተመው ቼክሰም ጋር አይዛመድም፤ ስለዚህ ተሰርዟል። እባክዎ እንደገና ለማውረድ ይሞክሩ።",
+        "unreadable": "ይህ መሣሪያ የወረደውን ፋይል ማረጋገጥ አልቻለም፤ ስለዚህ ተሰርዟል። እባክዎ እንደገና ለማውረድ ይሞክሩ።",
         "writeFailed": "ይህ መሣሪያ ሞዴሉን ማስቀመጥ አልቻለም። እባክዎ እንደገና ለማውረድ ይሞክሩ።"
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "ሁሉም አውዶች",
     "dismiss": "ሪፖርቱን አስወግድ",
     "dismissFailed": "ይህን ሪፖርት ገና ማስወገድ አልተቻለም። በጀርባ እንደገና መሞከሩን ይቀጥላል።",
+    "readMarkFailed": "ይህን ሪፖርት እንደተነበበ ምልክት ማድረግ አልተቻለም። ሪፖርቱ እንደገና ሲጫን ዳግም ይሞክራል።",
     "offline": "ከመስመር ውጭ · የተቀመጠ ሪፖርት",
     "cached": "የተቀመጠ ሪፖርት · ማደስ አይቻልም",
     "summary": "AI ማጠቃለያ",
@@ -4727,6 +4734,9 @@
     "morningEnd": "ሪፖርቱ የሚገኝበት የመጨረሻ ሰዓት",
     "timeHint": "የሪፖርት ጊዜ ሲያበቃ የመነሻ ካርዱ ከመስመር ውጭም ቢሆን የቀጥታ ሁኔታን ይመልሳል።",
     "invalidSchedule": "ትክክለኛ የሰዓት ሰቅ እና ባዶ ያልሆነ የሪፖርት ጊዜ ይምረጡ።",
+    "scheduleEmptyNight": "የሪፖርት ጊዜው ባዶ ነው። ከጊዜው መጀመሪያ በኋላ ያለ ዝግጁ ሰዓት ይምረጡ።",
+    "scheduleEmptyMorning": "ዝግጁ ሰዓቱ እና እስከሚገኝበት ሰዓቱ አንድ ናቸው። ሪፖርቱ ምን ያህል ጊዜ እንዲገኝ ይምረጡ።",
+    "scheduleFullDay": "ሁለቱ የሪፖርት ጊዜዎች ሙሉ ቀንን ይሸፍናሉ። የቀኑን አንድ ክፍል ከሪፖርቱ ውጭ ይተዉ።",
     "notificationsHint": "ለእያንዳንዱ የመርሃ ግብር ሪፖርት አንድ አጠቃላይ ማሳወቂያ። ከሚከፈልባቸው AI ማጠቃለያዎች ነጻ ነው።",
     "notificationPermission": "ሪፖርትዎን ለመቀበል የፑሽ ማሳወቂያዎችን ያንቁ።",
     "defaultModel": "የKiloን ነባሪ ሞዴል ተጠቀም",
@@ -4736,6 +4746,8 @@
     "estimate": "ግምት {{estimate}} · ከፍተኛ {{maximum}}",
     "estimateUnavailable": "ለእነዚህ ቅንብሮች የክፍያ ማጠቃለያ አይገኝም። ሞዴሉን ወይም ወሰኖችን ይቀይሩ፣ ወይም በኋላ ላይ እንደገና ይሞክሩ።",
     "confirmPaid": "ለ{{context}} የሚከፈልባቸው ማጠቃለያዎች ይንቁ?",
+    "paidDisclosure_one": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
+    "paidDisclosure_other": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
     "paidDisclosure": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
     "enable": "የሚከፈልባቸው ማጠቃለያዎችን አንቃ",
     "allContexts": "የግል እና የድርጅት ሪፖርቶች ተለይተው ይቀመጣሉ።",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "ርዕስ የሌለው እንቅስቃሴ",
     "metadataFailureProvider": "የአቅራቢ ስህተት",
     "metadataFailureTool": "የመሣሪያ ስህተት",
-    "metadataFailureCancelled": "ተሰርዟል",
+    "metadataStopped": "የመጨረሻው ዙር ተቆመ",
     "metadataFailureOther": "ያልተገለጸ ስህተት"
   },
   "systemSearch": {

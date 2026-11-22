@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesi",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesi",
       "live": "LANGSUNG",
-      "updating": "Mengemas kini"
+      "updating": "Mengemas kini",
+      "retentionLimit": "Memaparkan sesi terkini."
     },
     "sessionRow": {
       "deleteTitle": "Padam sesi?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
       "emptyReadOnlyTitle": "Tiada mesej dalam sesi ini",
-      "renameAccessibility": "Namakan semula sesi: {{title}}",
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuatkan.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Cuba memuatkan akaun semula",
     "retryLoadingPrivacy": "Cuba memuatkan pilihan privasi semula"
   },
+  "accountBlocked": {
+    "title": "Akaun disekat",
+    "description": "Kilo telah menyekat akaun ini, dan log masuk semula tidak akan membatalkan sekatan itu. Sokongan boleh menyemak sekatan itu atas permintaan.",
+    "domainDescription": "Kilo menyekat akaun pada domain e-mel ini, dan log masuk semula tidak akan mengubahnya. Sokongan boleh menyemak domain itu atas permintaan.",
+    "contactSupport": "Hubungi sokongan"
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman pengebilan"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },
   "screenHeader": {
-    "openMenu": "Buka menu",
-    "openMenuFor": "Buka menu untuk {{title}}"
+    "openMenu": "Buka menu"
   },
   "picker": {
     "optionsExpired": "Pilihan tamat tempoh",
@@ -4093,6 +4098,7 @@
         "network": "Muat turun tidak selesai. Semak sambungan anda dan cuba lagi.",
         "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang.",
         "checksum": "Fail yang dimuat turun tidak sepadan dengan checksum yang diterbitkan, jadi ia telah dibuang. Cuba muat turun sekali lagi.",
+        "unreadable": "Peranti ini tidak dapat menyemak fail yang dimuat turun, jadi ia telah dibuang. Cuba muat turun sekali lagi.",
         "writeFailed": "Peranti ini tidak dapat menyimpan model. Cuba muat turun sekali lagi."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Semua konteks",
     "dismiss": "Ketepikan laporan",
     "dismissFailed": "Laporan ini masih belum dapat diketepikan. Ia akan dicuba semula di latar belakang.",
+    "readMarkFailed": "Laporan ini tidak dapat ditanda sebagai dibaca. Ia akan dicuba semula apabila laporan dimuat semula.",
     "offline": "Luar talian · laporan disimpan",
     "cached": "Laporan disimpan · muat semula tidak tersedia",
     "summary": "Ringkasan AI",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Laporan tersedia sehingga",
     "timeHint": "Kad Utama memulihkan status langsung apabila tempoh laporan tamat, walaupun luar talian.",
     "invalidSchedule": "Pilih zon waktu yang sah dan tempoh laporan yang tidak kosong.",
+    "scheduleEmptyNight": "Tempoh laporan kosong. Pilih masa sedia yang lebih lewat daripada permulaan tempoh.",
+    "scheduleEmptyMorning": "Masa sedia dan masa tersedia sehingga adalah sama. Pilih berapa lama laporan kekal tersedia.",
+    "scheduleFullDay": "Kedua-dua tempoh meliputi satu hari penuh. Biarkan sebahagian hari di luar tempoh laporan.",
     "notificationsHint": "Satu pemberitahuan umum setiap laporan berjadual. Bebas daripada ringkasan AI berbayar.",
     "notificationPermission": "Hidupkan pemberitahuan push untuk menerima laporan anda.",
     "defaultModel": "Guna model lalai Kilo",
@@ -4736,7 +4746,9 @@
     "estimate": "Anggaran {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini. Tukar model atau had, atau cuba lagi nanti.",
     "confirmPaid": "Dayakan ringkasan berbayar untuk {{context}}?",
+    "paidDisclosure_one": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
     "paidDisclosure": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
+    "paidDisclosure_other": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
     "enable": "Dayakan ringkasan berbayar",
     "allContexts": "Laporan peribadi dan organisasi kekal berasingan.",
     "emptyHistory": "Tiada laporan tersimpan",
@@ -4775,7 +4787,7 @@
     "sourceActivity": "Aktiviti tanpa tajuk",
     "metadataFailureProvider": "ralat pembekal",
     "metadataFailureTool": "ralat alat",
-    "metadataFailureCancelled": "Dibatalkan",
+    "metadataStopped": "Pusingan terakhir dihentikan",
     "metadataFailureOther": "ralat tidak dinyatakan",
     "metadataPlan_one": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
     "metadataFiles_one": "{{displayCount}} fail diubah",

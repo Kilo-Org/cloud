@@ -26,6 +26,13 @@ import { isToolCardImagePending, useToolCardImageUri } from './tool-card-image-c
 const SHARE_CONTROL_FRAME = 'min-h-8 min-w-8 shrink-0 items-center justify-center rounded';
 const SHARE_CONTROL_HIT_SLOP = 8;
 
+/**
+ * One row frame for every cache state, so a row that starts unavailable keeps
+ * the height and inset of the row whose bytes land later.
+ */
+const CHIP_ROW_CLASS =
+  'flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900';
+
 function FileChip({
   label,
   mime,
@@ -40,28 +47,32 @@ function FileChip({
   const uri = useToolCardImageUri(partId);
   const pending = uri === undefined && isToolCardImagePending(partId);
 
-  if (uri === undefined && !pending) {
+  // One row body for every cache state: the filename keeps its line, and the
+  // subtitle names either the mime type or why the bytes are missing.
+  function renderRowBody(subtitle: string) {
     return (
-      <View className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
-        <FileIcon size={14} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">
-          {t('agentChat.filePart.fileUnavailableInSession')}
-        </Text>
-      </View>
+      <>
+        <FileIcon size={16} color={colors.mutedForeground} />
+        <View className="flex-1">
+          <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+            {label}
+          </Text>
+          <Text className="text-xs text-muted-foreground">{subtitle}</Text>
+        </View>
+      </>
     );
   }
 
-  const body = (
-    <>
-      <FileIcon size={16} color={colors.mutedForeground} />
-      <View className="flex-1">
-        <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
-          {label}
-        </Text>
-        <Text className="text-xs text-muted-foreground">{mime}</Text>
+  if (uri === undefined && !pending) {
+    // The row keeps its normal height and icon size so a missing cache entry
+    // reads as one more file row, not as a broken card: only the share control
+    // is absent, because there is no local file to hand to the platform.
+    return (
+      <View className={CHIP_ROW_CLASS}>
+        {renderRowBody(t('agentChat.filePart.fileUnavailableInSession'))}
       </View>
-    </>
-  );
+    );
+  }
 
   if (uri === undefined) {
     // The body is still being written. The share control's box stays in the
@@ -69,12 +80,12 @@ function FileChip({
     // point does not move when the write resolves.
     return (
       <View
-        className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+        className={CHIP_ROW_CLASS}
         accessible
         accessibilityRole="text"
         accessibilityState={{ busy: true }}
       >
-        {body}
+        {renderRowBody(mime)}
         <View
           className={cn(SHARE_CONTROL_FRAME, 'opacity-0')}
           accessibilityElementsHidden
@@ -106,8 +117,8 @@ function FileChip({
   }
 
   return (
-    <View className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
-      {body}
+    <View className={CHIP_ROW_CLASS}>
+      {renderRowBody(mime)}
       <Pressable
         className={cn(SHARE_CONTROL_FRAME, 'active:opacity-60')}
         hitSlop={SHARE_CONTROL_HIT_SLOP}

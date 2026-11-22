@@ -31,6 +31,7 @@ export const GGUF_FAILURE_KEYS = {
   network: 'modelChat.gguf.errors.network',
   invalidFile: 'modelChat.gguf.errors.invalidFile',
   checksum: 'modelChat.gguf.errors.checksum',
+  unreadable: 'modelChat.gguf.errors.unreadable',
   writeFailed: 'modelChat.gguf.errors.writeFailed',
 } as const satisfies Record<GgufDownloadProblem, string>;
 

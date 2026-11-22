@@ -90,6 +90,7 @@ export function useBriefingEnableFlow() {
       t('agentBriefing.paidDisclosure', {
         estimate: briefingMoney(confirmed.estimatedCostMicrodollars, i18n.language),
         maximum: briefingMoney(confirmed.maximumCostMicrodollars, i18n.language),
+        count: confirmed.maxDurationSeconds / 60,
         minutes: formatNumber(
           confirmed.maxDurationSeconds / 60,
           input.locale,

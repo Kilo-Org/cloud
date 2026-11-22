@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesi",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesi",
       "live": "LANGSUNG",
-      "updating": "Memperbarui"
+      "updating": "Memperbarui",
+      "retentionLimit": "Menampilkan sesi terbaru."
     },
     "sessionRow": {
       "deleteTitle": "Hapus sesi?",
@@ -1684,7 +1685,6 @@
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
       "emptyReadOnlyTitle": "Tidak ada pesan dalam sesi ini",
-      "renameAccessibility": "Ganti nama sesi: {{title}}",
       "cloningSession": "Menyalin sesi",
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuat.",
@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "Coba muat akun lagi",
     "retryLoadingPrivacy": "Coba muat pilihan privasi lagi"
   },
+  "accountBlocked": {
+    "title": "Akun diblokir",
+    "description": "Kilo memblokir akun ini, dan masuk lagi tidak akan membuka blokirnya. Tim dukungan dapat meninjau pemblokiran jika diminta.",
+    "domainDescription": "Kilo memblokir akun pada domain email ini, dan masuk lagi tidak akan mengubahnya. Tim dukungan dapat meninjau domain jika diminta.",
+    "contactSupport": "Hubungi tim dukungan"
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman penagihan"
@@ -2605,8 +2611,7 @@
     "timeoutDescription": "Permintaan melebihi batas waktu sebelum selesai. Coba lagi."
   },
   "screenHeader": {
-    "openMenu": "Buka menu",
-    "openMenuFor": "Buka menu untuk {{title}}"
+    "openMenu": "Buka menu"
   },
   "picker": {
     "optionsExpired": "Pilihan tidak lagi berlaku",
@@ -4093,6 +4098,7 @@
         "network": "Unduhan tidak selesai. Periksa koneksi Anda dan coba lagi.",
         "invalidFile": "File yang diunduh bukan model yang dapat dijalankan aplikasi ini, sehingga file tersebut dihapus.",
         "checksum": "File yang diunduh tidak cocok dengan checksum yang dipublikasikan, sehingga file tersebut dihapus. Coba unduh lagi.",
+        "unreadable": "Perangkat ini tidak dapat memeriksa file yang diunduh, sehingga file tersebut dihapus. Coba unduh lagi.",
         "writeFailed": "Perangkat ini tidak dapat menyimpan model. Coba unduh lagi."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Semua konteks",
     "dismiss": "Abaikan laporan",
     "dismissFailed": "Belum bisa mengabaikan laporan ini. Akan dicoba ulang di latar belakang.",
+    "readMarkFailed": "Belum bisa menandai laporan ini sebagai sudah dibaca. Akan dicoba ulang saat laporan dimuat ulang.",
     "offline": "Offline · laporan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
     "summary": "Ringkasan AI",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Laporan tersedia hingga",
     "timeHint": "Kartu Beranda kembali menampilkan status langsung saat periode laporan berakhir, bahkan saat offline.",
     "invalidSchedule": "Pilih zona waktu yang valid dan periode laporan yang tidak kosong.",
+    "scheduleEmptyNight": "Jendela laporan kosong. Pilih waktu siap setelah awal jendela.",
+    "scheduleEmptyMorning": "Waktu siap dan waktu tersedia hingga sama. Pilih berapa lama laporan tetap tersedia.",
+    "scheduleFullDay": "Kedua jendela mencakup satu hari penuh. Sisakan sebagian hari di luar jendela laporan.",
     "notificationsHint": "Satu notifikasi umum per laporan terjadwal. Terpisah dari ringkasan AI berbayar.",
     "notificationPermission": "Aktifkan notifikasi push untuk menerima laporan Anda.",
     "defaultModel": "Gunakan model default Kilo",
@@ -4736,7 +4746,9 @@
     "estimate": "Estimasi {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk pengaturan ini. Ubah model atau batasnya, atau coba lagi nanti.",
     "confirmPaid": "Aktifkan ringkasan berbayar untuk {{context}}?",
+    "paidDisclosure_other": "Perkiraan {{estimate}}, hingga {{maximum}}, dengan batas {{minutes}} menit. Biaya tetap berlaku meskipun pembuatan gagal.",
     "paidDisclosure": "Perkiraan {{estimate}}, hingga {{maximum}}, dengan batas {{minutes}} menit. Biaya tetap berlaku meskipun pembuatan gagal.",
+    "paidDisclosure_one": "Perkiraan {{estimate}}, hingga {{maximum}}, dengan batas {{minutes}} menit. Biaya tetap berlaku meskipun pembuatan gagal.",
     "enable": "Aktifkan ringkasan berbayar",
     "allContexts": "Laporan pribadi dan organisasi tetap terpisah.",
     "emptyHistory": "Belum ada laporan tersimpan",
@@ -4775,7 +4787,7 @@
     "sourceActivity": "Aktivitas tanpa judul",
     "metadataFailureProvider": "kesalahan penyedia",
     "metadataFailureTool": "kesalahan alat",
-    "metadataFailureCancelled": "Dibatalkan",
+    "metadataStopped": "Giliran terakhir dihentikan",
     "metadataFailureOther": "kesalahan tidak diketahui",
     "metadataPlan_one": "Rencana: {{displayDone}} dari {{displayTotal}} langkah selesai",
     "metadataFiles_one": "{{displayCount}} file diubah",

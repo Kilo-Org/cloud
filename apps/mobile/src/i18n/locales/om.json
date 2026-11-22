@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} turtii",
       "sectionAccessibility": "{{title}}: {{displayCount}} turtii",
       "live": "KALLATTIIN",
-      "updating": "Haaromsaa jira"
+      "updating": "Haaromsaa jira",
+      "retentionLimit": "Turtiiwwan kee haaraan agarsiifamaa jiran."
     },
     "sessionRow": {
       "deleteTitle": "Turtiin haa haqamu?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Gara jalaatti siqsi",
       "emptyTitle": "Hanga ammaatti ergaan hin jiru",
       "emptyReadOnlyTitle": "Turtii kana keessatti ergaan hin jiru",
-      "renameAccessibility": "Maqaa turtii jijjiiri: {{title}}",
       "cloningSession": "Turtii kopii gochaa jira",
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
       "historyTooLarge": "Galcheen turtii kanaa fe'uu baay'ee guddaa dha.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Herrega fe'uuf irra deebi'ii yaali",
     "retryLoadingPrivacy": "Filannoowwan iccitii dhuunfaa fe'uuf irra deebi'ii yaali"
   },
+  "accountBlocked": {
+    "title": "Herregni cufame",
+    "description": "Kilo herregni kana cufeera, akkasumas ammas seenuun cufamummaa kana hin haqu. Deeggarsi gaaffii irratti cufamummaa kana ilaaluu danda'a.",
+    "domainDescription": "Kilo herregoota doomeenii imeelii kana irratti cufeera, akkasumas ammas seenuun cufamummaa kana hin haqu. Deeggarsi gaaffii irratti doomeenii kana ilaaluu danda'a.",
+    "contactSupport": "Deeggarsa qunnami"
+  },
   "addCredits": {
     "cta": "Kiriiditii dabali",
     "billingPage": "fuula kaffaltii"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Kallattiin yeroo dheeraa waadaa'ee xumurutti hin gahine. Irra deebi'ii yaali."
   },
   "screenHeader": {
-    "openMenu": "Baafata bani",
-    "openMenuFor": "Baafata {{title}} bani"
+    "openMenu": "Baafata bani"
   },
   "picker": {
     "optionsExpired": "Filannoowwan yeroon isaanii darbeera",
@@ -4093,6 +4098,7 @@
         "network": "Buufinsi hin xumuramne. Walqunnamtii keessan sakatta'ii irra deebi'ii yaali.",
         "invalidFile": "Faayiliin buufame moodeela app kanaan hojjetamuu danda'u miti, kanaaf haqame.",
         "checksum": "Faayiliin buufame checksum isaa maxxanfameen wal hin simu, kanaaf haqame. Ammas irra deebi'ii buusi.",
+        "unreadable": "Meensi kun faayilii buufame sakatta'uu hin dandeenye, kanaaf haqame. Ammas irra deebi'ii buusi.",
         "writeFailed": "Meensi kun moodeela saaguu hin dandeenye. Ammas irra deebi'ii buusi."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Haalota hundaa",
     "dismiss": "Gabaasa dhiisi",
     "dismissFailed": "Gabaasa kana dhiisuun amma hin milkoofne. Duubatti irra deebi'ee yaala.",
+    "readMarkFailed": "Gabaasa kana akka dubbatameetti mallattoo kaa'uun hin milkoofne. Yeroo gabaasni deebi'ee fe'amu duubatti irra deebi'ee yaala.",
     "offline": "Toora ala · gabaasa kuufame",
     "cached": "Gabaasa kuufame · haaromsuun hin danda'amu",
     "summary": "Cuunfaa AI",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Gabaasni hanga yeroo jiraatu",
     "timeHint": "Kaardiin Home yeroo yeroon gabaasaa xumuramu, toora ala illee, haala yeroo ammaa deebisa.",
     "invalidSchedule": "Zoonii yeroo sirrii fi yeroo gabaasaa duwwaa hin taane filadhu.",
+    "scheduleEmptyNight": "Yeroon gabaasaa duwwaadha. Yeroo gabaasni qophaa'u yeroo gabaasaa jalqabaa irra booda filadhu.",
+    "scheduleEmptyMorning": "Yeroon gabaasni qophaa'u fi yeroon hanga gabaasni jiraatu walqixa. Gabaasni yeroo hammam jiraatu filadhu.",
+    "scheduleFullDay": "Yeroowwan lamaan guyyaa guutuu uwwisu. Guyyaa keessaa kutaa tokko gabaasaa ala dhiisi.",
     "notificationsHint": "Gabaasa sagantaa tokkotti beeksisa waliigalaa tokko. Cuunfaa AI kaffaltii irraa walaba.",
     "notificationPermission": "Gabaasa kee argachuuf beeksisa push dandeessisi.",
     "defaultModel": "Moodeela durtii Kilo fayyadami",
@@ -4736,7 +4746,9 @@
     "estimate": "Tilmaama {{estimate}} · daangaa ol'aanaa {{maximum}}",
     "estimateUnavailable": "Cuunfaan kaffaltii qindaa'inoota kanaaf hin argamu. Moodelii ykn daangoota jijjiiri, ykn booda irra deebi'ii yaali.",
     "confirmPaid": "Cuunfaa kaffaltii {{context}}f dandeessisuu?",
+    "paidDisclosure_one": "Tilmaamaan {{estimate}}, hanga {{maximum}}, daangaa daqiiqaa {{minutes}} wajjin. Uumamni yoo kufe illee kaffaltiin ni jira.",
     "paidDisclosure": "Tilmaamaan {{estimate}}, hanga {{maximum}}, daangaa daqiiqaa {{minutes}} wajjin. Uumamni yoo kufe illee kaffaltiin ni jira.",
+    "paidDisclosure_other": "Tilmaamaan {{estimate}}, hanga {{maximum}}, daangaa daqiiqaa {{minutes}} wajjin. Uumamni yoo kufe illee kaffaltiin ni jira.",
     "enable": "Cuunfaa kaffaltii dandeessisi",
     "allContexts": "Gabaasonni dhuunfaa fi dhaabbataa adda adda ta'u.",
     "emptyHistory": "Gabaasonni olkaa'aman hin jiran",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Sochii maqaa hin qabne",
     "metadataFailureProvider": "dogoggora dhiyeessaa",
     "metadataFailureTool": "dogoggora meeshaa",
-    "metadataFailureCancelled": "Haqame",
+    "metadataStopped": "Deebiin dhumaa dhaabbate",
     "metadataFailureOther": "dogoggora hin ibsamne"
   },
   "systemSearch": {

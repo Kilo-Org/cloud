@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} munkamenet",
       "sectionAccessibility": "{{title}}: {{displayCount}} munkamenet",
       "live": "ÉLŐ",
-      "updating": "Frissítés"
+      "updating": "Frissítés",
+      "retentionLimit": "A legutóbbi munkamenetek láthatók."
     },
     "sessionRow": {
       "deleteTitle": "Munkamenet törlése?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
       "emptyReadOnlyTitle": "Nincs üzenet ebben a munkamenetben",
-      "renameAccessibility": "Munkamenet átnevezése: {{title}}",
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
       "historyTooLarge": "Ez a munkamenet leirata túl nagy a betöltéshez.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Fiók betöltésének megismétlése",
     "retryLoadingPrivacy": "Adatvédelmi beállítások betöltésének megismétlése"
   },
+  "accountBlocked": {
+    "title": "Fiók letiltva",
+    "description": "A Kilo letiltotta ezt a fiókot, és az újabb bejelentkezés nem oldja fel a tiltást. Az ügyfélszolgálat kérésre felülvizsgálhatja a tiltást.",
+    "domainDescription": "A Kilo letiltja a fiókokat ezen az e-mail-domainon, és az újabb bejelentkezés nem oldja fel a tiltást. Az ügyfélszolgálat kérésre felülvizsgálhatja a domaint.",
+    "contactSupport": "Kapcsolatfelvétel az ügyfélszolgálattal"
+  },
   "addCredits": {
     "cta": "Egyenleg feltöltése",
     "billingPage": "számlázási oldal"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "A kérés túllépte az időkorlátot, mielőtt befejeződött volna. Próbáld újra."
   },
   "screenHeader": {
-    "openMenu": "Menü megnyitása",
-    "openMenuFor": "{{title}} menüjének megnyitása"
+    "openMenu": "Menü megnyitása"
   },
   "picker": {
     "optionsExpired": "A választható lehetőségek lejártak",
@@ -4093,6 +4098,7 @@
         "network": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot, és próbálja újra.",
         "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk.",
         "checksum": "A letöltött fájl nem egyezik a közzétett ellenőrzőösszegével, ezért eltávolítottuk. Próbálja meg újra a letöltést.",
+        "unreadable": "Ez az eszköz nem tudta ellenőrizni a letöltött fájlt, ezért eltávolítottuk. Próbálja meg újra a letöltést.",
         "writeFailed": "Ez az eszköz nem tudta elmenteni a modellt. Próbálja meg újra a letöltést."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Összes kontextus",
     "dismiss": "Jelentés elvetése",
     "dismissFailed": "A jelentés elvetése egyelőre nem sikerült. A háttérben újrapróbálkozik.",
+    "readMarkFailed": "Nem sikerült olvasottként megjelölni ezt a jelentést. A jelentés újratöltésekor újrapróbálkozik.",
     "offline": "Offline · mentett jelentés",
     "cached": "Mentett jelentés · frissítés nem érhető el",
     "summary": "AI-összefoglaló",
@@ -4727,6 +4734,9 @@
     "morningEnd": "A jelentés elérhető eddig",
     "timeHint": "A Kezdőlap kártyája az időablak végén visszaáll élő állapotra, offline is.",
     "invalidSchedule": "Válassz érvényes időzónát és egy nem üres időablakot.",
+    "scheduleEmptyNight": "A jelentés időablaka üres. Válassz az időablak kezdeténél későbbi kész időpontot.",
+    "scheduleEmptyMorning": "A kész időpont és az elérhető eddig időpont megegyezik. Válaszd ki, mennyi ideig marad elérhető a jelentés.",
+    "scheduleFullDay": "A két időablak egy teljes napot lefed. Hagyd a nap egy részét a jelentésen kívül.",
     "notificationsHint": "Egy általános értesítés ütemezett jelentésenként. Független a fizetős AI-összefoglalóktól.",
     "notificationPermission": "A jelentés fogadásához kapcsold be a push-értesítéseket.",
     "defaultModel": "A Kilo alapértelmezett modelljének használata",
@@ -4736,6 +4746,8 @@
     "estimate": "Becsült {{estimate}} · legfeljebb {{maximum}}",
     "estimateUnavailable": "Fizetett összefoglaló nem elérhető ezekkel a beállításokkal. Változtasd meg a modellt vagy a korlátokat, vagy próbáld újra később.",
     "confirmPaid": "Engedélyezed a fizetős összefoglalókat ehhez: {{context}}?",
+    "paidDisclosure_one": "Becsült költség {{estimate}}, legfeljebb {{maximum}}, {{minutes}} perces korláttal. A díj sikertelen generálás esetén is felszámításra kerül.",
+    "paidDisclosure_other": "Becsült költség {{estimate}}, legfeljebb {{maximum}}, {{minutes}} perces korláttal. A díj sikertelen generálás esetén is felszámításra kerül.",
     "paidDisclosure": "Becsült költség {{estimate}}, legfeljebb {{maximum}}, {{minutes}} perces korláttal. A díj sikertelen generálás esetén is felszámításra kerül.",
     "enable": "Fizetős összefoglalók engedélyezése",
     "allContexts": "A személyes és a szervezeti jelentések külön maradnak.",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Névtelen tevékenység",
     "metadataFailureProvider": "szolgáltatói hiba",
     "metadataFailureTool": "eszközhiba",
-    "metadataFailureCancelled": "Megszakítva",
+    "metadataStopped": "Az utolsó kör leállítva",
     "metadataFailureOther": "meghatározatlan hiba"
   },
   "systemSearch": {

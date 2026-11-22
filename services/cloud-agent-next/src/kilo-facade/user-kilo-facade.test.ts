@@ -115,7 +115,7 @@ function envStub(): Env {
     },
     SANDBOX_SESSION: {
       idFromName: vi.fn(() => 'sandbox-session-do-id'),
-      get: vi.fn(),
+      get: vi.fn(() => ({ getSessionHistorySource: vi.fn().mockResolvedValue('v1') })),
     },
   } as unknown as Env;
 }

@@ -1602,7 +1602,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioni",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessioni",
       "live": "IN TEMPO REALE",
-      "updating": "Aggiornamento in corso"
+      "updating": "Aggiornamento in corso",
+      "retentionLimit": "Vengono mostrate le sessioni più recenti."
     },
     "sessionRow": {
       "deleteTitle": "Eliminare la sessione?",
@@ -1674,7 +1675,6 @@
       "scrollToBottom": "Scorri fino in fondo",
       "emptyTitle": "Ancora nessun messaggio",
       "emptyReadOnlyTitle": "Nessun messaggio in questa sessione",
-      "renameAccessibility": "Rinomina la sessione: {{title}}",
       "cloningSession": "Clonazione in corso…",
       "couldNotLoadThisSession": "Impossibile caricare questa sessione.",
       "historyTooLarge": "La trascrizione di questa sessione è troppo grande da caricare.",
@@ -2568,6 +2568,12 @@
     "translateSummaries": "Traduci i riepiloghi",
     "autoExpandThinkingInactiveSubtitle": "Non ha effetto quando i dettagli del ragionamento sono nascosti."
   },
+  "accountBlocked": {
+    "title": "Account bloccato",
+    "description": "Kilo ha bloccato questo account e un nuovo accesso non lo sbloccherà. L'assistenza può riesaminare il blocco su richiesta.",
+    "domainDescription": "Kilo blocca gli account su questo dominio email e un nuovo accesso non lo cambierà. L'assistenza può riesaminare il dominio su richiesta.",
+    "contactSupport": "Contatta l'assistenza"
+  },
   "addCredits": {
     "cta": "Aggiungi crediti",
     "billingPage": "pagina di fatturazione"
@@ -2640,8 +2646,7 @@
     "timeoutDescription": "La richiesta è scaduta prima di essere completata. Riprova."
   },
   "screenHeader": {
-    "openMenu": "Apri il menu",
-    "openMenuFor": "Apri il menu di {{title}}"
+    "openMenu": "Apri il menu"
   },
   "picker": {
     "optionsExpired": "Opzioni scadute",
@@ -4167,6 +4172,7 @@
         "network": "Il download non è terminato. Controlla la connessione e riprova.",
         "invalidFile": "Il file scaricato non è un modello che questa app può eseguire, quindi è stato rimosso.",
         "checksum": "Il file scaricato non corrisponde al checksum pubblicato, quindi è stato rimosso. Riprova a scaricarlo.",
+        "unreadable": "Questo dispositivo non è riuscito a controllare il file scaricato, quindi è stato rimosso. Riprova a scaricarlo.",
         "writeFailed": "Questo dispositivo non è riuscito a salvare il modello. Riprova a scaricarlo."
       }
     },
@@ -4792,6 +4798,7 @@
     "contextAll": "Tutti i contesti",
     "dismiss": "Ignora il briefing",
     "dismissFailed": "Non è stato possibile ignorare subito questo briefing. Verrà ritentato automaticamente in background.",
+    "readMarkFailed": "Non è stato possibile contrassegnare questo briefing come letto. Verrà ritentato al prossimo caricamento del briefing.",
     "offline": "Offline · briefing salvato",
     "cached": "Briefing salvato · aggiornamento non disponibile",
     "summary": "Riepilogo AI",
@@ -4811,6 +4818,9 @@
     "morningEnd": "Briefing disponibile fino alle",
     "timeHint": "La scheda Home ripristina lo stato live al termine della finestra di briefing, anche offline.",
     "invalidSchedule": "Scegli un fuso orario valido e una finestra di briefing non vuota.",
+    "scheduleEmptyNight": "La finestra di briefing è vuota. Scegli un orario di disponibilità successivo all'inizio della finestra.",
+    "scheduleEmptyMorning": "L'orario di disponibilità e l'orario di fine disponibilità coincidono. Scegli per quanto tempo il briefing resta disponibile.",
+    "scheduleFullDay": "Le due finestre coprono un giorno intero. Lascia parte della giornata al di fuori del briefing.",
     "notificationsHint": "Una notifica generica per ogni briefing programmato. Indipendente dai riepiloghi AI a pagamento.",
     "notificationPermission": "Attiva le notifiche push per ricevere il tuo briefing.",
     "defaultModel": "Usa il modello predefinito di Kilo",
@@ -4820,6 +4830,9 @@
     "estimate": "Stima {{estimate}} · massimo {{maximum}}",
     "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni. Modifica il modello o i limiti, oppure riprova più tardi.",
     "confirmPaid": "Attivare i riepiloghi a pagamento per {{context}}?",
+    "paidDisclosure_one": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
+    "paidDisclosure_many": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
+    "paidDisclosure_other": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
     "paidDisclosure": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} min. L'addebito si applica anche se la generazione non riesce.",
     "enable": "Attiva riepiloghi a pagamento",
     "allContexts": "I briefing personali e dell'organizzazione restano separati.",
@@ -4867,7 +4880,7 @@
     "sourceActivity": "Attività senza titolo",
     "metadataFailureProvider": "errore del provider",
     "metadataFailureTool": "errore dello strumento",
-    "metadataFailureCancelled": "Annullata",
+    "metadataStopped": "Ultimo turno interrotto",
     "metadataFailureOther": "errore non specificato"
   },
   "systemSearch": {

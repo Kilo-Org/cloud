@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} iziseshini",
       "sectionAccessibility": "{{title}}: {{displayCount}} iziseshini",
       "live": "BUKHOMA",
-      "updating": "Kuyabuyekezwa"
+      "updating": "Kuyabuyekezwa",
+      "retentionLimit": "Kuboniswa iziseshini zakho zakamuva."
     },
     "sessionRow": {
       "deleteTitle": "Uyasusa iseshini?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
       "emptyReadOnlyTitle": "Ayikho imilayezo kulesi seshini",
-      "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
       "cloningSession": "Iseshini iyakopishwa",
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
       "historyTooLarge": "Umyalezo wale seshini mude kakhulu ukuthi ulayishwe.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Zama futhi ukulayisha i-akhawunti",
     "retryLoadingPrivacy": "Zama futhi ukulayisha izinketho zobumfihlo"
   },
+  "accountBlocked": {
+    "title": "I-akhawunti ivinjiwe",
+    "description": "I-Kilo ivale le akhawunti, futhi ukungena kabusha ngeke kuyisule. Ithimba losizo lingabuyekeza ukuvalwa uma kuceliwe.",
+    "domainDescription": "I-Kilo ivale ama-akhawunti kulesi sizinda se-imeyili, futhi ukungena kabusha ngeke kuyishintshe. Ithimba losizo lingabuyekeza isizinda uma kuceliwe.",
+    "contactSupport": "Xhumana nethimba losizo"
+  },
   "addCredits": {
     "cta": "Engeza amakhredithi",
     "billingPage": "ikhasi lokukhokha"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Isicelo siphelelwe yisikhathi ngaphambi kokuqedwa. Sicela uzame futhi."
   },
   "screenHeader": {
-    "openMenu": "Vula imenyu",
-    "openMenuFor": "Vula imenyu ye-{{title}}"
+    "openMenu": "Vula imenyu"
   },
   "picker": {
     "optionsExpired": "Izinketho ziphelelwe yisikhathi",
@@ -4093,6 +4098,7 @@
         "network": "Ukulanda akuphelanga. Hlola ukuxhumana kwakho bese uzama futhi.",
         "invalidFile": "Ifayela elilandiwe akusiyo imodeli le app engayisebenzisa, ngakho isusiwe.",
         "checksum": "Ifayela elilandiwe alihambisani ne-checksum yalo eshicilelwe, ngakho isusiwe. Zama ukulanda futhi.",
+        "unreadable": "Le divayisi alikwazanga ukuhlola ifayela elilandiwe, ngakho isusiwe. Zama ukulanda futhi.",
         "writeFailed": "Le divayisi alikwazanga ukugcina imodeli. Zama ukulanda futhi."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Imimongo yonke",
     "dismiss": "Chitha umbiko",
     "dismissFailed": "Umbiko awukachithwanga okwamanje. Uzama kabusha ngasemuva.",
+    "readMarkFailed": "Ayikwazekanga ukumaka lo mbiko njengokufundiwe. Kuzozanywa futhi lapho umbiko ulayishwa kabusha.",
     "offline": "Akuxhunyiwe · umbiko olondoloziwe",
     "cached": "Umbiko olondoloziwe · ukuvuselela akutholakali",
     "summary": "Isifinyezo se-AI",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Umbiko utholakala kuze kube",
     "timeHint": "Ikhadi Lasekhaya libuyisela isimo samanje uma isikhathi sombiko siphela, ngisho kungaxhunyiwe.",
     "invalidSchedule": "Khetha izoni yesikhathi evumelekile kanye nesikhathi sombiko esinobude obungaphezu kukaziro.",
+    "scheduleEmptyNight": "Isikhathi sombiko asinabude. Khetha isikhathi lapho umbiko ulungile khona, ngemva kwesikhathi sokuqala sombiko.",
+    "scheduleEmptyMorning": "Isikhathi lapho umbiko ulungile khona nesikhathi umbiko utholakala kuze kube ngaso kuyafana. Khetha ukuthi umbiko uhlale utholakala isikhathi esingakanani.",
+    "scheduleFullDay": "Izikhathi ezimbili zombiko zihlanganisa usuku oluphelele. Shiya ingxenye yosuku ngaphandle kombiko.",
     "notificationsHint": "Isaziso esisodwa esijwayelekile ngombiko ngamunye ohleliwe. Asincikile ezifinyezweni ze-AI ezikhokhelwayo.",
     "notificationPermission": "Vula izaziso ze-push ukuze uthole umbiko wakho.",
     "defaultModel": "Sebenzisa imodeli ezenzakalelayo ye-Kilo",
@@ -4736,7 +4746,9 @@
     "estimate": "Kulinganiselwe {{estimate}} · okuphezulu kakhulu {{maximum}}",
     "estimateUnavailable": "Isifinyezo esikhokhelwayo asitholakali kulezi zilungiselelo. Shintsha imodeli noma imikhawulo, noma zama futhi emva kwesikhathi.",
     "confirmPaid": "Vula izifinyezo ezikhokhelwayo ze-{{context}}?",
+    "paidDisclosure_one": "Kulinganiselwa ku-{{estimate}}, kuze kufike ku-{{maximum}}, nomkhawulo weminithi engu-{{minutes}}. Izindleko ziyasebenza ngisho noma ukukhiqiza kwehluleka.",
     "paidDisclosure": "Kulinganiselwa ku-{{estimate}}, kuze kufike ku-{{maximum}}, nomkhawulo wamaminithi angu-{{minutes}}. Izindleko ziyasebenza ngisho noma ukukhiqiza kwehluleka.",
+    "paidDisclosure_other": "Kulinganiselwa ku-{{estimate}}, kuze kufike ku-{{maximum}}, nomkhawulo wamaminithi angu-{{minutes}}. Izindleko ziyasebenza ngisho noma ukukhiqiza kwehluleka.",
     "enable": "Vula izifinyezo ezikhokhelwayo",
     "allContexts": "Imibiko yomuntu siqu neyenhlangano ihlala ihlukene.",
     "emptyHistory": "Ayikho imibiko elondoloziwe",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Umsebenzi ongenasihloko",
     "metadataFailureProvider": "iphutha lomhlinzeki",
     "metadataFailureTool": "iphutha lethuluzi",
-    "metadataFailureCancelled": "Kukhanseliwe",
+    "metadataStopped": "Umjikelezo wokugcina umisiwe",
     "metadataFailureOther": "iphutha elingacacisiwe"
   },
   "systemSearch": {

@@ -2223,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesija",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesija",
       "live": "UŽIVO",
-      "updating": "Ažuriranje"
+      "updating": "Ažuriranje",
+      "retentionLimit": "Prikazuju se najnovije sesije."
     },
     "sessionRow": {
       "deleteTitle": "Izbrisati sesiju?",
@@ -2295,7 +2296,6 @@
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Još nema poruka",
       "emptyReadOnlyTitle": "U ovoj sesiji nema poruka",
-      "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
       "historyTooLarge": "Prijepis ove sesije je prevelik za učitavanje.",
@@ -3156,6 +3156,12 @@
     "retryLoadingAccount": "Ponovno učitaj račun",
     "retryLoadingPrivacy": "Ponovno učitaj postavke privatnosti"
   },
+  "accountBlocked": {
+    "title": "Račun blokiran",
+    "description": "Kilo je blokirao ovaj račun i ponovna prijava to neće ukloniti. Podrška može na zahtjev pregledati blokadu.",
+    "domainDescription": "Kilo blokira račune na ovoj email domeni i ponovna prijava to neće promijeniti. Podrška može na zahtjev pregledati domenu.",
+    "contactSupport": "Obrati se podršci"
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stranica za naplatu"
@@ -3228,8 +3234,7 @@
     "timeoutDescription": "Zahtjev je istekao prije nego što je završio. Pokušaj ponovo."
   },
   "screenHeader": {
-    "openMenu": "Otvori izbornik",
-    "openMenuFor": "Otvori izbornik za {{title}}"
+    "openMenu": "Otvori izbornik"
   },
   "picker": {
     "optionsExpired": "Opcije više nisu dostupne",
@@ -4167,6 +4172,7 @@
         "network": "Preuzimanje nije dovršeno. Provjerite vezu i pokušajte ponovno.",
         "invalidFile": "Preuzeta datoteka nije model koji ova aplikacija može pokrenuti, pa je uklonjena.",
         "checksum": "Preuzeta datoteka ne odgovara objavljenom kontrolnom zbroju, pa je uklonjena. Pokušajte ponovno preuzeti.",
+        "unreadable": "Ovaj uređaj nije mogao provjeriti preuzetu datoteku, pa je uklonjena. Pokušajte ponovno preuzeti.",
         "writeFailed": "Ovaj uređaj nije mogao spremiti model. Pokušajte ponovno preuzeti."
       }
     },
@@ -4792,6 +4798,7 @@
     "contextAll": "Svi konteksti",
     "dismiss": "Odbaci izvješće",
     "dismissFailed": "Ovo izvješće još nije moguće odbaciti. Ponovni pokušaj odvija se u pozadini.",
+    "readMarkFailed": "Ovo izvješće nije moguće označiti kao pročitano. Ponovni pokušaj odvija se kad se izvješće ponovno učita.",
     "offline": "Izvan mreže · spremljeno izvješće",
     "cached": "Spremljeno izvješće · osvježavanje nije dostupno",
     "summary": "AI sažetak",
@@ -4811,6 +4818,9 @@
     "morningEnd": "Izvješće dostupno do",
     "timeHint": "Kartica na početnom zaslonu vraća trenutačni status kad prozor izvješća završi, čak i izvan mreže.",
     "invalidSchedule": "Odaberite valjanu vremensku zonu i neprazan prozor izvješća.",
+    "scheduleEmptyNight": "Prozor izvješća je prazan. Odaberite vrijeme spremnosti kasnije od početka prozora.",
+    "scheduleEmptyMorning": "Vrijeme spremnosti i vrijeme do kojeg je izvješće dostupno podudaraju se. Odaberite koliko dugo izvješće ostaje dostupno.",
+    "scheduleFullDay": "Dva prozora pokrivaju cijeli dan. Ostavite dio dana izvan izvješća.",
     "notificationsHint": "Jedna općenita obavijest po zakazanom izvješću. Neovisno o plaćenim AI sažecima.",
     "notificationPermission": "Uključite push obavijesti kako biste primali svoje izvješće.",
     "defaultModel": "Koristi zadani model tvrtke Kilo",
@@ -4820,7 +4830,10 @@
     "estimate": "Procjena {{estimate}} · najviše {{maximum}}",
     "estimateUnavailable": "Plaćeni sažetak nije dostupan za ove postavke. Promijenite model ili ograničenja, ili pokušajte ponovno kasnije.",
     "confirmPaid": "Omogućiti plaćene sažetke za {{context}}?",
-    "paidDisclosure": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata vrijedi i ako generiranje ne uspije.",
+    "paidDisclosure_one": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minute. Naplata vrijedi i ako generiranje ne uspije.",
+    "paidDisclosure_few": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minute. Naplata vrijedi i ako generiranje ne uspije.",
+    "paidDisclosure_other": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minuta. Naplata vrijedi i ako generiranje ne uspije.",
+    "paidDisclosure": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} minuta. Naplata vrijedi i ako generiranje ne uspije.",
     "enable": "Omogući plaćene sažetke",
     "allContexts": "Osobna i organizacijska izvješća ostaju odvojena.",
     "emptyHistory": "Nema spremljenih izvješća",
@@ -4867,7 +4880,7 @@
     "sourceActivity": "Aktivnost bez naslova",
     "metadataFailureProvider": "pogreška pružatelja",
     "metadataFailureTool": "pogreška alata",
-    "metadataFailureCancelled": "Otkazano",
+    "metadataStopped": "Posljednji pokušaj je zaustavljen",
     "metadataFailureOther": "nespecificirana pogreška"
   },
   "systemSearch": {

@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesións",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesións",
       "live": "EN TEMPO REAL",
-      "updating": "Actualizando"
+      "updating": "Actualizando",
+      "retentionLimit": "Mostrando as sesións máis recentes."
     },
     "sessionRow": {
       "deleteTitle": "Eliminar sesión?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Desprazarse ata o final",
       "emptyTitle": "Aínda non hai mensaxes",
       "emptyReadOnlyTitle": "Non hai mensaxes nesta sesión",
-      "renameAccessibility": "Renomear sesión: {{title}}",
       "cloningSession": "Clonando a sesión",
       "couldNotLoadThisSession": "Non se puido cargar esta sesión.",
       "historyTooLarge": "A transcrición desta sesión é demasiado grande para cargala.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Volver cargar a conta",
     "retryLoadingPrivacy": "Volver cargar as opcións de privacidade"
   },
+  "accountBlocked": {
+    "title": "Conta bloqueada",
+    "description": "Kilo bloqueou esta conta e volver iniciar sesión non a desbloqueará. A asistencia pode revisar o bloqueo se o solicitas.",
+    "domainDescription": "Kilo bloquea as contas neste dominio de correo e volver iniciar sesión non o cambiará. A asistencia pode revisar o dominio se o solicitas.",
+    "contactSupport": "Contactar coa asistencia"
+  },
   "addCredits": {
     "cta": "Engadir créditos",
     "billingPage": "páxina de facturación"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "A solicitude excedeu o tempo de espera antes de rematar. Téntao de novo."
   },
   "screenHeader": {
-    "openMenu": "Abrir o menú",
-    "openMenuFor": "Abrir o menú de {{title}}"
+    "openMenu": "Abrir o menú"
   },
   "picker": {
     "optionsExpired": "Opcións caducadas",
@@ -4093,6 +4098,7 @@
         "network": "A descarga non rematou. Comproba a túa conexión e téntao de novo.",
         "invalidFile": "O ficheiro descargado non é un modelo que esta aplicación poida executar, así que se eliminou.",
         "checksum": "O ficheiro descargado non coincide coa súa suma de verificación publicada, así que se eliminou. Tenta descargalo de novo.",
+        "unreadable": "Este dispositivo non puido comprobar o ficheiro descargado, así que se eliminou. Tenta descargalo de novo.",
         "writeFailed": "Este dispositivo non puido gardar o modelo. Tenta descargalo de novo."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Todos os contextos",
     "dismiss": "Descartar o informe",
     "dismissFailed": "Aínda non se puido descartar o informe. Volverá a intentarse en segundo plano.",
+    "readMarkFailed": "Non se puido marcar este informe como lido. Volverase intentar cando se recargue o informe.",
     "offline": "Sen conexión · informe gardado",
     "cached": "Informe gardado · non se pode actualizar",
     "summary": "Resumo con IA",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Informe dispoñible ata",
     "timeHint": "A tarxeta de Inicio volve ao estado en directo cando remata a xanela do informe, mesmo sen conexión.",
     "invalidSchedule": "Escolle un fuso horario válido e unha xanela do informe non baleira.",
+    "scheduleEmptyNight": "A xanela do informe está baleira. Escolle unha hora de preparación posterior ao inicio da xanela.",
+    "scheduleEmptyMorning": "A hora de preparación e a hora de fin de dispoñibilidade coinciden. Escolle canto tempo permanece dispoñible o informe.",
+    "scheduleFullDay": "As dúas xanelas cobren un día enteiro. Deixa parte do día fóra do informe.",
     "notificationsHint": "Unha notificación xenérica por cada informe programado. Independente dos resumos con IA de pago.",
     "notificationPermission": "Activa as notificacións push para recibir o teu informe.",
     "defaultModel": "Usar o modelo predeterminado de Kilo",
@@ -4736,6 +4746,8 @@
     "estimate": "Estimación {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Non hai dispoñible un resumo de pago para estes axustes. Cambia o modelo ou os límites, ou proba de novo máis tarde.",
     "confirmPaid": "Activar os resumos de pago para {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} min. Cóbrase aínda que a xeración falle.",
+    "paidDisclosure_other": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} min. Cóbrase aínda que a xeración falle.",
     "paidDisclosure": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} min. Cóbrase aínda que a xeración falle.",
     "enable": "Activar resumos de pago",
     "allContexts": "Os informes persoais e da organización mantéñense separados.",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Actividade sen título",
     "metadataFailureProvider": "erro do provedor",
     "metadataFailureTool": "erro da ferramenta",
-    "metadataFailureCancelled": "Cancelado",
+    "metadataStopped": "O último turno detívose",
     "metadataFailureOther": "erro non especificado"
   },
   "systemSearch": {

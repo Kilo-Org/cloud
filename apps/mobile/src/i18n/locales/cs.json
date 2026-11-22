@@ -2270,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} relace",
       "sectionAccessibility": "{{title}}: {{displayCount}} relace",
       "live": "ŽIVĚ",
-      "updating": "Aktualizace"
+      "updating": "Aktualizace",
+      "retentionLimit": "Zobrazují se nejnovější relace."
     },
     "sessionRow": {
       "deleteTitle": "Smazat relaci?",
@@ -2344,7 +2345,6 @@
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
       "emptyReadOnlyTitle": "Žádné zprávy v této relaci",
-      "renameAccessibility": "Přejmenovat relaci: {{title}}",
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
@@ -3217,6 +3217,12 @@
     "retryLoadingAccount": "Znovu načíst účet",
     "retryLoadingPrivacy": "Znovu načíst nastavení soukromí"
   },
+  "accountBlocked": {
+    "title": "Účet zablokován",
+    "description": "Kilo zablokovalo tento účet a nové přihlášení to nezruší. Podpora může blokaci na požádání přezkoumat.",
+    "domainDescription": "Kilo zablokovalo účty na této e-mailové doméně a nové přihlášení to nezruší. Podpora může doménu na požádání přezkoumat.",
+    "contactSupport": "Kontaktovat podporu"
+  },
   "addCredits": {
     "cta": "Dobít kredity",
     "billingPage": "stránka fakturace"
@@ -3289,8 +3295,7 @@
     "timeoutDescription": "Požadavek vypršel dříve, než se dokončil. Zkuste to prosím znovu."
   },
   "screenHeader": {
-    "openMenu": "Otevřít nabídku",
-    "openMenuFor": "Otevřít nabídku pro {{title}}"
+    "openMenu": "Otevřít nabídku"
   },
   "picker": {
     "optionsExpired": "Platnost možností vypršela",
@@ -4241,6 +4246,7 @@
         "network": "Stahování se nedokončilo. Zkontrolujte připojení a zkuste to znovu.",
         "invalidFile": "Stažený soubor není model, který by tato aplikace mohla spustit, proto byl odstraněn.",
         "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu.",
+        "unreadable": "Toto zařízení nemohlo stažený soubor zkontrolovat, proto byl odstraněn. Zkuste jej stáhnout znovu.",
         "writeFailed": "Toto zařízení nemohlo model uložit. Zkuste jej stáhnout znovu."
       }
     },
@@ -4876,6 +4882,7 @@
     "contextAll": "Všechny kontexty",
     "dismiss": "Skrýt přehled",
     "dismissFailed": "Přehled se zatím nepodařilo skrýt. Pokus se automaticky opakuje na pozadí.",
+    "readMarkFailed": "Tento přehled se nepodařilo označit jako přečtený. Při příštím načtení přehledu se pokus zopakuje.",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
     "summary": "AI shrnutí",
@@ -4895,6 +4902,9 @@
     "morningEnd": "Přehled dostupný do",
     "timeHint": "Karta na domovské obrazovce obnoví živý stav po skončení období přehledu, i offline.",
     "invalidSchedule": "Zvolte platné časové pásmo a neprázdné období přehledu.",
+    "scheduleEmptyNight": "Okno přehledu je prázdné. Zvolte čas připravenosti později než začátek okna.",
+    "scheduleEmptyMorning": "Čas připravenosti a čas konce dostupnosti se shodují. Zvolte, jak dlouho přehled zůstane dostupný.",
+    "scheduleFullDay": "Obě okna pokrývají celý den. Nechte část dne mimo přehled.",
     "notificationsHint": "Jedno obecné oznámení na každý naplánovaný přehled. Nezávisí na placených AI shrnutích.",
     "notificationPermission": "Pro příjem přehledu zapněte push oznámení.",
     "defaultModel": "Použít výchozí model Kilo",
@@ -4904,6 +4914,10 @@
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné. Změňte model nebo limity, případně to zkuste později.",
     "confirmPaid": "Povolit placená shrnutí pro {{context}}?",
+    "paidDisclosure_one": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_few": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_many": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_other": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
     "paidDisclosure": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
     "enable": "Povolit placená shrnutí",
     "allContexts": "Osobní a organizační přehledy zůstávají oddělené.",
@@ -4955,7 +4969,7 @@
     "sourceActivity": "Aktivita bez názvu",
     "metadataFailureProvider": "chyba poskytovatele",
     "metadataFailureTool": "chyba nástroje",
-    "metadataFailureCancelled": "Zrušeno",
+    "metadataStopped": "Poslední tah byl zastaven",
     "metadataFailureOther": "nespecifikovaná chyba"
   },
   "systemSearch": {

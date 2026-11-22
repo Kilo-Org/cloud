@@ -67,16 +67,18 @@ it('renders no line for a payload without any member', () => {
   expect(renderLines({})).toEqual([]);
 });
 
-it('names every failure kind', () => {
+it('names every failure kind and a stopped turn', () => {
   const kinds = [
-    ['provider', 'agentBriefing.metadataFailureProvider'],
-    ['tool', 'agentBriefing.metadataFailureTool'],
-    ['cancelled', 'agentBriefing.metadataFailureCancelled'],
-    ['other', 'agentBriefing.metadataFailureOther'],
-  ] as const satisfies readonly [NonNullable<BriefingSourceMetadata['failure']>['kind'], string][];
+    ['provider', ['agentBriefing.metadataFailure agentBriefing.metadataFailureProvider']],
+    ['tool', ['agentBriefing.metadataFailure agentBriefing.metadataFailureTool']],
+    // A stopped turn is not a failure: it names itself with no kind.
+    ['cancelled', ['agentBriefing.metadataStopped']],
+    ['other', ['agentBriefing.metadataFailure agentBriefing.metadataFailureOther']],
+  ] as const satisfies readonly [
+    NonNullable<BriefingSourceMetadata['failure']>['kind'],
+    readonly string[],
+  ][];
   for (const [kind, expected] of kinds) {
-    expect(briefingMetadataTexts({ failure: { kind } }, t, 'en')).toEqual([
-      `agentBriefing.metadataFailure ${expected}`,
-    ]);
+    expect(briefingMetadataTexts({ failure: { kind } }, t, 'en')).toEqual(expected);
   }
 });

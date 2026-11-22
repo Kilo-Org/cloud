@@ -1623,7 +1623,8 @@
       "sectionAccessibility_zero": "{{title}}: {{displayCount}} sessões",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessões",
       "live": "EM TEMPO REAL",
-      "updating": "Atualizando"
+      "updating": "Atualizando",
+      "retentionLimit": "Mostrando suas sessões mais recentes."
     },
     "sessionRow": {
       "deleteTitle": "Excluir sessão?",
@@ -1697,7 +1698,6 @@
       "scrollToBottom": "Rolar para o final",
       "emptyTitle": "Nenhuma mensagem ainda",
       "emptyReadOnlyTitle": "Nenhuma mensagem nesta sessão",
-      "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "Clonando sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
       "historyTooLarge": "A transcrição desta sessão é grande demais para carregar.",
@@ -2603,6 +2603,12 @@
     "translateSummaries": "Traduzir resumos",
     "autoExpandThinkingInactiveSubtitle": "Não tem efeito enquanto os detalhes do raciocínio estiverem ocultos."
   },
+  "accountBlocked": {
+    "title": "Conta bloqueada",
+    "description": "O Kilo bloqueou esta conta e entrar de novo não vai desfazer o bloqueio. O suporte pode revisar o bloqueio a pedido.",
+    "domainDescription": "O Kilo bloqueou este domínio de e-mail e entrar de novo não vai desfazer o bloqueio. O suporte pode revisar o domínio a pedido.",
+    "contactSupport": "Falar com o suporte"
+  },
   "addCredits": {
     "cta": "Adicionar créditos",
     "billingPage": "página de cobrança"
@@ -2675,8 +2681,7 @@
     "timeoutDescription": "A solicitação esgotou o tempo limite antes de ser concluída. Tente novamente."
   },
   "screenHeader": {
-    "openMenu": "Abrir menu",
-    "openMenuFor": "Abrir menu de {{title}}"
+    "openMenu": "Abrir menu"
   },
   "picker": {
     "optionsExpired": "Opções expiradas",
@@ -4241,6 +4246,7 @@
         "network": "O download não foi concluído. Verifique sua conexão e tente novamente.",
         "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido.",
         "checksum": "O arquivo baixado não corresponde à soma de verificação publicada, então ele foi removido. Tente baixar novamente.",
+        "unreadable": "Este dispositivo não conseguiu verificar o arquivo baixado, então ele foi removido. Tente baixar novamente.",
         "writeFailed": "Este dispositivo não conseguiu salvar o modelo. Tente baixar novamente."
       }
     },
@@ -4876,6 +4882,7 @@
     "contextAll": "Todos os contextos",
     "dismiss": "Ignorar relatório",
     "dismissFailed": "Ainda não foi possível ignorar este relatório. Tentaremos novamente em segundo plano.",
+    "readMarkFailed": "Ainda não foi possível marcar este relatório como lido. Tentaremos novamente quando ele for recarregado.",
     "offline": "Offline · relatório salvo",
     "cached": "Relatório salvo · atualização indisponível",
     "summary": "Resumo por IA",
@@ -4895,6 +4902,9 @@
     "morningEnd": "Relatório disponível até",
     "timeHint": "O cartão da tela inicial volta ao status ao vivo quando a janela do relatório termina, mesmo offline.",
     "invalidSchedule": "Escolha um fuso horário válido e uma janela do relatório não vazia.",
+    "scheduleEmptyNight": "A janela do relatório está vazia. Escolha um horário em que o relatório fique pronto depois do início da janela.",
+    "scheduleEmptyMorning": "O horário em que o relatório fica pronto e o horário até o qual ele fica disponível coincidem. Escolha por quanto tempo o relatório fica disponível.",
+    "scheduleFullDay": "As duas janelas cobrem um dia inteiro. Deixe parte do dia fora do relatório.",
     "notificationsHint": "Uma notificação genérica por relatório agendado. Independe dos resumos pagos por IA.",
     "notificationPermission": "Ative as notificações push para receber seu relatório.",
     "defaultModel": "Usar o modelo padrão do Kilo",
@@ -4904,7 +4914,11 @@
     "estimate": "Estimativa {{estimate}} · máximo de {{maximum}}",
     "estimateUnavailable": "Um resumo pago não está disponível para estas configurações. Altere o modelo ou os limites, ou tente novamente mais tarde.",
     "confirmPaid": "Ativar resumos pagos para {{context}}?",
-    "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com limite de {{minutes}} min. A cobrança ocorre mesmo se a geração falhar.",
+    "paidDisclosure_one": "{{estimate}} estimado, até {{maximum}}, com limite de {{minutes}} minuto. A cobrança ocorre mesmo se a geração falhar.",
+    "paidDisclosure_many": "{{estimate}} estimado, até {{maximum}}, com limite de {{minutes}} minutos. A cobrança ocorre mesmo se a geração falhar.",
+    "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com limite de {{minutes}} minutos. A cobrança ocorre mesmo se a geração falhar.",
+    "paidDisclosure_other": "{{estimate}} estimado, até {{maximum}}, com limite de {{minutes}} minutos. A cobrança ocorre mesmo se a geração falhar.",
+    "paidDisclosure_zero": "{{estimate}} estimado, até {{maximum}}, com limite de {{minutes}} minutos. A cobrança ocorre mesmo se a geração falhar.",
     "enable": "Ativar resumos pagos",
     "allContexts": "Relatórios pessoais e da organização ficam separados.",
     "emptyHistory": "Nenhum relatório salvo",
@@ -4955,7 +4969,7 @@
     "sourceActivity": "Atividade sem título",
     "metadataFailureProvider": "erro do provedor",
     "metadataFailureTool": "erro da ferramenta",
-    "metadataFailureCancelled": "Cancelada",
+    "metadataStopped": "Última execução interrompida",
     "metadataFailureOther": "erro não especificado"
   },
   "systemSearch": {

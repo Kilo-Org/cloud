@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessies",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessies",
       "live": "ACTIEF",
-      "updating": "Bijwerken"
+      "updating": "Bijwerken",
+      "retentionLimit": "De meest recente sessies worden weergegeven."
     },
     "sessionRow": {
       "deleteTitle": "Sessie verwijderen?",
@@ -1684,7 +1685,6 @@
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
       "emptyReadOnlyTitle": "Geen berichten in deze sessie",
-      "renameAccessibility": "Sessie hernoemen: {{title}}",
       "cloningSession": "Sessie klonen…",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
       "historyTooLarge": "Het transcript van deze sessie is te groot om te laden.",
@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "Account opnieuw laden",
     "retryLoadingPrivacy": "Privacykeuzes opnieuw laden"
   },
+  "accountBlocked": {
+    "title": "Account geblokkeerd",
+    "description": "Kilo heeft dit account geblokkeerd en opnieuw inloggen heft de blokkade niet op. De helpdesk kan de blokkade op verzoek bekijken.",
+    "domainDescription": "Kilo staat geen accounts toe op dit e-maildomein en opnieuw inloggen verandert daar niets aan. De helpdesk kan het domein op verzoek bekijken.",
+    "contactSupport": "Contact opnemen met de helpdesk"
+  },
   "addCredits": {
     "cta": "Tegoed aanvullen",
     "billingPage": "factureringspagina"
@@ -2605,8 +2611,7 @@
     "timeoutDescription": "Het verzoek duurde te lang. Probeer het opnieuw."
   },
   "screenHeader": {
-    "openMenu": "Menu openen",
-    "openMenuFor": "Menu voor {{title}} openen"
+    "openMenu": "Menu openen"
   },
   "picker": {
     "optionsExpired": "Opties niet meer geldig",
@@ -4093,6 +4098,7 @@
         "network": "De download is niet voltooid. Controleer je verbinding en probeer het opnieuw.",
         "invalidFile": "Het gedownloade bestand is geen model dat deze app kan uitvoeren, dus het is verwijderd.",
         "checksum": "Het gedownloade bestand komt niet overeen met de gepubliceerde controlesom, dus het is verwijderd. Probeer het opnieuw te downloaden.",
+        "unreadable": "Dit apparaat kon het gedownloade bestand niet controleren, dus het is verwijderd. Probeer het opnieuw te downloaden.",
         "writeFailed": "Dit apparaat kon het model niet opslaan. Probeer het opnieuw te downloaden."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Alle contexten",
     "dismiss": "Briefing negeren",
     "dismissFailed": "Deze briefing kon nog niet worden genegeerd. Er wordt op de achtergrond opnieuw geprobeerd.",
+    "readMarkFailed": "Deze briefing kon niet als gelezen worden gemarkeerd. Er wordt opnieuw geprobeerd zodra de briefing opnieuw laadt.",
     "offline": "Offline · opgeslagen briefing",
     "cached": "Opgeslagen briefing · vernieuwen niet beschikbaar",
     "summary": "AI-samenvatting",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Briefing beschikbaar tot",
     "timeHint": "De Home-kaart toont weer de live status als het briefingvenster eindigt, ook offline.",
     "invalidSchedule": "Kies een geldige tijdzone en een niet-leeg briefingvenster.",
+    "scheduleEmptyNight": "Het briefingvenster is leeg. Kies een tijdstip waarop de briefing gereed is dat later ligt dan de start van het venster.",
+    "scheduleEmptyMorning": "Het tijdstip waarop de briefing gereed is en het tijdstip tot wanneer deze beschikbaar is, vallen samen. Kies hoe lang de briefing beschikbaar blijft.",
+    "scheduleFullDay": "De twee vensters beslaan een volledige dag. Laat een deel van de dag buiten de briefing.",
     "notificationsHint": "Eén algemene melding per geplande briefing. Los van betaalde AI-samenvattingen.",
     "notificationPermission": "Schakel pushmeldingen in om je briefing te ontvangen.",
     "defaultModel": "Standaardmodel van Kilo gebruiken",
@@ -4736,7 +4746,9 @@
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
     "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen. Pas het model of de limieten aan, of probeer het later opnieuw.",
     "confirmPaid": "Betaalde samenvattingen inschakelen voor {{context}}?",
-    "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} min. Kosten gelden ook als het genereren mislukt.",
+    "paidDisclosure_one": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuut. Kosten gelden ook als het genereren mislukt.",
+    "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuten. Kosten gelden ook als het genereren mislukt.",
+    "paidDisclosure_other": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuten. Kosten gelden ook als het genereren mislukt.",
     "enable": "Betaalde samenvattingen inschakelen",
     "allContexts": "Persoonlijke en organisatiebriefings blijven gescheiden.",
     "emptyHistory": "Geen opgeslagen briefings",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Activiteit zonder titel",
     "metadataFailureProvider": "providerfout",
     "metadataFailureTool": "toolfout",
-    "metadataFailureCancelled": "Geannuleerd",
+    "metadataStopped": "Laatste beurt gestopt",
     "metadataFailureOther": "onbekende fout"
   },
   "systemSearch": {

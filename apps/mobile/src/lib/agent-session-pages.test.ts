@@ -4,6 +4,8 @@ import {
   collectSearchPages,
   collectUnfilteredPages,
   dedupeBySessionId,
+  SESSION_HISTORY_MAX_PAGES,
+  sessionPagesAtRetentionBound,
   shouldLoadMoreSessions,
 } from '@/lib/agent-session-pages';
 
@@ -149,5 +151,34 @@ describe('shouldLoadMoreSessions', () => {
         isPlaceholderData: false,
       })
     ).toBe(false);
+  });
+});
+
+describe('sessionPagesAtRetentionBound', () => {
+  const page = (nextCursor?: unknown) => ({ nextCursor });
+  const atBound = (last: { nextCursor?: unknown }) => [
+    ...Array.from({ length: SESSION_HISTORY_MAX_PAGES - 1 }, () => page('cursor-0')),
+    last,
+  ];
+
+  it('is false before any page has loaded', () => {
+    expect(sessionPagesAtRetentionBound(undefined)).toBe(false);
+    expect(sessionPagesAtRetentionBound([])).toBe(false);
+  });
+
+  it('is false below the bound even when the server has more', () => {
+    expect(sessionPagesAtRetentionBound([page('cursor-1')])).toBe(false);
+  });
+
+  it('is true at the bound when the last page still carries a cursor', () => {
+    expect(sessionPagesAtRetentionBound(atBound(page('cursor-1')))).toBe(true);
+  });
+
+  it('is false at the bound when the last page ended the history', () => {
+    expect(sessionPagesAtRetentionBound(atBound(page(null)))).toBe(false);
+  });
+
+  it('is false at the bound when the last page has no cursor field', () => {
+    expect(sessionPagesAtRetentionBound(atBound({}))).toBe(false);
   });
 });

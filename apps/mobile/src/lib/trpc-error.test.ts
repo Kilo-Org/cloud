@@ -4,9 +4,8 @@ import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
 import {
+  isAccountBlockedTrpcError,
   isControlPlaneTimeout,
-  isRetryableTrpcError,
-  isTerminalTrpcCode,
   isUsageSourceUnavailable,
   readTrpcServerMessage,
   trpcErrorVariant,
@@ -98,31 +97,34 @@ describe('trpcErrorVariant', () => {
   });
 });
 
-describe('isTerminalTrpcCode', () => {
-  it.each(['CONFLICT', 'BAD_REQUEST', 'NOT_FOUND'])('is terminal for %s', code => {
-    expect(isTerminalTrpcCode(code)).toBe(true);
+describe('isAccountBlockedTrpcError', () => {
+  it('recognizes the flag on a direct tRPC client error envelope', () => {
+    expect(isAccountBlockedTrpcError({ data: { code: 'FORBIDDEN', accountBlocked: true } })).toBe(
+      true
+    );
   });
 
-  it.each(['TOO_MANY_REQUESTS', 'PRECONDITION_FAILED', 'INTERNAL_SERVER_ERROR'])(
-    'stays retryable for %s',
-    code => {
-      expect(isTerminalTrpcCode(code)).toBe(false);
-    }
-  );
-
-  it('stays retryable for a failure with no code', () => {
-    expect(isTerminalTrpcCode(undefined)).toBe(false);
+  it('recognizes the flag on the server-shaped envelope', () => {
+    expect(
+      isAccountBlockedTrpcError({ shape: { data: { code: 'FORBIDDEN', accountBlocked: true } } })
+    ).toBe(true);
   });
 
-  it('offers no retry for a conflict in either envelope shape', () => {
-    // A conflict names a state that already exists, so the same request repeats
-    // the same refusal.
-    const direct = Object.assign(new Error('Trigger Name "take-one" already exists'), {
-      name: 'TRPCClientError',
-      data: { code: 'CONFLICT' },
-    });
-    expect(isRetryableTrpcError(direct)).toBe(false);
-    expect(isRetryableTrpcError({ shape: { data: { code: 'CONFLICT' } } })).toBe(false);
+  it('is false for an ordinary permission denial', () => {
+    expect(isAccountBlockedTrpcError(trpcCode('FORBIDDEN'))).toBe(false);
+    expect(isAccountBlockedTrpcError({ data: { code: 'FORBIDDEN', accountBlocked: false } })).toBe(
+      false
+    );
+  });
+
+  it('requires the boolean true, not a truthy stand-in', () => {
+    expect(isAccountBlockedTrpcError({ data: { accountBlocked: 'true' } })).toBe(false);
+  });
+
+  it('is false when there is no error at all', () => {
+    expect(isAccountBlockedTrpcError(undefined)).toBe(false);
+    expect(isAccountBlockedTrpcError(null)).toBe(false);
+    expect(isAccountBlockedTrpcError(new Error('network down'))).toBe(false);
   });
 });
 

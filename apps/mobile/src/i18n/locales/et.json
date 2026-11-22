@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seanssi",
       "sectionAccessibility": "{{title}}: {{displayCount}} seanssi",
       "live": "REAALAJAS",
-      "updating": "Uuendamine"
+      "updating": "Uuendamine",
+      "retentionLimit": "Kuvatakse kõige hiljutisemad seansid."
     },
     "sessionRow": {
       "deleteTitle": "Kas kustutada seanss?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
       "emptyReadOnlyTitle": "Selles seansis pole sõnumeid",
-      "renameAccessibility": "Nimeta seanss ümber: {{title}}",
       "cloningSession": "Seanssi kloonitakse",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",
       "historyTooLarge": "Selle seansi üleskirjutus on laadimiseks liiga suur.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Proovi konto laadimist uuesti",
     "retryLoadingPrivacy": "Proovi privaatsusvalikute laadimist uuesti"
   },
+  "accountBlocked": {
+    "title": "Konto blokeeritud",
+    "description": "Kilo blokeeris selle konto ja uuesti sisselogimine ei tühista blokeeringut. Tugi saab blokeeringu taotluse korral üle vaadata.",
+    "domainDescription": "Kilo ei luba sellel e-posti domeenil kontosid ja uuesti sisselogimine ei muuda seda. Tugi saab domeeni taotluse korral üle vaadata.",
+    "contactSupport": "Võta ühendust toega"
+  },
   "addCredits": {
     "cta": "Lisa krediiti",
     "billingPage": "arveldusleht"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },
   "screenHeader": {
-    "openMenu": "Ava menüü",
-    "openMenuFor": "Ava {{title}} menüü"
+    "openMenu": "Ava menüü"
   },
   "picker": {
     "optionsExpired": "Valikud aegunud",
@@ -4093,6 +4098,7 @@
         "network": "Allalaadimine ei lõppenud. Kontrolli ühendust ja proovi uuesti.",
         "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati.",
         "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovi uuesti alla laadida.",
+        "unreadable": "See seade ei suutnud allalaaditud faili kontrollida, seega see eemaldati. Proovi uuesti alla laadida.",
         "writeFailed": "See seade ei suutnud mudelit salvestada. Proovi uuesti alla laadida."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Kõik kontekstid",
     "dismiss": "Jäta ülevaade kõrvale",
     "dismissFailed": "Selle ülevaate kõrvale jätmine ei õnnestunud veel. Taustal proovitakse uuesti.",
+    "readMarkFailed": "Seda ülevaadet ei õnnestunud loetuks märkida. Uuesti proovitakse, kui ülevaade taas laaditakse.",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud ülevaade · värskendamine pole saadaval",
     "summary": "AI kokkuvõte",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Ülevaade saadaval kuni",
     "timeHint": "Avakuva kaart taastab reaalajas oleku, kui ülevaatevahemik lõpeb, isegi võrguühenduseta.",
     "invalidSchedule": "Vali kehtiv ajavöönd ja mittetühi ülevaatevahemik.",
+    "scheduleEmptyNight": "Ülevaatevahemik on tühi. Vali valmimisaeg, mis on hiljem kui vahemiku algus.",
+    "scheduleEmptyMorning": "Valmimisaeg ja kättesaadavuse lõppaeg kattuvad. Vali, kui kaua ülevaade saadaval püsib.",
+    "scheduleFullDay": "Kaks vahemikku katavad terve päeva. Jäta osa päevast ülevaatest välja.",
     "notificationsHint": "Üks üldine teavitus iga ajastatud ülevaate kohta. Ei sõltu tasulistest AI kokkuvõtetest.",
     "notificationPermission": "Ülevaate saamiseks lülita sisse push-teavitused.",
     "defaultModel": "Kasuta Kilo vaikemudelit",
@@ -4740,6 +4750,8 @@
     "estimateModelNotAllowed": "See mudel pole selles kontekstis lubatud. Vali teine mudel.",
     "estimateSpendLimitTooLow": "Kulupiirangu tõstmisel saaks selle kokkuvõtte lubada.",
     "confirmPaid": "Kas lubada tasulised kokkuvõtted kontekstis {{context}}?",
+    "paidDisclosure_one": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} min pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
+    "paidDisclosure_other": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} min pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
     "paidDisclosure": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} min pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
     "enable": "Luba tasulised kokkuvõtted",
     "allContexts": "Isiklikud ja organisatsiooni ülevaated hoitakse eraldi.",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Pealkirjata tegevus",
     "metadataFailureProvider": "pakkuja viga",
     "metadataFailureTool": "tööriista viga",
-    "metadataFailureCancelled": "Tühistatud",
+    "metadataStopped": "Viimane voor peatati",
     "metadataFailureOther": "täpsustamata viga"
   },
   "systemSearch": {

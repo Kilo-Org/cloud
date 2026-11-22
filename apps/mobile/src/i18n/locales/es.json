@@ -1635,7 +1635,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesiones",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesiones",
       "live": "EN DIRECTO",
-      "updating": "Actualizando"
+      "updating": "Actualizando",
+      "retentionLimit": "Mostrando las sesiones más recientes."
     },
     "sessionRow": {
       "deleteTitle": "¿Eliminar sesión?",
@@ -1707,7 +1708,6 @@
       "scrollToBottom": "Desplazarse al final",
       "emptyTitle": "Aún no hay mensajes",
       "emptyReadOnlyTitle": "Esta sesión no tiene mensajes",
-      "renameAccessibility": "Cambiar nombre de la sesión: {{title}}",
       "cloningSession": "Clonando sesión",
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
       "historyTooLarge": "La transcripción de esta sesión es demasiado grande para cargarla.",
@@ -2568,6 +2568,12 @@
     "retryLoadingAccount": "Volver a cargar la cuenta",
     "retryLoadingPrivacy": "Volver a cargar las opciones de privacidad"
   },
+  "accountBlocked": {
+    "title": "Cuenta bloqueada",
+    "description": "Kilo ha bloqueado esta cuenta y volver a iniciar sesión no lo desbloqueará. El soporte técnico puede revisar el bloqueo si lo solicitas.",
+    "domainDescription": "Kilo bloquea las cuentas de este dominio de correo electrónico y volver a iniciar sesión no lo cambiará. El soporte técnico puede revisar el dominio si lo solicitas.",
+    "contactSupport": "Contactar con soporte técnico"
+  },
   "addCredits": {
     "cta": "Añadir créditos",
     "billingPage": "página de facturación"
@@ -2640,8 +2646,7 @@
     "timeoutDescription": "La solicitud se agotó antes de completarse. Inténtalo de nuevo."
   },
   "screenHeader": {
-    "openMenu": "Abrir menú",
-    "openMenuFor": "Abrir menú de {{title}}"
+    "openMenu": "Abrir menú"
   },
   "picker": {
     "optionsExpired": "Opciones caducadas",
@@ -4167,6 +4172,7 @@
         "network": "La descarga no se completó. Comprueba tu conexión e inténtalo de nuevo.",
         "invalidFile": "El archivo descargado no es un modelo que esta aplicación pueda ejecutar, así que se eliminó.",
         "checksum": "El archivo descargado no coincide con su suma de verificación publicada, así que se eliminó. Intenta descargarlo de nuevo.",
+        "unreadable": "Este dispositivo no ha podido comprobar el archivo descargado, así que se eliminó. Intenta descargarlo de nuevo.",
         "writeFailed": "Este dispositivo no ha podido guardar el modelo. Intenta descargarlo de nuevo."
       }
     },
@@ -4792,6 +4798,7 @@
     "contextAll": "Todos los contextos",
     "dismiss": "Descartar informe",
     "dismissFailed": "Todavía no se ha podido descartar este informe. Se reintentará en segundo plano.",
+    "readMarkFailed": "No se ha podido marcar este informe como leído. Se reintentará cuando se vuelva a cargar el informe.",
     "offline": "Sin conexión · informe guardado",
     "cached": "Informe guardado · no se puede actualizar",
     "summary": "Resumen de IA",
@@ -4811,6 +4818,9 @@
     "morningEnd": "Informe disponible hasta",
     "timeHint": "La tarjeta de Inicio vuelve al estado en vivo cuando termina la ventana del informe, incluso sin conexión.",
     "invalidSchedule": "Elige una zona horaria válida y una ventana del informe no vacía.",
+    "scheduleEmptyNight": "La ventana del informe está vacía. Elige una hora de preparación posterior al inicio de la ventana.",
+    "scheduleEmptyMorning": "La hora de preparación y la hora de fin de disponibilidad coinciden. Elige cuánto tiempo permanece disponible el informe.",
+    "scheduleFullDay": "Las dos ventanas cubren un día completo. Deja parte del día fuera del informe.",
     "notificationsHint": "Una notificación genérica por cada informe programado. Independiente de los resúmenes de IA de pago.",
     "notificationPermission": "Activa las notificaciones push para recibir tu informe.",
     "defaultModel": "Usar el modelo predeterminado de Kilo",
@@ -4824,6 +4834,9 @@
     "estimateModelNotAllowed": "Este modelo no está permitido en este contexto. Elige otro modelo.",
     "estimateSpendLimitTooLow": "Sube el límite de gasto para permitir este resumen.",
     "confirmPaid": "¿Activar resúmenes de pago para {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimado, hasta {{maximum}}, con un límite de {{minutes}} min. Se cobra aunque la generación falle.",
+    "paidDisclosure_many": "{{estimate}} estimado, hasta {{maximum}}, con un límite de {{minutes}} min. Se cobra aunque la generación falle.",
+    "paidDisclosure_other": "{{estimate}} estimado, hasta {{maximum}}, con un límite de {{minutes}} min. Se cobra aunque la generación falle.",
     "paidDisclosure": "{{estimate}} estimado, hasta {{maximum}}, con un límite de {{minutes}} min. Se cobra aunque la generación falle.",
     "enable": "Activar resúmenes de pago",
     "allContexts": "Los informes personales y de organización se mantienen separados.",
@@ -4867,7 +4880,7 @@
     "sourceActivity": "Actividad sin título",
     "metadataFailureProvider": "error del proveedor",
     "metadataFailureTool": "error de la herramienta",
-    "metadataFailureCancelled": "Cancelado",
+    "metadataStopped": "El último turno se detuvo",
     "metadataFailureOther": "error no especificado"
   },
   "systemSearch": {

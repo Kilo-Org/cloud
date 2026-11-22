@@ -2270,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesijos",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesijos",
       "live": "TIESIOGIAI",
-      "updating": "Atnaujinama"
+      "updating": "Atnaujinama",
+      "retentionLimit": "Rodomos naujausios sesijos."
     },
     "sessionRow": {
       "deleteTitle": "Ištrinti sesiją?",
@@ -2344,7 +2345,6 @@
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
       "emptyReadOnlyTitle": "Šioje sesijoje nėra žinučių",
-      "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
       "historyTooLarge": "Šios sesijos nuorašas per didelis, kad jį būtų galima įkelti.",
@@ -3217,6 +3217,12 @@
     "retryLoadingAccount": "Bandyti įkelti paskyrą dar kartą",
     "retryLoadingPrivacy": "Bandyti įkelti privatumo parinktis dar kartą"
   },
+  "accountBlocked": {
+    "title": "Paskyra užblokuota",
+    "description": "Kilo užblokavo šią paskyrą, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti blokavimą gavusi prašymą.",
+    "domainDescription": "Kilo neleidžia paskyrų šiame el. pašto domene, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti domeną gavusi prašymą.",
+    "contactSupport": "Kreiptis į pagalbos tarnybą"
+  },
   "addCredits": {
     "cta": "Papildyti kreditus",
     "billingPage": "atsiskaitymų puslapis"
@@ -3289,8 +3295,7 @@
     "timeoutDescription": "Užklausa nebuvo atlikta per skirtąjį laiką. Bandyk dar kartą."
   },
   "screenHeader": {
-    "openMenu": "Atidaryti meniu",
-    "openMenuFor": "Atidaryti „{{title}}“ meniu"
+    "openMenu": "Atidaryti meniu"
   },
   "picker": {
     "optionsExpired": "Parinktys nebegalioja",
@@ -4241,6 +4246,7 @@
         "network": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir bandykite dar kartą.",
         "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas.",
         "checksum": "Atsisiųstas failas neatitinka paskelbtos kontrolinės sumos, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą.",
+        "unreadable": "Šis įrenginys negalėjo patikrinti atsisiųsto failo, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą.",
         "writeFailed": "Šis įrenginys negalėjo išsaugoti modelio. Pabandykite atsisiųsti dar kartą."
       }
     },
@@ -4876,6 +4882,7 @@
     "contextAll": "Visi kontekstai",
     "dismiss": "Atmesti suvestinę",
     "dismissFailed": "Šios suvestinės dar nepavyko atmesti. Bandymas kartojamas fone.",
+    "readMarkFailed": "Šios suvestinės nepavyko pažymėti kaip perskaitytos. Bandymas bus pakartotas, kai suvestinė bus įkelta iš naujo.",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota suvestinė · atnaujinti negalima",
     "summary": "AI santrauka",
@@ -4895,6 +4902,9 @@
     "morningEnd": "Suvestinė galima iki",
     "timeHint": "Pasibaigus suvestinės laikotarpiui, pradžios kortelė vėl rodo dabartinę būseną, net neprisijungus.",
     "invalidSchedule": "Pasirinkite tinkamą laiko juostą ir netuščią suvestinės laikotarpį.",
+    "scheduleEmptyNight": "Suvestinės laikotarpis tuščias. Pasirinkite paruošimo laiką, vėlesnį už laikotarpio pradžią.",
+    "scheduleEmptyMorning": "Paruošimo laikas ir laikas, iki kurio suvestinė galima, sutampa. Pasirinkite, kiek laiko suvestinė bus galima.",
+    "scheduleFullDay": "Abu laikotarpiai apima visą dieną. Palikite dalį dienos už suvestinės laikotarpio ribų.",
     "notificationsHint": "Vienas bendras pranešimas kiekvienai suplanuotai suvestinei. Nepriklauso nuo mokamų AI santraukų.",
     "notificationPermission": "Įjunkite push pranešimus, kad gautumėte suvestinę.",
     "defaultModel": "Naudoti numatytąjį Kilo modelį",
@@ -4904,7 +4914,11 @@
     "estimate": "Apskaičiavimas {{estimate}} · daugiausia {{maximum}}",
     "estimateUnavailable": "Mokama santrauka šiems nustatymams neprieinama. Pakeiskite modelį arba ribas, arba pabandykite vėliau.",
     "confirmPaid": "{{context}}: įjungti mokamas santraukas?",
-    "paidDisclosure": "Įvertis {{estimate}}, daugiausia {{maximum}}, laiko riba {{minutes}} min. Mokestis taikomas net ir nepavykus sukurti.",
+    "paidDisclosure_one": "Įvertis {{estimate}}, daugiausia {{maximum}}, laiko riba {{minutes}} minutė. Mokestis taikomas net ir nepavykus sukurti.",
+    "paidDisclosure_few": "Įvertis {{estimate}}, daugiausia {{maximum}}, laiko riba {{minutes}} minutės. Mokestis taikomas net ir nepavykus sukurti.",
+    "paidDisclosure_many": "Įvertis {{estimate}}, daugiausia {{maximum}}, laiko riba {{minutes}} minutės. Mokestis taikomas net ir nepavykus sukurti.",
+    "paidDisclosure": "Įvertis {{estimate}}, daugiausia {{maximum}}, laiko riba {{minutes}} minučių. Mokestis taikomas net ir nepavykus sukurti.",
+    "paidDisclosure_other": "Įvertis {{estimate}}, daugiausia {{maximum}}, laiko riba {{minutes}} minučių. Mokestis taikomas net ir nepavykus sukurti.",
     "enable": "Įjungti mokamas santraukas",
     "allContexts": "Asmeninės ir organizacijos suvestinės laikomos atskirai.",
     "emptyHistory": "Nėra išsaugotų suvestinių",
@@ -4955,7 +4969,7 @@
     "sourceActivity": "Veikla be pavadinimo",
     "metadataFailureProvider": "tiekėjo klaida",
     "metadataFailureTool": "įrankio klaida",
-    "metadataFailureCancelled": "Atšaukta",
+    "metadataStopped": "Paskutinis ėjimas buvo sustabdytas",
     "metadataFailureOther": "nenurodyta klaida"
   },
   "systemSearch": {

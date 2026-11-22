@@ -2223,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessions",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessions",
       "live": "EN DIRECTE",
-      "updating": "S'està actualitzant"
+      "updating": "S'està actualitzant",
+      "retentionLimit": "Es mostren les sessions més recents."
     },
     "sessionRow": {
       "deleteTitle": "Vols eliminar la sessió?",
@@ -2295,7 +2296,6 @@
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
       "emptyReadOnlyTitle": "No hi ha missatges en aquesta sessió",
-      "renameAccessibility": "Reanomena la sessió: {{title}}",
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "historyTooLarge": "La transcripció d'aquesta sessió és massa gran per carregar-la.",
@@ -3156,6 +3156,12 @@
     "retryLoadingAccount": "Torna a provar de carregar el compte",
     "retryLoadingPrivacy": "Torna a provar de carregar les opcions de privadesa"
   },
+  "accountBlocked": {
+    "title": "Compte bloquejat",
+    "description": "Kilo ha bloquejat aquest compte i tornar a iniciar sessió no el desbloquejarà. L'equip de suport pot revisar el bloqueig si ho sol·licites.",
+    "domainDescription": "Kilo no permet comptes en aquest domini de correu electrònic, i tornar a iniciar sessió no ho canviarà. L'equip de suport pot revisar el domini si ho sol·licites.",
+    "contactSupport": "Contacta amb l'equip de suport"
+  },
   "addCredits": {
     "cta": "Afegeix crèdits",
     "billingPage": "pàgina de facturació"
@@ -3228,8 +3234,7 @@
     "timeoutDescription": "La sol·licitud ha esgotat el temps d'espera. Torna-ho a provar."
   },
   "screenHeader": {
-    "openMenu": "Obre el menú",
-    "openMenuFor": "Obre el menú de {{title}}"
+    "openMenu": "Obre el menú"
   },
   "picker": {
     "optionsExpired": "Opcions caducades",
@@ -4167,6 +4172,7 @@
         "network": "La descàrrega no s'ha acabat. Comprova la connexió i torna-ho a provar.",
         "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat.",
         "checksum": "El fitxer descarregat no coincideix amb la suma de verificació publicada, així que s'ha eliminat. Torna a provar la descàrrega.",
+        "unreadable": "Aquest dispositiu no ha pogut comprovar el fitxer descarregat, així que s'ha eliminat. Torna a provar la descàrrega.",
         "writeFailed": "Aquest dispositiu no ha pogut desar el model. Torna a provar la descàrrega."
       }
     },
@@ -4792,6 +4798,7 @@
     "contextAll": "Tots els contextos",
     "dismiss": "Descarta l'informe",
     "dismissFailed": "Encara no s'ha pogut descartar aquest informe. Es torna a provar en segon pla.",
+    "readMarkFailed": "No s'ha pogut marcar aquest informe com a llegit. Es tornarà a provar quan es recarregui l'informe.",
     "offline": "Sense connexió · informe desat",
     "cached": "Informe desat · no es pot actualitzar",
     "summary": "Resum d'IA",
@@ -4811,6 +4818,9 @@
     "morningEnd": "Informe disponible fins a les",
     "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba la finestra de l'informe, fins i tot sense connexió.",
     "invalidSchedule": "Tria una zona horària vàlida i una finestra de l'informe no buida.",
+    "scheduleEmptyNight": "La finestra de l'informe és buida. Tria una hora de preparació posterior a l'inici de la finestra.",
+    "scheduleEmptyMorning": "L'hora de preparació i l'hora de fi de disponibilitat coincideixen. Tria quant de temps es manté disponible l'informe.",
+    "scheduleFullDay": "Les dues finestres cobreixen un dia complet. Deixa part del dia fora de l'informe.",
     "notificationsHint": "Una notificació genèrica per cada informe programat. Independent dels resums d'IA de pagament.",
     "notificationPermission": "Activa les notificacions push per rebre l'informe.",
     "defaultModel": "Usa el model per defecte de Kilo",
@@ -4820,6 +4830,9 @@
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració. Canvia el model o els límits, o torna-ho a provar més tard.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure_many": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure_other": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "enable": "Activa els resums de pagament",
     "allContexts": "Els informes personals i d'organització es mantenen separats.",
@@ -4867,7 +4880,7 @@
     "sourceActivity": "Activitat sense títol",
     "metadataFailureProvider": "error del proveïdor",
     "metadataFailureTool": "error d'eina",
-    "metadataFailureCancelled": "Cancel·lada",
+    "metadataStopped": "L'últim torn s'ha aturat",
     "metadataFailureOther": "error no especificat"
   },
   "systemSearch": {

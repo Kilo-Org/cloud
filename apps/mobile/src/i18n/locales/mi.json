@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} wātū",
       "sectionAccessibility": "{{title}}: {{displayCount}} wātū",
       "live": "MATAORA",
-      "updating": "Kei te whakahou"
+      "updating": "Kei te whakahou",
+      "retentionLimit": "E whakaatu ana i ōu wātū tino hou."
     },
     "sessionRow": {
       "deleteTitle": "Mukua te wātū?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Panuku ki raro rawa",
       "emptyTitle": "Kāore anō he karere",
       "emptyReadOnlyTitle": "Kāore he karere i tēnei wātū",
-      "renameAccessibility": "Whakaingoatia anō te wātū: {{title}}",
       "cloningSession": "Kei te tārua i te wātū",
       "couldNotLoadThisSession": "Kāore i taea te uta i tēnei wātū",
       "historyTooLarge": "He rahi rawa te tuhinga kōrero o tēnei wātū kāore e taea te uta.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Whakamātau anō ki te uta i te pūkete",
     "retryLoadingPrivacy": "Whakamātau anō ki te uta i ngā kōwhiringa matatapu"
   },
+  "accountBlocked": {
+    "title": "Kua aukatia te pūkete",
+    "description": "Kua aukatia e Kilo tēnei pūkete, ā, kāore e whakakorengia mā te takiuru anō. Ka taea e te rōpū tautoko te arotake i te aukati ina tonoa.",
+    "domainDescription": "Ka aukatia e Kilo ngā pūkete o tēnei rohe īmēra, ā, kāore e whakakorengia mā te takiuru anō. Ka taea e te rōpū tautoko te arotake i te rohe ina tonoa.",
+    "contactSupport": "Whakapā ki te rōpū tautoko"
+  },
   "addCredits": {
     "cta": "Tāpirihia he moni tōmua",
     "billingPage": "te whārangi utunga"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Kua pau te wā o te tono i mua i tōna otinga. Whakamātau anō."
   },
   "screenHeader": {
-    "openMenu": "Whakatuwheratia te tahua",
-    "openMenuFor": "Whakatuwheratia te tahua mō {{title}}"
+    "openMenu": "Whakatuwheratia te tahua"
   },
   "picker": {
     "optionsExpired": "Kua pau ngā kōwhiringa",
@@ -4093,6 +4098,7 @@
         "network": "Kāore i oti te tikiake. Tirohia tō hononga, ka ngana anō.",
         "invalidFile": "Ehara te kōnae kua tikiake i tētahi tauira ka taea e tēnei taupānga te whakahaere, nō reira kua tangohia.",
         "checksum": "Kāore te kōnae kua tikiake e ōrite ki tōna tātai arowhai kua whakaputaina, nō reira kua tangohia. Whakamātauria anō te tikiake.",
+        "unreadable": "Kāore tēnei pūrere i taea te arowhai te kōnae kua tikiake, nō reira kua tangohia. Whakamātauria anō te tikiake.",
         "writeFailed": "Kāore tēnei pūrere i taea te tiaki i te tauira. Whakamātauria anō te tikiake."
       }
     },
@@ -4708,6 +4714,7 @@
     "contextAll": "Ngā horopaki katoa",
     "dismiss": "Whakakorea te pūrongo",
     "dismissFailed": "Kāore anō kia taea te whakakore i tēnei pūrongo. Ka ngana aunoa anō i muri mai.",
+    "readMarkFailed": "Kāore i taea te tohu i tēnei pūrongo kua pānuitia. Ka ngana aunoa anō ina utaina anō te pūrongo.",
     "offline": "Tuimotu · pūrongo kua tiakina",
     "cached": "Pūrongo kua tiakina · kāore e taea te whakahou",
     "summary": "Whakarāpopototanga AI",
@@ -4727,6 +4734,9 @@
     "morningEnd": "Ka wātea te pūrongo tae noa ki te",
     "timeHint": "Ka whakahokia e te kāri Kāinga te tūnga ora ina mutu te wā pūrongo, ahakoa tuimotu.",
     "invalidSchedule": "Kōwhiria he rohe wā tika, me tētahi wā pūrongo kāore e ōrite tōna tīmatanga me tōna mutunga.",
+    "scheduleEmptyNight": "Kua kau te wā pūrongo. Kōwhiria he wā rite kei muri ake i te tīmatanga o te wā pūrongo.",
+    "scheduleEmptyMorning": "E ōrite ana te wā rite me te wā e wātea ana te pūrongo. Kōwhiria te roa e wātea ai te pūrongo.",
+    "scheduleFullDay": "Ka kapi te rā katoa i ngā wā pūrongo e rua. Waiho tētahi wāhanga o te rā i waho i te wā pūrongo.",
     "notificationsHint": "Kotahi whakamōhiotanga whānui mō ia pūrongo kua hōtaka. Motuhake i ngā whakarāpopototanga AI utu.",
     "notificationPermission": "Whakahohea ngā whakamōhiotanga kia whiwhi koe i tō pūrongo.",
     "defaultModel": "Whakamahia te tauira taunoa a Kilo",
@@ -4736,7 +4746,9 @@
     "estimate": "Whakatau tata {{estimate}} · teitei rawa {{maximum}}",
     "estimateUnavailable": "Kāore he whakarāpopototanga utu mō ēnei tautuhinga. Hurihia te tauira, ngā here rānei, ka ngana anō a muri ake nei.",
     "confirmPaid": "Whakahohe i ngā whakarāpopototanga utu mō {{context}}?",
+    "paidDisclosure_one": "{{estimate}} te matapae, tae noa ki {{maximum}}, me te tepe {{minutes}} meneti. Ka utua ahakoa ka rahua te waihanga.",
     "paidDisclosure": "{{estimate}} te matapae, tae noa ki {{maximum}}, me te tepe {{minutes}} meneti. Ka utua ahakoa ka rahua te waihanga.",
+    "paidDisclosure_other": "{{estimate}} te matapae, tae noa ki {{maximum}}, me te tepe {{minutes}} meneti. Ka utua ahakoa ka rahua te waihanga.",
     "enable": "Whakahohe whakarāpopototanga utu",
     "allContexts": "Ka noho motuhake ngā pūrongo whaiaro me ā te whakahaere.",
     "emptyHistory": "Kāore he pūrongo kua tiakina",
@@ -4779,7 +4791,7 @@
     "sourceActivity": "Ngohe kāore he ingoa",
     "metadataFailureProvider": "Hapa kaiwhakarato",
     "metadataFailureTool": "Hapa taputapu",
-    "metadataFailureCancelled": "Kua whakakorea",
+    "metadataStopped": "I whakamutua te huringa whakamutunga",
     "metadataFailureOther": "Hapa kāore i tautuhia"
   },
   "systemSearch": {

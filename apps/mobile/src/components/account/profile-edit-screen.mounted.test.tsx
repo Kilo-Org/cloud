@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite covers every state, save outcome and exit of this screen, and each case drives the same react-native, expo-router and tRPC mock harness declared here. */
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -391,10 +392,24 @@ describe('ProfileEditScreen', () => {
     expect(field(root, 'GitHub URL').props.disabled).toBeUndefined();
     expect(saveButton(root).props.loading).toBe(true);
 
-    // The button's disable lands on the next commit, so the guard refuses this press.
+    // This render already reads the save as pending, so the guard refuses the press.
     typeGithub(root, 'https://github.com/ada');
     press(root);
 
     expect(state.mutate).not.toHaveBeenCalled();
+  });
+
+  it('saves once when Save is pressed twice before the button shows the save as pending', async () => {
+    const root = await mount();
+
+    // `state.pending` stays false for the whole case: the pending render never
+    // commits, so both presses run the handler that still reads `isPending` as
+    // false, exactly as on the device when the second tap arrives first.
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+    press(root);
+
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    expect(state.mutate).toHaveBeenCalledWith({ github_url: 'https://github.com/ada' });
   });
 });

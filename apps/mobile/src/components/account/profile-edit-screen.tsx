@@ -77,6 +77,9 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const queryClient = useQueryClient();
   const linkedinRef = useRef(linkedinUrl ?? '');
   const githubRef = useRef(githubUrl ?? '');
+  // A save that is already in flight must not be sent again by a press that
+  // arrives before the pending render commits.
+  const submitLockedRef = useRef(false);
   const [linkedinError, setLinkedinError] = useState<string | null>(null);
   const [githubError, setGithubError] = useState<string | null>(null);
   const validateUrl = createProfileUrlError(t('profile.editProfile.invalidUrl'));
@@ -84,6 +87,9 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const update = useMutation(
     trpc.user.updateProfile.mutationOptions({
       onSuccess: () => {
+        // A completion can arrive after the reader left, and this form can still
+        // be mounted then; releasing the lock keeps Save usable for a later edit.
+        submitLockedRef.current = false;
         // The screen's read is cached for the default staleTime, so a quick return
         // would show the links as they were before this save.
         void queryClient.invalidateQueries({ queryKey: trpc.user.getProfileLinks.queryKey() });
@@ -93,15 +99,23 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
         onDone();
       },
       // The server's message is the account of what it refused, so it is shown
-      // as written rather than replaced with a generic failure.
-      onError: error => toast.error(error.message),
+      // as written rather than replaced with a generic failure. A refused save
+      // releases the form so the typed link can be sent again.
+      onError: error => {
+        submitLockedRef.current = false;
+        toast.error(error.message);
+      },
     })
   );
 
   const onSubmit = () => {
-    // One save at a time. The button's own `disabled` lands on the next commit,
-    // so this refuses a second press that arrives before that render.
-    if (update.isPending) {
+    // One save at a time. `update.isPending` is read from the render that made
+    // this closure, so a press dispatched before the pending render commits
+    // still sees `false` and would reach `mutate` a second time; the ref is
+    // shared across renders and is set before the request, so it closes that
+    // window. `isPending` stays the settle-time half of the check: it holds
+    // until the mutation actually settles, including the wait for it to start.
+    if (update.isPending || submitLockedRef.current) {
       return;
     }
     const linkedin = submittedUrl(linkedinRef.current, linkedinUrl);
@@ -117,6 +131,7 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
       onDone();
       return;
     }
+    submitLockedRef.current = true;
     update.mutate({
       ...(linkedin === undefined ? {} : { linkedin_url: linkedin }),
       ...(github === undefined ? {} : { github_url: github }),

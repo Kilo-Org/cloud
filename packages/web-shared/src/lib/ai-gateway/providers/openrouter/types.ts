@@ -11,8 +11,8 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 // Imports here must be type-only, and this file never imports the provider modules that import it
-// (mistral.ts, minimax.ts), which is what keeps the cycle broken. `reasoning-details` and
-// `inference-provider-id` are examples of permitted imports: types only, never values.
+// (for example mistral.ts, openai.ts and reflection.ts), which is what keeps the cycle broken. Its
+// own `reasoning-details` and `inference-provider-id` imports are the permitted kind: types only.
 
 export type OpenRouterProviderConfig = {
   order?: string[];

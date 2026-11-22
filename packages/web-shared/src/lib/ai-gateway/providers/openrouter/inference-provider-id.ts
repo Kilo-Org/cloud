@@ -362,12 +362,3 @@ export {
   type AzureCredentials,
   type VertexCredentials,
 } from '@kilocode/app-shared/byok-credentials';
-
-// The direct Vertex credential shapes live beside the other BYOK credential
-// modules. They are re-exported here because every existing import reads them
-// from this path.
-export {
-  GoogleServiceAccountKeyFileSchema,
-  DirectVertexCredentialsSchema,
-  type DirectVertexCredentials,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/direct-vertex-credentials';

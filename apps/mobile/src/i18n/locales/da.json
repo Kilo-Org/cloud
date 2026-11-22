@@ -943,7 +943,7 @@
       "title": "Kontroller",
       "openDetails": "Åbn detaljer for {{name}}",
       "notAvailable": "Kontrollerne er ikke tilgængelige endnu. Den seneste commit er muligvis ikke behandlet, eller Kilo GitHub-appen er ikke installeret i kildegrenens kodelager.",
-      "providerNotAvailable": "Kontrollerne er ikke tilgængelige endnu. Den seneste commit er muligvis ikke behandlet, eller din forbindelse har muligvis ikke adgang til elementet.",
+      "providerNotAvailable": "Kontrollerne er ikke tilgængelige endnu. Den seneste commit er muligvis ikke behandlet, eller din forbindelse har muligvis ikke adgang til dette kodelager.",
       "noAccess": "Du har ikke adgang til kontroller for dette kodelager.",
       "couldNotLoad": "Kunne ikke indlæse kontroller.",
       "retryChecks": "Prøv at indlæse kontrollerne igen",

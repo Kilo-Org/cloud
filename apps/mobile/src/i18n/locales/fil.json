@@ -943,7 +943,7 @@
       "title": "Mga pagsusuri",
       "openDetails": "Buksan ang mga detalye ng {{name}}",
       "notAvailable": "Wala pang makuhang pagsusuri. Maaaring hindi pa naproseso ang head commit, o hindi naka-install ang Kilo GitHub App sa head repository.",
-      "providerNotAvailable": "Wala pang makuhang pagsusuri. Maaaring hindi pa naproseso ang head commit, o maaaring walang access ang koneksyon mo sa item.",
+      "providerNotAvailable": "Wala pang makuhang pagsusuri. Maaaring hindi pa naproseso ang head commit, o maaaring walang access ang koneksyon mo sa head repository.",
       "noAccess": "Wala kang access sa mga pagsusuri para sa repository na ito.",
       "couldNotLoad": "Hindi ma-load ang mga pagsusuri.",
       "retryChecks": "Subukang muli ang mga pagsusuri",

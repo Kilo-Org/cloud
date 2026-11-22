@@ -943,7 +943,7 @@
       "title": "Pemeriksaan",
       "openDetails": "Buka butiran {{name}}",
       "notAvailable": "Pemeriksaan belum tersedia. Komit terkini mungkin belum diproses, atau apl GitHub Kilo belum dipasang pada repositori sumber.",
-      "providerNotAvailable": "Pemeriksaan belum tersedia. Komit terkini mungkin belum diproses, atau sambungan anda mungkin tidak mempunyai akses kepada perkara itu.",
+      "providerNotAvailable": "Pemeriksaan belum tersedia. Komit terkini mungkin belum diproses, atau sambungan anda mungkin tidak mempunyai akses kepada repositori ini.",
       "noAccess": "Anda tidak mempunyai akses kepada pemeriksaan untuk repositori ini.",
       "couldNotLoad": "Tidak dapat memuatkan pemeriksaan.",
       "retryChecks": "Cuba pemeriksaan semula",

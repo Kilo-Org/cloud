@@ -2881,7 +2881,7 @@
       "noAccess": "Vous n'avez pas accès aux vérifications de ce dépôt.",
       "noChecksReported": "Aucun résultat de vérification",
       "notAvailable": "Les vérifications ne sont pas encore disponibles. Le dernier commit n'a peut-être pas été traité ou l'application GitHub de Kilo n'est pas installée sur le dépôt source.",
-      "providerNotAvailable": "Les vérifications ne sont pas encore disponibles. Le dernier commit n'a peut-être pas été traité ou votre connexion n'a peut-être pas accès à l'élément.",
+      "providerNotAvailable": "Les vérifications ne sont pas encore disponibles. Le dernier commit n'a peut-être pas été traité ou votre connexion n'a peut-être pas accès à ce dépôt.",
       "openDetails": "Afficher les détails de {{name}}",
       "passed": "{{displayCount}} réussies",
       "passed_one": "{{displayCount}} réussie",

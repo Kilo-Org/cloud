@@ -943,7 +943,7 @@
       "title": "Kontroller",
       "openDetails": "Visa information om {{name}}",
       "notAvailable": "Kontrollerna är inte tillgängliga ännu. Den senaste incheckningen kanske inte har bearbetats, eller så är GitHub-appen för Kilo inte installerad i källgrenens kodarkiv.",
-      "providerNotAvailable": "Kontrollerna är inte tillgängliga ännu. Den senaste incheckningen kanske inte har bearbetats, eller så kan din anslutning sakna åtkomst till objektet.",
+      "providerNotAvailable": "Kontrollerna är inte tillgängliga ännu. Den senaste incheckningen kanske inte har bearbetats, eller så kan din anslutning sakna åtkomst till det här kodarkivet.",
       "noAccess": "Du har inte åtkomst till kontrollerna för det här kodarkivet.",
       "couldNotLoad": "Kunde inte läsa in kontrollerna.",
       "retryChecks": "Försök läsa in kontrollerna igen",

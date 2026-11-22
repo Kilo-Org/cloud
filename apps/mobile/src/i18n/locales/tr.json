@@ -2842,7 +2842,7 @@
       "noAccess": "Bu deponun kontrollerine erişimin yok.",
       "noChecksReported": "Kontrol bildirilmedi",
       "notAvailable": "Kontroller henüz kullanılamıyor. Son işleme henüz işlenmemiş olabilir veya kaynak depoda Kilo GitHub uygulaması kurulu olmayabilir.",
-      "providerNotAvailable": "Kontroller henüz kullanılamıyor. Son işleme henüz işlenmemiş olabilir veya bağlantınızın öğeye erişimi olmayabilir.",
+      "providerNotAvailable": "Kontroller henüz kullanılamıyor. Son işleme henüz işlenmemiş olabilir veya bağlantınızın bu kaynak depoya erişimi olmayabilir.",
       "openDetails": "{{name}} ayrıntılarını aç",
       "passed": "{{displayCount}} başarılı",
       "passed_one": "{{displayCount}} başarılı",

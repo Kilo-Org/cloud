@@ -518,10 +518,9 @@ describe('PrReviewChecksSection not-found arm', () => {
       expect(texts(renderer, 'prReview.checks.notAvailable')).toHaveLength(0);
       const actions = unavailableActions(renderer);
       expect(actions).toHaveLength(1);
-      // The card sits in the overview body, whose merge section owns the single
-      // filled primary, so the row asks for the embedded presentation: both
-      // controls on the outlined face rather than the whole-surface primary the
-      // sibling states use.
+      // The card sits in the overview body and spaces its own children, so the
+      // row asks for the embedded presentation: it takes that gap for its pair
+      // and drops the top margin a whole-surface row adds.
       expect(actions[0]?.props.presentation).toBe('embedded');
       const retry = actions[0]?.props.onRetry as (() => void) | undefined;
       if (!retry) {

@@ -159,44 +159,51 @@ describe('PrReviewUnavailableActions', () => {
     unmount();
   });
 
-  it('paints both embedded controls on the outlined face', async () => {
+  it('keeps one primary face on both presentations and leaves the check outlined', async () => {
     const scope: ProviderPrScope = {
       ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
       organizationId: null,
     };
-    const { renderer, unmount } = await mount(scope, 'embedded');
-    const [retryButton, checkButton] = findButtons(renderer);
-    if (!retryButton || !checkButton) {
+    const embedded = await mount(scope, 'embedded');
+    const [embeddedRetry, embeddedCheck] = findButtons(embedded.renderer);
+    if (!embeddedRetry || !embeddedCheck) {
       throw new Error('the two recovery buttons did not render');
     }
-    // Neither control takes the brand fill: the body the row is embedded in
-    // owns its primary. The retry asks for the quiet emphasis, which paints the
-    // outlined control, and the check keeps that same face. Both show one box
-    // edge, so the gap above the row and the gap inside it read as the same
-    // distance; a ghost check hides its own 48pt box and the row looked
-    // unevenly spaced.
-    expect(retryButton.props.emphasis).toBe('quiet');
-    expect(checkButton.props.variant).toBe('outline');
-    // The card's own gap spaces the row, so the appended margin a whole-surface
-    // row needs would double it.
-    expect(String(findRowRoot(renderer).props.className)).not.toContain('mt-3');
-    unmount();
+    // The retry paints the same filled primary face in both places: the row
+    // differs by its spacing, never by which control carries the fill.
+    expect(embeddedRetry.props.emphasis).toBeUndefined();
+    expect(embeddedCheck.props.variant).toBe('outline');
+    // The card's own gap spaces the embedded row, so the appended margin a
+    // whole-surface row needs would double it.
+    expect(String(findRowRoot(embedded.renderer).props.className)).not.toContain('mt-3');
+    embedded.unmount();
+
+    const surface = await mount(scope);
+    const [surfaceRetry, surfaceCheck] = findButtons(surface.renderer);
+    if (!surfaceRetry || !surfaceCheck) {
+      throw new Error('the two recovery buttons did not render');
+    }
+    expect(surfaceRetry.type).toBe(embeddedRetry.type);
+    expect(surfaceRetry.props.emphasis).toBeUndefined();
+    expect(surfaceCheck.props.variant).toBe('outline');
+    expect(String(findRowRoot(surface.renderer).props.className)).toContain('mt-3');
+    surface.unmount();
   });
 
-  it('keeps the whole-surface row on its filled retry and outlined check', async () => {
+  it.each([
+    ['embedded', 'embedded'],
+    ['surface', undefined],
+  ])('stacks both controls on one width in the %s row', async (_label, presentation) => {
     const scope: ProviderPrScope = {
       ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
       organizationId: null,
     };
-    const { renderer, unmount } = await mount(scope);
-    const [retryButton, checkButton] = findButtons(renderer);
-    if (!retryButton || !checkButton) {
-      throw new Error('the two recovery buttons did not render');
-    }
-    // No emphasis override: the state action keeps the filled default face.
-    expect(retryButton.props.emphasis).toBeUndefined();
-    expect(checkButton.props.variant).toBe('outline');
-    expect(String(findRowRoot(renderer).props.className)).toContain('mt-3');
+    const { renderer, unmount } = await mount(scope, presentation as 'embedded' | undefined);
+    // A centred, content-sized column shrinks each control to its own label,
+    // which is what left the pair as one narrow retry and one wider check. The
+    // column keeps the default cross-axis stretch, so both controls share the
+    // width of the wider one.
+    expect(String(findRowRoot(renderer).props.className)).not.toContain('items-center');
     unmount();
   });
 });

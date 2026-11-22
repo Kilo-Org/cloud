@@ -2881,7 +2881,7 @@
       "noAccess": "Non hai accesso ai controlli di questo repository.",
       "noChecksReported": "Nessun controllo segnalato",
       "notAvailable": "I controlli non sono ancora disponibili. L'ultimo commit potrebbe non essere stato elaborato oppure l'app Kilo per GitHub potrebbe non essere installata nel repository di origine.",
-      "providerNotAvailable": "I controlli non sono ancora disponibili. L'ultimo commit potrebbe non essere stato elaborato oppure la connessione potrebbe non avere accesso all'elemento.",
+      "providerNotAvailable": "I controlli non sono ancora disponibili. L'ultimo commit potrebbe non essere stato elaborato oppure la connessione potrebbe non avere accesso a questo repository.",
       "openDetails": "Apri i dettagli di {{name}}",
       "passed": "{{displayCount}} superati",
       "passed_one": "{{displayCount}} superati",

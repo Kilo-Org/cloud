@@ -1003,7 +1003,7 @@
       "title": "Gwiriadau",
       "openDetails": "Agor manylion {{name}}",
       "notAvailable": "Nid yw'r gwiriadau ar gael eto. Efallai nad yw'r ymrwymiad diweddaraf wedi'i brosesu, neu nad yw ap GitHub Kilo wedi'i osod ar yr ystorfa ffynhonnell.",
-      "providerNotAvailable": "Nid yw'r gwiriadau ar gael eto. Efallai nad yw'r ymrwymiad diweddaraf wedi'i brosesu, neu efallai nad oes gan eich cysylltiad fynediad at yr eitem.",
+      "providerNotAvailable": "Nid yw'r gwiriadau ar gael eto. Efallai nad yw'r ymrwymiad diweddaraf wedi'i brosesu, neu efallai nad oes gan eich cysylltiad fynediad at yr ystorfa hon.",
       "noAccess": "Nid oes gennych fynediad at wiriadau'r ystorfa hon.",
       "couldNotLoad": "Ni lwyddwyd i lwytho'r gwiriadau.",
       "retryChecks": "Rhoi cynnig eto ar wiriadau",

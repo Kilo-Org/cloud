@@ -973,7 +973,7 @@
       "title": "Verificações",
       "openDetails": "Abrir detalhes de {{name}}",
       "notAvailable": "As verificações ainda não estão disponíveis. O commit mais recente pode ainda não ter sido processado ou a aplicação do Kilo para o GitHub pode não estar instalada no repositório de origem.",
-      "providerNotAvailable": "As verificações ainda não estão disponíveis. O commit mais recente pode ainda não ter sido processado ou a sua ligação pode não ter acesso ao item.",
+      "providerNotAvailable": "As verificações ainda não estão disponíveis. O commit mais recente pode ainda não ter sido processado ou a sua ligação pode não ter acesso a este repositório.",
       "noAccess": "Não tens acesso às verificações deste repositório.",
       "couldNotLoad": "Não foi possível carregar as verificações.",
       "retryChecks": "Tentar carregar as verificações novamente",

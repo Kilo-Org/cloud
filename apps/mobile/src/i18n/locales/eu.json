@@ -943,7 +943,7 @@
       "title": "Egiaztapenak",
       "openDetails": "Ireki xehetasunak: {{name}}",
       "notAvailable": "Egiaztapenak ez daude oraindik eskuragarri. Baliteke azken egikaritzea prozesatu gabe egotea edo jatorri-biltegian Kilo GitHub aplikazioa instalatuta ez egotea.",
-      "providerNotAvailable": "Egiaztapenak ez daude oraindik eskuragarri. Baliteke azken egikaritzea prozesatu gabe egotea edo zure konexioak elementua eskura ez izatea.",
+      "providerNotAvailable": "Egiaztapenak ez daude oraindik eskuragarri. Baliteke azken egikaritzea prozesatu gabe egotea edo zure konexioak jatorri-biltegia eskura ez izatea.",
       "noAccess": "Ez duzu sarbiderik biltegi honen egiaztapenetara.",
       "couldNotLoad": "Ezin izan dira egiaztapenak kargatu.",
       "retryChecks": "Saiatu egiaztapenak berriro kargatzen",

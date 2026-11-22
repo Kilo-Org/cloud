@@ -943,7 +943,7 @@
       "title": "Kontrollid",
       "openDetails": "Ava {{name}} üksikasjad",
       "notAvailable": "Kontrollid pole veel saadaval. Uusim kommit võib olla veel töötlemata või Kilo GitHubi rakendus pole lähtehoidlasse installitud.",
-      "providerNotAvailable": "Kontrollid pole veel saadaval. Uusim kommit võib olla veel töötlemata või teie ühendusel ei pruugi olla üksusele ligipääsu.",
+      "providerNotAvailable": "Kontrollid pole veel saadaval. Uusim kommit võib olla veel töötlemata või teie ühendusel ei pruugi olla sellele lähtehoidlale ligipääsu.",
       "noAccess": "Sul puudub juurdepääs selle hoidla kontrollidele.",
       "couldNotLoad": "Kontrollide laadimine ebaõnnestus.",
       "retryChecks": "Proovi kontrollide laadimist uuesti",

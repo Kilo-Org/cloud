@@ -943,7 +943,7 @@
       "title": "Yoxlamalar",
       "openDetails": "{{name}} haqqında təfərrüatları aç",
       "notAvailable": "Yoxlamalar hələ əlçatan deyil. Son kommit hələ emal edilməmiş ola bilər və ya Kilo GitHub tətbiqi mənbə repozitoriyada quraşdırılmayıb.",
-      "providerNotAvailable": "Yoxlamalar hələ əlçatan deyil. Son kommit hələ emal edilməmiş ola bilər və ya bağlantınızın elementə çıxışı olmaya bilər.",
+      "providerNotAvailable": "Yoxlamalar hələ əlçatan deyil. Son kommit hələ emal edilməmiş ola bilər və ya bağlantınızın bu repozitoriyaya çıxışı olmaya bilər.",
       "noAccess": "Bu repozitoriyanın yoxlamalarına girişin yoxdur.",
       "couldNotLoad": "Yoxlamalar yüklənə bilmədi.",
       "retryChecks": "Yoxlamaları yükləməyə yenidən cəhd et",

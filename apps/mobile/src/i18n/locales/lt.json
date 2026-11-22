@@ -973,7 +973,7 @@
       "title": "Patikrinimai",
       "openDetails": "Atidaryti {{name}} informaciją",
       "notAvailable": "Patikrinimai dar nepasiekiami. Naujausias pakeitimų įrašas galėjo būti dar neapdorotas arba užklausos šakos saugykloje neįdiegta Kilo GitHub programėlė.",
-      "providerNotAvailable": "Patikrinimai dar nepasiekiami. Naujausias pakeitimų įrašas galėjo būti dar neapdorotas arba jūsų ryšys gali neturėti prieigos prie įrašo.",
+      "providerNotAvailable": "Patikrinimai dar nepasiekiami. Naujausias pakeitimų įrašas galėjo būti dar neapdorotas arba jūsų ryšys gali neturėti prieigos prie šios saugyklos.",
       "noAccess": "Neturi prieigos prie šios saugyklos patikrinimų.",
       "couldNotLoad": "Nepavyko įkelti patikrinimų.",
       "retryChecks": "Pakartoti patikrinimus",

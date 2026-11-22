@@ -958,7 +958,7 @@
       "title": "Provere",
       "openDetails": "Otvori detalje za {{name}}",
       "notAvailable": "Provere još nisu dostupne. Poslednji komit možda nije obrađen ili aplikacija Kilo za GitHub nije instalirana za izvorni repozitorijum.",
-      "providerNotAvailable": "Provere još nisu dostupne. Poslednji komit možda nije obrađen ili vaša veza možda nema pristup stavci.",
+      "providerNotAvailable": "Provere još nisu dostupne. Poslednji komit možda nije obrađen ili vaša veza možda nema pristup ovom repozitorijumu.",
       "noAccess": "Nemaš pristup proverama za ovaj repozitorijum.",
       "couldNotLoad": "Nije moguće učitati provere.",
       "retryChecks": "Ponovo pokušaj da učitaš provere",

@@ -943,7 +943,7 @@
       "title": "Izihlolo",
       "openDetails": "Vula imininingwane ye-{{name}}",
       "notAvailable": "Izihlolo azikatholakali. Kungenzeka irekhodi lakamuva lezinguquko alikacutshungulwa, noma i-Kilo GitHub App ayifakiwe enqolobaneni yekhodi yezinguquko.",
-      "providerNotAvailable": "Izihlolo azikatholakali. Kungenzeka irekhodi lakamuva lezinguquko alikacutshungulwa, noma kungenzeka ukuthi ukuxhumana kwakho akunakho ukufinyelela entweni.",
+      "providerNotAvailable": "Izihlolo azikatholakali. Kungenzeka irekhodi lakamuva lezinguquko alikacutshungulwa, noma kungenzeka ukuthi ukuxhumana kwakho akunakho ukufinyelela kule nqolobana yekhodi yezinguquko.",
       "noAccess": "Awunayo imvume yokubuka izihlolo zale nqolobane yekhodi.",
       "couldNotLoad": "Asikwazanga ukulayisha izihlolo.",
       "retryChecks": "Zama izihlolo futhi",

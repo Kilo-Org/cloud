@@ -943,7 +943,7 @@
       "title": "Kontroles",
       "openDetails": "Maak die besonderhede van {{name}} oop",
       "notAvailable": "Kontroles is nog nie beskikbaar nie. Die jongste vaslegging is dalk nog nie verwerk nie, of die Kilo GitHub-toep is nie op die bronbewaarplek geïnstalleer nie.",
-      "providerNotAvailable": "Kontroles is nog nie beskikbaar nie. Die jongste vaslegging is dalk nog nie verwerk nie, of jou verbinding het dalk nie toegang tot die item nie.",
+      "providerNotAvailable": "Kontroles is nog nie beskikbaar nie. Die jongste vaslegging is dalk nog nie verwerk nie, of jou verbinding het dalk nie toegang tot hierdie bronbewaarplek nie.",
       "noAccess": "Jy het nie toegang tot kontroles vir hierdie bewaarplek nie.",
       "couldNotLoad": "Kon nie die kontroles laai nie.",
       "retryChecks": "Probeer die kontroles weer",

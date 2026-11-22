@@ -2842,7 +2842,7 @@
       "noAccess": "Bạn không có quyền xem các bước kiểm tra của kho lưu trữ này.",
       "noChecksReported": "Chưa có thông tin kiểm tra",
       "notAvailable": "Chưa có thông tin kiểm tra. Có thể bản ghi mới nhất chưa được xử lý hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ nguồn.",
-      "providerNotAvailable": "Chưa có thông tin kiểm tra. Có thể bản ghi mới nhất chưa được xử lý hoặc kết nối của bạn không có quyền truy cập vào mục này.",
+      "providerNotAvailable": "Chưa có thông tin kiểm tra. Có thể bản ghi mới nhất chưa được xử lý hoặc kết nối của bạn không có quyền truy cập vào kho lưu trữ nguồn.",
       "openDetails": "Mở chi tiết {{name}}",
       "passed": "{{displayCount}} đạt",
       "passed_one": "{{displayCount}} đạt",

@@ -943,7 +943,7 @@
       "title": "Athuganir",
       "openDetails": "Opna nánari upplýsingar um {{name}}",
       "notAvailable": "Athuganir eru ekki tiltækar enn. Nýjasta innsendingin gæti enn verið óafgreidd eða Kilo-forritið fyrir GitHub er ekki uppsett í upprunakóðageymslunni.",
-      "providerNotAvailable": "Athuganir eru ekki tiltækar enn. Nýjasta innsendingin gæti enn verið óafgreidd, eða tengingin þín gæti ekki haft aðgang að atriðinu.",
+      "providerNotAvailable": "Athuganir eru ekki tiltækar enn. Nýjasta innsendingin gæti enn verið óafgreidd, eða tengingin þín gæti ekki haft aðgang að þessari upprunakóðageymslu.",
       "noAccess": "Þú hefur ekki aðgang að athugunum fyrir þessa kóðageymslu.",
       "couldNotLoad": "Ekki tókst að hlaða athugunum.",
       "retryChecks": "Reyna aftur að hlaða athugunum",

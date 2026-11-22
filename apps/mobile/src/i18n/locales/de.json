@@ -2842,7 +2842,7 @@
       "noAccess": "Du hast keinen Zugriff auf die Prüfungen dieses Repositorys.",
       "noChecksReported": "Keine Prüfungen gemeldet",
       "notAvailable": "Die Prüfungen sind noch nicht verfügbar. Möglicherweise wurde der aktuelle Commit noch nicht verarbeitet oder die GitHub-App von Kilo ist im Quell-Repository nicht installiert.",
-      "providerNotAvailable": "Die Prüfungen sind noch nicht verfügbar. Möglicherweise wurde der aktuelle Commit noch nicht verarbeitet oder deine Verbindung hat keinen Zugriff auf den Eintrag.",
+      "providerNotAvailable": "Die Prüfungen sind noch nicht verfügbar. Möglicherweise wurde der aktuelle Commit noch nicht verarbeitet oder deine Verbindung hat keinen Zugriff auf dieses Repository.",
       "openDetails": "Details zu {{name}} öffnen",
       "passed": "{{displayCount}} bestanden",
       "passed_one": "{{displayCount}} bestanden",

@@ -973,7 +973,7 @@
       "title": "Kontroly",
       "openDetails": "Otvoriť podrobnosti kontroly {{name}}",
       "notAvailable": "Kontroly zatiaľ nie sú dostupné. Najnovší commit možno ešte nie je spracovaný alebo v zdrojovom repozitári nie je nainštalovaná aplikácia Kilo pre GitHub.",
-      "providerNotAvailable": "Kontroly zatiaľ nie sú dostupné. Najnovší commit možno ešte nie je spracovaný alebo vaše pripojenie nemá prístup k položke.",
+      "providerNotAvailable": "Kontroly zatiaľ nie sú dostupné. Najnovší commit možno ešte nie je spracovaný alebo vaše pripojenie nemá prístup k tomuto repozitáru.",
       "noAccess": "Nemáš prístup ku kontrolám tohto repozitára.",
       "couldNotLoad": "Kontroly sa nepodarilo načítať.",
       "retryChecks": "Znova načítať kontroly",

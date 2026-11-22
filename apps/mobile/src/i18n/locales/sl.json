@@ -973,7 +973,7 @@
       "title": "Preverjanja",
       "openDetails": "Odpri podrobnosti za {{name}}",
       "notAvailable": "Preverjanja še niso na voljo. Zadnja potrditev morda še ni obdelana ali pa aplikacija Kilo za GitHub ni nameščena v izvornem repozitoriju.",
-      "providerNotAvailable": "Preverjanja še niso na voljo. Zadnja potrditev morda še ni obdelana ali pa vaša povezava nima dostopa do elementa.",
+      "providerNotAvailable": "Preverjanja še niso na voljo. Zadnja potrditev morda še ni obdelana ali pa vaša povezava nima dostopa do tega repozitorija.",
       "noAccess": "Nimaš dostopa do preverjanj za ta repozitorij.",
       "couldNotLoad": "Preverjanj ni bilo mogoče naložiti.",
       "retryChecks": "Znova poskusi naložiti preverjanja",

@@ -943,7 +943,7 @@
       "title": "Tarkistukset",
       "openDetails": "Avaa tarkistuksen tiedot: {{name}}",
       "notAvailable": "Tarkistukset eivät ole vielä käytettävissä. Uusinta muutostallennusta ei ehkä ole käsitelty tai Kilo GitHub -sovellusta ei ole asennettu siihen koodivarastoon, josta muutos tulee.",
-      "providerNotAvailable": "Tarkistukset eivät ole vielä käytettävissä. Uusinta muutostallennusta ei ehkä ole käsitelty tai yhteydelläsi ei ehkä ole pääsyä kohteeseen.",
+      "providerNotAvailable": "Tarkistukset eivät ole vielä käytettävissä. Uusinta muutostallennusta ei ehkä ole käsitelty tai yhteydelläsi ei ehkä ole pääsyä tähän koodivarastoon.",
       "noAccess": "Sinulla ei ole oikeutta tarkastella tämän koodivaraston tarkistuksia.",
       "couldNotLoad": "Tarkistuksia ei voitu ladata.",
       "retryChecks": "Yritä uudelleen ladata tarkistukset",

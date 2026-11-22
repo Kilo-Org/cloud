@@ -37,21 +37,17 @@ import { useTRPC } from '@/lib/trpc';
  *
  * The retry is the state's one primary, the shared `StateAction`, as on the
  * connect gate and the GitHub install CTA: it is the action that can recover
- * the item from here. The connection check stays the outlined control below
- * it, at the same compact size with its own leading icon, because it answers a
- * different question — whether the account is still connected — and a state
- * with two equally weighted buttons has no primary at all.
+ * the item from here, and it paints that same brand fill in both schemes. The
+ * connection check stays the outlined secondary below it at the same compact
+ * size with its own leading icon, because it answers a different question —
+ * whether the account is still connected. The column stretches both controls to
+ * one width, so the pair reads as one stack of two ranked actions instead of two
+ * differently sized boxes, and the retry is the one that carries the fill.
  *
- * That primary belongs to a whole-surface unavailable state. A caller that
- * embeds the row inside a body owning its own primary passes
- * `presentation="embedded"` instead: the retry takes the quiet emphasis, so it
- * never competes with the body's filled primary, and the connection check keeps
- * that same outlined face instead of the quieter ghost one. Both controls then
- * paint one visible box edge, so the gap above the row and the gap inside it
- * read as the same distance; a ghost check hides its own 48pt box and the row
- * looked like one tight pair and one loose one. The row also drops the margin
- * it uses as a whole surface — the card's own gap spaces it from the copy
- * above — and spaces its two controls by that same gap.
+ * `presentation` picks only the spacing the row needs where it sits: as a whole
+ * surface it adds its own top margin above the copy; embedded in a body whose
+ * card already spaces its children, it takes the card's gap for its own pair
+ * instead, so the gap above the row and the gap inside it read as one distance.
  */
 export function PrReviewUnavailableActions({
   onRetry,
@@ -61,8 +57,9 @@ export function PrReviewUnavailableActions({
   onRetry: () => void;
   isRetrying: boolean;
   /**
-   * `embedded` when the surrounding body already shows its own primary action:
-   * both controls on the outlined face, with no margin of its own.
+   * `embedded` when the row sits inside a body that spaces its own children:
+   * the row takes that gap for its pair and drops the top margin it adds as a
+   * whole surface. The two faces are the same either way.
    */
   presentation?: 'surface' | 'embedded';
 }>) {
@@ -143,13 +140,17 @@ export function PrReviewUnavailableActions({
 
   const embedded = presentation === 'embedded';
   return (
-    <View className={embedded ? 'w-full items-center gap-3' : 'mt-3 items-center gap-2'}>
+    // No `items-center`: a centred column shrinks each control to its own
+    // label, and the pair then reads as two differently sized boxes. The
+    // default cross-axis stretch sizes both controls to the wider label, so the
+    // retry leads on the brand fill and the check follows at that same width as
+    // the outlined secondary.
+    <View className={embedded ? 'gap-3' : 'mt-3 gap-2'}>
       <StateAction
         label={t('common.retry')}
         icon={RotateCcw}
         onPress={onRetry}
         loading={isRetrying}
-        {...(embedded ? { emphasis: 'quiet' as const } : {})}
       />
       <Button
         size="sm"

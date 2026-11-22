@@ -2881,7 +2881,7 @@
       "noAccess": "No tienes acceso a las verificaciones de este repositorio.",
       "noChecksReported": "No se han notificado verificaciones",
       "notAvailable": "Las verificaciones aún no están disponibles. Puede que la última confirmación no se haya procesado o que la aplicación de Kilo para GitHub no esté instalada en el repositorio de origen.",
-      "providerNotAvailable": "Las verificaciones aún no están disponibles. Puede que la última confirmación no se haya procesado o que tu conexión no tenga acceso al elemento.",
+      "providerNotAvailable": "Las verificaciones aún no están disponibles. Puede que la última confirmación no se haya procesado o que tu conexión no tenga acceso al repositorio de origen.",
       "openDetails": "Abrir los detalles de {{name}}",
       "passed": "{{displayCount}} superadas",
       "passed_one": "{{displayCount}} superadas",

@@ -256,10 +256,9 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
       // been reported yet) and names the provider connection, which is the
       // second cause a provider NOT_FOUND can carry; the shared unavailable
       // term would drop both and leave only "the item may be missing".
-      // This card sits in the overview body, whose merge section below owns
-      // the single filled primary, so the recovery row is embedded: both
-      // controls on the outlined face, on the same centred axis as the copy
-      // and spaced by the card's own gap.
+      // This card sits in the overview body, so the recovery row is embedded:
+      // it takes the card's own gap for its pair and its retry still leads on
+      // the one brand fill, with the connection check at that same width below.
       if (isProviderPlatform(queries.platform)) {
         return (
           <Section label={t('prReview.checks.title')}>

@@ -943,7 +943,7 @@
       "title": "Verifikasyon",
       "openDetails": "Louvri detay {{name}}",
       "notAvailable": "Verifikasyon yo poko disponib. Petèt dènye komit la poko trete, oswa aplikasyon Kilo pou GitHub la pa enstale sou depo sous la.",
-      "providerNotAvailable": "Verifikasyon yo poko disponib. Petèt dènye komit la poko trete, oswa koneksyon ou pa gen aksè a atik la.",
+      "providerNotAvailable": "Verifikasyon yo poko disponib. Petèt dènye komit la poko trete, oswa koneksyon ou pa gen aksè a depo sa a.",
       "noAccess": "Ou pa gen aksè ak verifikasyon pou depo sa a.",
       "couldNotLoad": "Pa t ka chaje verifikasyon yo.",
       "retryChecks": "Eseye verifikasyon yo ankò",

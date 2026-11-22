@@ -2842,7 +2842,7 @@
       "noAccess": "Je hebt geen toegang tot de controles voor deze repository.",
       "noChecksReported": "Geen controles gemeld",
       "notAvailable": "De controles zijn nog niet beschikbaar. Mogelijk is de laatste commit nog niet verwerkt of is de Kilo GitHub-app niet voor de bronrepository geïnstalleerd.",
-      "providerNotAvailable": "De controles zijn nog niet beschikbaar. Mogelijk is de laatste commit nog niet verwerkt of heeft je verbinding geen toegang tot het item.",
+      "providerNotAvailable": "De controles zijn nog niet beschikbaar. Mogelijk is de laatste commit nog niet verwerkt of heeft je verbinding geen toegang tot de bronrepository.",
       "openDetails": "Details van {{name}} openen",
       "passed": "{{displayCount}} geslaagd",
       "passed_one": "{{displayCount}} geslaagd",

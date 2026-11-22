@@ -247,20 +247,25 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
     const state = classifyPrReviewQueryState(checks.error);
     if (state.kind === 'not-found') {
       // GitHub's NOT_FOUND here means the ref has no checks access (usually
-      // the app is not installed on the head repo), so it stays terminal.
+      // the app is not installed on the head repo), so it stays terminal and
+      // keeps the copy that names those two causes.
       // GitLab folds its connection failures into the same NOT_FOUND, and
       // Bitbucket does the same for its workspace failures, so those scopes
       // get the read retry plus the connection check instead of a dead end.
+      // Their card keeps the checks cause (a head commit whose checks have not
+      // been reported yet) and names the provider connection, which is the
+      // second cause a provider NOT_FOUND can carry; the shared unavailable
+      // term would drop both and leave only "the item may be missing".
       // This card sits in the overview body, whose merge section below owns
-      // the single filled primary, so the recovery row is embedded: an
-      // outlined retry above a ghost connection check, on the same centred
-      // axis as the copy and spaced by the card's own gap.
+      // the single filled primary, so the recovery row is embedded: both
+      // controls on the outlined face, on the same centred axis as the copy
+      // and spaced by the card's own gap.
       if (isProviderPlatform(queries.platform)) {
         return (
           <Section label={t('prReview.checks.title')}>
             <Card key={CONTENT_CARD_KEY} className="items-center gap-3">
               <Text className="text-center text-sm text-muted-foreground">
-                {t('prReview.terms.unavailableDescription')}
+                {t('prReview.checks.providerNotAvailable')}
               </Text>
               <PrReviewUnavailableActions
                 presentation="embedded"

@@ -933,6 +933,7 @@
       "title": "Tekshiruvlar",
       "openDetails": "{{name}} tafsilotlarini ochish",
       "notAvailable": "Tekshiruvlar hali mavjud emas. Oxirgi kommit hali qayta ishlanmagan yoki manba omborga Kilo GitHub ilovasi o'rnatilmagan bo'lishi mumkin.",
+      "providerNotAvailable": "Tekshiruvlar hali mavjud emas. Oxirgi kommit hali qayta ishlanmagan yoki aloqangiz elementga kirish imkoniga ega bo'lmagan bo'lishi mumkin.",
       "noAccess": "Sizda bu ombor tekshiruvlariga kirish huquqi yo'q.",
       "couldNotLoad": "Tekshiruvlarni yuklab bo'lmadi.",
       "retryChecks": "Tekshiruvlarni qayta yuklash",

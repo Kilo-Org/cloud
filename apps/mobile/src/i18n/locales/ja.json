@@ -2825,6 +2825,7 @@
       "noAccess": "このリポジトリのチェックにアクセスできません。",
       "noChecksReported": "チェックは報告されていません",
       "notAvailable": "チェックの情報はまだ表示できません。マージ元ブランチの先頭コミットが未処理か、マージ元リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
+      "providerNotAvailable": "チェックの情報はまだ表示できません。マージ元ブランチの先頭コミットが未処理か、接続が項目にアクセスできない可能性があります。",
       "openDetails": "{{name}}の詳細を開く",
       "passed": "{{displayCount}}件成功",
       "passed_one": "{{displayCount}}件成功",

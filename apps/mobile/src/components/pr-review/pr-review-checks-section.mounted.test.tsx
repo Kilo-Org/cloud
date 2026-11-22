@@ -491,7 +491,7 @@ describe('PrReviewChecksSection not-found arm', () => {
     const { renderer, restore } = mountNotFound();
 
     expect(texts(renderer, 'prReview.checks.notAvailable')).toHaveLength(1);
-    expect(texts(renderer, 'prReview.terms.unavailableDescription')).toHaveLength(0);
+    expect(texts(renderer, 'prReview.checks.providerNotAvailable')).toHaveLength(0);
     expect(unavailableActions(renderer)).toHaveLength(0);
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
 
@@ -510,17 +510,18 @@ describe('PrReviewChecksSection not-found arm', () => {
       const { renderer, restore } = mountNotFound(scope);
 
       // GitLab and Bitbucket fold their connection failures into the same
-      // NOT_FOUND a removed item produces, so the copy is the shared unavailable
-      // description and the state carries the read retry plus the connection
-      // check instead of the terminal card.
-      expect(texts(renderer, 'prReview.terms.unavailableDescription')).toHaveLength(1);
+      // NOT_FOUND a removed item produces, so the card keeps the checks cause
+      // and names the provider connection, and the state carries the read retry
+      // plus the connection check instead of the terminal card.
+      expect(texts(renderer, 'prReview.checks.providerNotAvailable')).toHaveLength(1);
+      expect(texts(renderer, 'prReview.terms.unavailableDescription')).toHaveLength(0);
       expect(texts(renderer, 'prReview.checks.notAvailable')).toHaveLength(0);
       const actions = unavailableActions(renderer);
       expect(actions).toHaveLength(1);
       // The card sits in the overview body, whose merge section owns the single
-      // filled primary, so the row asks for the embedded presentation: an
-      // outlined retry above a ghost check rather than the whole-surface
-      // primary the sibling states use.
+      // filled primary, so the row asks for the embedded presentation: both
+      // controls on the outlined face rather than the whole-surface primary the
+      // sibling states use.
       expect(actions[0]?.props.presentation).toBe('embedded');
       const retry = actions[0]?.props.onRetry as (() => void) | undefined;
       if (!retry) {

@@ -44,11 +44,14 @@ import { useTRPC } from '@/lib/trpc';
  *
  * That primary belongs to a whole-surface unavailable state. A caller that
  * embeds the row inside a body owning its own primary passes
- * `presentation="embedded"` instead: the retry takes the outlined face and the
- * connection check the ghost one, so neither competes with the body's filled
- * primary and the outlined retry still leads the row. The row also drops the
- * margin it uses as a whole surface — the card's own gap spaces it from the
- * copy above — and spaces its two controls by that same gap.
+ * `presentation="embedded"` instead: the retry takes the outlined face, so it
+ * never competes with the body's filled primary, and the connection check keeps
+ * that same outlined face instead of the quiet ghost one. Both controls then
+ * paint one visible box edge, so the gap above the row and the gap inside it
+ * read as the same distance; a ghost check hides its own 48pt box and the row
+ * looked like one tight pair and one loose one. The row also drops the margin
+ * it uses as a whole surface — the card's own gap spaces it from the copy
+ * above — and spaces its two controls by that same gap.
  */
 export function PrReviewUnavailableActions({
   onRetry,
@@ -151,7 +154,7 @@ export function PrReviewUnavailableActions({
       <Button
         size="sm"
         className={STATE_ACTION_CLASS}
-        variant={embedded ? 'ghost' : 'outline'}
+        variant="outline"
         onPress={() => {
           void checkConnection();
         }}

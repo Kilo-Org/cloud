@@ -933,6 +933,7 @@
       "title": "Ellenőrzések",
       "openDetails": "{{name}} részleteinek megnyitása",
       "notAvailable": "Az ellenőrzések még nem érhetők el. Lehet, hogy a forráság legutóbbi véglegesítését még nem dolgozták fel, vagy a forráság tárolójához nincs telepítve a Kilo GitHub-alkalmazása.",
+      "providerNotAvailable": "Az ellenőrzések még nem érhetők el. Lehet, hogy a forráság legutóbbi véglegesítését még nem dolgozták fel, vagy a kapcsolatának nincs hozzáférése az elemhez.",
       "noAccess": "Nincs hozzáférésed a tároló ellenőrzéseihez.",
       "couldNotLoad": "Nem sikerült betölteni az ellenőrzéseket.",
       "retryChecks": "Ellenőrzések betöltésének megismétlése",

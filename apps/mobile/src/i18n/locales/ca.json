@@ -948,6 +948,7 @@
       "title": "Comprovacions",
       "openDetails": "Obre els detalls de {{name}}",
       "notAvailable": "Les comprovacions encara no estan disponibles. Pot ser que l'última comissió no s'hagi processat o que l'aplicació de Kilo per a GitHub no estigui instal·lada al repositori d'origen.",
+      "providerNotAvailable": "Les comprovacions encara no estan disponibles. Pot ser que l'última comissió no s'hagi processat o que la teva connexió no tingui accés a l'element.",
       "noAccess": "No tens accés a les comprovacions d'aquest repositori.",
       "couldNotLoad": "No s'han pogut carregar les comprovacions.",
       "retryChecks": "Torna a comprovar",

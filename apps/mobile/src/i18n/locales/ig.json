@@ -933,6 +933,7 @@
       "title": "Nnwale",
       "openDetails": "Mepee nkọwa {{name}}",
       "notAvailable": "Nnwale adịbeghị. O nwere ike ịbụ na ahazibeghị ndekọ mgbanwe kacha ọhụrụ, ma ọ bụ na etinyeghị ngwa Kilo GitHub n'ebe nchekwa e si na ya ewepụta mgbanwe.",
+      "providerNotAvailable": "Nnwale adịbeghị. O nwere ike ịbụ na ahazibeghị ndekọ mgbanwe kacha ọhụrụ, ma ọ bụ na njikọ gị enweghị ike ịnweta ihe ahụ.",
       "noAccess": "Ị nweghị ikike ilele nnwale maka ebe nchekwa a.",
       "couldNotLoad": "Enweghị ike ibudata nnwale.",
       "retryChecks": "Nwaa nnwale ọzọ",

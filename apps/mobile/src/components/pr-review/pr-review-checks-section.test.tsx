@@ -366,15 +366,16 @@ describe('PrReviewChecksSection error arms', () => {
     },
   ])('swaps the terminal card for the recovery rows on a $platform scope', ({ scope }) => {
     // GitLab and Bitbucket fold their connection failures into the same
-    // NOT_FOUND a removed item produces, so the copy is the shared unavailable
-    // description and the state carries the recovery rows, not the terminal
-    // card. The rows are a host here (see the mock above); the mounted suite
-    // mounts the real ones.
+    // NOT_FOUND a removed item produces, so the card keeps the checks cause and
+    // names the provider connection, and the state carries the recovery rows,
+    // not the terminal card. The rows are a host here (see the mock above); the
+    // mounted suite mounts the real ones.
     query.isError = true;
     query.error = { data: { code: 'NOT_FOUND' } };
     const renderer = mount(PR_WEB_URL, scope);
 
-    expect(textNodes(renderer, 'prReview.terms.unavailableDescription')).toHaveLength(1);
+    expect(textNodes(renderer, 'prReview.checks.providerNotAvailable')).toHaveLength(1);
+    expect(textNodes(renderer, 'prReview.terms.unavailableDescription')).toHaveLength(0);
     expect(textNodes(renderer, 'prReview.checks.notAvailable')).toHaveLength(0);
     const actions = renderer.root.findAll(
       node => String(node.type) === 'PrReviewUnavailableActions'

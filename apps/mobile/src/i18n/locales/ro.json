@@ -948,6 +948,7 @@
       "title": "Verificări",
       "openDetails": "Deschide detaliile pentru {{name}}",
       "notAvailable": "Verificările nu sunt disponibile încă. Este posibil ca ultimul commit să nu fi fost procesat sau aplicația Kilo pentru GitHub să nu fie instalată pentru depozitul sursă.",
+      "providerNotAvailable": "Verificările nu sunt disponibile încă. Este posibil ca ultimul commit să nu fi fost procesat sau ca conexiunea ta să nu aibă acces la element.",
       "noAccess": "Nu ai acces la verificările acestui depozit.",
       "couldNotLoad": "Nu s-au putut încărca verificările.",
       "retryChecks": "Reîncearcă verificările",

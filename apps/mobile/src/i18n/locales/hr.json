@@ -948,6 +948,7 @@
       "title": "Provjere",
       "openDetails": "Otvori pojedinosti provjere {{name}}",
       "notAvailable": "Provjere još nisu dostupne. Najnovija revizija možda nije obrađena ili aplikacija Kilo za GitHub nije instalirana za izvorišni repozitorij.",
+      "providerNotAvailable": "Provjere još nisu dostupne. Najnovija revizija možda nije obrađena ili vaša veza možda nema pristup stavci.",
       "noAccess": "Nemaš pristup provjerama za ovaj repozitorij.",
       "couldNotLoad": "Nije moguće učitati provjere.",
       "retryChecks": "Pokušaj ponovno učitati provjere",

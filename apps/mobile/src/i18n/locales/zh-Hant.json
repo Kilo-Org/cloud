@@ -2825,6 +2825,7 @@
       "noAccess": "你沒有權限檢視此存放庫的檢查結果。",
       "noChecksReported": "尚無檢查結果",
       "notAvailable": "目前尚無檢查結果。可能是來源分支的最新提交尚未處理，或來源存放庫尚未安裝 Kilo GitHub App。",
+      "providerNotAvailable": "目前尚無檢查結果。可能是來源分支的最新提交尚未處理，或您的連線無法存取此項目。",
       "openDetails": "開啟 {{name}} 的詳細資料",
       "passed": "{{displayCount}} 項通過",
       "passed_one": "{{displayCount}} 項通過",

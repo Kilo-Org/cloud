@@ -933,6 +933,7 @@
       "title": "Gwaje-gwaje",
       "openDetails": "Buɗe cikakken bayanin {{name}}",
       "notAvailable": "Ba a samun gwaje-gwajen tukuna. Wataƙila ba a sarrafa rikodin canje-canje na ƙarshe ba, ko ba a shigar da manhajar Kilo ta GitHub a ma'ajiyar lambar da aka fito da canje-canjen ba.",
+      "providerNotAvailable": "Ba a samun gwaje-gwajen tukuna. Wataƙila ba a sarrafa rikodin canje-canje na ƙarshe ba, ko kuma haɗin ku ba zai iya samun sa ba.",
       "noAccess": "Ba ka da damar duba gwaje-gwajen wannan ma'ajiyar lamba.",
       "couldNotLoad": "Ba a iya loda gwaje-gwaje ba.",
       "retryChecks": "Sake gwada gwaje-gwajen",

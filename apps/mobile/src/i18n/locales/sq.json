@@ -933,6 +933,7 @@
       "title": "Kontrollet",
       "openDetails": "Hap detajet e {{name}}",
       "notAvailable": "Kontrollet nuk janë ende të disponueshme. Depozitimi i fundit mund të mos jetë përpunuar ose aplikacioni Kilo për GitHub mund të mos jetë instaluar në depon burimore.",
+      "providerNotAvailable": "Kontrollet nuk janë ende të disponueshme. Depozitimi i fundit mund të mos jetë përpunuar, ose lidhja juaj mund të mos ketë akses në elementin.",
       "noAccess": "Nuk ke qasje te kontrollet për këtë depo.",
       "couldNotLoad": "Nuk u arrit të ngarkoheshin kontrollet.",
       "retryChecks": "Riprovo kontrollet",

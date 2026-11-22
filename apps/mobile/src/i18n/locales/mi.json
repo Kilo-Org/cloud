@@ -933,6 +933,7 @@
       "title": "Ngā arowhai",
       "openDetails": "Whakatuwheratia ngā taipitopito o {{name}}",
       "notAvailable": "Kāore anō ngā arowhai kia wātea. Kāore anō pea te tāpaetanga hou rawa kia tukatukahia, kāore rānei te taupānga Kilo GitHub i tāutatia ki te pātaka waehere i takea mai ai ngā huringa.",
+      "providerNotAvailable": "Kāore anō ngā arowhai kia wātea. Kāore anō pea te tāpaetanga hou rawa kia tukatukahia, kāore rānei e taea e tō hononga te uru atu ki te mea.",
       "noAccess": "Kāore koe e whakaaetia kia uru ki ngā arowhai mō tēnei pātaka waehere.",
       "couldNotLoad": "Kāore i taea te uta i ngā arowhai.",
       "retryChecks": "Whakamātau anō i ngā arowhai",

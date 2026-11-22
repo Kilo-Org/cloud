@@ -933,6 +933,7 @@
       "title": "Vipimo",
       "openDetails": "Fungua maelezo ya {{name}}",
       "notAvailable": "Vipimo bado havipatikani. Huenda rekodi ya mwisho ya mabadiliko haijachakatwa, au programu ya Kilo ya GitHub haijasakinishwa kwenye hazina ya tawi lenye mabadiliko.",
+      "providerNotAvailable": "Vipimo bado havipatikani. Huenda rekodi ya mwisho ya mabadiliko haijachakatwa, au huenda muunganisho wako hauwezi kufikia kitu hicho.",
       "noAccess": "Huna ruhusa ya kuona vipimo vya hazina hii ya msimbo.",
       "couldNotLoad": "Imeshindikana kupakia vipimo.",
       "retryChecks": "Jaribu vipimo tena",

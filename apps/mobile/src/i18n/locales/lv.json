@@ -948,6 +948,7 @@
       "title": "Pārbaudes",
       "openDetails": "Skatīt informāciju par {{name}}",
       "notAvailable": "Pārbaudes vēl nav pieejamas. Iespējams, avota zara jaunākais komits vēl nav apstrādāts vai avota repozitorijā nav instalēta Kilo GitHub lietotne.",
+      "providerNotAvailable": "Pārbaudes vēl nav pieejamas. Iespējams, avota zara jaunākais komits vēl nav apstrādāts, vai arī jūsu savienojumam varētu nebūt piekļuves vienumam.",
       "noAccess": "Tev nav piekļuves šī repozitorija pārbaudēm.",
       "couldNotLoad": "Neizdevās ielādēt pārbaudes.",
       "retryChecks": "Mēģināt vēlreiz ielādēt pārbaudes",

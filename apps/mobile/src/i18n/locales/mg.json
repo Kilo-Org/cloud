@@ -933,6 +933,7 @@
       "title": "Fanamarinana",
       "openDetails": "Sokafy ny antsipirian'ny {{name}}",
       "notAvailable": "Mbola tsy azo jerena ny fanamarinana. Mety mbola tsy voakarakara ny firaketana fanovana farany, na tsy napetraka ao amin'ny tahirin-kaody niavian'ny fanovana ny rindranasa Kilo ho an'ny GitHub.",
+      "providerNotAvailable": "Mbola tsy azo jerena ny fanamarinana. Mety mbola tsy voakarakara ny firaketana fanovana farany, na mety tsy afaka miditra amin'ilay zavatra ny fifandraisanao.",
       "noAccess": "Tsy manana alalana hijery ny fanamarinana ho an'ity tahirin-kaody ity ianao.",
       "couldNotLoad": "Tsy tafiditra ny fanamarinana.",
       "retryChecks": "Andramo indray ny fanamarinana",

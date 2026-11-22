@@ -963,6 +963,7 @@
       "title": "Kontroly",
       "openDetails": "Otevřít podrobnosti kontroly {{name}}",
       "notAvailable": "Kontroly zatím nejsou dostupné. Poslední commit zdrojové větve možná ještě nebyl zpracován nebo ve zdrojovém repozitáři není nainstalovaná aplikace Kilo pro GitHub.",
+      "providerNotAvailable": "Kontroly zatím nejsou dostupné. Poslední commit zdrojové větve možná ještě nebyl zpracován nebo tvoje připojení nemá přístup k této položce.",
       "noAccess": "Nemáš přístup ke kontrolám tohoto repozitáře.",
       "couldNotLoad": "Kontroly se nepodařilo načíst.",
       "retryChecks": "Znovu načíst kontroly",

@@ -933,6 +933,7 @@
       "title": "Comprobacións",
       "openDetails": "Abrir os detalles de {{name}}",
       "notAvailable": "As comprobacións aínda non están dispoñibles. Pode que a última remisión aínda non se procesase ou que a aplicación de Kilo para GitHub non estea instalada no repositorio de orixe.",
+      "providerNotAvailable": "As comprobacións aínda non están dispoñibles. Pode que a última remisión aínda non se procesase ou que a túa conexión non teña acceso ao elemento.",
       "noAccess": "Non tes acceso ás comprobacións deste repositorio.",
       "couldNotLoad": "Non se puideron cargar as comprobacións.",
       "retryChecks": "Volver cargar as comprobacións",

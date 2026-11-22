@@ -978,6 +978,7 @@
       "title": "Kontrolli",
       "openDetails": "Iftaħ id-dettalji ta' {{name}}",
       "notAvailable": "Il-kontrolli għadhom mhumiex disponibbli. Jista' jkun li l-aħħar reġistrazzjoni tal-bidliet għadha ma ġietx ipproċessata, jew l-app ta' Kilo għal GitHub mhix installata fir-repożitorju tas-sors.",
+      "providerNotAvailable": "Il-kontrolli għadhom mhumiex disponibbli. Jista' jkun li l-aħħar reġistrazzjoni tal-bidliet għadha ma ġietx ipproċessata, jew il-konnessjoni tiegħek m'għandhiex aċċess għall-element.",
       "noAccess": "M'għandekx aċċess għall-kontrolli ta' dan ir-repożitorju.",
       "couldNotLoad": "Ma setgħux jitgħabbew il-kontrolli.",
       "retryChecks": "Erġa' pprova tgħabbi l-kontrolli",

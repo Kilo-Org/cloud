@@ -933,6 +933,7 @@
       "title": "Qorannoowwan",
       "openDetails": "Bal'ina {{name}} bani",
       "notAvailable": "Qorannoowwan hanga ammaatti hin argaman. Galmeen jijjiiramaa dhumaa hin adeemsifamne ta'a, ykn appiin Kilo GitHub kuusaa koodii madda jijjiiramaa irratti hin fe'amne ta'a.",
+      "providerNotAvailable": "Qorannoowwan hanga ammaatti hin argaman. Galmeen jijjiiramaa dhumaa hin adeemsifamne ta'a, ykn walqunnamtiin kee wanta sanaaf argannaa hin qabu ta'a.",
       "noAccess": "Qorannoowwan kuusaa koodii kanaa ilaaluuf hayyama hin qabdu.",
       "couldNotLoad": "Qorannoowwan fe'uu hin danda'amne.",
       "retryChecks": "Qorannoowwan irra deebi'ii yaali",

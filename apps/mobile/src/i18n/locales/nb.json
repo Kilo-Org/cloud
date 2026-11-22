@@ -933,6 +933,7 @@
       "title": "Sjekker",
       "openDetails": "Åpne detaljer for {{name}}",
       "notAvailable": "Sjekkene er ikke tilgjengelige ennå. Den siste commiten er kanskje ikke behandlet, eller Kilo GitHub-appen er ikke installert for kodelageret med kildegrenen.",
+      "providerNotAvailable": "Sjekkene er ikke tilgjengelige ennå. Den siste commiten er kanskje ikke behandlet, eller tilkoblingen din har kanskje ikke tilgang til elementet.",
       "noAccess": "Du har ikke tilgang til sjekkene for dette kodelageret.",
       "couldNotLoad": "Kunne ikke laste inn sjekkene.",
       "retryChecks": "Prøv å laste inn sjekkene på nytt",

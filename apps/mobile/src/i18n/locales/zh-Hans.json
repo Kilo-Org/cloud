@@ -2825,6 +2825,7 @@
       "noAccess": "你无权查看此仓库的检查结果。",
       "noChecksReported": "暂无检查结果",
       "notAvailable": "暂时无法查看检查结果。可能是最新提交尚未处理，或源仓库尚未安装 Kilo GitHub 应用。",
+      "providerNotAvailable": "暂时无法查看检查结果。可能是最新提交尚未处理，或你的连接无法访问该内容。",
       "openDetails": "查看 {{name}} 的详情",
       "passed": "{{displayCount}} 项通过",
       "passed_one": "{{displayCount}} 项通过",

@@ -2825,6 +2825,7 @@
       "noAccess": "Kamu tidak memiliki akses ke pemeriksaan repositori ini.",
       "noChecksReported": "Belum ada hasil pemeriksaan",
       "notAvailable": "Pemeriksaan belum tersedia. Commit terkini mungkin belum diproses, atau aplikasi Kilo untuk GitHub belum dipasang di repositori sumber.",
+      "providerNotAvailable": "Pemeriksaan belum tersedia. Commit terkini mungkin belum diproses, atau koneksi Anda mungkin tidak memiliki akses ke item.",
       "openDetails": "Buka detail {{name}}",
       "passed": "{{displayCount}} lulus",
       "passed_one": "{{displayCount}} lulus",

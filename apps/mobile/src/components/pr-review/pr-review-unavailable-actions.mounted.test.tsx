@@ -158,7 +158,7 @@ describe('PrReviewUnavailableActions', () => {
     unmount();
   });
 
-  it('leads the embedded row with the outlined retry and a ghost check', async () => {
+  it('paints both embedded controls on the outlined face', async () => {
     const scope: ProviderPrScope = {
       ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
       organizationId: null,
@@ -169,10 +169,11 @@ describe('PrReviewUnavailableActions', () => {
       throw new Error('the two recovery buttons did not render');
     }
     // Neither control takes the brand fill: the body the row is embedded in
-    // owns its primary, so the outlined retry carries the row and the ghost
-    // check sits under it.
+    // owns its primary. Both show one box edge, so the gap above the row and
+    // the gap inside it read as the same distance; a ghost check hides its own
+    // 48pt box and the row looked unevenly spaced.
     expect(retryButton.props.variant).toBe('outline');
-    expect(checkButton.props.variant).toBe('ghost');
+    expect(checkButton.props.variant).toBe('outline');
     // The card's own gap spaces the row, so the appended margin a whole-surface
     // row needs would double it.
     expect(String(findRowRoot(renderer).props.className)).not.toContain('mt-3');

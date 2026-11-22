@@ -978,6 +978,7 @@
       "title": "Seiceálacha",
       "openDetails": "Oscail sonraí {{name}}",
       "notAvailable": "Níl na seiceálacha ar fáil go fóill. Seans nár próiseáladh an taifead athruithe reatha, nó nach bhfuil aip GitHub Kilo suiteáilte ar an stór foinseach.",
+      "providerNotAvailable": "Níl na seiceálacha ar fáil go fóill. Seans nár próiseáladh an taifead athruithe reatha, nó b'fhéidir nach bhfuil rochtain ag do cheangal ar an mír.",
       "noAccess": "Níl rochtain agat ar sheiceálacha an stóir seo.",
       "couldNotLoad": "Níorbh fhéidir na seiceálacha a lódáil.",
       "retryChecks": "Bain triail as na seiceálacha arís",

@@ -2901,6 +2901,7 @@
       "noAccess": "Nie masz dostępu do kontroli tego repozytorium.",
       "noChecksReported": "Brak zgłoszonych kontroli",
       "notAvailable": "Kontrole nie są jeszcze dostępne. Być może najnowszy commit nie został jeszcze przetworzony lub aplikacja Kilo dla GitHub nie jest zainstalowana w repozytorium źródłowym.",
+      "providerNotAvailable": "Kontrole nie są jeszcze dostępne. Być może najnowszy commit nie został jeszcze przetworzony lub Twoje połączenie może nie mieć dostępu do elementu.",
       "openDetails": "Otwórz szczegóły {{name}}",
       "passed": "zaliczone: {{displayCount}}",
       "passed_one": "zaliczone: {{displayCount}}",

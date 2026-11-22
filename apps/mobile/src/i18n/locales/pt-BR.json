@@ -2901,6 +2901,7 @@
       "noAccess": "Você não tem acesso às verificações deste repositório.",
       "noChecksReported": "Nenhuma verificação informada",
       "notAvailable": "As verificações ainda não estão disponíveis. O commit de origem pode não ter sido processado ou o aplicativo do Kilo para GitHub pode não estar instalado no repositório de origem.",
+      "providerNotAvailable": "As verificações ainda não estão disponíveis. O commit de origem pode não ter sido processado ou sua conexão pode não ter acesso ao item.",
       "openDetails": "Abrir detalhes de {{name}}",
       "passed": "{{displayCount}} com sucesso",
       "passed_one": "{{displayCount}} com sucesso",

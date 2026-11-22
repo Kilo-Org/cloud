@@ -1025,6 +1025,7 @@
       "title": "Checks",
       "openDetails": "Open {{name}} details",
       "notAvailable": "Checks aren't available yet. The head commit may not have been processed, or the Kilo GitHub App isn't installed on the head repository.",
+      "providerNotAvailable": "Checks aren't available yet. The head commit may not have been processed, or your connection may not have access to the item.",
       "noAccess": "You don't have access to checks for this repository.",
       "couldNotLoad": "Couldn't load checks.",
       "retryChecks": "Retry checks",

@@ -516,8 +516,8 @@ async function releaseChain(params: { ctx: TRPCContext; base: string }): Promise
       return { state: 'released', key: `${key}:x${submissionKeyDigest(randomUUID(), 8)}` };
     }
     // Re-derived from `base`, not from this step's key, so the identity does not
-    // grow with the chain: it stays `base` + 18 characters (32 for the terminal
-    // `:x` segment), inside the Worker's `operationKey` bound of 128.
+    // grow with the chain: every step is `base` + 18 characters, and the terminal
+    // step adds 10 more, inside the Worker's `operationKey` bound of 128.
     key = `${params.base}:r${submissionKeyDigest(previous.id, 16)}`;
   }
   return { state: 'released', key };

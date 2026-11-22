@@ -168,11 +168,16 @@ function terminalStatusOf(
 
 /**
  * The one cadence rule: every caller that needs a snapshot's refresh interval
- * reads this function. A terminal snapshot is quiet regardless of the counts
- * that survive beside it, so auth/privacy termination cannot keep polling.
+ * reads this function. It takes the caller's already-narrowed terminal status
+ * rather than testing the predicate again, and a terminal snapshot is quiet
+ * regardless of the counts that survive beside it, so auth/privacy termination
+ * cannot keep polling.
  */
-function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
-  if (terminalStatusOf(snapshot.status) !== null) return QUIET_REFRESH_MS;
+function refreshInterval(
+  snapshot: GlanceableAgentsSnapshot,
+  terminal: GlanceableTerminalStatus | null
+): number {
+  if (terminal !== null) return QUIET_REFRESH_MS;
   return snapshot.status === 'waiting' ||
     snapshot.status === 'stale' ||
     snapshot.status === 'expired' ||
@@ -308,7 +313,7 @@ function staleness(data: HomeWidgetData): {
       ? null
       : snapshot.updatedAt;
   const confirmedAt = timestampMs(checkedAt);
-  const refreshMs = refreshInterval(snapshot);
+  const refreshMs = refreshInterval(snapshot, terminal);
   return {
     terminal,
     primaryKind,

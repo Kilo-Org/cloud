@@ -8,7 +8,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
-import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
+import { withInstallationServerLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import {
   DISCORD_CLIENT_ID,
   DISCORD_CLIENT_SECRET,
@@ -60,6 +60,13 @@ export class DiscordGuildRebindNotAllowedError extends Error {
 
 /** How long a single bot-removal request may take before it counts as failed. */
 const DISCORD_BOT_REMOVAL_TIMEOUT_MS = 10_000;
+
+/**
+ * How long the release of a replaced server may take. The release runs inside
+ * the installation lock, whose `lock_timeout` is 5s, so this must stay below it:
+ * a request that outlasts the wait would make a concurrent connect abort.
+ */
+export const DISCORD_RELEASE_REMOVAL_TIMEOUT_MS = 4_000;
 
 /**
  * The message the server puts on a Discord disconnect Discord did not confirm.
@@ -475,8 +482,14 @@ export async function upsertDiscordInstallation(
  * server. The OAuth exchange stores no user token, deliberately, so this call is
  * the one that ends the membership the integration holds. Discord answers 204
  * when the bot left, and 403 or 404 when the bot is not a member of that server.
+ *
+ * `timeoutMs` bounds the request. A caller inside the installation lock passes a
+ * value below that lock's wait; the disconnect path uses the full default.
  */
-export async function removeBotFromGuild(guildId: string | null): Promise<DiscordBotRemoval> {
+export async function removeBotFromGuild(
+  guildId: string | null,
+  timeoutMs = DISCORD_BOT_REMOVAL_TIMEOUT_MS
+): Promise<DiscordBotRemoval> {
   if (!DISCORD_BOT_TOKEN) {
     return { status: 'unavailable', reason: 'not_configured' };
   }
@@ -498,7 +511,7 @@ export async function removeBotFromGuild(guildId: string | null): Promise<Discor
       headers: {
         Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
       },
-      signal: AbortSignal.timeout(DISCORD_BOT_REMOVAL_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (response.ok) {
@@ -537,16 +550,16 @@ export async function removeBotFromGuild(guildId: string | null): Promise<Discor
  * The previous server is released only while it is still unclaimed. A server
  * that another owner has since recorded belongs to that connection, so it is
  * left alone. The lookup and the removal hold the per-server lock the connect
- * write takes, so the two steps are one decision.
+ * write takes, so the two steps are one decision. That lock takes no owner key,
+ * so a release in flight never delays another connection of the same owner.
  */
 export async function releasePreviousDiscordGuild(
   owner: Owner,
   previousGuildId: string
 ): Promise<void> {
   try {
-    const removal = await withWorkspaceInstallationLock(
+    const removal = await withInstallationServerLock(
       PLATFORM.DISCORD,
-      owner,
       previousGuildId,
       async tx => {
         const recordedByAnotherOwner = await getConflictingDiscordInstallation(
@@ -558,7 +571,7 @@ export async function releasePreviousDiscordGuild(
           return null;
         }
 
-        return removeBotFromGuild(previousGuildId);
+        return removeBotFromGuild(previousGuildId, DISCORD_RELEASE_REMOVAL_TIMEOUT_MS);
       }
     );
 

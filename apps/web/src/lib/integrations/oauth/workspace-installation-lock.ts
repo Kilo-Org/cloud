@@ -18,3 +18,22 @@ export async function withWorkspaceInstallationLock<T>(
     return operation(tx);
   });
 }
+
+/**
+ * Serialize operations on one installation id. This takes no owner key, so an
+ * operation that only concerns a single installation never blocks another
+ * installation of the same owner.
+ */
+export async function withInstallationServerLock<T>(
+  platform: 'linear' | 'slack' | 'discord',
+  installationId: string,
+  operation: (tx: DrizzleTransaction) => Promise<T>
+): Promise<T> {
+  return db.transaction(async tx => {
+    await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+    await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+    const key = `integration-installation:${platform}:${installationId}`;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+    return operation(tx);
+  });
+}

@@ -71,6 +71,7 @@ import {
   addDiscordReaction,
   DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
   DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
+  DISCORD_RELEASE_REMOVAL_TIMEOUT_MS,
   postDiscordMessage,
   releasePreviousDiscordGuild,
   removeBotFromGuild,
@@ -358,12 +359,31 @@ describe('discord-service previous guild release', () => {
   const otherOwner = { type: 'user', id: 'user-2' } satisfies Owner;
   const lockState = { depth: 0 };
 
+  /** The text of a drizzle `sql` statement, so a test can name the lock it takes. */
+  function statementText(statement: unknown): string {
+    if (!statement || typeof statement !== 'object' || !('queryChunks' in statement)) {
+      return '';
+    }
+    const { queryChunks } = statement;
+    if (!Array.isArray(queryChunks)) return '';
+
+    return queryChunks
+      .map(chunk => {
+        if (typeof chunk === 'string') return chunk;
+        if (!chunk || typeof chunk !== 'object' || !('value' in chunk)) return '';
+        const value = chunk.value;
+        return Array.isArray(value) ? value.join('') : String(value ?? '');
+      })
+      .join('');
+  }
+
   beforeEach(() => {
     jest.restoreAllMocks();
     mockCaptureException.mockReset();
     mockLimit.mockReset();
     mockLimit.mockResolvedValue([]);
     mockTxExecute.mockReset();
+    mockTxExecute.mockResolvedValue([]);
     mockTransaction.mockReset();
     lockState.depth = 0;
     mockTransaction.mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) => {
@@ -386,6 +406,19 @@ describe('discord-service previous guild release', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it('holds only the server lock, not the owner lock', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await releasePreviousDiscordGuild(owner, guildId);
+
+    const lockStatements = mockTxExecute.mock.calls
+      .map(([statement]) => statementText(statement))
+      .filter(text => text.includes('pg_advisory_xact_lock'));
+    expect(lockStatements).toHaveLength(1);
+    expect(lockStatements[0]).toContain(`integration-installation:discord:${guildId}`);
+    expect(lockStatements[0]).not.toContain('integration-installation-owner');
+  });
+
   it.each([204, 404])('leaves the server without reporting a %i answer', async status => {
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
       expect(lockState.depth).toBe(1);
@@ -403,6 +436,18 @@ describe('discord-service previous guild release', () => {
       })
     );
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('bounds the release removal below the lock wait', async () => {
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await releasePreviousDiscordGuild(owner, guildId);
+
+    expect(timeoutSpy).toHaveBeenCalledWith(DISCORD_RELEASE_REMOVAL_TIMEOUT_MS);
+    expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBe(timeoutSpy.mock.results[0]?.value);
   });
 
   it.each([

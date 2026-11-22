@@ -466,5 +466,10 @@ describe('ModelAccessForm leave guard', () => {
     pressBack();
     expect(h.confirm).not.toHaveBeenCalled();
     expect(h.repeat).toHaveBeenCalledTimes(1);
+
+    // The viewer cannot write either: Save is disabled for the same reason the
+    // lists are, and a press that reaches the handler still issues no write.
+    await pressSave(root);
+    expect(h.mutateAsync).not.toHaveBeenCalled();
   });
 });

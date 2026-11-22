@@ -183,6 +183,14 @@ vi.mock('expo', () => ({
   },
 }));
 
+// `expo/fetch` is the runtime's streaming fetch, and its module loads the Expo
+// native runtime that a Node test worker has no binary for. The stub delegates
+// to the global fetch these workers do provide, so a suite that spies on
+// `globalThis.fetch` still sees the request it answers.
+vi.mock('expo/fetch', () => ({
+  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
+}));
+
 // `expo-application` answers from the native binary; a test project has none,
 // so its expo module lookup throws. The values are what a dev build reports and
 // no suite asserts on them: a suite that does mocks this module itself and wins.

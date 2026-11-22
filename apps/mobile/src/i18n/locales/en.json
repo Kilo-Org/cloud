@@ -17,6 +17,7 @@
     "contextAll": "All contexts",
     "dismiss": "Dismiss brief",
     "dismissFailed": "Couldn’t dismiss this brief yet. It retries in the background.",
+    "readMarkFailed": "Couldn’t mark this brief as read. It will try again when the brief reloads.",
     "offline": "Offline · saved brief",
     "cached": "Saved brief · refresh unavailable",
     "summary": "AI summary",
@@ -36,6 +37,9 @@
     "morningEnd": "Brief available until",
     "timeHint": "The Home card restores live status when the brief window ends, even offline.",
     "invalidSchedule": "Choose a valid time zone and a non-empty brief window.",
+    "scheduleEmptyNight": "The brief window is empty. Choose a ready time later than the window start.",
+    "scheduleEmptyMorning": "The ready time and the available until time match. Choose how long the brief stays available.",
+    "scheduleFullDay": "The two windows cover a full day. Leave part of the day outside the brief.",
     "notificationsHint": "One generic notification per scheduled brief. Independent of paid AI summaries.",
     "notificationPermission": "Turn on push notifications to receive your brief.",
     "defaultModel": "Use Kilo’s default model",
@@ -49,7 +53,9 @@
     "estimateModelNotAllowed": "This model isn’t allowed in this context. Choose another model.",
     "estimateSpendLimitTooLow": "Raise the spend safeguard to allow this summary.",
     "confirmPaid": "Enable paid summaries for {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
     "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
+    "paidDisclosure_other": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
     "enable": "Enable paid summaries",
     "allContexts": "Personal and organization briefs stay separate.",
     "emptyHistory": "No saved briefs",
@@ -88,7 +94,7 @@
     "metadataFailure": "Last turn failed: {{kind}}",
     "metadataFailureProvider": "provider error",
     "metadataFailureTool": "tool error",
-    "metadataFailureCancelled": "cancelled",
+    "metadataStopped": "Last turn was stopped",
     "metadataFailureOther": "unspecified error"
   },
   "nativeRemote": {
@@ -2268,7 +2274,8 @@
       "sectionAccessibility_one": "{{title}}, {{displayCount}} session",
       "sectionAccessibility": "{{title}}, {{displayCount}} sessions",
       "sectionAccessibility_other": "{{title}}, {{displayCount}} sessions",
-      "live": "LIVE"
+      "live": "LIVE",
+      "retentionLimit": "Showing your most recent sessions."
     },
     "sessionRow": {
       "deleteTitle": "Delete session?",
@@ -2338,7 +2345,6 @@
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
       "emptyReadOnlyTitle": "No messages in this session",
-      "renameAccessibility": "Rename session: {{title}}",
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",
       "historyTooLarge": "This session's transcript is too large to load.",
@@ -3187,6 +3193,12 @@
     "retryLoadingAccount": "Retry loading account",
     "retryLoadingPrivacy": "Retry loading privacy choices"
   },
+  "accountBlocked": {
+    "title": "Account blocked",
+    "description": "Kilo blocked this account, and signing in again will not clear it. Support can review the block on request.",
+    "domainDescription": "Kilo does not allow accounts on this email domain, and signing in again will not change it. Support can review the domain on request.",
+    "contactSupport": "Contact support"
+  },
   "addCredits": {
     "cta": "Add credits",
     "billingPage": "billing page"
@@ -3271,8 +3283,7 @@
     "timeoutDescription": "The request timed out before it finished. Try again."
   },
   "screenHeader": {
-    "openMenu": "Open menu",
-    "openMenuFor": "Open menu for {{title}}"
+    "openMenu": "Open menu"
   },
   "picker": {
     "optionsExpired": "Options expired",

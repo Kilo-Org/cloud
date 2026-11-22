@@ -1,7 +1,8 @@
 import { type MarkedToken, type Token } from 'marked';
 
 import { lexMarkdown } from '@/components/agents/markdown-parse-cache';
-import { firstGraphemes } from '@/lib/graphemes';
+import { i18n } from '@/i18n';
+import { boundedOneLineExcerpt } from '@/lib/format';
 
 /**
  * The longest line a chat derives from a message it holds.
@@ -49,8 +50,6 @@ function windowStart(text: string): string {
   }
   return cut;
 }
-
-const ELLIPSIS = '…';
 
 /**
  * The plain text of inline markdown: emphasis, strong text, inline code,
@@ -161,17 +160,9 @@ function markedTokenText(token: MarkedToken): string {
  * window is labelled from the start of its body, and the rest is never read.
  */
 export function derivedChatText(text: string): string {
-  const source = windowStart(text);
-  const oneLine = chatPlainText(source).replaceAll(/\s+/gu, ' ').trim();
-  // A string no longer than the cap in code units holds no more characters
-  // than that, so the common short message never reaches the segmenter.
-  if (oneLine.length <= DERIVED_CHAT_TEXT_MAX_LENGTH) {
-    return oneLine;
-  }
-  const head = firstGraphemes(oneLine, DERIVED_CHAT_TEXT_MAX_LENGTH);
-  if (!head.more) {
-    return oneLine;
-  }
-  const cut = firstGraphemes(oneLine, DERIVED_CHAT_TEXT_MAX_LENGTH - 1).text;
-  return `${cut.trimEnd()}${ELLIPSIS}`;
+  return boundedOneLineExcerpt(
+    chatPlainText(windowStart(text)),
+    DERIVED_CHAT_TEXT_MAX_LENGTH,
+    i18n.language
+  );
 }

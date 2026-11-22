@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} phiên",
       "sectionAccessibility": "{{title}}: {{displayCount}} phiên",
       "live": "TRỰC TIẾP",
-      "updating": "Đang cập nhật"
+      "updating": "Đang cập nhật",
+      "retentionLimit": "Đang hiển thị các phiên gần đây nhất của bạn."
     },
     "sessionRow": {
       "deleteTitle": "Xóa phiên?",
@@ -1684,7 +1685,6 @@
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "emptyReadOnlyTitle": "Phiên này không có tin nhắn",
-      "renameAccessibility": "Đổi tên phiên: {{title}}",
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
       "historyTooLarge": "Kết xuất của phiên này quá lớn để tải.",
@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "Thử tải lại thông tin tài khoản",
     "retryLoadingPrivacy": "Thử tải lại các tùy chọn quyền riêng tư"
   },
+  "accountBlocked": {
+    "title": "Tài khoản bị chặn",
+    "description": "Kilo đã chặn tài khoản này và đăng nhập lại sẽ không gỡ được lệnh chặn. Bộ phận hỗ trợ có thể xem xét lệnh chặn theo yêu cầu.",
+    "domainDescription": "Kilo không cho phép tài khoản trên tên miền email này và đăng nhập lại sẽ không thay đổi điều đó. Bộ phận hỗ trợ có thể xem xét tên miền theo yêu cầu.",
+    "contactSupport": "Liên hệ hỗ trợ"
+  },
   "addCredits": {
     "cta": "Nạp tiền",
     "billingPage": "trang thanh toán"
@@ -2605,8 +2611,7 @@
     "timeoutDescription": "Yêu cầu đã quá thời gian chờ. Vui lòng thử lại."
   },
   "screenHeader": {
-    "openMenu": "Mở trình đơn",
-    "openMenuFor": "Mở trình đơn cho {{title}}"
+    "openMenu": "Mở trình đơn"
   },
   "picker": {
     "optionsExpired": "Tùy chọn đã hết hạn",
@@ -4701,6 +4706,7 @@
     "contextAll": "Tất cả ngữ cảnh",
     "dismiss": "Bỏ qua bản tin",
     "dismissFailed": "Chưa thể bỏ qua bản tin này. Hệ thống sẽ tự thử lại trong nền.",
+    "readMarkFailed": "Chưa thể đánh dấu bản tin này là đã đọc. Hệ thống sẽ tự thử lại khi bản tin tải lại.",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Bản tin đã lưu · không thể làm mới",
     "summary": "Tóm tắt AI",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Bản tin có sẵn đến",
     "timeHint": "Thẻ Trang chủ sẽ trở lại trạng thái trực tiếp khi khung thời gian bản tin kết thúc, kể cả khi ngoại tuyến.",
     "invalidSchedule": "Hãy chọn múi giờ hợp lệ và khung thời gian bản tin không trống.",
+    "scheduleEmptyNight": "Khung thời gian bản tin đang trống. Hãy chọn thời điểm bản tin sẵn sàng muộn hơn thời điểm bắt đầu khung.",
+    "scheduleEmptyMorning": "Thời điểm bản tin sẵn sàng và thời điểm bản tin có sẵn đến trùng nhau. Hãy chọn khoảng thời gian bản tin có sẵn.",
+    "scheduleFullDay": "Hai khung thời gian bao trùm cả ngày. Hãy để một phần trong ngày nằm ngoài bản tin.",
     "notificationsHint": "Một thông báo chung cho mỗi bản tin theo lịch. Không phụ thuộc vào tóm tắt AI trả phí.",
     "notificationPermission": "Bật thông báo đẩy để nhận bản tin của bạn.",
     "defaultModel": "Dùng mô hình mặc định của Kilo",
@@ -4729,7 +4738,9 @@
     "estimate": "Ước tính {{estimate}} · tối đa {{maximum}}",
     "estimateUnavailable": "Không có bản tóm tắt trả phí cho các cài đặt này. Hãy đổi mô hình hoặc giới hạn, hoặc thử lại sau.",
     "confirmPaid": "Bật tóm tắt trả phí cho {{context}}?",
+    "paidDisclosure_one": "Ước tính {{estimate}}, tối đa {{maximum}}, giới hạn {{minutes}} phút. Vẫn tính phí kể cả khi tạo thất bại.",
     "paidDisclosure": "Ước tính {{estimate}}, tối đa {{maximum}}, giới hạn {{minutes}} phút. Vẫn tính phí kể cả khi tạo thất bại.",
+    "paidDisclosure_other": "Ước tính {{estimate}}, tối đa {{maximum}}, giới hạn {{minutes}} phút. Vẫn tính phí kể cả khi tạo thất bại.",
     "enable": "Bật tóm tắt trả phí",
     "allContexts": "Bản tin cá nhân và tổ chức được tách riêng.",
     "emptyHistory": "Chưa có bản tin đã lưu",
@@ -4768,7 +4779,7 @@
     "sourceActivity": "Hoạt động chưa đặt tên",
     "metadataFailureProvider": "lỗi nhà cung cấp",
     "metadataFailureTool": "lỗi công cụ",
-    "metadataFailureCancelled": "Đã hủy",
+    "metadataStopped": "Lượt trước đã bị dừng",
     "metadataFailureOther": "lỗi không xác định",
     "metadataPlan_one": "Kế hoạch: {{displayDone}}/{{displayTotal}} bước đã xong",
     "metadataFiles_one": "{{displayCount}} tệp đã thay đổi",

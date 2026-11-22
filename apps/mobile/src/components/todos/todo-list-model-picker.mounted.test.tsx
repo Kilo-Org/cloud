@@ -63,7 +63,7 @@ vi.mock('@/lib/hooks/use-available-models', async importOriginal => {
   const actual = await importOriginal<typeof AvailableModels>();
   return {
     ...actual,
-    useAvailableModels: () => ({ models: state.models, isLoading: false }),
+    useAvailableModels: () => ({ models: state.models, isLoading: false, refetch: vi.fn() }),
   };
 });
 vi.mock('@/lib/hooks/use-todos', () => ({
@@ -123,6 +123,7 @@ vi.mock('@/components/ui/icons', () => ({
   ImageIcon: 'ImageIcon',
   Info: 'Info',
   NotebookPen: 'NotebookPen',
+  RefreshCw: 'RefreshCw',
   Search: 'Search',
   SearchX: 'SearchX',
   Star: 'Star',

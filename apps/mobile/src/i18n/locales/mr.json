@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} सत्रे",
       "sectionAccessibility": "{{title}}: {{displayCount}} सत्रे",
       "live": "थेट",
-      "updating": "अपडेट होत आहे"
+      "updating": "अपडेट होत आहे",
+      "retentionLimit": "सर्वात अलीकडची सत्रे दाखवली जात आहेत."
     },
     "sessionRow": {
       "deleteTitle": "सत्र हटवायचे?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "शेवटपर्यंत स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
       "emptyReadOnlyTitle": "या सत्रात संदेश नाहीत",
-      "renameAccessibility": "{{title}} या सत्राचे नाव बदला",
       "cloningSession": "सत्राची प्रत तयार होत आहे",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",
       "historyTooLarge": "या सत्राची ट्रान्सक्रिप्ट लोड करण्यासाठी खूप मोठी आहे.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "खाते लोड करण्याचा पुन्हा प्रयत्न करा",
     "retryLoadingPrivacy": "गोपनीयतेचे पर्याय लोड करण्याचा पुन्हा प्रयत्न करा"
   },
+  "accountBlocked": {
+    "title": "खाते अवरोधित",
+    "description": "Kilo ने हे खाते अवरोधित केले आहे, आणि पुन्हा साइन इन केल्यास ते उघडणार नाही. विनंतीनुसार मदत पथक अवरोधाचे पुनरावलोकन करू शकते.",
+    "domainDescription": "Kilo या ईमेल डोमेनवरील खात्यांना परवानगी देत नाही, आणि पुन्हा साइन इन केल्यास हे बदलणार नाही. विनंतीनुसार मदत पथक डोमेनचे पुनरावलोकन करू शकते.",
+    "contactSupport": "मदत पथकाशी संपर्क साधा"
+  },
   "addCredits": {
     "cta": "क्रेडिट जोडा",
     "billingPage": "बिलिंग पृष्ठ"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "विनंती पूर्ण होण्यापूर्वी वेळ संपली. कृपया पुन्हा प्रयत्न करा."
   },
   "screenHeader": {
-    "openMenu": "मेनू उघडा",
-    "openMenuFor": "{{title}} साठी मेनू उघडा"
+    "openMenu": "मेनू उघडा"
   },
   "picker": {
     "optionsExpired": "पर्याय कालबाह्य झाले",
@@ -3270,7 +3275,7 @@
     "subscriptionLoading": "Kilo Pass चे सदस्यत्व लोड होत आहे",
     "retryHint": "Kilo Pass ची स्थिती पुन्हा मिळवण्याचा प्रयत्न करते.",
     "endedOn": "संपले {{date}}",
-    "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही।",
+    "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही.",
     "notAvailableTitle": "Kilo Pass ॲपमध्ये नाही",
     "noPassDescription": "या खात्याकडे Kilo Pass नाही.",
     "statusActive": "सक्रिय",
@@ -4701,6 +4706,7 @@
     "contextAll": "सर्व संदर्भ",
     "dismiss": "आढाव्याकडे दुर्लक्ष करा",
     "dismissFailed": "या आढाव्याकडे अजून दुर्लक्ष करता आले नाही. ते पार्श्वभूमीवर पुन्हा प्रयत्न करत आहे.",
+    "readMarkFailed": "हा आढावा वाचला म्हणून चिन्हांकित करता आला नाही. आढावा पुन्हा लोड होईल तेव्हा ते पुन्हा प्रयत्न करेल.",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला आढावा · रिफ्रेश उपलब्ध नाही",
     "summary": "AI सारांश",
@@ -4720,6 +4726,9 @@
     "morningEnd": "आढावा उपलब्ध राहण्याची अंतिम वेळ",
     "timeHint": "आढावा कालावधी संपल्यावर Home कार्ड थेट स्थिती पुन्हा दाखवते, ऑफलाइन असतानाही.",
     "invalidSchedule": "वैध वेळ क्षेत्र आणि रिकामे नसलेला आढावा कालावधी निवडा.",
+    "scheduleEmptyNight": "आढावा कालावधी रिकामा आहे. कालावधी सुरू होण्याच्या वेळेनंतरची तयार होण्याची वेळ निवडा.",
+    "scheduleEmptyMorning": "तयार होण्याची वेळ आणि उपलब्ध राहण्याची अंतिम वेळ जुळतात. आढावा किती काळ उपलब्ध राहील ते निवडा.",
+    "scheduleFullDay": "दोन्ही कालावधी संपूर्ण दिवस व्यापतात. दिवसाचा काही भाग आढाव्याबाहेर ठेवा.",
     "notificationsHint": "प्रत्येक नियोजित आढाव्यासाठी एक सामान्य सूचना. सशुल्क AI सारांशांपासून स्वतंत्र.",
     "notificationPermission": "तुमचा आढावा मिळवण्यासाठी पुश सूचना सुरू करा.",
     "defaultModel": "Kilo चे डीफॉल्ट मॉडेल वापरा",
@@ -4729,7 +4738,9 @@
     "estimate": "अंदाज {{estimate}} · कमाल {{maximum}}",
     "estimateUnavailable": "या सेटिंग्ससाठी सशुल्क सारांश उपलब्ध नाही. मॉडेल किंवा मर्यादा बदला, किंवा नंतर पुन्हा प्रयत्न करा.",
     "confirmPaid": "{{context}} साठी सशुल्क सारांश सुरू करायचे?",
-    "paidDisclosure": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनि मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
+    "paidDisclosure_one": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनिटाच्या मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
+    "paidDisclosure": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनिटांच्या मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
+    "paidDisclosure_other": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनिटांच्या मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
     "enable": "सशुल्क सारांश सुरू करा",
     "allContexts": "वैयक्तिक आणि संस्थेचे आढावे वेगळे ठेवले जातात.",
     "emptyHistory": "जतन केलेले आढावे नाहीत",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "शीर्षकहीन क्रियाकलाप",
     "metadataFailureProvider": "प्रदाता त्रुटी",
     "metadataFailureTool": "साधन त्रुटी",
-    "metadataFailureCancelled": "रद्द",
+    "metadataStopped": "शेवटची फेरी थांबली",
     "metadataFailureOther": "अनिर्दिष्ट त्रुटी"
   },
   "systemSearch": {
@@ -4850,7 +4861,7 @@
       "new": "नवीन ट्रिगर",
       "create": "ट्रिगर तयार करा",
       "emptyTitle": "अजून ट्रिगर नाहीत",
-      "emptyDescription": "तुमचा पहिला ट्रिगर तयार करा।",
+      "emptyDescription": "तुमचा पहिला ट्रिगर तयार करा.",
       "loadFailedTitle": "ट्रिगर लोड करता आले नाहीत",
       "loadFailedDescription": "कनेक्शन असल्यावर पुन्हा प्रयत्न करा.",
       "detailLoadFailedTitle": "हा ट्रिगर लोड करता आला नाही",

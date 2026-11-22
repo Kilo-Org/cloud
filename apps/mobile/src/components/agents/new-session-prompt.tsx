@@ -537,6 +537,7 @@ export function NewSessionPrompt({
           isLoadingModels={isLoadingModels}
           modelLocked={modelLocked}
           modelLockLabel={modelLockLabel}
+          onRetryModels={onRefetchModels}
           className="border-b-[0.5px] border-hair-soft bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
         {sharePrefill.failed ? (

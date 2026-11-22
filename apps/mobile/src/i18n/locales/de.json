@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} Sitzungen",
       "sectionAccessibility": "{{title}}: {{displayCount}} Sitzungen",
       "live": "IN ECHTZEIT",
-      "updating": "Wird aktualisiert"
+      "updating": "Wird aktualisiert",
+      "retentionLimit": "Es werden die neuesten Sitzungen angezeigt."
     },
     "sessionRow": {
       "deleteTitle": "Sitzung löschen?",
@@ -1684,7 +1685,6 @@
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
       "emptyReadOnlyTitle": "Keine Nachrichten in dieser Sitzung",
-      "renameAccessibility": "Sitzung umbenennen: {{title}}",
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
       "historyTooLarge": "Das Protokoll dieser Sitzung ist zum Laden zu groß.",
@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "Konto erneut laden",
     "retryLoadingPrivacy": "Datenschutzeinstellungen erneut laden"
   },
+  "accountBlocked": {
+    "title": "Konto gesperrt",
+    "description": "Kilo hat dieses Konto gesperrt, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Sperre auf Anfrage prüfen.",
+    "domainDescription": "Kilo sperrt Konten auf dieser E-Mail-Domain, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Domain auf Anfrage prüfen.",
+    "contactSupport": "Support kontaktieren"
+  },
   "addCredits": {
     "cta": "Guthaben aufladen",
     "billingPage": "abrechnungsseite"
@@ -2605,8 +2611,7 @@
     "timeoutDescription": "Die Anfrage wurde nicht rechtzeitig abgeschlossen. Bitte versuche es erneut."
   },
   "screenHeader": {
-    "openMenu": "Menü öffnen",
-    "openMenuFor": "Menü für {{title}} öffnen"
+    "openMenu": "Menü öffnen"
   },
   "picker": {
     "optionsExpired": "Auswahl nicht mehr gültig",
@@ -4701,6 +4706,7 @@
     "contextAll": "Alle Kontexte",
     "dismiss": "Briefing ausblenden",
     "dismissFailed": "Dieses Briefing konnte noch nicht ausgeblendet werden. Der Vorgang wird im Hintergrund wiederholt.",
+    "readMarkFailed": "Dieses Briefing konnte noch nicht als gelesen markiert werden. Der Vorgang wird beim nächsten Laden des Briefings wiederholt.",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeichertes Briefing · Aktualisierung nicht verfügbar",
     "summary": "AI-Zusammenfassung",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Briefing verfügbar bis",
     "timeHint": "Die Startseiten-Karte zeigt nach Ende des Briefing-Zeitraums wieder den Live-Status, auch offline.",
     "invalidSchedule": "Wähle eine gültige Zeitzone und einen nicht leeren Briefing-Zeitraum.",
+    "scheduleEmptyNight": "Der Briefing-Zeitraum ist leer. Wähle eine Bereitschaftszeit nach dem Beginn des Zeitraums.",
+    "scheduleEmptyMorning": "Die Bereitschaftszeit und die Verfügbar-bis-Zeit stimmen überein. Wähle, wie lange das Briefing verfügbar bleibt.",
+    "scheduleFullDay": "Die beiden Zeitfenster decken einen ganzen Tag ab. Lass einen Teil des Tages außerhalb des Briefings.",
     "notificationsHint": "Eine allgemeine Benachrichtigung pro geplantem Briefing. Unabhängig von kostenpflichtigen AI-Zusammenfassungen.",
     "notificationPermission": "Aktiviere Push-Benachrichtigungen, um dein Briefing zu erhalten.",
     "defaultModel": "Standardmodell von Kilo verwenden",
@@ -4733,6 +4742,8 @@
     "estimateModelNotAllowed": "Dieses Modell ist in diesem Kontext nicht zugelassen. Wähle ein anderes Modell.",
     "estimateSpendLimitTooLow": "Erhöhe die Ausgabengrenze, um diese Zusammenfassung zu ermöglichen.",
     "confirmPaid": "Kostenpflichtige Zusammenfassungen für {{context}} aktivieren?",
+    "paidDisclosure_one": "Geschätzt {{estimate}}, bis zu {{maximum}}, mit einem Limit von {{minutes}} Min. Kosten fallen auch an, wenn die Erstellung fehlschlägt.",
+    "paidDisclosure_other": "Geschätzt {{estimate}}, bis zu {{maximum}}, mit einem Limit von {{minutes}} Min. Kosten fallen auch an, wenn die Erstellung fehlschlägt.",
     "paidDisclosure": "Geschätzt {{estimate}}, bis zu {{maximum}}, mit einem Limit von {{minutes}} Min. Kosten fallen auch an, wenn die Erstellung fehlschlägt.",
     "enable": "Kostenpflichtige Zusammenfassungen aktivieren",
     "allContexts": "Persönliche und Organisations-Briefings bleiben getrennt.",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Unbenannte Aktivität",
     "metadataFailureProvider": "Anbieterfehler",
     "metadataFailureTool": "Tool-Fehler",
-    "metadataFailureCancelled": "Abgebrochen",
+    "metadataStopped": "Letzter Durchlauf gestoppt",
     "metadataFailureOther": "Unspezifischer Fehler"
   },
   "systemSearch": {

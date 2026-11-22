@@ -101,6 +101,26 @@ describe('refresh terminal classification', () => {
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
   });
 
+  it('names a blocked account on the 401 refusal', async () => {
+    store.set(AUTH_TOKEN_KEY, 'dead-token');
+    store.set(REFRESH_TOKEN_KEY, 'dead-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '123');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ error: 'USER_BLOCKED' }, { status: 401 })
+    );
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      kind: 'refused',
+      sessionVersion: currentAuthEpoch(),
+      userBlocked: true,
+    });
+    // The block ends the session exactly as any other 401 does; the flag only
+    // explains that end to the surface the sign-out leaves behind.
+    expect(store.get(REFRESH_TOKEN_KEY)).toBeUndefined();
+  });
+
   it('keeps the in-memory owner serving after the 401 clear so sign-out cleanup can authenticate', async () => {
     store.set(AUTH_TOKEN_KEY, 'dead-token');
     store.set(REFRESH_TOKEN_KEY, 'dead-refresh');
@@ -227,6 +247,34 @@ describe('refresh terminal classification', () => {
     });
     expect(events).toHaveLength(1);
     expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
+  });
+
+  it('stays terminal on a 401 whose body stalls, without the blocked copy', async () => {
+    store.set(AUTH_TOKEN_KEY, 'dead-token');
+    store.set(REFRESH_TOKEN_KEY, 'dead-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '123');
+    // A response whose body never settles after its headers: the session is
+    // over whatever the body says, so the refusal must not wait on it and must
+    // not fall through to the retryable outcome.
+    const stalled = {
+      ok: false,
+      status: 401,
+      headers: new Headers(),
+      text: () => new Promise<string>(() => undefined),
+    } as unknown as Response;
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(stalled);
+    const events = recordEvents();
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      kind: 'refused',
+      sessionVersion: currentAuthEpoch(),
+    });
+    // No body, so no blocked copy, and the dead pair is gone all the same.
+    expect(store.get(REFRESH_TOKEN_KEY)).toBeUndefined();
+    expect(events).toHaveLength(1);
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
   });
 

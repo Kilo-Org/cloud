@@ -18,12 +18,13 @@ import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-gr
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { SCREEN_GUTTER_DP } from '@/lib/layout';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
   hasRetentionBudget,
   reconcileFirstPage,
   withInfiniteRetention,
 } from '@/lib/query/infinite-retention';
-import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { reportReceiptRoute } from '@/lib/report-receipt-route';
 import {
@@ -53,9 +54,16 @@ const SEPARATOR = ' · ';
 const listStyle = { flex: 1 } satisfies ViewStyle;
 // The page gutter and the top pad live on the content container; the cells are
 // one continuous grouped card, so no per-cell inset and no gap between them.
+//
+// Both branches take this one style, so the skeleton keeps the geometry of the
+// rows that replace it: the gutter is the app's single page inset, the same one
+// the header and the receipt this list opens use, and the top pad is the 14pt
+// the loading branch's `pt-4` painted before (the native rem is 14pt). One
+// inset value for both axes is what stops the card moving 2dp sideways and 2dp
+// up the moment the first page settles.
 const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingTop: 16,
+  paddingHorizontal: SCREEN_GUTTER_DP,
+  paddingTop: SCREEN_GUTTER_DP,
 } satisfies ViewStyle;
 
 /**
@@ -157,7 +165,7 @@ export function ReportReceiptsScreen() {
       />
       <View className="flex-1">
         {loading ? (
-          <TabScreenScrollView className="flex-1" contentContainerClassName="px-4 pt-4">
+          <TabScreenScrollView className="flex-1" contentContainerStyle={listContentContainerStyle}>
             {/* The loaded rows are one grouped card, so the reserve is one. */}
             <RowGroup>
               <RowSkeleton subtitle />

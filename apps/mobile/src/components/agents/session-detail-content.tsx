@@ -758,11 +758,11 @@ export function SessionDetailContent({
   const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { condenseToolCalls } = useCondenseToolCallsPreference();
-  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
-    organizationId,
-    'member',
-    { enabled: sessionDataLoaded }
-  );
+  const {
+    models: catalogModels,
+    isLoading: gatewayCatalogLoading,
+    refetch: refetchCatalog,
+  } = useAvailableModels(organizationId, 'member', { enabled: sessionDataLoaded });
   // The picker lists models only once the session's scope is resolved. Until
   // then it holds its loading state, so it never presents a model list for a
   // scope the screen has not settled.
@@ -1922,6 +1922,21 @@ export function SessionDetailContent({
     }
   }, [manager, t]);
 
+  // The chip's Retry for an empty catalog. The chip lists whichever catalog its
+  // source projects: a v1 CLI answer is re-asked through the connection, and a
+  // legacy session's rows come from the gateway catalog, which the CLI cannot
+  // refresh.
+  const handleRetryModels = useCallback(() => {
+    if (
+      sessionModels.source === 'remote-cli-catalog' ||
+      sessionModels.source === 'remote-unavailable'
+    ) {
+      manager.retryRemoteModels();
+    } else {
+      void refetchCatalog();
+    }
+  }, [manager, refetchCatalog, sessionModels.source]);
+
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
       if (activeSessionType === 'remote') {
@@ -2990,9 +3005,7 @@ export function SessionDetailContent({
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
-                  onTitlePressAccessibilityHint: t('agentChat.session.renameAccessibility', {
-                    title: rename.title,
-                  }),
+                  onTitlePressAccessibilityHint: t('agentChat.session.renameSession'),
                 }
               : {})}
           />
@@ -3404,6 +3417,8 @@ export function SessionDetailContent({
                 modelOptions={modelOptionsForToolbar}
                 modelLocked={modelLocked}
                 modelLockLabel={pinned.agentName}
+                isLoadingModels={sessionModels.isLoading}
+                onRetryModels={handleRetryModels}
                 onModelSelect={handleModelSelect}
                 organizationId={organizationId}
                 attachmentsEnabled={supportsAttachments}

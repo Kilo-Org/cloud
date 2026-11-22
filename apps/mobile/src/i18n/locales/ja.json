@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 件のセッション",
       "sectionAccessibility": "{{title}}：{{displayCount}} 件のセッション",
       "live": "ライブ",
-      "updating": "更新中"
+      "updating": "更新中",
+      "retentionLimit": "最新のセッションを表示しています。"
     },
     "sessionRow": {
       "deleteTitle": "セッションを削除しますか？",
@@ -1684,7 +1685,6 @@
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "emptyReadOnlyTitle": "このセッションにメッセージはありません",
-      "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "historyTooLarge": "このセッションの履歴は大きすぎて読み込めません。",
@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "アカウントの読み込みを再試行",
     "retryLoadingPrivacy": "プライバシー設定の読み込みを再試行"
   },
+  "accountBlocked": {
+    "title": "アカウントがブロックされています",
+    "description": "Kiloはこのアカウントをブロックしており、再度サインインしてもブロックは解除されません。サポートはご要望に応じてブロックを確認できます。",
+    "domainDescription": "Kiloはこのメールドメインのアカウントをブロックしており、再度サインインしてもブロックは解除されません。サポートはご要望に応じてドメインを確認できます。",
+    "contactSupport": "サポートに連絡"
+  },
   "addCredits": {
     "cta": "クレジットを追加",
     "billingPage": "請求ページ"
@@ -2605,8 +2611,7 @@
     "timeoutDescription": "リクエストが完了する前にタイムアウトしました。もう一度お試しください。"
   },
   "screenHeader": {
-    "openMenu": "メニューを開く",
-    "openMenuFor": "{{title}}のメニューを開く"
+    "openMenu": "メニューを開く"
   },
   "picker": {
     "optionsExpired": "選択肢の有効期限が切れました",
@@ -4701,6 +4706,7 @@
     "contextAll": "すべてのコンテキスト",
     "dismiss": "ブリーフィングを非表示にする",
     "dismissFailed": "このブリーフィングはまだ非表示にできませんでした。バックグラウンドで再試行されます。",
+    "readMarkFailed": "このブリーフィングを既読にできませんでした。再読み込み時に再試行します。",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みブリーフィング · 更新できません",
     "summary": "AI要約",
@@ -4720,6 +4726,9 @@
     "morningEnd": "ブリーフの利用可能期限",
     "timeHint": "ブリーフ期間が終わると、オフラインでもホームカードはライブ状況に戻ります。",
     "invalidSchedule": "有効なタイムゾーンと、空でないブリーフ期間を選択してください。",
+    "scheduleEmptyNight": "ブリーフ期間が空です。ブリーフ期間の開始より後の準備完了時刻を選択してください。",
+    "scheduleEmptyMorning": "準備完了時刻と利用可能終了時刻が一致しています。ブリーフが利用可能な期間の長さを選択してください。",
+    "scheduleFullDay": "2つのブリーフ期間が1日全体をカバーしています。1日の一部をブリーフの対象外にしてください。",
     "notificationsHint": "スケジュールされたブリーフごとに1回、一般的な通知が届きます。有料のAI要約とは無関係です。",
     "notificationPermission": "ブリーフィングを受け取るには、プッシュ通知をオンにしてください。",
     "defaultModel": "Kiloのデフォルトモデルを使用",
@@ -4729,7 +4738,9 @@
     "estimate": "推定 {{estimate}} · 最大 {{maximum}}",
     "estimateUnavailable": "これらの設定では有料サマリーを利用できません。モデルや上限を変更するか、後でもう一度お試しください。",
     "confirmPaid": "{{context}}の有料要約を有効にしますか?",
+    "paidDisclosure_other": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
     "paidDisclosure": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
+    "paidDisclosure_one": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
     "enable": "有料要約を有効にする",
     "allContexts": "個人と組織のブリーフィングは別々に管理されます。",
     "emptyHistory": "保存済みのブリーフィングはありません",
@@ -4768,7 +4779,7 @@
     "sourceActivity": "無題のアクティビティ",
     "metadataFailureProvider": "プロバイダーエラー",
     "metadataFailureTool": "ツールエラー",
-    "metadataFailureCancelled": "キャンセル済み",
+    "metadataStopped": "前回のターンが停止されました",
     "metadataFailureOther": "不明なエラー",
     "metadataPlan_one": "プラン: {{displayTotal}}ステップ中{{displayDone}}完了",
     "metadataFiles_one": "{{displayCount}}件のファイルを変更",

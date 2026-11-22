@@ -41,10 +41,13 @@ export type SessionRawExportResult =
 /**
  * Stream a session's stored rows as NDJSON for an internal export.
  *
- * Read-only: the gate query only selects, and the Durable Object method it calls
- * only selects, so this is safe against a live session. No user credential is
- * involved — authorization is the route's dedicated export token — and the
- * caller is trusted to have established that the pair belongs in the export.
+ * The gate query and the export itself only select, so a plain export is safe
+ * against a live session. With `deleteIfEmpty` an object that stores nothing is
+ * also scheduled for a storage reset: the Durable Object writes a cleanup marker
+ * and arms the alarm that applies the reset, so this path mutates storage. No
+ * user credential is involved — authorization is the route's dedicated export
+ * token — and the caller is trusted to have established that the pair belongs in
+ * the export.
  */
 export async function getSessionRawExport(
   env: Env,

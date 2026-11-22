@@ -1,5 +1,6 @@
-/* eslint-disable max-classes-per-file, typescript-eslint/no-extraneous-class, typescript-eslint/no-unnecessary-condition, eslint/class-methods-use-this, eslint/no-empty-function, eslint-plugin-promise/prefer-await-to-callbacks, eslint-plugin-promise/prefer-await-to-then, typescript-eslint/promise-function-async -- the react-native host stub must mimic the module surface the real @native-html/render engine consumes (classes with no-op methods, promise-returning Linking shims); test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-classes-per-file, typescript-eslint/no-extraneous-class, typescript-eslint/no-unnecessary-condition, eslint/class-methods-use-this, eslint/no-empty-function, eslint-plugin-promise/prefer-await-to-callbacks, eslint-plugin-promise/prefer-await-to-then, typescript-eslint/promise-function-async, eslint/max-lines -- the react-native host stub must mimic the module surface the real @native-html/render engine consumes (classes with no-op methods, promise-returning Linking shims); test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx); one file holds every assertion about this renderer so the single stub is the only engine harness */
 import { createElement } from 'react';
+import RenderHTML from '@native-html/render';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -204,6 +205,73 @@ describe('MarkdownHtml nested-list styling (real HTML engine)', () => {
 
     expect(heading).toBeDefined();
     expect(heading?.style.some(s => s.fontSize === 20 && s.fontWeight === '700')).toBe(true);
+  });
+});
+
+describe('MarkdownHtml content width', () => {
+  type LayoutHandler = (event: {
+    nativeEvent: { layout: { x: number; y: number; width: number; height: number } };
+  }) => void;
+
+  /** The wrapper that reports its own frame; the engine's root is not ours. */
+  function layoutHandler(renderer: TestRenderer.ReactTestRenderer): LayoutHandler {
+    const wrapper = renderer.root.findAll(
+      node => (node.type as unknown) === 'View' && typeof node.props.onLayout === 'function'
+    )[0];
+    const handler = wrapper?.props.onLayout as LayoutHandler | undefined;
+    if (handler === undefined) {
+      throw new Error('MarkdownHtml rendered no measured container');
+    }
+    return handler;
+  }
+
+  function engineWidth(renderer: TestRenderer.ReactTestRenderer): unknown {
+    const engine = renderer.root.findAllByType(RenderHTML).at(-1);
+    if (engine === undefined) {
+      throw new Error('MarkdownHtml rendered no HTML engine');
+    }
+    return engine.props.contentWidth;
+  }
+
+  async function reportWidth(
+    renderer: TestRenderer.ReactTestRenderer,
+    width: number
+  ): Promise<void> {
+    const onLayout = layoutHandler(renderer);
+    await act(async () => {
+      onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height: 40 } } });
+      await Promise.resolve();
+    });
+  }
+
+  it('reports the measured container width, not the window width, once layout lands', async () => {
+    const renderer = await mountHtml('<p>inset body</p>');
+
+    // The window answers only for the first frame, before any layout exists.
+    expect(engineWidth(renderer)).toBe(rnStub.useWindowDimensions().width);
+
+    await reportWidth(renderer, 286);
+
+    expect(engineWidth(renderer)).toBe(286);
+  });
+
+  it('follows a later layout of a different width, such as a rotation', async () => {
+    const renderer = await mountHtml('<p>inset body</p>');
+
+    await reportWidth(renderer, 286);
+    await reportWidth(renderer, 412);
+
+    expect(engineWidth(renderer)).toBe(412);
+  });
+
+  it('keeps the same width when the wrapper reports its frame again', async () => {
+    const renderer = await mountHtml('<p>inset body</p>');
+
+    await reportWidth(renderer, 286);
+    const settled = engineWidth(renderer);
+    await reportWidth(renderer, 286);
+
+    expect(engineWidth(renderer)).toBe(settled);
   });
 });
 

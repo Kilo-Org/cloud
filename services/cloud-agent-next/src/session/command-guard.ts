@@ -392,23 +392,19 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git -?* config -?* --add *',
   'git -?* config -?* --replace-all *',
   'git -?* config -?* --unset *',
-  // The `-c key=value` form sets the same keys on the command line. Each rule
-  // names the key itself, before its value, and takes any separator run around
-  // it, so a key that only contains the word keeps working.
-  'git -c*push=*',
-  'git -c*push.*=*',
-  'git -c*force=*',
-  'git -c*force.*=*',
-  'git -c*mirror=*',
-  'git -c*mirror.*=*',
-  'git -c*alias*=*',
-  'git*-c*push=*',
-  'git*-c*push.*=*',
-  'git*-c*force=*',
-  'git*-c*force.*=*',
-  'git*-c*mirror=*',
-  'git*-c*mirror.*=*',
-  'git*-c*alias*=*',
+  // The `-c key[=value]` form sets configuration on the command line, and git
+  // matches a key without regard to case and reads a key with no value as true,
+  // so a rule cannot name one key or one value. Every inline setting is refused
+  // instead. The dash has to start the option group, after `git` or after a
+  // global option, so a short option that is `c` elsewhere, such as the one that
+  // creates a branch, is unaffected.
+  'git -c*',
+  'git  -c*',
+  'git   -c*',
+  'git\t-c*',
+  'git -?* -c*',
+  'git -?*  -c*',
+  'git -?*\t-c*',
 ];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [

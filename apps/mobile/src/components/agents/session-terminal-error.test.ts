@@ -31,6 +31,11 @@ describe('classifyTerminalError', () => {
     ['This session is no longer available.', 'gone'],
     ['Service is unavailable right now. Please try again.', 'unavailable'],
     ['Service is temporarily unavailable. Please retry in a moment.', 'unavailable'],
+    // The SDK's copy for a retryable paged transcript read.
+    ['Session history temporarily unavailable', 'transient'],
+    // The terminal kinds name a stored page a retry re-reads unchanged.
+    ['Session history is unavailable', 'unknown'],
+    ['Session history too large to load', 'unknown'],
     ['Connection lost. Please retry in a moment.', 'transient'],
     ['Connection failed. Please retry in a moment.', 'transient'],
     ['Something went wrong. Please retry in a moment.', 'transient'],
@@ -49,6 +54,12 @@ describe('describeTerminalFailure', () => {
   it.each([
     {
       message: 'Connection lost. Please retry in a moment.',
+      variant: 'server',
+      key: 'agentChat.session.connectionTrouble',
+      retryable: true,
+    },
+    {
+      message: 'Session history temporarily unavailable',
       variant: 'server',
       key: 'agentChat.session.connectionTrouble',
       retryable: true,

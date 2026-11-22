@@ -28,11 +28,11 @@ export type TerminalErrorClass =
 
 /**
  * Classify a terminal session error message. Matches the session manager's
- * `formatError` output strings, which are English and never translated —
- * the class is what the screen renders its own copy from. A typed transcript
- * read failure never reaches here: its kind decides retry-vs-terminal before
- * this runs. Unknown text is `'unknown'`, which shows the generic message and
- * offers no retry (safer than a fake one).
+ * `formatError` strings and the SDK's typed transcript-read copy; both are
+ * English and never translated. A typed read failure that arrives as a kind
+ * decides retry-vs-terminal before this runs; one that reaches the child sheet
+ * as the SDK's message string (a failed first hydrate) classifies here.
+ * Unknown text is `'unknown'`: the generic message, with no retry.
  *
  * The credits phrase is matched case-insensitively: the Durable Object's safe
  * projection writes `Assistant request failed: insufficient credits`
@@ -66,6 +66,13 @@ export function classifyTerminalError(message: string): TerminalErrorClass {
     message.includes('Service is temporarily unavailable')
   ) {
     return 'unavailable';
+  }
+  // The SDK's own copy for a paged transcript read that can succeed on retry
+  // (`SESSION_HISTORY_UNAVAILABLE_MESSAGE`). Without this, the child sheet's
+  // hydration error — which stores that typed message — would classify as
+  // unknown and lose its Retry.
+  if (message.includes('Session history temporarily unavailable')) {
+    return 'transient';
   }
   if (message.includes('retry in a moment')) {
     return 'transient';
@@ -389,10 +396,7 @@ type SessionRuntimeFailure = {
  * original stays in `detail` for Copy.
  */
 export function describeSessionRuntimeFailure(message: string): SessionRuntimeFailure {
-  return {
-    message: sessionStatusErrorMessage({ message }),
-    detail: message,
-  };
+  return { message: sessionStatusErrorMessage({ message }), detail: message };
 }
 
 /**

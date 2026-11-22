@@ -522,6 +522,7 @@
       "receiptLabel": "Ontvangstbewijs",
       "copyReceiptId": "Ontvangstbewijs-ID kopiëren",
       "appealLabel": "Bezwaar",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ontvangen",
       "triageOpen": "In behandeling",
       "triageActioned": "Gegrond",
@@ -555,7 +556,7 @@
       "title": "Meldingen",
       "rowSubtitle": "Meldingen die je hebt ingediend en hun uitkomsten",
       "emptyTitle": "Nog geen meldingen",
-      "emptyDescription": "Meldingen die je vanuit een reactie of een AI-antwoord indient, verschijnen hier.",
+      "emptyDescription": "Meldingen die je indient vanuit een opmerking in een pull request-discussie of vanuit een AI-antwoord in de sessie van een agent, verschijnen hier met hun uitkomst.",
       "couldNotLoad": "Kon je meldingen niet laden",
       "capped": "Je ziet je meest recente meldingen."
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessies",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessies",
       "live": "ACTIEF",
-      "updating": "Bijwerken"
+      "updating": "Bijwerken",
+      "retentionLimit": "De meest recente sessies worden weergegeven."
     },
     "sessionRow": {
       "deleteTitle": "Sessie verwijderen?",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
       "emptyReadOnlyTitle": "Geen berichten in deze sessie",
-      "renameAccessibility": "Sessie hernoemen: {{title}}",
       "cloningSession": "Sessie klonen…",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
       "historyTooLarge": "Het transcript van deze sessie is te groot om te laden.",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "Account opnieuw laden",
     "retryLoadingPrivacy": "Privacykeuzes opnieuw laden"
   },
+  "accountBlocked": {
+    "title": "Account geblokkeerd",
+    "description": "Kilo heeft dit account geblokkeerd en opnieuw inloggen heft de blokkade niet op. De helpdesk kan de blokkade op verzoek bekijken.",
+    "domainDescription": "Kilo staat geen accounts toe op dit e-maildomein en opnieuw inloggen verandert daar niets aan. De helpdesk kan het domein op verzoek bekijken.",
+    "contactSupport": "Contact opnemen met de helpdesk"
+  },
   "addCredits": {
     "cta": "Tegoed aanvullen",
     "billingPage": "factureringspagina"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "Het verzoek duurde te lang. Probeer het opnieuw."
   },
   "screenHeader": {
-    "openMenu": "Menu openen",
-    "openMenuFor": "Menu voor {{title}} openen"
+    "openMenu": "Menu openen"
   },
   "picker": {
     "optionsExpired": "Opties niet meer geldig",
@@ -2890,8 +2896,9 @@
       "checkActiveConnection": "De verbinding is actief, maar dit item kan nog steeds niet worden geladen.",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
-      "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
+      "reconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
       "bitbucketNotConnectedTitle": "Bitbucket is niet gekoppeld",
+      "bitbucketAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het te koppelen.",
       "adminOnlyConnectDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
@@ -4699,6 +4706,7 @@
     "contextAll": "Alle contexten",
     "dismiss": "Briefing negeren",
     "dismissFailed": "Deze briefing kon nog niet worden genegeerd. Er wordt op de achtergrond opnieuw geprobeerd.",
+    "readMarkFailed": "Deze briefing kon niet als gelezen worden gemarkeerd. Er wordt opnieuw geprobeerd zodra de briefing opnieuw laadt.",
     "offline": "Offline · opgeslagen briefing",
     "cached": "Opgeslagen briefing · vernieuwen niet beschikbaar",
     "summary": "AI-samenvatting",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Uitvoeren als mij",
       "runAsCreatorDescription": "Elke uitvoering gebruikt je account, dus de geheime header is vereist.",
       "saveFailedTitle": "Kan de trigger niet opslaan",
+      "nameTaken": "Er bestaat al een trigger met de naam “{{name}}”.",
+      "saveFailedRetry": "Kan de server niet bereiken. Controleer je verbinding en probeer het opnieuw.",
+      "saveFailedCheck": "Controleer de waarden in het formulier en probeer het opnieuw.",
       "deleteTitle": "Deze trigger verwijderen?",
       "deleteMessage": "Aanroepen naar {{name}} mislukken. Dit kan niet ongedaan worden gemaakt.",
       "deleteMessageScheduled": "Geplande uitvoeringen van {{name}} stoppen. Dit kan niet ongedaan worden gemaakt.",

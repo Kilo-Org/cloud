@@ -524,6 +524,7 @@
       "receiptLabel": "Potvrdenie",
       "copyReceiptId": "Kopírovať ID potvrdenia",
       "appealLabel": "Odvolanie",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Prijaté",
       "triageOpen": "Posudzuje sa",
       "triageActioned": "Opodstatnené",
@@ -557,7 +558,7 @@
       "title": "Nahlásenia",
       "rowSubtitle": "Nahlásenia, ktoré si podal, a ich výsledky",
       "emptyTitle": "Zatiaľ žiadne nahlásenia",
-      "emptyDescription": "Nahlásenia, ktoré podáš z komentára alebo z odpovede AI, sa zobrazia tu.",
+      "emptyDescription": "Nahlásenia, ktoré podáš z komentára v diskusii k pull requestu alebo z odpovede AI v relácii agenta, sa zobrazia tu aj s ich výsledkom.",
       "couldNotLoad": "Nepodarilo sa načítať tvoje nahlásenia",
       "capped": "Zobrazujú sa tvoje najnovšie nahlásenia."
     },
@@ -1048,8 +1049,9 @@
       "checkActiveConnection": "Pripojenie je aktívne, ale táto položka sa stále nedá načítať.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
-      "gitlabReconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
+      "reconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
       "bitbucketNotConnectedTitle": "Bitbucket nie je pripojený",
+      "bitbucketAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho pripojil.",
       "adminOnlyConnectDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
@@ -2268,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} relácie",
       "sectionAccessibility": "{{title}}: {{displayCount}} relácie",
       "live": "NAŽIVO",
-      "updating": "Aktualizuje sa"
+      "updating": "Aktualizuje sa",
+      "retentionLimit": "Zobrazujú sa najnovšie relácie."
     },
     "sessionRow": {
       "deleteTitle": "Odstrániť reláciu?",
@@ -2342,7 +2345,6 @@
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
       "emptyReadOnlyTitle": "Žiadne správy v tejto relácii",
-      "renameAccessibility": "Premenovať reláciu: {{title}}",
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
       "historyTooLarge": "Pepis tejto relácie je na načítanie príliš veľký.",
@@ -3215,6 +3217,12 @@
     "retryLoadingAccount": "Znova načítať účet",
     "retryLoadingPrivacy": "Znova načítať nastavenia súkromia"
   },
+  "accountBlocked": {
+    "title": "Účet je zablokovaný",
+    "description": "Kilo zablokovalo tento účet a nové prihlásenie blokovanie nezruší. Podpora môže blokovanie na požiadanie preveriť.",
+    "domainDescription": "Kilo blokuje účty na tejto e-mailovej doméne a nové prihlásenie to nezmení. Podpora môže doménu na požiadanie preveriť.",
+    "contactSupport": "Kontaktovať podporu"
+  },
   "addCredits": {
     "cta": "Doplniť kredity",
     "billingPage": "stránka fakturácie"
@@ -3287,8 +3295,7 @@
     "timeoutDescription": "Požiadavka trvala príliš dlho. Skúste to znova."
   },
   "screenHeader": {
-    "openMenu": "Otvoriť ponuku",
-    "openMenuFor": "Otvoriť ponuku pre {{title}}"
+    "openMenu": "Otvoriť ponuku"
   },
   "picker": {
     "optionsExpired": "Platnosť možností sa skončila",
@@ -4867,6 +4874,7 @@
     "contextAll": "Všetky kontexty",
     "dismiss": "Ignorovať prehľad",
     "dismissFailed": "Tento prehľad sa zatiaľ nepodarilo ignorovať. Na pozadí sa to pokúsi znova.",
+    "readMarkFailed": "Tento prehľad sa nepodarilo označiť ako prečítaný. Pri ďalšom načítaní prehľadu sa to pokúsi znova.",
     "offline": "Offline · uložený prehľad",
     "cached": "Uložený prehľad · obnovenie nedostupné",
     "summary": "AI zhrnutie",
@@ -5067,6 +5075,9 @@
       "runAsCreator": "Spustiť ako ja",
       "runAsCreatorDescription": "Každé spustenie používa váš účet, preto je tajná hlavička povinná.",
       "saveFailedTitle": "Nepodarilo sa uložiť spúšťač",
+      "nameTaken": "Spúšťač s názvom „{{name}}“ už existuje.",
+      "saveFailedRetry": "Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie a skúste to znova.",
+      "saveFailedCheck": "Skontrolujte hodnoty vo formulári a skúste to znova.",
       "deleteTitle": "Odstrániť tento spúšťač?",
       "deleteMessage": "Volania na {{name}} zlyhajú. Toto sa nedá vrátiť späť.",
       "deleteMessageScheduled": "Naplánované spustenia spúšťača {{name}} sa zastavia. Toto sa nedá vrátiť späť.",

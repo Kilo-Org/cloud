@@ -51,6 +51,15 @@ function isRefreshRefusalBody(body: unknown): boolean {
 }
 
 /**
+ * The one refresh refusal body that explains the session instead of merely
+ * ending it: the route answers `401 { error: 'USER_BLOCKED' }` when the account
+ * behind the stored pair is blocked. The refresh rotation parses it so the
+ * sign-out it triggers can say why; the classifier and the frozen wire contract
+ * stay as they are, because a 401 is terminal whether or not it names a block.
+ */
+export const UserBlockRefusalBodySchema = z.object({ error: z.literal('USER_BLOCKED') });
+
+/**
  * Every route whose terminal refusal {@link reportAuthTerminalFailure} reports:
  * the native auth POSTs (`postAuth`) and the refresh rotation. The
  * network-error fetch wrapper reads this list so it does not file a second

@@ -225,9 +225,13 @@ export async function storeGitLabOAuthIntegration(
           scopes: input.scopes,
           integration_status: INTEGRATION_STATUS.ACTIVE,
           // This transaction stores fresh credentials for the row, so the row
-          // records them as usable. The PAT connect clears the same columns.
+          // records them as usable. The PAT connect clears the same columns,
+          // and so does this write: a suspension recorded for the previous
+          // connection must not survive the reconnect that replaces it.
           auth_invalid_at: null,
           auth_invalid_reason: null,
+          suspended_at: null,
+          suspended_by: null,
           repositories: input.repositories,
           repositories_synced_at: repositoriesSyncedAt,
           updated_at: new Date().toISOString(),

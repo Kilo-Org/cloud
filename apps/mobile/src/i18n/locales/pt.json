@@ -524,6 +524,7 @@
       "receiptLabel": "Comprovativo",
       "copyReceiptId": "Copiar ID do comprovativo",
       "appealLabel": "Recurso",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Recebida",
       "triageOpen": "Em análise",
       "triageActioned": "Procedente",
@@ -557,7 +558,7 @@
       "title": "Denúncias",
       "rowSubtitle": "As denúncias que fizeste e os respetivos resultados",
       "emptyTitle": "Ainda não há denúncias",
-      "emptyDescription": "As denúncias que fizeres a partir de um comentário ou de uma resposta de IA aparecem aqui.",
+      "emptyDescription": "As denúncias que fizeres a partir de um comentário numa discussão de pull request ou de uma resposta da IA numa sessão de agente aparecem aqui com o respetivo resultado.",
       "couldNotLoad": "Não foi possível carregar as tuas denúncias",
       "capped": "A mostrar as tuas denúncias mais recentes."
     },
@@ -1048,8 +1049,9 @@
       "checkActiveConnection": "A ligação está ativa, mas este item ainda não pode ser carregado.",
       "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
-      "gitlabReconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
+      "reconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
       "bitbucketNotConnectedTitle": "O Bitbucket não está ligado",
+      "bitbucketAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que o ligue.",
       "adminOnlyConnectDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a sua conta pessoal"
@@ -2268,7 +2270,8 @@
       "sectionAccessibility_zero": "{{title}}: {{displayCount}} sessões",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessões",
       "live": "EM TEMPO REAL",
-      "updating": "A atualizar"
+      "updating": "A atualizar",
+      "retentionLimit": "A mostrar as sessões mais recentes."
     },
     "sessionRow": {
       "deleteTitle": "Eliminar sessão?",
@@ -2342,7 +2345,6 @@
       "scrollToBottom": "Ir para o fim da conversa",
       "emptyTitle": "Ainda sem mensagens",
       "emptyReadOnlyTitle": "Não há mensagens nesta sessão",
-      "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "A clonar a sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
       "historyTooLarge": "A transcrição desta sessão é demasiado grande para ser carregada.",
@@ -3215,6 +3217,12 @@
     "retryLoadingAccount": "Tentar carregar a conta novamente",
     "retryLoadingPrivacy": "Tentar carregar as preferências de privacidade novamente"
   },
+  "accountBlocked": {
+    "title": "Conta bloqueada",
+    "description": "O Kilo bloqueou esta conta e iniciar sessão novamente não vai desfazer o bloqueio. O suporte pode rever o bloqueio a pedido.",
+    "domainDescription": "O Kilo não permite contas neste domínio de e-mail e iniciar sessão novamente não vai alterar o bloqueio. O suporte pode rever o domínio a pedido.",
+    "contactSupport": "Contactar o suporte"
+  },
   "addCredits": {
     "cta": "Adicionar créditos",
     "billingPage": "página de faturação"
@@ -3287,8 +3295,7 @@
     "timeoutDescription": "O pedido não terminou a tempo. Tenta novamente."
   },
   "screenHeader": {
-    "openMenu": "Abrir menu",
-    "openMenuFor": "Abrir menu de {{title}}"
+    "openMenu": "Abrir menu"
   },
   "picker": {
     "optionsExpired": "Opções desatualizadas",
@@ -4867,6 +4874,7 @@
     "contextAll": "Todos os contextos",
     "dismiss": "Ignorar relatório",
     "dismissFailed": "Ainda não foi possível ignorar este relatório. Tentaremos novamente em segundo plano.",
+    "readMarkFailed": "Não foi possível marcar este relatório como lido. Tentaremos novamente quando o relatório for recarregado.",
     "offline": "Offline · relatório guardado",
     "cached": "Relatório guardado · atualização indisponível",
     "summary": "Resumo de IA",
@@ -5067,6 +5075,9 @@
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Todas as execuções usam a sua conta, por isso o cabeçalho secreto é obrigatório.",
       "saveFailedTitle": "Não foi possível guardar o acionador",
+      "nameTaken": "Já existe um acionador chamado «{{name}}».",
+      "saveFailedRetry": "Não foi possível contactar o servidor. Verifique a ligação e tente novamente.",
+      "saveFailedCheck": "Verifique os valores do formulário e tente novamente.",
       "deleteTitle": "Eliminar este acionador?",
       "deleteMessage": "As chamadas para {{name}} vão falhar. Esta ação não pode ser anulada.",
       "deleteMessageScheduled": "As execuções agendadas de {{name}} param. Esta ação não pode ser anulada.",

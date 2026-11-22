@@ -525,6 +525,7 @@
       "receiptLabel": "Admháil",
       "copyReceiptId": "Cóipeáil aitheantas na hadmhála",
       "appealLabel": "Achomharc",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Faighte",
       "triageOpen": "Á athbhreithniú",
       "triageActioned": "Seasadh leis",
@@ -558,7 +559,7 @@
       "title": "Tuairiscí",
       "rowSubtitle": "Na tuairiscí a chuir tú isteach agus a dtorthaí",
       "emptyTitle": "Níl aon tuairiscí ann fós",
-      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht nó ó fhreagra AI.",
+      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht i bplé ar iarratas tarraingthe nó ó fhreagra AI i seisiún gníomhaire, mar aon lena dtoradh.",
       "couldNotLoad": "Níorbh fhéidir do chuid tuairiscí a lódáil",
       "capped": "Ag taispeáint do chuid tuairiscí is déanaí."
     },
@@ -1067,8 +1068,9 @@
       "checkActiveConnection": "Tá an nasc gníomhach, ach ní féidir an mhír seo a lódáil fós.",
       "bitbucketOrgOnlyDescription": "Athraigh an cuntas thuas go heagraíocht chun iarratais tharraingthe Bitbucket na heagraíochta sin a athbhreithniú.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
-      "gitlabReconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
+      "reconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
       "bitbucketNotConnectedTitle": "Níl Bitbucket nasctha",
+      "bitbucketAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a cheangal.",
       "adminOnlyConnectDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
@@ -2315,7 +2317,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seisiún",
       "sectionAccessibility": "{{title}}: {{displayCount}} seisiún",
       "live": "BEO",
-      "updating": "Ag nuashonrú"
+      "updating": "Ag nuashonrú",
+      "retentionLimit": "Taispeántar do sheisiúin is déanaí."
     },
     "sessionRow": {
       "deleteTitle": "An scriosfar an seisiún?",
@@ -2391,7 +2394,6 @@
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
       "emptyReadOnlyTitle": "Níl aon teachtaireacht sa seisiún seo",
-      "renameAccessibility": "Athainmnigh seisiún: {{title}}",
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "historyTooLarge": "Tá tras-scríbhinn an tseisiúin seo rómhór le lódáil.",
@@ -3276,6 +3278,12 @@
     "retryLoadingAccount": "Bain triail as an gcuntas a lódáil arís",
     "retryLoadingPrivacy": "Bain triail as na roghanna príobháideachta a lódáil arís"
   },
+  "accountBlocked": {
+    "title": "Cuntas blocáilte",
+    "description": "Chuir Kilo bac ar an gcuntas seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an bac a athbhreithniú ar iarratas.",
+    "domainDescription": "Cuireann Kilo bac ar chuntais a bhaineann leis an bhfearann ríomhphoist seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an fearann a athbhreithniú ar iarratas.",
+    "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta"
+  },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",
     "billingPage": "leathanach billeála"
@@ -3348,8 +3356,7 @@
     "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },
   "screenHeader": {
-    "openMenu": "Oscail roghchlár",
-    "openMenuFor": "Oscail roghchlár do {{title}}"
+    "openMenu": "Oscail roghchlár"
   },
   "picker": {
     "optionsExpired": "Roghanna imithe in éag",
@@ -4951,6 +4958,7 @@
     "contextAll": "Gach comhthéacs",
     "dismiss": "Cuir an tuarascáil as an áireamh",
     "dismissFailed": "Ní féidir an túarascáil seo a chur as an áireamh go fóill. Déanfaidh sé iarracht arís sa chúlra.",
+    "readMarkFailed": "Níorbh fhéidir an túarascáil seo a mharcáil mar léite. Déanfaidh sé iarracht arís nuair a athlódálfar an túarascáil.",
     "offline": "As líne · tuarascáil shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
     "summary": "Achoimre AI",
@@ -5155,6 +5163,9 @@
       "runAsCreator": "Rith mar mise",
       "runAsCreatorDescription": "Úsáideann gach rith do chuntas, mar sin tá an ceanntásc rúnda riachtanach.",
       "saveFailedTitle": "Níorbh fhéidir an truicear a shábháil",
+      "nameTaken": "Tá truicear darb ainm “{{name}}” ann cheana.",
+      "saveFailedRetry": "Níorbh fhéidir teacht ar an bhfreastalaí. Seiceáil do nasc agus bain triail eile as.",
+      "saveFailedCheck": "Seiceáil na luachanna san fhoirm agus bain triail eile as.",
       "deleteTitle": "Scrios an truicear seo?",
       "deleteMessage": "Teipfidh glaonna chuig {{name}}. Ní féidir é seo a chealú.",
       "deleteMessageScheduled": "Stopfaidh ritheanna sceidealaithe an truicir {{name}}. Ní féidir é seo a chealú.",

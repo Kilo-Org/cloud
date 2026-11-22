@@ -522,6 +522,7 @@
       "receiptLabel": "Irisidi",
       "copyReceiptId": "Kopisha i-ID yerisidi",
       "appealLabel": "Isikhalo",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Wamukelwe",
       "triageOpen": "Uyabuyekezwa",
       "triageActioned": "Usekelwe",
@@ -555,7 +556,7 @@
       "title": "Imibiko",
       "rowSubtitle": "Imibiko oyifakile kanye nemiphumela yayo",
       "emptyTitle": "Ayikho imibiko okwamanje",
-      "emptyDescription": "Imibiko oyifaka kusukela kumazwana noma empendulweni ye-AI ivela lapha.",
+      "emptyDescription": "Imibiko oyifaka kusukela kumazwana engxoxweni ye-pull request noma empendulweni ye-AI eseshini yomenzeli ivela lapha kanye nomphumela wayo.",
       "couldNotLoad": "Akukwazekanga ukulayisha imibiko yakho",
       "capped": "Kuboniswa imibiko yakho yamuva kakhulu."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Ukuxhumana kuyasebenza, kodwa le nto ayikakwazi ukulayishwa.",
       "bitbucketOrgOnlyDescription": "Shintsha i-akhawunti engenhla ibe yinhlangano ukuze ubuyekeze ama-PR ayo e-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
-      "gitlabReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
+      "reconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
       "bitbucketNotConnectedTitle": "I-Bitbucket ayixhunyiwe",
+      "bitbucketAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma.",
       "adminOnlyConnectDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "contextLine": "Ku-{{organization}}",
       "contextLinePersonal": "Kwokomuntu siqu"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} iziseshini",
       "sectionAccessibility": "{{title}}: {{displayCount}} iziseshini",
       "live": "BUKHOMA",
-      "updating": "Kuyabuyekezwa"
+      "updating": "Kuyabuyekezwa",
+      "retentionLimit": "Kuboniswa iziseshini zakho zakamuva."
     },
     "sessionRow": {
       "deleteTitle": "Uyasusa iseshini?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
       "emptyReadOnlyTitle": "Ayikho imilayezo kulesi seshini",
-      "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
       "cloningSession": "Iseshini iyakopishwa",
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
       "historyTooLarge": "Umyalezo wale seshini mude kakhulu ukuthi ulayishwe.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Zama futhi ukulayisha i-akhawunti",
     "retryLoadingPrivacy": "Zama futhi ukulayisha izinketho zobumfihlo"
   },
+  "accountBlocked": {
+    "title": "I-akhawunti ivinjiwe",
+    "description": "I-Kilo ivale le akhawunti, futhi ukungena kabusha ngeke kuyisule. Ithimba losizo lingabuyekeza ukuvalwa uma kuceliwe.",
+    "domainDescription": "I-Kilo ivale ama-akhawunti kulesi sizinda se-imeyili, futhi ukungena kabusha ngeke kuyishintshe. Ithimba losizo lingabuyekeza isizinda uma kuceliwe.",
+    "contactSupport": "Xhumana nethimba losizo"
+  },
   "addCredits": {
     "cta": "Engeza amakhredithi",
     "billingPage": "ikhasi lokukhokha"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Isicelo siphelelwe yisikhathi ngaphambi kokuqedwa. Sicela uzame futhi."
   },
   "screenHeader": {
-    "openMenu": "Vula imenyu",
-    "openMenuFor": "Vula imenyu ye-{{title}}"
+    "openMenu": "Vula imenyu"
   },
   "picker": {
     "optionsExpired": "Izinketho ziphelelwe yisikhathi",
@@ -4699,6 +4706,7 @@
     "contextAll": "Imimongo yonke",
     "dismiss": "Chitha umbiko",
     "dismissFailed": "Umbiko awukachithwanga okwamanje. Uzama kabusha ngasemuva.",
+    "readMarkFailed": "Ayikwazekanga ukumaka lo mbiko njengokufundiwe. Kuzozanywa futhi lapho umbiko ulayishwa kabusha.",
     "offline": "Akuxhunyiwe · umbiko olondoloziwe",
     "cached": "Umbiko olondoloziwe · ukuvuselela akutholakali",
     "summary": "Isifinyezo se-AI",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Sebenza njengami",
       "runAsCreatorDescription": "Ukusebenza konke kusebenzisa i-akhawunti yakho, ngakho iheda eyimfihlo iyadingeka.",
       "saveFailedTitle": "Akukwazekanga ukugcina isibangeli",
+      "nameTaken": "Isibangeli esibizwa ngokuthi “{{name}}” sesivele sikhona.",
+      "saveFailedRetry": "Asikwazanga ukufinyelela kuseva. Hlola uxhumano lwakho bese uzama futhi.",
+      "saveFailedCheck": "Hlola amanani asefomini bese uzama futhi.",
       "deleteTitle": "Susa lesi sibangeli?",
       "deleteMessage": "Izingcingo eziya ku-{{name}} zizohluleka. Lokhu ngeke kubuyiselwe.",
       "deleteMessageScheduled": "Ukusebenza okuhleliwe kwesibangeli {{name}} kuzoma. Lokhu ngeke kubuyiselwe.",

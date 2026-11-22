@@ -524,6 +524,7 @@
       "receiptLabel": "Patvirtinimas",
       "copyReceiptId": "Kopijuoti patvirtinimo ID",
       "appealLabel": "Apskundimas",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Gautas",
       "triageOpen": "Peržiūrimas",
       "triageActioned": "Pagrįstas",
@@ -557,7 +558,7 @@
       "title": "Pranešimai",
       "rowSubtitle": "Jūsų pateikti pranešimai ir jų rezultatai",
       "emptyTitle": "Kol kas pranešimų nėra",
-      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro arba AI atsakymo, rodomi čia.",
+      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro PR diskusijoje arba iš DI atsakymo agento sesijoje, rodomi čia kartu su savo rezultatu.",
       "couldNotLoad": "Nepavyko įkelti jūsų pranešimų",
       "capped": "Rodomi naujausi jūsų pranešimai."
     },
@@ -1048,8 +1049,9 @@
       "checkActiveConnection": "Ryšys aktyvus, bet šio elemento vis tiek nepavyksta įkelti.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
-      "gitlabReconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
+      "reconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
       "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
+      "bitbucketAdminOnlyDescription": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti.",
       "adminOnlyConnectDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
@@ -2268,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesijos",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesijos",
       "live": "TIESIOGIAI",
-      "updating": "Atnaujinama"
+      "updating": "Atnaujinama",
+      "retentionLimit": "Rodomos naujausios sesijos."
     },
     "sessionRow": {
       "deleteTitle": "Ištrinti sesiją?",
@@ -2342,7 +2345,6 @@
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
       "emptyReadOnlyTitle": "Šioje sesijoje nėra žinučių",
-      "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
       "historyTooLarge": "Šios sesijos nuorašas per didelis, kad jį būtų galima įkelti.",
@@ -3215,6 +3217,12 @@
     "retryLoadingAccount": "Bandyti įkelti paskyrą dar kartą",
     "retryLoadingPrivacy": "Bandyti įkelti privatumo parinktis dar kartą"
   },
+  "accountBlocked": {
+    "title": "Paskyra užblokuota",
+    "description": "Kilo užblokavo šią paskyrą, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti blokavimą gavusi prašymą.",
+    "domainDescription": "Kilo neleidžia paskyrų šiame el. pašto domene, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti domeną gavusi prašymą.",
+    "contactSupport": "Kreiptis į pagalbos tarnybą"
+  },
   "addCredits": {
     "cta": "Papildyti kreditus",
     "billingPage": "atsiskaitymų puslapis"
@@ -3287,8 +3295,7 @@
     "timeoutDescription": "Užklausa nebuvo atlikta per skirtąjį laiką. Bandyk dar kartą."
   },
   "screenHeader": {
-    "openMenu": "Atidaryti meniu",
-    "openMenuFor": "Atidaryti „{{title}}“ meniu"
+    "openMenu": "Atidaryti meniu"
   },
   "picker": {
     "optionsExpired": "Parinktys nebegalioja",
@@ -4867,6 +4874,7 @@
     "contextAll": "Visi kontekstai",
     "dismiss": "Atmesti suvestinę",
     "dismissFailed": "Šios suvestinės dar nepavyko atmesti. Bandymas kartojamas fone.",
+    "readMarkFailed": "Šios suvestinės nepavyko pažymėti kaip perskaitytos. Bandymas bus pakartotas, kai suvestinė bus įkelta iš naujo.",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota suvestinė · atnaujinti negalima",
     "summary": "AI santrauka",
@@ -5067,6 +5075,9 @@
       "runAsCreator": "Paleisti kaip mane",
       "runAsCreatorDescription": "Kiekvienas paleidimas naudoja jūsų paskyrą, todėl slaptoji antraštė yra privaloma.",
       "saveFailedTitle": "Nepavyko išsaugoti trigerio",
+      "nameTaken": "Trigeris pavadinimu „{{name}}“ jau yra.",
+      "saveFailedRetry": "Nepavyko pasiekti serverio. Patikrinkite ryšį ir bandykite dar kartą.",
+      "saveFailedCheck": "Patikrinkite formos reikšmes ir bandykite dar kartą.",
       "deleteTitle": "Ištrinti šį trigerį?",
       "deleteMessage": "Iškvietimai į {{name}} bus nesėkmingi. To atšaukti negalima.",
       "deleteMessageScheduled": "Suplanuoti trigerio {{name}} paleidimai sustos. To atšaukti negalima.",

@@ -522,6 +522,7 @@
       "receiptLabel": "Alındı",
       "copyReceiptId": "Alındı kimliğini kopyala",
       "appealLabel": "İtiraz",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Alındı",
       "triageOpen": "İnceleniyor",
       "triageActioned": "Haklı bulundu",
@@ -555,7 +556,7 @@
       "title": "Raporlar",
       "rowSubtitle": "Gönderdiğiniz raporlar ve sonuçları",
       "emptyTitle": "Henüz rapor yok",
-      "emptyDescription": "Bir yorumdan veya bir yapay zeka yanıtından gönderdiğiniz raporlar burada görünür.",
+      "emptyDescription": "Bir pull request tartışmasındaki yorumdan veya bir ajan oturumundaki yapay zeka yanıtından gönderdiğiniz raporlar, sonuçlarıyla birlikte burada görünür.",
       "couldNotLoad": "Raporlarınız yüklenemedi",
       "capped": "En son raporlarınız gösteriliyor."
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} oturum",
       "sectionAccessibility": "{{title}}: {{displayCount}} oturum",
       "live": "CANLI",
-      "updating": "Güncelleniyor"
+      "updating": "Güncelleniyor",
+      "retentionLimit": "En son oturumlar gösteriliyor."
     },
     "sessionRow": {
       "deleteTitle": "Oturum silinsin mi?",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "emptyReadOnlyTitle": "Bu oturumda mesaj yok",
-      "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "Hesabı yüklemeyi tekrar dene",
     "retryLoadingPrivacy": "Gizlilik tercihlerini yüklemeyi tekrar dene"
   },
+  "accountBlocked": {
+    "title": "Hesap engellendi",
+    "description": "Kilo bu hesabı engelledi ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine engeli inceleyebilir.",
+    "domainDescription": "Kilo bu e-posta alan adındaki hesapları engelliyor ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine alan adını inceleyebilir.",
+    "contactSupport": "Destekle iletişime geç"
+  },
   "addCredits": {
     "cta": "Kredi ekle",
     "billingPage": "faturalandırma sayfası"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "İstek tamamlanmadan zaman aşımına uğradı. Lütfen tekrar dene."
   },
   "screenHeader": {
-    "openMenu": "Menüyü aç",
-    "openMenuFor": "{{title}} için menüyü aç"
+    "openMenu": "Menüyü aç"
   },
   "picker": {
     "optionsExpired": "Seçeneklerin süresi doldu",
@@ -2890,8 +2896,9 @@
       "checkActiveConnection": "Bağlantı aktif, ancak bu öğe hâlâ yüklenemiyor.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
-      "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
+      "reconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
+      "bitbucketAdminOnlyDescription": "Bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "adminOnlyConnectDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
@@ -4699,6 +4706,7 @@
     "contextAll": "Tüm bağlamlar",
     "dismiss": "Raporu yok say",
     "dismissFailed": "Bu rapor henüz yok sayılamadı. Arka planda yeniden denenecek.",
+    "readMarkFailed": "Bu rapor okundu olarak işaretlenemedi. Rapor yeniden yüklendiğinde tekrar denenecek.",
     "offline": "Çevrimdışı · kayıtlı rapor",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
     "summary": "AI özeti",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Benim adıma çalıştır",
       "runAsCreatorDescription": "Her çalıştırma hesabınızı kullanır, bu nedenle gizli başlık gerekir.",
       "saveFailedTitle": "Tetikleyici kaydedilemedi",
+      "nameTaken": "“{{name}}” adlı bir tetikleyici zaten var.",
+      "saveFailedRetry": "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+      "saveFailedCheck": "Formdaki değerleri kontrol edip tekrar deneyin.",
       "deleteTitle": "Bu tetikleyici silinsin mi?",
       "deleteMessage": "{{name}} adresine yapılan çağrılar başarısız olur. Bu işlem geri alınamaz.",
       "deleteMessageScheduled": "{{name}} tetikleyicisinin zamanlanmış çalıştırmaları durur. Bu işlem geri alınamaz.",

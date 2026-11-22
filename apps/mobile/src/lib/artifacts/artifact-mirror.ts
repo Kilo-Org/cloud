@@ -69,32 +69,50 @@ export function mirrorSessionDir(sessionId: string): Directory | null {
  * prune the folders and files the snapshot dropped, then write the index last
  * so a reader never sees an index for files that are not there yet.
  *
+ * Reports whether it changed the tree in a way the index bytes cannot show: a
+ * directory it had to create, or an entry it pruned. The caller announces that
+ * repair, because the index it builds from the same snapshot can be byte-for-byte
+ * identical while the tree moved underneath it -- a session with no files
+ * publishes an empty list, so a folder the platform file browser deleted is
+ * re-created without the listing changing, and a crashed run's staging file is
+ * pruned the same way. Without the report an open browser would keep showing the
+ * deleted folder until something else happened to refresh it.
+ *
  * Idempotent: applying the same snapshot twice leaves both the tree and the
- * index bytes untouched. Best effort: the mirror is derived data, so a
- * filesystem failure must never reach the sync that called it.
+ * index bytes untouched, and the second apply reports `false`. Best effort: the
+ * mirror is derived data, so a filesystem failure must never reach the sync that
+ * called it; a snapshot that stopped partway still moved the tree, and reports
+ * `true` for it.
  */
-export function applyArtifactSnapshot(manifest: ArtifactMirrorManifest): void {
+export function applyArtifactSnapshot(manifest: ArtifactMirrorManifest): boolean {
   const root = artifactMirrorRoot();
   if (root === null) {
-    return;
+    return false;
   }
   try {
-    root.create({ idempotent: true, intermediates: true });
+    let repaired = ensureDirectory(root);
     const sessionsDirectory = new Directory(root, ARTIFACT_MIRROR_SESSIONS_DIR_NAME);
-    sessionsDirectory.create({ idempotent: true, intermediates: true });
+    repaired = ensureDirectory(sessionsDirectory) || repaired;
 
     const liveSessionIds = new Set<string>();
     for (const session of manifest.sessions) {
       const sessionDirectory = new Directory(sessionsDirectory, session.id);
-      sessionDirectory.create({ idempotent: true, intermediates: true });
+      repaired = ensureDirectory(sessionDirectory) || repaired;
       liveSessionIds.add(session.id);
-      pruneStaleEntries(sessionDirectory, new Set(session.files.map(file => file.id)));
+      const pruned = pruneStaleEntries(
+        sessionDirectory,
+        new Set(session.files.map(file => file.id))
+      );
+      repaired = pruned || repaired;
     }
 
-    pruneStaleEntries(sessionsDirectory, liveSessionIds);
+    repaired = pruneStaleEntries(sessionsDirectory, liveSessionIds) || repaired;
     writeManifest(root, manifest);
+    return repaired;
   } catch {
-    // Derived data: the next sync rebuilds it. Never throw into the caller.
+    // Derived data: the next sync rebuilds it. Never throw into the caller, and
+    // a partially applied snapshot is still a tree change to announce.
+    return true;
   }
 }
 
@@ -134,13 +152,42 @@ function writeManifest(root: Directory, manifest: ArtifactMirrorManifest): void 
   part.moveSync(target, { overwrite: true });
 }
 
-function pruneStaleEntries(directory: Directory, liveNames: ReadonlySet<string>): void {
-  if (!directory.exists) {
-    return;
-  }
-  for (const entry of directory.list()) {
-    if (!liveNames.has(entry.name)) {
-      entry.delete();
+function pruneStaleEntries(directory: Directory, liveNames: ReadonlySet<string>): boolean {
+  let pruned = false;
+  try {
+    if (!directory.exists) {
+      return false;
     }
+    for (const entry of directory.list()) {
+      if (!liveNames.has(entry.name)) {
+        try {
+          entry.delete();
+          pruned = true;
+        } catch {
+          // One entry the filesystem refuses to delete must not stop the index
+          // write, so it stays for the next run.
+        }
+      }
+    }
+  } catch {
+    // A folder the filesystem will not even list, or a path that is not one,
+    // must not hold the index back either: whatever sits there stays for the
+    // next run.
   }
+  return pruned;
+}
+
+/**
+ * Create `directory` when it is missing, reporting whether this call was what
+ * created it. The exists check is what turns the idempotent create into a repair
+ * report: a directory that is already there moves nothing. `idempotent` stays on
+ * for the race with another writer, where a create that finds the directory does
+ * no harm -- over-reporting a repair only costs one extra refresh.
+ */
+function ensureDirectory(directory: Directory): boolean {
+  if (directory.exists) {
+    return false;
+  }
+  directory.create({ idempotent: true, intermediates: true });
+  return true;
 }

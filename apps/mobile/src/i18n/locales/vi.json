@@ -522,6 +522,7 @@
       "receiptLabel": "Biên nhận",
       "copyReceiptId": "Sao chép mã biên nhận",
       "appealLabel": "Kháng nghị",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Đã tiếp nhận",
       "triageOpen": "Đang xem xét",
       "triageActioned": "Được chấp nhận",
@@ -555,7 +556,7 @@
       "title": "Báo cáo",
       "rowSubtitle": "Các báo cáo bạn đã gửi và kết quả của chúng",
       "emptyTitle": "Chưa có báo cáo nào",
-      "emptyDescription": "Các báo cáo bạn gửi từ bình luận hoặc phản hồi của AI sẽ xuất hiện ở đây.",
+      "emptyDescription": "Các báo cáo bạn gửi từ bình luận trong thảo luận pull request hoặc từ phản hồi của AI trong phiên tác nhân sẽ xuất hiện ở đây cùng với kết quả của chúng.",
       "couldNotLoad": "Không thể tải báo cáo của bạn",
       "capped": "Đang hiển thị các báo cáo gần đây nhất của bạn."
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} phiên",
       "sectionAccessibility": "{{title}}: {{displayCount}} phiên",
       "live": "TRỰC TIẾP",
-      "updating": "Đang cập nhật"
+      "updating": "Đang cập nhật",
+      "retentionLimit": "Đang hiển thị các phiên gần đây nhất của bạn."
     },
     "sessionRow": {
       "deleteTitle": "Xóa phiên?",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "emptyReadOnlyTitle": "Phiên này không có tin nhắn",
-      "renameAccessibility": "Đổi tên phiên: {{title}}",
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
       "historyTooLarge": "Kết xuất của phiên này quá lớn để tải.",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "Thử tải lại thông tin tài khoản",
     "retryLoadingPrivacy": "Thử tải lại các tùy chọn quyền riêng tư"
   },
+  "accountBlocked": {
+    "title": "Tài khoản bị chặn",
+    "description": "Kilo đã chặn tài khoản này và đăng nhập lại sẽ không gỡ được lệnh chặn. Bộ phận hỗ trợ có thể xem xét lệnh chặn theo yêu cầu.",
+    "domainDescription": "Kilo không cho phép tài khoản trên tên miền email này và đăng nhập lại sẽ không thay đổi điều đó. Bộ phận hỗ trợ có thể xem xét tên miền theo yêu cầu.",
+    "contactSupport": "Liên hệ hỗ trợ"
+  },
   "addCredits": {
     "cta": "Nạp tiền",
     "billingPage": "trang thanh toán"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "Yêu cầu đã quá thời gian chờ. Vui lòng thử lại."
   },
   "screenHeader": {
-    "openMenu": "Mở trình đơn",
-    "openMenuFor": "Mở trình đơn cho {{title}}"
+    "openMenu": "Mở trình đơn"
   },
   "picker": {
     "optionsExpired": "Tùy chọn đã hết hạn",
@@ -2890,8 +2896,9 @@
       "checkActiveConnection": "Kết nối đang hoạt động, nhưng vẫn không thể tải mục này.",
       "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tài khoản này chưa có tổ chức nào. Bạn có thể xem các PR Bitbucket sau khi tạo hoặc tham gia một tổ chức.",
-      "gitlabReconnectAdminOnlyDescription": "Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối lại.",
+      "reconnectAdminOnlyDescription": "Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối lại.",
       "bitbucketNotConnectedTitle": "Bitbucket chưa được kết nối",
+      "bitbucketAdminOnlyDescription": "Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối.",
       "adminOnlyConnectDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
       "contextLine": "Cho {{organization}}",
       "contextLinePersonal": "Cho tài khoản cá nhân"
@@ -4699,6 +4706,7 @@
     "contextAll": "Tất cả ngữ cảnh",
     "dismiss": "Bỏ qua bản tin",
     "dismissFailed": "Chưa thể bỏ qua bản tin này. Hệ thống sẽ tự thử lại trong nền.",
+    "readMarkFailed": "Chưa thể đánh dấu bản tin này là đã đọc. Hệ thống sẽ tự thử lại khi bản tin tải lại.",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Bản tin đã lưu · không thể làm mới",
     "summary": "Tóm tắt AI",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Chạy dưới danh nghĩa tôi",
       "runAsCreatorDescription": "Mỗi lần chạy đều dùng tài khoản của bạn, nên bắt buộc phải có tiêu đề bí mật.",
       "saveFailedTitle": "Không thể lưu trình kích hoạt",
+      "nameTaken": "Đã có trình kích hoạt tên “{{name}}”.",
+      "saveFailedRetry": "Không thể kết nối đến máy chủ. Hãy kiểm tra kết nối và thử lại.",
+      "saveFailedCheck": "Hãy kiểm tra các giá trị trong biểu mẫu và thử lại.",
       "deleteTitle": "Xóa trình kích hoạt này?",
       "deleteMessage": "Các lệnh gọi tới {{name}} sẽ thất bại. Không thể hoàn tác thao tác này.",
       "deleteMessageScheduled": "Các lần chạy đã lên lịch của trình kích hoạt {{name}} sẽ dừng. Không thể hoàn tác thao tác này.",

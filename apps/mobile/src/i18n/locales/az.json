@@ -522,6 +522,7 @@
       "receiptLabel": "Qəbz",
       "copyReceiptId": "Qəbz ID-ni kopyala",
       "appealLabel": "Apellyasiya",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Qəbul edildi",
       "triageOpen": "Nəzərdən keçirilir",
       "triageActioned": "Təsdiqləndi",
@@ -555,7 +556,7 @@
       "title": "Şikayətlər",
       "rowSubtitle": "Göndərdiyiniz şikayətlər və onların nəticələri",
       "emptyTitle": "Hələ şikayət yoxdur",
-      "emptyDescription": "Şərhdən və ya AI cavabından göndərdiyiniz şikayətlər burada görünəcək.",
+      "emptyDescription": "Pull request müzakirəsindəki şərhdən və ya agent sessiyasındakı AI cavabından göndərdiyiniz şikayətlər nəticələri ilə birlikdə burada görünəcək.",
       "couldNotLoad": "Şikayətləriniz yüklənə bilmədi",
       "capped": "Ən son şikayətləriniz göstərilir."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Bağlantı aktivdir, lakin bu element hələ də yüklənə bilmir.",
       "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabda hələ ki, heç bir təşkilat yoxdur. Təşkilat yaratdıqdan və ya ona qoşulduqdan sonra Bitbucket birləşdirmə sorğularına baxış keçirə bilərsən.",
-      "gitlabReconnectAdminOnlyDescription": "Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
+      "reconnectAdminOnlyDescription": "Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "bitbucketNotConnectedTitle": "Bitbucket qoşulmayıb",
+      "bitbucketAdminOnlyDescription": "Onu qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "adminOnlyConnectDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "contextLine": "{{organization}} üçün",
       "contextLinePersonal": "Şəxsi hesabınız üçün"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessiya",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessiya",
       "live": "CANLI",
-      "updating": "Yenilənir"
+      "updating": "Yenilənir",
+      "retentionLimit": "Ən son sessiyalarınız göstərilir."
     },
     "sessionRow": {
       "deleteTitle": "Sessiya silinsin?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Ən aşağıya sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
       "emptyReadOnlyTitle": "Bu sessiyada mesaj yoxdur",
-      "renameAccessibility": "Sessiyanın adını dəyiş: {{title}}",
       "cloningSession": "Sessiya klonlanır",
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
       "historyTooLarge": "Bu sessiyanın transkripti yükləmək üçün çox böyükdür.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Hesabı yükləməyə yenidən cəhd et",
     "retryLoadingPrivacy": "Məxfilik seçimlərini yükləməyə yenidən cəhd et"
   },
+  "accountBlocked": {
+    "title": "Hesab bloklanıb",
+    "description": "Kilo bu hesabı bloklayıb və yenidən daxil olmaq bloku aradan qaldırmayacaq. Dəstək xidməti sorğu əsasında bloku nəzərdən keçirə bilər.",
+    "domainDescription": "Kilo bu e-poçt domenindəki hesabları bloklayır və yenidən daxil olmaq bunu dəyişməyəcək. Dəstək xidməti sorğu əsasında domeni nəzərdən keçirə bilər.",
+    "contactSupport": "Dəstək xidməti ilə əlaqə saxla"
+  },
   "addCredits": {
     "cta": "Kredit əlavə et",
     "billingPage": "ödəniş səhifəsi"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Sorğu tamamlanmazdan əvvəl vaxtı bitdi. Yenidən cəhd et."
   },
   "screenHeader": {
-    "openMenu": "Menyunu aç",
-    "openMenuFor": "{{title}} üçün menyunu aç"
+    "openMenu": "Menyunu aç"
   },
   "picker": {
     "optionsExpired": "Seçimlərin müddəti bitib",
@@ -4699,6 +4706,7 @@
     "contextAll": "Bütün kontekstlər",
     "dismiss": "Hesabatı rədd et",
     "dismissFailed": "Bu hesabatı rədd etmək hələ alınmadı. Arxa planda yenidən cəhd edilir.",
+    "readMarkFailed": "Bu hesabatı oxunmuş kimi qeyd etmək alınmadı. Hesabat yenidən yüklənəndə təkrar cəhd ediləcək.",
     "offline": "Oflayn · saxlanmış hesabat",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
     "summary": "AI xülasəsi",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Mənim hesabımla işlə",
       "runAsCreatorDescription": "Hər icra hesabınızdan istifadə edir, buna görə məxfi başlıq tələb olunur.",
       "saveFailedTitle": "Tətikləyici yadda saxlanıla bilmədi",
+      "nameTaken": "“{{name}}” adlı tətikləyici artıq mövcuddur.",
+      "saveFailedRetry": "Serverə çatmaq mümkün olmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+      "saveFailedCheck": "Formadakı dəyərləri yoxlayın və yenidən cəhd edin.",
       "deleteTitle": "Bu tətikləyici silinsin?",
       "deleteMessage": "{{name}} ünvanına edilən çağırışlar uğursuz olacaq. Bu əməliyyat geri qaytarıla bilməz.",
       "deleteMessageScheduled": "{{name}} tətikləyicisinin planlaşdırılıb icra olunan çağırışları dayanacaq. Bu əməliyyat geri qaytarıla bilməz.",

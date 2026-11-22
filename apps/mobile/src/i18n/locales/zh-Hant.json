@@ -522,6 +522,7 @@
       "receiptLabel": "回執",
       "copyReceiptId": "複製回執 ID",
       "appealLabel": "申訴",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "已收到",
       "triageOpen": "審查中",
       "triageActioned": "成立",
@@ -555,7 +556,7 @@
       "title": "檢舉記錄",
       "rowSubtitle": "你提交的檢舉及其結果",
       "emptyTitle": "尚無檢舉記錄",
-      "emptyDescription": "你從留言或 AI 回應提交的檢舉會顯示在這裡。",
+      "emptyDescription": "你從提取要求討論中的留言或代理工作階段中的 AI 回應提交的檢舉，會連同處理結果顯示在這裡。",
       "couldNotLoad": "無法載入你的檢舉",
       "capped": "僅顯示你最近的檢舉。"
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 個工作階段",
       "sectionAccessibility": "{{title}}：{{displayCount}} 個工作階段",
       "live": "即時",
-      "updating": "更新中"
+      "updating": "更新中",
+      "retentionLimit": "顯示您最近的工作階段。"
     },
     "sessionRow": {
       "deleteTitle": "要刪除工作階段嗎？",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
       "emptyReadOnlyTitle": "此工作階段中沒有訊息",
-      "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
       "historyTooLarge": "此工作階段的對話記錄過大，無法載入。",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "重新載入帳戶",
     "retryLoadingPrivacy": "重新載入隱私權選項"
   },
+  "accountBlocked": {
+    "title": "帳號已封鎖",
+    "description": "Kilo 已封鎖此帳號，重新登入也不會解除封鎖。如有請求，客服可以複核封鎖。",
+    "domainDescription": "Kilo 不允許使用此電子郵件網域的帳號，重新登入也不會改變。如有請求，客服可以複核該網域。",
+    "contactSupport": "聯絡客服"
+  },
   "addCredits": {
     "cta": "加值點數",
     "billingPage": "帳單頁面"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "請求逾時，未能完成。請再試一次。"
   },
   "screenHeader": {
-    "openMenu": "開啟選單",
-    "openMenuFor": "開啟 {{title}} 的選單"
+    "openMenu": "開啟選單"
   },
   "picker": {
     "optionsExpired": "選項已過期",
@@ -2890,8 +2896,9 @@
       "checkActiveConnection": "連線已啟用，但此項目仍無法載入。",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
-      "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
+      "reconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
       "bitbucketNotConnectedTitle": "尚未連結 Bitbucket",
+      "bitbucketAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員進行連結。",
       "adminOnlyConnectDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
@@ -4699,6 +4706,7 @@
     "contextAll": "所有使用情境",
     "dismiss": "忽略簡報",
     "dismissFailed": "暫時無法忽略此簡報。系統會在背景自動重試。",
+    "readMarkFailed": "暫時無法將此簡報標示為已讀。簡報重新載入時會再試一次。",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的簡報 · 無法重新整理",
     "summary": "AI 摘要",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "以我的身分執行",
       "runAsCreatorDescription": "每次執行都會使用你的帳戶，因此必須提供密鑰標頭。",
       "saveFailedTitle": "無法儲存觸發器",
+      "nameTaken": "名為「{{name}}」的觸發器已存在。",
+      "saveFailedRetry": "無法連線到伺服器。請檢查連線後再試一次。",
+      "saveFailedCheck": "請檢查表單中的值，然後再試一次。",
       "deleteTitle": "要刪除此觸發器嗎？",
       "deleteMessage": "對 {{name}} 的呼叫將會失敗。此動作無法復原。",
       "deleteMessageScheduled": "{{name}} 觸發器的已排程執行將會停止。此動作無法復原。",

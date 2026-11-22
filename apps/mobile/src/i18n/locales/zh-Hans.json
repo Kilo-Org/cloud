@@ -522,6 +522,7 @@
       "receiptLabel": "回执",
       "copyReceiptId": "复制回执 ID",
       "appealLabel": "申诉",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "已收到",
       "triageOpen": "审核中",
       "triageActioned": "举报成立",
@@ -555,7 +556,7 @@
       "title": "举报记录",
       "rowSubtitle": "你提交的举报及其处理结果",
       "emptyTitle": "暂无举报",
-      "emptyDescription": "你从评论或 AI 回复中提交的举报将显示在这里。",
+      "emptyDescription": "你从拉取请求讨论中的评论或智能体会话中的 AI 回复提交的举报会连同处理结果显示在这里。",
       "couldNotLoad": "无法加载你的举报",
       "capped": "仅显示你最近的举报。"
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 个会话",
       "sectionAccessibility": "{{title}}：{{displayCount}} 个会话",
       "live": "实时",
-      "updating": "正在更新"
+      "updating": "正在更新",
+      "retentionLimit": "仅显示最近的历史会话。"
     },
     "sessionRow": {
       "deleteTitle": "删除会话？",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "emptyReadOnlyTitle": "此会话中无消息",
-      "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
       "historyTooLarge": "此会话的对话记录过大，无法加载。",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "重新加载账号信息",
     "retryLoadingPrivacy": "重新加载隐私选项"
   },
+  "accountBlocked": {
+    "title": "账号已被封禁",
+    "description": "Kilo 已封禁此账号，重新登录也不会解除封禁。如有请求，技术支持可以复核封禁。",
+    "domainDescription": "Kilo 已封禁此邮箱域名上的账号，重新登录也不会解除封禁。如有请求，技术支持可以复核此域名。",
+    "contactSupport": "联系技术支持"
+  },
   "addCredits": {
     "cta": "充值额度",
     "billingPage": "账单页面"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "请求超时，未能完成。请重试。"
   },
   "screenHeader": {
-    "openMenu": "打开菜单",
-    "openMenuFor": "打开 {{title}} 的菜单"
+    "openMenu": "打开菜单"
   },
   "picker": {
     "optionsExpired": "选项已过期",
@@ -2890,8 +2896,9 @@
       "checkActiveConnection": "连接已激活，但此项仍无法加载。",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
-      "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
+      "reconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
       "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
+      "bitbucketAdminOnlyDescription": "请让组织所有者、管理员或账单管理员进行连接。",
       "adminOnlyConnectDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
@@ -4699,6 +4706,7 @@
     "contextAll": "所有使用情境",
     "dismiss": "忽略简报",
     "dismissFailed": "暂时无法忽略此简报。将在后台自动重试。",
+    "readMarkFailed": "暂时无法将此简报标记为已读。将在简报重新加载时自动重试。",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的简报 · 无法刷新",
     "summary": "AI 摘要",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "以我的身份运行",
       "runAsCreatorDescription": "每次运行都会使用你的账号，因此必须填写密钥请求头。",
       "saveFailedTitle": "无法保存触发器",
+      "nameTaken": "名为“{{name}}”的触发器已存在。",
+      "saveFailedRetry": "无法连接到服务器。请检查连接后重试。",
+      "saveFailedCheck": "请检查表单中的内容后重试。",
       "deleteTitle": "删除此触发器？",
       "deleteMessage": "对 {{name}} 的调用将失败。此操作无法撤销。",
       "deleteMessageScheduled": "{{name}} 的已计划运行将停止。此操作无法撤销。",

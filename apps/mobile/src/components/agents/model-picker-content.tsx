@@ -1,7 +1,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { selectionHaptic } from '@/lib/haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, Info, Plus, SearchX, X } from '@/components/ui/icons';
+import { AlertCircle, Info, Plus, RefreshCw, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -208,8 +208,9 @@ export function ModelPickerContent() {
   // `instance-picker`'s zero-instance state is the same shape. The state also
   // owns the way out: an unavailable model is a missing credential, so its one
   // action opens the provider-key form instead of leaving the sheet a dead end.
-  // It also owns the row's check: with nothing pickable, a check would claim a
-  // selection the state denies.
+  // The state explains why nothing here is pickable; it does not change what a
+  // row shows: the row the session is on still marks that model like every
+  // other sheet's, because that is the session's selection, not a new pick.
   const allOptionsUnavailable =
     bridge !== undefined &&
     bridge.options.length > 0 &&
@@ -237,7 +238,6 @@ export function ModelPickerContent() {
           acceptsVariant={acceptsVariant}
           isFavorite={item.isFavorite}
           showProvider={item.showsProvider}
-          suppressUnavailableCheck={allOptionsUnavailable}
           onSelectModel={handleSelectModel}
           onSelectVariant={handleSelectVariant}
           onToggleFavorite={handleToggleFavorite}
@@ -246,7 +246,6 @@ export function ModelPickerContent() {
     },
     [
       acceptsVariant,
-      allOptionsUnavailable,
       handleSelectModel,
       handleSelectVariant,
       handleToggleFavorite,
@@ -266,6 +265,31 @@ export function ModelPickerContent() {
       />
     );
   }
+
+  // The zero-row state's one way back. With a query, clearing it is the
+  // recovery the Agents search empty state offers too, so the only exit from
+  // "No matches" is not backspacing the query away. With an empty catalog
+  // there is nothing to clear: a caller that can refetch it offers that, and
+  // one that cannot keeps the state purely informational.
+  const retryCatalog = bridge.retryCatalog;
+  const clearSearchAction = deferredSearch.trim() ? (
+    <StateAction label={t('common.clearSearch')} icon={X} onPress={handleClearSearch} />
+  ) : null;
+  const retryAction = retryCatalog ? (
+    <StateAction
+      label={t('common.retry')}
+      icon={RefreshCw}
+      onPress={() => {
+        // The sheet holds the pick it opened on; a refetch fills the caller's
+        // catalog, not this bridge. Closing returns the person to the chip that
+        // shows the arriving list, instead of leaving a sheet that keeps saying
+        // nothing is available.
+        retryCatalog();
+        cancelPicker();
+      }}
+    />
+  ) : null;
+  const emptyStateAction = clearSearchAction ?? retryAction;
 
   return (
     <PickerSheet
@@ -305,14 +329,7 @@ export function ModelPickerContent() {
               ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.modelPicker.noModelsDescription')
           }
-          action={
-            // The in-field X is one way back; the no-matches body offers the
-            // same recovery the Agents search empty state does, so the only
-            // exit from "No matches" is not backspacing the query away.
-            deferredSearch.trim() ? (
-              <StateAction label={t('common.clearSearch')} icon={X} onPress={handleClearSearch} />
-            ) : undefined
-          }
+          action={emptyStateAction}
         />
       ) : (
         // No wrapping View: react-native-screens honors the formSheet header

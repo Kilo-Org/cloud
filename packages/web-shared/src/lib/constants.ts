@@ -25,6 +25,13 @@ export const MINIMUM_TOP_UP_AMOUNT = 10;
 export const MAXIMUM_TOP_UP_AMOUNT = 10_000;
 export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid';
 
+// LANDING_URL and APP_URL (below) name different sites: LANDING_URL is the
+// marketing site, APP_URL the app. The marketing site has a single production
+// origin and no staging origin, so VERCEL_TARGET_ENV does not move it.
+// APP_URL_OVERRIDE lets a developer point the app at a LAN address or another
+// port while the marketing site keeps its own local port, so that override
+// does not move it either. A deployment whose app URL moves therefore keeps
+// linking to the marketing origin, which is intended.
 export const LANDING_URL =
   process.env.NODE_ENV === 'production' ? 'https://kilo.ai' : 'http://localhost:3001';
 

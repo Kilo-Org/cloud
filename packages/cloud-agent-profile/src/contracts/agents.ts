@@ -1,3 +1,4 @@
+import { RESERVED_AGENT_SLUGS } from '@kilocode/app-shared/agent-profile';
 import { AgentConfigSchema } from '@kilocode/db/schema-types';
 import * as z from 'zod';
 
@@ -6,19 +7,10 @@ export const MAX_AGENT_NAME_LENGTH = 100;
 export const MAX_AGENT_SLUG_LENGTH = 50;
 
 /**
- * Built-in kilo agent slugs reserved by cloud-agent-next. Profile-scoped
- * agents must not collide with these to keep the picker unambiguous.
+ * Agent ids reserved by the CLI itself. A profile agent uses an id of its own,
+ * so the runtime keeps each profile agent separate from the CLI's agents.
  */
-export const BUILTIN_AGENT_SLUGS = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
+export const BUILTIN_AGENT_SLUGS: ReadonlySet<string> = new Set(RESERVED_AGENT_SLUGS);
 
 // First char must be a letter — matches the kilocode extension's import
 // validator (`/^[a-z][a-z0-9-]*$/`) so agents round-trip cleanly.

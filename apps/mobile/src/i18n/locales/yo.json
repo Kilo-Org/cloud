@@ -522,6 +522,7 @@
       "receiptLabel": "Ìwé ẹ̀rí",
       "copyReceiptId": "Dákọ ID ìwé ẹ̀rí",
       "appealLabel": "Ẹ̀bẹ̀",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "A ti gbà á",
       "triageOpen": "Ó wà lábẹ́ àtúnyẹ̀wò",
       "triageActioned": "A fọwọ́ sí i",
@@ -555,7 +556,7 @@
       "title": "Àwọn ìjábọ̀",
       "rowSubtitle": "Àwọn ìjábọ̀ tí o fi ránṣẹ́ àti àbájáde wọn",
       "emptyTitle": "Kò tíì sí ìjábọ̀ kankan",
-      "emptyDescription": "Àwọn ìjábọ̀ tí o bá fi ránṣẹ́ láti inú ọ̀rọ̀ kan tàbí ìdáhùn AI yóò hàn níbí.",
+      "emptyDescription": "Àwọn ìjábọ̀ tí o bá fi ránṣẹ́ láti inú àsọyé kan nínú ìjíròrò pull request tàbí láti inú ìdáhùn AI nínú ìgbà iṣẹ́ aṣojú yóò hàn níbí pẹ̀lú àbájáde wọn.",
       "couldNotLoad": "A kò lè gbé àwọn ìjábọ̀ rẹ wá",
       "capped": "À ń fi àwọn ìjábọ̀ rẹ tó ṣẹ̀ṣẹ̀ wá hàn."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Ìsopọ̀ ń ṣiṣẹ́, ṣùgbọ́n a kò lè gbé nkan yìí wọlé síbẹ̀.",
       "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
-      "gitlabReconnectAdminOnlyDescription": "Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n tún so ó pọ̀.",
+      "reconnectAdminOnlyDescription": "Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n tún so ó pọ̀.",
       "bitbucketNotConnectedTitle": "A kò tíì so Bitbucket pọ̀",
+      "bitbucketAdminOnlyDescription": "Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n so ó pọ̀.",
       "adminOnlyConnectDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
       "contextLine": "Fún {{organization}}",
       "contextLinePersonal": "Fún ti ara ẹni"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
       "sectionAccessibility": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
       "live": "LỌ́WỌ́LỌ́WỌ́",
-      "updating": "Ń ṣe ìmúdójúìwọ̀n"
+      "updating": "Ń ṣe ìmúdójúìwọ̀n",
+      "retentionLimit": "Ń ṣàfihàn àwọn ìgbà iṣẹ́ tuntun jùlọ rẹ."
     },
     "sessionRow": {
       "deleteTitle": "Pa ìgbà iṣẹ́ rẹ́?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
       "emptyReadOnlyTitle": "Kò sí ìfiránṣẹ́ nínú ìgbà iṣẹ́ yìí",
-      "renameAccessibility": "Yí orúkọ ìgbà iṣẹ́ padà: {{title}}",
       "cloningSession": "Ń ṣe àdàkọ ìgbà iṣẹ́",
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
       "historyTooLarge": "Ìgbésílẹ̀ ìgbà iṣẹ́ yìí tóbí jù lọ láti lè gbé wọlé.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Tún gbìyànjú láti ṣàkójọ àkọọ́lẹ̀",
     "retryLoadingPrivacy": "Tún gbìyànjú láti ṣàkójọ àwọn àṣàyàn ìpamọ́"
   },
+  "accountBlocked": {
+    "title": "Àkọọ́lẹ̀ rẹ ti dí",
+    "description": "Kilo ti dí àkọọ́lẹ̀ yìí, àti wíwọlé lẹ́ẹ̀kan sí i kò ní yọ ìdí náà kúrò. Ẹgbẹ́ ìrànlọ́wọ́ lè yẹ̀wò ìdí náà tí a bá béèrè.",
+    "domainDescription": "Kilo kò gba àwọn àkọọ́lẹ̀ lórí dómèènì ímeèlì yìí, àti wíwọlé lẹ́ẹ̀kan sí i kò ní yọ ìdínà náà kúrò. Ẹgbẹ́ ìrànlọ́wọ́ lè yẹ̀wò dómèènì náà tí a bá béèrè.",
+    "contactSupport": "Kàn sí ẹgbẹ́ ìrànlọ́wọ́"
+  },
   "addCredits": {
     "cta": "Fi kirẹ́dítì kún un",
     "billingPage": "ojú ìwé ìsanwó"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Ìbéèrè náà kò parí rí kí àkókò rẹ̀ tó tán. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "screenHeader": {
-    "openMenu": "Ṣí àkójọ àṣàyàn",
-    "openMenuFor": "Ṣí àkójọ àṣàyàn fún {{title}}"
+    "openMenu": "Ṣí àkójọ àṣàyàn"
   },
   "picker": {
     "optionsExpired": "Àwọn àṣàyàn ti dópin",
@@ -4699,6 +4706,7 @@
     "contextAll": "Gbogbo àyíká",
     "dismiss": "Yọ ìròyìn kúrò",
     "dismissFailed": "Kì í ṣeé yọ ìròyìn yìí kúrò ṣẹ́ṣẹ́. Ọ́ máa tún gbìyànjú fúnra rẹ̀.",
+    "readMarkFailed": "A kò lè sàmì sí ìròyìn yìí pé a ti kà á. Yóò tún gbìyànjú nígbà tí ìròyìn bá tún gbé wọlé.",
     "offline": "Kò sí lórí ayélujára · ìròyìn tí a fipamọ́",
     "cached": "Ìròyìn tí a fipamọ́ · kò ṣeé sọ di tuntun",
     "summary": "Àkópọ̀ AI",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Ṣiṣẹ́ gẹ́gẹ́ bí èmi",
       "runAsCreatorDescription": "Ìṣiṣẹ́ kọ̀ọ̀kan máa ń lo àkọọ́lẹ̀ rẹ, nítorí náà àkọlé àṣírí pọn dandan.",
       "saveFailedTitle": "A kò lè fi ìmúṣiṣẹ́ pamọ́",
+      "nameTaken": "Ìmúṣiṣẹ́ kan tí orúkọ rẹ̀ ń jẹ́ “{{name}}” ti wà tẹ́lẹ̀.",
+      "saveFailedRetry": "A kò lè dé sáfà. Ṣàyẹ̀wò ìsopọ̀ rẹ kí o sì tún gbìyànjú.",
+      "saveFailedCheck": "Ṣàyẹ̀wò àwọn iye inú fọ́ọ̀mù náà, kí o sì tún gbìyànjú.",
       "deleteTitle": "Yọ ìmúṣiṣẹ́ yìí kúrò?",
       "deleteMessage": "Àwọn ìpè sí {{name}} máa kùnà. A kò lè yí èyí padà.",
       "deleteMessageScheduled": "Àwọn ìṣiṣẹ́ ti ṣètò fún ìmúṣiṣẹ́ {{name}} máa dúró. A kò lè yí èyí padà.",

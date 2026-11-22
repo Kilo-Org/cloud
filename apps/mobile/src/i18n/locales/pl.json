@@ -524,6 +524,7 @@
       "receiptLabel": "Potwierdzenie",
       "copyReceiptId": "Skopiuj identyfikator potwierdzenia",
       "appealLabel": "Odwołanie",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Otrzymano",
       "triageOpen": "W trakcie rozpatrywania",
       "triageActioned": "Uwzględniono",
@@ -557,7 +558,7 @@
       "title": "Zgłoszenia",
       "rowSubtitle": "Zgłoszenia, które złożyłeś, i ich wyniki",
       "emptyTitle": "Nie masz jeszcze zgłoszeń",
-      "emptyDescription": "Zgłoszenia złożone z komentarza lub odpowiedzi AI pojawiają się tutaj.",
+      "emptyDescription": "Zgłoszenia złożone z komentarza w dyskusji o pull requeście lub z odpowiedzi AI w sesji agenta pojawiają się tutaj wraz z ich wynikiem.",
       "couldNotLoad": "Nie udało się wczytać twoich zgłoszeń",
       "capped": "Wyświetlane są twoje najnowsze zgłoszenia."
     },
@@ -1655,7 +1656,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesji",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesji",
       "live": "NA ŻYWO",
-      "updating": "Aktualizowanie"
+      "updating": "Aktualizowanie",
+      "retentionLimit": "Wyświetlane są najnowsze sesje."
     },
     "sessionRow": {
       "deleteTitle": "Usunąć sesję?",
@@ -1729,7 +1731,6 @@
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
       "emptyReadOnlyTitle": "Brak wiadomości w tej sesji",
-      "renameAccessibility": "Zmień nazwę sesji: {{title}}",
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
       "historyTooLarge": "Zapis tej sesji jest zbyt duży, żeby go wczytać.",
@@ -2602,6 +2603,12 @@
     "retryLoadingAccount": "Ponów wczytywanie konta",
     "retryLoadingPrivacy": "Ponów wczytywanie ustawień prywatności"
   },
+  "accountBlocked": {
+    "title": "Konto zablokowane",
+    "description": "Kilo zablokował to konto, a ponowne zalogowanie nie zdejmie blokady. Pomoc techniczna może na życzenie sprawdzić blokadę.",
+    "domainDescription": "Kilo zablokował konta na tej domenie e-mail, a ponowne zalogowanie nie zdejmie blokady. Pomoc techniczna może na życzenie sprawdzić domenę.",
+    "contactSupport": "Skontaktuj się z pomocą techniczną"
+  },
   "addCredits": {
     "cta": "Doładuj konto",
     "billingPage": "strona rozliczeń"
@@ -2674,8 +2681,7 @@
     "timeoutDescription": "Serwer nie odpowiada wystarczająco szybko. Spróbuj ponownie."
   },
   "screenHeader": {
-    "openMenu": "Otwórz menu",
-    "openMenuFor": "Otwórz menu dla {{title}}"
+    "openMenu": "Otwórz menu"
   },
   "picker": {
     "optionsExpired": "Opcje są już nieaktualne",
@@ -2972,8 +2978,9 @@
       "checkActiveConnection": "Połączenie jest aktywne, ale nadal nie można wczytać tego elementu.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
-      "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
+      "reconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
       "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
+      "bitbucketAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby go połączyć.",
       "adminOnlyConnectDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
@@ -4867,6 +4874,7 @@
     "contextAll": "Wszystkie konteksty",
     "dismiss": "Odrzuć raport",
     "dismissFailed": "Nie udało się jeszcze odrzucić tego raportu. Zostanie to ponowione w tle.",
+    "readMarkFailed": "Nie udało się oznaczyć tego raportu jako przeczytany. Spróbujemy ponownie przy następnym wczytaniu raportu.",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
     "summary": "Podsumowanie AI",
@@ -5067,6 +5075,9 @@
       "runAsCreator": "Uruchamiaj jako ja",
       "runAsCreatorDescription": "Każde uruchomienie używa Twojego konta, więc nagłówek z sekretem jest wymagany.",
       "saveFailedTitle": "Nie udało się zapisać wyzwalacza",
+      "nameTaken": "Wyzwalacz o nazwie „{{name}}” już istnieje.",
+      "saveFailedRetry": "Nie udało się połączyć z serwerem. Sprawdź połączenie i spróbuj ponownie.",
+      "saveFailedCheck": "Sprawdź wartości w formularzu i spróbuj ponownie.",
       "deleteTitle": "Usunąć ten wyzwalacz?",
       "deleteMessage": "Wywołania do {{name}} będą kończyć się niepowodzeniem. Tej operacji nie można cofnąć.",
       "deleteMessageScheduled": "Zaplanowane uruchomienia wyzwalacza {{name}} zostaną zatrzymane. Tej operacji nie można cofnąć.",

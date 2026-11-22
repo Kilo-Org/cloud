@@ -522,6 +522,7 @@
       "receiptLabel": "Resibo",
       "copyReceiptId": "Kopyahin ang id ng resibo",
       "appealLabel": "Apela",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Natanggap",
       "triageOpen": "Sinusuri",
       "triageActioned": "Pinagtibay",
@@ -555,7 +556,7 @@
       "title": "Mga ulat",
       "rowSubtitle": "Mga ulat na isinumite mo at ang mga resulta nito",
       "emptyTitle": "Wala pang ulat",
-      "emptyDescription": "Lalabas dito ang mga ulat na isusumite mo mula sa isang komento o tugon ng AI.",
+      "emptyDescription": "Lalabas dito ang mga ulat na isusumite mo mula sa isang komento sa talakayan ng pull request o sa tugon ng AI sa sesyon ng ahente, kasama ang resulta ng mga ito.",
       "couldNotLoad": "Hindi ma-load ang mga ulat mo",
       "capped": "Ipinapakita ang mga pinakabago mong ulat."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Aktibo ang koneksyon, ngunit hindi pa rin ma-load ang item na ito.",
       "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Wala pang mga organisasyon ang account na ito. Masusuri ang mga pull request sa Bitbucket kapag gumawa ka o sumali ka ng isang organisasyon.",
-      "gitlabReconnectAdminOnlyDescription": "Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta itong muli.",
+      "reconnectAdminOnlyDescription": "Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta itong muli.",
       "bitbucketNotConnectedTitle": "Hindi nakakonekta ang Bitbucket",
+      "bitbucketAdminOnlyDescription": "Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta ito.",
       "adminOnlyConnectDescription": "Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
       "contextLine": "Para sa {{organization}}",
       "contextLinePersonal": "Para sa pansariling account"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} session",
       "sectionAccessibility": "{{title}}: {{displayCount}} session",
       "live": "AKTIBO",
-      "updating": "Ina-update"
+      "updating": "Ina-update",
+      "retentionLimit": "Ipinapakita ang iyong mga pinakabagong session."
     },
     "sessionRow": {
       "deleteTitle": "Burahin ang session?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
       "emptyReadOnlyTitle": "Walang mensahe ang sesyong ito",
-      "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",
       "cloningSession": "Kinokopya ang sesyon",
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
       "historyTooLarge": "Sobrang laki ng transkrip ng sesyong ito para i-load.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Subukang i-load muli ang account",
     "retryLoadingPrivacy": "Subukang i-load muli ang mga pagpipilian sa privacy"
   },
+  "accountBlocked": {
+    "title": "Na-block ang account",
+    "description": "Na-block ng Kilo ang account na ito, at hindi ito maaalis kahit mag-sign in muli. Maaaring suriin ng suporta ang pag-block kapag hiniling.",
+    "domainDescription": "Hindi pinapayagan ng Kilo ang mga account sa email domain na ito, at hindi ito mababago kahit mag-sign in muli. Maaaring suriin ng suporta ang domain kapag hiniling.",
+    "contactSupport": "Makipag-ugnayan sa suporta"
+  },
   "addCredits": {
     "cta": "Magdagdag ng kredito",
     "billingPage": "pahina ng pagsingil"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Nag-timeout ang kahilingan bago ito natapos. Pakisubukang muli."
   },
   "screenHeader": {
-    "openMenu": "Buksan ang menu",
-    "openMenuFor": "Buksan ang menu para sa {{title}}"
+    "openMenu": "Buksan ang menu"
   },
   "picker": {
     "optionsExpired": "Nag-expire ang mga opsyon",
@@ -4699,6 +4706,7 @@
     "contextAll": "Lahat ng konteksto",
     "dismiss": "Balewalain ang briefing",
     "dismissFailed": "Hindi pa matatanggal ang briefing na ito. Sasubukin itong muli sa background.",
+    "readMarkFailed": "Hindi pa namarkahan ang briefing na ito bilang nabasa. Sasubukin itong muli kapag nag-reload ang briefing.",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na briefing · hindi ma-refresh",
     "summary": "Buod ng AI",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Patakbuhin bilang ako",
       "runAsCreatorDescription": "Ginagamit ng bawat pagtakbo ang iyong kuwenta, kaya kailangan ang sekretong header.",
       "saveFailedTitle": "Hindi maimbak ang pampapagana",
+      "nameTaken": "May pampapagana nang tinatawag na “{{name}}”.",
+      "saveFailedRetry": "Hindi maabot ang server. Suriin ang koneksyon mo at subukan ulit.",
+      "saveFailedCheck": "Suriin ang mga halaga sa form at subukan ulit.",
       "deleteTitle": "Tanggalin ang pampapaganang ito?",
       "deleteMessage": "Mabibigo ang mga tawag sa {{name}}. Hindi na ito maibabalik.",
       "deleteMessageScheduled": "Titigil ang mga naka-iskedyul na pagtakbo ng {{name}}. Hindi na ito maibabalik.",

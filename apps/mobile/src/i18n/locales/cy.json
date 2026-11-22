@@ -526,6 +526,7 @@
       "receiptLabel": "Derbynneb",
       "copyReceiptId": "Copïo rhif adnabod y dderbynneb",
       "appealLabel": "Apêl",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Wedi'i dderbyn",
       "triageOpen": "Wrthi'n cael ei adolygu",
       "triageActioned": "Wedi'i gadarnhau",
@@ -559,7 +560,7 @@
       "title": "Adroddiadau",
       "rowSubtitle": "Yr adroddiadau rydych wedi'u cyflwyno a'u canlyniadau",
       "emptyTitle": "Dim adroddiadau eto",
-      "emptyDescription": "Bydd adroddiadau rydych yn eu cyflwyno o sylw neu o ymateb AI yn ymddangos yma.",
+      "emptyDescription": "Bydd adroddiadau rydych yn eu cyflwyno o sylw mewn trafodaeth cais tynnu neu o ymateb AI mewn sesiwn asiant yn ymddangos yma gyda'r canlyniad.",
       "couldNotLoad": "Methu llwytho eich adroddiadau",
       "capped": "Yn dangos eich adroddiadau diweddaraf."
     },
@@ -1086,8 +1087,9 @@
       "checkActiveConnection": "Mae'r cysylltiad yn weithredol, ond ni ellir llwytho'r eitem hon o hyd.",
       "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
-      "gitlabReconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
+      "reconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
       "bitbucketNotConnectedTitle": "Nid yw Bitbucket wedi'i gysylltu",
+      "bitbucketAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei gysylltu.",
       "adminOnlyConnectDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
@@ -2362,7 +2364,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesiwn",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesiwn",
       "live": "BYW",
-      "updating": "Yn diweddaru"
+      "updating": "Yn diweddaru",
+      "retentionLimit": "Yn dangos eich sesiynau diweddaraf."
     },
     "sessionRow": {
       "deleteTitle": "Dileu sesiwn?",
@@ -2440,7 +2443,6 @@
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
       "emptyReadOnlyTitle": "Dim negeseuon yn y sesiwn hon",
-      "renameAccessibility": "Ailenwi sesiwn: {{title}}",
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "historyTooLarge": "Mae trawsgrifiad y sesiwn hon yn rhy fawr i'w llwytho.",
@@ -3337,6 +3339,12 @@
     "retryLoadingAccount": "Rhoi cynnig eto ar lwytho'r cyfrif",
     "retryLoadingPrivacy": "Rhoi cynnig eto ar lwytho'r dewisiadau preifatrwydd"
   },
+  "accountBlocked": {
+    "title": "Cyfrif wedi'i rwystro",
+    "description": "Mae Kilo wedi rhwystro'r cyfrif hwn, ac ni fydd mewngofnodi eto yn ei glirio. Gall y tîm cymorth adolygu'r rhwystr ar gais.",
+    "domainDescription": "Nid yw Kilo yn caniatáu cyfrifon ar y parth e-bost hwn, ac ni fydd mewngofnodi eto yn ei newid. Gall y tîm cymorth adolygu'r parth ar gais.",
+    "contactSupport": "Cysylltu â'r tîm cymorth"
+  },
   "addCredits": {
     "cta": "Ychwanegu credydau",
     "billingPage": "tudalen filio"
@@ -3409,8 +3417,7 @@
     "timeoutDescription": "Daeth amser y cais i ben cyn iddo orffen. Ceisiwch eto."
   },
   "screenHeader": {
-    "openMenu": "Agor y ddewislen",
-    "openMenuFor": "Agor y ddewislen ar gyfer {{title}}"
+    "openMenu": "Agor y ddewislen"
   },
   "picker": {
     "optionsExpired": "Daeth yr opsiynau i ben",
@@ -5035,6 +5042,7 @@
     "contextAll": "Pob cyd-destun",
     "dismiss": "Diystyru'r briff",
     "dismissFailed": "Methwyd â diystyru'r briff hwn am y tro. Bydd yn rhoi cynnig arall yn y cefndir.",
+    "readMarkFailed": "Methwyd â marcio'r briff hwn fel wedi'i ddarllen. Bydd yn rhoi cynnig arall pan fydd y briff yn ail-lwytho.",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Briff wedi'i gadw · methu adnewyddu",
     "summary": "Crynodeb AI",
@@ -5243,6 +5251,9 @@
       "runAsCreator": "Rhedeg fel fi",
       "runAsCreatorDescription": "Mae pob rhediad yn defnyddio’ch cyfrif, felly mae’r pennawd cyfrinachol yn ofynnol.",
       "saveFailedTitle": "Methwyd cadw’r sbardun",
+      "nameTaken": "Mae sbardun o’r enw ‘{{name}}’ eisoes yn bodoli.",
+      "saveFailedRetry": "Methu cyrraedd y gweinydd. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "saveFailedCheck": "Gwiriwch y gwerthoedd yn y ffurflen a rhowch gynnig eto.",
       "deleteTitle": "Dileu’r sbardun hwn?",
       "deleteMessage": "Bydd galwadau i {{name}} yn methu. Ni ellir dad-wneud hyn.",
       "deleteMessageScheduled": "Bydd rhediadau'r sbardun {{name}} sydd wedi'u trefnu yn stopio. Ni ellir dad-wneud hyn.",

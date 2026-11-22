@@ -8,6 +8,7 @@ import {
 } from '@/app/api/organizations/hooks';
 import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
@@ -284,7 +285,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       if (!model || !model.endpoint) continue;
 
       offerings.push({
-        providerSlug: provider.slug,
+        providerSlug: normalizeInferenceProviderId(provider.slug),
         providerDisplayName: provider.displayName,
         providerIconUrl: normalizeProviderIconUrl(provider.icon?.url),
         trains: modelTrains(model, provider.dataPolicy.training),
@@ -310,7 +311,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           count++;
         }
       }
-      map.set(provider.slug, count);
+      map.set(normalizeInferenceProviderId(provider.slug), count);
     }
 
     return map;
@@ -319,7 +320,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const byokOnlyProviderSlugs = useMemo(
     () =>
       new Set(
-        openRouterProviders.filter(provider => provider.byokOnly).map(provider => provider.slug)
+        openRouterProviders
+          .filter(provider => provider.byokOnly)
+          .map(provider => normalizeInferenceProviderId(provider.slug))
       ),
     [openRouterProviders]
   );
@@ -333,7 +336,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       }
 
       rows.push({
-        providerSlug: provider.slug,
+        providerSlug: normalizeInferenceProviderId(provider.slug),
         providerDisplayName: provider.displayName,
         providerIconUrl: normalizeProviderIconUrl(provider.icon?.url),
         modelCount: providerModels.length,
@@ -428,7 +431,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
   const infoProviderModels = useMemo((): ProviderModelRow[] => {
     if (!infoProvider) return [];
-    const provider = openRouterProviders.find(p => p.slug === infoProvider.providerSlug);
+    const provider = openRouterProviders.find(
+      p => normalizeInferenceProviderId(p.slug) === infoProvider.providerSlug
+    );
     if (!provider) return [];
 
     const rows: ProviderModelRow[] = [];

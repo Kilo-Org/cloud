@@ -522,6 +522,7 @@
       "receiptLabel": "पावती",
       "copyReceiptId": "पावतीचा आयडी कॉपी करा",
       "appealLabel": "अपील",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "प्राप्त झाली",
       "triageOpen": "पुनरावलोकनात",
       "triageActioned": "मान्य केली",
@@ -555,7 +556,7 @@
       "title": "तक्रारी",
       "rowSubtitle": "तुम्ही दाखल केलेल्या तक्रारी आणि त्यांचे निर्णय",
       "emptyTitle": "अद्याप तक्रारी नाहीत",
-      "emptyDescription": "तुम्ही कमेंट किंवा AI उत्तरावरून दाखल करता त्या तक्रारी येथे दिसतील.",
+      "emptyDescription": "तुम्ही पुल रिक्वेस्ट चर्चेतील कमेंटमधून किंवा एजंट सत्रातील AI उत्तरावरून दाखल करता त्या तक्रारी त्यांच्या निर्णयासह येथे दिसतील.",
       "couldNotLoad": "तुमच्या तक्रारी लोड करता आल्या नाहीत",
       "capped": "तुमच्या सर्वात अलीकडील तक्रारी दाखवत आहे."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "कनेक्शन सक्रिय आहे, परंतु हा आयटम अजूनही लोड करता येत नाही.",
       "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संस्थेत बदला.",
       "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संस्था जोडलेली नाही. संस्था तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
-      "gitlabReconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
+      "reconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
       "bitbucketNotConnectedTitle": "Bitbucket जोडलेले नाही",
+      "bitbucketAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते जोडण्यास सांगा.",
       "adminOnlyConnectDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
       "contextLine": "{{organization}} साठी",
       "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} सत्रे",
       "sectionAccessibility": "{{title}}: {{displayCount}} सत्रे",
       "live": "थेट",
-      "updating": "अपडेट होत आहे"
+      "updating": "अपडेट होत आहे",
+      "retentionLimit": "सर्वात अलीकडची सत्रे दाखवली जात आहेत."
     },
     "sessionRow": {
       "deleteTitle": "सत्र हटवायचे?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "शेवटपर्यंत स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
       "emptyReadOnlyTitle": "या सत्रात संदेश नाहीत",
-      "renameAccessibility": "{{title}} या सत्राचे नाव बदला",
       "cloningSession": "सत्राची प्रत तयार होत आहे",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",
       "historyTooLarge": "या सत्राची ट्रान्सक्रिप्ट लोड करण्यासाठी खूप मोठी आहे.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "खाते लोड करण्याचा पुन्हा प्रयत्न करा",
     "retryLoadingPrivacy": "गोपनीयतेचे पर्याय लोड करण्याचा पुन्हा प्रयत्न करा"
   },
+  "accountBlocked": {
+    "title": "खाते अवरोधित",
+    "description": "Kilo ने हे खाते अवरोधित केले आहे, आणि पुन्हा साइन इन केल्यास ते उघडणार नाही. विनंतीनुसार मदत पथक अवरोधाचे पुनरावलोकन करू शकते.",
+    "domainDescription": "Kilo या ईमेल डोमेनवरील खात्यांना परवानगी देत नाही, आणि पुन्हा साइन इन केल्यास हे बदलणार नाही. विनंतीनुसार मदत पथक डोमेनचे पुनरावलोकन करू शकते.",
+    "contactSupport": "मदत पथकाशी संपर्क साधा"
+  },
   "addCredits": {
     "cta": "क्रेडिट जोडा",
     "billingPage": "बिलिंग पृष्ठ"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "विनंती पूर्ण होण्यापूर्वी वेळ संपली. कृपया पुन्हा प्रयत्न करा."
   },
   "screenHeader": {
-    "openMenu": "मेनू उघडा",
-    "openMenuFor": "{{title}} साठी मेनू उघडा"
+    "openMenu": "मेनू उघडा"
   },
   "picker": {
     "optionsExpired": "पर्याय कालबाह्य झाले",
@@ -3268,7 +3275,7 @@
     "subscriptionLoading": "Kilo Pass चे सदस्यत्व लोड होत आहे",
     "retryHint": "Kilo Pass ची स्थिती पुन्हा मिळवण्याचा प्रयत्न करते.",
     "endedOn": "संपले {{date}}",
-    "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही।",
+    "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही.",
     "notAvailableTitle": "Kilo Pass ॲपमध्ये नाही",
     "noPassDescription": "या खात्याकडे Kilo Pass नाही.",
     "statusActive": "सक्रिय",
@@ -4699,6 +4706,7 @@
     "contextAll": "सर्व संदर्भ",
     "dismiss": "आढाव्याकडे दुर्लक्ष करा",
     "dismissFailed": "या आढाव्याकडे अजून दुर्लक्ष करता आले नाही. ते पार्श्वभूमीवर पुन्हा प्रयत्न करत आहे.",
+    "readMarkFailed": "हा आढावा वाचला म्हणून चिन्हांकित करता आला नाही. आढावा पुन्हा लोड होईल तेव्हा ते पुन्हा प्रयत्न करेल.",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला आढावा · रिफ्रेश उपलब्ध नाही",
     "summary": "AI सारांश",
@@ -4848,7 +4856,7 @@
       "new": "नवीन ट्रिगर",
       "create": "ट्रिगर तयार करा",
       "emptyTitle": "अजून ट्रिगर नाहीत",
-      "emptyDescription": "तुमचा पहिला ट्रिगर तयार करा।",
+      "emptyDescription": "तुमचा पहिला ट्रिगर तयार करा.",
       "loadFailedTitle": "ट्रिगर लोड करता आले नाहीत",
       "loadFailedDescription": "कनेक्शन असल्यावर पुन्हा प्रयत्न करा.",
       "detailLoadFailedTitle": "हा ट्रिगर लोड करता आला नाही",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "माझ्या रूपात चालवा",
       "runAsCreatorDescription": "प्रत्येक रन तुमचे खाते वापरते, त्यामुळे सीक्रेट हेडर आवश्यक आहे.",
       "saveFailedTitle": "ट्रिगर जतन करता आला नाही",
+      "nameTaken": "“{{name}}” नावाचा ट्रिगर आधीच अस्तित्वात आहे.",
+      "saveFailedRetry": "सर्व्हरपर्यंत पोहोचता आले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+      "saveFailedCheck": "फॉर्ममधील मूल्ये तपासा आणि पुन्हा प्रयत्न करा.",
       "deleteTitle": "हा ट्रिगर हटवायचा?",
       "deleteMessage": "{{name}} वरचे कॉल अयशस्वी होतील. हे पूर्ववत करता येणार नाही.",
       "deleteMessageScheduled": "{{name}} चे नियोजित रन थांबतील. हे पूर्ववत करता येणार नाही.",

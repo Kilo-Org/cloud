@@ -522,6 +522,7 @@
       "receiptLabel": "Kvittering",
       "copyReceiptId": "Kopier kvitterings-id",
       "appealLabel": "Klage",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Modtaget",
       "triageOpen": "Under behandling",
       "triageActioned": "Taget til følge",
@@ -555,7 +556,7 @@
       "title": "Anmeldelser",
       "rowSubtitle": "Dine indsendte anmeldelser og deres resultater",
       "emptyTitle": "Ingen anmeldelser endnu",
-      "emptyDescription": "Anmeldelser, du indsender fra en kommentar eller et AI-svar, vises her.",
+      "emptyDescription": "Anmeldelser, du indsender fra en kommentar i en pull request-diskussion eller fra et AI-svar i en agentsession, vises her sammen med resultatet.",
       "couldNotLoad": "Kunne ikke indlæse dine anmeldelser",
       "capped": "Viser dine seneste anmeldelser."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Forbindelsen er aktiv, men dette element kan stadig ikke indlæses.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
-      "gitlabReconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
+      "reconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
       "bitbucketNotConnectedTitle": "Bitbucket er ikke tilsluttet",
+      "bitbucketAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
       "adminOnlyConnectDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioner",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessioner",
       "live": "I REALTID",
-      "updating": "Opdaterer"
+      "updating": "Opdaterer",
+      "retentionLimit": "Viser de seneste sessioner."
     },
     "sessionRow": {
       "deleteTitle": "Slet session?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
       "emptyReadOnlyTitle": "Ingen beskeder i denne session",
-      "renameAccessibility": "Omdøb session: {{title}}",
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
       "historyTooLarge": "Denne sessions transskription er for stor at indlæse.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Prøv at indlæse kontoen igen",
     "retryLoadingPrivacy": "Prøv at indlæse privatlivsindstillingerne igen"
   },
+  "accountBlocked": {
+    "title": "Konto blokeret",
+    "description": "Kilo har blokeret denne konto, og det hjælper ikke at logge ind igen. Support kan gennemgå blokeringen efter anmodning.",
+    "domainDescription": "Kilo blokerer konti på dette e-maildomæne, og det ændrer ikke noget at logge ind igen. Support kan gennemgå domænet efter anmodning.",
+    "contactSupport": "Kontakt support"
+  },
   "addCredits": {
     "cta": "Tilføj kreditter",
     "billingPage": "faktureringsside"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Anmodningen fik timeout, før den blev gennemført. Prøv igen."
   },
   "screenHeader": {
-    "openMenu": "Åbn menu",
-    "openMenuFor": "Åbn menu for {{title}}"
+    "openMenu": "Åbn menu"
   },
   "picker": {
     "optionsExpired": "Valgmuligheder udløbet",
@@ -4699,6 +4706,7 @@
     "contextAll": "Alle kontekster",
     "dismiss": "Afvis briefing",
     "dismissFailed": "Denne briefing kunne ikke afvises endnu. Der forsøges igen i baggrunden.",
+    "readMarkFailed": "Denne briefing kunne ikke markeres som læst. Der forsøges igen, når briefingen indlæses.",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt briefing · kan ikke opdateres",
     "summary": "AI-resumé",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Kør som mig",
       "runAsCreatorDescription": "Hver kørsel bruger din konto, så det hemmelige headerfelt er påkrævet.",
       "saveFailedTitle": "Kunne ikke gemme udløseren",
+      "nameTaken": "Der findes allerede en udløser med navnet »{{name}}«.",
+      "saveFailedRetry": "Kunne ikke få kontakt til serveren. Tjek din forbindelse og prøv igen.",
+      "saveFailedCheck": "Tjek værdierne i formularen og prøv igen.",
       "deleteTitle": "Slet denne udløser?",
       "deleteMessage": "Kald til {{name}} vil fejle. Dette kan ikke fortrydes.",
       "deleteMessageScheduled": "Planlagte kørsler af {{name}} stopper. Dette kan ikke fortrydes.",

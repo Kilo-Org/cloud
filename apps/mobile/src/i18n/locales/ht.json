@@ -522,6 +522,7 @@
       "receiptLabel": "Resi",
       "copyReceiptId": "Kopye ID resi a",
       "appealLabel": "Apèl",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Resevwa",
       "triageOpen": "Nan revizyon",
       "triageActioned": "Konfime",
@@ -555,7 +556,7 @@
       "title": "Rapò",
       "rowSubtitle": "Rapò ou te soumèt ak rezilta yo",
       "emptyTitle": "Poko gen rapò",
-      "emptyDescription": "Rapò ou soumèt soti nan yon kòmantè oswa nan yon repons AI ap parèt isit la.",
+      "emptyDescription": "Rapò ou soumèt soti nan yon kòmantè nan yon diskisyon pull request, oswa nan yon repons AI nan yon sesyon ajan, ap parèt isit la ak rezilta yo.",
       "couldNotLoad": "Nou pa t ka chaje rapò ou",
       "capped": "Ap montre rapò ou ki pi resan yo."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Koneksyon an aktif, men eleman sa a pa ka chaje toujou.",
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
-      "gitlabReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
+      "reconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
       "bitbucketNotConnectedTitle": "Bitbucket pa konekte",
+      "bitbucketAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou konekte l.",
       "adminOnlyConnectDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
       "contextLine": "Pou {{organization}}",
       "contextLinePersonal": "Pou kont pèsonèl ou"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesyon",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesyon",
       "live": "AN DIRÈK",
-      "updating": "Ap mete ajou"
+      "updating": "Ap mete ajou",
+      "retentionLimit": "Sa yo se sesyon ki pi resan yo."
     },
     "sessionRow": {
       "deleteTitle": "Efase sesyon an?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
       "emptyReadOnlyTitle": "Pa gen mesaj nan sesyon sa a",
-      "renameAccessibility": "Chanje non sesyon an: {{title}}",
       "cloningSession": "Ap klone sesyon an",
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",
       "historyTooLarge": "Transksipsyon sesyon sa a twò gwo pou chaje.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Eseye chaje kont lan ankò",
     "retryLoadingPrivacy": "Eseye chaje chwa konfidansyalite yo ankò"
   },
+  "accountBlocked": {
+    "title": "Kont bloke",
+    "description": "Kilo bloke kont sa a, epi rekonekte p ap retire blokaj la. Ekip sipò a ka revize blokaj la sou demann.",
+    "domainDescription": "Kilo bloke kont ki sou domèn imèl sa a, epi rekonekte p ap chanje blokaj la. Ekip sipò a ka revize domèn nan sou demann.",
+    "contactSupport": "Kontakte ekip sipò a"
+  },
   "addCredits": {
     "cta": "Ajoute kredi",
     "billingPage": "paj faktirasyon an"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Demann lan te depase delè li. Tanpri eseye ankò."
   },
   "screenHeader": {
-    "openMenu": "Louvri meni an",
-    "openMenuFor": "Louvri meni pou {{title}}"
+    "openMenu": "Louvri meni an"
   },
   "picker": {
     "optionsExpired": "Opsyon ekspire",
@@ -4699,6 +4706,7 @@
     "contextAll": "Tout kontèks yo",
     "dismiss": "Rejte rapò a",
     "dismissFailed": "Pa reyisi rejte rapò sa a kounye a. Li ap eseye ankò nan pakoulè.",
+    "readMarkFailed": "Pa reyisi make rapò sa a kòm li. Li ap eseye ankò lè rapò a rechaje.",
     "offline": "Hò liy · rapò anrejistre",
     "cached": "Rapò anrejistre · pa ka rafrechi",
     "summary": "Rezime AI",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Egzekite kòm mwen",
       "runAsCreatorDescription": "Chak egzekisyon sèvi ak kont ou, kidonk antèt sekrè a obligatwa.",
       "saveFailedTitle": "Nou pa t kapab sove deklanchè a",
+      "nameTaken": "Gen deja yon deklanchè ki rele \"{{name}}\".",
+      "saveFailedRetry": "Nou pa t kapab konekte ak sèvè a. Tcheke koneksyon w epi eseye ankò.",
+      "saveFailedCheck": "Tcheke valè ki nan fòm nan epi eseye ankò.",
       "deleteTitle": "Efase deklanchè sa a?",
       "deleteMessage": "Apèl sou {{name}} ap echwe. Sa pa ka defèt.",
       "deleteMessageScheduled": "Egzekisyon pwograme pou deklanchè {{name}} sispann. Sa pa ka defèt.",

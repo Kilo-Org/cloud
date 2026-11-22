@@ -522,6 +522,7 @@
       "receiptLabel": "Kinnitus",
       "copyReceiptId": "Kopeeri kinnituse ID",
       "appealLabel": "Vaidlustus",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Vastu võetud",
       "triageOpen": "Ülevaatamisel",
       "triageActioned": "Rahuldatud",
@@ -555,7 +556,7 @@
       "title": "Teated",
       "rowSubtitle": "Sinu esitatud teated ja nende tulemused",
       "emptyTitle": "Teateid veel pole",
-      "emptyDescription": "Siia ilmuvad teated, mille esitad kommentaari või AI vastuse kohta.",
+      "emptyDescription": "Siia ilmuvad koos tulemusega teated, mille esitad PR-arutelu kommentaari või agendi seansi AI vastuse kohta.",
       "couldNotLoad": "Sinu teateid ei õnnestunud laadida",
       "capped": "Kuvatakse sinu viimased teated."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Ühendus on aktiivne, kuid seda üksust ei saa siiski laadida.",
       "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsiooni vastu, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
-      "gitlabReconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
+      "reconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
       "bitbucketNotConnectedTitle": "Bitbucket pole ühendatud",
+      "bitbucketAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see ühendada.",
       "adminOnlyConnectDescription": "Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seanssi",
       "sectionAccessibility": "{{title}}: {{displayCount}} seanssi",
       "live": "REAALAJAS",
-      "updating": "Uuendamine"
+      "updating": "Uuendamine",
+      "retentionLimit": "Kuvatakse kõige hiljutisemad seansid."
     },
     "sessionRow": {
       "deleteTitle": "Kas kustutada seanss?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
       "emptyReadOnlyTitle": "Selles seansis pole sõnumeid",
-      "renameAccessibility": "Nimeta seanss ümber: {{title}}",
       "cloningSession": "Seanssi kloonitakse",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",
       "historyTooLarge": "Selle seansi üleskirjutus on laadimiseks liiga suur.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Proovi konto laadimist uuesti",
     "retryLoadingPrivacy": "Proovi privaatsusvalikute laadimist uuesti"
   },
+  "accountBlocked": {
+    "title": "Konto blokeeritud",
+    "description": "Kilo blokeeris selle konto ja uuesti sisselogimine ei tühista blokeeringut. Tugi saab blokeeringu taotluse korral üle vaadata.",
+    "domainDescription": "Kilo ei luba sellel e-posti domeenil kontosid ja uuesti sisselogimine ei muuda seda. Tugi saab domeeni taotluse korral üle vaadata.",
+    "contactSupport": "Võta ühendust toega"
+  },
   "addCredits": {
     "cta": "Lisa krediiti",
     "billingPage": "arveldusleht"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },
   "screenHeader": {
-    "openMenu": "Ava menüü",
-    "openMenuFor": "Ava {{title}} menüü"
+    "openMenu": "Ava menüü"
   },
   "picker": {
     "optionsExpired": "Valikud aegunud",
@@ -4699,6 +4706,7 @@
     "contextAll": "Kõik kontekstid",
     "dismiss": "Jäta ülevaade kõrvale",
     "dismissFailed": "Selle ülevaate kõrvale jätmine ei õnnestunud veel. Taustal proovitakse uuesti.",
+    "readMarkFailed": "Seda ülevaadet ei õnnestunud loetuks märkida. Uuesti proovitakse, kui ülevaade taas laaditakse.",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud ülevaade · värskendamine pole saadaval",
     "summary": "AI kokkuvõte",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Käivita minuna",
       "runAsCreatorDescription": "Iga käivitus kasutab sinu kontot, seega on salajane päis nõutav.",
       "saveFailedTitle": "Päästiku salvestamine ebaõnnestus",
+      "nameTaken": "Päästik nimega „{{name}}” on juba olemas.",
+      "saveFailedRetry": "Serveriga ei saanud ühendust. Kontrolli ühendust ja proovi uuesti.",
+      "saveFailedCheck": "Kontrolli vormi väärtusi ja proovi uuesti.",
       "deleteTitle": "Kustutada see päästik?",
       "deleteMessage": "Kutsed nimele {{name}} nurjuvad. Seda ei saa tagasi võtta.",
       "deleteMessageScheduled": "Päästiku nimega {{name}} ajastatud käivitused lõppevad. Seda ei saa tagasi võtta.",

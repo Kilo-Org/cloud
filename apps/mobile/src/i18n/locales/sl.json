@@ -524,6 +524,7 @@
       "receiptLabel": "Potrdilo",
       "copyReceiptId": "Kopiraj ID potrdila",
       "appealLabel": "Pritožba",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Prejeto",
       "triageOpen": "V pregledu",
       "triageActioned": "Utemeljeno",
@@ -557,7 +558,7 @@
       "title": "Prijave",
       "rowSubtitle": "Prijave, ki si jih oddal, in njihovi izidi",
       "emptyTitle": "Ni še nobene prijave",
-      "emptyDescription": "Prijave, ki jih oddaš iz komentarja ali odgovora AI, se prikažejo tukaj.",
+      "emptyDescription": "Prijave, ki jih oddaš iz komentarja v razpravi o zahtevi za združitev ali iz odgovora AI v seji agenta, se prikažejo tukaj skupaj z izidom.",
       "couldNotLoad": "Tvojih prijav ni bilo mogoče naložiti",
       "capped": "Prikazane so tvoje najnovejše prijave."
     },
@@ -1048,8 +1049,9 @@
       "checkActiveConnection": "Povezava je aktivna, vendar tega elementa še vedno ni mogoče naložiti.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
-      "gitlabReconnectAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
+      "reconnectAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket ni povezan",
+      "bitbucketAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da ga poveže.",
       "adminOnlyConnectDescription": "Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osebni račun"
@@ -2268,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sej",
       "sectionAccessibility": "{{title}}: {{displayCount}} sej",
       "live": "V ŽIVO",
-      "updating": "Posodabljanje"
+      "updating": "Posodabljanje",
+      "retentionLimit": "Prikazane so najnovejše seje."
     },
     "sessionRow": {
       "deleteTitle": "Izbrišem sejo?",
@@ -2342,7 +2345,6 @@
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
       "emptyReadOnlyTitle": "V tej seji ni sporočil",
-      "renameAccessibility": "Preimenuj sejo: {{title}}",
       "cloningSession": "Kloniranje seje",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "historyTooLarge": "Zapis te seje je prevelik za nalaganje.",
@@ -3215,6 +3217,12 @@
     "retryLoadingAccount": "Poskusi znova naložiti račun",
     "retryLoadingPrivacy": "Poskusi znova naložiti nastavitve zasebnosti"
   },
+  "accountBlocked": {
+    "title": "Račun blokiran",
+    "description": "Kilo je blokiral ta račun in nova prijava blokade ne bo odpravila. Podpora lahko blokado na zahtevo pregleda.",
+    "domainDescription": "Kilo ne dovoljuje računov na tej e-poštni domeni in ponovna prijava tega ne bo spremenila. Podpora lahko domeno na zahtevo pregleda.",
+    "contactSupport": "Obrni se na podporo"
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stran za obračunavanje"
@@ -3287,8 +3295,7 @@
     "timeoutDescription": "Odgovora strežnika nismo prejeli pravočasno. Poskusi znova."
   },
   "screenHeader": {
-    "openMenu": "Odpri meni",
-    "openMenuFor": "Odpri meni za {{title}}"
+    "openMenu": "Odpri meni"
   },
   "picker": {
     "optionsExpired": "Možnosti niso več veljavne",
@@ -4867,6 +4874,7 @@
     "contextAll": "Vsi konteksti",
     "dismiss": "Zavrzi poročilo",
     "dismissFailed": "Poročila še ni mogoče zavreči. Ponovni poskus bo izveden v ozadju.",
+    "readMarkFailed": "Tega poročila ni bilo mogoče označiti kot prebrano. Ponovni poskus bo izveden ob ponovnem nalaganju poročila.",
     "offline": "Brez povezave · shranjeno poročilo",
     "cached": "Shranjeno poročilo · osvežitev ni na voljo",
     "summary": "AI povzetek",
@@ -5067,6 +5075,9 @@
       "runAsCreator": "Izvajaj kot jaz",
       "runAsCreatorDescription": "Vsako izvajanje uporabi vaš račun, zato je skrivno zaglavje obvezno.",
       "saveFailedTitle": "Sprožilca ni bilo mogoče shraniti",
+      "nameTaken": "Sprožilec z imenom »{{name}}« že obstaja.",
+      "saveFailedRetry": "Strežnika ni bilo mogoče doseči. Preverite povezavo in poskusite znova.",
+      "saveFailedCheck": "Preverite vrednosti v obrazcu in poskusite znova.",
       "deleteTitle": "Želite izbrisati ta sprožilec?",
       "deleteMessage": "Klici na {{name}} ne bodo uspeli. Tega ni mogoče razveljaviti.",
       "deleteMessageScheduled": "Načrtovani zagoni sprožilca {{name}} se bodo ustavili. Tega ni mogoče razveljaviti.",

@@ -10,6 +10,7 @@ import {
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   VIRTUAL_PROVIDER,
   withoutVirtualProvider,
@@ -90,7 +91,10 @@ export function hasActiveModelRestrictions(restrictions: ModelRestrictions): boo
  * the same allow list permits; without one, they have nowhere to route.
  *
  * Both model-decision engines share this rule so the same restrictions always
- * admit the same routes.
+ * admit the same routes. Both arguments hold canonical provider slugs by
+ * construction, so the membership test is an exact match: every allow set goes
+ * through `normalizeInferenceProviderIds`, and every provider set arrives from
+ * `buildModelIdToProviderSlugsIndex`, which canonicalizes each snapshot slug.
  */
 export function getEligibleProviderRoutes(
   modelProviders: ReadonlySet<string>,
@@ -111,7 +115,9 @@ export function createAllowPredicateFromProviderAllowList(
   customLlmGrantee?: CustomLlmGrantee
 ): ProviderAwareAllowPredicate {
   const modelDenySet = new Set(modelDenyList?.map(normalizeModelId));
-  const providerAllowSet = providerAllowList ? new Set(providerAllowList) : undefined;
+  const providerAllowSet = providerAllowList
+    ? new Set(normalizeInferenceProviderIds(providerAllowList))
+    : undefined;
   return async (modelId: string): Promise<boolean> => {
     const normalizedModelId = normalizeModelId(modelId);
     if (!requireModelInCurrentSnapshot && !providerAllowSet && modelDenySet.size === 0) return true;
@@ -128,6 +134,10 @@ export function createAllowPredicateFromProviderAllowList(
       (await getModelInferenceProviders(modelId)) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
+    // Both sides are canonical: the allow set above already went through
+    // `normalizeInferenceProviderIds`, and each provider set arrives either from
+    // the provider index (canonicalized snapshot slugs) or from a public custom LLM
+    // definition. The shared route rule therefore compares exact strings.
     return getEligibleProviderRoutes(providerSlugs, providerAllowSet).size > 0;
   };
 }

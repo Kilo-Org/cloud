@@ -522,6 +522,7 @@
       "receiptLabel": "受付",
       "copyReceiptId": "受付IDをコピー",
       "appealLabel": "異議申し立て",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "受付済み",
       "triageOpen": "審査中",
       "triageActioned": "認められました",
@@ -555,7 +556,7 @@
       "title": "通報一覧",
       "rowSubtitle": "通報した内容とその結果",
       "emptyTitle": "通報はまだありません",
-      "emptyDescription": "コメントまたはAIの回答から通報した内容がここに表示されます。",
+      "emptyDescription": "プルリクエストのディスカッションのコメント、またはエージェントのセッションでのAIの応答から通報した内容が、その結果とともにここに表示されます。",
       "couldNotLoad": "通報を読み込めませんでした",
       "capped": "最新の通報を表示しています。"
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 件のセッション",
       "sectionAccessibility": "{{title}}：{{displayCount}} 件のセッション",
       "live": "ライブ",
-      "updating": "更新中"
+      "updating": "更新中",
+      "retentionLimit": "最新のセッションを表示しています。"
     },
     "sessionRow": {
       "deleteTitle": "セッションを削除しますか？",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "emptyReadOnlyTitle": "このセッションにメッセージはありません",
-      "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "historyTooLarge": "このセッションの履歴は大きすぎて読み込めません。",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "アカウントの読み込みを再試行",
     "retryLoadingPrivacy": "プライバシー設定の読み込みを再試行"
   },
+  "accountBlocked": {
+    "title": "アカウントがブロックされています",
+    "description": "Kiloはこのアカウントをブロックしており、再度サインインしてもブロックは解除されません。サポートはご要望に応じてブロックを確認できます。",
+    "domainDescription": "Kiloはこのメールドメインのアカウントをブロックしており、再度サインインしてもブロックは解除されません。サポートはご要望に応じてドメインを確認できます。",
+    "contactSupport": "サポートに連絡"
+  },
   "addCredits": {
     "cta": "クレジットを追加",
     "billingPage": "請求ページ"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "リクエストが完了する前にタイムアウトしました。もう一度お試しください。"
   },
   "screenHeader": {
-    "openMenu": "メニューを開く",
-    "openMenuFor": "{{title}}のメニューを開く"
+    "openMenu": "メニューを開く"
   },
   "picker": {
     "optionsExpired": "選択肢の有効期限が切れました",
@@ -2890,8 +2896,9 @@
       "checkActiveConnection": "接続は有効ですが、この項目はまだ読み込めません。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
-      "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
+      "reconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
+      "bitbucketAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に接続を依頼してください。",
       "adminOnlyConnectDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
@@ -4699,6 +4706,7 @@
     "contextAll": "すべてのコンテキスト",
     "dismiss": "ブリーフィングを非表示にする",
     "dismissFailed": "このブリーフィングはまだ非表示にできませんでした。バックグラウンドで再試行されます。",
+    "readMarkFailed": "このブリーフィングを既読にできませんでした。再読み込み時に再試行します。",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みブリーフィング · 更新できません",
     "summary": "AI要約",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "自分として実行",
       "runAsCreatorDescription": "すべての実行があなたのアカウントを使用するため、シークレットヘッダーが必要です。",
       "saveFailedTitle": "トリガーを保存できませんでした",
+      "nameTaken": "「{{name}}」という名前のトリガーは既に存在します。",
+      "saveFailedRetry": "サーバーに接続できませんでした。接続を確認して再試行してください。",
+      "saveFailedCheck": "フォームの値を確認して再試行してください。",
       "deleteTitle": "このトリガーを削除しますか？",
       "deleteMessage": "{{name}}への呼び出しは失敗します。この操作は元に戻せません。",
       "deleteMessageScheduled": "{{name}}の予定された実行は停止します。この操作は元に戻せません。",

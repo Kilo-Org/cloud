@@ -523,6 +523,7 @@
       "receiptLabel": "Comprobante",
       "copyReceiptId": "Copiar ID del comprobante",
       "appealLabel": "Apelación",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Recibida",
       "triageOpen": "En revisión",
       "triageActioned": "Procedente",
@@ -556,7 +557,7 @@
       "title": "Denuncias",
       "rowSubtitle": "Denuncias que has presentado y sus resultados",
       "emptyTitle": "Aún no hay denuncias",
-      "emptyDescription": "Las denuncias que presentes desde un comentario o una respuesta de IA aparecerán aquí.",
+      "emptyDescription": "Las denuncias que presentes desde un comentario en una discusión de pull request, o desde una respuesta de IA en una sesión del agente, aparecen aquí con su resultado.",
       "couldNotLoad": "No se pudieron cargar tus denuncias",
       "capped": "Se muestran tus denuncias más recientes."
     },
@@ -1634,7 +1635,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesiones",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesiones",
       "live": "EN DIRECTO",
-      "updating": "Actualizando"
+      "updating": "Actualizando",
+      "retentionLimit": "Mostrando las sesiones más recientes."
     },
     "sessionRow": {
       "deleteTitle": "¿Eliminar sesión?",
@@ -1706,7 +1708,6 @@
       "scrollToBottom": "Desplazarse al final",
       "emptyTitle": "Aún no hay mensajes",
       "emptyReadOnlyTitle": "Esta sesión no tiene mensajes",
-      "renameAccessibility": "Cambiar nombre de la sesión: {{title}}",
       "cloningSession": "Clonando sesión",
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
       "historyTooLarge": "La transcripción de esta sesión es demasiado grande para cargarla.",
@@ -2567,6 +2568,12 @@
     "retryLoadingAccount": "Volver a cargar la cuenta",
     "retryLoadingPrivacy": "Volver a cargar las opciones de privacidad"
   },
+  "accountBlocked": {
+    "title": "Cuenta bloqueada",
+    "description": "Kilo ha bloqueado esta cuenta y volver a iniciar sesión no lo desbloqueará. El soporte técnico puede revisar el bloqueo si lo solicitas.",
+    "domainDescription": "Kilo bloquea las cuentas de este dominio de correo electrónico y volver a iniciar sesión no lo cambiará. El soporte técnico puede revisar el dominio si lo solicitas.",
+    "contactSupport": "Contactar con soporte técnico"
+  },
   "addCredits": {
     "cta": "Añadir créditos",
     "billingPage": "página de facturación"
@@ -2639,8 +2646,7 @@
     "timeoutDescription": "La solicitud se agotó antes de completarse. Inténtalo de nuevo."
   },
   "screenHeader": {
-    "openMenu": "Abrir menú",
-    "openMenuFor": "Abrir menú de {{title}}"
+    "openMenu": "Abrir menú"
   },
   "picker": {
     "optionsExpired": "Opciones caducadas",
@@ -2931,8 +2937,9 @@
       "checkActiveConnection": "La conexión está activa, pero este elemento aún no se puede cargar.",
       "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
-      "gitlabReconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
+      "reconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
       "bitbucketNotConnectedTitle": "Bitbucket no está conectado",
+      "bitbucketAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que lo conecte.",
       "adminOnlyConnectDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para tu cuenta personal"
@@ -4783,6 +4790,7 @@
     "contextAll": "Todos los contextos",
     "dismiss": "Descartar informe",
     "dismissFailed": "Todavía no se ha podido descartar este informe. Se reintentará en segundo plano.",
+    "readMarkFailed": "No se ha podido marcar este informe como leído. Se reintentará cuando se vuelva a cargar el informe.",
     "offline": "Sin conexión · informe guardado",
     "cached": "Informe guardado · no se puede actualizar",
     "summary": "Resumen de IA",
@@ -4979,6 +4987,9 @@
       "runAsCreator": "Ejecutar como yo",
       "runAsCreatorDescription": "Cada ejecución usa tu cuenta, así que la cabecera secreta es obligatoria.",
       "saveFailedTitle": "No se pudo guardar el disparador",
+      "nameTaken": "Ya existe un disparador llamado «{{name}}».",
+      "saveFailedRetry": "No se pudo conectar con el servidor. Comprueba tu conexión y vuelve a intentarlo.",
+      "saveFailedCheck": "Revisa los valores del formulario y vuelve a intentarlo.",
       "deleteTitle": "¿Eliminar este disparador?",
       "deleteMessage": "Las llamadas a {{name}} fallarán. Esto no se puede deshacer.",
       "deleteMessageScheduled": "Las ejecuciones programadas de {{name}} se detendrán. Esto no se puede deshacer.",

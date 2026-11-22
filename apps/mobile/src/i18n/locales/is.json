@@ -522,6 +522,7 @@
       "receiptLabel": "Kvittun",
       "copyReceiptId": "Afrita auðkenni kvittunar",
       "appealLabel": "Áfrýjun",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Móttekin",
       "triageOpen": "Í yfirferð",
       "triageActioned": "Tekin til greina",
@@ -555,7 +556,7 @@
       "title": "Tilkynningar",
       "rowSubtitle": "Tilkynningar sem þú sendir inn og niðurstöður þeirra",
       "emptyTitle": "Engar tilkynningar ennþá",
-      "emptyDescription": "Tilkynningar sem þú sendir inn úr athugasemd eða svari frá gervigreind birtast hér.",
+      "emptyDescription": "Tilkynningar sem þú sendir inn úr athugasemd í PR-umræðu eða úr svari gervigreindar í lotu umboðsmanns birtast hér ásamt niðurstöðu þeirra.",
       "couldNotLoad": "Ekki tókst að hlaða tilkynningunum þínum",
       "capped": "Sýni nýjustu tilkynningarnar þínar."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Tengingin er virk, en samt er ekki hægt að hlaða þessu atriði.",
       "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
-      "gitlabReconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
+      "reconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
       "bitbucketNotConnectedTitle": "Bitbucket er ekki tengt",
+      "bitbucketAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það.",
       "adminOnlyConnectDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} lotur",
       "sectionAccessibility": "{{title}}: {{displayCount}} lotur",
       "live": "Í RAUNTÍMA",
-      "updating": "Uppfæri"
+      "updating": "Uppfæri",
+      "retentionLimit": "Nýjustu loturnar eru sýndar."
     },
     "sessionRow": {
       "deleteTitle": "Eyða lotu?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
       "emptyReadOnlyTitle": "Engin skilaboð í þessari lotu",
-      "renameAccessibility": "Endurnefna lotu: {{title}}",
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
       "historyTooLarge": "Spjallslóð þessarar lotu er of stór til að hlaða.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Reyna aftur að hlaða reikningnum",
     "retryLoadingPrivacy": "Reyna aftur að hlaða persónuverndarvalkostum"
   },
+  "accountBlocked": {
+    "title": "Reikningur lokaður",
+    "description": "Kilo hefur lokað þessum reikningi og ný innskráning opnar hann ekki. Þjónustuver getur farið yfir lokunina sé þess óskað.",
+    "domainDescription": "Kilo lokar fyrir reikninga á þessu tölvupóstsléni og ný innskráning breytir því ekki. Þjónustuver getur farið yfir lénið sé þess óskað.",
+    "contactSupport": "Hafa samband við þjónustuver"
+  },
   "addCredits": {
     "cta": "Bæta við inneign",
     "billingPage": "innheimtusíðu"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Beiðnin rann út á tíma áður en hún kláraðist. Reyndu aftur."
   },
   "screenHeader": {
-    "openMenu": "Opna valmynd",
-    "openMenuFor": "Opna valmynd fyrir {{title}}"
+    "openMenu": "Opna valmynd"
   },
   "picker": {
     "optionsExpired": "Valkostir útrunnir",
@@ -4699,6 +4706,7 @@
     "contextAll": "Öll samhengi",
     "dismiss": "Vísa yfirliti frá",
     "dismissFailed": "Tókst ekki að vísa yfirlitinu frá eins og er. Það reynir aftur í bakgrunni.",
+    "readMarkFailed": "Tókst ekki að merkja þetta yfirlit sem lesið. Það reynir aftur þegar yfirlitið hleðst aftur.",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistað yfirlit · ekki hægt að uppfæra",
     "summary": "AI samantekt",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Keyra sem ég",
       "runAsCreatorDescription": "Sérhver keyrsla notar reikninginn þinn, svo leyndarhausinn er nauðsynlegur.",
       "saveFailedTitle": "Gat ekki vistað kveikjuna",
+      "nameTaken": "Kveikja sem heitir „{{name}}“ er þegar til.",
+      "saveFailedRetry": "Náði ekki sambandi við þjóninn. Athugaðu nettenginguna og reyndu aftur.",
+      "saveFailedCheck": "Athugaðu gildin í forminu og reyndu aftur.",
       "deleteTitle": "Eyða þessari kveikju?",
       "deleteMessage": "Köll til {{name}} munu mistakast. Þetta er ekki hægt að afturkalla.",
       "deleteMessageScheduled": "Áætlaðar keyrslur kveikjunnar {{name}} stöðvast. Þetta er ekki hægt að afturkalla.",

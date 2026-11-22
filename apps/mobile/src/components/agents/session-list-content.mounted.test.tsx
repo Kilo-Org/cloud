@@ -193,6 +193,7 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     hasFreshHistory: true,
     isFetchingNextPage: false,
     isFetchNextPageError: false,
+    isRetentionLimited: false,
     onRetryNextPage: () => undefined,
     refetch: vi.fn<ContentProps['refetch']>().mockResolvedValue(undefined),
     onRetry: () => undefined,
@@ -992,6 +993,65 @@ describe('AgentSessionListContent next-page footer', () => {
     });
     expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
       i18n.t('common.couldnTLoadMore')
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
+  });
+
+  it('says the history stopped at the retention bound', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isRetentionLimited: true,
+      })
+    );
+    // The bound is a third ending: the rows stay, and the list says why it
+    // stopped instead of ending silently like a complete history.
+    expect(rows(renderer).map(row => row.id)).toEqual(['a', 'b']);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('agents.sessionList.retentionLimit')
+    );
+    expect(hosts(renderer, 'Button')).toHaveLength(0);
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
+  });
+
+  it('shows the failed next page instead of the bound line', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isRetentionLimited: true,
+        isFetchNextPageError: true,
+        onRetryNextPage: () => undefined,
+      })
+    );
+    const texts = hosts(renderer, 'Text').map(node => node.props.children);
+    expect(texts).toContain(i18n.t('common.couldnTLoadMore'));
+    expect(texts).not.toContain(i18n.t('agents.sessionList.retentionLimit'));
+  });
+
+  it('shows the spinner instead of the bound line while the next page loads', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isRetentionLimited: true,
+        isFetchingNextPage: true,
+      })
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('agents.sessionList.retentionLimit')
+    );
+  });
+
+  it('renders no footer for a complete history', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isRetentionLimited: false,
+      })
+    );
+    expect(rows(renderer).map(row => row.id)).toEqual(['a', 'b']);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('agents.sessionList.retentionLimit')
     );
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
   });

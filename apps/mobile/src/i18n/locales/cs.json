@@ -524,6 +524,7 @@
       "receiptLabel": "Potvrzení",
       "copyReceiptId": "Kopírovat ID potvrzení",
       "appealLabel": "Odvolání",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Přijato",
       "triageOpen": "Posuzuje se",
       "triageActioned": "Uznáno",
@@ -557,7 +558,7 @@
       "title": "Nahlášení",
       "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
       "emptyTitle": "Zatím žádná nahlášení",
-      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "emptyDescription": "Nahlášení, která podáte z komentáře v diskuzi k pull requestu nebo z odpovědi AI v relaci agenta, se zde zobrazí včetně výsledku.",
       "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
       "capped": "Zobrazují se vaše nejnovější nahlášení."
     },
@@ -1048,8 +1049,9 @@
       "checkActiveConnection": "Připojení je aktivní, ale tuto položku pořád nejde načíst.",
       "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
-      "gitlabReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
+      "reconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
       "bitbucketNotConnectedTitle": "Bitbucket není připojen",
+      "bitbucketAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho připojil.",
       "adminOnlyConnectDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
@@ -2268,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} relace",
       "sectionAccessibility": "{{title}}: {{displayCount}} relace",
       "live": "ŽIVĚ",
-      "updating": "Aktualizace"
+      "updating": "Aktualizace",
+      "retentionLimit": "Zobrazují se nejnovější relace."
     },
     "sessionRow": {
       "deleteTitle": "Smazat relaci?",
@@ -2342,7 +2345,6 @@
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
       "emptyReadOnlyTitle": "Žádné zprávy v této relaci",
-      "renameAccessibility": "Přejmenovat relaci: {{title}}",
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
@@ -3215,6 +3217,12 @@
     "retryLoadingAccount": "Znovu načíst účet",
     "retryLoadingPrivacy": "Znovu načíst nastavení soukromí"
   },
+  "accountBlocked": {
+    "title": "Účet zablokován",
+    "description": "Kilo zablokovalo tento účet a nové přihlášení to nezruší. Podpora může blokaci na požádání přezkoumat.",
+    "domainDescription": "Kilo zablokovalo účty na této e-mailové doméně a nové přihlášení to nezruší. Podpora může doménu na požádání přezkoumat.",
+    "contactSupport": "Kontaktovat podporu"
+  },
   "addCredits": {
     "cta": "Dobít kredity",
     "billingPage": "stránka fakturace"
@@ -3287,8 +3295,7 @@
     "timeoutDescription": "Požadavek vypršel dříve, než se dokončil. Zkuste to prosím znovu."
   },
   "screenHeader": {
-    "openMenu": "Otevřít nabídku",
-    "openMenuFor": "Otevřít nabídku pro {{title}}"
+    "openMenu": "Otevřít nabídku"
   },
   "picker": {
     "optionsExpired": "Platnost možností vypršela",
@@ -4867,6 +4874,7 @@
     "contextAll": "Všechny kontexty",
     "dismiss": "Skrýt přehled",
     "dismissFailed": "Přehled se zatím nepodařilo skrýt. Pokus se automaticky opakuje na pozadí.",
+    "readMarkFailed": "Tento přehled se nepodařilo označit jako přečtený. Při příštím načtení přehledu se pokus zopakuje.",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
     "summary": "AI shrnutí",
@@ -5067,6 +5075,9 @@
       "runAsCreator": "Spouštět jako já",
       "runAsCreatorDescription": "Každé spuštění používá váš účet, takže je vyžadována tajná hlavička.",
       "saveFailedTitle": "Spouštěč se nepodařilo uložit",
+      "nameTaken": "Spouštěč s názvem „{{name}}“ už existuje.",
+      "saveFailedRetry": "Nepodařilo se spojit se serverem. Zkontrolujte připojení a zkuste to znovu.",
+      "saveFailedCheck": "Zkontrolujte hodnoty ve formuláři a zkuste to znovu.",
       "deleteTitle": "Smazat tento spouštěč?",
       "deleteMessage": "Volání na {{name}} selžou. Tuto akci nelze vrátit.",
       "deleteMessageScheduled": "Naplánované běhy {{name}} se zastaví. Tuto akci nelze vrátit.",

@@ -525,6 +525,7 @@
       "receiptLabel": "Irċevuta",
       "copyReceiptId": "Ikkopja l-id tal-irċevuta",
       "appealLabel": "Appell",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Riċevut",
       "triageOpen": "Qed jiġi rieżaminat",
       "triageActioned": "Milqugħ",
@@ -558,7 +559,7 @@
       "title": "Rapporti",
       "rowSubtitle": "Rapporti li ppreżentajt u l-eżiti tagħhom",
       "emptyTitle": "Għad m'hemmx rapporti",
-      "emptyDescription": "Rapporti li tippreżenta minn kumment jew minn risposta tal-AI jidhru hawn.",
+      "emptyDescription": "Rapporti li tippreżenta minn kumment f'diskussjoni ta' pull request, jew minn risposta tal-AI f'sessjoni tal-aġent, jidhru hawn flimkien mal-eżitu tagħhom.",
       "couldNotLoad": "Ir-rapporti tiegħek ma setgħux jitgħabbew",
       "capped": "Qed jintwerew l-aktar rapporti reċenti tiegħek."
     },
@@ -1067,8 +1068,9 @@
       "checkActiveConnection": "Il-konnessjoni hija attiva, iżda dan l-element għadu ma jistax jiġi mgħobbi.",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
-      "gitlabReconnectAdminOnlyDescription": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
+      "reconnectAdminOnlyDescription": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
       "bitbucketNotConnectedTitle": "Bitbucket mhux konness",
+      "bitbucketAdminOnlyDescription": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjah.",
       "adminOnlyConnectDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
@@ -2315,7 +2317,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessjonijiet",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessjonijiet",
       "live": "F'ĦIN REALI",
-      "updating": "Qed isir l-aġġornament"
+      "updating": "Qed isir l-aġġornament",
+      "retentionLimit": "Qed jintwerew is-sessjonijiet l-aktar reċenti tiegħek."
     },
     "sessionRow": {
       "deleteTitle": "Tħassar is-sessjoni?",
@@ -2391,7 +2394,6 @@
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
       "emptyReadOnlyTitle": "L-ebda messaġġ f'din is-sessjoni",
-      "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
       "historyTooLarge": "It-transkrizzjoni ta' din is-sessjoni hija kbira wisq biex titgħabba.",
@@ -3276,6 +3278,12 @@
     "retryLoadingAccount": "Erġa' pprova tgħabbi l-kont",
     "retryLoadingPrivacy": "Erġa' pprova tgħabbi l-għażliet tal-privatezza"
   },
+  "accountBlocked": {
+    "title": "Kont imblukkat",
+    "description": "Kilo imblokka dan il-kont u d-dħul mill-ġdid ma jneħħix l-imblokk. L-appoġġ jista' jirrevedi l-imblokk fuq talba.",
+    "domainDescription": "Kilo ma jippermettix kontijiet fuq dan id-dominju tal-email u d-dħul mill-ġdid ma jbiddilx dan. L-appoġġ jista' jirrevedi d-dominju fuq talba.",
+    "contactSupport": "Ikkuntattja l-appoġġ"
+  },
   "addCredits": {
     "cta": "Żid krediti",
     "billingPage": "paġna tal-ħlasijiet"
@@ -3348,8 +3356,7 @@
     "timeoutDescription": "It-talba ma tlestietx fiż-żmien tagħha. Jekk jogħġbok erġa' pprova."
   },
   "screenHeader": {
-    "openMenu": "Iftaħ il-menu",
-    "openMenuFor": "Iftaħ il-menu għal {{title}}"
+    "openMenu": "Iftaħ il-menu"
   },
   "picker": {
     "optionsExpired": "L-għażliet skadew",
@@ -4951,6 +4958,7 @@
     "contextAll": "Il-kuntesti kollha",
     "dismiss": "Warrab il-briefing",
     "dismissFailed": "Dan il-briefing għadux twarrab. Jerġa' jipprova fil-isfond.",
+    "readMarkFailed": "Dan il-briefing ma setax jiġi mmarkat bħala moqri. Se jerġa' jipprova meta l-briefing jerġa' jitgħabba.",
     "offline": "Offline · briefing issejvjat",
     "cached": "Briefing issejvjat · aġġornament mhux disponibbli",
     "summary": "Sommarju AI",
@@ -5155,6 +5163,9 @@
       "runAsCreator": "Eżegwi bħali",
       "runAsCreatorDescription": "Kull eżekuzzjoni tuża l-kont tiegħek, għalhekk l-intestatura sigrieta hija meħtieġa.",
       "saveFailedTitle": "Ma setax jiġi salvat l-iskattatur",
+      "nameTaken": "Diġà jeżisti skattatur bl-isem \"{{name}}\".",
+      "saveFailedRetry": "Is-server ma ntlaħaqx. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "saveFailedCheck": "Iċċekkja l-valuri fil-formola u erġa' pprova.",
       "deleteTitle": "Tħassar dan l-iskattatur?",
       "deleteMessage": "Is-sejħiet lil {{name}} se jfallu. Dan ma jistax jiġi annullat.",
       "deleteMessageScheduled": "L-eżekuzzjonijiet ipprogrammati ta' {{name}} se jieqfu. Dan ma jistax jiġi annullat.",

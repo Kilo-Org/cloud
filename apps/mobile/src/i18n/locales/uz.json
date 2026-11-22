@@ -522,6 +522,7 @@
       "receiptLabel": "Kvitansiya",
       "copyReceiptId": "Kvitansiya identifikatorini nusxalash",
       "appealLabel": "Apellyatsiya",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Qabul qilindi",
       "triageOpen": "Ko'rib chiqilmoqda",
       "triageActioned": "Tasdiqlandi",
@@ -555,7 +556,7 @@
       "title": "Shikoyatlar",
       "rowSubtitle": "Yuborgan shikoyatlaringiz va ularning natijalari",
       "emptyTitle": "Hozircha shikoyatlar yo'q",
-      "emptyDescription": "Izoh yoki AI javobidan yuborgan shikoyatlaringiz shu yerda ko'rinadi.",
+      "emptyDescription": "Pull request muhokamasidagi izohdan yoki agent sessiyasidagi sun'iy intellekt javobidan yuborgan shikoyatlaringiz natijalari bilan birga shu yerda ko'rinadi.",
       "couldNotLoad": "Shikoyatlaringizni yuklab bo'lmadi",
       "capped": "Eng so'nggi shikoyatlaringiz ko'rsatilmoqda."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Ulanish faol, lekin bu elementni hali ham yuklab boʻlmaydi.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
-      "gitlabReconnectAdminOnlyDescription": "Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang.",
+      "reconnectAdminOnlyDescription": "Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang.",
       "bitbucketNotConnectedTitle": "Bitbucket ulanmagan",
+      "bitbucketAdminOnlyDescription": "Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang.",
       "adminOnlyConnectDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessiya",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessiya",
       "live": "JONLI",
-      "updating": "Yangilanmoqda"
+      "updating": "Yangilanmoqda",
+      "retentionLimit": "Eng so'nggi sessiyalaringiz ko'rsatilmoqda."
     },
     "sessionRow": {
       "deleteTitle": "Sessiya o'chirilsinmi?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
       "emptyReadOnlyTitle": "Bu sessiyada xabarlar yo'q",
-      "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "historyTooLarge": "Bu sessiya transkripti yuklash uchun juda katta.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Hisobni qayta yuklash",
     "retryLoadingPrivacy": "Maxfiylik sozlamalarini qayta yuklash"
   },
+  "accountBlocked": {
+    "title": "Hisob bloklangan",
+    "description": "Kilo bu hisobni bloklagan va qayta kirish blokni olib tashlamaydi. Yordam xizmati so'rov bo'yicha blokni ko'rib chiqishi mumkin.",
+    "domainDescription": "Kilo bu elektron pochta domenidagi hisoblarni bloklaydi va qayta kirish buni o'zgartirmaydi. Yordam xizmati so'rov bo'yicha domenni ko'rib chiqishi mumkin.",
+    "contactSupport": "Yordam xizmatiga murojaat qilish"
+  },
   "addCredits": {
     "cta": "Kreditlar qo'shish",
     "billingPage": "to'lov sahifasi"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "So'rov tugashidan oldin vaqt tugadi. Iltimos, qayta urinib ko'ring."
   },
   "screenHeader": {
-    "openMenu": "Menyuni ochish",
-    "openMenuFor": "{{title}} uchun menyuni ochish"
+    "openMenu": "Menyuni ochish"
   },
   "picker": {
     "optionsExpired": "Variantlar eskirgan",
@@ -4699,6 +4706,7 @@
     "contextAll": "Barcha kontekstlar",
     "dismiss": "Brifingni e’tiborsiz qoldirish",
     "dismissFailed": "Brifingni hozircha e’tiborsiz qoldirib bo‘lmadi. U fonda qayta urinadi.",
+    "readMarkFailed": "Brifingni o‘qilgan deb belgilab bo‘lmadi. Brifing qayta yuklanganda u yana urinib ko‘radi.",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan brifing · yangilab bo‘lmaydi",
     "summary": "AI xulosasi",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Men nomimdan ishga tushirish",
       "runAsCreatorDescription": "Har bir ishga tushirish hisobingizdan foydalanadi, shuning uchun maxfiy sarlavha majburiy.",
       "saveFailedTitle": "Ishga tushirgichni saqlab boʻlmadi",
+      "nameTaken": "“{{name}}” nomli ishga tushirgich allaqachon mavjud.",
+      "saveFailedRetry": "Serverga ulanib boʻlmadi. Ulanishni tekshirib, qayta urinib koʻring.",
+      "saveFailedCheck": "Formadagi qiymatlarni tekshirib, qayta urinib koʻring.",
       "deleteTitle": "Bu ishga tushirgich oʻchirilsinmi?",
       "deleteMessage": "{{name}} ga qilingan chaqiruvlar muvaffaqiyatsiz boʻladi. Buni ortga qaytarib boʻlmaydi.",
       "deleteMessageScheduled": "{{name}} ishga tushirgichining rejalashtirilgan ishga tushirishlari toʻxtaydi. Buni ortga qaytarib boʻlmaydi.",

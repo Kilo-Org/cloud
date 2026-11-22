@@ -523,6 +523,7 @@
       "receiptLabel": "Accusé de réception",
       "copyReceiptId": "Copier l'identifiant de l'accusé de réception",
       "appealLabel": "Recours",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel) : {{status}}",
       "triageReceived": "Reçu",
       "triageOpen": "En cours d'examen",
       "triageActioned": "Retenu",
@@ -556,7 +557,7 @@
       "title": "Signalements",
       "rowSubtitle": "Signalements que vous avez déposés et leurs résultats",
       "emptyTitle": "Aucun signalement pour l'instant",
-      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire ou d'une réponse de l'IA apparaissent ici.",
+      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire dans une discussion de pull request, ou d'une réponse de l'IA dans une session d'agent, apparaissent ici avec leur résultat.",
       "couldNotLoad": "Impossible de charger vos signalements",
       "capped": "Affichage de vos signalements les plus récents."
     },
@@ -1602,7 +1603,6 @@
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
       "emptyReadOnlyTitle": "Aucun message dans cette session",
-      "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session",
       "historyTooLarge": "La transcription de cette session est trop volumineuse pour être chargée.",
@@ -2496,6 +2496,12 @@
     "translateSummaries": "Traduire les résumés",
     "autoExpandThinkingInactiveSubtitle": "Aucun effet tant que les détails de la réflexion sont masqués."
   },
+  "accountBlocked": {
+    "title": "Compte bloqué",
+    "description": "Kilo a bloqué ce compte, et une nouvelle connexion ne lèvera pas le blocage. L'assistance peut examiner le blocage sur demande.",
+    "domainDescription": "Kilo bloque les comptes sur ce domaine de messagerie, et une nouvelle connexion ne changera pas cela. L'assistance peut examiner le domaine sur demande.",
+    "contactSupport": "Contacter l'assistance"
+  },
   "addCredits": {
     "cta": "Ajouter des crédits",
     "billingPage": "page de facturation"
@@ -2564,8 +2570,7 @@
     "timeoutDescription": "La demande a mis trop de temps à aboutir. Réessayez."
   },
   "screenHeader": {
-    "openMenu": "Ouvrir le menu",
-    "openMenuFor": "Ouvrir le menu pour {{title}}"
+    "openMenu": "Ouvrir le menu"
   },
   "picker": {
     "optionsExpired": "Options indisponibles",
@@ -2812,7 +2817,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessions",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessions",
       "live": "EN DIRECT",
-      "updating": "Mise à jour en cours"
+      "updating": "Mise à jour en cours",
+      "retentionLimit": "Affichage des sessions les plus récentes."
     },
     "sessionRow": {
       "deleteTitle": "Supprimer la session ?",
@@ -2931,8 +2937,9 @@
       "checkActiveConnection": "La connexion est active, mais cet élément ne peut toujours pas être chargé.",
       "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
-      "gitlabReconnectAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
+      "reconnectAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
       "bitbucketNotConnectedTitle": "Bitbucket n'est pas connecté",
+      "bitbucketAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, un administrateur ou un responsable de la facturation de le connecter.",
       "adminOnlyConnectDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "contextLine": "Pour {{organization}}",
       "contextLinePersonal": "Pour votre compte personnel"
@@ -4783,6 +4790,7 @@
     "contextAll": "Tous les contextes",
     "dismiss": "Ignorer le briefing",
     "dismissFailed": "Impossible d’ignorer ce briefing pour l’instant. Une nouvelle tentative est effectuée en arrière-plan.",
+    "readMarkFailed": "Impossible de marquer ce briefing comme lu. Une nouvelle tentative aura lieu au rechargement du briefing.",
     "offline": "Hors ligne · briefing enregistré",
     "cached": "Briefing enregistré · actualisation indisponible",
     "summary": "Résumé IA",
@@ -4979,6 +4987,9 @@
       "runAsCreator": "Exécuter en tant que moi",
       "runAsCreatorDescription": "Chaque exécution utilise votre compte, l’en-tête secret est donc requis.",
       "saveFailedTitle": "Impossible d’enregistrer le déclencheur",
+      "nameTaken": "Un déclencheur nommé « {{name}} » existe déjà.",
+      "saveFailedRetry": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+      "saveFailedCheck": "Vérifiez les valeurs du formulaire et réessayez.",
       "deleteTitle": "Supprimer ce déclencheur ?",
       "deleteMessage": "Les appels à {{name}} échoueront. Cette action est irréversible.",
       "deleteMessageScheduled": "Les exécutions planifiées de {{name}} s'arrêteront. Cette action est irréversible.",

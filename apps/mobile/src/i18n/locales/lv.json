@@ -523,6 +523,7 @@
       "receiptLabel": "Apstiprinājums",
       "copyReceiptId": "Kopēt apstiprinājuma ID",
       "appealLabel": "Pārsūdzība",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Saņemts",
       "triageOpen": "Tiek izskatīts",
       "triageActioned": "Apstiprināts",
@@ -556,7 +557,7 @@
       "title": "Ziņojumi",
       "rowSubtitle": "Jūsu iesniegtie ziņojumi un to rezultāti",
       "emptyTitle": "Vēl nav ziņojumu",
-      "emptyDescription": "Šeit parādīsies ziņojumi, kurus iesniedzat no komentāra vai AI atbildes.",
+      "emptyDescription": "Ziņojumi, kurus iesniedzat no komentāra PR diskusijā vai no AI atbildes aģenta sesijā, šeit parādās kopā ar to rezultātu.",
       "couldNotLoad": "Neizdevās ielādēt jūsu ziņojumus",
       "capped": "Tiek rādīti jūsu jaunākie ziņojumi."
     },
@@ -1029,8 +1030,9 @@
       "checkActiveConnection": "Savienojums ir aktīvs, bet šo vienumu joprojām nevar ielādēt.",
       "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
-      "gitlabReconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
+      "reconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
       "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
+      "bitbucketAdminOnlyDescription": "Lūdziet īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot.",
       "adminOnlyConnectDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
@@ -2221,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesijas",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesijas",
       "live": "REĀLLAIKĀ",
-      "updating": "Notiek atjaunināšana"
+      "updating": "Notiek atjaunināšana",
+      "retentionLimit": "Tiek rādītas jūsu jaunākās sesijas."
     },
     "sessionRow": {
       "deleteTitle": "Dzēst sesiju?",
@@ -2293,7 +2296,6 @@
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
       "emptyReadOnlyTitle": "Šajā sesijā nav ziņojumu",
-      "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
       "cloningSession": "Klonē sesiju…",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
       "historyTooLarge": "Šīs sesijas ieraksts ir pārāk liels, lai to ielādētu.",
@@ -3154,6 +3156,12 @@
     "retryLoadingAccount": "Mēģināt ielādēt kontu vēlreiz",
     "retryLoadingPrivacy": "Mēģināt ielādēt privātuma iestatījumus vēlreiz"
   },
+  "accountBlocked": {
+    "title": "Konts bloķēts",
+    "description": "Kilo ir bloķējis šo kontu, un atkārtota pieteikšanās to neatbloķēs. Atbalsta dienests var pārskatīt bloķējumu pēc pieprasījuma.",
+    "domainDescription": "Kilo bloķē kontus šajā e-pasta domēnā, un atkārtota pieteikšanās to nemainīs. Atbalsta dienests var pārskatīt domēnu pēc pieprasījuma.",
+    "contactSupport": "Sazināties ar atbalsta dienestu"
+  },
   "addCredits": {
     "cta": "Papildināt kredītus",
     "billingPage": "norēķinu lapa"
@@ -3226,8 +3234,7 @@
     "timeoutDescription": "Pieprasījums tika pārtraukts, jo netika pabeigts laikā. Lūdzu, mēģini vēlreiz."
   },
   "screenHeader": {
-    "openMenu": "Atvērt izvēlni",
-    "openMenuFor": "Atvērt {{title}} izvēlni"
+    "openMenu": "Atvērt izvēlni"
   },
   "picker": {
     "optionsExpired": "Izvēles vairs nav pieejamas",
@@ -4783,6 +4790,7 @@
     "contextAll": "Visi konteksti",
     "dismiss": "Noraidīt atskaiti",
     "dismissFailed": "Šo atskaiti vēl neizdevās noraidīt. Mēģinājums tiks atkārtots fonā.",
+    "readMarkFailed": "Neizdevās atzīmēt šo atskaiti kā lasītu. Mēģinājums tiks atkārtots, kad atskaite pārlādēsies.",
     "offline": "Bezsaistē · saglabāta atskaite",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
     "summary": "AI kopsavilkums",
@@ -4979,6 +4987,9 @@
       "runAsCreator": "Palaist manā vārdā",
       "runAsCreatorDescription": "Katra palaišana izmanto jūsu kontu, tāpēc noslēpuma galvene ir obligāta.",
       "saveFailedTitle": "Neizdevās saglabāt trigeri",
+      "nameTaken": "Trigeris ar nosaukumu „{{name}}” jau pastāv.",
+      "saveFailedRetry": "Neizdevās sazināties ar serveri. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+      "saveFailedCheck": "Pārbaudiet veidlapas vērtības un mēģiniet vēlreiz.",
       "deleteTitle": "Dzēst šo trigeri?",
       "deleteMessage": "Izsaukumi uz {{name}} neizdosies. To nevar atsaukt.",
       "deleteMessageScheduled": "Trigera {{name}} ieplānotās palaišanas apstāsies. To nevar atsaukt.",

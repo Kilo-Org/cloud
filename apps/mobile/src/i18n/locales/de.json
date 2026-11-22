@@ -522,6 +522,7 @@
       "receiptLabel": "Bestätigung",
       "copyReceiptId": "Bestätigungs-ID kopieren",
       "appealLabel": "Einspruch",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Eingegangen",
       "triageOpen": "In Prüfung",
       "triageActioned": "Stattgegeben",
@@ -555,7 +556,7 @@
       "title": "Meldungen",
       "rowSubtitle": "Eingereichte Meldungen und ihre Ergebnisse",
       "emptyTitle": "Noch keine Meldungen",
-      "emptyDescription": "Meldungen, die du zu einem Kommentar oder einer KI-Antwort einreichst, erscheinen hier.",
+      "emptyDescription": "Meldungen, die du zu einem Kommentar in einer Pull-Request-Diskussion oder zu einer KI-Antwort in einer Agentensitzung einreichst, erscheinen hier mit ihrem Ergebnis.",
       "couldNotLoad": "Deine Meldungen konnten nicht geladen werden",
       "capped": "Deine neuesten Meldungen werden angezeigt."
     },
@@ -1613,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} Sitzungen",
       "sectionAccessibility": "{{title}}: {{displayCount}} Sitzungen",
       "live": "IN ECHTZEIT",
-      "updating": "Wird aktualisiert"
+      "updating": "Wird aktualisiert",
+      "retentionLimit": "Es werden die neuesten Sitzungen angezeigt."
     },
     "sessionRow": {
       "deleteTitle": "Sitzung löschen?",
@@ -1683,7 +1685,6 @@
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
       "emptyReadOnlyTitle": "Keine Nachrichten in dieser Sitzung",
-      "renameAccessibility": "Sitzung umbenennen: {{title}}",
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
       "historyTooLarge": "Das Protokoll dieser Sitzung ist zum Laden zu groß.",
@@ -2532,6 +2533,12 @@
     "retryLoadingAccount": "Konto erneut laden",
     "retryLoadingPrivacy": "Datenschutzeinstellungen erneut laden"
   },
+  "accountBlocked": {
+    "title": "Konto gesperrt",
+    "description": "Kilo hat dieses Konto gesperrt, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Sperre auf Anfrage prüfen.",
+    "domainDescription": "Kilo sperrt Konten auf dieser E-Mail-Domain, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Domain auf Anfrage prüfen.",
+    "contactSupport": "Support kontaktieren"
+  },
   "addCredits": {
     "cta": "Guthaben aufladen",
     "billingPage": "abrechnungsseite"
@@ -2604,8 +2611,7 @@
     "timeoutDescription": "Die Anfrage wurde nicht rechtzeitig abgeschlossen. Bitte versuche es erneut."
   },
   "screenHeader": {
-    "openMenu": "Menü öffnen",
-    "openMenuFor": "Menü für {{title}} öffnen"
+    "openMenu": "Menü öffnen"
   },
   "picker": {
     "optionsExpired": "Auswahl nicht mehr gültig",
@@ -2890,8 +2896,9 @@
       "checkActiveConnection": "Die Verbindung ist aktiv, aber dieses Element kann weiterhin nicht geladen werden.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
-      "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
+      "reconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
       "bitbucketNotConnectedTitle": "Bitbucket ist nicht verbunden",
+      "bitbucketAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, es zu verbinden.",
       "adminOnlyConnectDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
@@ -4699,6 +4706,7 @@
     "contextAll": "Alle Kontexte",
     "dismiss": "Briefing ausblenden",
     "dismissFailed": "Dieses Briefing konnte noch nicht ausgeblendet werden. Der Vorgang wird im Hintergrund wiederholt.",
+    "readMarkFailed": "Dieses Briefing konnte noch nicht als gelesen markiert werden. Der Vorgang wird beim nächsten Laden des Briefings wiederholt.",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeichertes Briefing · Aktualisierung nicht verfügbar",
     "summary": "AI-Zusammenfassung",
@@ -4888,9 +4896,12 @@
       "condenseOnComplete": "Kontext verdichten, wenn der Lauf endet",
       "activeTitle": "Auslöser aktiv",
       "activeDescription": "Pausierte Webhooks antworten mit 404.",
-      "runAsCreator": "Als ich ausführen",
+      "runAsCreator": "In meinem Namen ausführen",
       "runAsCreatorDescription": "Jeder Lauf verwendet dein Konto, daher ist der geheime Header erforderlich.",
       "saveFailedTitle": "Der Auslöser konnte nicht gespeichert werden",
+      "nameTaken": "Ein Auslöser mit dem Namen „{{name}}“ existiert bereits.",
+      "saveFailedRetry": "Der Server konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
+      "saveFailedCheck": "Prüfe die Werte im Formular und versuche es erneut.",
       "deleteTitle": "Diesen Auslöser löschen?",
       "deleteMessage": "Aufrufe an {{name}} schlagen fehl. Dies kann nicht rückgängig gemacht werden.",
       "deleteMessageScheduled": "Geplante Ausführungen von {{name}} werden gestoppt. Dies kann nicht rückgängig gemacht werden.",

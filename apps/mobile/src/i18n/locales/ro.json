@@ -523,6 +523,7 @@
       "receiptLabel": "Confirmare",
       "copyReceiptId": "Copiază ID-ul confirmării",
       "appealLabel": "Contestație",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Primit",
       "triageOpen": "În analiză",
       "triageActioned": "Admis",
@@ -556,7 +557,7 @@
       "title": "Raportări",
       "rowSubtitle": "Raportările trimise de tine și rezultatele lor",
       "emptyTitle": "Nicio raportare încă",
-      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu sau dintr-un răspuns AI apar aici.",
+      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu într-o discuție despre un pull request sau dintr-un răspuns AI într-o sesiune de agent apar aici împreună cu rezultatul lor.",
       "couldNotLoad": "Nu am putut încărca raportările tale",
       "capped": "Sunt afișate cele mai recente raportări ale tale."
     },
@@ -1029,8 +1030,9 @@
       "checkActiveConnection": "Conexiunea este activă, dar acest element tot nu poate fi încărcat.",
       "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
-      "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
+      "reconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
       "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
+      "bitbucketAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze.",
       "adminOnlyConnectDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
@@ -2221,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesiuni",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesiuni",
       "live": "ÎN TIMP REAL",
-      "updating": "Se actualizează"
+      "updating": "Se actualizează",
+      "retentionLimit": "Se afișează cele mai recente sesiuni."
     },
     "sessionRow": {
       "deleteTitle": "Ștergi sesiunea?",
@@ -2293,7 +2296,6 @@
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
       "emptyReadOnlyTitle": "Niciun mesaj în această sesiune",
-      "renameAccessibility": "Redenumește sesiunea: {{title}}",
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
       "historyTooLarge": "Transcrierea acestei sesiuni este prea mare pentru a fi încărcată.",
@@ -3154,6 +3156,12 @@
     "retryLoadingAccount": "Reîncearcă încărcarea contului",
     "retryLoadingPrivacy": "Reîncearcă încărcarea opțiunilor de confidențialitate"
   },
+  "accountBlocked": {
+    "title": "Cont blocat",
+    "description": "Kilo a blocat acest cont și o nouă autentificare nu va ridica blocarea. Asistența poate analiza blocarea la cerere.",
+    "domainDescription": "Kilo nu permite conturi pe acest domeniu de e-mail, iar o nouă autentificare nu va schimba acest lucru. Asistența poate analiza domeniul la cerere.",
+    "contactSupport": "Contactează asistența"
+  },
   "addCredits": {
     "cta": "Adaugă credite",
     "billingPage": "pagina de facturare"
@@ -3226,8 +3234,7 @@
     "timeoutDescription": "Cererea a expirat înainte de a se finaliza. Încearcă din nou."
   },
   "screenHeader": {
-    "openMenu": "Deschide meniul",
-    "openMenuFor": "Deschide meniul pentru {{title}}"
+    "openMenu": "Deschide meniul"
   },
   "picker": {
     "optionsExpired": "Opțiunile au expirat",
@@ -4783,6 +4790,7 @@
     "contextAll": "Toate contextele",
     "dismiss": "Ignoră raportul",
     "dismissFailed": "Raportul nu a putut fi ignorat încă. Se reîncearcă în fundal.",
+    "readMarkFailed": "Raportul nu a putut fi marcat ca citit. Se va reîncerca la reîncărcarea raportului.",
     "offline": "Offline · raport salvat",
     "cached": "Raport salvat · reîmprospătare indisponibilă",
     "summary": "Rezumat AI",
@@ -4979,6 +4987,9 @@
       "runAsCreator": "Rulează ca mine",
       "runAsCreatorDescription": "Fiecare rulare folosește contul tău, deci antetul secret este obligatoriu.",
       "saveFailedTitle": "Nu s-a putut salva declanșatorul",
+      "nameTaken": "Există deja un declanșator numit „{{name}}”.",
+      "saveFailedRetry": "Nu s-a putut contacta serverul. Verifică conexiunea și încearcă din nou.",
+      "saveFailedCheck": "Verifică valorile din formular și încearcă din nou.",
       "deleteTitle": "Ștergi acest declanșator?",
       "deleteMessage": "Apelurile către {{name}} vor eșua. Această acțiune nu poate fi anulată.",
       "deleteMessageScheduled": "Execuțiile programate ale {{name}} se opresc. Această acțiune nu poate fi anulată.",

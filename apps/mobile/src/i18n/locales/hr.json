@@ -523,6 +523,7 @@
       "receiptLabel": "Potvrda",
       "copyReceiptId": "Kopiraj ID potvrde",
       "appealLabel": "Žalba",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Zaprimljeno",
       "triageOpen": "U razmatranju",
       "triageActioned": "Usvojeno",
@@ -556,7 +557,7 @@
       "title": "Prijave",
       "rowSubtitle": "Prijave koje ste podnijeli i njihovi ishodi",
       "emptyTitle": "Još nema prijava",
-      "emptyDescription": "Prijave koje podnesete na komentar ili AI odgovor pojavljuju se ovdje.",
+      "emptyDescription": "Prijave koje podnesete iz komentara u raspravi o PR-u ili iz AI odgovora u sesiji agenta pojavljuju se ovdje sa svojim ishodom.",
       "couldNotLoad": "Nije moguće učitati vaše prijave",
       "capped": "Prikazuju se vaše najnovije prijave."
     },
@@ -1029,8 +1030,9 @@
       "checkActiveConnection": "Veza je aktivna, ali ova stavka se još uvijek ne može učitati.",
       "bitbucketOrgOnlyDescription": "Prebaci račun gore na organizaciju za pregled njenih zahtjeva za spajanje na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacija. Zahtjeve za spajanje na Bitbucketu moći ćeš pregledati kada stvoriš ili se pridružiš organizaciji.",
-      "gitlabReconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili upravitelja naplate da ga ponovno poveže.",
+      "reconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili upravitelja naplate da ga ponovno poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
+      "bitbucketAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili upravitelja naplate da ga poveže.",
       "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osobni račun"
@@ -2221,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesija",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesija",
       "live": "UŽIVO",
-      "updating": "Ažuriranje"
+      "updating": "Ažuriranje",
+      "retentionLimit": "Prikazuju se najnovije sesije."
     },
     "sessionRow": {
       "deleteTitle": "Izbrisati sesiju?",
@@ -2293,7 +2296,6 @@
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Još nema poruka",
       "emptyReadOnlyTitle": "U ovoj sesiji nema poruka",
-      "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
       "historyTooLarge": "Prijepis ove sesije je prevelik za učitavanje.",
@@ -3154,6 +3156,12 @@
     "retryLoadingAccount": "Ponovno učitaj račun",
     "retryLoadingPrivacy": "Ponovno učitaj postavke privatnosti"
   },
+  "accountBlocked": {
+    "title": "Račun blokiran",
+    "description": "Kilo je blokirao ovaj račun i ponovna prijava to neće ukloniti. Podrška može na zahtjev pregledati blokadu.",
+    "domainDescription": "Kilo blokira račune na ovoj email domeni i ponovna prijava to neće promijeniti. Podrška može na zahtjev pregledati domenu.",
+    "contactSupport": "Obrati se podršci"
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stranica za naplatu"
@@ -3226,8 +3234,7 @@
     "timeoutDescription": "Zahtjev je istekao prije nego što je završio. Pokušaj ponovo."
   },
   "screenHeader": {
-    "openMenu": "Otvori izbornik",
-    "openMenuFor": "Otvori izbornik za {{title}}"
+    "openMenu": "Otvori izbornik"
   },
   "picker": {
     "optionsExpired": "Opcije više nisu dostupne",
@@ -4783,6 +4790,7 @@
     "contextAll": "Svi konteksti",
     "dismiss": "Odbaci izvješće",
     "dismissFailed": "Ovo izvješće još nije moguće odbaciti. Ponovni pokušaj odvija se u pozadini.",
+    "readMarkFailed": "Ovo izvješće nije moguće označiti kao pročitano. Ponovni pokušaj odvija se kad se izvješće ponovno učita.",
     "offline": "Izvan mreže · spremljeno izvješće",
     "cached": "Spremljeno izvješće · osvježavanje nije dostupno",
     "summary": "AI sažetak",
@@ -4979,6 +4987,9 @@
       "runAsCreator": "Pokreni kao ja",
       "runAsCreatorDescription": "Svako pokretanje upotrebljava vaš račun, pa je zaglavlje s tajnom obavezno.",
       "saveFailedTitle": "Nije moguće spremiti okidač",
+      "nameTaken": "Okidač s nazivom „{{name}}” već postoji.",
+      "saveFailedRetry": "Nije moguće doći do poslužitelja. Provjerite vezu i pokušajte ponovno.",
+      "saveFailedCheck": "Provjerite vrijednosti u obrascu i pokušajte ponovno.",
       "deleteTitle": "Izbrisati ovaj okidač?",
       "deleteMessage": "Pozivi na {{name}} neće uspjeti. Ovo se ne može poništiti.",
       "deleteMessageScheduled": "Zakazana pokretanja okidača {{name}} prestat će. Ovo se ne može poništiti.",

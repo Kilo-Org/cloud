@@ -522,6 +522,7 @@
       "receiptLabel": "Ontvangsbewys",
       "copyReceiptId": "Kopieer ontvangsbewys-ID",
       "appealLabel": "Appèl",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ontvang",
       "triageOpen": "Word hersien",
       "triageActioned": "Gehandhaaf",
@@ -555,7 +556,7 @@
       "title": "Verslae",
       "rowSubtitle": "Verslae wat jy ingedien het en die uitkomste daarvan",
       "emptyTitle": "Nog geen verslae nie",
-      "emptyDescription": "Verslae wat jy van 'n kommentaar of 'n KI-antwoord indien, verskyn hier.",
+      "emptyDescription": "Verslae wat jy uit 'n kommentaar in 'n pull request-bespreking of uit 'n KI-antwoord in 'n agentsessie indien, verskyn hier saam met die uitkoms daarvan.",
       "couldNotLoad": "Kon nie jou verslae laai nie",
       "capped": "Wys jou mees onlangse verslae."
     },
@@ -1010,8 +1011,9 @@
       "checkActiveConnection": "Die koppeling is aktief, maar hierdie item kan steeds nie gelaai word nie.",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
-      "gitlabReconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
+      "reconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
       "bitbucketNotConnectedTitle": "Bitbucket is nie gekoppel nie",
+      "bitbucketAdminOnlyDescription": "Vra 'n organisasie-Eienaar, Administrateur of Faktureringsbestuurder om dit te koppel.",
       "adminOnlyConnectDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
       "contextLine": "Vir {{organization}}",
       "contextLinePersonal": "Vir jou persoonlike rekening"
@@ -2174,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessies",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessies",
       "live": "REGSTREEKS",
-      "updating": "Besig om op te dateer"
+      "updating": "Besig om op te dateer",
+      "retentionLimit": "Die mees onlangse sessies word gewys."
     },
     "sessionRow": {
       "deleteTitle": "Skrap sessie?",
@@ -2244,7 +2247,6 @@
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "emptyReadOnlyTitle": "Geen boodskappe in hierdie sessie nie",
-      "renameAccessibility": "Hernoem sessie: {{title}}",
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
       "historyTooLarge": "Hierdie sessie se transkripsie is te groot om te laai.",
@@ -3093,6 +3095,12 @@
     "retryLoadingAccount": "Probeer weer om die rekening te laai",
     "retryLoadingPrivacy": "Probeer weer om die privaatheidskeuses te laai"
   },
+  "accountBlocked": {
+    "title": "Rekening geblokkeer",
+    "description": "Kilo het hierdie rekening geblokkeer, en weer aanmeld sal dit nie ophef nie. Ondersteuning kan die blokkade op versoek hersien.",
+    "domainDescription": "Kilo blokkeer rekeninge op hierdie e-posdomein, en weer aanmeld sal dit nie verander nie. Ondersteuning kan die domein op versoek hersien.",
+    "contactSupport": "Kontak ondersteuning"
+  },
   "addCredits": {
     "cta": "Voeg krediete by",
     "billingPage": "faktureringsbladsy"
@@ -3165,8 +3173,7 @@
     "timeoutDescription": "Die versoek het uitgeval voordat dit voltooi kon word. Probeer asseblief weer."
   },
   "screenHeader": {
-    "openMenu": "Maak spyskaart oop",
-    "openMenuFor": "Maak spyskaart vir {{title}} oop"
+    "openMenu": "Maak spyskaart oop"
   },
   "picker": {
     "optionsExpired": "Opsies verval",
@@ -4699,6 +4706,7 @@
     "contextAll": "Alle kontekste",
     "dismiss": "Verwerp verslag",
     "dismissFailed": "Hierdie verslag kon nog nie verwerp word nie. Dit word op die agtergrond weer probeer.",
+    "readMarkFailed": "Kon nie hierdie verslag as gelees merk nie. Dit word weer probeer wanneer die verslag herlaai.",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfrissing nie beskikbaar nie",
     "summary": "AI-opsomming",
@@ -4891,6 +4899,9 @@
       "runAsCreator": "Loop as ek",
       "runAsCreatorDescription": "Elke lopie gebruik jou rekening, so die geheime-opskrif is nodig.",
       "saveFailedTitle": "Kon nie die sneller stoor nie",
+      "nameTaken": "’n Sneller met die naam “{{name}}” bestaan reeds.",
+      "saveFailedRetry": "Kon nie die bediener bereik nie. Kyk jou verbinding na en probeer weer.",
+      "saveFailedCheck": "Kontroleer die waardes in die vorm en probeer weer.",
       "deleteTitle": "Vee hierdie sneller uit?",
       "deleteMessage": "Oproepe na {{name}} sal misluk. Dit kan nie ongedaan gemaak word nie.",
       "deleteMessageScheduled": "Geskeduleerde lopies van die sneller {{name}} stop. Dit kan nie ongedaan gemaak word nie.",

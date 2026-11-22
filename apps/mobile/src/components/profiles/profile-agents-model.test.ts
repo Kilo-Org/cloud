@@ -10,7 +10,6 @@ import {
   mergePermissions,
   PERMISSION_TOOLS,
   readDisabledTools,
-  readToolRules,
   readWholeToolAction,
   validateAgentForm,
 } from '@/components/profiles/profile-agents-model';
@@ -69,8 +68,6 @@ describe('mergePermissions', () => {
   });
 
   it('keeps every stored rule the edit does not change', () => {
-    // The sheet submits this after a switch is flipped off and back on in one
-    // edit, so every loaded rule, per-pattern maps included, must survive it.
     const loaded: AgentPermissionMap = {
       bash: { 'git *': 'allow', '*': 'ask' },
       read: 'ask',
@@ -82,38 +79,22 @@ describe('mergePermissions', () => {
       read: 'deny',
       external_directory: null,
     });
-    expect(mergePermissions(loaded, readDisabledTools(loaded))).toEqual(loaded);
+    // `bash` holds a per-pattern map, so its switch starts on; off and back on is
+    // the cycle the sheet saves, so the loaded rules must survive it.
+    const cycle = [...readDisabledTools(loaded), 'bash'];
+    expect(mergePermissions(loaded, cycle)).toMatchObject({ bash: 'deny' });
+    expect(
+      mergePermissions(
+        loaded,
+        cycle.filter(t => t !== 'bash')
+      )
+    ).toEqual(loaded);
     expect(mergePermissions(undefined, [])).toBeUndefined();
   });
 
   it('keeps a whole-agent action as the stored value', () => {
     expect(mergePermissions('deny', ['read'])).toBe('deny');
     expect(mergePermissions('ask', [])).toBe('ask');
-  });
-});
-
-describe('readToolRules', () => {
-  const rules = (permission: AgentPermissionMap): [string, string][] => [
-    ...readToolRules(permission),
-  ];
-
-  it('names a per-tool ask and joins a per-pattern map in its own key order', () => {
-    expect(rules({ read: 'ask' })).toEqual([['read', 'ask']]);
-    expect(rules({ bash: { 'git *': 'allow', '*': 'ask' } })).toEqual([
-      ['bash', 'git *: allow · *: ask'],
-    ]);
-  });
-
-  it('skips the null sentinel, and reports nothing for a map of only sentinels', () => {
-    expect(rules({ bash: { 'git *': 'deny', mcp: null } })).toEqual([['bash', 'git *: deny']]);
-    expect(rules({ bash: { mcp: null } })).toEqual([]);
-  });
-
-  it('reports nothing for allow, deny, an absent or unlisted tool, or a whole-agent action', () => {
-    expect(rules({ read: 'allow', edit: 'deny', external_directory: 'ask' })).toEqual([]);
-    expect(rules(undefined)).toEqual([]);
-    expect(rules(null)).toEqual([]);
-    expect([rules('ask').length, rules('deny').length]).toEqual([0, 0]);
   });
 });
 

@@ -8,6 +8,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
+import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import {
   DISCORD_CLIENT_ID,
   DISCORD_CLIENT_SECRET,
@@ -535,27 +536,48 @@ export async function removeBotFromGuild(guildId: string | null): Promise<Discor
  *
  * The previous server is released only while it is still unclaimed. A server
  * that another owner has since recorded belongs to that connection, so it is
- * left alone.
+ * left alone. The lookup and the removal hold the per-server lock the connect
+ * write takes, so the two steps are one decision.
  */
 export async function releasePreviousDiscordGuild(
   owner: Owner,
   previousGuildId: string
 ): Promise<void> {
-  const recordedByAnotherOwner = await getConflictingDiscordInstallation(owner, previousGuildId);
-  if (recordedByAnotherOwner) {
-    return;
+  try {
+    const removal = await withWorkspaceInstallationLock(
+      PLATFORM.DISCORD,
+      owner,
+      previousGuildId,
+      async tx => {
+        const recordedByAnotherOwner = await getConflictingDiscordInstallation(
+          owner,
+          previousGuildId,
+          tx
+        );
+        if (recordedByAnotherOwner) {
+          return null;
+        }
+
+        return removeBotFromGuild(previousGuildId);
+      }
+    );
+
+    if (removal === null || removal.status === 'left' || removal.status === 'already_absent') {
+      return;
+    }
+
+    captureException(new Error(`Previous Discord server release ended as ${removal.status}`), {
+      tags: { source: 'discord_oauth', op: 'release_previous_guild' },
+      extra: { guildId: previousGuildId, status: removal.status, reason: removal.reason },
+    });
+  } catch (error) {
+    // The connection write has already committed, so a failure here cannot fail
+    // the connect; it is reported and the callback continues.
+    captureException(error, {
+      tags: { source: 'discord_oauth', op: 'release_previous_guild' },
+      extra: { guildId: previousGuildId, outcome: 'lookup_failed' },
+    });
   }
-
-  const removal = await removeBotFromGuild(previousGuildId);
-
-  if (removal.status === 'left' || removal.status === 'already_absent') {
-    return;
-  }
-
-  captureException(new Error(`Previous Discord server release ended as ${removal.status}`), {
-    tags: { source: 'discord_oauth', op: 'release_previous_guild' },
-    extra: { guildId: previousGuildId, status: removal.status, reason: removal.reason },
-  });
 }
 
 /**

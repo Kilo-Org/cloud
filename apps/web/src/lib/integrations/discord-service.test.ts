@@ -11,19 +11,22 @@ const mockUpdateReturning = jest.fn();
 const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 const mockDeleteWhere = jest.fn();
+const mockTxExecute = jest.fn();
+const mockTransaction = jest.fn();
+const mockSelect = jest.fn(() => ({
+  from: jest.fn(() => ({
+    where: jest.fn(() => ({
+      orderBy: jest.fn(() => ({
+        limit: mockLimit,
+      })),
+      limit: mockLimit,
+    })),
+  })),
+}));
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
-    select: jest.fn(() => ({
-      from: jest.fn(() => ({
-        where: jest.fn(() => ({
-          orderBy: jest.fn(() => ({
-            limit: mockLimit,
-          })),
-          limit: mockLimit,
-        })),
-      })),
-    })),
+    select: () => mockSelect(),
     update: jest.fn(() => ({
       set: mockUpdateSet,
     })),
@@ -33,6 +36,10 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     delete: jest.fn(() => ({
       where: mockDeleteWhere,
     })),
+    // Accessed lazily: jest.mock factories hoist above the const declarations.
+    get transaction() {
+      return mockTransaction;
+    },
   },
 }));
 
@@ -349,12 +356,24 @@ describe('discord-service rebind result', () => {
 describe('discord-service previous guild release', () => {
   const guildId = '111111111111111111';
   const otherOwner = { type: 'user', id: 'user-2' } satisfies Owner;
+  const lockState = { depth: 0 };
 
   beforeEach(() => {
     jest.restoreAllMocks();
     mockCaptureException.mockReset();
     mockLimit.mockReset();
     mockLimit.mockResolvedValue([]);
+    mockTxExecute.mockReset();
+    mockTransaction.mockReset();
+    lockState.depth = 0;
+    mockTransaction.mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) => {
+      lockState.depth += 1;
+      try {
+        return await operation({ execute: mockTxExecute, select: mockSelect });
+      } finally {
+        lockState.depth -= 1;
+      }
+    });
   });
 
   it('leaves a server another owner records alone', async () => {
@@ -368,12 +387,14 @@ describe('discord-service previous guild release', () => {
   });
 
   it.each([204, 404])('leaves the server without reporting a %i answer', async status => {
-    const fetchSpy = jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(null, { status }));
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      expect(lockState.depth).toBe(1);
+      return new Response(null, { status });
+    });
 
     await expect(releasePreviousDiscordGuild(owner, guildId)).resolves.toBeUndefined();
 
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
     expect(fetchSpy).toHaveBeenCalledWith(
       `https://discord.com/api/v10/users/%40me/guilds/${guildId}`,
       expect.objectContaining({
@@ -406,6 +427,20 @@ describe('discord-service previous guild release', () => {
     expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { source: 'discord_oauth', op: 'release_previous_guild' },
       extra: { guildId, status: 'unavailable', reason: 'rejected_token' },
+    });
+  });
+
+  it('reports a failed lookup without rejecting', async () => {
+    const lookupError = new Error('connection terminated');
+    mockLimit.mockRejectedValueOnce(lookupError);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(releasePreviousDiscordGuild(owner, guildId)).resolves.toBeUndefined();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(lookupError, {
+      tags: { source: 'discord_oauth', op: 'release_previous_guild' },
+      extra: { guildId, outcome: 'lookup_failed' },
     });
   });
 });

@@ -4,11 +4,20 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { MissingStepError, STEP_ORDER, describeSteps, resolveSteps } from './validate.mjs';
+import {
+  MissingStepError,
+  STEP_ORDER,
+  describeSteps,
+  isMainModule,
+  resolveSteps,
+} from './validate.mjs';
 
 const scriptPath = fileURLToPath(new URL('./validate.mjs', import.meta.url));
+// The exact URL the guard compares against, so the tests exercise the real value
+// rather than one rebuilt from the same helper under test.
+const scriptUrl = new URL('./validate.mjs', import.meta.url).href;
 const allSteps = {
   typecheck: 'node typecheck.mjs',
   lint: 'node lint.mjs',
@@ -191,4 +200,26 @@ test('--list prints each resolved step and runs nothing', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('the guard fires when the invoked path is this module', () => {
+  assert.equal(isMainModule(scriptUrl, scriptPath), true);
+});
+
+test('the guard stays quiet for a different invoked path', () => {
+  assert.equal(isMainModule(scriptUrl, '/fixture/other.mjs'), false);
+});
+
+test('the guard stays quiet when the module was imported, not run', () => {
+  // An imported module has no entry path: `process.argv[1]` is the importer's.
+  assert.equal(isMainModule(scriptUrl, undefined), false);
+});
+
+test('the guard compares through file-URL encoding, not raw strings', () => {
+  // Inserting a space into the real path is enough: the module URL then carries
+  // `%20`, so raw string equality would miss the match.
+  const spacedPath = scriptPath.replace(/([^/]+)$/, 'with space $1');
+  assert.doesNotMatch(scriptUrl, /with space/);
+  assert.match(pathToFileURL(spacedPath).href, /with%20space/);
+  assert.equal(isMainModule(pathToFileURL(spacedPath).href, spacedPath), true);
 });

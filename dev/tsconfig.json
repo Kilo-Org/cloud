@@ -3,8 +3,12 @@
   // a local stack). They are not imported by any workspace, so without a program
   // of their own they would only be typechecked as a side effect of a workspace
   // that happens to list them, and a script that stops being listed quietly
-  // stops being checked. This program covers the scripts at the top of `dev/`;
-  // the subdirectories hold fixtures and service code with their own callers.
+  // stops being checked. This program covers the scripts at the top of `dev/`.
+  //
+  // The `local/` and `seed/` subtrees are deliberately outside this program. They
+  // carry long-standing type errors under its settings and need their own
+  // clean-up before they can join it, so they stay covered only by the
+  // `test:dev-local` tsx runs until then.
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",

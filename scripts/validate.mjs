@@ -17,6 +17,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 // The one ordered list every caller reads. Required steps must exist in the
 // manifest that runs them; optional steps are skipped when it lacks them.
@@ -110,6 +111,18 @@ export function run(argv, dir = process.cwd()) {
   return 0;
 }
 
-if (import.meta.main) {
+/**
+ * Whether this module is the process entry point.
+ *
+ * `import.meta.main` needs Node 24.2, and the manifest admits older 24 releases where the
+ * chain would silently run nothing. Comparing the module URL with the invoked path answers the
+ * same question on every supported version.
+ */
+export function isMainModule(moduleUrl, invokedPath) {
+  if (!invokedPath) return false;
+  return moduleUrl === pathToFileURL(invokedPath).href;
+}
+
+if (isMainModule(import.meta.url, process.argv[1])) {
   process.exitCode = run(process.argv);
 }

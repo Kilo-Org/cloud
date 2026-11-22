@@ -292,13 +292,51 @@ describe('handleDiscordOAuthCallback', () => {
 
     expectRedirectLocation(response, '/integrations/discord?success=installed');
     expect(mockedProbeBotInGuild).toHaveBeenCalledWith(GUILD_ID);
+    // The selected server before the write, the recorded one after it.
+    expect(mockedProbeBotInGuild).toHaveBeenCalledTimes(2);
     expect(mockedDiscardDiscordGuildRows).not.toHaveBeenCalled();
     expect(mockedCaptureException).not.toHaveBeenCalled();
     expect(mockedCaptureMessage).not.toHaveBeenCalled();
   });
 
-  test('discards the row and reports an absent bot after the write committed', async () => {
+  test('refuses a selected server without the bot without writing or releasing', async () => {
     mockedProbeBotInGuild.mockResolvedValue({ status: 'absent' });
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORGANIZATION_ID}/integrations/discord?error=bot_not_in_server`
+    );
+    // The refusal happens before the write, so an existing connection keeps its
+    // row and the bot in the server it already records.
+    expect(mockedProbeBotInGuild).toHaveBeenCalledTimes(1);
+    expect(mockedProbeBotInGuild).toHaveBeenCalledWith(GUILD_ID);
+    expect(mockedUpsertDiscordInstallation).not.toHaveBeenCalled();
+    expect(mockedReleasePreviousDiscordGuild).not.toHaveBeenCalled();
+    expect(mockedDiscardDiscordGuildRows).not.toHaveBeenCalled();
+    expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'discord_oauth', op: 'connect_membership_check' },
+      extra: { guildId: GUILD_ID, outcome: 'absent' },
+    });
+  });
+
+  test('discards the row when a first connect is read back without the bot', async () => {
+    mockedUpsertDiscordInstallation.mockResolvedValue({
+      integration: {
+        id: 'integration-1',
+        platform_installation_id: GUILD_ID,
+        platform_account_id: GUILD_ID,
+      } as never,
+      previousGuildId: null,
+    });
+    mockedProbeBotInGuild
+      .mockResolvedValueOnce({ status: 'present' })
+      .mockResolvedValueOnce({ status: 'absent' });
     const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
       provider: 'discord',
       purpose: 'provider_install',
@@ -307,20 +345,24 @@ describe('handleDiscordOAuthCallback', () => {
     const response = await callDiscordCallback(makeRequest(state));
 
     expectRedirectLocation(response, '/integrations/discord?error=bot_not_in_server');
+    expect(mockedProbeBotInGuild).toHaveBeenCalledTimes(2);
     expect(mockedDiscardDiscordGuildRows).toHaveBeenCalledWith(
       { type: 'user', id: USER_ID },
-      GUILD_ID
+      GUILD_ID,
+      ['integration-1']
     );
     expect(mockedDiscardDiscordGuildRows).toHaveBeenCalledTimes(1);
+    expect(mockedReleasePreviousDiscordGuild).not.toHaveBeenCalled();
     expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { source: 'discord_oauth', op: 'connect_membership_check' },
       extra: { guildId: GUILD_ID, outcome: 'absent', discarded: 1 },
     });
   });
 
-  test('probes the server the connection records, not the one it replaced', async () => {
+  test('probes the selected server before the write and never discards on a rebind', async () => {
     mockedUpsertDiscordInstallation.mockResolvedValue({
       integration: {
+        id: 'integration-1',
         platform_installation_id: GUILD_ID,
         platform_account_id: GUILD_ID,
       } as never,
@@ -333,16 +375,48 @@ describe('handleDiscordOAuthCallback', () => {
 
     await callDiscordCallback(makeRequest(state));
 
+    expect(mockedProbeBotInGuild).toHaveBeenCalledTimes(1);
     expect(mockedProbeBotInGuild).toHaveBeenCalledWith(GUILD_ID);
     expect(mockedProbeBotInGuild).not.toHaveBeenCalledWith(PREVIOUS_GUILD_ID);
+    // The owner's one row already names the new server, so discarding it would
+    // keep the bot in the server the owner left without a record of the new one.
+    expect(mockedDiscardDiscordGuildRows).not.toHaveBeenCalled();
     expect(mockedReleasePreviousDiscordGuild).toHaveBeenCalledWith(
       { type: 'org', id: ORGANIZATION_ID },
       PREVIOUS_GUILD_ID
     );
   });
 
-  test('keeps the row and succeeds when the probe cannot conclude', async () => {
-    mockedProbeBotInGuild.mockResolvedValue({ status: 'unreachable', reason: 'network' });
+  test('keeps the row and succeeds when the selected server probe cannot conclude', async () => {
+    mockedProbeBotInGuild
+      .mockResolvedValueOnce({ status: 'unreachable', reason: 'network' })
+      .mockResolvedValueOnce({ status: 'present' });
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(response, '/integrations/discord?success=installed');
+    expect(mockedUpsertDiscordInstallation).toHaveBeenCalledTimes(1);
+    expect(mockedDiscardDiscordGuildRows).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockedCaptureMessage).toHaveBeenCalledWith(
+      'Discord connect could not verify the bot is in the selected server',
+      {
+        level: 'warning',
+        tags: { source: 'discord_oauth', op: 'connect_membership_check' },
+        extra: { guildId: GUILD_ID, outcome: 'unreachable', reason: 'network' },
+      }
+    );
+  });
+
+  test('keeps the row and succeeds when the read-back probe cannot conclude', async () => {
+    mockedProbeBotInGuild
+      .mockResolvedValueOnce({ status: 'present' })
+      .mockResolvedValueOnce({ status: 'unreachable', reason: 'response_error' });
     const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
       provider: 'discord',
       purpose: 'provider_install',
@@ -353,12 +427,13 @@ describe('handleDiscordOAuthCallback', () => {
     expectRedirectLocation(response, '/integrations/discord?success=installed');
     expect(mockedDiscardDiscordGuildRows).not.toHaveBeenCalled();
     expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedCaptureMessage).toHaveBeenCalledTimes(1);
     expect(mockedCaptureMessage).toHaveBeenCalledWith(
       'Discord connect could not verify the bot is in the server',
       {
         level: 'warning',
         tags: { source: 'discord_oauth', op: 'connect_membership_check' },
-        extra: { guildId: GUILD_ID, outcome: 'unreachable', reason: 'network' },
+        extra: { guildId: GUILD_ID, outcome: 'unreachable', reason: 'response_error' },
       }
     );
   });

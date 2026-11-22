@@ -171,13 +171,51 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     // 7. Exchange code for access token
     const oauthData = await exchangeDiscordCode(code);
 
-    // 8. Store installation in database. The organization path is the only caller
-    // allowed to move an existing organization connection to another server, and
-    // only after the organization role check above. The per-server lock keeps two
-    // concurrent connections of one server from each passing the ownership check.
+    // 8. The OAuth consent selects a server and adds the bot to it. Read that
+    // server before anything is written, because a write must not move an
+    // existing connection to a server where the bot cannot act: the row it
+    // replaces would then be the only record of a membership left behind. A
+    // server the bot is not in therefore ends the connect with nothing written
+    // and nothing released, so an existing connection keeps its row and its bot
+    // in its previous server. An unread answer is not evidence against the
+    // connection, so it is reported and the connect continues.
     const guildId = oauthData.guild?.id
       ? parseDiscordSnowflake(oauthData.guild.id, 'guild ID')
       : null;
+    if (guildId) {
+      const selectedPresence = await probeBotInGuild(guildId);
+
+      if (selectedPresence.status === 'absent') {
+        captureException(new Error('Discord connect selected a server without the bot'), {
+          tags: { source: 'discord_oauth', op: 'connect_membership_check' },
+          extra: { guildId, outcome: selectedPresence.status },
+        });
+
+        return NextResponse.redirect(
+          new URL(
+            buildIntegrationOAuthRedirectPathFromState(
+              PLATFORM.DISCORD,
+              state,
+              'error=bot_not_in_server'
+            ),
+            APP_URL
+          )
+        );
+      }
+
+      if (selectedPresence.status === 'unreachable') {
+        captureMessage('Discord connect could not verify the bot is in the selected server', {
+          level: 'warning',
+          tags: { source: 'discord_oauth', op: 'connect_membership_check' },
+          extra: { guildId, outcome: selectedPresence.status, reason: selectedPresence.reason },
+        });
+      }
+    }
+
+    // 9. Store installation in database. The organization path is the only caller
+    // allowed to move an existing organization connection to another server, and
+    // only after the organization role check above. The per-server lock keeps two
+    // concurrent connections of one server from each passing the ownership check.
     // Resolve the owner's model policy before the lock, so the transaction only
     // performs the ownership check and the installation write.
     const defaultModel =
@@ -212,26 +250,29 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       throw error;
     }
 
-    // 9. The connection now names the new server, so the bot is removed from the
-    // server it replaced. This runs after the write has committed, so the release
-    // follows the connection rather than deciding it.
-    if (installation.previousGuildId) {
-      await releasePreviousDiscordGuild(owner, installation.previousGuildId);
-    }
-
-    // 9b. The write records the server the consent selected, but the bot's
-    // membership in it can be gone by now: another owner's connect can release a
-    // server it read as unclaimed before that consent's membership landed, and a
-    // manual kick ends it too. A row for a server without the bot cannot act, so
-    // it is discarded rather than left as a connection that is silently dead.
+    // 10. A connection the write did not move was read a moment before it
+    // committed, and the bot's membership can be gone by now: another owner's
+    // connect can release a server it read as unclaimed before that consent's
+    // membership landed, and a manual kick ends it too. Such a row describes a
+    // connection that cannot act, so it is discarded.
+    //
+    // Only a write that did not move an existing connection is re-read. A rebind
+    // moved the owner's one row to the new server, so discarding it would keep
+    // the bot in the server the owner just left while deleting the record of the
+    // server the consent selected, and the release below keeps both memberships
+    // matching a connection that stays.
     const recordedGuildId =
       installation.integration.platform_installation_id ??
       installation.integration.platform_account_id;
-    if (recordedGuildId) {
+    if (recordedGuildId && installation.previousGuildId === null) {
       const presence = await probeBotInGuild(recordedGuildId);
 
       if (presence.status === 'absent') {
-        const discarded = await discardDiscordGuildRows(owner, recordedGuildId);
+        // The row the write returned is the one this connect may discard, so the
+        // discard names it and not every row of the same owner and server.
+        const discarded = await discardDiscordGuildRows(owner, recordedGuildId, [
+          installation.integration.id,
+        ]);
         captureException(new Error('Discord connect recorded a server without the bot'), {
           tags: { source: 'discord_oauth', op: 'connect_membership_check' },
           extra: { guildId: recordedGuildId, outcome: presence.status, discarded },
@@ -261,7 +302,15 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       }
     }
 
-    // 10. Redirect to success page
+    // 11. The connection is kept, so the bot is removed from the server it
+    // replaced. This runs after the write has committed and after the check
+    // above, so the release follows a connection that stays rather than deciding
+    // it.
+    if (installation.previousGuildId) {
+      await releasePreviousDiscordGuild(owner, installation.previousGuildId);
+    }
+
+    // 12. Redirect to success page
     const successPath = verified.returnTo
       ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=discord_installed')
       : buildIntegrationOAuthRedirectPath(PLATFORM.DISCORD, owner, 'success=installed');

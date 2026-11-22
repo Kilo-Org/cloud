@@ -228,7 +228,9 @@ describe('Discord forwarded message admission', () => {
     expect(addDiscordReaction).toHaveBeenCalledTimes(1);
     expect(addDiscordReaction).toHaveBeenCalledWith(CHANNEL_ID, MESSAGE_ID, '\u23f3');
     expect(postDiscordMessage).not.toHaveBeenCalled();
-    expect(removeDiscordReaction).not.toHaveBeenCalled();
+    // The hourglass is removed, so the message is not left processing forever.
+    expect(removeDiscordReaction).toHaveBeenCalledTimes(1);
+    expect(removeDiscordReaction).toHaveBeenCalledWith(CHANNEL_ID, MESSAGE_ID, '\u23f3');
   });
 
   it('processes concurrent deliveries of one message only once', async () => {

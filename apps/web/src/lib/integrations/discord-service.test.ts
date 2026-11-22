@@ -13,7 +13,7 @@ const mockUpdateReturning = jest.fn();
 const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 const mockDeleteWhere = jest.fn();
-/** The unlocked delete chain, used by the connect path's discard. */
+/** The unlocked delete chain, used by `removeDbRowOnly`. */
 const mockDbDeleteWhere = jest.fn((_condition?: unknown) => ({ returning: mockDbDeleteReturning }));
 const mockDbDeleteReturning = jest.fn();
 const mockTxExecute = jest.fn();
@@ -977,40 +977,93 @@ describe('discord-service guild membership probe', () => {
 describe('discord-service guild row discard', () => {
   const guildId = '123456789012345678';
   const otherOwner = { type: 'user', id: 'user-2' } satisfies Owner;
+  const ids = ['integration-1'];
+  const lockState = { depth: 0 };
+  const mockDiscardReturning = jest.fn();
 
   beforeEach(() => {
     jest.restoreAllMocks();
-    mockDbDeleteWhere.mockClear();
-    mockDbDeleteReturning.mockReset();
+    mockDeleteWhere.mockReset();
+    mockTxExecute.mockReset();
+    mockTxExecute.mockResolvedValue([]);
+    mockTransaction.mockReset();
+    mockDiscardReturning.mockReset();
+    lockState.depth = 0;
+    mockTransaction.mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) => {
+      lockState.depth += 1;
+      try {
+        return await operation({
+          execute: mockTxExecute,
+          select: mockTxSelect,
+          delete: () => ({
+            where: (condition: unknown) => {
+              mockDeleteWhere(condition);
+              return { returning: mockDiscardReturning };
+            },
+          }),
+        });
+      } finally {
+        lockState.depth -= 1;
+      }
+    });
   });
 
-  it('names the owner and the server in the delete', async () => {
-    mockDbDeleteReturning.mockResolvedValue([{ id: 'integration-1' }]);
+  it('names the owner, the server, and the observed ids in the delete', async () => {
+    mockDiscardReturning.mockResolvedValue([{ id: 'integration-1' }]);
 
-    await expect(discardDiscordGuildRows(owner, guildId)).resolves.toBe(1);
+    await expect(discardDiscordGuildRows(owner, guildId, ids)).resolves.toBe(1);
 
-    const predicate = mockDbDeleteWhere.mock.calls[0]?.[0];
+    const predicate = mockDeleteWhere.mock.calls[0]?.[0];
     const rendered = new PgDialect().sqlToQuery(predicate as SQL);
     // The server id appears once per identifier column the condition covers.
     expect(rendered.params.filter(param => param === guildId)).toHaveLength(2);
     expect(rendered.params).toContain(owner.id);
     expect(rendered.params).not.toContain(otherOwner.id);
+    expect(rendered.params).toContain('integration-1');
     expect(rendered.sql).toContain('"platform_installation_id"');
     expect(rendered.sql).toContain('"platform_account_id"');
     expect(rendered.sql).toContain('"owned_by_user_id"');
     expect(rendered.sql).toContain('"owned_by_organization_id"');
+    // Only the rows the caller observed, so a connect that commits during the
+    // probe keeps its row.
+    expect(rendered.sql).toContain('"id" in');
+  });
+
+  it('takes the connect owner and server locks before the delete', async () => {
+    const deleteDepths: number[] = [];
+    mockDeleteWhere.mockImplementation(() => {
+      deleteDepths.push(lockState.depth);
+    });
+    mockDiscardReturning.mockResolvedValue([{ id: 'integration-1' }]);
+
+    await discardDiscordGuildRows(owner, guildId, ids);
+
+    const statements = mockTxExecute.mock.calls.map(([statement]) => statementText(statement));
+    const ownerLock = `integration-installation-owner:discord:user:${owner.id}`;
+    expect(statements.some(text => text.includes(ownerLock))).toBe(true);
+    expect(statements.some(text => text.includes(`:discord:${guildId}`))).toBe(true);
+    expect(deleteDepths).toEqual([1]);
   });
 
   it('reports how many rows it removed', async () => {
-    mockDbDeleteReturning.mockResolvedValue([{ id: 'integration-1' }, { id: 'legacy-row' }]);
+    mockDiscardReturning.mockResolvedValue([{ id: 'integration-1' }, { id: 'legacy-row' }]);
 
-    await expect(discardDiscordGuildRows(owner, guildId)).resolves.toBe(2);
+    await expect(
+      discardDiscordGuildRows(owner, guildId, ['integration-1', 'legacy-row'])
+    ).resolves.toBe(2);
   });
 
   it('reports no removal when the owner records no such row', async () => {
-    mockDbDeleteReturning.mockResolvedValue([]);
+    mockDiscardReturning.mockResolvedValue([]);
 
-    await expect(discardDiscordGuildRows(owner, guildId)).resolves.toBe(0);
+    await expect(discardDiscordGuildRows(owner, guildId, ids)).resolves.toBe(0);
+  });
+
+  it('deletes nothing and takes no lock when it observed no row', async () => {
+    await expect(discardDiscordGuildRows(owner, guildId, [])).resolves.toBe(0);
+
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 });
 

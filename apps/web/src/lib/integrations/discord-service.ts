@@ -3,7 +3,7 @@ import { captureException } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull, or, sql } from 'drizzle-orm';
+import { eq, and, inArray, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -570,8 +570,7 @@ export async function removeBotFromGuild(
 }
 
 /**
- * Whether the bot is in one server, as the connect path needs it once the row
- * that records the server has committed.
+ * Whether the bot is in one server, as the connect path needs it.
  *
  * `absent` is Discord's answer that the bot is not in the server, which is what
  * a server the bot was never added to and a server the bot was kicked from both
@@ -597,8 +596,9 @@ const DISCORD_GUILD_PROBE_TIMEOUT_MS = 5_000;
  * and 404 both answer `absent`. A 401 means Discord rejects the token itself, and
  * every other answer, including a throw, leaves the question open.
  *
- * `timeoutMs` bounds the request. The caller sits in the request path after the
- * connection write, so a slow answer is reported as unreachable rather than held.
+ * `timeoutMs` bounds the request. The connect path sits in the request path with
+ * this probe both before and after the connection write, so a slow answer is
+ * reported as unreachable rather than held.
  */
 export async function probeBotInGuild(
   guildId: string,
@@ -648,32 +648,54 @@ export async function probeBotInGuild(
 }
 
 /**
- * Delete this owner's rows that record `guildId` and report how many were
+ * Delete the rows `ids` name for this owner and server, and report how many were
  * removed.
  *
- * The connect path calls this once it has proven the bot is not in the server the
- * row records: such a row describes a connection that cannot act, so it is
- * discarded. The conditions are the disconnect's, so a legacy row that carries
- * the server id only in `platform_account_id` goes with the canonical one. The
- * owner conditions keep every other owner's row out of the delete.
+ * The connect path calls this once it has proven the bot is not in the server
+ * those rows record: such a row describes a connection that cannot act, so it is
+ * discarded. `ids` are the rows the caller observed, because the probe that
+ * settled the question runs after the connect lock was released, and a connect
+ * by the same owner to the same server can commit while it runs. The delete
+ * therefore takes the connect's owner and server locks, and names those ids, so
+ * every condition is re-checked under the lock and a row that committed in
+ * between is left alone.
+ *
+ * The remaining conditions are the disconnect's, so a legacy row that carries
+ * the server id only in `platform_account_id` goes with the canonical one, and
+ * the owner conditions keep every other owner's row out of the delete. The
+ * section runs one statement at the server lock budget, so it stays below the
+ * lock wait.
  */
 export async function discardDiscordGuildRows(
   owner: Owner,
   guildId: string,
-  database: typeof db | DrizzleTransaction = db
+  ids: string[]
 ): Promise<number> {
-  const deleted = await database
-    .delete(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.DISCORD),
-        recordsDiscordGuildCondition(guildId),
-        ...getOwnershipConditions(owner)
-      )
-    )
-    .returning({ id: platform_integrations.id });
+  if (ids.length === 0) {
+    return 0;
+  }
 
-  return deleted.length;
+  return withWorkspaceInstallationLock(
+    PLATFORM.DISCORD,
+    owner,
+    guildId,
+    async tx => {
+      const deleted = await tx
+        .delete(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DISCORD),
+            recordsDiscordGuildCondition(guildId),
+            ...getOwnershipConditions(owner),
+            inArray(platform_integrations.id, ids)
+          )
+        )
+        .returning({ id: platform_integrations.id });
+
+      return deleted.length;
+    },
+    { statementTimeoutMs: INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS }
+  );
 }
 
 /**

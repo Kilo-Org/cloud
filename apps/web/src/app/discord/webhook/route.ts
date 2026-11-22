@@ -173,6 +173,10 @@ async function processGatewayMessage(event: ForwardedGatewayEvent) {
   // change between the lookup above and the model call.
   if (result.error === 'installation_not_active') {
     console.log('[DiscordBot:Webhook] Skipped reply for inactive installation', { guildId });
+    // The processing reaction was added before the model call, so it is removed
+    // here too: this return ends the work for the message, and the hourglass
+    // would otherwise stay on it with nothing left to replace it.
+    await removeDiscordReaction(channelId, messageId, PROCESSING_EMOJI);
     return;
   }
 

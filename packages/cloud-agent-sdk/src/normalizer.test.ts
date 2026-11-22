@@ -1169,34 +1169,22 @@ describe('normalize', () => {
       });
     });
 
-    it('treats a list whose first entry is malformed as carrying no questions', () => {
+    it('treats a list whose first entry is malformed as unreadable', () => {
       const data = { id: 'q-1', questions: [{ header: 'Approval' }, question] };
       const result = normalize(createRaw('question.asked', data));
-      expect(result).toEqual({
-        type: 'question.asked',
-        requestId: 'q-1',
-        questions: undefined,
-      });
+      expect(result).toEqual({ type: 'question.unreadable', requestId: 'q-1' });
     });
 
-    it('keeps an explicitly empty questions array', () => {
+    it('treats an empty questions array as unreadable', () => {
       const data = { id: 'q-1', questions: [] };
       const result = normalize(createRaw('question.asked', data));
-      expect(result).toEqual({
-        type: 'question.asked',
-        requestId: 'q-1',
-        questions: [],
-      });
+      expect(result).toEqual({ type: 'question.unreadable', requestId: 'q-1' });
     });
 
-    it('has questions undefined when not an array', () => {
+    it('treats a question list that is not an array as unreadable', () => {
       const data = { id: 'q-1', questions: 'not-an-array' };
       const result = normalize(createRaw('question.asked', data));
-      expect(result).toEqual({
-        type: 'question.asked',
-        requestId: 'q-1',
-        questions: undefined,
-      });
+      expect(result).toEqual({ type: 'question.unreadable', requestId: 'q-1' });
     });
 
     it('keeps every question in a list exactly at the maximum', () => {
@@ -1248,7 +1236,7 @@ describe('normalize', () => {
       });
     });
 
-    it('treats an over-limit first question as carrying no questions', () => {
+    it('treats an over-limit first question as unreadable', () => {
       const overLimitOptions = Array.from(
         { length: SESSION_QUESTION_MAX_OPTIONS + 1 },
         (_, index) => ({ label: `Option ${index}`, description: `Runs option ${index}` })
@@ -1258,29 +1246,31 @@ describe('normalize', () => {
         question,
       ];
       const result = normalize(createRaw('question.asked', { id: 'q-1', questions }));
-      expect(result).toEqual({
-        type: 'question.asked',
-        requestId: 'q-1',
-        questions: undefined,
-      });
+      expect(result).toEqual({ type: 'question.unreadable', requestId: 'q-1' });
     });
 
-    it('drops an over-limit question list but keeps the prompt', () => {
+    it('treats an over-limit question list as unreadable', () => {
       const questions = Array.from({ length: SESSION_QUESTION_MAX_QUESTIONS + 1 }, () => ({
         question: 'Continue?',
         header: 'Continue',
-        options: [],
+        options: [{ label: 'Yes', description: 'Continue' }],
       }));
       const result = normalize(createRaw('question.asked', { id: 'q-1', questions }));
-      expect(result).toEqual({
-        type: 'question.asked',
-        requestId: 'q-1',
-        questions: undefined,
-      });
+      expect(result).toEqual({ type: 'question.unreadable', requestId: 'q-1' });
+    });
+
+    it('returns an unreadable notice when questions is absent', () => {
+      const result = normalize(createRaw('question.asked', { id: 'q-1' }));
+      expect(result).toEqual({ type: 'question.unreadable', requestId: 'q-1' });
     });
 
     it('returns null when id is missing', () => {
       expect(normalize(createRaw('question.asked', { tool: { callID: 'c-1' } }))).toBeNull();
+    });
+
+    it('returns null when id is empty even with a readable list', () => {
+      expect(normalize(createRaw('question.asked', { id: '', questions: [question] }))).toBeNull();
+      expect(normalize(createRaw('question.asked', { id: '', questions: [] }))).toBeNull();
     });
 
     it('returns null when id is not a string', () => {

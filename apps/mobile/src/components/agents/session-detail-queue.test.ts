@@ -652,6 +652,7 @@ function makeManager() {
       activeSuggestion: { value: null },
       pendingQuestions: { value: [] },
       pendingPermissions: { value: [] },
+      unreadableQuestions: { value: [] },
       unreadablePermissions: { value: [] },
       totalCost: { value: null },
       childMessages: { value: () => new Map() },

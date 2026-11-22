@@ -2787,7 +2787,9 @@
       "skip": "Ohita",
       "retrySkip": "Yritä ohittaa uudelleen",
       "submitting": "Lähetetään…",
-      "sendAnswers": "Lähetä vastaukset"
+      "sendAnswers": "Lähetä vastaukset",
+      "unreadableTitle": "Kysymystä ei voitu näyttää",
+      "unreadableBody": "Agentti odottaa kysymystä, jota tämä sovellus ei voi näyttää, joten siitä ei näy vastauskorttia. Vastaa kysymykseen CLI:ssä jatkaaksesi."
     },
     "blockingCard": {
       "questionUnavailable": "Tämä kysymys ei ole enää käytettävissä.",

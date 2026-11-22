@@ -2999,7 +2999,9 @@
       "skip": "Hepgor",
       "retrySkip": "Ceisio hepgor eto",
       "submitting": "Yn cyflwyno…",
-      "sendAnswers": "Anfon atebion"
+      "sendAnswers": "Anfon atebion",
+      "unreadableTitle": "Methwyd dangos y cwestiwn hwn",
+      "unreadableBody": "Mae'r asiant yn aros am gwestiwn na all yr ap hwn ei ddangos, felly nid oes unrhyw gerdyn ateb yn ymddangos ar ei gyfer. Atebwch y cwestiwn yn y CLI i barhau."
     },
     "blockingCard": {
       "questionUnavailable": "Nid yw'r cwestiwn hwn ar gael mwyach.",

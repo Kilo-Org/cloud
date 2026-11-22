@@ -2787,7 +2787,9 @@
       "skip": "Laktawan",
       "retrySkip": "Subukang laktawan muli",
       "submitting": "Isinusumite…",
-      "sendAnswers": "Ipadala ang mga sagot"
+      "sendAnswers": "Ipadala ang mga sagot",
+      "unreadableTitle": "Hindi maipakita ang tanong na ito",
+      "unreadableBody": "Naghihintay ang agent sa isang tanong na hindi maipakita ng app na ito, kaya walang card ng sagot na lumalabas para rito. Sagutin ang tanong sa CLI upang magpatuloy."
     },
     "blockingCard": {
       "questionUnavailable": "Hindi na masasagot ang tanong na ito.",

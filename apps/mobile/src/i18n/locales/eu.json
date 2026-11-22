@@ -2787,7 +2787,9 @@
       "skip": "Saltatu",
       "retrySkip": "Saiatu berriro saltatzen",
       "submitting": "Bidaltzen…",
-      "sendAnswers": "Bidali erantzunak"
+      "sendAnswers": "Bidali erantzunak",
+      "unreadableTitle": "Galdera hau ezin izan da erakutsi",
+      "unreadableBody": "Agentea galdera baten zain dago, eta aplikazio honek ezin du galdera hori erakutsi; beraz, ez da erantzun-txartelik agertzen galdera horretarako. Erantzun galderari CLI-n jarraitzeko."
     },
     "blockingCard": {
       "questionUnavailable": "Galdera hau jada ez dago erabilgarri.",

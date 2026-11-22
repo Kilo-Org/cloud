@@ -2787,7 +2787,9 @@
       "skip": "Jäta vahele",
       "retrySkip": "Proovi vahelejätmist uuesti",
       "submitting": "Saatmine…",
-      "sendAnswers": "Saada vastused"
+      "sendAnswers": "Saada vastused",
+      "unreadableTitle": "Seda küsimust ei saanud kuvada",
+      "unreadableBody": "Agent ootab küsimust, mida see rakendus ei saa näidata, seega selle kohta vastusekaarti ei kuvata. Vasta küsimusele CLI-s, et jätkata."
     },
     "blockingCard": {
       "questionUnavailable": "See küsimus pole enam saadaval.",

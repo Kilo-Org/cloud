@@ -2787,7 +2787,9 @@
       "skip": "Tīpoka",
       "retrySkip": "Whakamātau anō ki te tīpoka",
       "submitting": "Kei te tuku…",
-      "sendAnswers": "Tukuna ngā whakautu"
+      "sendAnswers": "Tukuna ngā whakautu",
+      "unreadableTitle": "Kāore i taea te whakaatu tēnei pātai",
+      "unreadableBody": "E tatari ana te māngai ki tētahi pātai kāore e taea e tēnei taupānga te whakaatu, nō reira kāore he kāri whakautu e puta ana mō taua pātai. Whakautua te pātai ki te CLI kia haere tonu ai."
     },
     "blockingCard": {
       "questionUnavailable": "Kāore tēnei pātai e wātea ana ināianei.",

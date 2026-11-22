@@ -134,6 +134,7 @@ export function inventoryPending(): NativePendingRequests {
         fields: [{ key: 'answer', title: 'Your choice', type: 'text' }],
       },
     ],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   };
 }

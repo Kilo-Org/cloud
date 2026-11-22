@@ -2787,7 +2787,9 @@
       "skip": "Dingano",
       "retrySkip": "Andramo dinganina indray",
       "submitting": "Mandefa…",
-      "sendAnswers": "Alefaso ny valiny"
+      "sendAnswers": "Alefaso ny valiny",
+      "unreadableTitle": "Tsy afaka naseho ity fanontaniana ity",
+      "unreadableBody": "Miandry fanontaniana izay tsy afaka asehon'ity rindrankajy ity ny agent, ka tsy misy karatra valiny miseho ho an'io. Valio ao amin'ny CLI ny fanontaniana mba hahafahana manohy."
     },
     "blockingCard": {
       "questionUnavailable": "Tsy misy intsony ity fanontaniana ity.",

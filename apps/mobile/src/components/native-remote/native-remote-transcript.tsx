@@ -3,6 +3,7 @@ import { type TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { displaySafeText } from '@kilocode/app-shared/display-text';
 import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
+import { QuestionUnreadableNotice } from '@/components/agents/question-unreadable-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
@@ -80,6 +81,13 @@ export function NativeRemoteTranscript({
         // notice points the user at the CLI, which can still answer it. The
         // screen already pads this column, so the notice drops its own margin.
         <PermissionUnreadableNotice inset={false} />
+      ) : null}
+      {pending.unreadableQuestions.length > 0 ? (
+        // No answer card for these: the request carried no questions this app
+        // could read, so a card would offer a choice nobody parsed. The notice
+        // points the user at the CLI, which can still answer it. The screen
+        // already pads this column, so the notice drops its own margin.
+        <QuestionUnreadableNotice inset={false} />
       ) : null}
       {pending.permissions.map(permission => (
         <View key={permission.id} className="gap-2 rounded-lg border border-border p-3">

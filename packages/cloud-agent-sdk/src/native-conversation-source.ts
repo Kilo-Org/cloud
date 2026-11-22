@@ -12,7 +12,7 @@ import {
 } from './native-sync-snapshot';
 import { upsertByKey, upsertByRequestId } from './pending-requests';
 import { permissionAskedIdentitySchema } from './schemas';
-import type { SessionSnapshot, UnreadablePermissionState } from './types';
+import type { SessionSnapshot, UnreadablePermissionState, UnreadableQuestionState } from './types';
 
 const permissionSchema = z
   .object({
@@ -52,6 +52,8 @@ const inventoryQuestionSchema = z
   .passthrough();
 /** What an entry still says about itself when its scope cannot be read. */
 const inventoryIdentitySchema = z.object({ requestID: z.string().min(1) }).passthrough();
+/** What a live form still says about itself when its fields cannot be read. */
+const formIdentitySchema = z.object({ id: z.string().min(1) }).passthrough();
 const inventorySchema = z.object({
   permissions: z.array(z.unknown()).optional(),
   questions: z.array(z.unknown()).optional(),
@@ -60,6 +62,8 @@ const recordSchema = z.record(z.string(), z.unknown());
 export type NativePendingRequests = {
   permissions: z.infer<typeof permissionSchema>[];
   questions: z.infer<typeof questionSchema>[];
+  /** Question requests this app could not read, oldest first. */
+  unreadableQuestions: UnreadableQuestionState[];
   /** Permission requests this app could not read, oldest first. */
   unreadablePermissions: UnreadablePermissionState[];
 };
@@ -90,7 +94,8 @@ export function reduceNativePendingRequests(
     const inventory = inventorySchema.safeParse(
       wrapper.success ? wrapper.data['pending'] : undefined
     );
-    if (!inventory.success) return { permissions: [], questions: [], unreadablePermissions: [] };
+    if (!inventory.success)
+      return { permissions: [], questions: [], unreadableQuestions: [], unreadablePermissions: [] };
     const permissions: NativePendingRequests['permissions'] = [];
     const unreadable = new Set<string>();
     for (const entry of inventory.data.permissions ?? []) {
@@ -110,14 +115,23 @@ export function reduceNativePendingRequests(
       if (identity.success) unreadable.add(identity.data.requestID);
     }
     const questions: NativePendingRequests['questions'] = [];
+    const unreadableQuestionIDs = new Set<string>();
     for (const entry of inventory.data.questions ?? []) {
       const parsed = inventoryQuestionSchema.safeParse(entry);
-      if (parsed.success)
+      // A card with nothing to answer is not a readable question either: the
+      // runner cannot prompt for a choice it never describes.
+      if (parsed.success && parsed.data.fields.length > 0) {
         questions.push({
           ...parsed.data,
           id: parsed.data.requestID,
           metadata: { kind: 'question' as const },
         });
+        continue;
+      }
+      // No card may stand for a form this app cannot read, but it can still
+      // name the question; an entry with no readable identity is dropped.
+      const identity = inventoryIdentitySchema.safeParse(entry);
+      if (identity.success) unreadableQuestionIDs.add(identity.data.requestID);
     }
     return {
       permissions,
@@ -125,6 +139,7 @@ export function reduceNativePendingRequests(
       // The runner inventory is the authoritative snapshot, so it also rebuilds
       // unreadable notices from this frame alone: a request it no longer lists
       // is settled, and one it lists readably has a card instead.
+      unreadableQuestions: [...unreadableQuestionIDs].map(requestId => ({ requestId })),
       unreadablePermissions: [...unreadable].map(requestId => ({ requestId })),
     };
   }
@@ -168,15 +183,39 @@ export function reduceNativePendingRequests(
     };
   if (event.type === 'form.created') {
     const form = questionSchema.safeParse(data.data['form']);
-    if (form.success)
+    // A form with no fields leaves a card with nothing to answer, so it is not
+    // readable either and falls through to the identity notice below.
+    if (form.success && form.data.fields.length > 0)
       return {
         ...pending,
         // In place, so a replayed form keeps its place in the oldest-first list.
         questions: [...upsertByKey(pending.questions, form.data, item => item.id)],
+        // A readable form supersedes an unreadable notice for the same id.
+        unreadableQuestions: pending.unreadableQuestions.filter(
+          item => item.requestId !== form.data.id
+        ),
       };
+    const identity = formIdentitySchema.safeParse(data.data['form']);
+    if (!identity.success) return pending;
+    // The fields could not be read, so no question card may stand for this id:
+    // a card already shown for it would describe questions the app no longer holds.
+    return {
+      ...pending,
+      questions: pending.questions.filter(item => item.id !== identity.data.id),
+      // In place, so a replayed request keeps its place in the oldest-first list.
+      unreadableQuestions: [
+        ...upsertByRequestId(pending.unreadableQuestions, { requestId: identity.data.id }),
+      ],
+    };
   }
   if (event.type === 'form.replied' || event.type === 'form.cancelled')
-    return { ...pending, questions: pending.questions.filter(item => item.id !== data.data['id']) };
+    return {
+      ...pending,
+      questions: pending.questions.filter(item => item.id !== data.data['id']),
+      unreadableQuestions: pending.unreadableQuestions.filter(
+        item => item.requestId !== data.data['id']
+      ),
+    };
   return pending;
 }
 

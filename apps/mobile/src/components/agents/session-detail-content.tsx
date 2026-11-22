@@ -55,6 +55,7 @@ import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { QuestionCard } from '@/components/agents/question-card';
+import { QuestionUnreadableNotice } from '@/components/agents/question-unreadable-notice';
 import {
   type ContextSheetIdentity,
   getContextSheetMountState,
@@ -437,6 +438,7 @@ export function SessionDetailContent({
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
   const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
+  const unreadableQuestions = useAtomValue(manager.atoms.unreadableQuestions);
   const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
@@ -3277,6 +3279,7 @@ export function SessionDetailContent({
             the composer clear. */}
         <View className="shrink" style={sideInsetStyle}>
           {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
+          {unreadableQuestions.length > 0 ? <QuestionUnreadableNotice /> : null}
 
           {blockingInteraction === 'question' && activeQuestion ? (
             <QuestionCard

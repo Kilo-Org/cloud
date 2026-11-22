@@ -2840,7 +2840,9 @@
       "skip": "Sari peste",
       "retrySkip": "Încearcă din nou să omiți",
       "submitting": "Se trimite…",
-      "sendAnswers": "Trimite răspunsurile"
+      "sendAnswers": "Trimite răspunsurile",
+      "unreadableTitle": "Această întrebare nu a putut fi afișată",
+      "unreadableBody": "Agentul așteaptă o întrebare pe care această aplicație nu o poate afișa, așa că nu apare niciun card pentru ea. Răspunde la întrebare în CLI pentru a continua."
     },
     "blockingCard": {
       "questionUnavailable": "Această întrebare nu mai este disponibilă.",

@@ -2787,7 +2787,9 @@
       "skip": "Irra darbi",
       "retrySkip": "Irra darbuuf deebi'ii yaali",
       "submitting": "Ergaa jira…",
-      "sendAnswers": "Deebiiwwan ergi"
+      "sendAnswers": "Deebiiwwan ergi",
+      "unreadableTitle": "Gaaffiin kun agarsiifamuu hin dandeenye",
+      "unreadableBody": "Ajentiin gaaffii appiin kun agarsiisuu hin dandeenye eeggachaa jira; kanaaf kaardiin deebii isaaf hin mul'atu. Itti fufuuf, gaaffii CLI keessatti deebisi."
     },
     "blockingCard": {
       "questionUnavailable": "Gaaffiin kun kana booda hin argamu.",

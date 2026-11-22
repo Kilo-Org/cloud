@@ -1244,7 +1244,11 @@ describe('queued message cancellation replay', () => {
     });
     deliver('kilocode', {
       type: 'question.asked',
-      properties: { id: 'current-question', sessionID: kiloSessionId, questions: [] },
+      properties: {
+        id: 'current-question',
+        sessionID: kiloSessionId,
+        questions: [{ question: 'Continue?', header: 'Approval', options: [] }],
+      },
     });
     expect(notifications).not.toHaveBeenCalled();
     expect(session.storage.getMessageIds()).toEqual([]);

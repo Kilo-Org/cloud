@@ -2787,7 +2787,9 @@
       "skip": "Tsallake",
       "retrySkip": "Sake gwada tsallakewa",
       "submitting": "Ana aikawa…",
-      "sendAnswers": "Aika amsoshi"
+      "sendAnswers": "Aika amsoshi",
+      "unreadableTitle": "Ba a iya nuna wannan tambayar ba",
+      "unreadableBody": "Wakilin yana jiran tambayar da wannan manhajar ba za ta iya nunawa ba, don haka ba a nuna wani kati na amsa dominta. Amsa tambayar a cikin CLI domin ci gaba."
     },
     "blockingCard": {
       "questionUnavailable": "An daina samun wannan tambayar.",

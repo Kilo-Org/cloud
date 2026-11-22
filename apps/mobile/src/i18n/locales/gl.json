@@ -2787,7 +2787,9 @@
       "skip": "Omitir",
       "retrySkip": "Volver tentar omitir",
       "submitting": "Enviando…",
-      "sendAnswers": "Enviar respostas"
+      "sendAnswers": "Enviar respostas",
+      "unreadableTitle": "Non se puido amosar esta pregunta",
+      "unreadableBody": "O agente está agardando unha pregunta que esta aplicación non pode amosar, polo que non aparece ningunha tarxeta de resposta para ela. Responde á pregunta na CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pregunta xa non está dispoñible.",

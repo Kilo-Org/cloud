@@ -35,6 +35,7 @@ import {
   type StoredMessage,
   type ToolPart,
   type UnreadablePermissionState,
+  type UnreadableQuestionState,
 } from '@kilocode/cloud-agent-sdk';
 import { cloudAgentId, kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
@@ -53,6 +54,7 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
+import { QuestionUnreadableNotice } from '@/components/agents/question-unreadable-notice';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import {
   isSessionGoalCollapsed,
@@ -3887,6 +3889,48 @@ describe('session detail unreadable permission notice', () => {
     });
 
     expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(0);
+  });
+});
+
+describe('session detail unreadable question notice', () => {
+  const waiting: readonly UnreadableQuestionState[] = [{ requestId: 'que-1' }];
+  const none: readonly UnreadableQuestionState[] = [];
+
+  it('explains the waiting question and draws no answer card', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadableQuestions, waiting);
+    });
+
+    expect(view.renderer.root.findAllByType(QuestionUnreadableNotice)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType('QuestionCard')).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(
+      'waiting on a question this app cannot show'
+    );
+  });
+
+  it('sits beside the unreadable permission notice', async () => {
+    const view = await mountDetails([]);
+    const unreadablePermission: readonly UnreadablePermissionState[] = [{ requestId: 'perm-1' }];
+    act(() => {
+      view.store.set(view.manager.atoms.unreadableQuestions, waiting);
+      view.store.set(view.manager.atoms.unreadablePermissions, unreadablePermission);
+    });
+
+    expect(view.renderer.root.findAllByType(QuestionUnreadableNotice)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(1);
+  });
+
+  it('renders nothing once the request is answered', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadableQuestions, waiting);
+    });
+    act(() => {
+      view.store.set(view.manager.atoms.unreadableQuestions, none);
+    });
+
+    expect(view.renderer.root.findAllByType(QuestionUnreadableNotice)).toHaveLength(0);
   });
 });
 

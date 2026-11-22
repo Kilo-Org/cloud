@@ -2225,7 +2225,9 @@
       "skip": "略過",
       "retrySkip": "再次嘗試略過",
       "submitting": "送出中…",
-      "sendAnswers": "傳送答案"
+      "sendAnswers": "傳送答案",
+      "unreadableTitle": "無法顯示此問題",
+      "unreadableBody": "代理程式正在等待一個此應用程式無法顯示的問題，因此不會顯示該問題的答案卡。請在 CLI 中回答該問題以繼續。"
     },
     "blockingCard": {
       "questionUnavailable": "此問題已無法作答。",

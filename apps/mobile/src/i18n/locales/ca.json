@@ -2840,7 +2840,9 @@
       "skip": "Omet",
       "retrySkip": "Torna a provar d'ometre",
       "submitting": "Enviant…",
-      "sendAnswers": "Envia les respostes"
+      "sendAnswers": "Envia les respostes",
+      "unreadableTitle": "No s'ha pogut mostrar aquesta pregunta",
+      "unreadableBody": "L'agent està esperant una pregunta que aquesta aplicació no pot mostrar, així que no apareix cap targeta de resposta per a aquesta pregunta. Responeu la pregunta al CLI per continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Aquesta pregunta ja no està disponible.",

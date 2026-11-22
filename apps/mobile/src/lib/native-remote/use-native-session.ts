@@ -117,6 +117,7 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
   const pending = conversation?.pending ?? {
     permissions: [],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   };
 

@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useUrlOrganizationId } from '@/hooks/useUrlOrganizationId';
 import { CloudReadOnlyThread } from '@/components/cloud-agent-next/assistant-ui/CloudThread';
+import { QuestionUnreadableNotice } from '@/components/cloud-agent-next/QuestionUnreadableNotice';
 import { commandResult, commandRunner, sendNativePrompt } from './native-remote-events';
 
 const tokenSchema = z.object({ token: z.string() });
@@ -171,7 +172,12 @@ function NativeRemoteScope({ organizationID }: { organizationID: string | undefi
     if (await run('prompt', () => sendNativePrompt(connection, prompt, queue))) setPrompt('');
   }
   const conversation = useMemo(() => (state ? readNativeConversation(state) : undefined), [state]);
-  const pending = conversation?.pending ?? { permissions: [], questions: [] };
+  const pending = conversation?.pending ?? {
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
   const canControl = state?.connection === 'connected' && state.runnerConnected;
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
@@ -365,6 +371,7 @@ function NativeRemoteScope({ organizationID }: { organizationID: string | undefi
                 <p className="text-muted-foreground text-sm">This session has no messages yet.</p>
               )}
           </div>
+          {pending.unreadableQuestions.length > 0 && <QuestionUnreadableNotice />}
           {pending.permissions.map(request => (
             <div className="space-y-2 rounded border p-3" key={request.id}>
               <p>Permission: {request.action}</p>

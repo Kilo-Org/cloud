@@ -64,6 +64,7 @@ import type {
   CloudStatus,
   QuestionState,
   PermissionState,
+  UnreadableQuestionState,
   UnreadablePermissionState,
   SlashCommandInfo,
   SlashCommandCatalogStatus,
@@ -583,6 +584,12 @@ type SessionManagerAtoms = {
   agentBoard: W<AgentBoardState>;
   /** Every pending permission, oldest first. `activePermission` is the head. */
   pendingPermissions: W<readonly StandalonePermission[]>;
+  /**
+   * Pending question requests whose list this app could not read, oldest first.
+   * No card can answer them; the surfaces show a notice that points the user at
+   * the CLI.
+   */
+  unreadableQuestions: W<readonly UnreadableQuestionState[]>;
   /**
    * Pending permission requests whose scope this app could not read, oldest
    * first. No card can answer them; the surfaces show a notice that points the
@@ -1305,6 +1312,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const backgroundActivityAtom = atom<BackgroundActivityState>({ status: 'inactive' });
   const agentBoardAtom = atom<AgentBoardState>({ status: 'inactive' });
   const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
+  const unreadableQuestionsAtom = atom<readonly UnreadableQuestionState[]>([]);
   const unreadablePermissionsAtom = atom<readonly UnreadablePermissionState[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
   const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
@@ -1818,6 +1826,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(backgroundActivityAtom, { status: 'inactive' });
     store.set(agentBoardAtom, { status: 'inactive' });
     store.set(pendingPermissionsAtom, []);
+    store.set(unreadableQuestionsAtom, []);
     store.set(unreadablePermissionsAtom, []);
     store.set(suggestionAtom, null);
     store.set(activeSuggestionAtom, null);
@@ -2458,6 +2467,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
+      const nextUnreadableQuestions = session.state.getUnreadableQuestions();
+      if (!sameRequestIds(store.get(unreadableQuestionsAtom), nextUnreadableQuestions)) {
+        store.set(unreadableQuestionsAtom, nextUnreadableQuestions);
+      }
       const nextUnreadablePermissions = session.state.getUnreadablePermissions();
       if (!sameRequestIds(store.get(unreadablePermissionsAtom), nextUnreadablePermissions)) {
         store.set(unreadablePermissionsAtom, nextUnreadablePermissions);
@@ -4773,6 +4786,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       backgroundActivity: backgroundActivityAtom,
       agentBoard: agentBoardAtom,
       pendingPermissions: pendingPermissionsAtom,
+      unreadableQuestions: unreadableQuestionsAtom,
       unreadablePermissions: unreadablePermissionsAtom,
       suggestion: suggestionAtom,
       activeSuggestion: activeSuggestionAtom,

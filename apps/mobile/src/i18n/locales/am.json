@@ -2787,7 +2787,9 @@
       "skip": "ይዝለሉ",
       "retrySkip": "ለመዝለል እንደገና ይሞክሩ",
       "submitting": "በማስገባት ላይ…",
-      "sendAnswers": "መልሶችን ይላኩ"
+      "sendAnswers": "መልሶችን ይላኩ",
+      "unreadableTitle": "ይህ ጥያቄ ማሳየት አልተቻለም",
+      "unreadableBody": "ወኪሉ ይህ መተግበሪያ ማሳየት የማይችለውን ጥያቄ በመጠበቅ ላይ ነው፣ ስለዚህ ለዚህ ጥያቄ ካርድ አይታይም። ለመቀጠል ጥያቄውን በ CLI ውስጥ ይመልሱ።"
     },
     "blockingCard": {
       "questionUnavailable": "ይህ ጥያቄ ከእንግዲህ አይገኝም።",

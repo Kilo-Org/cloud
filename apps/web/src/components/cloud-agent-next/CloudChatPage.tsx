@@ -84,6 +84,7 @@ import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
 import { PermissionUnreadableNotice } from './PermissionUnreadableNotice';
+import { QuestionUnreadableNotice } from './QuestionUnreadableNotice';
 import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
 import { CloudAgentBillingError } from './CloudAgentBillingError';
@@ -321,6 +322,7 @@ export default function CloudChatPage({
   const commits = useAtomValue(manager.atoms.commits);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const unreadableQuestions = useAtomValue(manager.atoms.unreadableQuestions);
   const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
@@ -1988,6 +1990,11 @@ export default function CloudChatPage({
                                     <PermissionUnreadableNotice />
                                   </div>
                                 )}
+                              {unreadableQuestions.length > 0 && transcriptPhase !== 'opening' && (
+                                <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                                  <QuestionUnreadableNotice />
+                                </div>
+                              )}
                               {activeQuestion && transcriptPhase !== 'opening' && (
                                 <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
                                   <QuestionToolCard

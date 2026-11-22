@@ -303,6 +303,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (
         awaitingConnectedSnapshot &&
         (event.type === 'question.asked' ||
+          event.type === 'question.unreadable' ||
           event.type === 'question.replied' ||
           event.type === 'question.rejected' ||
           event.type === 'permission.asked' ||

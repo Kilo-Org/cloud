@@ -2904,7 +2904,9 @@
       "skip": "Skip",
       "retrySkip": "Retry skip",
       "submitting": "Submitting…",
-      "sendAnswers": "Send answers"
+      "sendAnswers": "Send answers",
+      "unreadableTitle": "This question could not be displayed",
+      "unreadableBody": "The agent is waiting on a question this app cannot show, so no answer card appears for it. Answer the question in the CLI to continue."
     },
     "blockingCard": {
       "questionUnavailable": "This question is no longer available.",

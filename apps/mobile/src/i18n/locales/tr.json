@@ -2225,7 +2225,9 @@
       "skip": "Atla",
       "retrySkip": "Atlamayı tekrar dene",
       "submitting": "Gönderiliyor…",
-      "sendAnswers": "Yanıtları gönder"
+      "sendAnswers": "Yanıtları gönder",
+      "unreadableTitle": "Bu soru görüntülenemedi",
+      "unreadableBody": "Aracı, bu uygulamanın gösteremediği bir soruyu bekliyor; bu yüzden o soru için yanıt kartı gösterilmiyor. Devam etmek için soruyu CLI'de yanıtla."
     },
     "blockingCard": {
       "questionUnavailable": "Bu soru artık kullanılamıyor.",

@@ -2219,7 +2219,9 @@
       "skip": "Salta",
       "retrySkip": "Riprova a saltare",
       "submitting": "Invio in corso…",
-      "sendAnswers": "Invia le risposte"
+      "sendAnswers": "Invia le risposte",
+      "unreadableTitle": "Impossibile visualizzare la domanda",
+      "unreadableBody": "L'agente è in attesa di una domanda che questa app non può mostrare, quindi non viene visualizzata alcuna scheda di risposta. Rispondi alla domanda nella CLI per continuare."
     },
     "blockingCard": {
       "questionUnavailable": "Questa domanda non è più disponibile.",

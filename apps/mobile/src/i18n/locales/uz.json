@@ -2787,7 +2787,9 @@
       "skip": "O'tkazib yuborish",
       "retrySkip": "Qayta o'tkazib yuborish",
       "submitting": "Yuborilmoqda…",
-      "sendAnswers": "Javoblarni yuborish"
+      "sendAnswers": "Javoblarni yuborish",
+      "unreadableTitle": "Savolni ko'rsatib bo'lmadi",
+      "unreadableBody": "Agent bu ilova ko'rsata olmaydigan savolni kutmoqda, shuning uchun bu savol uchun javob kartasi ko'rsatilmaydi. Davom etish uchun savolga CLI'da javob bering."
     },
     "blockingCard": {
       "questionUnavailable": "Bu savol endi mavjud emas.",

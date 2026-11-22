@@ -16,6 +16,7 @@ const FIXTURE_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
 const FIXTURE_STATES = {
   'pending-permission': 'pending-permission',
   'permission-failed': 'permission-failed',
+  'pending-unreadable-question': 'pending-unreadable-question',
   running: 'running',
 } satisfies Record<string, AgentChatFixtureState>;
 
@@ -33,7 +34,9 @@ const FIXTURE_STATES = {
  * the card shows its retryable failure branch — the failure banner and Retry
  * replacing Deny/Allow — and a later answer, the Retry tap, succeeds.
  * `?state=running` answers that ask, so the row reports the work instead — the
- * state the wait returns to.
+ * state the wait returns to. `?state=pending-unreadable-question` holds that
+ * running transcript behind a question request this app could not read: the
+ * notice names the wait and points at the CLI, and no answer card is drawn.
  *
  * The development fixture path in `src/app/+native-intent.tsx` maps to it, and a
  * release build refuses the path outright so the fixture is never reachable.

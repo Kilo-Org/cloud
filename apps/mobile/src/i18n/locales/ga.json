@@ -2946,7 +2946,9 @@
       "skip": "Scipeáil",
       "retrySkip": "Bain triail eile as scipeáil",
       "submitting": "Ag seoladh…",
-      "sendAnswers": "Seol freagraí"
+      "sendAnswers": "Seol freagraí",
+      "unreadableTitle": "Níorbh fhéidir an cheist seo a thaispeáint",
+      "unreadableBody": "Tá an gníomhaire ag fanacht le ceist nach féidir leis an aip seo a thaispeáint, mar sin ní thaispeántar aon chárta freagra di. Freagair an cheist sa CLI chun leanúint ar aghaidh."
     },
     "blockingCard": {
       "questionUnavailable": "Níl an cheist seo ar fáil a thuilleadh.",

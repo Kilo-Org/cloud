@@ -2840,7 +2840,9 @@
       "skip": "Izlaist",
       "retrySkip": "Mēģināt izlaist vēlreiz",
       "submitting": "Nosūta…",
-      "sendAnswers": "Nosūtīt atbildes"
+      "sendAnswers": "Nosūtīt atbildes",
+      "unreadableTitle": "Šo jautājumu nevarēja parādīt",
+      "unreadableBody": "Aģents gaida jautājumu, ko šī lietotne nevar parādīt, tāpēc par to netiek parādīta neviena atbildes kartīte. Atbildēt uz jautājumu CLI, lai turpinātu."
     },
     "blockingCard": {
       "questionUnavailable": "Šis jautājums vairs nav pieejams.",

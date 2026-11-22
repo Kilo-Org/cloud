@@ -687,7 +687,12 @@ test('unreadable pending inventory clears controls without blocking later ordere
   expect(state?.pending.permissions.map(item => item.id)).toEqual(['old']);
   socket.frame('remote.state', { incarnation: 'runner', runID: 'run', pending: null }, 2, 'events');
   await flush();
-  expect(state?.pending).toEqual({ permissions: [], questions: [], unreadablePermissions: [] });
+  expect(state?.pending).toEqual({
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  });
   socket.frame(
     'permission.asked',
     { incarnation: 'runner', runID: 'run', data: { data: { id: 'invalid' } } },

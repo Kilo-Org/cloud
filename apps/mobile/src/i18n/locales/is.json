@@ -2787,7 +2787,9 @@
       "skip": "Sleppa",
       "retrySkip": "Reyna að sleppa aftur",
       "submitting": "Sendir…",
-      "sendAnswers": "Senda svör"
+      "sendAnswers": "Senda svör",
+      "unreadableTitle": "Ekki tókst að birta þessa spurningu",
+      "unreadableBody": "Agentinn bíður eftir spurningu sem þetta forrit getur ekki sýnt, svo ekkert svarspjald birtist fyrir henni. Svaraðu spurningunni í CLI til að halda áfram."
     },
     "blockingCard": {
       "questionUnavailable": "Þessi spurning er ekki lengur tiltæk.",

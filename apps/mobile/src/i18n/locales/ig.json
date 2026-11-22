@@ -2787,7 +2787,9 @@
       "skip": "Mafee",
       "retrySkip": "Nwaa ịmafe ọzọ",
       "submitting": "Na-eziga…",
-      "sendAnswers": "Ziga azịza"
+      "sendAnswers": "Ziga azịza",
+      "unreadableTitle": "Enweghị ike igosi ajụjụ a",
+      "unreadableBody": "Onye nnọchite na-eche ajụjụ nke ngwa a enweghị ike igosi, ya mere ọ dịghị kaadị azịza na-apụta maka ya. Zaa ajụjụ ahụ na CLI ka ị gaa n'ihu."
     },
     "blockingCard": {
       "questionUnavailable": "Ajụjụ a adịkwaghị.",

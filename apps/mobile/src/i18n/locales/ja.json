@@ -2225,7 +2225,9 @@
       "skip": "スキップ",
       "retrySkip": "スキップを再試行",
       "submitting": "送信中…",
-      "sendAnswers": "回答を送信"
+      "sendAnswers": "回答を送信",
+      "unreadableTitle": "この質問を表示できませんでした",
+      "unreadableBody": "エージェントは、このアプリでは表示できない質問への回答を待っており、その質問の回答カードは表示されません。続行するには、CLIで質問に回答してください。"
     },
     "blockingCard": {
       "questionUnavailable": "この質問には回答できなくなりました。",

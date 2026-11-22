@@ -30,6 +30,7 @@ import {
   type StandaloneSuggestion,
   type StoredMessage,
   type SuggestionState,
+  type UnreadableQuestionState,
   type UnreadablePermissionState,
   type WorkspaceArtifactsRefresh,
   type WorktreeChangesRefresh,
@@ -201,9 +202,16 @@ function fixed<T>(value: T) {
  * `permission-failed` holds the pending-permission screen too, but the first
  * answer to the bash ask fails like a transient transport error, so the card
  * shows its retryable failure branch, and a later answer — the Retry tap —
- * succeeds.
+ * succeeds. `pending-unreadable-question` holds the running transcript with a
+ * question request this app could not read: the notice names the wait and the
+ * CLI as the place to answer it, and no answer card is drawn.
  */
-export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'permission-failed' | 'running';
+export type AgentChatFixtureState =
+  | 'idle'
+  | 'pending-permission'
+  | 'permission-failed'
+  | 'running'
+  | 'pending-unreadable-question';
 
 /**
  * The session manager the real screen mounts against, typed as the product's own
@@ -213,6 +221,10 @@ export function createAgentChatFixtureManager(
   state: AgentChatFixtureState = 'idle'
 ): SessionManager {
   const waitingForPermission = state === 'pending-permission' || state === 'permission-failed';
+  // The unreadable question keeps the running transcript: the CLI still holds
+  // the request, so no answer card exists and the notice is the whole surface.
+  const unreadableQuestions: readonly UnreadableQuestionState[] =
+    state === 'pending-unreadable-question' ? [{ requestId: 'que_designGateUnreadable' }] : [];
   // The first answer to the ask must fail like a transient transport error, and
   // a later answer — the Retry tap — succeed, so the counter closes over the
   // manager and every other fixture state shares the idle no-op below.
@@ -314,6 +326,7 @@ export function createAgentChatFixtureManager(
       pendingPermissions: fixed<readonly StandalonePermission[]>(
         waitingForPermission ? [PENDING_BASH_ASK] : []
       ),
+      unreadableQuestions: fixed<readonly UnreadableQuestionState[]>(unreadableQuestions),
       unreadablePermissions: fixed<readonly UnreadablePermissionState[]>([]),
       suggestion: fixed<SuggestionState | null>(null),
       activeSuggestion: fixed<StandaloneSuggestion | null>(null),

@@ -2840,7 +2840,9 @@
       "skip": "Preskoči",
       "retrySkip": "Pokušaj ponovo da preskočiš",
       "submitting": "Slanje…",
-      "sendAnswers": "Pošalji odgovore"
+      "sendAnswers": "Pošalji odgovore",
+      "unreadableTitle": "Pitanje nije moglo da se prikaže",
+      "unreadableBody": "Agent čeka na pitanje koje ova aplikacija ne može da prikaže, pa se za to pitanje ne prikazuje nikakva kartica. Odgovorite na pitanje u CLI-ju da biste nastavili."
     },
     "blockingCard": {
       "questionUnavailable": "Ovo pitanje više nije dostupno.",

@@ -891,6 +891,97 @@ describe('createServiceState', () => {
     });
   });
 
+  describe('question.unreadable', () => {
+    const questions: QuestionInfo[] = [
+      { question: 'Allow?', header: 'Permission', options: [{ label: 'Yes', description: '' }] },
+    ];
+
+    it('tracks a request whose list could not be read', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+
+      expect(state.getUnreadableQuestions()).toEqual([{ requestId: 'req-1' }]);
+      expect(state.snapshot().unreadableQuestions).toEqual([{ requestId: 'req-1' }]);
+      expect(state.getQuestion()).toBeNull();
+    });
+
+    it('keeps one notice per request id', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+      state.process({ type: 'question.unreadable', requestId: 'req-2' });
+
+      expect(state.getUnreadableQuestions()).toEqual([
+        { requestId: 'req-1' },
+        { requestId: 'req-2' },
+      ]);
+    });
+
+    it('clears the notice on question.replied', () => {
+      const onQuestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionResolved }));
+
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+      state.process({ type: 'question.replied', requestId: 'req-1' });
+
+      expect(state.getUnreadableQuestions()).toEqual([]);
+      expect(onQuestionResolved).toHaveBeenCalledWith('req-1');
+    });
+
+    it('clears the notice on question.rejected', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+      state.process({ type: 'question.rejected', requestId: 'req-1' });
+
+      expect(state.getUnreadableQuestions()).toEqual([]);
+    });
+
+    it('drops the notice when a readable request for the same id arrives', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+      state.process({ type: 'question.asked', requestId: 'req-1', questions });
+
+      expect(state.getUnreadableQuestions()).toEqual([]);
+      expect(state.getQuestion()?.requestId).toBe('req-1');
+    });
+
+    it('replaces a readable card when the same request arrives unreadable', () => {
+      const onQuestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionResolved }));
+
+      state.process({ type: 'question.asked', requestId: 'req-1', questions });
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+
+      expect(state.getQuestion()).toBeNull();
+      expect(state.getUnreadableQuestions()).toEqual([{ requestId: 'req-1' }]);
+      expect(onQuestionResolved).toHaveBeenCalledWith('req-1');
+    });
+
+    it('clears the notice when the session reconnects', () => {
+      const onQuestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionResolved }));
+
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+      expect(state.getUnreadableQuestions()).toEqual([]);
+      expect(onQuestionResolved).toHaveBeenCalledWith('req-1');
+    });
+
+    it('clears the notice on reset', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'question.unreadable', requestId: 'req-1' });
+      state.reset();
+
+      expect(state.getUnreadableQuestions()).toEqual([]);
+    });
+  });
+
   describe('preparing', () => {
     it('normal step sets cloudStatus to preparing', () => {
       const state = createServiceState(makeConfig());

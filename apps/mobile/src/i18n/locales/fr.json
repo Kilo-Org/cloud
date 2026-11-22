@@ -2147,7 +2147,9 @@
       "skip": "Passer",
       "retrySkip": "Réessayer de passer",
       "submitting": "Envoi…",
-      "sendAnswers": "Envoyer les réponses"
+      "sendAnswers": "Envoyer les réponses",
+      "unreadableTitle": "Impossible d'afficher cette question",
+      "unreadableBody": "L'agent attend une question que cette application ne peut pas afficher, donc aucune carte de réponse n'apparaît pour celle-ci. Répondez à la question dans le CLI pour continuer."
     },
     "blockingCard": {
       "questionUnavailable": "Cette question n'est plus disponible.",

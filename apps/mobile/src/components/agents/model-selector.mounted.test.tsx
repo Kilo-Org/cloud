@@ -218,9 +218,9 @@ describe('ModelPickerOptionRow unavailable row', () => {
     expect(String(row?.props.accessibilityLabel)).toContain(
       i18n.t('agentChat.modelSelector.selectedState')
     );
-    expect(
-      (row?.props.accessibilityState as { selected?: boolean } | undefined)?.selected
-    ).toBe(true);
+    expect((row?.props.accessibilityState as { selected?: boolean } | undefined)?.selected).toBe(
+      true
+    );
   });
 
   it('still draws the check on a selected available row', () => {

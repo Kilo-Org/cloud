@@ -145,15 +145,8 @@ describe('shared tap-target geometry', () => {
   });
 
   it('renders the field clear target on its own node instead of a slop into the field', async () => {
-    // The in-field clear control sits inside the field's content box beside its
-    // `TextInput`, so the frame an audit reads is the control's own: `hitSlop`
-    // never widens that frame, and a reach toward the input would take taps the
-    // field should get. The box is the icon target rather than the 44pt design
-    // target, because whole-pixel layout on Android lands a 44pt box under it.
-    // Placement (the call site's logical trailing margin) stays out of this box.
     expect(await compiledDp(FIELD_CLEAR_BOX_CLASS, 'height')).toBe(ICON_TARGET_DP);
     expect(await compiledDp(FIELD_CLEAR_BOX_CLASS, 'width')).toBe(ICON_TARGET_DP);
-    // Centring has no dp value to compile, so it stays a class check.
     expect(FIELD_CLEAR_BOX_CLASS).toContain('items-center');
     expect(FIELD_CLEAR_BOX_CLASS).toContain('justify-center');
     // The box is taller than the shared input's 44pt floor, so it cancels the
@@ -182,11 +175,6 @@ describe('shared tap-target geometry', () => {
   });
 
   it('renders a text-only action frame at the platform minimum on both axes', async () => {
-    // The regression this guards: a text link whose only child is one label
-    // line reports that line's height as its own rect, and `hitSlop` never
-    // lifts the rect an audit reads. `min-h-11` would be 38.5pt on device. The
-    // width floor is needed because the caller drops its hit slop: a short
-    // label is only a couple of glyphs wide.
     platform.OS = 'ios';
     const ios = textActionTargetClass();
     expect(ios).toContain('min-h-[44px]');
@@ -203,11 +191,6 @@ describe('shared tap-target geometry', () => {
   });
 
   it('cancels a row text action down to the row content band on both platforms', () => {
-    // The regression this guards: the action's box is taller than the row's
-    // one-line content band, so the node, not the row, set the height — 65pt on
-    // iOS and 69dp on Android beside a two-line row's 57.75pt — and a group
-    // grew when one of its rows swapped the action for a button. The row
-    // cancels the overhang the switch cancels, at the action's own target.
     const band = TOUCH_TARGET_DP - 2 * TOUCH_TARGET_OVERHANG_DP;
 
     platform.OS = 'ios';
@@ -228,11 +211,6 @@ describe('shared tap-target geometry', () => {
   });
 
   it('cancels the action box slack under the copy it sits below', async () => {
-    // The regression this guards: the box centres one label line, so a tile
-    // that pads its edges evenly showed a wider gap under its action than above
-    // its copy. The margin removes that slack from the layout, so the tile pads
-    // the same on both edges while the box stays above the audit floor and
-    // never reaches the message above it.
     const height = await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'minHeight');
     expect(height).toBe(32);
     expect(height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
@@ -251,9 +229,6 @@ describe('shared tap-target geometry', () => {
   });
 
   it('renders a state surface action on the Android 48dp minimum', async () => {
-    // Android's `<Button>` rule is 48dp on the pressed node's own rect, and the
-    // shared `Button` default frame is `min-h-[44px]`. `hitSlop` would widen
-    // the touch region without moving that rect, so the floor is the class.
     expect(STATE_ACTION_TARGET_DP).toBe(48);
     expect(STATE_ACTION_TARGET_DP).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     expect(STATE_ACTION_CLASS).toContain('min-h-[48px]');
@@ -262,12 +237,6 @@ describe('shared tap-target geometry', () => {
   });
 
   it('renders an interactive row frame tall enough for both platforms', async () => {
-    // The regression this guards: a selection or menu row whose only child is
-    // one label line reports that line's height plus its padding as its own
-    // rect, and a row sized that way landed under the target on device.
-    // `min-h-11` is under the floor here; `hitSlop` would widen the touch region
-    // without moving the rect an audit reads, so the floor has to be the row's
-    // own class.
     const height = await compiledDp(ROW_TARGET_CLASS, 'minHeight');
     expect(height).toBe(ICON_TARGET_DP);
     expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
@@ -343,8 +312,6 @@ describe('shared tap-target geometry', () => {
   });
 
   it('carries the compact button frame past the design target with its slop', () => {
-    // The regression this guards: the 36dp `sm` frame renders 35.81dp at
-    // density 420, so 4 per side measured 43.81dp — under `DESIGN.md`'s 44pt.
     expect(COMPACT_BUTTON_HIT_SLOP.top).toBe(5);
     expect(COMPACT_BUTTON_HIT_SLOP.top).toBe(COMPACT_BUTTON_HIT_SLOP.bottom);
     expect(COMPACT_BUTTON_HIT_SLOP.left).toBe(COMPACT_BUTTON_HIT_SLOP.top);
@@ -564,8 +531,6 @@ describe('standalone legal link geometry', () => {
     expect(LEGAL_LINK_MIN_DP).toBe(48);
     expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
     expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minWidth')).toBe(LEGAL_LINK_MIN_DP);
-    // The utilities are literal in the source so the class compiler can see
-    // them; these hold the literals to the dp constants beside them.
     expect(LEGAL_LINK_BOX_CLASS).toContain(`min-h-[${LEGAL_LINK_MIN_DP}px]`);
     expect(LEGAL_LINK_BOX_CLASS).toContain(`min-w-[${LEGAL_LINK_MIN_DP}px]`);
   });

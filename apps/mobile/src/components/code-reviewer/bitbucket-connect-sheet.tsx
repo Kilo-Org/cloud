@@ -179,19 +179,20 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       // The repair this sheet would offer decides which trio can make it: an
       // OAuth connection is an owner's to change, a stored token needs anyone
       // who may reconnect it, and a first connect asks for whoever holds the
-      // permission. The last two sentences name the organization whose rule
-      // refused, so a person in several of them reads which one this is; the
-      // first connect sentence is the shared role sentence the composer's
+      // permission. The reconnect and owner sentences name the organization
+      // whose rule refused, so a person in several of them reads which one this
+      // is; the first connect sentence is the shared ask the composer's
       // Bitbucket card states beside the same restriction.
-      const deniedDescription = managesExisting
-        ? t('codeReviewer.bitbucketConnect.deniedManagedByOwner', {
-            organization: org.organizationName,
-          })
-        : integrationId === null
-          ? t('prReview.connect.bitbucketAdminOnlyDescription')
-          : t('codeReviewer.bitbucketConnect.deniedReconnectRole', {
-              organization: org.organizationName,
-            });
+      let deniedDescription = t('prReview.connect.bitbucketAdminOnlyDescription');
+      if (managesExisting) {
+        deniedDescription = t('codeReviewer.bitbucketConnect.deniedManagedByOwner', {
+          organization: org.organizationName,
+        });
+      } else if (integrationId !== null) {
+        deniedDescription = t('codeReviewer.bitbucketConnect.deniedReconnectRole', {
+          organization: org.organizationName,
+        });
+      }
       // The same organization's lapsed plan refuses every organization change,
       // so a member must not read the role as the only blocker: the plan line
       // under the role names the owner and the billing step that unblocks it.

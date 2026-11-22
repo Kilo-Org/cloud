@@ -85,7 +85,6 @@ beforeEach(async () => {
   jest.resetModules();
   jest.clearAllMocks();
   mockOrderBy.mockReset().mockResolvedValue([entry()]);
-  mockWarn.mockReset();
   mockReplicaOrderBy.mockReset().mockResolvedValue([entry()]);
   mockPublicationEnabled = true;
   jest.useFakeTimers();
@@ -202,8 +201,14 @@ describe('model stats snapshot cache', () => {
     const recovered = await cache.getModelStatsSnapshot();
     expect(recovered).not.toBe(first);
     expect(mockSelect).toHaveBeenCalledTimes(3);
-    // A successful load clears the marker, so the next outage reports again.
     expect(mockWarn).toHaveBeenCalledTimes(1);
+
+    // A successful load cleared the marker, so the next outage reports again even with the same
+    // error object.
+    jest.advanceTimersByTime(TTL);
+    mockOrderBy.mockRejectedValueOnce(new Error('unavailable'));
+    expect(await cache.getModelStatsSnapshot()).toBe(recovered);
+    expect(mockWarn).toHaveBeenCalledTimes(2);
   });
 
   it('reports a cold failure as serving no model stats', async () => {

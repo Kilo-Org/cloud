@@ -15,7 +15,7 @@ import {
 } from '@native-html/render';
 
 import * as convertModule from './markdown-html-convert';
-import { convertHtmlToMarkdown, convertHtmlToMarkdownWithTail } from './markdown-html-convert';
+import { convertHtmlToMarkdown } from './markdown-html-convert';
 import {
   type MarkdownHtmlIncrementalConverted,
   type MarkdownHtmlSnapshot,
@@ -26,7 +26,11 @@ import {
 import { isMarkdownImageLoadAllowed, requestMarkdownImageTrust } from './markdown-image-confirm';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { clearMarkdownParseCachesForTests } from './markdown-parse-cache';
-import { extendsPreviousRaw, incrementalInput, MarkdownText } from './markdown-text';
+import {
+  extendsPreviousRaw,
+  MarkdownText,
+  publishConversion,
+} from './markdown-text';
 
 const EMPTY_SNAPSHOT: MarkdownHtmlSnapshot = {
   value: '',
@@ -971,15 +975,6 @@ function lexedCharacterCount(): number {
   return lexer.mock.calls.reduce((total, [source]) => total + source.length, 0);
 }
 
-/** The previous-publish record fields the component writes for a raw value. */
-function tailOf(rawValue: string): { tailStart: number; tailConverted: string } {
-  const { tailStart } = convertHtmlToMarkdownWithTail(rawValue);
-  return {
-    tailStart,
-    tailConverted: tailStart === 0 ? '' : convertHtmlToMarkdown(rawValue.slice(tailStart)),
-  };
-}
-
 /** The first prefix of `value` whose incremental split differs from the whole-value split. */
 function firstDivergence(value: string): string {
   let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
@@ -1044,25 +1039,26 @@ describe('splitMarkdownHtmlIncremental', () => {
       const value = INCREMENTAL_CORPUS.slice(0, index);
       const whole = convertHtmlToMarkdown(value);
       const record = extendsPreviousRaw(value, prior);
-      const input = incrementalInput(value, record, prior);
+      const conversion = publishConversion(value, record, prior);
       const composed =
-        record?.appended !== undefined && prior !== undefined
+        record?.mode === 'appended' && prior !== undefined
           ? prior.convert(record.appended, prior.tail.value)
           : whole;
       expect(composed, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toBe(whole);
-      if (record?.appended !== undefined) {
+      if (record?.mode === 'appended') {
         gatedPublishes += 1;
       }
-      const result = splitMarkdownHtmlIncremental(input);
+      const result = splitMarkdownHtmlIncremental(conversion.input);
       expect(result.segments, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toEqual(
         splitMarkdownHtml(whole)
       );
       prior = {
         tail: result.snapshot,
         rawValue: value,
-        // The record the component writes carries where its conversion stops
-        // being final and that region's conversion; the gate needs both.
-        ...tailOf(value),
+        // The record the component writes carries the tail this publish's own
+        // conversion found, so the gate's next comparison never re-converts the
+        // region. This is the product's own value, so the two cannot drift.
+        conversion: conversion.tail,
         convert: (suffix, previous) =>
           suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
       };
@@ -1530,6 +1526,71 @@ describe('MarkdownText streaming conversion tail', () => {
           `publish ${index} whole-value scans`
         ).toEqual([]);
       }
+    } finally {
+      spy.mockRestore();
+      withTailSpy.mockRestore();
+    }
+  });
+
+  it('converts a declined publish exactly once', async () => {
+    // The first publish of a mount and every declined publish convert the whole
+    // value once: the conversion returns the markdown and its tail in one scan,
+    // and the splitter receives that same markdown instead of converting the
+    // value again. No publish may pass the whole accumulated value to the plain
+    // converter, and the tail scan may see the whole value at most once.
+    const calls: string[] = [];
+    const scans: string[] = [];
+    const original = convertModule.convertHtmlToMarkdown;
+    const originalWithTail = convertModule.convertHtmlToMarkdownWithTail;
+    const spy = vi.spyOn(convertModule, 'convertHtmlToMarkdown').mockImplementation(value => {
+      calls.push(value);
+      return original(value);
+    });
+    const withTailSpy = vi
+      .spyOn(convertModule, 'convertHtmlToMarkdownWithTail')
+      .mockImplementation(value => {
+        scans.push(value);
+        return originalWithTail(value);
+      });
+    try {
+      // A single-line value's open region starts at offset 0, so the next
+      // publish cannot reproduce any of its conversion by composition and the
+      // gate declines on a mid-line append rather than at a block boundary.
+      const first = 'Intro text `code';
+      const second = 'Intro text `code span';
+      expect(
+        publishConversion(first, null, undefined).tail.start,
+        'a single line leaves nothing final'
+      ).toBe(0);
+
+      calls.length = 0;
+      scans.length = 0;
+      const renderer = await mount(<MarkdownText value={first} />);
+      // Read the component's work before `expectWholeValueRender`'s own
+      // whole-value conversion flows through the spies.
+      const firstCalls = [...calls];
+      const firstScans = [...scans];
+      expectWholeValueRender(renderer, first, 'first publish');
+      expect(firstCalls, 'first publish plain conversions').not.toContain(first);
+      expect(
+        firstScans.filter(source => source === first),
+        'first publish whole-value scans'
+      ).toHaveLength(1);
+
+      calls.length = 0;
+      scans.length = 0;
+      await act(async () => {
+        await Promise.resolve();
+        renderer.update(<MarkdownText value={second} />);
+      });
+      const declinedCalls = [...calls];
+      const declinedScans = [...scans];
+      expectWholeValueRender(renderer, second, 'declined publish');
+      expect(declinedCalls, 'declined publish plain conversions').not.toContain(second);
+      expect(
+        declinedScans.filter(source => source === second),
+        'declined publish whole-value scans'
+      ).toHaveLength(1);
     } finally {
       spy.mockRestore();
       withTailSpy.mockRestore();

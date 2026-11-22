@@ -539,7 +539,17 @@
       "nextStepInReview": "ఫలితం ఈ స్క్రీన్‌పై కనిపిస్తుంది, నిర్ణయం తర్వాత మీరు అప్పీల్ చేయవచ్చు.",
       "nextStepAppeal": "అప్పీల్ ఫలితం ఈ స్క్రీన్‌పై కనిపిస్తుంది.",
       "nextStepFinal": "అప్పీల్ నిర్ణయం తుదిది. ఇకపై అప్పీల్ సమర్పించలేరు.",
-      "viewReceipt": "రసీదును చూడండి"
+      "viewReceipt": "రసీదును చూడండి",
+      "targetLabel": "ఫిర్యాదు చేసిన అంశం",
+      "reasonLabel": "ఫిర్యాదు కారణం",
+      "targetMessage": "AI ప్రత్యుత్తరం",
+      "targetComment": "పుల్ రిక్వెస్ట్ వ్యాఖ్య",
+      "targetUser": "వినియోగదారు",
+      "reasonHarmful": "హానికర కంటెంట్",
+      "reasonIllegal": "చట్టవిరుద్ధ కంటెంట్",
+      "reasonHarassment": "వేధింపు",
+      "reasonSpam": "అవాంఛిత ప్రకటనలు",
+      "reasonOther": "మరో కారణం"
     },
     "reportReceipts": {
       "title": "రిపోర్ట్‌లు",

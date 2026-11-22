@@ -539,7 +539,17 @@
       "nextStepInReview": "Utfallet visas på den här skärmen, och du kan överklaga efter ett beslut.",
       "nextStepAppeal": "Utfallet av överklagandet visas på den här skärmen.",
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
-      "viewReceipt": "Visa kvitto"
+      "viewReceipt": "Visa kvitto",
+      "targetLabel": "Anmält objekt",
+      "reasonLabel": "Orsak till anmälan",
+      "targetMessage": "AI-svar",
+      "targetComment": "PR-kommentar",
+      "targetUser": "Användare",
+      "reasonHarmful": "Skadligt innehåll",
+      "reasonIllegal": "Olagligt innehåll",
+      "reasonHarassment": "Trakasserier",
+      "reasonSpam": "Skräppost",
+      "reasonOther": "Annan anledning"
     },
     "reportReceipts": {
       "title": "Anmälningar",

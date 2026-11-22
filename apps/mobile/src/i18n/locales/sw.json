@@ -539,7 +539,17 @@
       "nextStepInReview": "Matokeo yataonekana kwenye skrini hii, na unaweza kukata rufaa baada ya uamuzi.",
       "nextStepAppeal": "Matokeo ya rufaa yataonekana kwenye skrini hii.",
       "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
-      "viewReceipt": "Angalia risiti"
+      "viewReceipt": "Angalia risiti",
+      "targetLabel": "Kitu kilichoripotiwa",
+      "reasonLabel": "Sababu ya ripoti",
+      "targetMessage": "Jibu la AI",
+      "targetComment": "Maoni ya PR",
+      "targetUser": "Mtumiaji",
+      "reasonHarmful": "Maudhui hatarishi",
+      "reasonIllegal": "Maudhui haramu",
+      "reasonHarassment": "Unyanyasaji",
+      "reasonSpam": "Barua taka",
+      "reasonOther": "Sababu nyingine"
     },
     "reportReceipts": {
       "title": "Ripoti",

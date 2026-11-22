@@ -539,7 +539,17 @@
       "nextStepInReview": "ຜົນຈະສະແດງຢູ່ໜ້າຈໍນີ້ ແລະ ທ່ານສາມາດອຸທອນໄດ້ຫຼັງຈາກມີຄຳຕັດສິນ.",
       "nextStepAppeal": "ຜົນຂອງການອຸທອນຈະສະແດງຢູ່ໜ້າຈໍນີ້.",
       "nextStepFinal": "ຄຳຕັດສິນການອຸທອນເປັນຂັ້ນສຸດທ້າຍ. ບໍ່ສາມາດຍື່ນອຸທອນໄດ້ອີກ.",
-      "viewReceipt": "ເບິ່ງໃບຮັບ"
+      "viewReceipt": "ເບິ່ງໃບຮັບ",
+      "targetLabel": "ສິ່ງທີ່ຖືກລາຍງານ",
+      "reasonLabel": "ເຫດຜົນຂອງການລາຍງານ",
+      "targetMessage": "ຄຳຕອບ AI",
+      "targetComment": "ຄຳເຫັນ PR",
+      "targetUser": "ຜູ້ໃຊ້",
+      "reasonHarmful": "ເນື້ອຫາອັນຕະລາຍ",
+      "reasonIllegal": "ເນື້ອຫາຜິດກົດໝາຍ",
+      "reasonHarassment": "ການລ່ວງລະເມີດ",
+      "reasonSpam": "ໂຄສະນາລົບກວນ",
+      "reasonOther": "ເຫດຜົນອື່ນ"
     },
     "reportReceipts": {
       "title": "ການລາຍງານ",

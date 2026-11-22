@@ -539,7 +539,17 @@
       "nextStepInReview": "Sakamakon zai bayyana a wannan allon, kuma za ka iya ɗaukaka ƙara bayan an yanke hukunci.",
       "nextStepAppeal": "Sakamakon ɗaukaka ƙara zai bayyana a wannan allon.",
       "nextStepFinal": "Hukuncin ɗaukaka ƙara ya zama na ƙarshe. Ba za a iya gabatar da wata ɗaukaka ƙara ba.",
-      "viewReceipt": "Duba rasidi"
+      "viewReceipt": "Duba rasidi",
+      "targetLabel": "Abin rahoto",
+      "reasonLabel": "Dalilin rahoto",
+      "targetMessage": "Amsar mataimaki",
+      "targetComment": "Tsokacin buƙatar haɗawa",
+      "targetUser": "Mai amfani",
+      "reasonHarmful": "Abun ciki mai cutarwa",
+      "reasonIllegal": "Abun ciki haramun",
+      "reasonHarassment": "Cin zarafi",
+      "reasonSpam": "Saƙon banza",
+      "reasonOther": "Wani dalili"
     },
     "reportReceipts": {
       "title": "Rahotanni",

@@ -541,7 +541,17 @@
       "nextStepInReview": "Rezultatas pasirodys šiame ekrane, o priėmus sprendimą galėsite pateikti apskundimą.",
       "nextStepAppeal": "Apskundimo rezultatas pasirodys šiame ekrane.",
       "nextStepFinal": "Sprendimas dėl apskundimo yra galutinis. Kito apskundimo pateikti negalima.",
-      "viewReceipt": "Peržiūrėti patvirtinimą"
+      "viewReceipt": "Peržiūrėti patvirtinimą",
+      "targetLabel": "Pranešimo objektas",
+      "reasonLabel": "Pranešimo priežastis",
+      "targetMessage": "DI atsakymas",
+      "targetComment": "Pakeitimų užklausos komentaras",
+      "targetUser": "Naudotojas",
+      "reasonHarmful": "Kenksmingas turinys",
+      "reasonIllegal": "Neteisėtas turinys",
+      "reasonHarassment": "Priekabiavimas",
+      "reasonSpam": "Nepageidaujama reklama",
+      "reasonOther": "Kita priežastis"
     },
     "reportReceipts": {
       "title": "Pranešimai",

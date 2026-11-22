@@ -539,7 +539,17 @@
       "nextStepInReview": "Lopputulos näkyy tällä näytöllä, ja voit valittaa päätöksen jälkeen.",
       "nextStepAppeal": "Valituksen lopputulos näkyy tällä näytöllä.",
       "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
-      "viewReceipt": "Näytä kuitti"
+      "viewReceipt": "Näytä kuitti",
+      "targetLabel": "Ilmoitettu kohde",
+      "reasonLabel": "Ilmoituksen syy",
+      "targetMessage": "Tekoälyn vastaus",
+      "targetComment": "Muutospyynnön kommentti",
+      "targetUser": "Käyttäjä",
+      "reasonHarmful": "Haitallinen sisältö",
+      "reasonIllegal": "Laiton sisältö",
+      "reasonHarassment": "Häirintä",
+      "reasonSpam": "Roskaposti",
+      "reasonOther": "Muu syy"
     },
     "reportReceipts": {
       "title": "Ilmoitukset",

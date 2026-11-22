@@ -631,7 +631,17 @@
       "nextStepInReview": "The outcome will appear on this screen, and you can appeal after a decision.",
       "nextStepAppeal": "The appeal outcome will appear on this screen.",
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
-      "viewReceipt": "View receipt"
+      "viewReceipt": "View receipt",
+      "targetLabel": "Reported item",
+      "reasonLabel": "Reason for report",
+      "targetMessage": "AI response",
+      "targetComment": "PR comment",
+      "targetUser": "Person",
+      "reasonHarmful": "Harmful content",
+      "reasonIllegal": "Illegal content",
+      "reasonHarassment": "Harassment",
+      "reasonSpam": "Spam",
+      "reasonOther": "Another reason"
     },
     "reportReceipts": {
       "title": "Reports",

@@ -539,7 +539,17 @@
       "nextStepInReview": "Umphumela uzovela kulesi sikrini, futhi ungafaka isikhalo ngemva kwesinqumo.",
       "nextStepAppeal": "Umphumela wesikhalo uzovela kulesi sikrini.",
       "nextStepFinal": "Isinqumo sesikhalo siyisinqumo sokugcina. Akukho esinye isikhalo esingafakwa.",
-      "viewReceipt": "Buka irisidi"
+      "viewReceipt": "Buka irisidi",
+      "targetLabel": "Into ebikiwe",
+      "reasonLabel": "Isizathu sombiko",
+      "targetMessage": "Impendulo yomsizi",
+      "targetComment": "Amazwana esicelo",
+      "targetUser": "Umsebenzisi",
+      "reasonHarmful": "Okuqukethwe okulimazayo",
+      "reasonIllegal": "Okuqukethwe okungekho emthethweni",
+      "reasonHarassment": "Ukuhlukumeza",
+      "reasonSpam": "Izikhangiso ezingacelwanga",
+      "reasonOther": "Esinye isizathu"
     },
     "reportReceipts": {
       "title": "Imibiko",

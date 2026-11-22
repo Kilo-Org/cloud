@@ -539,7 +539,17 @@
       "nextStepInReview": "Rezultati do të shfaqet në këtë ekran dhe mund të apelosh pas një vendimi.",
       "nextStepAppeal": "Rezultati i apelimit do të shfaqet në këtë ekran.",
       "nextStepFinal": "Vendimi i apelimit është përfundimtar. Nuk mund të dërgohet asnjë apelim tjetër.",
-      "viewReceipt": "Shiko dëftesën"
+      "viewReceipt": "Shiko dëftesën",
+      "targetLabel": "Elementi i raportuar",
+      "reasonLabel": "Arsyeja e raportimit",
+      "targetMessage": "Përgjigje e asistentit",
+      "targetComment": "Koment në kërkesë",
+      "targetUser": "Përdorues",
+      "reasonHarmful": "Përmbajtje e dëmshme",
+      "reasonIllegal": "Përmbajtje e paligjshme",
+      "reasonHarassment": "Ngacmim",
+      "reasonSpam": "Reklama të padëshiruara",
+      "reasonOther": "Arsye tjetër"
     },
     "reportReceipts": {
       "title": "Raportet",

@@ -539,7 +539,17 @@
       "nextStepInReview": "Das Ergebnis erscheint auf diesem Bildschirm, und nach einer Entscheidung kannst du Einspruch einlegen.",
       "nextStepAppeal": "Das Ergebnis deines Einspruchs erscheint auf diesem Bildschirm.",
       "nextStepFinal": "Die Entscheidung über den Einspruch ist endgültig. Ein weiterer Einspruch ist nicht möglich.",
-      "viewReceipt": "Bestätigung anzeigen"
+      "viewReceipt": "Bestätigung anzeigen",
+      "targetLabel": "Gemeldetes Element",
+      "reasonLabel": "Meldegrund",
+      "targetMessage": "KI-Antwort",
+      "targetComment": "PR-Kommentar",
+      "targetUser": "Benutzer",
+      "reasonHarmful": "Schädlicher Inhalt",
+      "reasonIllegal": "Rechtswidriger Inhalt",
+      "reasonHarassment": "Belästigung",
+      "reasonSpam": "Unerwünschte Werbung",
+      "reasonOther": "Sonstiger Grund"
     },
     "reportReceipts": {
       "title": "Meldungen",

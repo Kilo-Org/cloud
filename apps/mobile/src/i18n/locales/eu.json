@@ -539,7 +539,17 @@
       "nextStepInReview": "Emaitza pantaila honetan agertuko da, eta erabakia hartu ondoren helegitea aurkez dezakezu.",
       "nextStepAppeal": "Helegitearen emaitza pantaila honetan agertuko da.",
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
-      "viewReceipt": "Ikusi agiria"
+      "viewReceipt": "Ikusi agiria",
+      "targetLabel": "Salatutakoa",
+      "reasonLabel": "Salaketaren arrazoia",
+      "targetMessage": "AIaren erantzuna",
+      "targetComment": "Bateratze-eskaerako iruzkina",
+      "targetUser": "Erabiltzailea",
+      "reasonHarmful": "Eduki kaltegarria",
+      "reasonIllegal": "Eduki legez kanpokoa",
+      "reasonHarassment": "Jazarpena",
+      "reasonSpam": "Zabor-posta",
+      "reasonOther": "Beste arrazoi bat"
     },
     "reportReceipts": {
       "title": "Salaketak",

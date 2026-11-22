@@ -539,7 +539,17 @@
       "nextStepInReview": "Үр дүн нь энэ дэлгэц дээр харагдах бөгөөд шийдвэр гарсны дараа та давж заалдах боломжтой.",
       "nextStepAppeal": "Давж заалдлын үр дүн энэ дэлгэц дээр харагдах болно.",
       "nextStepFinal": "Давж заалдлын шийдвэр эцсийн байна. Дахин давж заалдах боломжгүй.",
-      "viewReceipt": "Баримт харах"
+      "viewReceipt": "Баримт харах",
+      "targetLabel": "Гомдол гаргасан зүйл",
+      "reasonLabel": "Гомдлын шалтгаан",
+      "targetMessage": "Хиймэл оюуны хариулт",
+      "targetComment": "Нэгтгэх хүсэлтийн сэтгэгдэл",
+      "targetUser": "Хэрэглэгч",
+      "reasonHarmful": "Хортой агуулга",
+      "reasonIllegal": "Хууль бус агуулга",
+      "reasonHarassment": "Дарамт",
+      "reasonSpam": "Спам",
+      "reasonOther": "Өөр шалтгаан"
     },
     "reportReceipts": {
       "title": "Мэдэгдэл",

@@ -539,7 +539,17 @@
       "nextStepInReview": "Hiseho eo amin'ity efijery ity ny vokany, ary afaka manao fampakarana ianao aorian'ny fanapahan-kevitra.",
       "nextStepAppeal": "Hiseho eo amin'ity efijery ity ny vokatry ny fampakarana.",
       "nextStepFinal": "Farany ny fanapahan-kevitra momba ny fampakarana. Tsy misy fampakarana hafa azo alefa intsony.",
-      "viewReceipt": "Jereo ny porofo"
+      "viewReceipt": "Jereo ny porofo",
+      "targetLabel": "Zavatra notaterina",
+      "reasonLabel": "Anton'ny tatitra",
+      "targetMessage": "Valin'ny AI",
+      "targetComment": "Fanehoan-kevitry ny PR",
+      "targetUser": "Mpampiasa",
+      "reasonHarmful": "Votoaty manimba",
+      "reasonIllegal": "Votoaty tsy ara-dalàna",
+      "reasonHarassment": "Fanorisorenana",
+      "reasonSpam": "Doka tsy nangatahana",
+      "reasonOther": "Antony hafa"
     },
     "reportReceipts": {
       "title": "Tatitra",

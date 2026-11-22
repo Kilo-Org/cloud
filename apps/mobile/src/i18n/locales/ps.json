@@ -539,7 +539,17 @@
       "nextStepInReview": "پایله به په دې پرده کې ښکاره شي، او تاسو کولی شئ له پرېکړې وروسته استیناف وکړئ.",
       "nextStepAppeal": "د استیناف پایله به په دې پرده کې ښکاره شي.",
       "nextStepFinal": "د استیناف پرېکړه قطعي ده. نور استیناف نه شي سپارل کېدای.",
-      "viewReceipt": "رسید وګورئ"
+      "viewReceipt": "رسید وګورئ",
+      "targetLabel": "راپور شوی توکی",
+      "reasonLabel": "د راپور دلیل",
+      "targetMessage": "د مصنوعي ځیرکتیا ځواب",
+      "targetComment": "د پل ریکویسټ تبصره",
+      "targetUser": "کارن",
+      "reasonHarmful": "زیانمنه منځپانګه",
+      "reasonIllegal": "غیرقانوني منځپانګه",
+      "reasonHarassment": "ځورونه",
+      "reasonSpam": "ناغوښتلې اعلانات",
+      "reasonOther": "بل دلیل"
     },
     "reportReceipts": {
       "title": "راپورونه",

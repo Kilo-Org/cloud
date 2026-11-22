@@ -539,7 +539,17 @@
       "nextStepInReview": "De uitkomst verschijnt op dit scherm en na een besluit kun je bezwaar maken.",
       "nextStepAppeal": "De uitkomst van je bezwaar verschijnt op dit scherm.",
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
-      "viewReceipt": "Ontvangstbewijs bekijken"
+      "viewReceipt": "Ontvangstbewijs bekijken",
+      "targetLabel": "Gemeld item",
+      "reasonLabel": "Reden van melding",
+      "targetMessage": "AI-antwoord",
+      "targetComment": "PR-opmerking",
+      "targetUser": "Gebruiker",
+      "reasonHarmful": "Schadelijke inhoud",
+      "reasonIllegal": "Illegale inhoud",
+      "reasonHarassment": "Intimidatie",
+      "reasonSpam": "Ongewenste reclame",
+      "reasonOther": "Andere reden"
     },
     "reportReceipts": {
       "title": "Meldingen",

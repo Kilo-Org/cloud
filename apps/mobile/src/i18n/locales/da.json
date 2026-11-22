@@ -539,7 +539,17 @@
       "nextStepInReview": "Resultatet vises på denne skærm, og du kan klage, når der er truffet en afgørelse.",
       "nextStepAppeal": "Resultatet af din klage vises på denne skærm.",
       "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
-      "viewReceipt": "Se kvittering"
+      "viewReceipt": "Se kvittering",
+      "targetLabel": "Anmeldt element",
+      "reasonLabel": "Årsag til anmeldelse",
+      "targetMessage": "AI-svar",
+      "targetComment": "PR-kommentar",
+      "targetUser": "Bruger",
+      "reasonHarmful": "Skadeligt indhold",
+      "reasonIllegal": "Ulovligt indhold",
+      "reasonHarassment": "Chikane",
+      "reasonSpam": "Uønsket reklame",
+      "reasonOther": "Anden årsag"
     },
     "reportReceipts": {
       "title": "Anmeldelser",

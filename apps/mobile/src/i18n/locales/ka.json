@@ -539,7 +539,17 @@
       "nextStepInReview": "შედეგი გამოჩნდება ამ ეკრანზე, ხოლო გადაწყვეტილების შემდეგ შეძლებთ გასაჩივრებას.",
       "nextStepAppeal": "გასაჩივრების შედეგი გამოჩნდება ამ ეკრანზე.",
       "nextStepFinal": "გასაჩივრების გადაწყვეტილება საბოლოოა. შემდგომი გასაჩივრება შეუძლებელია.",
-      "viewReceipt": "ქვითრის ნახვა"
+      "viewReceipt": "ქვითრის ნახვა",
+      "targetLabel": "საჩივრის ობიექტი",
+      "reasonLabel": "საჩივრის მიზეზი",
+      "targetMessage": "AI-ის პასუხი",
+      "targetComment": "PR-ის კომენტარი",
+      "targetUser": "მომხმარებელი",
+      "reasonHarmful": "მავნე შიგთავსი",
+      "reasonIllegal": "უკანონო შიგთავსი",
+      "reasonHarassment": "შევიწროება",
+      "reasonSpam": "სპამი",
+      "reasonOther": "სხვა მიზეზი"
     },
     "reportReceipts": {
       "title": "მოხსენებები",

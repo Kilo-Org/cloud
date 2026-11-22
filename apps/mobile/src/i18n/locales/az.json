@@ -539,7 +539,17 @@
       "nextStepInReview": "Nəticə bu ekranda görünəcək və qərardan sonra apellyasiya verə bilərsiniz.",
       "nextStepAppeal": "Apellyasiyanın nəticəsi bu ekranda görünəcək.",
       "nextStepFinal": "Apellyasiya qərarı qətidir. Artıq apellyasiya vermək mümkün deyil.",
-      "viewReceipt": "Qəbzə bax"
+      "viewReceipt": "Qəbzə bax",
+      "targetLabel": "Şikayət olunan",
+      "reasonLabel": "Şikayət səbəbi",
+      "targetMessage": "Süni intellekt cavabı",
+      "targetComment": "Birləşdirmə sorğusu şərhi",
+      "targetUser": "İstifadəçi",
+      "reasonHarmful": "Zərərli məzmun",
+      "reasonIllegal": "Qanunsuz məzmun",
+      "reasonHarassment": "Təqib",
+      "reasonSpam": "İstənməyən reklam",
+      "reasonOther": "Digər səbəb"
     },
     "reportReceipts": {
       "title": "Şikayətlər",

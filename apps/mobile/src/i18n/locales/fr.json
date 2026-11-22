@@ -540,7 +540,17 @@
       "nextStepInReview": "Le résultat s'affichera sur cet écran, et vous pourrez déposer un recours après la décision.",
       "nextStepAppeal": "Le résultat du recours s'affichera sur cet écran.",
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
-      "viewReceipt": "Voir l'accusé de réception"
+      "viewReceipt": "Voir l'accusé de réception",
+      "targetLabel": "Élément signalé",
+      "reasonLabel": "Motif du signalement",
+      "targetMessage": "Réponse de l'IA",
+      "targetComment": "Commentaire de PR",
+      "targetUser": "Utilisateur",
+      "reasonHarmful": "Contenu préjudiciable",
+      "reasonIllegal": "Contenu illégal",
+      "reasonHarassment": "Harcèlement",
+      "reasonSpam": "Publicité non sollicitée",
+      "reasonOther": "Autre motif"
     },
     "reportReceipts": {
       "title": "Signalements",

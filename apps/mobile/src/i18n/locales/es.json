@@ -540,7 +540,17 @@
       "nextStepInReview": "El resultado aparecerá en esta pantalla y podrás apelar tras la decisión.",
       "nextStepAppeal": "El resultado de tu apelación aparecerá en esta pantalla.",
       "nextStepFinal": "La decisión de la apelación es definitiva. No se puede presentar otra apelación.",
-      "viewReceipt": "Ver comprobante"
+      "viewReceipt": "Ver comprobante",
+      "targetLabel": "Elemento denunciado",
+      "reasonLabel": "Motivo de denuncia",
+      "targetMessage": "Respuesta de IA",
+      "targetComment": "Comentario de PR",
+      "targetUser": "Usuario",
+      "reasonHarmful": "Contenido dañino",
+      "reasonIllegal": "Contenido ilegal",
+      "reasonHarassment": "Acoso",
+      "reasonSpam": "Publicidad no deseada",
+      "reasonOther": "Otro motivo"
     },
     "reportReceipts": {
       "title": "Denuncias",

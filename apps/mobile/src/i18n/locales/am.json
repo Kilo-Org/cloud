@@ -539,7 +539,17 @@
       "nextStepInReview": "ውጤቱ በዚህ ማያ ላይ ይታያል፣ ከውሳኔ በኋላም ይግባኝ ማለት ይችላሉ።",
       "nextStepAppeal": "የይግባኝዎ ውጤት በዚህ ማያ ላይ ይታያል።",
       "nextStepFinal": "የይግባኙ ውሳኔ የመጨረሻ ነው። ተጨማሪ ይግባኝ ማቅረብ አይቻልም።",
-      "viewReceipt": "ደረሰኙን ይመልከቱ"
+      "viewReceipt": "ደረሰኙን ይመልከቱ",
+      "targetLabel": "ሪፖርት የተደረገበት ንጥል",
+      "reasonLabel": "የሪፖርት ምክንያት",
+      "targetMessage": "የAI ምላሽ",
+      "targetComment": "የማዋሃድ ጥያቄ አስተያየት",
+      "targetUser": "ተጠቃሚ",
+      "reasonHarmful": "ጎጂ ይዘት",
+      "reasonIllegal": "ሕገ-ወጥ ይዘት",
+      "reasonHarassment": "ትንኮሳ",
+      "reasonSpam": "አይፈለጌ ማስታወቂያ",
+      "reasonOther": "ሌላ ምክንያት"
     },
     "reportReceipts": {
       "title": "ሪፖርቶች",

@@ -539,7 +539,17 @@
       "nextStepInReview": "ප්‍රතිඵලය මෙම තිරයේ දිස්වනු ඇති අතර, තීරණයක් ගත් පසු ඔබට අභියාචනා කළ හැක.",
       "nextStepAppeal": "අභියාචනයේ ප්‍රතිඵලය මෙම තිරයේ දිස්වනු ඇත.",
       "nextStepFinal": "අභියාචන තීරණය අවසාන ය. තවදුරටත් අභියාචනයක් ඉදිරිපත් කළ නොහැක.",
-      "viewReceipt": "රිසිට්පත බලන්න"
+      "viewReceipt": "රිසිට්පත බලන්න",
+      "targetLabel": "වාර්තා කළ අයිතමය",
+      "reasonLabel": "වාර්තාවට හේතුව",
+      "targetMessage": "AI පිළිතුර",
+      "targetComment": "පුල් ඉල්ලීම් අදහස",
+      "targetUser": "පරිශීලකයා",
+      "reasonHarmful": "හානිකර අන්තර්ගතය",
+      "reasonIllegal": "නීති විරෝධී අන්තර්ගතය",
+      "reasonHarassment": "හිරිහැර කිරීම",
+      "reasonSpam": "අනවශ්‍ය පණිවිඩ",
+      "reasonOther": "වෙනත් හේතුවක්"
     },
     "reportReceipts": {
       "title": "වාර්තා",

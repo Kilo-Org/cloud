@@ -539,7 +539,17 @@
       "nextStepInReview": "O resultado aparecerá nesta pantalla e poderás presentar un recurso unha vez tomada a decisión.",
       "nextStepAppeal": "O resultado do recurso aparecerá nesta pantalla.",
       "nextStepFinal": "A decisión do recurso é definitiva. Non se pode presentar ningún recurso máis.",
-      "viewReceipt": "Ver xustificante"
+      "viewReceipt": "Ver xustificante",
+      "targetLabel": "Elemento denunciado",
+      "reasonLabel": "Motivo da denuncia",
+      "targetMessage": "Resposta da IA",
+      "targetComment": "Comentario da solicitude",
+      "targetUser": "Usuario",
+      "reasonHarmful": "Contido nocivo",
+      "reasonIllegal": "Contido ilegal",
+      "reasonHarassment": "Acoso",
+      "reasonSpam": "Publicidade non desexada",
+      "reasonOther": "Outro motivo"
     },
     "reportReceipts": {
       "title": "Denuncias",

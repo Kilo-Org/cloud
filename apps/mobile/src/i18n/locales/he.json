@@ -540,7 +540,17 @@
       "nextStepInReview": "התוצאה תופיע במסך זה, ואפשר לערער לאחר ההחלטה.",
       "nextStepAppeal": "תוצאת הערעור תופיע במסך זה.",
       "nextStepFinal": "החלטת הערעור סופית. לא ניתן להגיש ערעור נוסף.",
-      "viewReceipt": "הצגת האישור"
+      "viewReceipt": "הצגת האישור",
+      "targetLabel": "פריט מדווח",
+      "reasonLabel": "סיבת הדיווח",
+      "targetMessage": "תשובת AI",
+      "targetComment": "תגובה בבקשת משיכה",
+      "targetUser": "משתמש",
+      "reasonHarmful": "תוכן מזיק",
+      "reasonIllegal": "תוכן לא חוקי",
+      "reasonHarassment": "הטרדה",
+      "reasonSpam": "ספאם",
+      "reasonOther": "סיבה אחרת"
     },
     "reportReceipts": {
       "title": "דיווחים",

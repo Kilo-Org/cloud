@@ -539,7 +539,17 @@
       "nextStepInReview": "परिणाम इस स्क्रीन पर दिखाई देगा, और निर्णय के बाद आप अपील कर सकते हैं।",
       "nextStepAppeal": "अपील का परिणाम इस स्क्रीन पर दिखाई देगा।",
       "nextStepFinal": "अपील का निर्णय अंतिम है। अब और कोई अपील दर्ज नहीं की जा सकती।",
-      "viewReceipt": "रसीद देखें"
+      "viewReceipt": "रसीद देखें",
+      "targetLabel": "रिपोर्ट की गई वस्तु",
+      "reasonLabel": "रिपोर्ट का कारण",
+      "targetMessage": "एआई उत्तर",
+      "targetComment": "पुल रिक्वेस्ट टिप्पणी",
+      "targetUser": "व्यक्ति",
+      "reasonHarmful": "हानिकारक सामग्री",
+      "reasonIllegal": "अवैध सामग्री",
+      "reasonHarassment": "उत्पीड़न",
+      "reasonSpam": "अवांछित संदेश",
+      "reasonOther": "अन्य कारण"
     },
     "reportReceipts": {
       "title": "रिपोर्टें",

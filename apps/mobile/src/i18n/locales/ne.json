@@ -539,7 +539,17 @@
       "nextStepInReview": "नतिजा यही स्क्रिनमा देखिनेछ, र निर्णय भएपछि तपाईं पुनरावेदन गर्न सक्नुहुनेछ।",
       "nextStepAppeal": "पुनरावेदनको नतिजा यही स्क्रिनमा देखिनेछ।",
       "nextStepFinal": "पुनरावेदनको निर्णय अन्तिम हो। अब थप पुनरावेदन पेश गर्न सकिँदैन।",
-      "viewReceipt": "रसिद हेर्नुहोस्"
+      "viewReceipt": "रसिद हेर्नुहोस्",
+      "targetLabel": "रिपोर्ट गरिएको वस्तु",
+      "reasonLabel": "रिपोर्टको कारण",
+      "targetMessage": "एआई जवाफ",
+      "targetComment": "पुल रिक्वेस्ट टिप्पणी",
+      "targetUser": "प्रयोगकर्ता",
+      "reasonHarmful": "हानिकारक सामग्री",
+      "reasonIllegal": "अवैध सामग्री",
+      "reasonHarassment": "उत्पीडन",
+      "reasonSpam": "अवांछित विज्ञापन",
+      "reasonOther": "अन्य कारण"
     },
     "reportReceipts": {
       "title": "रिपोर्टहरू",

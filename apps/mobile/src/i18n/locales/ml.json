@@ -539,7 +539,17 @@
       "nextStepInReview": "ഫലം ഈ സ്ക്രീനിൽ ദൃശ്യമാകും, തീരുമാനത്തിന് ശേഷം അപ്പീൽ നൽകാം.",
       "nextStepAppeal": "അപ്പീലിന്റെ ഫലം ഈ സ്ക്രീനിൽ ദൃശ്യമാകും.",
       "nextStepFinal": "അപ്പീലിന്റെ തീരുമാനം അന്തിമമാണ്. ഇനി അപ്പീൽ സമർപ്പിക്കാനാകില്ല.",
-      "viewReceipt": "രസീത് കാണുക"
+      "viewReceipt": "രസീത് കാണുക",
+      "targetLabel": "റിപ്പോർട്ട് ചെയ്തത്",
+      "reasonLabel": "റിപ്പോർട്ടിന്റെ കാരണം",
+      "targetMessage": "എഐ മറുപടി",
+      "targetComment": "പുൾ റിക്വസ്റ്റ് അഭിപ്രായം",
+      "targetUser": "വ്യക്തി",
+      "reasonHarmful": "ഹാനികരമായ ഉള്ളടക്കം",
+      "reasonIllegal": "നിയമവിരുദ്ധ ഉള്ളടക്കം",
+      "reasonHarassment": "പീഡനം",
+      "reasonSpam": "അനാവശ്യ പരസ്യം",
+      "reasonOther": "മറ്റൊരു കാരണം"
     },
     "reportReceipts": {
       "title": "റിപ്പോർട്ടുകൾ",

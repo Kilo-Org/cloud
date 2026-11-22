@@ -539,7 +539,17 @@
       "nextStepInReview": "Bu'aan gabaasaa fuula kana irratti mul'ata, murtee boodas ol'iyyachuu dandeessa.",
       "nextStepAppeal": "Bu'aan ol'iyyannoo kee fuula kana irratti mul'ata.",
       "nextStepFinal": "Murteen ol'iyyannoo kan dhumaa dha. Ol'iyyannoon biraa ergamuu hin danda'u.",
-      "viewReceipt": "Ragaa ilaali"
+      "viewReceipt": "Ragaa ilaali",
+      "targetLabel": "Wanta gabaabame",
+      "reasonLabel": "Sababaa gabaasaa",
+      "targetMessage": "Deebii AI",
+      "targetComment": "Yaada PR",
+      "targetUser": "Fayyadamaa",
+      "reasonHarmful": "Qabiyyee miidhaa qabu",
+      "reasonIllegal": "Qabiyyee seeraan ala",
+      "reasonHarassment": "Dhiibbaa",
+      "reasonSpam": "Beeksisa hin barbaadamne",
+      "reasonOther": "Sababaa biraa"
     },
     "reportReceipts": {
       "title": "Gabaasoota",

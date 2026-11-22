@@ -541,7 +541,17 @@
       "nextStepInReview": "O resultado aparecerá nesta tela, e você poderá recorrer após a decisão.",
       "nextStepAppeal": "O resultado do recurso aparecerá nesta tela.",
       "nextStepFinal": "A decisão do recurso é definitiva. Não é possível enviar outro recurso.",
-      "viewReceipt": "Ver comprovante"
+      "viewReceipt": "Ver comprovante",
+      "targetLabel": "Item denunciado",
+      "reasonLabel": "Motivo da denúncia",
+      "targetMessage": "Resposta da IA",
+      "targetComment": "Comentário do PR",
+      "targetUser": "Usuário",
+      "reasonHarmful": "Conteúdo nocivo",
+      "reasonIllegal": "Conteúdo ilegal",
+      "reasonHarassment": "Assédio",
+      "reasonSpam": "Publicidade não solicitada",
+      "reasonOther": "Outro motivo"
     },
     "reportReceipts": {
       "title": "Denúncias",

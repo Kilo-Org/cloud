@@ -539,7 +539,17 @@
       "nextStepInReview": "પરિણામ આ સ્ક્રીન પર દેખાશે, અને નિર્ણય પછી તમે અપીલ કરી શકશો.",
       "nextStepAppeal": "અપીલનું પરિણામ આ સ્ક્રીન પર દેખાશે.",
       "nextStepFinal": "અપીલનો નિર્ણય અંતિમ છે. હવે વધુ અપીલ કરી શકાતી નથી.",
-      "viewReceipt": "રસીદ જુઓ"
+      "viewReceipt": "રસીદ જુઓ",
+      "targetLabel": "રિપોર્ટ કરેલી વસ્તુ",
+      "reasonLabel": "રિપોર્ટનું કારણ",
+      "targetMessage": "એઆઈ જવાબ",
+      "targetComment": "પુલ રિક્વેસ્ટ ટિપ્પણી",
+      "targetUser": "વપરાશકર્તા",
+      "reasonHarmful": "હાનિકારક સામગ્રી",
+      "reasonIllegal": "ગેરકાયદેસર સામગ્રી",
+      "reasonHarassment": "હેરાનગતિ",
+      "reasonSpam": "અનિચ્છિત જાહેરાત",
+      "reasonOther": "બીજું કારણ"
     },
     "reportReceipts": {
       "title": "રિપોર્ટ્સ",

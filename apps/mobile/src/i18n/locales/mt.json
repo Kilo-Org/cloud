@@ -542,7 +542,17 @@
       "nextStepInReview": "Ir-riżultat se jidher fuq dan l-iskrin, u tista' tappella wara deċiżjoni.",
       "nextStepAppeal": "Ir-riżultat tal-appell se jidher fuq dan l-iskrin.",
       "nextStepFinal": "Id-deċiżjoni tal-appell hija finali. Ma jistax jiġi ppreżentat appell ieħor.",
-      "viewReceipt": "Ara l-irċevuta"
+      "viewReceipt": "Ara l-irċevuta",
+      "targetLabel": "Oġġett irrappurtat",
+      "reasonLabel": "Raġuni tar-rapport",
+      "targetMessage": "Tweġiba tal-AI",
+      "targetComment": "Kumment fit-talba",
+      "targetUser": "Persuna",
+      "reasonHarmful": "Kontenut dannuż",
+      "reasonIllegal": "Kontenut illegali",
+      "reasonHarassment": "Fastidju",
+      "reasonSpam": "Reklamar mhux mixtieq",
+      "reasonOther": "Raġuni oħra"
     },
     "reportReceipts": {
       "title": "Rapporti",

@@ -539,7 +539,17 @@
       "nextStepInReview": "Rezilta a ap parèt sou ekran sa a, epi ou ka fè apèl apre yon desizyon.",
       "nextStepAppeal": "Rezilta apèl la ap parèt sou ekran sa a.",
       "nextStepFinal": "Desizyon apèl la final. Ou pa ka soumèt okenn lòt apèl.",
-      "viewReceipt": "Wè resi a"
+      "viewReceipt": "Wè resi a",
+      "targetLabel": "Eleman rapòte",
+      "reasonLabel": "Rezon rapò a",
+      "targetMessage": "Repons AI",
+      "targetComment": "Kòmantè PR",
+      "targetUser": "Moun",
+      "reasonHarmful": "Kontni danjre",
+      "reasonIllegal": "Kontni ilegal",
+      "reasonHarassment": "Arasman",
+      "reasonSpam": "Piblisite endezirab",
+      "reasonOther": "Yon lòt rezon"
     },
     "reportReceipts": {
       "title": "Rapò",

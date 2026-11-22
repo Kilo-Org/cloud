@@ -503,8 +503,8 @@ export async function upsertDiscordInstallation(
  * server. The OAuth exchange stores no user token, deliberately, so this call is
  * the one that ends the membership the integration holds. Discord answers 204
  * when the bot left and 404 for a server it is not in. A 403 means the token may
- * not act on that guild, so it is reported as a failure rather than read as a
- * membership that is already gone.
+ * not act on that guild, so it is reported as `unavailable` for the support step,
+ * because repeating the same request cannot change it.
  *
  * `timeoutMs` bounds the request. A caller inside the installation lock passes a
  * value below that lock's wait; without one the full default applies.

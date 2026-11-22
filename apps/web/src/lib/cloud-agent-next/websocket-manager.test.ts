@@ -363,13 +363,47 @@ describe('cloud-agent-next websocket-manager', () => {
     socketAt(1).simulateClose(1011, 'Host shutting down');
     jest.advanceTimersByTime(2000);
 
-    jest.advanceTimersByTime(10000);
+    socketAt(2).simulateMessage(eventMessage(3));
+    jest.advanceTimersByTime(6000);
+    socketAt(2).simulateMessage(eventMessage(4));
+    jest.advanceTimersByTime(4000);
     socketAt(2).simulateClose(1011, 'Host shutting down');
 
     expect(reconnectAttempts).toEqual([1, 2, 1]);
   });
 
-  it('refreshes the ticket at most once for a flapping 1006 server', async () => {
+  it('keeps the escalation when a socket closes without delivering a frame', () => {
+    const { onStateChange, reconnectAttempts } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1011, 'Host shutting down');
+    jest.advanceTimersByTime(1000);
+
+    jest.advanceTimersByTime(30000);
+    socketAt(1).simulateClose(1011, 'Host shutting down');
+
+    expect(reconnectAttempts).toEqual([1, 2]);
+  });
+
+  it('keeps the escalation when a socket closes before the stability window', () => {
+    const { onStateChange, reconnectAttempts } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1011, 'Host shutting down');
+    jest.advanceTimersByTime(1000);
+
+    socketAt(1).simulateMessage(eventMessage(4));
+    jest.advanceTimersByTime(9999);
+    socketAt(1).simulateClose(1011, 'Host shutting down');
+
+    expect(reconnectAttempts).toEqual([1, 2]);
+  });
+
+  it('refreshes the ticket at most once per connection lifetime', async () => {
     const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
     const { onStateChange, reconnectAttempts } = recordStates();
     const manager = createWebSocketManager(createConfig({ onRefreshTicket, onStateChange }));
@@ -382,6 +416,7 @@ describe('cloud-agent-next websocket-manager', () => {
     expect(onRefreshTicket).toHaveBeenCalledTimes(1);
     expect(MockWebSocket.instances).toHaveLength(2);
 
+    socketAt(1).simulateMessage(eventMessage(7));
     socketAt(1).simulateClose(1006, '');
 
     expect(onRefreshTicket).toHaveBeenCalledTimes(1);
@@ -390,24 +425,6 @@ describe('cloud-agent-next websocket-manager', () => {
 
     jest.advanceTimersByTime(1000);
     expect(MockWebSocket.instances).toHaveLength(3);
-  });
-
-  it('does not refresh the ticket twice after a greeted socket closes with 1006', async () => {
-    const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
-    const { onStateChange, reconnectAttempts } = recordStates();
-    const manager = createWebSocketManager(createConfig({ onRefreshTicket, onStateChange }));
-
-    manager.connect();
-
-    socketAt(0).simulateClose(1006, '');
-    await flushPromises();
-    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
-
-    socketAt(1).simulateMessage(eventMessage(7));
-    socketAt(1).simulateClose(1006, '');
-
-    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
-    expect(reconnectAttempts).toEqual([1]);
   });
 
   it('refreshes the ticket again when a stable socket closes with an auth code', async () => {
@@ -422,6 +439,8 @@ describe('cloud-agent-next websocket-manager', () => {
     expect(onRefreshTicket).toHaveBeenCalledTimes(1);
     expect(MockWebSocket.instances).toHaveLength(2);
 
+    jest.advanceTimersByTime(10000);
+    socketAt(1).simulateMessage(eventMessage(8));
     jest.advanceTimersByTime(10000);
     socketAt(1).simulateClose(1008, 'policy violation');
     await flushPromises();

@@ -185,7 +185,7 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
     // Always include lastEventId if we have one - this enables replay after any reconnection
     // (whether from network issues, ticket refresh, or other disconnects)
     const urlWithReplay = lastEventId ? buildUrl(lastEventId) : buildUrl();
-    socketOpenedAt = Date.now();
+    socketOpenedAt = null;
     setState({ status: 'connecting' });
 
     const newWs = new WebSocket(urlWithReplay);
@@ -203,6 +203,7 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
       }
 
       const event = parsed.event;
+      socketOpenedAt ??= Date.now();
       // Only advance the cursor for persisted events (positive IDs).
       // Volatile events (e.g. preparing progress) use id 0; allowing them
       // to regress the cursor causes a full replay on the next reconnect.

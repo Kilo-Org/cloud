@@ -249,6 +249,24 @@ async function settleTurnAndAsk(
   return messageId;
 }
 
+/** One turn still live on the route that asks a question nothing answered yet. */
+async function startLiveTurnAndAsk(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  peer: FakeSandboxPeer
+): Promise<void> {
+  await expect(stub.send(promptPayload(createMessageId(), 'start'))).resolves.toEqual({
+    type: 'ok',
+  });
+  peer.prepareView = peer.view('ready');
+  await stub.onRoute({ state: 'ready', attemptId: peer.attemptId });
+  await waitFor(async () => {
+    const live = await stub.getSession();
+    if (live.type !== 'found') throw new Error('Session disappeared');
+    expect(live.messages.map(message => message.state)).toEqual(['accepted']);
+  });
+  await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: QUESTION_ID } }] });
+}
+
 afterEach(async () => {
   await clearFacadeRoots().catch(() => undefined);
   await reset();
@@ -313,5 +331,61 @@ describe('facade answer for a session that moved on', { timeout: 30_000 }, () =>
     } finally {
       await backend.restore();
     }
+  });
+
+  it('refuses with the retryable answer error when the live route cannot take the reply', async () => {
+    const { stub, peer } = await registerColdSession();
+    await seedFacadeRoot();
+    const answer = peer.answer.bind(peer);
+    try {
+      await startLiveTurnAndAsk(stub, peer);
+      // The live path takes the reply in the Session DO and reads no payer, so
+      // only the peer forward is replaced here.
+      await runInDurableObject(stub, () => {
+        Object.assign(peer, { answer: async () => 'not_connected' });
+      });
+
+      const response = await postAnswer();
+
+      expect(response.status).toBe(409);
+      expect(response.headers.get('retry-after')).toBe('1');
+      await expect(response.json()).resolves.toEqual({
+        error: 'KILO_ANSWER_RETRY_REQUIRED',
+        message: 'The session moved on; send the answer again',
+      });
+      // The interaction still waits, so the same reply is admissible again.
+      await expect(stub.getPendingInteractions()).resolves.toMatchObject({
+        questions: [{ id: QUESTION_ID }],
+      });
+    } finally {
+      await runInDurableObject(stub, () => {
+        peer.answer = answer;
+      });
+    }
+  });
+
+  it('keeps the terminal answer error when a runtime event already resolved the interaction', async () => {
+    const { stub, peer } = await registerColdSession();
+    await seedFacadeRoot();
+    await startLiveTurnAndAsk(stub, peer);
+    // The runtime answered the question itself while the turn stayed live, so
+    // nothing waits on this reply any more.
+    await stub.onEvents({
+      events: [{ type: 'question.replied', properties: { requestID: QUESTION_ID } }],
+    });
+
+    const response = await postAnswer();
+
+    // A resolved interaction stays terminal: no retry header, no retryable code.
+    expect(response.status).toBe(409);
+    expect(response.headers.get('retry-after')).toBeNull();
+    await expect(response.json()).resolves.toEqual({
+      error: 'KILO_INTERACTION_UNAVAILABLE',
+      message: 'The session does not wait on this interaction',
+    });
+    await expect(stub.getPendingInteractions()).resolves.toEqual({
+      questions: [],
+      permissions: [],
+    });
   });
 });

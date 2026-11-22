@@ -305,6 +305,31 @@ describe('answerQuestion', () => {
     }
   });
 
+  it('reports a live reply the route could not take as a retryable conflict', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    const harness = setup();
+    harness.stub.answer.mockResolvedValue('retry');
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(
+        harness.caller.answerQuestion({
+          sessionId: SESSION_ID,
+          questionId: 'q_1',
+          answers: [['yes']],
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        cause: { error: 'ANSWER_RETRY_REQUIRED', retryable: true },
+      });
+      // The live path admits nothing itself, so no continuation is preflighted.
+      expect(harness.stub.admitAnswerContinuation).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('reports a capacity refusal before reading the payer balance', async () => {
     fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
     const harness = setup();

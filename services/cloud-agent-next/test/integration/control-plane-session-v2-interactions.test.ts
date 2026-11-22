@@ -524,7 +524,9 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     await runInDurableObject(stub, () => {
       Object.assign(peer, { answer: async () => 'not_connected' });
     });
-    await expect(stub.answer(payload)).resolves.toBe('not_connected');
+    // The interaction still waits, so the refusal is retryable rather than
+    // terminal for this reply.
+    await expect(stub.answer(payload)).resolves.toBe('retry');
     await runInDurableObject(stub, () => {
       Object.assign(peer, {
         answer: async () => {
@@ -532,7 +534,7 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
         },
       });
     });
-    await expect(stub.answer(payload)).resolves.toBe('not_connected');
+    await expect(stub.answer(payload)).resolves.toBe('retry');
     expect(
       await runInDurableObject(stub, (_instance, state) =>
         state.storage.get('session_pending_interactions')

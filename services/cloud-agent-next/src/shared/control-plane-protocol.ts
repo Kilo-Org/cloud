@@ -1133,6 +1133,19 @@ export const controlPlaneDispatchResultSchema = z.union([
   z.object({ result: z.literal('queue-full') }).strict(),
 ]);
 
+/**
+ * The result of an answer. It adds `retry` to the dispatch result: the
+ * interaction the reply names still waits, but the live sandbox route could not
+ * take the reply, so the same reply is admissible once the route is available
+ * again. Callers must keep the interaction and offer a retry. `abort` keeps
+ * reporting `ControlPlaneDispatchResult`, because an abort has nothing to
+ * retry.
+ */
+export const controlPlaneAnswerResultSchema = z.union([
+  controlPlaneDispatchResultSchema,
+  z.literal('retry'),
+]);
+
 export const controlPlaneStatusResultSchema = z
   .object({
     sessionId: z.string().min(1),
@@ -1890,6 +1903,7 @@ export type ControlPlaneContinuationAdmissionResult = z.infer<
   typeof controlPlaneContinuationAdmissionResultSchema
 >;
 export type ControlPlaneDispatchResult = z.infer<typeof controlPlaneDispatchResultSchema>;
+export type ControlPlaneAnswerResult = z.infer<typeof controlPlaneAnswerResultSchema>;
 export type ControlPlaneStatusResult = z.infer<typeof controlPlaneStatusResultSchema>;
 export type ControlPlaneSessionCredentialsPayload = z.infer<
   typeof controlPlaneSessionCredentialsPayloadSchema

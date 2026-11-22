@@ -3181,6 +3181,33 @@ describe('hosted native routes', () => {
     expect(admitAnswerContinuation).toHaveBeenCalledTimes(1);
   });
 
+  it('reports a retryable refusal when the live route could not take the reply', async () => {
+    const env = envStub();
+    vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({
+      answer: vi.fn(async () => 'retry' as const),
+    })) as never;
+    const validatePromptBalance = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_live/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['Blue']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      authToken: 'caller-bearer',
+      deps: hostedDeps({ validatePromptBalance }),
+    });
+    // Retryable, so a client keeps the interaction instead of dropping it.
+    expect(response.status).toBe(409);
+    expect(response.headers.get('Retry-After')).toBe('1');
+    await expect(response.json()).resolves.toEqual({
+      error: 'KILO_ANSWER_RETRY_REQUIRED',
+      message: 'The session moved on; send the answer again',
+    });
+    // A live reply is already paid for, so no balance read happens.
+    expect(validatePromptBalance).not.toHaveBeenCalled();
+  });
+
   it('answers a live turn without reading the balance', async () => {
     const env = envStub();
     vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({

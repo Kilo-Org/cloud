@@ -295,11 +295,12 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   Public execution-stop notices retain their bounded reason and recovery guidance.
 - Pending questions and permissions are projected from events. Answers go to the wrapper through the
   Sandbox DO. If the turn already settled, for example because the sandbox stopped, the answer is
-  sent as a new message. The answer call only preflights that new turn; the admit call rebuilds it
-  from the session's current state and reports `sent`, `queue-full`, `retry` or `not_connected`.
-  `retry` means the named interaction is still pending and only the preflighted turn no longer
-  matches the session, so the caller can preflight the same reply again; `not_connected` is terminal
-  for that reply.
+  sent as a new message. The answer call itself also reports a retryable refusal. That happens when
+  the live route cannot take the reply and the interaction still waits. The same reply is then
+  admissible after the route returns. The answer call only preflights that new turn; the admit call
+  rebuilds it from the session's current state and reports `sent`, `queue-full`, `retry` or
+  `not_connected`. `retry` means the named interaction is still pending and this reply could not be
+  taken, so the caller can use the same reply again; `not_connected` is terminal for that reply.
 - Each terminal message produces one report. The batch callback fires when no `queued` or
   `accepted` message remains (current callback semantics).
 - The per-user facade serves native `/event` and `/global/event`. `/event` first opens the same

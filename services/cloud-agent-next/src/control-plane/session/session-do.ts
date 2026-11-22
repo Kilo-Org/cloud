@@ -117,6 +117,7 @@ import {
   controlPlaneWorkspaceStoppedPayloadSchema,
   type ControlPlaneAnswerPayload,
   type ControlPlaneAnswerReply,
+  type ControlPlaneAnswerResult,
   type ControlPlaneAdmitAnswerPayload,
   type ControlPlaneCancelWorkspacePayload,
   type ControlPlaneCancelWorkspaceResult,
@@ -571,7 +572,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   cancelWorkspace(
     payload: ControlPlaneCancelWorkspacePayload
   ): Promise<ControlPlaneCancelWorkspaceResult>;
-  answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
+  answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneAnswerResult>;
   release(payload: ControlPlaneReleasePayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
@@ -2146,7 +2147,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult> {
+  async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneAnswerResult> {
     await this.initialized;
     if (this.registration === null) return 'not_connected';
     const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
@@ -2156,18 +2157,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A live turn takes the answer directly (spec §5). The route is named by
       // this DO, never by the caller, so a wrong id cannot reach a sibling.
       if (this.messages.some(message => message.state === 'accepted')) {
-        const peer = this.sandboxPeer();
-        if (peer === null) return 'not_connected';
-        let result: ControlPlaneDispatchResult;
-        try {
-          result = await peer.answer({ sessionId: this.sessionId, reply: parsed.reply });
-        } catch {
-          return 'not_connected';
-        }
-        // The Sandbox DO only answers a live turn, so it cannot report capacity.
-        if (result !== 'sent') return 'not_connected';
-        await this.resolvePendingInteraction(parsed.reply);
-        return 'sent';
+        const forwarded = await this.forwardToLiveTurn(parsed.reply);
+        if (forwarded === 'sent') return 'sent';
+        // The forward resolves the interaction only when it succeeds, so a
+        // refusal while the interaction still waits is retryable, exactly as
+        // `admitAnswerContinuation` reports it.
+        return this.hasPendingInteraction(target.collection, target.id) ? 'retry' : 'not_connected';
       }
       // The asking turn already settled: the answer would become a new message
       // that continues the chat (spec §5). A new message costs a turn, so this
@@ -2264,19 +2259,24 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  /** Hands a reply to the live turn that now owns it (spec §5). */
+  /**
+   * Hands a reply to the live turn that now owns it (spec §5). It only reports
+   * whether the route took the reply; the caller decides whether a failure is
+   * retryable, because the caller knows the interaction it named.
+   */
   private async forwardToLiveTurn(
     reply: ControlPlaneAnswerReply
-  ): Promise<ControlPlaneContinuationAdmissionResult> {
+  ): Promise<'sent' | 'not_connected'> {
     const peer = this.sandboxPeer();
     if (peer === null) return 'not_connected';
-    let result: ControlPlaneDispatchResult;
+    let result: ControlPlaneAnswerResult;
     try {
       result = await peer.answer({ sessionId: this.sessionId, reply });
     } catch {
       return 'not_connected';
     }
-    // The Sandbox DO only answers a live turn, so it cannot return a continuation.
+    // The Sandbox DO only answers a live turn, so it cannot report capacity or
+    // build a continuation.
     if (result !== 'sent') return 'not_connected';
     await this.resolvePendingInteraction(reply);
     return 'sent';

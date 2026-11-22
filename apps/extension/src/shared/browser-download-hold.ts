@@ -38,6 +38,10 @@ export interface DownloadStep {
   readonly element?: string | undefined;
   /** The noun a report tells the model to repeat: `click`, `navigation`. */
   readonly noun: string;
+  /**
+   * The origin the gate bound this step's approval under: the sensitive element's or focused field's
+   * own frame origin when the gate classified one, and the call's origin otherwise.
+   */
   readonly origin: string;
   readonly session: string;
   readonly tabId: number;

@@ -24,6 +24,15 @@ const sensitiveOf = (result: AgentPreflight) => (result.ok ? undefined : result.
 
 const sensitiveReasonOf = (result: AgentPreflight) => sensitiveOf(result)?.reason;
 
+/** The allowed preflight, so a spec body never branches on the outcome's own kind. */
+const allowedOf = (result: AgentPreflight): Extract<AgentPreflight, { readonly ok: true }> => {
+  if (!result.ok) {
+    throw new Error(`expected an allowed call, got ${JSON.stringify(result.failure)}`);
+  }
+
+  return result;
+};
+
 /** Node 12 is the pay frame's field; every other node lives in the main frame. */
 const frameIdForTestNode = (backendNodeId: number): string =>
   backendNodeId === 12 ? 'f1' : 'main';
@@ -935,6 +944,59 @@ describe('sensitive steps', () => {
       origin: 'https://pay.example.com',
       reason: SENSITIVE_REASON.password,
     });
+  });
+
+  it('redeems a cross-frame approval with the origin the gate bound, not the call\u2019s', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-f' });
+    const args = {
+      fields: [
+        { name: 'Name', target: 'e11', type: 'textbox', value: 'Igor' },
+        { name: 'Card', target: 'e12', type: 'textbox', value: '4242' },
+      ],
+    };
+    const session = createSession({
+      frameIdForBackendNode: frameIdForTestNode,
+      probeByObject: { 'obj-12': passwordProbe },
+    });
+    const refused = await run({ args, session, toolName: 'browser_fill_form' }, tokens);
+
+    // The step is sensitive, and its refusal labels the element's own frame rather than the call's origin.
+    expect(sensitiveOf(refused)).toStrictEqual({
+      element: 'e12',
+      origin: 'https://pay.example.com',
+      reason: SENSITIVE_REASON.password,
+    });
+
+    // The runtime issues the approval against the element and the origin the refusal reported.
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      element: 'e12',
+      origin: 'https://pay.example.com',
+      reason: SENSITIVE_REASON.password,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_fill_form',
+    });
+    const allowed = allowedOf(
+      await run({ args, session, stepTokens: [token], toolName: 'browser_fill_form' }, tokens)
+    );
+
+    // The redeemed approval reports the origin it was stored under, so a file approval issued on its retry matches.
+    expect(allowed).toMatchObject({
+      sensitiveToken: { element: 'e12', origin: 'https://pay.example.com', token },
+    });
+    // The call's origin is the first target's frame; the approval stays bound to the sensitive element's.
+    expect([allowed.origin, allowed.sensitiveToken?.origin]).toStrictEqual([
+      'https://app.example.com',
+      'https://pay.example.com',
+    ]);
+
+    const replay = await run(
+      { args, session, stepTokens: [token], toolName: 'browser_fill_form' },
+      tokens
+    );
+
+    expect(replay.ok).toBe(false);
   });
 
   it('fails closed when the focus chain enters a cross-origin frame', async () => {

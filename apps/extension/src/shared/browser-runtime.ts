@@ -3237,14 +3237,16 @@ export const createBrowserRuntime = ({
           readonly step: DownloadStep | undefined;
           readonly tokenTabId: number;
         }): BrowserToolRunOutcome => {
-          // A download approval issued for a call the gate classified on an element binds that same element, so the
-          // Retry carries the binding the gate recomputes for it.
-          // The preflight here is still the full union, so its ok branch is what the element is read through.
+          // A download approval issued for a call the gate classified on an element binds that same element and the
+          // Origin the gate bound it under, so the Retry carries the binding the gate recomputes for it.
+          // The preflight here is still the full union, so its ok branch is what those are read through.
           const element = preflight?.ok === true ? preflight.sensitiveToken?.element : undefined;
+          const boundOrigin =
+            preflight?.ok === true ? (preflight.sensitiveToken?.origin ?? origin) : origin;
           const token = issueSensitiveToken(
             {
               element,
-              origin,
+              origin: boundOrigin,
               reason: SENSITIVE_REASON.download,
             },
             tokenTabId,
@@ -3417,7 +3419,8 @@ export const createBrowserRuntime = ({
               ...(preflight.sensitiveToken?.element === undefined
                 ? {}
                 : { element: preflight.sensitiveToken.element }),
-              origin: preflight.origin,
+              // The origin the gate bound this call's approval under, which is its sensitive element's own frame.
+              origin: preflight.sensitiveToken?.origin ?? preflight.origin,
               session: sessionKey,
               tabId: stepTab ?? tabId,
               toolName: stepToolName,
@@ -3744,7 +3747,8 @@ export const createBrowserRuntime = ({
                 argumentHash: stepHash,
                 ...downloadStepText(stepToolName, stepArgumentsRecord),
                 element: preflight.sensitiveToken?.element,
-                origin: preflight.origin,
+                // The origin the gate bound this call's approval under, which is its sensitive element's own frame.
+                origin: preflight.sensitiveToken?.origin ?? preflight.origin,
                 session: sessionKey,
                 // The tab the step runs on, which for `browser_tabs new` is the tab it opened: the repeat lands there.
                 tabId: runTabId,
@@ -4254,6 +4258,11 @@ export const createBrowserRuntime = ({
           }
         } else if (agentContext !== undefined && stoppedFiles + settlement.kept.length > 0) {
           const origin = preflight?.ok ? preflight.origin : '';
+          // The origin the gate bound this call's approval under, which is its sensitive element's own frame when it
+          // Classified one: the approval this refusal issues has to match the binding the gate recomputes on retry.
+          const boundOrigin = preflight?.ok
+            ? (preflight.sensitiveToken?.origin ?? preflight.origin)
+            : '';
           const reason = SENSITIVE_REASON.download;
           // The refused file is what the approval will buy: the step's own download, never the first one the browser
           // Stopped. A later step's download is a fresh approval of its own.
@@ -4265,7 +4274,7 @@ export const createBrowserRuntime = ({
                   // The gate classified this call on an element, and its binding carries that element: a download
                   // Approval on the same call must match it on the retry instead of asking for the step again.
                   element: preflight.sensitiveToken?.element,
-                  origin,
+                  origin: boundOrigin,
                   reason,
                 },
                 runTabId,

@@ -1009,8 +1009,7 @@ describe('agent browser calls', () => {
       kind: 'needs_permission',
     });
 
-    // The same origin answers as an ordinary page, so the gate classifies no step for the retry: the runtime alone
-    // Redeems the token it carries, and that token names no file.
+    // The same origin answers as an ordinary page, so the gate classifies no step for the retry.
     cdp.setFrameUrl(`${consent}/settings`);
     const retried = await click([expectStepToken(sensitiveRefusal)]);
 
@@ -1021,6 +1020,139 @@ describe('agent browser calls', () => {
       kind: 'needs_permission',
     });
     expect(downloads.cancelled).toStrictEqual([61]);
+  });
+
+  it('redeems a file approval a cross-frame sensitive step issued on its retry', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    /** The pay frame's field is sensitive; every node of the tab's own document is an ordinary one. */
+    const passwordProbe = { fields: [{ kind: 'password' }], paymentFormSubmit: false };
+    const plainProbe = { fields: [], paymentFormSubmit: false };
+    // The pay frame's tree gives node 31 an interactive role, so a snapshot surfaces it as the ref `e31`.
+    const payTree = {
+      nodes: [
+        { childIds: ['2'], nodeId: '1', role: { value: 'RootWebArea' } },
+        {
+          backendDOMNodeId: 31,
+          name: { value: 'Card number' },
+          nodeId: '2',
+          role: { value: 'textbox' },
+        },
+      ],
+    };
+    // One isolated world per frame, so the ownership probe can tell which document holds a node.
+    const worlds = new Map<number, string>();
+    let nextWorld = 3;
+    /** The presses that reached the page: the refused call never runs the tool. */
+    let presses = 0;
+
+    cdp.setHandlers({
+      'Accessibility.getFullAXTree': params => {
+        const { frameId } = params ?? {};
+
+        return frameId === 'f1' ? payTree : MAIN_TREE;
+      },
+      'DOM.resolveNode': params => {
+        const requested = params?.['backendNodeId'] ?? params?.['nodeId'];
+        const backendNodeId = typeof requested === 'number' ? String(requested) : 'none';
+        const contextId = params?.['executionContextId'];
+        const world = typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main';
+
+        return { object: { objectId: `obj-${backendNodeId}-${world}` } };
+      },
+      'Input.dispatchMouseEvent': params => {
+        // A drag is one press and one release: only the press can start the file. The approved retry is the second
+        // Press, because the refused call never ran the tool.
+        if (params?.['type'] === 'mousePressed') {
+          presses += 1;
+          downloads.emit({
+            id: 70 + presses,
+            tabId: TAB_ID,
+            url: `${MAIN_ORIGIN}/report.txt`,
+          });
+        }
+
+        return {};
+      },
+      'Page.createIsolatedWorld': params => {
+        const frameId = typeof params?.['frameId'] === 'string' ? params['frameId'] : 'main';
+        const executionContextId = nextWorld;
+
+        nextWorld += 1;
+        worlds.set(executionContextId, frameId);
+
+        return { executionContextId };
+      },
+      'Runtime.callFunctionOn': params => {
+        const declaration = params?.['functionDeclaration'];
+        const objectId = typeof params?.['objectId'] === 'string' ? params['objectId'] : '';
+        const [backendNodeId = 'none', world = 'main'] = objectId.split('-').slice(1);
+        // The gate's ownership probe: node 31 is the pay frame's field, every other node the tab's document.
+        const nodeFrame = backendNodeId === '31' ? 'f1' : 'main';
+
+        return {
+          result: {
+            value:
+              typeof declaration === 'string' && declaration.includes('ownerDocument')
+                ? nodeFrame === world
+                : JSON.stringify(backendNodeId === '31' ? passwordProbe : plainProbe),
+          },
+        };
+      },
+    });
+
+    const grants: readonly BrowserGrant[] = [
+      readGrant,
+      actGrant,
+      { class: 'read', origin: FRAME_ORIGIN },
+      { class: 'act', origin: FRAME_ORIGIN },
+    ];
+
+    // The refs the drag targets: `e2` in the tab's own document, `e31` in the pay frame.
+    const snapshot = await runtime.runTool({
+      agent: { authorized: grants },
+      arguments: {},
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_snapshot',
+    });
+
+    expect(snapshot.kind).toBe('result');
+
+    const drag = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: grants, sensitive: [...sensitive] },
+        arguments: { endTarget: 'e31', startTarget: 'e2' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_drag',
+      });
+
+    // The sensitive element is in the pay frame while the call's first target is in the tab's own document.
+    const refusedStep = await drag([]);
+
+    expect(refusedStep).toMatchObject({
+      items: [{ class: 'sensitive', origin: FRAME_ORIGIN, reason: SENSITIVE_REASON.password }],
+      kind: 'needs_permission',
+    });
+
+    // The step's approval lets the drag run; the file it starts keeps the ordinary download rule.
+    const refusedFile = await drag([expectStepToken(refusedStep)]);
+
+    // The refusal still names the call's own origin.
+    expect(refusedFile).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(downloads.cancelled).toStrictEqual([71]);
+
+    // The file approval is bound to the origin the gate classified, so the retry redeems it instead of asking again.
+    const retried = await drag([expectStepToken(refusedFile)]);
+
+    // The approval bought the one file the refusal named: that file is kept, and nothing else was stopped.
+    expect(downloads.cancelled).toStrictEqual([71]);
+    expect(JSON.stringify(expectResult(retried).result)).toContain('report.txt');
   });
 
   it('fails the response of a file a payment-form submit starts when the downloads permission is withheld', async () => {

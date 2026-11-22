@@ -965,3 +965,107 @@ describe('ProfileMcpScreen server cap', () => {
     unmount();
   });
 });
+
+/** A sheet draft typed while the role allowed the write; the store keeps it past an unmount. */
+async function seedSheetDraft(): Promise<void> {
+  const first = await mountScreen();
+  pressEmptyAction(first.renderer);
+  changeText(first.renderer.root, 'Server name', 'portal-server');
+  changeText(first.renderer.root, 'Command line', 'npx portal-mcp');
+  first.unmount();
+}
+
+describe('ProfileMcpScreen manage permission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    Object.assign(h.query, {
+      data: testProfile(),
+      error: undefined,
+      isError: false,
+      isPending: false,
+      isRefetching: false,
+    });
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('renders no sheet for a stored draft once the role is read-only, and states the role once', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'read-only';
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+    expect(
+      findAll(renderer.root, 'Text').filter(
+        node => node.props.children === i18n.t('profiles.organizationRoleRequired')
+      )
+    ).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('drops that draft with the denial, so a later allowed render stays closed', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'read-only';
+
+    const denied = await mountScreen();
+    expect(findAll(denied.renderer.root, 'SheetHeader')).toHaveLength(0);
+    denied.unmount();
+
+    permissionState.permission = 'allowed';
+    const allowed = await mountScreen();
+    expect(findAll(allowed.renderer.root, 'SheetHeader')).toHaveLength(0);
+    allowed.unmount();
+  });
+
+  it('keeps the draft while the role resolves, then reopens on the typed fields', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'resolving';
+
+    const resolving = await mountScreen();
+    expect(findAll(resolving.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(resolving.renderer, resolving.queryClient);
+      await Promise.resolve();
+    });
+
+    expect(findOne(resolving.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(resolving.renderer.root, 'Server name').props.defaultValue).toBe(
+      'portal-server'
+    );
+    expect(findField(resolving.renderer.root, 'Command line').props.defaultValue).toBe(
+      'npx portal-mcp'
+    );
+
+    resolving.unmount();
+  });
+
+  it('closes the open sheet when the role is denied and does not reopen it when it returns', async () => {
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+    changeText(renderer.root, 'Server name', 'portal-server');
+
+    permissionState.permission = 'read-only';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    unmount();
+  });
+});

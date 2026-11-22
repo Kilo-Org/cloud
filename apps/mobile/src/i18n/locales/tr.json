@@ -3382,7 +3382,7 @@
   "organization": {
     "auditLog": {
       "title": "Denetim günlüğü",
-      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Denetim olayı yok",
       "emptyDescription": "Bu kuruluşta gerçekleştirilen işlemler burada görünür.",
       "truncated": "En son olaylar gösteriliyor.",
@@ -3436,7 +3436,7 @@
     },
     "billing": {
       "title": "Faturalandırma",
-      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir.",
+      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonelik",
       "state": "Durum",
       "stateNone": "Abonelik yok",
@@ -3625,7 +3625,7 @@
       "emptyDescription": "Daha önceki istekleri görmek için Önceki saat'i kullanın.",
       "emptyBoundDescription": "İstek kayıtları en fazla buraya kadar geriye gider.",
       "loadError": "İstek günlükleri yüklenemedi.",
-      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} giriş · {{output}} çıkış",
       "byok": "BYOK"
     },

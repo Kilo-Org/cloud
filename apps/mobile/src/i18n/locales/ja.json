@@ -3382,7 +3382,7 @@
   "organization": {
     "auditLog": {
       "title": "監査ログ",
-      "permissionDenied": "監査ログを閲覧できるのは、Enterpriseプランの組織のオーナー、管理者、または請求管理者のみです。",
+      "permissionDenied": "監査ログを閲覧できるのは、Enterpriseプランの組織のオーナー、管理者、または請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "監査イベントはありません",
       "emptyDescription": "この組織で行われた操作がここに表示されます。",
       "truncated": "最新のイベントを表示しています。",
@@ -3436,7 +3436,7 @@
     },
     "billing": {
       "title": "請求",
-      "permissionDenied": "請求情報を表示できるのは、組織のオーナー、管理者、請求管理者のみです。",
+      "permissionDenied": "請求情報を表示できるのは、組織のオーナー、管理者、請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "サブスクリプション",
       "state": "状態",
       "stateNone": "サブスクリプションなし",
@@ -3625,7 +3625,7 @@
       "emptyDescription": "「前の1時間」をタップすると、それより前のリクエストが表示されます。",
       "emptyBoundDescription": "リクエストログはここまでしかさかのぼれません。",
       "loadError": "リクエストログを読み込めませんでした。",
-      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
+      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "入力 {{input}} · 出力 {{output}}",
       "byok": "BYOK"
     },

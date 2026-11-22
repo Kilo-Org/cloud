@@ -399,7 +399,7 @@
       "title": "Funguo za watoa huduma",
       "rowSubtitle": "Tumia malipo ya mtoa huduma wako",
       "orgDescription": "Funguo hizi zinashirikiwa na kila mtu katika shirika na zinatozwa kwenye akaunti zake za watoa huduma.",
-      "viewOnly": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kubadilisha funguo zake.",
+      "viewOnly": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kubadilisha funguo zake.",
       "description": "Maombi yanayopitia funguo hizi yanatozwa kwenye akaunti yako ya mtoa huduma badala ya salio lako la Kilo.",
       "managedByPlan": "Inasimamiwa na mpango wako wa uandishi wa msimbo",
       "enableKey": "Washa ufunguo wa {{provider}}",
@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "Kumbukumbu za ukaguzi",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika lililo kwenye mpango wa Enterprise pekee anayeweza kusoma kumbukumbu zake za ukaguzi.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika lililo kwenye mpango wa Enterprise pekee anayeweza kusoma kumbukumbu zake za ukaguzi. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Hakuna matukio ya ukaguzi",
       "emptyDescription": "Vitendo vinavyofanywa katika shirika hili huonekana hapa.",
       "truncated": "Inaonyesha matukio ya hivi karibuni zaidi.",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "Malipo",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kuona malipo yake.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kuona malipo yake. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Usajili",
       "state": "Hali",
       "stateNone": "Hakuna usajili",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "Tumia Saa iliyotangulia ili kuona maombi ya awali.",
       "emptyBoundDescription": "Kumbukumbu za maombi haziendi nyuma zaidi ya hapa.",
       "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ndani · {{output}} nje",
       "byok": "BYOK"
     },

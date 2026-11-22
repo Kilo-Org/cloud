@@ -401,7 +401,7 @@
       "title": "Chaves de provedor",
       "rowSubtitle": "Use o faturamento do seu próprio provedor",
       "orgDescription": "Essas chaves são compartilhadas com todos na organização e cobradas nas contas de provedor da organização.",
-      "viewOnly": "Somente um proprietário, administrador ou gerente de faturamento da organização pode alterar as chaves dela.",
+      "viewOnly": "Somente um proprietário, administrador ou gerente de cobrança da organização pode alterar as chaves dela.",
       "description": "As solicitações feitas com essas chaves são cobradas na sua conta do provedor, e não no seu saldo Kilo.",
       "managedByPlan": "Gerenciada pelo seu plano de programação",
       "enableKey": "Ativar a chave do {{provider}}",
@@ -3508,7 +3508,7 @@
   "organization": {
     "auditLog": {
       "title": "Registro de auditoria",
-      "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento de uma organização no plano Enterprise podem ver o registro de auditoria dela.",
+      "permissionDenied": "Somente proprietários, administradores ou gerentes de cobrança de uma organização no plano Enterprise podem ver o registro de auditoria dela. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nenhum evento de auditoria",
       "emptyDescription": "As ações realizadas nesta organização aparecem aqui.",
       "truncated": "Mostrando os eventos mais recentes.",
@@ -3562,7 +3562,7 @@
     },
     "billing": {
       "title": "Faturamento",
-      "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento da organização podem ver o faturamento.",
+      "permissionDenied": "Somente proprietários, administradores ou gerentes de cobrança da organização podem ver o faturamento. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Assinatura",
       "state": "Status",
       "stateNone": "Sem assinatura",
@@ -3751,7 +3751,7 @@
       "emptyDescription": "Use Hora anterior para ver solicitações anteriores.",
       "emptyBoundDescription": "Os registros de solicitações não vão além deste ponto.",
       "loadError": "Não foi possível carregar os registros de solicitações.",
-      "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento de uma organização podem ver os registros de solicitações dela.",
+      "permissionDenied": "Somente proprietários, administradores ou gerentes de cobrança de uma organização podem ver os registros de solicitações dela. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} de entrada · {{output}} de saída",
       "byok": "BYOK"
     },

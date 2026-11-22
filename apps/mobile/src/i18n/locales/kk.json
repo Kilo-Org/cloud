@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "Аудит журналы",
-      "permissionDenied": "Аудит журналын тек Enterprise жоспарындағы ұйымның иесі, әкімшісі немесе төлем менеджері оқи алады.",
+      "permissionDenied": "Аудит журналын тек Enterprise жоспарындағы ұйымның иесі, әкімшісі немесе төлем менеджері оқи алады. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Аудит оқиғалары жоқ",
       "emptyDescription": "Осы ұйымда жасалған әрекеттер осында көрсетіледі.",
       "truncated": "Ең соңғы оқиғалар көрсетілуде.",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "Төлемдер",
-      "permissionDenied": "Ұйымның төлем деректерін тек оның иесі, әкімшісі немесе төлем менеджері көре алады.",
+      "permissionDenied": "Ұйымның төлем деректерін тек оның иесі, әкімшісі немесе төлем менеджері көре алады. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Жазылым",
       "state": "Күйі",
       "stateNone": "Жазылым жоқ",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "Ертеректегі сұраныстарды көру үшін «Ертерек сағат» түймесін пайдаланыңыз.",
       "emptyBoundDescription": "Сұраныс журналдары бұдан ертерек кезеңді қамтымайды.",
       "loadError": "Сұраныс журналдарын жүктеу мүмкін болмады.",
-      "permissionDenied": "Сұраныс журналдарын тек ұйымның иесі, әкімшісі немесе төлем менеджері оқи алады.",
+      "permissionDenied": "Сұраныс журналдарын тек ұйымның иесі, әкімшісі немесе төлем менеджері оқи алады. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} кіріс · {{output}} шығыс",
       "byok": "BYOK"
     },

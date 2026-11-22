@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "آڈٹ لاگ",
-      "permissionDenied": "انٹرپرائز پلان پر صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کا آڈٹ لاگ دیکھ سکتا ہے۔",
+      "permissionDenied": "انٹرپرائز پلان پر صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کا آڈٹ لاگ دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "کوئی آڈٹ ایونٹ نہیں",
       "emptyDescription": "اس تنظیم میں کیے گئے اقدامات یہاں ظاہر ہوتے ہیں۔",
       "truncated": "حالیہ ترین ایونٹس دکھائے جا رہے ہیں۔",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "بلنگ",
-      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کی بلنگ دیکھ سکتا ہے۔",
+      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کی بلنگ دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "subscription": "سبسکرپشن",
       "state": "حالت",
       "stateNone": "کوئی سبسکرپشن نہیں",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "پہلے کی درخواستیں دیکھنے کے لیے پچھلا گھنٹہ استعمال کریں۔",
       "emptyBoundDescription": "درخواستوں کا ریکارڈ بس یہیں تک دستیاب ہے۔",
       "loadError": "درخواست لاگز لوڈ نہیں ہو سکے۔",
-      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔",
+      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ان پٹ {{input}} · آؤٹ پٹ {{output}}",
       "byok": "BYOK"
     },

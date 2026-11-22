@@ -3382,7 +3382,7 @@
   "organization": {
     "auditLog": {
       "title": "Nhật ký kiểm tra",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức dùng gói Enterprise mới có thể xem nhật ký kiểm tra của tổ chức.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức dùng gói Enterprise mới có thể xem nhật ký kiểm tra của tổ chức. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Không có sự kiện kiểm tra",
       "emptyDescription": "Các hành động được thực hiện trong tổ chức này sẽ hiển thị tại đây.",
       "truncated": "Đang hiển thị các sự kiện gần đây nhất.",
@@ -3436,7 +3436,7 @@
     },
     "billing": {
       "title": "Thanh toán",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem thông tin thanh toán.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem thông tin thanh toán. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Gói đăng ký",
       "state": "Trạng thái",
       "stateNone": "Không có gói đăng ký",
@@ -3625,7 +3625,7 @@
       "emptyDescription": "Dùng Giờ cũ hơn để xem các yêu cầu trước đó.",
       "emptyBoundDescription": "Nhật ký yêu cầu không lưu xa hơn mốc này.",
       "loadError": "Không thể tải nhật ký yêu cầu.",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vào · {{output}} ra",
       "byok": "BYOK"
     },

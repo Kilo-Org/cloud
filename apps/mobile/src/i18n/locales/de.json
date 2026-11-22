@@ -399,7 +399,7 @@
       "title": "Anbieterschlüssel",
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
       "orgDescription": "Diese Schlüssel werden mit allen in der Organisation geteilt und über deren Anbieterkonten abgerechnet.",
-      "viewOnly": "Nur Inhaber, Admins oder Abrechnungsverantwortliche der Organisation können ihre Schlüssel ändern.",
+      "viewOnly": "Nur Inhaber, Admins oder Abrechnungsmanager der Organisation können ihre Schlüssel ändern.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
       "managedByPlan": "Von deinem Coding-Plan verwaltet",
       "enableKey": "{{provider}}-Schlüssel aktivieren",
@@ -3382,7 +3382,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit-Log",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation mit Enterprise-Plan können deren Audit-Log einsehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation mit Enterprise-Plan können deren Audit-Log einsehen. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Keine Audit-Ereignisse",
       "emptyDescription": "Hier erscheinen Aktionen, die in dieser Organisation ausgeführt werden.",
       "truncated": "Es werden die neuesten Ereignisse angezeigt.",
@@ -3436,7 +3436,7 @@
     },
     "billing": {
       "title": "Abrechnung",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Abrechnung sehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation können deren Abrechnung sehen. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Kein Abonnement",
@@ -3625,7 +3625,7 @@
       "emptyDescription": "Tippe auf „Frühere Stunde“, um frühere Anfragen anzuzeigen.",
       "emptyBoundDescription": "Weiter zurück reichen die Anfrageprotokolle nicht.",
       "loadError": "Anfrage-Logs konnten nicht geladen werden.",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation können deren Anfrage-Logs einsehen. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ein · {{output}} aus",
       "byok": "BYOK"
     },

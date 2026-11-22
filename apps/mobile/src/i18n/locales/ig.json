@@ -399,7 +399,7 @@
       "title": "Igodo ndị na-enye ọrụ",
       "rowSubtitle": "Jiri ịkwụ ụgwọ nke onye na-enye ọrụ gị",
       "orgDescription": "A na-ekerịta igodo ndị a na onye ọ bụla nọ na nzukọ ahụ, a na-akwụkwa ụgwọ ha n'akaụntụ ndị na-enye ọrụ nke nzukọ ahụ.",
-      "viewOnly": "Ọ bụ naanị onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịkwụ ụgwọ nwere ike ịgbanwe igodo ya.",
+      "viewOnly": "Ọ bụ naanị onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ nwere ike ịgbanwe igodo ya.",
       "description": "A na-akwụ ụgwọ arịrịọ site n'igodo ndị a n'akaụntụ onye na-enye ọrụ gị kama n'ego fọdụrụ gị na Kilo.",
       "managedByPlan": "Atụmatụ koodu gị na-ahazi ya",
       "enableKey": "Gbanye igodo {{provider}}",
@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "Ndekọ nyocha",
-      "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ n'atụmatụ Enterprise nwere ike ịgụ ndekọ nyocha ya.",
+      "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye njikwa ịgba ụgwọ n'atụmatụ Enterprise nwere ike ịgụ ndekọ nyocha ya. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Enweghị ihe omume nyocha",
       "emptyDescription": "Ihe a na-eme n'òtù a na-apụta ebe a.",
       "truncated": "Na-egosi ihe omume kachasị ọhụrụ.",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "Ịkwụ ụgwọ",
-      "permissionDenied": "Ọ bụ naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịhụ ihe gbasara ịkwụ ụgwọ ya.",
+      "permissionDenied": "Ọ bụ naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye njikwa ịgba ụgwọ nwere ike ịhụ ihe gbasara ịkwụ ụgwọ ya. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Ndenye aha",
       "state": "Ọnọdụ",
       "stateNone": "Enweghị ndenye aha",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "Jiri Awa gara aga hụ arịrịọ ndị mbụ.",
       "emptyBoundDescription": "Ndekọ arịrịọ anaghị alaghachi azụ karịa nke a.",
       "loadError": "Enweghị ike ibudata ndekọ arịrịọ.",
-      "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịgụ ndekọ arịrịọ ya.",
+      "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye njikwa ịgba ụgwọ nwere ike ịgụ ndekọ arịrịọ ya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} batara · {{output}} pụtara",
       "byok": "BYOK"
     },

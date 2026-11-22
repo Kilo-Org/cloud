@@ -3516,7 +3516,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditní protokol",
-      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žádné události auditu",
       "emptyDescription": "Zde se zobrazí akce provedené v této organizaci.",
       "truncated": "Zobrazují se nejnovější události.",
@@ -3570,7 +3570,7 @@
     },
     "billing": {
       "title": "Fakturace",
-      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Předplatné",
       "state": "Stav",
       "stateNone": "Bez předplatného",
@@ -3747,7 +3747,7 @@
       "emptyDescription": "Pomocí tlačítka „Starší hodina“ zobrazíte dřívější požadavky.",
       "emptyBoundDescription": "Záznamy požadavků dál do minulosti nesahají.",
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
-      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },

@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "Revisjonslogg",
-      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i en organisasjon med Enterprise-planen kan lese revisjonsloggen.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i en organisasjon med Enterprise-planen kan lese revisjonsloggen. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ingen revisjonshendelser",
       "emptyDescription": "Handlinger som utføres i denne organisasjonen, vises her.",
       "truncated": "Viser de nyeste hendelsene.",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan se faktureringen.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan se faktureringen. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Ingen abonnement",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "Bruk «Eldre time» for å se tidligere forespørsler.",
       "emptyBoundDescription": "Forespørselsloggene går ikke lenger tilbake enn dette.",
       "loadError": "Kunne ikke laste inn forespørselslogger.",
-      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} inn · {{output}} ut",
       "byok": "BYOK"
     },

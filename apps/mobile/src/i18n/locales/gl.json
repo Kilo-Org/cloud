@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "Rexistro de auditoría",
-      "permissionDenied": "Só un propietario, administrador ou xestor de facturación dunha organización co plan Enterprise pode ler o seu rexistro de auditoría.",
+      "permissionDenied": "Só un propietario, administrador ou xestor de facturación dunha organización co plan Enterprise pode ler o seu rexistro de auditoría. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Non hai eventos de auditoría",
       "emptyDescription": "Aquí aparecen as accións realizadas nesta organización.",
       "truncated": "Móstranse os eventos máis recentes.",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "Facturación",
-      "permissionDenied": "Só o propietario, un administrador ou un xestor de facturación da organización pode ver a súa facturación.",
+      "permissionDenied": "Só o propietario, un administrador ou un xestor de facturación da organización pode ver a súa facturación. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscrición",
       "state": "Estado",
       "stateNone": "Sen subscrición",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "Usa Hora anterior para ver solicitudes anteriores.",
       "emptyBoundDescription": "Os rexistros de solicitudes non van máis atrás.",
       "loadError": "Non se puideron cargar os rexistros de solicitudes.",
-      "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes.",
+      "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} de entrada · {{output}} de saída",
       "byok": "BYOK"
     },

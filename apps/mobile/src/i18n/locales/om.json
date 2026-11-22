@@ -399,7 +399,7 @@
       "title": "Furtuuwwan dhiyeessaa",
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
       "orgDescription": "Furtuuwwan kunneen namoota dhaabbata keessa jiran hundaaf qoodamanii herrega dhiyeessaa dhaabbatichaatti kaffalamu.",
-      "viewOnly": "Abbaa dhaabbatichaa, bulchaa ykn hogganaa kaffaltii qofatu furtuuwwan isaa jijjiiruu danda'a.",
+      "viewOnly": "Abbaa dhaabbatichaa, bulchaa ykn bulchaa kaffaltii qofatu furtuuwwan isaa jijjiiruu danda'a.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
       "managedByPlan": "Karoora koodii keetiin bulfama",
       "enableKey": "Furtuu {{provider}} dandeessisi",
@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "Galmee odiitii",
-      "permissionDenied": "Galmee odiitii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hoggantoota kaffaltii karoora Enterprise irra jiran qofa.",
+      "permissionDenied": "Galmee odiitii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii karoora Enterprise irra jiran qofa. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Taateen odiitii hin jiru",
       "emptyDescription": "Tarkaanfiiwwan dhaabbata kana keessatti fudhataman asitti mul'atu.",
       "truncated": "Taateewwan dhihoo kana raawwataman agarsiifamaa jiru.",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "Kaffaltii",
-      "permissionDenied": "Kaffaltii dhaabbataa abbaa dhaabbataa, bulchaa ykn hoogganaa kaffaltii qofatu arguu danda'a.",
+      "permissionDenied": "Kaffaltii dhaabbataa abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii qofatu arguu danda'a. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Galmee tajaajilaa",
       "state": "Haala",
       "stateNone": "Galmeen tajaajilaa hin jiru",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "Sa'aatii darbe fayyadamuun gaaffiiwwan darban ilaali.",
       "emptyBoundDescription": "Galmeewwan gaaffii kana caalaa duubatti hin deeman.",
       "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
-      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hogganaa kaffaltii qofa.",
+      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii qofa. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} seene · {{output}} ba'e",
       "byok": "BYOK"
     },

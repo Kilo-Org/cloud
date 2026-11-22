@@ -3453,7 +3453,7 @@
   "organization": {
     "auditLog": {
       "title": "Dnevnik revizije",
-      "permissionDenied": "Dnevnik revizije organizacije na Enterprise planu mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
+      "permissionDenied": "Dnevnik revizije organizacije na Enterprise planu mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nema događaja revizije",
       "emptyDescription": "Ovde se prikazuju radnje preduzete u ovoj organizaciji.",
       "truncated": "Prikazuju se najnoviji događaji.",
@@ -3507,7 +3507,7 @@
     },
     "billing": {
       "title": "Naplata",
-      "permissionDenied": "Podatke o naplati mogu da vide samo vlasnik, administrator ili menadžer naplate organizacije.",
+      "permissionDenied": "Podatke o naplati mogu da vide samo vlasnik, administrator ili menadžer naplate organizacije. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Pretplata",
       "state": "Status",
       "stateNone": "Nema pretplate",
@@ -3684,7 +3684,7 @@
       "emptyDescription": "Koristite dugme „Prethodni sat” da biste videli ranije zahteve.",
       "emptyBoundDescription": "Dnevnici zahteva ne sežu dalje u prošlost.",
       "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
-      "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
+      "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ulaz · {{output}} izlaz",
       "byok": "BYOK"
     },

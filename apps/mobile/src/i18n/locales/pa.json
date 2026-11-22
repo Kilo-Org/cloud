@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "ਆਡਿਟ ਲੌਗ",
-      "permissionDenied": "Enterprise ਪਲਾਨ ਵਾਲੀ ਸੰਸਥਾ ਦਾ ਆਡਿਟ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "Enterprise ਪਲਾਨ ਵਾਲੀ ਸੰਸਥਾ ਦਾ ਆਡਿਟ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "ਕੋਈ ਆਡਿਟ ਇਵੈਂਟ ਨਹੀਂ",
       "emptyDescription": "ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਕੀਤੀਆਂ ਕਾਰਵਾਈਆਂ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੀਆਂ ਹਨ।",
       "truncated": "ਸਭ ਤੋਂ ਹਾਲੀਆ ਇਵੈਂਟ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ।",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "ਬਿਲਿੰਗ",
-      "permissionDenied": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਇਸ ਦੀ ਬਿਲਿੰਗ ਦੇਖ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਇਸ ਦੀ ਬਿਲਿੰਗ ਦੇਖ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "subscription": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ",
       "state": "ਸਥਿਤੀ",
       "stateNone": "ਕੋਈ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਨਹੀਂ",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "ਪਿਛਲੀਆਂ ਬੇਨਤੀਆਂ ਵੇਖਣ ਲਈ 'ਪਿਛਲਾ ਘੰਟਾ' ਦੀ ਵਰਤੋਂ ਕਰੋ।",
       "emptyBoundDescription": "ਬੇਨਤੀਆਂ ਦਾ ਇਤਿਹਾਸ ਇੱਥੋਂ ਤੱਕ ਹੀ ਉਪਲਬਧ ਹੈ।",
       "loadError": "ਬੇਨਤੀ ਲੌਗ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
-      "permissionDenied": "ਸੰਸਥਾ ਦੇ ਬੇਨਤੀ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "ਸੰਸਥਾ ਦੇ ਬੇਨਤੀ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ਇਨਪੁੱਟ · {{output}} ਆਉਟਪੁੱਟ",
       "byok": "BYOK"
     },

@@ -3382,7 +3382,7 @@
   "organization": {
     "auditLog": {
       "title": "审计日志",
-      "permissionDenied": "只有 Enterprise 套餐组织的所有者、管理员或账单管理员才能查看其审计日志。",
+      "permissionDenied": "只有 Enterprise 套餐组织的所有者、管理员或账单管理员才能查看其审计日志。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "暂无审计事件",
       "emptyDescription": "此组织中执行的操作会显示在这里。",
       "truncated": "仅显示最近的事件。",
@@ -3436,7 +3436,7 @@
     },
     "billing": {
       "title": "账单",
-      "permissionDenied": "只有组织所有者、管理员或账单管理员才能查看组织账单。",
+      "permissionDenied": "只有组织所有者、管理员或账单管理员才能查看组织账单。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "订阅",
       "state": "状态",
       "stateNone": "无订阅",
@@ -3625,7 +3625,7 @@
       "emptyDescription": "使用“上一小时”查看更早的请求。",
       "emptyBoundDescription": "请求日志最多只能追溯到此处。",
       "loadError": "无法加载请求日志。",
-      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
+      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "输入 {{input}} · 输出 {{output}}",
       "byok": "BYOK"
     },

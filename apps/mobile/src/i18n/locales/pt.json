@@ -3516,7 +3516,7 @@
   "organization": {
     "auditLog": {
       "title": "Registo de auditoria",
-      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização com o plano Enterprise pode consultar o respetivo registo de auditoria.",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização com o plano Enterprise pode consultar o respetivo registo de auditoria. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Sem eventos de auditoria",
       "emptyDescription": "As ações realizadas nesta organização aparecem aqui.",
       "truncated": "São apresentados os eventos mais recentes.",
@@ -3570,7 +3570,7 @@
     },
     "billing": {
       "title": "Faturação",
-      "permissionDenied": "Só o proprietário, um administrador ou um gestor de faturação da organização pode ver a faturação.",
+      "permissionDenied": "Só o proprietário, um administrador ou um gestor de faturação da organização pode ver a faturação. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscrição",
       "state": "Estado",
       "stateNone": "Sem subscrição",
@@ -3747,7 +3747,7 @@
       "emptyDescription": "Utilize Hora anterior para ver pedidos anteriores.",
       "emptyBoundDescription": "Os registos de pedidos não recuam mais do que isto.",
       "loadError": "Não foi possível carregar os registos de pedidos.",
-      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos.",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} de entrada · {{output}} de saída",
       "byok": "BYOK"
     },

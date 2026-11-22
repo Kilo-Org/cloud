@@ -3382,7 +3382,7 @@
   "organization": {
     "auditLog": {
       "title": "Log audit",
-      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi dengan paket Enterprise yang dapat membaca log auditnya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi dengan paket Enterprise yang dapat membaca log auditnya. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Tidak ada peristiwa audit",
       "emptyDescription": "Tindakan yang dilakukan di organisasi ini akan muncul di sini.",
       "truncated": "Menampilkan peristiwa terbaru.",
@@ -3436,7 +3436,7 @@
     },
     "billing": {
       "title": "Penagihan",
-      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat melihat penagihannya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat melihat penagihannya. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Langganan",
       "state": "Status",
       "stateNone": "Tidak ada langganan",
@@ -3625,7 +3625,7 @@
       "emptyDescription": "Gunakan Jam sebelumnya untuk melihat permintaan yang lebih awal.",
       "emptyBoundDescription": "Log permintaan hanya tersedia sampai titik ini.",
       "loadError": "Tidak dapat memuat log permintaan.",
-      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat membaca log permintaannya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} masuk · {{output}} keluar",
       "byok": "BYOK"
     },

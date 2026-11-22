@@ -401,7 +401,7 @@
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
       "orgDescription": "Tieto kľúče zdieľajú všetci v organizácii a účtujú sa na jej účty u poskytovateľov.",
-      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, správca alebo manažér fakturácie.",
+      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, administrátor alebo správca fakturácie.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "managedByPlan": "Spravované tvojím plánom pre kódovanie",
       "enableKey": "Povoliť kľúč {{provider}}",
@@ -3516,7 +3516,7 @@
   "organization": {
     "auditLog": {
       "title": "Protokol auditu",
-      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise.",
+      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žiadne udalosti auditu",
       "emptyDescription": "Tu sa zobrazia akcie vykonané v tejto organizácii.",
       "truncated": "Zobrazujú sa najnovšie udalosti.",
@@ -3570,7 +3570,7 @@
     },
     "billing": {
       "title": "Fakturácia",
-      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie.",
+      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Predplatné",
       "state": "Stav",
       "stateNone": "Bez predplatného",
@@ -3747,7 +3747,7 @@
       "emptyDescription": "Ak chcete zobraziť skoršie požiadavky, použite tlačidlo „Staršia hodina“.",
       "emptyBoundDescription": "Záznamy požiadaviek nesiahajú ďalej do minulosti.",
       "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
-      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
+      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },

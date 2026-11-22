@@ -3390,7 +3390,7 @@
   "organization": {
     "auditLog": {
       "title": "Rajistar bincike",
-      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi a tsarin Enterprise ne kaɗai zai iya karanta rajistar binciken ƙungiyar.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi a tsarin Enterprise ne kaɗai zai iya karanta rajistar binciken ƙungiyar. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Babu abubuwan bincike",
       "emptyDescription": "Ayyukan da aka yi a wannan ƙungiya suna bayyana a nan.",
       "truncated": "Ana nuna abubuwan baya-bayan nan.",
@@ -3444,7 +3444,7 @@
     },
     "billing": {
       "title": "Biyan kuɗi",
-      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya ganin bayanan biyan kuɗinta.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya ganin bayanan biyan kuɗinta. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Rajista",
       "state": "Matsayi",
       "stateNone": "Babu rajista",
@@ -3621,7 +3621,7 @@
       "emptyDescription": "Yi amfani da \"Awa ta baya\" don duba buƙatun da suka gabata.",
       "emptyBoundDescription": "Nan ne iyakar tarihin bayanan buƙatu.",
       "loadError": "An kasa loda rajistun buƙatu.",
-      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} shigarwa · {{output}} fitarwa",
       "byok": "BYOK"
     },

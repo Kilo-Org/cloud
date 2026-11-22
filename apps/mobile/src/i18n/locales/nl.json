@@ -399,7 +399,7 @@
       "title": "Providersleutels",
       "rowSubtitle": "Facturering via je eigen provider",
       "orgDescription": "Deze sleutels worden gedeeld met iedereen in de organisatie en gefactureerd aan de provideraccounts van de organisatie.",
-      "viewOnly": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de sleutels wijzigen.",
+      "viewOnly": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de sleutels wijzigen.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
       "managedByPlan": "Beheerd door je codeerabonnement",
       "enableKey": "Sleutel van {{provider}} inschakelen",
@@ -3382,7 +3382,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditlogboek",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Geen auditgebeurtenissen",
       "emptyDescription": "Acties die in deze organisatie worden uitgevoerd, verschijnen hier.",
       "truncated": "De meest recente gebeurtenissen worden weergegeven.",
@@ -3436,7 +3436,7 @@
     },
     "billing": {
       "title": "Facturering",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de facturering bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de facturering bekijken. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Geen abonnement",
@@ -3625,7 +3625,7 @@
       "emptyDescription": "Gebruik Eerder uur om eerdere verzoeken te bekijken.",
       "emptyBoundDescription": "Verder terug gaan de verzoeklogboeken niet.",
       "loadError": "Kan verzoeklogboeken niet laden.",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de verzoeklogboeken bekijken. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} uit",
       "byok": "BYOK"
     },

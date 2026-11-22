@@ -401,7 +401,7 @@
       "title": "Klucze dostawców",
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
       "orgDescription": "Te klucze są współdzielone ze wszystkimi członkami organizacji, a koszty są rozliczane na jej kontach u dostawców.",
-      "viewOnly": "Tylko właściciel, administrator lub menedżer rozliczeń organizacji może zmieniać jej klucze.",
+      "viewOnly": "Tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji może zmieniać jej klucze.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
       "managedByPlan": "Zarządzany przez twój plan kodowania",
       "enableKey": "Włącz klucz {{provider}}",
@@ -3508,7 +3508,7 @@
   "organization": {
     "auditLog": {
       "title": "Dziennik audytu",
-      "permissionDenied": "Dziennik audytu może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji w planie Enterprise.",
+      "permissionDenied": "Dziennik audytu może przeglądać tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji w planie Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Brak zdarzeń audytu",
       "emptyDescription": "Tutaj pojawiają się działania podjęte w tej organizacji.",
       "truncated": "Wyświetlane są najnowsze zdarzenia.",
@@ -3562,7 +3562,7 @@
     },
     "billing": {
       "title": "Rozliczenia",
-      "permissionDenied": "Rozliczenia organizacji może zobaczyć tylko jej właściciel, administrator lub menedżer rozliczeń.",
+      "permissionDenied": "Rozliczenia organizacji może zobaczyć tylko jej właściciel, administrator lub osoba zarządzająca rozliczeniami. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subskrypcja",
       "state": "Stan",
       "stateNone": "Brak subskrypcji",
@@ -3751,7 +3751,7 @@
       "emptyDescription": "Użyj przycisku Wcześniejsza godzina, aby wyświetlić wcześniejsze żądania.",
       "emptyBoundDescription": "Dzienniki żądań nie sięgają dalej wstecz.",
       "loadError": "Nie udało się wczytać dzienników żądań.",
-      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
+      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} wej. · {{output}} wyj.",
       "byok": "BYOK"
     },

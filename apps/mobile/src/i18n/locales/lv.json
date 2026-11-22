@@ -3453,7 +3453,7 @@
   "organization": {
     "auditLog": {
       "title": "Audita žurnāls",
-      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns.",
+      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nav audita notikumu",
       "emptyDescription": "Šeit tiek rādītas šajā organizācijā veiktās darbības.",
       "truncated": "Tiek rādīti jaunākie notikumi.",
@@ -3507,7 +3507,7 @@
     },
     "billing": {
       "title": "Norēķini",
-      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonements",
       "state": "Statuss",
       "stateNone": "Nav abonementa",
@@ -3684,7 +3684,7 @@
       "emptyDescription": "Izmantojiet pogu „Iepriekšējā stunda”, lai apskatītu iepriekšējos pieprasījumus.",
       "emptyBoundDescription": "Pieprasījumu žurnāli tālāk pagātnē nesniedzas.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
-      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ievade · {{output}} izvade",
       "byok": "BYOK"
     },

@@ -25,9 +25,11 @@ import { getOrganizationGitHubInstallationSlots } from '@/lib/integrations/db/pr
 import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositories,
+} from '@/lib/integrations/platforms/github/adapter';
+import {
   GITHUB_LISTING_BUDGET_MESSAGE,
   GitHubListingBudgetExceededError,
-} from '@/lib/integrations/platforms/github/adapter';
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { TRPCError } from '@trpc/server';
 import {
   resolveOwner,

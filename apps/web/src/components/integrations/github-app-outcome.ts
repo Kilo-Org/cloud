@@ -48,6 +48,9 @@ export const PENDING_REQUEST_EXPLANATION = {
   start_again:
     'This request is still pending. Cancel it and start the connection again to complete it.',
 } as const;
+/** Shown when a GitHub installation listing is larger than one connect attempt reads. */
+export const INSTALLATION_LISTING_TOO_LARGE_MESSAGE =
+  "Kilo could not check this GitHub account's installations because there are too many. Remove the Kilo App installations you no longer need in GitHub, then try again.";
 
 export type AppReturnOutcomeView = {
   kind: 'installed' | 'pending' | 'blocked' | 'retryable';
@@ -136,6 +139,8 @@ export function buildAppReturnOutcomeView(input: {
                       ? 'This request is still pending. Start the connection again to complete it.'
                       : input.error === 'install_state_user_mismatch'
                         ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
+                        : input.error === 'installation_listing_too_large'
+                          ? INSTALLATION_LISTING_TOO_LARGE_MESSAGE
                         : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 

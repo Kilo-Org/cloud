@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Uus turbetuvastus ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kriitiline",
+      "high": "Kõrge",
+      "medium": "Keskmine",
+      "low": "Madal"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA hoiatus"
     },

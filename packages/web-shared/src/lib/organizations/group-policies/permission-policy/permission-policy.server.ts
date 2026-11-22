@@ -2,7 +2,7 @@ import 'server-only';
 
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
-import { organization_groups } from '@kilocode/db/schema';
+import { organization_groups, type Organization } from '@kilocode/db/schema';
 import type {
   OrganizationGroupAgentPermissionsPolicy,
   OrganizationGroupPolicy,
@@ -13,18 +13,38 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
-import { parseOrganizationGroupPolicies } from '../organization-group-policies.server';
+import { parseGroupPolicies } from '../organization-group-policies.server';
 import {
+  isOrganizationPermissionPolicyType,
   MemberPermissionPolicySchema,
   PERMISSION_POLICY_MAX_AGE_SECONDS,
+  type OrganizationPermissionPolicy,
 } from './permission-policy.schema';
+
+function permissionPolicyWritesFlagEnabled(): boolean {
+  return process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED === 'true';
+}
+
+async function resolveManaged(
+  tx: DrizzleTransaction,
+  organization: Organization
+): Promise<boolean> {
+  return (
+    organization.plan === 'enterprise' &&
+    isOrganizationFeatureEnabled(
+      await readOrganizationFeatures(tx),
+      'org_permission_policy',
+      organization.id
+    )
+  );
+}
 
 export async function assertOrganizationPermissionPolicyWriteEnabled(
   organizationId: string,
   tx: DrizzleTransaction
 ): Promise<void> {
   if (
-    process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED !== 'true' ||
+    !permissionPolicyWritesFlagEnabled() ||
     !isOrganizationFeatureEnabled(
       await readOrganizationFeatures(tx),
       'org_permission_policy',
@@ -38,8 +58,12 @@ export async function assertOrganizationPermissionPolicyWriteEnabled(
   }
 }
 
-function permissionPolicies(policies: OrganizationGroupPolicy[]) {
-  return policies.filter(policy => policy.type !== 'model_access');
+export function permissionPolicies(
+  policies: OrganizationGroupPolicy[]
+): OrganizationPermissionPolicy[] {
+  return policies.filter((policy): policy is OrganizationPermissionPolicy =>
+    isOrganizationPermissionPolicyType(policy.type)
+  );
 }
 
 function dedupeLayers<T>(layers: T[]): T[] {
@@ -98,13 +122,7 @@ export async function assertOrganizationPermissionPolicyFits(
     .where(eq(organization_groups.organization_id, organizationId));
   const policies = [
     ...context.defaultPolicies,
-    ...groups.flatMap(group =>
-      parseOrganizationGroupPolicies(group.policies, {
-        organizationId,
-        groupId: group.id,
-        source: 'group',
-      })
-    ),
+    ...groups.flatMap(group => parseGroupPolicies(group, organizationId)),
   ];
   const parsed = MemberPermissionPolicySchema.safeParse(
     buildMemberPolicyResponse({
@@ -134,13 +152,7 @@ export async function getStoredOrganizationPermissionPolicy(
         organizationId,
         subject: { type: 'defaultAccess' },
       });
-      const managed =
-        context.organization.plan === 'enterprise' &&
-        isOrganizationFeatureEnabled(
-          await readOrganizationFeatures(tx),
-          'org_permission_policy',
-          context.organization.id
-        );
+      const managed = await resolveManaged(tx, context.organization);
       let policies = context.defaultPolicies;
       if (groupId) {
         const [group] = await tx
@@ -155,15 +167,11 @@ export async function getStoredOrganizationPermissionPolicy(
           .limit(1);
         if (!group) throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found' });
         if (managed)
-          policies = parseOrganizationGroupPolicies(group.policies, {
-            organizationId,
-            groupId,
-            source: 'group',
-          });
+          policies = parseGroupPolicies({ id: groupId, policies: group.policies }, organizationId);
       }
       return {
         managed,
-        writesEnabled: managed && process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED === 'true',
+        writesEnabled: managed && permissionPolicyWritesFlagEnabled(),
         policies: managed ? permissionPolicies(policies) : [],
         policyRevision: context.policyRevision,
       };
@@ -180,18 +188,12 @@ export async function getOrganizationPermissionPolicy(organizationId: string, ki
         organizationId,
         subject: { type: 'member', kiloUserId },
       });
-      const managed =
-        context.organization.plan === 'enterprise' &&
-        isOrganizationFeatureEnabled(
-          await readOrganizationFeatures(tx),
-          'org_permission_policy',
-          context.organization.id
-        );
+      const managed = await resolveManaged(tx, context.organization);
       const defaultPolicies = managed ? permissionPolicies(context.defaultPolicies) : [];
       const groups = managed
-        ? context.groupIds.flatMap((groupId, index) => {
-            const policies = permissionPolicies(context.groupPolicies[index]);
-            return policies.length ? [{ groupId, policies }] : [];
+        ? context.groups.flatMap(group => {
+            const policies = permissionPolicies(group.policies);
+            return policies.length ? [{ groupId: group.id, policies }] : [];
           })
         : [];
       const validated = MemberPermissionPolicySchema.safeParse(

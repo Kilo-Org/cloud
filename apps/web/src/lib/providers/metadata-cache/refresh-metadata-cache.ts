@@ -3,7 +3,6 @@ import 'server-only';
 import pLimit from 'p-limit';
 import { inArray, sql } from 'drizzle-orm';
 import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   fetchMetadata,
@@ -16,7 +15,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { openRouterEmbeddingModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
-import { OPENAI_CHATGPT_API_KEY_ENV } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/upstream';
+import { readOpenAiChatGptPartnerKey } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/upstream';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
@@ -63,7 +62,7 @@ function catalogSources(): MetadataSource<unknown>[] {
     modelsDevCatalogSource,
     ...directByokMetadataSources,
   ];
-  if (getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV).trim()) {
+  if (readOpenAiChatGptPartnerKey() !== null) {
     sources.push(openAiServedModelsMetadataSource);
   }
   return [...new Map(sources.map(source => [source.url, source])).values()];

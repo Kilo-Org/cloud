@@ -24,13 +24,14 @@ import { modelCapabilityKey } from './model-capability';
 
 /**
  * The catalog key of each GGUF failure. Exported because the local failure
- * copy fixture renders the same four problems through the same row.
+ * copy fixture renders the same problems through the same row.
  */
 export const GGUF_FAILURE_KEYS = {
   space: 'modelChat.gguf.errors.space',
   network: 'modelChat.gguf.errors.network',
   invalidFile: 'modelChat.gguf.errors.invalidFile',
   checksum: 'modelChat.gguf.errors.checksum',
+  writeFailed: 'modelChat.gguf.errors.writeFailed',
 } as const satisfies Record<GgufDownloadProblem, string>;
 
 function progressKey(download: GgufDownload): string {

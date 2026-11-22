@@ -3,16 +3,13 @@ import 'server-only';
 import { kilo_pass_issuances, kilo_pass_subscriptions } from '@kilocode/db/schema';
 import { and, asc, eq, ne } from 'drizzle-orm';
 
-import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassPaymentProvider,
   type KiloPassWelcomePromoEligibilityReason,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
-
-type Db = typeof defaultDb;
-type DbOrTx = Db | DrizzleTransaction;
 
 export type KiloPassWelcomePromoPolicy = 'account-history-only' | 'settled-payment-required';
 
@@ -39,7 +36,7 @@ export function getKiloPassWelcomePromoPolicy(params: {
 }
 
 export async function getInitialWelcomePromoContextForSubscription(
-  db: DbOrTx,
+  db: DrizzleConnection,
   params: { subscriptionId: string }
 ): Promise<InitialWelcomePromoContext | null> {
   const initialIssuance = await db
@@ -62,7 +59,7 @@ export type MonthlyWelcomePromoAccountContext = {
 };
 
 export async function getMonthlyWelcomePromoAccountContext(
-  db: DbOrTx,
+  db: DrizzleConnection,
   params: {
     kiloUserId: string;
     subscriptionId: string;

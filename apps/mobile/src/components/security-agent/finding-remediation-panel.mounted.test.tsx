@@ -20,6 +20,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 
 import { FindingRemediationPanel } from './finding-remediation-panel';
+import { i18n } from '@/i18n';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 
 const texts = vi.hoisted(() => ({ items: [] as string[] }));
@@ -32,6 +33,8 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   retry: vi.fn(),
   cancel: vi.fn(),
+  // The deliberate retry for the paused analysis read the panel renders.
+  pausedRetry: vi.fn<() => Promise<void>>(),
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -90,6 +93,9 @@ vi.mock('@/lib/hooks/use-security-remediation', () => ({
   useRetrySecurityRemediation: () => ({ mutate: mocks.retry, isPending: false }),
   useCancelSecurityRemediation: () => ({ mutate: mocks.cancel, isPending: false }),
 }));
+vi.mock('@/lib/hooks/use-security-findings', () => ({
+  useRetrySecurityAnalysis: () => ({ retry: mocks.pausedRetry, isRetrying: false }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
@@ -144,6 +150,9 @@ function renderPanel(
         analysis,
         isLoading: false,
         isError: false,
+        isPending: false,
+        fetchStatus: 'idle',
+        connectivity: 'online',
         onRetry: () => undefined,
         ...props,
       })
@@ -170,6 +179,8 @@ function pressButtons(r: R): void {
 describe('FindingRemediationPanel remediation timeline', () => {
   beforeEach(() => {
     texts.items = [];
+    mocks.pausedRetry.mockReset();
+    mocks.pausedRetry.mockResolvedValue(undefined);
   });
 
   it('centers an empty remediation with its blocker reason', () => {
@@ -226,6 +237,45 @@ describe('FindingRemediationPanel remediation timeline', () => {
     expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
     act(error.props.onRetry as () => void);
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  // A first read the online manager paused is neither loading nor failed, so
+  // without its own branch it reads as "no analysis yet" and never recovers.
+  it('names the connection for a paused read instead of the empty state', () => {
+    const tree = renderPanel(undefined, {
+      isPending: true,
+      fetchStatus: 'paused',
+      connectivity: 'offline',
+    });
+
+    expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    const error = tree.root.findByType(QueryError);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe(i18n.t('securityAgent.remediation.couldNotLoad'));
+    expect(error.props.isRetrying).toBe(false);
+    act(error.props.onRetry as () => void);
+    expect(mocks.pausedRetry).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the skeleton and the empty state while connectivity is unsettled', () => {
+    const paused = renderPanel(undefined, {
+      isPending: true,
+      fetchStatus: 'paused',
+      connectivity: 'unknown',
+    });
+    expect(paused.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(paused.root.findAllByType(EmptyState)).toHaveLength(1);
+
+    const loading = renderPanel(undefined, {
+      isPending: true,
+      fetchStatus: 'fetching',
+      isLoading: true,
+      connectivity: 'offline',
+    });
+    expect(loading.root.findAllByType(Skeleton)).toHaveLength(2);
+    expect(loading.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(loading.root.findAllByType(EmptyState)).toHaveLength(0);
   });
 
   it('preserves server-approved actions in the centered state', () => {

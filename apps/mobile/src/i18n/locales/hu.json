@@ -309,6 +309,7 @@
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
+    "availableToSpendInOrganization": "Ebben a szervezetben elkölthető",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -450,6 +451,17 @@
       "location": "Vertex-helyszín",
       "clientEmail": "Szolgáltatásfiók e-mail-címe",
       "privateKey": "Szolgáltatásfiók privát kulcsa",
+      "privateKeyBlockRequired": "Illeszd be a teljes kulcsblokkot, a BEGIN sortól az END sorig.",
+      "privateKeyEncrypted": "Ez a kulcsblokk jelmondattal védett. Illessz be egy jelmondat nélküli szolgáltatásfiók-kulcsot.",
+      "names": {
+        "codestral": "Csak a régi Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Bejelentkezés ChatGPT-fiókkal)",
+        "xiaomi": "Xiaomi (használat alapú fizetés)",
+        "zai": "Z.ai (használat alapú fizetés)",
+        "bedrockByok": "Amazon Bedrock (közvetlen)",
+        "vertexByok": "Google Vertex AI (közvetlen)"
+      },
       "modelMappings": "Modell-megfeleltetések",
       "modelMappingsDescription": "Gateway-modell átirányítása egyéni deployment névre.",
       "mappingTitle": "{{number}}. megfeleltetés",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
     "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
-      "signIn": "Bejelentkezés",
-      "profileOrganizations": "Profil & szervezetek"
+      "signIn": "bejelentkezés",
+      "profileOrganizations": "profil & szervezetek",
+      "chat": "csevegés",
+      "notifications": "értesítések",
+      "integrations": "integrációk"
     }
   },
   "preferences": {
@@ -1199,6 +1214,8 @@
       "emptyTitle": "Még nincsenek értesítések",
       "emptyCategoryTitle": "Ebben a kategóriában nincsenek értesítések",
       "emptyBody": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
+      "emptyBody_one": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
+      "emptyBody_other": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
       "capped": "A legutóbbi értesítések láthatók.",
       "loadError": "Nem sikerült betölteni az értesítési előzményeket.",
       "openFailed": "Ez az értesítés már sehol nem nyitható meg."
@@ -1434,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
+      "deniedManagedByOwner": "Kérd meg {{organization}} egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+      "deniedConnectRole": "Csak {{organization}} tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
+      "deniedReconnectRole": "Kérd meg {{organization}} egy tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
       "managedOnWebTitle": "A weben kezelve",
       "managedOnWebShort": "Ezt a kapcsolatot a weben, számítógépről kezelheti.",
       "managedOnWebRepositories": "Válassza ki {{organization}} tárolóit a weben, számítógépről.",
@@ -1571,7 +1591,9 @@
       "unavailablePersonallySwitchAction": "Szervezet váltása",
       "unavailableOrganizationTitle": "A tanácsellenőrzés jelenleg nem érhető el",
       "unavailableForOrganization": "A tanácsellenőrzéshez aktív előfizetéssel vagy próbaidőszakkal rendelkező Enterprise csomag szükséges. Ez a szervezet jelenleg nem rendelkezik vele.",
-      "unavailableForOrganizationNeutral": "A tanácsellenőrzés jelenleg nem érhető el ennél a szervezetnél. Kérjük, próbálja újra később.",
+      "unavailablePlanCheck": "A tanácsellenőrzés nem tudta ellenőrizni a szervezet csomagját. Próbálja újra az ellenőrzést.",
+      "unavailableFlagRollout": "A tanácsellenőrzés még nem érhető el ennél a szervezetnél. Frissítse az alkalmazást a legújabb verzióra, hogy megkapja.",
+      "unavailableForOrganizationMember": "A tanácsellenőrzéshez aktív előfizetéssel vagy próbaidőszakkal rendelkező Enterprise csomag szükséges. A szervezet tulajdonosa módosíthatja a csomagot.",
       "unavailableOnBitbucket": "A tanácsellenőrzés nem érhető el Bitbucket-adattárakhoz.",
       "noRepositories": "Még nincs kiválasztott adattár. Először válassz adattárakat az adattárbeállításokban.",
       "specialists": "Szakértők",
@@ -2550,8 +2572,7 @@
       "searchPlaceholder": "Adattárak keresése",
       "noMatches": "Nincs találat",
       "noRepositories": "Nincs elérhető adattár",
-      "noRepositoriesDescription": "Egyetlen adattár sincs a fiókodhoz kapcsolva.",
-      "loading": "Betöltés…",
+      "noRepositoriesDescription": "Az adattárak betöltéséhez csatlakoztass GitHubot vagy GitLabot.",
       "accessibility": "Adattár: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3440,7 +3461,7 @@
       "manageOnWeb": "Számlázási beállítások a weben",
       "changePlan": "Csomag módosítása",
       "buySeats": "Férőhelyek vásárlása",
-      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a weben történik.",
+      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a kilo.ai oldalon történik.",
       "setupAutoTopUp": "Automatikus feltöltés beállítása",
       "manageAutoTopUp": "Automatikus feltöltés kezelése",
       "opensOnWeb": "A weben nyílik meg"
@@ -3626,10 +3647,10 @@
       "nameLabel": "Mód neve",
       "nameRequired": "Adjon meg egy módnevet.",
       "notFound": "Ez a mód már nem létezik.",
-      "restrictionHint": "Csak a mintának megfelelő fájlok szerkeszthetők. Hagyja üresen, hogy minden fájl engedélyezett legyen.",
-      "restrictionInvalid": "Adjon meg egy érvényes mintát.",
+      "restrictionHint": "A reguláris kifejezés kiválasztja, hogy ez a mód mely fájlokat szerkesztheti; például a `\\.md$` csak a markdown-fájlokat engedi. Hagyja üresen, hogy minden fájl engedélyezett legyen.",
+      "restrictionInvalid": "Adjon meg egy érvényes reguláris kifejezést.",
       "restrictionLabel": "Korlátozás címkéje",
-      "restrictionPattern": "Fájlminta",
+      "restrictionPattern": "Fájlkorlátozás",
       "roleLabel": "Szerepkör meghatározása",
       "roleRequired": "Írja le, mit csinál ez a mód.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "Az e-mailek kézbesítése átmenetileg nem érhető el. Próbáld újra később.",
     "admissionRequired": "Az eszközöd nem ellenőrizhető. Válaszd ezt a lehetőséget a másik eszközön vagy a weben való bejelentkezéshez: „$t(login.moreSignInOptions)”.",
     "default": "Hiba történt. Próbáld újra.",
-    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Próbáld újra.",
     "startSignInFailed": "Nem sikerült elindítani a bejelentkezést. Próbáld újra.",
     "couldNotOpenBrowser": "Nem sikerült megnyitni a böngészőt. Próbáld újra.",
     "signInTimedOut": "A bejelentkezés időtúllépés miatt megszakadt. Próbáld újra.",
@@ -4058,7 +4079,8 @@
         "space": "Nincs elég szabad tárhely ehhez a modellhez. Szabadítson fel tárhelyet, és próbálja újra.",
         "network": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot, és próbálja újra.",
         "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk.",
-        "checksum": "A letöltött fájl nem egyezik a közzétett ellenőrzőösszegével, ezért eltávolítottuk. Próbálja meg újra a letöltést."
+        "checksum": "A letöltött fájl nem egyezik a közzétett ellenőrzőösszegével, ezért eltávolítottuk. Próbálja meg újra a letöltést.",
+        "writeFailed": "Ez az eszköz nem tudta elmenteni a modellt. Próbálja meg újra a letöltést."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "Ön egy…",
       "tools": "Eszközök",
       "wholeToolRule": "Ez az ügynök egyszerre egy szabályt alkalmaz minden eszközre: {{rule}}. Ezek a kapcsolók csak olvashatók.",
+      "toolRule": "Tárolt szabály: {{rule}}",
       "visibility": "Láthatóság",
       "visibilityPrimary": "Elsődleges — a választóban látható",
       "visibilitySubagent": "Alügynök — csak másoktól hívható",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
+      "expiredGrant": "Lejárt: {{description}}",
       "googlePlayReceipt": "A nyugta a Google Playen érhető el",
       "kind": {
         "adjustment": "Korrekció",
         "balanceNeutral": "Egyenlegsemleges",
         "deduction": "Levonás",
         "grant": "Kreditjuttatás",
+        "promotionalCredits": "Promóciós kreditek",
         "welcomeCredits": "Üdvözlő kreditek",
         "purchase": "Vásárlás"
+      },
+      "program": {
+        "adminBulkGrant": "Adminisztrátori kreditjuttatás",
+        "contributorChampion": "Közreműködői bajnok kredit",
+        "feedback": "Visszajelzéskredit",
+        "influencer": "Influenszerkredit",
+        "ossMonthlyReset": "Nyílt forráskódú támogatás visszaállítása",
+        "ossSponsorship": "Nyílt forráskódú támogatási kredit",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Használati problémáért járó kredit",
+        "vibeDay": "Vibe day kredit"
       },
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
-      "retentionLimit": "A legutóbbi kreditelőzmények láthatók."
+      "retentionLimit": "A legutóbbi kreditelőzmények láthatók.",
+      "voidedGrant": "Érvénytelenítve: {{description}}"
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
@@ -5087,6 +5124,20 @@
       "eu": "Európai Unió",
       "au": "Ausztrália",
       "jp": "Japán"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Beállítások keresése",
+    "noMatches": "Nincs megfelelő beállítás",
+    "emptyDescription": "Próbálj másik beállításnévre vagy kulcsszóra keresni.",
+    "resultsStatus": "Talált beállítások: {{resultCount}}",
+    "keywords": {
+      "signOut": "kijelentkezés|kilépés",
+      "appearance": "téma|színséma",
+      "appUnlock": "biometria|arcfelismerés|ujjlenyomat",
+      "language": "nyelv|fordítás",
+      "notifications": "értesítések|riasztások",
+      "privacy": "analitika|követés|adatvédelem"
     }
   }
 }

@@ -309,6 +309,7 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
+    "availableToSpendInOrganization": "Tillgängligt att spendera i den här organisationen",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",
@@ -450,6 +451,17 @@
       "location": "Vertex-plats",
       "clientEmail": "E-postadress för tjänstkonto",
       "privateKey": "Privat nyckel för tjänstkonto",
+      "privateKeyBlockRequired": "Klistra in hela nyckelblocket, från BEGIN-raden till END-raden.",
+      "privateKeyEncrypted": "Det här nyckelblocket är skyddat med en lösenfras. Klistra in en nyckel för tjänstkonto som inte har någon lösenfras.",
+      "names": {
+        "codestral": "Endast äldre Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Logga in med ChatGPT)",
+        "xiaomi": "Xiaomi (betala per användning)",
+        "zai": "Z.ai (betala per användning)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Modellmappningar",
       "modelMappingsDescription": "Dirigera en gatewaymodell till ett anpassat distributionsnamn.",
       "mappingTitle": "Mappning {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Korrigeringar och förbättringar i {{areas}}.",
     "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
     "changelogAreas": {
-      "signIn": "Inloggning",
-      "profileOrganizations": "Profil & organisationer"
+      "signIn": "inloggning",
+      "profileOrganizations": "profil & organisationer",
+      "chat": "chatt",
+      "notifications": "aviseringar",
+      "integrations": "integrationer"
     }
   },
   "preferences": {
@@ -1199,6 +1214,8 @@
       "emptyTitle": "Inga aviseringar än",
       "emptyCategoryTitle": "Inga aviseringar i den här kategorin",
       "emptyBody": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
+      "emptyBody_one": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
+      "emptyBody_other": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
       "capped": "Visar de senaste aviseringarna.",
       "loadError": "Kunde inte läsa in aviseringshistoriken.",
       "openFailed": "Den här aviseringen öppnas inte längre någonstans."
@@ -1434,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
+      "deniedManagedByOwner": "Be en ägare i {{organization}} att ändra anslutningen som du inte kan ändra.",
+      "deniedConnectRole": "Endast ägare, administratörer och faktureringsansvariga i {{organization}} kan ansluta den.",
+      "deniedReconnectRole": "Be en ägare, administratör eller faktureringsansvarig i {{organization}} att ansluta den på nytt.",
       "managedOnWebTitle": "Hanteras på webben",
       "managedOnWebShort": "Den här anslutningen hanteras på webben från en dator.",
       "managedOnWebRepositories": "Välj repositorier för {{organization}} på webben från en dator.",
@@ -1571,7 +1591,9 @@
       "unavailablePersonallySwitchAction": "Byt organisation",
       "unavailableOrganizationTitle": "Rådsgranskning är inte tillgänglig",
       "unavailableForOrganization": "Rådsgranskning kräver Enterprise-planen med ett aktivt abonnemang eller en provperiod. Den här organisationen har det inte just nu.",
-      "unavailableForOrganizationNeutral": "Rådsgranskning är inte tillgänglig för den här organisationen just nu. Försök igen senare.",
+      "unavailablePlanCheck": "Rådsgranskning kunde inte kontrollera den här organisationens plan. Försök igen för att kontrollera den på nytt.",
+      "unavailableFlagRollout": "Rådsgranskning är inte tillgänglig för den här organisationen ännu. Uppdatera appen till den senaste versionen för att få den.",
+      "unavailableForOrganizationMember": "Rådsgranskning kräver Enterprise-planen med ett aktivt abonnemang eller en provperiod. En organisationsägare kan ändra planen.",
       "unavailableOnBitbucket": "Rådsgranskning är inte tillgänglig för Bitbucket-kodarkiv.",
       "noRepositories": "Inga kodarkiv har valts än. Välj kodarkiv i inställningarna för kodarkiv först.",
       "specialists": "Experter",
@@ -2546,8 +2568,7 @@
       "searchPlaceholder": "Sök efter kodarkiv...",
       "noMatches": "Inga träffar",
       "noRepositories": "Inga kodarkiv tillgängliga",
-      "noRepositoriesDescription": "Inga kodarkiv är anslutna till ditt konto.",
-      "loading": "Läser in…",
+      "noRepositoriesDescription": "Anslut GitHub eller GitLab för att läsa in kodarkiv.",
       "accessibility": "Kodarkiv: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3440,7 +3461,7 @@
       "manageOnWeb": "Faktureringsinställningar på webben",
       "changePlan": "Byt plan",
       "buySeats": "Köp platser",
-      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på webben.",
+      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på kilo.ai.",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
       "opensOnWeb": "Öppnas på webben"
@@ -3626,10 +3647,10 @@
       "nameLabel": "Lägesnamn",
       "nameRequired": "Ange ett lägesnamn.",
       "notFound": "Det här läget finns inte längre.",
-      "restrictionHint": "Endast filer som matchar det här mönstret kan redigeras. Lämna det tomt för att tillåta alla filer.",
-      "restrictionInvalid": "Ange ett giltigt mönster.",
+      "restrictionHint": "Ett reguljärt uttryck väljer vilka filer det här läget får redigera, till exempel `\\.md$` för endast markdown-filer. Lämna det tomt för att tillåta alla filer.",
+      "restrictionInvalid": "Ange ett giltigt reguljärt uttryck.",
       "restrictionLabel": "Begränsningsetikett",
-      "restrictionPattern": "Filmönster",
+      "restrictionPattern": "Filbegränsning",
       "roleLabel": "Rolldefinition",
       "roleRequired": "Beskriv vad det här läget gör.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "Det går inte att skicka e-post just nu. Försök igen senare.",
     "admissionRequired": "Din enhet kan inte verifieras. Välj ”$t(login.moreSignInOptions)” för att logga in på en annan enhet eller via webben.",
     "default": "Något gick fel. Försök igen.",
-    "retryableAdmission": "Vi kunde inte verifiera den här enheten. Kontrollera anslutningen och försök igen.",
+    "retryableAdmission": "Det gick inte att verifiera den här enheten. Försök igen.",
     "startSignInFailed": "Kunde inte starta inloggningen. Försök igen.",
     "couldNotOpenBrowser": "Kunde inte öppna webbläsaren. Försök igen.",
     "signInTimedOut": "Inloggningen tog för lång tid. Försök igen.",
@@ -4058,7 +4079,8 @@
         "space": "Det finns inte tillräckligt med ledigt utrymme för den här modellen. Frigör utrymme och försök igen.",
         "network": "Nedladdningen slutfördes inte. Kontrollera anslutningen och försök igen.",
         "invalidFile": "Den nedladdade filen är inte en modell som den här appen kan köra, så den har tagits bort.",
-        "checksum": "Den nedladdade filen matchar inte sin publicerade kontrollsumma, så den har tagits bort. Försök ladda ner den igen."
+        "checksum": "Den nedladdade filen matchar inte sin publicerade kontrollsumma, så den har tagits bort. Försök ladda ner den igen.",
+        "writeFailed": "Den här enheten kunde inte spara modellen. Försök ladda ner den igen."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "Du är en…",
       "tools": "Verktyg",
       "wholeToolRule": "Den här agenten tillämpar en regel på alla verktyg samtidigt: {{rule}}. Dessa reglage är skrivskyddade.",
+      "toolRule": "Sparad regel: {{rule}}",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "Kreditavdrag",
       "emptyDescription": "Kreditköp, kvitton och användning visas här.",
       "emptyTitle": "Ingen kredithistorik",
+      "expiredGrant": "Utgånget: {{description}}",
       "googlePlayReceipt": "Kvitto från Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Avdrag",
         "grant": "Kredittilldelning",
+        "promotionalCredits": "Kampanjkrediter",
         "welcomeCredits": "Välkomstkrediter",
         "purchase": "Köp"
+      },
+      "program": {
+        "adminBulkGrant": "Administratörskredittilldelning",
+        "contributorChampion": "Bidragsgivarmästarkredit",
+        "feedback": "Feedbackkredit",
+        "influencer": "Influencerkredit",
+        "ossMonthlyReset": "Återställning av sponsring av öppen källkod",
+        "ossSponsorship": "Kredit för sponsring av öppen källkod",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Kredit för användningsproblem",
+        "vibeDay": "Vibe day-kredit"
       },
       "purchaseFallback": "Kreditköp",
       "receipt": "Kvitto",
       "receiptA11y": "Öppna kvittot för {{description}}, {{amount}}, från {{date}}",
       "receiptUnavailable": "Det finns inget kvitto för det här köpet.",
-      "retentionLimit": "Visar den senaste kredithistoriken."
+      "retentionLimit": "Visar den senaste kredithistoriken.",
+      "voidedGrant": "Makulerad: {{description}}"
     },
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
@@ -5087,6 +5124,20 @@
       "eu": "Europeiska unionen",
       "au": "Australien",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Sök inställningar",
+    "noMatches": "Inga matchande inställningar",
+    "emptyDescription": "Prova ett annat inställningsnamn eller sökord.",
+    "resultsStatus": "Hittade inställningar: {{resultCount}}",
+    "keywords": {
+      "signOut": "logga ut|utloggning",
+      "appearance": "tema|färgschema",
+      "appUnlock": "biometri|ansiktsigenkänning|fingeravtryck",
+      "language": "språk|översättning",
+      "notifications": "aviseringar|notiser|pushnotiser",
+      "privacy": "analys|statistik|spårning"
     }
   }
 }

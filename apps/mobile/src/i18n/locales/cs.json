@@ -311,6 +311,7 @@
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
+    "availableToSpendInOrganization": "Dostupné k utracení v této organizaci",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",
@@ -452,6 +453,17 @@
       "location": "Umístění Vertex",
       "clientEmail": "E-mail účtu služby",
       "privateKey": "Soukromý klíč účtu služby",
+      "privateKeyBlockRequired": "Vložte celý blok klíče, od řádku BEGIN po řádek END.",
+      "privateKeyEncrypted": "Tento blok klíče je chráněný přístupovou frází. Vložte klíč účtu služby, který nemá přístupovou frázi.",
+      "names": {
+        "codestral": "Pouze starší Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Přihlásit se přes ChatGPT)",
+        "xiaomi": "Xiaomi (platba podle spotřeby)",
+        "zai": "Z.ai (platba podle spotřeby)",
+        "bedrockByok": "Amazon Bedrock (přímé účtování)",
+        "vertexByok": "Google Vertex AI (přímé účtování)"
+      },
       "modelMappings": "Mapování modelů",
       "modelMappingsDescription": "Přesměrujte model brány na vlastní název nasazení.",
       "mappingTitle": "Mapování {{number}}",
@@ -545,8 +557,11 @@
     "changelogFixesIn": "Opravy a vylepšení v oblastech: {{areas}}.",
     "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
     "changelogAreas": {
-      "signIn": "Přihlášení",
-      "profileOrganizations": "Profil i organizace"
+      "signIn": "přihlášení",
+      "profileOrganizations": "profil i organizace",
+      "chat": "konverzace",
+      "notifications": "oznámení",
+      "integrations": "integrace"
     }
   },
   "preferences": {
@@ -1253,6 +1268,10 @@
       "emptyTitle": "Zatím žádná oznámení",
       "emptyCategoryTitle": "V této kategorii nejsou žádná oznámení",
       "emptyBody": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "emptyBody_one": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "emptyBody_few": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "emptyBody_many": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "emptyBody_other": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
       "capped": "Zobrazují se nejnovější oznámení.",
       "loadError": "Historii oznámení se nepodařilo načíst.",
       "openFailed": "Toto oznámení se už nikde neotevře."
@@ -1488,6 +1507,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
+      "deniedManagedByOwner": "Požádejte vlastníka {{organization}} o změnu připojení, které nemůžete změnit.",
+      "deniedConnectRole": "Připojit ho mohou pouze vlastníci {{organization}}, správci a správci fakturace.",
+      "deniedReconnectRole": "Požádejte vlastníka {{organization}}, správce nebo správce fakturace, aby ho znovu připojil.",
       "managedOnWebTitle": "Spravuje se na webu",
       "managedOnWebShort": "Toto připojení se spravuje na webu z počítače.",
       "managedOnWebRepositories": "Vyberte repozitáře pro {{organization}} na webu z počítače.",
@@ -1629,7 +1651,9 @@
       "unavailablePersonallySwitchAction": "Přepnout organizaci",
       "unavailableOrganizationTitle": "Kontrola radou není nyní dostupná",
       "unavailableForOrganization": "Kontrola radou vyžaduje plán Enterprise s aktivním předplatným nebo zkušebním obdobím. Tato organizace jej nyní nemá.",
-      "unavailableForOrganizationNeutral": "Kontrola radou není pro tuto organizaci nyní dostupná. Zkuste to znovu později.",
+      "unavailablePlanCheck": "Kontrola radou nemohla zkontrolovat plán této organizace. Zkuste to znovu.",
+      "unavailableFlagRollout": "Kontrola radou ještě není pro tuto organizaci dostupná. Aktualizujte aplikaci na nejnovější verzi, abyste ji získali.",
+      "unavailableForOrganizationMember": "Kontrola radou vyžaduje plán Enterprise s aktivním předplatným nebo zkušebním obdobím. Plán může změnit vlastník organizace.",
       "unavailableOnBitbucket": "Kontrola radou není dostupná pro repozitáře Bitbucket.",
       "noRepositories": "Zatím nejsou vybrány žádné repozitáře. Nejprve je vyberte v nastavení repozitářů.",
       "specialists": "Specialisté",
@@ -2650,8 +2674,7 @@
       "searchPlaceholder": "Hledat repozitáře",
       "noMatches": "Žádné shody",
       "noRepositories": "Žádné repozitáře nejsou k dispozici",
-      "noRepositoriesDescription": "K vašemu účtu nejsou připojeny žádné repozitáře.",
-      "loading": "Načítání…",
+      "noRepositoriesDescription": "Chcete-li načíst repozitáře, připojte GitHub nebo GitLab.",
       "accessibility": "Repozitář: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3564,7 +3587,7 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
-      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na webu.",
+      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na kilo.ai.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"
@@ -3750,10 +3773,10 @@
       "nameLabel": "Název režimu",
       "nameRequired": "Zadejte název režimu.",
       "notFound": "Tento režim už neexistuje.",
-      "restrictionHint": "Upravovat lze jen soubory odpovídající tomuto vzoru. Nechte prázdné pro povolení všech souborů.",
-      "restrictionInvalid": "Zadejte platný vzor.",
+      "restrictionHint": "Regulární výraz vybírá, které soubory může tento režim upravovat, například `\\.md$` jen pro soubory markdown. Nechte prázdné pro povolení všech souborů.",
+      "restrictionInvalid": "Zadejte platný regulární výraz.",
       "restrictionLabel": "Označení omezení",
-      "restrictionPattern": "Vzor souboru",
+      "restrictionPattern": "Omezení souborů",
       "roleLabel": "Definice role",
       "roleRequired": "Popište, co tento režim dělá.",
       "tool": {
@@ -3841,7 +3864,7 @@
     "emailDeliveryFailed": "E-maily teď nelze doručovat. Zkus to později.",
     "admissionRequired": "Tvé zařízení nelze ověřit. Vyber „$t(login.moreSignInOptions)“ a přihlas se na jiném zařízení nebo přes web.",
     "default": "Něco se pokazilo. Zkus to prosím znovu.",
-    "retryableAdmission": "Toto zařízení se nepodařilo ověřit. Zkontroluj připojení a zkus to znovu.",
+    "retryableAdmission": "Toto zařízení se nepodařilo ověřit. Zkus to znovu.",
     "startSignInFailed": "Přihlášení se nepodařilo zahájit. Zkus to znovu.",
     "couldNotOpenBrowser": "Prohlížeč se nepodařilo otevřít. Zkus to znovu.",
     "signInTimedOut": "Vypršel časový limit pro přihlášení. Zkus to znovu.",
@@ -4204,7 +4227,8 @@
         "space": "Pro tento model není dostatek volného úložiště. Uvolněte místo a zkuste to znovu.",
         "network": "Stahování se nedokončilo. Zkontrolujte připojení a zkuste to znovu.",
         "invalidFile": "Stažený soubor není model, který by tato aplikace mohla spustit, proto byl odstraněn.",
-        "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu."
+        "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu.",
+        "writeFailed": "Toto zařízení nemohlo model uložit. Zkuste jej stáhnout znovu."
       }
     },
     "catalog": {
@@ -4543,6 +4567,7 @@
       "promptPlaceholder": "ty jsi…",
       "tools": "Nástroje",
       "wholeToolRule": "Tento agent aplikuje jedno pravidlo na všechny nástroje najednou: {{rule}}. Tyto přepínače jsou pouze pro čtení.",
+      "toolRule": "Uložené pravidlo: {{rule}}",
       "visibility": "Viditelnost",
       "visibilityPrimary": "Primární — zobrazí se ve výběru",
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",
@@ -4652,20 +4677,34 @@
       "deductionFallback": "Odečtení kreditů",
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
+      "expiredGrant": "Platnost vypršela: {{description}}",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
         "balanceNeutral": "Bez vlivu na zůstatek",
         "deduction": "Odečtení",
         "grant": "Přidělení kreditů",
+        "promotionalCredits": "Propagační kredity",
         "welcomeCredits": "Uvítací kredity",
         "purchase": "Nákup"
+      },
+      "program": {
+        "adminBulkGrant": "Přidělení kreditů správcem",
+        "contributorChampion": "Kredit pro šampiona přispěvatelů",
+        "feedback": "Kredit za zpětnou vazbu",
+        "influencer": "Kredit pro influencery",
+        "ossMonthlyReset": "Měsíční obnovení kreditů OSS",
+        "ossSponsorship": "Kredit za sponzorství OSS",
+        "pullRequest": "Kredit za PR",
+        "usageIssue": "Kredit za problém s využitím",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
       "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
-      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů.",
+      "voidedGrant": "Stornováno: {{description}}"
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
@@ -5261,6 +5300,20 @@
       "eu": "Evropská unie",
       "au": "Austrálie",
       "jp": "Japonsko"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hledat předvolby",
+    "noMatches": "Žádné odpovídající předvolby",
+    "emptyDescription": "Zkuste jiný název předvolby nebo klíčové slovo.",
+    "resultsStatus": "Nalezené předvolby: {{resultCount}}",
+    "keywords": {
+      "signOut": "odhlášení|odhlásit se",
+      "appearance": "motiv|barevné schéma|tmavý režim",
+      "appUnlock": "biometrie|obličej|otisk prstu",
+      "language": "jazyk|překlad",
+      "notifications": "upozornění|oznámení",
+      "privacy": "analytika|sledování"
     }
   }
 }

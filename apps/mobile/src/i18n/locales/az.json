@@ -309,6 +309,7 @@
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
+    "availableToSpendInOrganization": "Bu təşkilatda xərcləmək üçün mövcud",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",
@@ -450,6 +451,17 @@
       "location": "Vertex məkanı",
       "clientEmail": "Xidmət hesabının e-poçtu",
       "privateKey": "Xidmət hesabının şəxsi açarı",
+      "privateKeyBlockRequired": "Bütün açar blokunu BEGIN sətrindən END sətrinə qədər yapışdır.",
+      "privateKeyEncrypted": "Bu açar bloku parol ifadəsi ilə qorunur. Parol ifadəsi olmayan xidmət hesabı açarını yapışdır.",
+      "names": {
+        "codestral": "Yalnız köhnə Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ilə daxil ol)",
+        "xiaomi": "Xiaomi (istifadəyə görə ödəniş)",
+        "zai": "Z.ai (istifadəyə görə ödəniş)",
+        "bedrockByok": "Amazon Bedrock (birbaşa)",
+        "vertexByok": "Google Vertex AI (birbaşa)"
+      },
       "modelMappings": "Model uyğunlaşdırmaları",
       "modelMappingsDescription": "Gateway modelini xüsusi deployment adına yönləndir.",
       "mappingTitle": "Uyğunlaşdırma {{number}}",
@@ -544,7 +556,10 @@
     "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
     "changelogAreas": {
       "signIn": "Giriş",
-      "profileOrganizations": "Profil ilə təşkilatlar"
+      "profileOrganizations": "Profil ilə təşkilatlar",
+      "chat": "Söhbət",
+      "notifications": "Bildirişlər",
+      "integrations": "İnteqrasiyalar"
     }
   },
   "preferences": {
@@ -1199,6 +1214,8 @@
       "emptyTitle": "Hələ bildiriş yoxdur",
       "emptyCategoryTitle": "Bu kateqoriyada bildiriş yoxdur",
       "emptyBody": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
+      "emptyBody_one": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
+      "emptyBody_other": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
       "capped": "Ən son bildirişlər göstərilir.",
       "loadError": "Bildiriş tarixçəsini yükləmək mümkün olmadı.",
       "openFailed": "Bu bildiriş artıq heç yerdə açılmır."
@@ -1434,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
+      "deniedManagedByOwner": "Dəyişə bilmədiyiniz bağlantını dəyişmək üçün {{organization}} təşkilatının sahibinə müraciət edin.",
+      "deniedConnectRole": "Onu yalnız {{organization}} təşkilatının sahibləri, inzibatçıları və ödəniş menecerləri qoşa bilər.",
+      "deniedReconnectRole": "Onu yenidən qoşmaq üçün {{organization}} təşkilatının sahibindən, inzibatçısından və ya ödəniş menecerindən xahiş edin.",
       "managedOnWebTitle": "Vebdə idarə olunur",
       "managedOnWebShort": "Bu bağlantı kompüterdən vebdə idarə olunur.",
       "managedOnWebRepositories": "{{organization}} üçün repozitoriyaları kompüterdən vebdə seçin.",
@@ -1571,7 +1591,9 @@
       "unavailablePersonallySwitchAction": "Təşkilatı dəyişdir",
       "unavailableOrganizationTitle": "Şura yoxlaması mövcud deyil",
       "unavailableForOrganization": "Şura yoxlaması aktiv abunəlik və ya sınaq dövrü olan Enterprise plan tələb edir. Bu təşkilatda hazırda bu yoxdur.",
-      "unavailableForOrganizationNeutral": "Şura yoxlaması hazırda bu təşkilat üçün mövcud deyil. Daha sonra yenidən cəhd edin.",
+      "unavailablePlanCheck": "Şura yoxlaması bu təşkilatın planını yoxlaya bilmədi. Yenidən yoxlamaq üçün cəhd edin.",
+      "unavailableFlagRollout": "Şura yoxlaması hələ bu təşkilat üçün mövcud deyil. Onu əldə etmək üçün tətbiqi ən son versiyaya yeniləyin.",
+      "unavailableForOrganizationMember": "Şura yoxlaması aktiv abunəlik və ya sınaq dövrü olan Enterprise plan tələb edir. Təşkilat sahibi planı dəyişə bilər.",
       "unavailableOnBitbucket": "Şura yoxlaması Bitbucket repozitoriyaları üçün əlçatan deyil.",
       "noRepositories": "Hələ heç bir repozitoriya seçilməyib. Əvvəlcə repozitoriya ayarlarında repozitoriyaları seç.",
       "specialists": "Mütəxəssislər",
@@ -2546,8 +2568,7 @@
       "searchPlaceholder": "Repozitoriya axtarışı",
       "noMatches": "Uyğunluq yoxdur",
       "noRepositories": "Mövcud repozitoriya yoxdur",
-      "noRepositoriesDescription": "Hesabına qoşulmuş repozitoriya yoxdur.",
-      "loading": "Yüklənir…",
+      "noRepositoriesDescription": "Repozitoriyaları yükləmək üçün GitHub və ya GitLab-ı qoş.",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3440,7 +3461,7 @@
       "manageOnWeb": "Vebdə ödənişlər ayarları",
       "changePlan": "Planı dəyiş",
       "buySeats": "İstifadəçi yerləri al",
-      "managedOnWeb": "Plan, istifadəçi yerləri və avtomatik artırma vebdə idarə olunur.",
+      "managedOnWeb": "Plan, istifadəçi yerləri və avtomatik artırma kilo.ai ünvanında idarə olunur.",
       "setupAutoTopUp": "Avtomatik artırmanı qur",
       "manageAutoTopUp": "Avtomatik artırmanı idarə et",
       "opensOnWeb": "Vebdə açılır"
@@ -3626,10 +3647,10 @@
       "nameLabel": "Rejim adı",
       "nameRequired": "Rejim adı daxil edin.",
       "notFound": "Bu rejim artıq mövcud deyil.",
-      "restrictionHint": "Yalnız bu şablona uyğun fayllar redaktə edilə bilər. Bütün fayllara icazə vermək üçün onu boş buraxın.",
-      "restrictionInvalid": "Düzgün şablon daxil edin.",
+      "restrictionHint": "Müntəzəm ifadə bu rejimin redaktə edə biləcəyi faylları seçir, məsələn yalnız markdown faylları üçün `\\.md$`. Bütün fayllara icazə vermək üçün onu boş buraxın.",
+      "restrictionInvalid": "Düzgün müntəzəm ifadə daxil edin.",
       "restrictionLabel": "Məhdudiyyət etiketi",
-      "restrictionPattern": "Fayl şablonu",
+      "restrictionPattern": "Fayl məhdudiyyəti",
       "roleLabel": "Rol tərifi",
       "roleRequired": "Bu rejimin nə etdiyini təsvir edin.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "E-poçt göndərmək müvəqqəti olaraq mümkün deyil. Bir az sonra yenidən cəhd et.",
     "admissionRequired": "Cihazını təsdiqləmək mümkün deyil. Başqa cihazdan və ya saytdan daxil olmaq üçün “$t(login.moreSignInOptions)” seçimini aç.",
     "default": "Xəta baş verdi. Yenidən cəhd et.",
-    "retryableAdmission": "Bu cihazı təsdiqləmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+    "retryableAdmission": "Bu cihazı təsdiqləmək mümkün olmadı. Yenidən cəhd et.",
     "startSignInFailed": "Giriş prosesini başlatmaq mümkün olmadı. Yenidən cəhd et.",
     "couldNotOpenBrowser": "Brauzeri açmaq mümkün olmadı. Yenidən cəhd et.",
     "signInTimedOut": "Giriş üçün ayrılmış vaxt bitdi. Yenidən cəhd et.",
@@ -4058,7 +4079,8 @@
         "space": "Bu model üçün kifayət qədər boş yaddaş yoxdur. Yer boşaldın və yenidən cəhd edin.",
         "network": "Yükləmə tamamlanmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
         "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi.",
-        "checksum": "Yüklənmiş fayl dərc olunmuş yoxlama cəmi ilə uyğun gəlmir, ona görə silindi. Yükləməni yenidən cəhd edin."
+        "checksum": "Yüklənmiş fayl dərc olunmuş yoxlama cəmi ilə uyğun gəlmir, ona görə silindi. Yükləməni yenidən cəhd edin.",
+        "writeFailed": "Bu cihaz modeli saxlaya bilmədi. Yükləməni yenidən cəhd edin."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "Siz bir…",
       "tools": "Alətlər",
       "wholeToolRule": "Bu agent bütün alətlərə eyni anda bir qayda tətbiq edir: {{rule}}. Bu keçidlər yalnız oxunaqlıdır.",
+      "toolRule": "Saxlanılan qayda: {{rule}}",
       "visibility": "Görünüş",
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "Kredit çıxılması",
       "emptyDescription": "Kredit alışları, qəbzlər və istifadə burada görünəcək.",
       "emptyTitle": "Kredit tarixçəsi yoxdur",
+      "expiredGrant": "Müddəti bitib: {{description}}",
       "googlePlayReceipt": "Google Play qəbzi",
       "kind": {
         "adjustment": "Düzəliş",
         "balanceNeutral": "Balansa təsirsiz",
         "deduction": "Çıxılma",
         "grant": "Kredit hədiyyəsi",
+        "promotionalCredits": "Promosyon kreditlər",
         "welcomeCredits": "Xoş gəlmə krediti",
         "purchase": "Alış"
+      },
+      "program": {
+        "adminBulkGrant": "İnzibatçı kredit hədiyyəsi",
+        "contributorChampion": "Töhfəçi çempion krediti",
+        "feedback": "Rəy krediti",
+        "influencer": "İnfluenser krediti",
+        "ossMonthlyReset": "OSS sponsorluğu yenilənməsi",
+        "ossSponsorship": "OSS sponsorluğu krediti",
+        "pullRequest": "Birləşdirmə sorğusu krediti",
+        "usageIssue": "İstifadə problemi krediti",
+        "vibeDay": "Vibe Day krediti"
       },
       "purchaseFallback": "Kredit alışı",
       "receipt": "Qəbz",
       "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
       "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil.",
-      "retentionLimit": "Ən son kredit tarixçəsi göstərilir."
+      "retentionLimit": "Ən son kredit tarixçəsi göstərilir.",
+      "voidedGrant": "Ləğv edilib: {{description}}"
     },
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
@@ -5087,6 +5124,20 @@
       "eu": "Avropa İttifaqı",
       "au": "Avstraliya",
       "jp": "Yaponiya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Seçim axtarışı",
+    "noMatches": "Uyğun seçim tapılmadı",
+    "emptyDescription": "Başqa seçim adı və ya açar sözlə axtarın.",
+    "resultsStatus": "Tapılan seçimlər: {{resultCount}}",
+    "keywords": {
+      "signOut": "çıxış|hesabdan çıxış",
+      "appearance": "mövzu|rəng sxemi|qaranlıq rejim",
+      "appUnlock": "biometriya|üz tanıma|barmaq izi",
+      "language": "dil|tərcümə",
+      "notifications": "bildiriş|xəbərdarlıq",
+      "privacy": "analitika|izləmə"
     }
   }
 }

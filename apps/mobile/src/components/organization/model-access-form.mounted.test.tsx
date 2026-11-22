@@ -149,6 +149,7 @@ function element(
     onRetryCatalog: overrides.onRetryCatalog ?? (() => undefined),
     providerAllowList,
     modelDenyList: overrides.modelDenyList ?? [],
+    providerNames: {},
     gateway: undefined,
     gatewayIsError: false,
     gatewayIsFetching: false,

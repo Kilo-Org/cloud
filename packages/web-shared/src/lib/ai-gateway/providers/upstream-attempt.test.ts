@@ -25,7 +25,7 @@ jest.mock('./preferred-provider-order-config', () => ({
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
@@ -68,7 +68,7 @@ describe('bounded spending provider enforcement', () => {
       { tag: 'expensive-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
     ],
   };
-  const catalogEntry: OpenRouterModel = {
+  const catalogEntry: OpenRouterCatalogModel = {
     id: model.id,
     name: model.name,
     created: 0,
@@ -131,7 +131,7 @@ describe('bounded spending provider enforcement', () => {
   it('serves a connected customer without applying a Kilo debit limit to the external bill', async () => {
     jest
       .mocked(applyProviderSpecificLogic)
-      .mockImplementationOnce(async (_provider, _model, request) => {
+      .mockImplementationOnce(async ({ requestToMutate: request }) => {
         Object.assign(request.body, {
           billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
         });
@@ -253,7 +253,7 @@ describe('upstream model catalog validation', () => {
           };
     jest
       .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, request) => {
+      .mockImplementation(async ({ requestToMutate: request }) => {
         request.body.model = wireModel;
       });
     return sendUpstreamAttempt({
@@ -449,11 +449,9 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       user.id
     );
     // The real transform puts the delegated token in this header.
-    jest
-      .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, _request, extraHeaders) => {
-        extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
-      });
+    jest.mocked(applyProviderSpecificLogic).mockImplementation(async ({ extraHeaders }) => {
+      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
+    });
   });
 
   async function send(response: Response) {
@@ -547,11 +545,9 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toBeNull();
 
     // The credential the row holds now still records its own limit.
-    jest
-      .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, _request, extraHeaders) => {
-        extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = RECONNECTED_TOKEN;
-      });
+    jest.mocked(applyProviderSpecificLogic).mockImplementation(async ({ extraHeaders }) => {
+      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = RECONNECTED_TOKEN;
+    });
     await send(usageLimitResponse());
     await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toMatchObject({
       code: 'subscription_sharing_usage_limit_exceeded',

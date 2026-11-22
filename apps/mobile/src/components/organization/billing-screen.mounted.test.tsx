@@ -16,6 +16,8 @@ import {
 } from './billing-screen.test-helpers';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 beforeEach(() => {
   resetBillingQueries();
 });
@@ -196,7 +198,7 @@ describe('OrganizationBillingScreen change plan placement', () => {
 
     expect(bannerAction(renderer)).toBeUndefined();
     expect(renderer.root.findAllByType('ExternalBillingLink' as never)).toHaveLength(0);
-    expect(texts(renderer)).toContain('The plan, seats and auto top-up are managed on the web.');
+    expect(texts(renderer)).toContain(i18n.t('organization.billing.managedOnWeb'));
     unmount();
   });
 

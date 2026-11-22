@@ -6,7 +6,18 @@ import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useTRPC } from '@/lib/trpc';
 
-export type DeleteAccountPhase = 'idle' | 'requesting' | 'awaiting-code' | 'executing' | 'deleted';
+type DeleteAccountPhase = 'idle' | 'requesting' | 'awaiting-code' | 'executing' | 'deleted';
+
+/** The delete flow's state and the actions the caller drives it with. */
+export type DeleteAccountState = {
+  phase: DeleteAccountPhase;
+  isPending: boolean;
+  code: string;
+  canSubmitCode: boolean;
+  beginDelete: () => void;
+  submitCode: () => void;
+  setCode: (code: string) => void;
+};
 
 type DeleteAccountChallenge = { challengeId: string; devCode?: string };
 
@@ -42,12 +53,13 @@ function derivePhase(state: {
  * `beginDelete` requests a confirmation-code challenge. On success the hook
  * moves to `awaiting-code`; the caller renders a code field and calls
  * `submitCode`. `submitCode` sends nothing until the field holds a code, and
- * `canSubmitCode` tells the caller when it does. `submitCode` executes the
- * deletion and, on success, signs the user out. Any execute failure keeps the
- * challenge so the caller can fix the blocker (or correct the code) and
- * resubmit the same `challengeId`.
+ * `canSubmitCode` tells the caller when it does. `code` is the text the caller's
+ * uncontrolled field should show when it mounts, including the development code
+ * a challenge prefills. `submitCode` executes the deletion and, on success,
+ * signs the user out. Any execute failure keeps the challenge so the caller can
+ * fix the blocker (or correct the code) and resubmit the same `challengeId`.
  */
-export function useDeleteAccount() {
+export function useDeleteAccount(): DeleteAccountState {
   const trpc = useTRPC();
   const { signOut } = useAuth();
 
@@ -104,7 +116,10 @@ export function useDeleteAccount() {
   return {
     phase,
     isPending,
-    devCode: challenge?.devCode ?? null,
+    // The caller's field is uncontrolled, so it seeds itself from this value
+    // whenever it mounts. The hook, not the field, owns the text across an
+    // unmount (Settings search replaces the default list and restores it).
+    code: trimmedCode,
     canSubmitCode: trimmedCode.length > 0,
     beginDelete,
     submitCode,

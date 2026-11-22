@@ -309,6 +309,7 @@
     "hideBalance": "Qari hadhaaga",
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
+    "availableToSpendInOrganization": "Waxaa lagu kharash gali karaa ururkan",
     "signOutTitle": "Ma ka baxaysaa?",
     "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
     "deleteAccountTitle": "Ma tirtiraysaa akoonka?",
@@ -450,6 +451,17 @@
       "location": "Goobta Vertex",
       "clientEmail": "Iimaylka service account",
       "privateKey": "Furaha gaarka ah ee service account",
+      "privateKeyBlockRequired": "Ku dheji block-ka furaha oo dhan, laga bilaabo safka BEGIN ilaa safka END.",
+      "privateKeyEncrypted": "Block-kan furaha ah waxaa lagu ilaaliyaa weedh sirta ah. Ku dheji furaha service account oo aan lahayn weedh sirta ah.",
+      "names": {
+        "codestral": "Codestral duugoobay kaliya",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Ku soo gal ChatGPT)",
+        "xiaomi": "Xiaomi (bixi inta aad isticmaalayso)",
+        "zai": "Z.ai (bixi inta aad isticmaalayso)",
+        "bedrockByok": "Amazon Bedrock (tooska ah)",
+        "vertexByok": "Google Vertex AI (tooska ah)"
+      },
       "modelMappings": "Isku-xidhka moodellada",
       "modelMappingsDescription": "U dir moodel gateway ah magac deployment oo gaar ah.",
       "mappingTitle": "Isku-xidhka {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Hagaajinno iyo horumarin lagu sameeyay {{areas}}.",
     "changelogFixesPolish": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
     "changelogAreas": {
-      "signIn": "Gelitaanka",
-      "profileOrganizations": "Xogta shakhsiga & ururada"
+      "signIn": "gelitaanka",
+      "profileOrganizations": "xogta shakhsiga & ururada",
+      "chat": "sheekaysi",
+      "notifications": "ogeysiisyada",
+      "integrations": "isku-xidhka"
     }
   },
   "preferences": {
@@ -1199,6 +1214,8 @@
       "emptyTitle": "Weli ogeysiisyo ma jiraan",
       "emptyCategoryTitle": "Qaybtaan ogeysiisyo ma jiraan",
       "emptyBody": "Ogeysiisyada ay hesho akoonkan ayaa halkan ka muuqda. Waxaa la hayaa {{days}} maalmood.",
+      "emptyBody_one": "Ogeysiisyada ay hesho akoonkan ayaa halkan ka muuqda. Waxaa la hayaa {{days}} maalmood.",
+      "emptyBody_other": "Ogeysiisyada ay hesho akoonkan ayaa halkan ka muuqda. Waxaa la hayaa {{days}} maalmood.",
       "capped": "Waxaa la muujinayaa ogeysiisyada ugu dambeeyay.",
       "loadError": "Taariikhda ogeysiisyada lama soo dejin karin.",
       "openFailed": "Ogeysiiskan mar dambe meelna lagama furi karo."
@@ -1434,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "deniedManagedByOwner": "Weydii milkiile ka mid ah {{organization}} si uu u beddelo isku-xidhka aadan beddeli karin.",
+      "deniedConnectRole": "Milkiilayaasha, maamulayaasha iyo maareeyayaasha biilasha ee {{organization}} oo keliya ayaa ku xidhi kara.",
+      "deniedReconnectRole": "Weydii milkiile, maamule ama maareeyaha biilasha ee {{organization}} si ay dib ugu xidhaan.",
       "managedOnWebTitle": "Waxaa lagu maamulaa shabakadda",
       "managedOnWebShort": "Xiriirkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
       "managedOnWebRepositories": "Dooro keydadka {{organization}} ee shabakadda adigoo kombiyuutar isticmaalaya.",
@@ -1571,7 +1591,9 @@
       "unavailablePersonallySwitchAction": "Beddel hay'ad",
       "unavailableOrganizationTitle": "Dib-u-eegista golaha hadda looma heli karo",
       "unavailableForOrganization": "Dib-u-eegista golaha waxay u baahan tahay qorshaha Enterprise oo leh rukunka firfircoon ama muddada tijaabada. Ururkaan hadda ma laha.",
-      "unavailableForOrganizationNeutral": "Dib-u-eegista golaha looma heli karo ururkaan hadda. Mar dambe isku day.",
+      "unavailablePlanCheck": "Dib-u-eegista golaha ma awoodin inay hubiso qorshaha ururkaan. Mar kale isku day si aad u hubiso.",
+      "unavailableFlagRollout": "Dib-u-eegista golaha weli looma heli karo ururkaan. Cusboonaysii abka nooca ugu dambeeya si aad u hesho.",
+      "unavailableForOrganizationMember": "Dib-u-eegista golaha waxay u baahan tahay qorshaha Enterprise oo leh rukunka firfircoon ama muddada tijaabada. Milkiilaha ururka ayaa beddeli karaa qorshaha.",
       "unavailableOnBitbucket": "Dib-u-eegista golaha lama heli karo kaydka Bitbucket.",
       "noRepositories": "Weli lama dooran kayd. Marka hore dooro kaydadka dejinta kaydka dhexdeeda.",
       "specialists": "Takhasusleyaal",
@@ -2546,8 +2568,7 @@
       "searchPlaceholder": "Raadinta kaydadka",
       "noMatches": "Wax u dhigma lama helin",
       "noRepositories": "Ma jiraan kaydad la heli karo",
-      "noRepositoriesDescription": "Ma jiraan kaydad ku xiran akoonkaaga.",
-      "loading": "Waa la soo shubayaa…",
+      "noRepositoriesDescription": "Si aad u soo shubto kaydadka, ku xir GitHub ama GitLab.",
       "accessibility": "Kaydka: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3440,7 +3461,7 @@
       "manageOnWeb": "Dejinta biilasha ee shabakadda",
       "changePlan": "Beddel qorshaha",
       "buySeats": "Iibso boosas",
-      "managedOnWeb": "Qorshaha, boosaska iyo ku-shubidda tooska ah waxaa lagu maamulaa shabakadda.",
+      "managedOnWeb": "Qorshaha, boosaska iyo ku-shubidda tooska ah waxaa lagu maamulaa kilo.ai.",
       "setupAutoTopUp": "Deji ku-shubid toos ah",
       "manageAutoTopUp": "Maaree ku-shubid toos ah",
       "opensOnWeb": "Waxay ku furmaysaa webka"
@@ -3626,10 +3647,10 @@
       "nameLabel": "Magaca qaabka",
       "nameRequired": "Geli magaca qaabka.",
       "notFound": "Qaabkani mar dambe ma jiro.",
-      "restrictionHint": "Kaliya faylasha u dhigma naqshaddan ayaa la tafatiran karaa. Ka tag madhan si fayl walba loo oggolaado.",
-      "restrictionInvalid": "Geli naqshad sax ah.",
+      "restrictionHint": "Tibaax caadi ah ayaa doorata faylasha qaabkani tafatiran karo, tusaale ahaan `\\.md$` kaliya faylasha markdown. Ka tag madhan si fayl walba loo oggolaado.",
+      "restrictionInvalid": "Geli tibaax caadi ah oo sax ah.",
       "restrictionLabel": "Summada xaddidka",
-      "restrictionPattern": "Naqshadda faylka",
+      "restrictionPattern": "Xaddidka faylka",
       "roleLabel": "Qeexitaanka doorka",
       "roleRequired": "Sharax waxa qaabkani qabto.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "Dirista iimaylka si ku meel gaar ah looma heli karo. Fadlan mar kale isku day waqti dambe.",
     "admissionRequired": "Qalabkaaga lama xaqiijin karo. Isticmaal '$t(login.moreSignInOptions)' si aad uga soo gasho qalab kale ama bogga internetka.",
     "default": "Waxbaa khaldamay. Fadlan mar kale isku day.",
-    "retryableAdmission": "Qalabkan lama xaqiijin karin. Hubi xiriirkaaga oo mar kale isku day.",
+    "retryableAdmission": "Lama xaqiijin karin qalabkan. Isku day mar kale.",
     "startSignInFailed": "Soo gelitaanka lama bilaabi karin. Fadlan mar kale isku day.",
     "couldNotOpenBrowser": "Biraawsarka lama furi karin. Fadlan mar kale isku day.",
     "signInTimedOut": "Waqtigii loo qabtay soo gelitaanka wuu dhammaaday. Fadlan mar kale isku day.",
@@ -4058,7 +4079,8 @@
         "space": "Ma jiro kayd bannaan oo ku filan moodeelkan. Meel bannaan samee oo mar kale isku day.",
         "network": "Soo dejintu ma dhammaanin. Hubi xiriirkaaga oo mar kale isku day.",
         "invalidFile": "Faylka la soo dejiyay ma aha moodeel uu abkani ku shaqeyn karo, sidaas darteed waa la tirtiray.",
-        "checksum": "Faylka la soo dejiyay kuma eka checksum-kiisa la daabacay, sidaas darteed waa la tirtiray. Mar kale isku day soo dejinta."
+        "checksum": "Faylka la soo dejiyay kuma eka checksum-kiisa la daabacay, sidaas darteed waa la tirtiray. Mar kale isku day soo dejinta.",
+        "writeFailed": "Qalabkani ma kaydin karin moodeelka. Mar kale isku day soo dejinta."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "Waxaad tahay…",
       "tools": "Qalabka",
       "wholeToolRule": "Wakiilkan waxa uu hal xeer isku mar ku dabaqaa qalab kasta: {{rule}}. Beddelladan waa akhris-kaliya.",
+      "toolRule": "Xeer kaydsan: {{rule}}",
       "visibility": "Muuqashada",
       "visibilityPrimary": "Aasaasiga ah — oo lagu muujiyay dooriyaha",
       "visibilitySubagent": "Subagent — kaliya kuwa kale looga yeeri karo",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "Ka-goynta kiredit-ka",
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",
+      "expiredGrant": "Waqtigiisu dhacay: {{description}}",
       "googlePlayReceipt": "Rasiid ka yimid Google Play",
       "kind": {
         "adjustment": "Hagaajin",
         "balanceNeutral": "Aan saamaynin haraaga",
         "deduction": "Ka-goyn",
         "grant": "Deeq kiredit",
+        "promotionalCredits": "Kiredit xayeysiin",
         "welcomeCredits": "Kiredit soo dhawoow",
         "purchase": "Iibsasho"
+      },
+      "program": {
+        "adminBulkGrant": "Deeq kiredit maamule",
+        "contributorChampion": "Kiredit halyeeyga wax-ku-biirka",
+        "feedback": "Kiredit jawaab-celin",
+        "influencer": "Kiredit saameynle",
+        "ossMonthlyReset": "Cusboonaysiinta kafaalaqaadka OSS",
+        "ossSponsorship": "Kiredit kafaalaqaadka OSS",
+        "pullRequest": "Kiredit codsi isku-darid",
+        "usageIssue": "Kiredit dhibaatada isticmaalka",
+        "vibeDay": "Kiredit Vibe Day"
       },
       "purchaseFallback": "Iibsashada kiredit",
       "receipt": "Rasiid",
       "receiptA11y": "Fur rasiidka {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Iibsashadan rasiid looma hayo.",
-      "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa."
+      "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa.",
+      "voidedGrant": "La buriyay: {{description}}"
     },
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
@@ -5087,6 +5124,20 @@
       "eu": "Midowga Yurub",
       "au": "Australiya",
       "jp": "Jabbaan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Raadinta dookhyada",
+    "noMatches": "Lama helin dookhyo u dhigma",
+    "emptyDescription": "Isku day magac dookh ama erey raadin oo kale.",
+    "resultsStatus": "Dookhyada la helay: {{resultCount}}",
+    "keywords": {
+      "signOut": "ka bax|ka bixid",
+      "appearance": "muuqaal|midab|naqshad",
+      "appUnlock": "aqoonsiga jirka|aqoonsiga wejiga|faraha",
+      "language": "luuqad|turjumaad",
+      "notifications": "digniino|ogeysiisyo",
+      "privacy": "asturnaan|falanqayn|dabagal"
     }
   }
 }

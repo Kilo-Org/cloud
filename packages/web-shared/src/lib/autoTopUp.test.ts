@@ -976,6 +976,58 @@ describe('auto top-up card errors with empty decline codes', () => {
       expect(events[0].event_type).toBe('charge.attempted');
     }
   );
+
+  test.each(['toString', 'constructor', 'hasOwnProperty'] as const)(
+    'a decline code that names an inherited property ("%s") disables with the unknown_error fallback',
+    async inheritedName => {
+      const user = await insertTestUser({
+        google_user_email: `at-inherited-${crypto.randomUUID()}@example.com`,
+        auto_top_up_enabled: true,
+        stripe_customer_id: `cus_inherited_${crypto.randomUUID()}`,
+        total_microdollars_acquired: 0,
+        microdollars_used: toMicrodollars(10),
+      });
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: user.id,
+        created_by_user_id: user.id,
+        stripe_payment_method_id: 'pm_inherited_test',
+        amount_cents: 2000,
+        disabled_reason: null,
+      });
+
+      const invoiceId = `inv_inherited_${crypto.randomUUID()}`;
+      (client.invoices.create as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        created: 1_700_000_000,
+      });
+      (client.invoices.update as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        created: 1_700_000_000,
+      });
+      (client.invoiceItems.create as jest.Mock).mockResolvedValue({
+        id: `ii_inherited_${crypto.randomUUID()}`,
+      });
+      (client.invoices.pay as jest.Mock).mockRejectedValue(
+        new Stripe.errors.StripeCardError({
+          type: 'card_error',
+          message: 'This card was declined.',
+          decline_code: inheritedName,
+          code: inheritedName,
+        })
+      );
+
+      await maybePerformAutoTopUp(toUserForBalance(user));
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_user_id, user.id),
+      });
+      expect(config?.disabled_reason).toBe(inheritedName);
+
+      const sendMock = sendAutoTopUpFailedEmail as jest.Mock;
+      expect(sendMock).toHaveBeenCalledTimes(1);
+      expect(sendMock.mock.calls[0][1]).toMatchObject({ reason: '' });
+    }
+  );
 });
 
 describe('auto top-up failed email recipients for organizations', () => {
@@ -1063,6 +1115,95 @@ describe('deferred funding opt-out', () => {
       });
       expect(savedConfig?.attempt_started_at).toBeNull();
       expect(sendAutoTopUpFailedEmail).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('auto top-up invoice that does not reach paid', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    jest.clearAllMocks();
+  });
+
+  test.each(['user', 'organization'] as const)(
+    'disables %s auto top-up with the verification reason and emails it',
+    async entityType => {
+      const user = await insertTestUser({
+        google_user_email: `at-unpaid-${entityType}-${crypto.randomUUID()}@example.com`,
+        auto_top_up_enabled: true,
+        stripe_customer_id: `cus_unpaid_${crypto.randomUUID()}`,
+        total_microdollars_acquired: 0,
+        microdollars_used: toMicrodollars(10),
+      });
+      const org =
+        entityType === 'organization'
+          ? await createOrganization('Unpaid invoice test', user.id)
+          : undefined;
+
+      if (org) {
+        await db
+          .update(organizations)
+          .set({
+            auto_top_up_enabled: true,
+            stripe_customer_id: `cus_unpaid_org_${crypto.randomUUID()}`,
+            total_microdollars_acquired: 0,
+            microdollars_used: toMicrodollars(10),
+          })
+          .where(eq(organizations.id, org.id));
+      }
+
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: org ? null : user.id,
+        owned_by_organization_id: org?.id ?? null,
+        created_by_user_id: user.id,
+        stripe_payment_method_id: 'pm_unpaid_test',
+        amount_cents: 2000,
+        disabled_reason: null,
+      });
+
+      const invoiceId = `inv_unpaid_${crypto.randomUUID()}`;
+      (client.invoices.create as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        created: 1_700_000_000,
+      });
+      (client.invoices.update as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        created: 1_700_000_000,
+      });
+      (client.invoiceItems.create as jest.Mock).mockResolvedValue({
+        id: `ii_unpaid_${crypto.randomUUID()}`,
+      });
+      // The off-session payment needs further customer action, so the invoice is not paid.
+      (client.invoices.pay as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        status: 'requires_action',
+      });
+
+      if (org) {
+        await maybePerformOrganizationAutoTopUp({
+          id: org.id,
+          auto_top_up_enabled: true,
+          total_microdollars_acquired: 0,
+          microdollars_used: toMicrodollars(10),
+        });
+      } else {
+        await maybePerformAutoTopUp(toUserForBalance(user));
+      }
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: org
+          ? eq(auto_top_up_configs.owned_by_organization_id, org.id)
+          : eq(auto_top_up_configs.owned_by_user_id, user.id),
+      });
+      expect(config?.disabled_reason).toBe('unexpected_invoice_status');
+      expect(config?.attempt_started_at).toBeNull();
+      expect(await db.select().from(credit_transactions)).toHaveLength(0);
+
+      const sendMock = sendAutoTopUpFailedEmail as jest.Mock;
+      expect(sendMock).toHaveBeenCalledTimes(1);
+      expect(sendMock.mock.calls[0][1]).toMatchObject({
+        reason: 'The payment requires additional verification.',
+      });
     }
   );
 });

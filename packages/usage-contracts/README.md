@@ -8,7 +8,15 @@ Import contracts and usage enums directly from this package. Database/type
 alignment checks belong in web-shared
 (`usage-record-contract-alignment.ts`), outside this package. Preserve nullable
 fields, safe integer limits, ISO timestamps, optional bouncer data, and unknown-key
-stripping when changing the contract.
+stripping when changing the contract. The safe-integer rule covers every
+microdollar and token-count field in `UsageRecordRequest` and its metadata,
+including `market_cost`, `non_inference_cost`, `cache_discount`, and
+`prior_microdollar_usage`.
+
+Non-LLM usage messages are tagged envelopes built by the single
+`taggedQueueMessageSchema` factory in `queue-envelope.ts`:
+`{kind, v: 1, record}`. A new provider contributes only its kind literal and
+record schema; an LLM usage message stays untagged.
 
 ## Exa usage
 

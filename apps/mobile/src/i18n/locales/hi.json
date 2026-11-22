@@ -309,6 +309,7 @@
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
+    "availableToSpendInOrganization": "इस संगठन में खर्च करने के लिए उपलब्ध",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",
@@ -450,6 +451,17 @@
       "location": "Vertex लोकेशन",
       "clientEmail": "सर्विस अकाउंट ईमेल",
       "privateKey": "सर्विस अकाउंट प्राइवेट कुंजी",
+      "privateKeyBlockRequired": "BEGIN पंक्ति से END पंक्ति तक पूरा कुंजी ब्लॉक पेस्ट करें।",
+      "privateKeyEncrypted": "यह कुंजी ब्लॉक पासफ़्रेज़ से सुरक्षित है। ऐसी सर्विस अकाउंट कुंजी पेस्ट करें जिसमें कोई पासफ़्रेज़ न हो।",
+      "names": {
+        "codestral": "केवल पुराना Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT से साइन इन करें)",
+        "xiaomi": "Xiaomi (उपयोग के अनुसार भुगतान)",
+        "zai": "Z.ai (उपयोग के अनुसार भुगतान)",
+        "bedrockByok": "Amazon Bedrock (सीधा)",
+        "vertexByok": "Google Vertex AI (सीधा)"
+      },
       "modelMappings": "मॉडल मैपिंग",
       "modelMappingsDescription": "किसी गेटवे मॉडल को कस्टम डिप्लॉयमेंट नाम पर भेजें।",
       "mappingTitle": "मैपिंग {{number}}",
@@ -544,7 +556,10 @@
     "changelogFixesPolish": "त्रुटि-सुधार और बेहतरी।",
     "changelogAreas": {
       "signIn": "साइन-इन",
-      "profileOrganizations": "प्रोफ़ाइल व संगठन"
+      "profileOrganizations": "प्रोफ़ाइल व संगठन",
+      "chat": "चैट",
+      "notifications": "सूचनाएँ",
+      "integrations": "इंटीग्रेशन"
     }
   },
   "preferences": {
@@ -638,6 +653,8 @@
       "emptyTitle": "अभी तक कोई सूचना नहीं",
       "emptyCategoryTitle": "इस श्रेणी में कोई सूचना नहीं",
       "emptyBody": "इस खाते को मिलने वाली सूचनाएँ यहाँ दिखाई देती हैं। इन्हें {{days}} दिनों तक रखा जाता है।",
+      "emptyBody_one": "इस खाते को मिलने वाली सूचनाएँ यहाँ दिखाई देती हैं। इन्हें {{days}} दिनों तक रखा जाता है।",
+      "emptyBody_other": "इस खाते को मिलने वाली सूचनाएँ यहाँ दिखाई देती हैं। इन्हें {{days}} दिनों तक रखा जाता है।",
       "capped": "सबसे हाल की सूचनाएँ दिखाई जा रही हैं।",
       "loadError": "सूचनाओं का इतिहास लोड नहीं हो सका।",
       "openFailed": "यह सूचना अब कहीं नहीं खुलती।"
@@ -738,6 +755,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
+      "deniedManagedByOwner": "जिस कनेक्शन को आप नहीं बदल सकते, उसे बदलने के लिए {{organization}} के किसी मालिक से कहें।",
+      "deniedConnectRole": "केवल {{organization}} के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
+      "deniedReconnectRole": "इसे फिर से कनेक्ट करने के लिए {{organization}} के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।",
       "managedOnWebTitle": "वेब पर प्रबंधित",
       "managedOnWebShort": "यह कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है।",
       "managedOnWebRepositories": "{{organization}} के लिए कंप्यूटर से वेब पर रिपॉज़िटरी चुनें।",
@@ -1010,7 +1030,9 @@
       "unavailablePersonallySwitchAction": "संगठन बदलें",
       "unavailableOrganizationTitle": "काउंसिल समीक्षा उपलब्ध नहीं है",
       "unavailableForOrganization": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। इस संगठन के पास यह अभी नहीं है।",
-      "unavailableForOrganizationNeutral": "इस संगठन के लिए काउंसिल समीक्षा अभी उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें।",
+      "unavailablePlanCheck": "काउंसिल समीक्षा इस संगठन की योजना की जाँच नहीं कर सकी। दोबारा जाँचने के लिए फिर से कोशिश करें।",
+      "unavailableFlagRollout": "काउंसिल समीक्षा इस संगठन के लिए अभी उपलब्ध नहीं है। इसे पाने के लिए ऐप को नवीनतम संस्करण में अपडेट करें।",
+      "unavailableForOrganizationMember": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। संगठन का मालिक योजना बदल सकता है।",
       "unavailableOnBitbucket": "काउंसिल समीक्षा Bitbucket रिपॉज़िटरी के लिए उपलब्ध नहीं है।",
       "noRepositories": "अभी तक कोई रिपॉज़िटरी नहीं चुनी गई है। पहले रिपॉज़िटरी सेटिंग में रिपॉज़िटरी चुनें।",
       "specialists": "विशेषज्ञ",
@@ -1945,9 +1967,8 @@
       "searchPlaceholder": "रिपॉज़िटरी खोजें…",
       "noMatches": "कोई मिलान नहीं",
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
-      "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है।",
+      "noRepositoriesDescription": "रिपॉज़िटरी लोड करने के लिए GitHub या GitLab जोड़ें।",
       "accessibility": "रिपॉज़िटरी: {{label}}",
-      "loading": "लोड हो रहा है…",
       "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
@@ -3432,7 +3453,7 @@
       "manageOnWeb": "वेब पर बिलिंग सेटिंग्स",
       "changePlan": "प्लान बदलें",
       "buySeats": "सीटें खरीदें",
-      "managedOnWeb": "प्लान, सीटें और ऑटो टॉप-अप वेब पर प्रबंधित किए जाते हैं।",
+      "managedOnWeb": "प्लान, सीटें और ऑटो टॉप-अप kilo.ai पर प्रबंधित किए जाते हैं।",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
       "manageAutoTopUp": "ऑटो टॉप-अप प्रबंधित करें",
       "opensOnWeb": "वेब पर खुलता है"
@@ -3630,10 +3651,10 @@
       "nameLabel": "मोड नाम",
       "nameRequired": "मोड नाम दर्ज करें।",
       "notFound": "यह मोड अब मौजूद नहीं है।",
-      "restrictionHint": "केवल इस पैटर्न से मेल खाने वाली फ़ाइलें संपादित की जा सकती हैं। हर फ़ाइल को अनुमति देने के लिए इसे खाली छोड़ें।",
-      "restrictionInvalid": "मान्य पैटर्न दर्ज करें।",
+      "restrictionHint": "एक रेगुलर एक्सप्रेशन तय करता है कि यह मोड किन फ़ाइलों को संपादित कर सकता है, उदाहरण के लिए `\\.md$` केवल markdown फ़ाइलों के लिए। हर फ़ाइल को अनुमति देने के लिए इसे खाली छोड़ें।",
+      "restrictionInvalid": "मान्य रेगुलर एक्सप्रेशन दर्ज करें।",
       "restrictionLabel": "प्रतिबंध लेबल",
-      "restrictionPattern": "फ़ाइल पैटर्न",
+      "restrictionPattern": "फ़ाइल प्रतिबंध",
       "roleLabel": "भूमिका परिभाषा",
       "roleRequired": "बताएँ कि यह मोड क्या करता है।",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "फ़िलहाल ईमेल नहीं भेजा जा सकता। कृपया बाद में फिर से कोशिश करें।",
     "admissionRequired": "आपके डिवाइस की पुष्टि नहीं की जा सकती। किसी दूसरे डिवाइस पर या वेब के माध्यम से साइन इन करने के लिए '$t(login.moreSignInOptions)' का उपयोग करें।",
     "default": "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
-    "retryableAdmission": "हम इस डिवाइस की पुष्टि नहीं कर सके। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+    "retryableAdmission": "इस डिवाइस की पुष्टि नहीं हो सकी। फिर से प्रयास करें।",
     "startSignInFailed": "साइन-इन शुरू नहीं हो सका। कृपया फिर से कोशिश करें।",
     "couldNotOpenBrowser": "ब्राउज़र नहीं खुल सका। कृपया फिर से कोशिश करें।",
     "signInTimedOut": "साइन-इन का समय समाप्त हो गया। कृपया फिर से कोशिश करें।",
@@ -4058,7 +4079,8 @@
         "space": "इस मॉडल के लिए पर्याप्त खाली स्टोरेज नहीं है। जगह खाली करें और फिर कोशिश करें।",
         "network": "डाउनलोड पूरा नहीं हुआ। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
         "invalidFile": "डाउनलोड की गई फ़ाइल कोई ऐसा मॉडल नहीं है जिसे यह ऐप चला सके, इसलिए इसे हटा दिया गया।",
-        "checksum": "डाउनलोड की गई फ़ाइल उसके प्रकाशित चेकसम से मेल नहीं खाती, इसलिए इसे हटा दिया गया। फिर से डाउनलोड करके देखें।"
+        "checksum": "डाउनलोड की गई फ़ाइल उसके प्रकाशित चेकसम से मेल नहीं खाती, इसलिए इसे हटा दिया गया। फिर से डाउनलोड करके देखें।",
+        "writeFailed": "यह डिवाइस मॉडल को सहेज नहीं सका। डाउनलोड फिर से करके देखें।"
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "तुम एक …",
       "tools": "औजार",
       "wholeToolRule": "यह एजेंट एक साथ सभी औजारों पर एक नियम लागू करता है: {{rule}}। ये स्विच केवल-पढ़ने योग्य हैं।",
+      "toolRule": "संग्रहित नियम: {{rule}}",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकर में दिखाया गया है",
       "visibilitySubagent": "सबएजेंट — केवल दूसरों से कॉल करने योग्य",
@@ -4492,22 +4515,36 @@
       "activityUnavailable": "क्रेडिट गतिविधि लोड नहीं हो सकी।",
       "appStoreReceipt": "App Store की रसीद",
       "deductionFallback": "क्रेडिट कटौती",
-      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहां दिखेंगे।",
+      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहाँ दिखेंगे।",
       "emptyTitle": "कोई क्रेडिट इतिहास नहीं",
+      "expiredGrant": "समय समाप्त: {{description}}",
       "googlePlayReceipt": "Google Play की रसीद",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "बैलेंस पर असर नहीं",
         "deduction": "कटौती",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रमोशनल क्रेडिट",
         "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरीदारी"
+      },
+      "program": {
+        "adminBulkGrant": "एडमिन द्वारा क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता चैंपियन क्रेडिट",
+        "feedback": "प्रतिक्रिया क्रेडिट",
+        "influencer": "इन्फ्लुएंसर क्रेडिट",
+        "ossMonthlyReset": "OSS प्रायोजन नवीनीकरण",
+        "ossSponsorship": "OSS प्रायोजन क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्ट क्रेडिट",
+        "usageIssue": "उपयोग समस्या क्रेडिट",
+        "vibeDay": "Vibe Day क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरीदारी",
       "receipt": "रसीद",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} की रसीद खोलें",
       "receiptUnavailable": "इस खरीदारी की रसीद उपलब्ध नहीं है।",
-      "retentionLimit": "सबसे हाल का क्रेडिट इतिहास दिखाया जा रहा है।"
+      "retentionLimit": "सबसे हाल का क्रेडिट इतिहास दिखाया जा रहा है।",
+      "voidedGrant": "रद्द किया गया: {{description}}"
     },
     "title": "क्रेडिट खरीदें",
     "description": "क्रेडिट एक बार की खरीद है जो Kilo App में AI कोडिंग सत्र चलाने के लिए आपके Kilo बैलेंस में जोड़ी जाती है। स्टोर आपके खाते से शुल्क लेता है और स्टोर द्वारा भुगतान की पुष्टि के बाद क्रेडिट जोड़े जाते हैं।",
@@ -4768,7 +4805,7 @@
     "connectFailed": "कनेक्शन पेज नहीं खोला जा सका"
   },
   "invoices": {
-    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
+    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहाँ दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
     "personalPeriod": "पिछले 12 महीने"
   },
   "cloudAgent": {
@@ -5088,6 +5125,20 @@
       "eu": "यूरोपीय संघ",
       "au": "ऑस्ट्रेलिया",
       "jp": "जापान"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "पसंद में खोजें",
+    "noMatches": "मेल खाती कोई पसंद नहीं मिली",
+    "emptyDescription": "पसंद का कोई दूसरा नाम या कीवर्ड आज़माएँ।",
+    "resultsStatus": "पसंद मिलीं: {{resultCount}}",
+    "keywords": {
+      "signOut": "साइन आउट|लॉग आउट|बाहर निकलें",
+      "appearance": "थीम|रंग|डार्क मोड",
+      "appUnlock": "बायोमेट्रिक्स|चेहरा|फिंगरप्रिंट",
+      "language": "भाषा|अनुवाद",
+      "notifications": "सूचनाएँ|अलर्ट",
+      "privacy": "विश्लेषण|ट्रैकिंग"
     }
   }
 }

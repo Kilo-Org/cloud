@@ -58,6 +58,54 @@ describe('InstallationLookupService', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
+  it('returns the exact hosted workflow selection for checking additional live repositories', async () => {
+    const orgId = '00000000-0000-4000-8000-000000000001';
+    const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+    const row = {
+      id: expectedIntegrationId,
+      platform_installation_id: '100',
+      platform_account_login: 'GitHubOrg',
+      github_app_type: 'lite',
+      owned_by_organization_id: orgId,
+      owned_by_user_id: null,
+      integration_status: 'active',
+      repository_access: 'selected',
+      repositories: [{ full_name: 'GitHubOrg/Primary' }, { full_name: 'GitHubOrg/Tools' }],
+      permissions: null,
+    } satisfies InstallationRow;
+    const params = {
+      userId: 'oauth/member',
+      orgId,
+      expectedIntegrationId,
+      githubRepo: 'githuborg/primary',
+    };
+
+    await expect(createService([row]).findHostedWorkspaceInstallation(params)).resolves.toEqual({
+      success: true,
+      installationId: '100',
+      accountLogin: 'GitHubOrg',
+      githubAppType: 'lite',
+      selectedRepositories: new Set(['githuborg/primary', 'githuborg/tools']),
+    });
+    await expect(
+      createService([row]).findHostedWorkspaceInstallation({
+        ...params,
+        githubRepo: 'githuborg/stale',
+      })
+    ).resolves.toEqual({
+      success: false,
+      reason: 'repository_not_installed',
+    });
+    await expect(
+      createService([
+        { ...row, owned_by_organization_id: null, owned_by_user_id: params.userId },
+      ]).findHostedWorkspaceInstallation(params)
+    ).resolves.toEqual({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+  });
+
   it('fails closed when multiple active personal installations match the requested owner', async () => {
     const service = createService([
       {

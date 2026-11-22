@@ -1,3 +1,4 @@
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
 /* eslint-disable max-lines */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -5,6 +6,7 @@ import {
   __resetSharePayloadStoreForTests,
   peekSharePayload,
   putSharePayload,
+  setSharePersistUserId,
   takeSharePayload,
 } from '@/lib/share-payload';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -51,6 +53,21 @@ const expoFileSystemMock = vi.hoisted(() => {
 vi.mock('expo-file-system', () => ({
   File: expoFileSystemMock.File,
   Paths: expoFileSystemMock.Paths,
+}));
+
+// The drafts module is lazily required by the store helpers, so it must not
+// evaluate the native encrypted-kv / sentry chain.
+const kvMock = vi.hoisted(() => ({
+  getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
+  setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
+  removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
+  listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
+}));
+
+vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
+
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
 }));
 
 // share-prefill also exports the React hook (expo-router). Keep the pure core
@@ -282,6 +299,54 @@ describe('applySharePrefill', () => {
     expect(nativeCalls).toEqual([]);
     expect(deliveredCalls).toEqual([1]);
     expect(clearCalls).toEqual([1]);
+  });
+
+  it('returns the payload only for the account that staged it', async () => {
+    setSharePersistUserId('userA');
+    const id = putSharePayload({
+      text: 'staged by a',
+      files: [{ name: 'a.png', uri: 'file:///cache/a.png' }],
+      failedFiles: [],
+    });
+
+    const delivered = await applySharePrefill({
+      shareId: id,
+      input: null,
+      maxLength: 4000,
+      onChangeText: noopChange,
+      addCandidates: async () => {
+        await Promise.resolve();
+        // The account boundary lands between the take and the rejection.
+        setSharePersistUserId('userB');
+        throw new Error('upload failed');
+      },
+      clearShareIdParam: noopClear,
+    });
+
+    expect(delivered).toBe(false);
+    // The payload leaves with the account session that staged it.
+    expect(peekSharePayload(id)).toBeNull();
+  });
+
+  it('restores the payload when the upload fails inside the same account session', async () => {
+    setSharePersistUserId('userA');
+    const id = putSharePayload({
+      text: 'staged by a',
+      files: [{ name: 'a.png', uri: 'file:///cache/a.png' }],
+      failedFiles: [],
+    });
+
+    const delivered = await applySharePrefill({
+      shareId: id,
+      input: null,
+      maxLength: 4000,
+      onChangeText: noopChange,
+      addCandidates: rejectAfterTick,
+      clearShareIdParam: noopClear,
+    });
+
+    expect(delivered).toBe(false);
+    expect(peekSharePayload(id)?.text).toBe('staged by a');
   });
 
   it('delivers nothing for a share whose composer moved on', async () => {

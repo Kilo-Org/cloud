@@ -310,6 +310,7 @@
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
+    "availableToSpendInOrganization": "Disponible per gastar en aquesta organització",
     "signOutTitle": "Vols tancar la sessió?",
     "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball.",
     "deleteAccountTitle": "Vols eliminar el compte?",
@@ -451,6 +452,17 @@
       "location": "Ubicació de Vertex",
       "clientEmail": "Correu electrònic del compte de servei",
       "privateKey": "Clau privada del compte de servei",
+      "privateKeyBlockRequired": "Enganxa tot el bloc de clau, des de la línia BEGIN fins a la línia END.",
+      "privateKeyEncrypted": "Aquest bloc de clau està protegit amb una frase de contrasenya. Enganxa una clau del compte de servei que no tingui cap frase de contrasenya.",
+      "names": {
+        "codestral": "Només Codestral antic",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Inicia la sessió amb ChatGPT)",
+        "xiaomi": "Xiaomi (pagament per ús)",
+        "zai": "Z.ai (pagament per ús)",
+        "bedrockByok": "Amazon Bedrock (directe)",
+        "vertexByok": "Google Vertex AI (directe)"
+      },
       "modelMappings": "Assignacions de models",
       "modelMappingsDescription": "Envia un model de la passarel·la a un nom de desplegament personalitzat.",
       "mappingTitle": "Assignació {{number}}",
@@ -544,8 +556,11 @@
     "changelogFixesIn": "Correccions i millores a {{areas}}.",
     "changelogFixesPolish": "Correccions i millores a tota l'aplicació.",
     "changelogAreas": {
-      "signIn": "Inici de sessió",
-      "profileOrganizations": "Perfil & organitzacions"
+      "signIn": "inici de sessió",
+      "profileOrganizations": "perfil & organitzacions",
+      "chat": "xat",
+      "notifications": "notificacions",
+      "integrations": "integracions"
     }
   },
   "preferences": {
@@ -1226,6 +1241,9 @@
       "emptyTitle": "Encara no hi ha notificacions",
       "emptyCategoryTitle": "No hi ha notificacions en aquesta categoria",
       "emptyBody": "Les notificacions que rep aquest compte apareixen aquí. Es conserven durant {{days}} dies.",
+      "emptyBody_one": "Les notificacions que rep aquest compte apareixen aquí. Es conserven durant {{days}} dies.",
+      "emptyBody_many": "Les notificacions que rep aquest compte apareixen aquí. Es conserven durant {{days}} dies.",
+      "emptyBody_other": "Les notificacions que rep aquest compte apareixen aquí. Es conserven durant {{days}} dies.",
       "capped": "Es mostren les notificacions més recents.",
       "loadError": "No s'ha pogut carregar l'historial de notificacions.",
       "openFailed": "Aquesta notificació ja no s'obre enlloc."
@@ -1461,6 +1479,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexió de Bitbucket amb {{organization}} es gestiona al web des d'un ordinador.",
+      "deniedManagedByOwner": "Demana a un propietari de {{organization}} que canviï la connexió que no pots editar.",
+      "deniedConnectRole": "Només els propietaris, els administradors i els gestors de facturació de {{organization}} poden connectar-lo.",
+      "deniedReconnectRole": "Demana a un propietari, administrador o gestor de facturació de {{organization}} que la reconnecti.",
       "managedOnWebTitle": "Es gestiona al web",
       "managedOnWebShort": "Aquesta connexió es gestiona al web des d'un ordinador.",
       "managedOnWebRepositories": "Tria els repositoris de {{organization}} al web des d'un ordinador.",
@@ -1600,7 +1621,9 @@
       "unavailablePersonallySwitchAction": "Canvia d'organització",
       "unavailableOrganizationTitle": "La revisió en consell no està disponible",
       "unavailableForOrganization": "La revisió en consell necessita el pla Enterprise amb una subscripció o un període de prova actiu. Aquesta organització no en disposa ara mateix.",
-      "unavailableForOrganizationNeutral": "La revisió en consell no està disponible per a aquesta organització ara mateix. Torna-ho a provar més tard.",
+      "unavailablePlanCheck": "La revisió en consell no ha pogut comprovar el pla d'aquesta organització. Torna-ho a provar per comprovar-ho de nou.",
+      "unavailableFlagRollout": "La revisió en consell encara no està disponible per a aquesta organització. Actualitza l'aplicació a la versió més recent per obtenir-la.",
+      "unavailableForOrganizationMember": "La revisió en consell necessita el pla Enterprise amb una subscripció o un període de prova actiu. Un propietari de l'organització pot canviar el pla.",
       "unavailableOnBitbucket": "La revisió en consell no està disponible per als repositoris de Bitbucket.",
       "noRepositories": "Encara no hi ha cap repositori seleccionat. Primer tria'n a la configuració de repositoris.",
       "specialists": "Especialistes",
@@ -2598,8 +2621,7 @@
       "searchPlaceholder": "Cerca de repositoris",
       "noMatches": "Cap coincidència",
       "noRepositories": "Cap repositori disponible",
-      "noRepositoriesDescription": "No hi ha cap repositori connectat al teu compte.",
-      "loading": "Carregant…",
+      "noRepositoriesDescription": "Connecta GitHub o GitLab per carregar repositoris.",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3502,7 +3524,7 @@
       "manageOnWeb": "Configuració de la facturació al web",
       "changePlan": "Canvia el pla",
       "buySeats": "Compra llicències",
-      "managedOnWeb": "El pla, les llicències i la recàrrega automàtica es gestionen al web.",
+      "managedOnWeb": "El pla, les llicències i la recàrrega automàtica es gestionen a kilo.ai.",
       "setupAutoTopUp": "Configura la recàrrega automàtica",
       "manageAutoTopUp": "Gestiona la recàrrega automàtica",
       "opensOnWeb": "S'obre al web"
@@ -3688,10 +3710,10 @@
       "nameLabel": "Nom del mode",
       "nameRequired": "Introdueix un nom de mode.",
       "notFound": "Aquest mode ja no existeix.",
-      "restrictionHint": "Només es poden editar els fitxers que coincideixin amb aquest patró. Deixa'l buit per permetre tots els fitxers.",
-      "restrictionInvalid": "Introdueix un patró vàlid.",
+      "restrictionHint": "Una expressió regular selecciona quins fitxers pot editar aquest mode, per exemple `\\.md$` només per a fitxers markdown. Deixa'l buit per permetre tots els fitxers.",
+      "restrictionInvalid": "Introdueix una expressió regular vàlida.",
       "restrictionLabel": "Etiqueta de restricció",
-      "restrictionPattern": "Patró de fitxer",
+      "restrictionPattern": "Restricció de fitxers",
       "roleLabel": "Definició del rol",
       "roleRequired": "Descriu què fa aquest mode.",
       "tool": {
@@ -3777,7 +3799,7 @@
     "emailDeliveryFailed": "L'enviament de correus electrònics no està disponible temporalment. Torna-ho a provar més tard.",
     "admissionRequired": "No es pot verificar el teu dispositiu. Utilitza «$t(login.moreSignInOptions)» per iniciar la sessió en un altre dispositiu o des del web.",
     "default": "S'ha produït un error. Torna-ho a provar.",
-    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comprova la connexió i torna-ho a provar.",
+    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Torna-ho a provar.",
     "startSignInFailed": "No s'ha pogut iniciar la sessió. Torna-ho a provar.",
     "couldNotOpenBrowser": "No s'ha pogut obrir el navegador. Torna-ho a provar.",
     "signInTimedOut": "S'ha esgotat el temps per iniciar la sessió. Torna-ho a provar.",
@@ -4131,7 +4153,8 @@
         "space": "No hi ha prou espai d'emmagatzematge lliure per a aquest model. Allibera espai i torna-ho a provar.",
         "network": "La descàrrega no s'ha acabat. Comprova la connexió i torna-ho a provar.",
         "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat.",
-        "checksum": "El fitxer descarregat no coincideix amb la suma de verificació publicada, així que s'ha eliminat. Torna a provar la descàrrega."
+        "checksum": "El fitxer descarregat no coincideix amb la suma de verificació publicada, així que s'ha eliminat. Torna a provar la descàrrega.",
+        "writeFailed": "Aquest dispositiu no ha pogut desar el model. Torna a provar la descàrrega."
       }
     },
     "catalog": {
@@ -4464,6 +4487,7 @@
       "promptPlaceholder": "Ets un…",
       "tools": "Eines",
       "wholeToolRule": "Aquest agent aplica una regla a cada eina alhora: {{rule}}. Aquests interruptors són de només lectura.",
+      "toolRule": "Regla desada: {{rule}}",
       "visibility": "Visibilitat",
       "visibilityPrimary": "Principal — es mostra al selector",
       "visibilitySubagent": "Subagent — només es pot trucar des d'altres",
@@ -4573,20 +4597,34 @@
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
+      "expiredGrant": "Caducat: {{description}}",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
         "adjustment": "Ajust",
         "balanceNeutral": "Sense efecte en el saldo",
         "deduction": "Deducció",
         "grant": "Concessió de crèdits",
+        "promotionalCredits": "Crèdits promocionals",
         "welcomeCredits": "Crèdits de benvinguda",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessió de crèdits de l'administrador",
+        "contributorChampion": "Crèdit de campió dels col·laboradors",
+        "feedback": "Crèdit per comentaris",
+        "influencer": "Crèdit d'influencer",
+        "ossMonthlyReset": "Renovació mensual del patrocini de codi obert",
+        "ossSponsorship": "Crèdit de patrocini de codi obert",
+        "pullRequest": "Crèdit per PR",
+        "usageIssue": "Crèdit per problema d'ús",
+        "vibeDay": "Crèdit del dia Vibe"
       },
       "purchaseFallback": "Compra de crèdits",
       "receipt": "Rebut",
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
-      "retentionLimit": "Es mostra l'historial de crèdits més recent."
+      "retentionLimit": "Es mostra l'historial de crèdits més recent.",
+      "voidedGrant": "Anul·lat: {{description}}"
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
@@ -5174,6 +5212,20 @@
       "eu": "Unió Europea",
       "au": "Austràlia",
       "jp": "Japó"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cerca a les preferències",
+    "noMatches": "No s'ha trobat cap preferència",
+    "emptyDescription": "Prova amb un altre nom de preferència o una altra paraula clau.",
+    "resultsStatus": "Preferències trobades: {{resultCount}}",
+    "keywords": {
+      "signOut": "tancar sessió|sortir",
+      "appearance": "tema|colors",
+      "appUnlock": "biometria|reconeixement facial|empremta digital",
+      "language": "idioma|traducció",
+      "notifications": "avisos|alertes|notificacions",
+      "privacy": "analítica|seguiment"
     }
   }
 }

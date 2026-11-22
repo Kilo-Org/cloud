@@ -71,6 +71,15 @@ export type UserExportsList = {
 /** An organization the signed in person may export, from `exportableOrganizations`. */
 export type ExportableOrganization = { id: string; name: string };
 
+function belongsToSubject(
+  record: Pick<UserExport, 'subjectType' | 'organizationId'>,
+  organizationId: string | null
+): boolean {
+  return organizationId === null
+    ? record.subjectType === 'user'
+    : record.organizationId === organizationId;
+}
+
 /**
  * The export in flight for one subject, or undefined.
  *
@@ -83,11 +92,7 @@ export function findActiveExport(
   organizationId: string | null
 ): UserExport | undefined {
   return records?.find(
-    record =>
-      isActiveUserExportStatus(record.status) &&
-      (organizationId === null
-        ? record.subjectType === 'user'
-        : record.organizationId === organizationId)
+    record => isActiveUserExportStatus(record.status) && belongsToSubject(record, organizationId)
   );
 }
 
@@ -98,11 +103,7 @@ export function findReadyExport(
   now: Date = new Date()
 ): UserExport | undefined {
   return records?.find(
-    record =>
-      getDisplayStatus(record, now) === 'ready' &&
-      (organizationId === null
-        ? record.subjectType === 'user'
-        : record.organizationId === organizationId)
+    record => getDisplayStatus(record, now) === 'ready' && belongsToSubject(record, organizationId)
   );
 }
 

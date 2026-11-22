@@ -9,7 +9,7 @@ import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/or
 import {
   GITHUB_LISTING_BUDGET_MESSAGE,
   GitHubListingBudgetExceededError,
-} from '@/lib/integrations/platforms/github/adapter';
+} from '@/lib/integrations/platforms/github/listing-budget';
 
 type TestIntegration = {
   id: string;

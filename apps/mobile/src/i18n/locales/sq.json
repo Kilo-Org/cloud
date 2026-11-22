@@ -309,6 +309,7 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
+    "availableToSpendInOrganization": "Në dispozicion për shpenzim në këtë organizatë",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -450,6 +451,17 @@
       "location": "Vendndodhja Vertex",
       "clientEmail": "Email-i i llogarisë së shërbimit",
       "privateKey": "Çelësi privat i llogarisë së shërbimit",
+      "privateKeyBlockRequired": "Ngjit të gjithë bllokun e çelësit, nga rreshti BEGIN deri në rreshtin END.",
+      "privateKeyEncrypted": "Ky bllok i çelësit është i mbrojtur me frazëkalim. Ngjit një çelës të llogarisë së shërbimit që nuk ka frazëkalim.",
+      "names": {
+        "codestral": "Vetëm Codestral i vjetëruar",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Hyr me ChatGPT)",
+        "xiaomi": "Xiaomi (paguaj sipas përdorimit)",
+        "zai": "Z.ai (paguaj sipas përdorimit)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Hartëzimet e modeleve",
       "modelMappingsDescription": "Drejto një model të gateway-t te një emër i personalizuar deployment-i.",
       "mappingTitle": "Hartëzimi {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
     "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
     "changelogAreas": {
-      "signIn": "Hyrja",
-      "profileOrganizations": "Profili & organizatat"
+      "signIn": "hyrja",
+      "profileOrganizations": "profili & organizatat",
+      "chat": "biseda",
+      "notifications": "njoftimet",
+      "integrations": "integrimet"
     }
   },
   "preferences": {
@@ -1199,6 +1214,8 @@
       "emptyTitle": "Nuk ka ende njoftime",
       "emptyCategoryTitle": "Nuk ka njoftime në këtë kategori",
       "emptyBody": "Njoftimet që merr kjo llogari shfaqen këtu. Ato ruhen për {{days}} ditë.",
+      "emptyBody_one": "Njoftimet që merr kjo llogari shfaqen këtu. Ato ruhen për {{days}} ditë.",
+      "emptyBody_other": "Njoftimet që merr kjo llogari shfaqen këtu. Ato ruhen për {{days}} ditë.",
       "capped": "Po shfaqen njoftimet më të fundit.",
       "loadError": "Nuk u arrit të ngarkohej historiku i njoftimeve.",
       "openFailed": "Ky njoftim nuk hapet më askund."
@@ -1434,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Lidhja me Bitbucket e {{organization}} menaxhohet në ueb nga një kompjuter.",
+      "deniedManagedByOwner": "Kërkoji një pronari të {{organization}} të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+      "deniedConnectRole": "Vetëm pronarët e {{organization}}, administratorët dhe menaxherët e faturimit mund ta lidhin.",
+      "deniedReconnectRole": "Kërkoni nga një pronar, administrator ose menaxher faturimi i {{organization}} ta rilidhë atë.",
       "managedOnWebTitle": "Menaxhohet në ueb",
       "managedOnWebShort": "Kjo lidhje menaxhohet në ueb nga një kompjuter.",
       "managedOnWebRepositories": "Zgjidh repositorët për {{organization}} në ueb nga një kompjuter.",
@@ -1571,7 +1591,9 @@
       "unavailablePersonallySwitchAction": "Ndërro organizatën",
       "unavailableOrganizationTitle": "Shqyrtimi nga këshilli nuk është i disponueshëm tani",
       "unavailableForOrganization": "Shqyrtimi nga këshilli kërkon planin Enterprise me një pajtim ose një periudhë provë aktive. Kjo organizatë nuk e ka atë tani.",
-      "unavailableForOrganizationNeutral": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë tani. Provoni përsëri më vonë.",
+      "unavailablePlanCheck": "Shqyrtimi nga këshilli nuk mundi të kontrollojë planin e kësaj organizate. Riprovoni për ta kontrolluar përsëri.",
+      "unavailableFlagRollout": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë ende. Përditësoni aplikacionin në versionin më të fundit për ta marrë atë.",
+      "unavailableForOrganizationMember": "Shqyrtimi nga këshilli kërkon planin Enterprise me një pajtim aktiv ose një periudhë provë. Një pronar i organizatës mund ta ndryshojë planin.",
       "unavailableOnBitbucket": "Shqyrtimi nga këshilli nuk është i disponueshëm për depot e Bitbucket.",
       "noRepositories": "Ende nuk është zgjedhur asnjë depo. Zgjidh fillimisht depot te cilësimet e depove.",
       "specialists": "Ekspertë",
@@ -2546,8 +2568,7 @@
       "searchPlaceholder": "Kërko depo",
       "noMatches": "Asnjë përputhje",
       "noRepositories": "Asnjë depo e disponueshme",
-      "noRepositoriesDescription": "Asnjë depo nuk është e lidhur me llogarinë tënde.",
-      "loading": "Duke u ngarkuar…",
+      "noRepositoriesDescription": "Për të ngarkuar depot, lidhu me GitHub ose GitLab.",
       "accessibility": "Depoja: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3440,7 +3461,7 @@
       "manageOnWeb": "Cilësimet e faturimit në ueb",
       "changePlan": "Ndrysho planin",
       "buySeats": "Bli vende",
-      "managedOnWeb": "Plani, vendet dhe rimbushja automatike menaxhohen në ueb.",
+      "managedOnWeb": "Plani, vendet dhe rimbushja automatike menaxhohen në kilo.ai.",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
       "manageAutoTopUp": "Menaxho rimbushjen automatike",
       "opensOnWeb": "Hapet në ueb"
@@ -3626,10 +3647,10 @@
       "nameLabel": "Emri i mënyrës",
       "nameRequired": "Vendos një emër mënyre.",
       "notFound": "Kjo mënyrë nuk ekziston më.",
-      "restrictionHint": "Mund të redaktohen vetëm skedarët që përputhen me këtë model. Lëre bosh për të lejuar çdo skedar.",
-      "restrictionInvalid": "Vendos një model të vlefshëm.",
+      "restrictionHint": "Një shprehje e rregullt zgjedh skedarët që kjo mënyrë mund të redaktojë, për shembull `\\.md$` vetëm për skedarët markdown. Lëre bosh për të lejuar çdo skedar.",
+      "restrictionInvalid": "Vendos një shprehje të rregullt të vlefshme.",
       "restrictionLabel": "Etiketa e kufizimit",
-      "restrictionPattern": "Modeli i skedarit",
+      "restrictionPattern": "Kufizim skedarësh",
       "roleLabel": "Përkufizimi i rolit",
       "roleRequired": "Përshkruaj çfarë bën kjo mënyrë.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "Dërgimi i emailit është përkohësisht i padisponueshëm. Provo përsëri më vonë.",
     "admissionRequired": "Pajisja jote nuk mund të verifikohet. Përdor '$t(login.moreSignInOptions)' për të hyrë në një pajisje tjetër ose përmes uebit.",
     "default": "Diçka shkoi keq. Provo përsëri.",
-    "retryableAdmission": "Nuk arritëm ta verifikonim këtë pajisje. Kontrollo lidhjen dhe provo përsëri.",
+    "retryableAdmission": "Nuk u arrit të verifikohej kjo pajisje. Provo përsëri.",
     "startSignInFailed": "Nuk u nis procesi i hyrjes. Provo përsëri.",
     "couldNotOpenBrowser": "Nuk u arrit të hapej shfletuesi. Provo përsëri.",
     "signInTimedOut": "Koha për të hyrë ka mbaruar. Provo përsëri.",
@@ -4058,7 +4079,8 @@
         "space": "Nuk ka hapësirë të lirë të mjaftueshme për këtë model. Liro hapësirë dhe provo përsëri.",
         "network": "Shkarkimi nuk përfundoi. Kontrollo lidhjen e internetit dhe provo përsëri.",
         "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq.",
-        "checksum": "Skedari i shkarkuar nuk përputhet me shumën e kontrollit të publikuar, prandaj u hoq. Provoni ta shkarkoni përsëri."
+        "checksum": "Skedari i shkarkuar nuk përputhet me shumën e kontrollit të publikuar, prandaj u hoq. Provoni ta shkarkoni përsëri.",
+        "writeFailed": "Kjo pajisje nuk mundi ta ruante modelin. Provoni ta shkarkoni përsëri."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "Ju jeni një…",
       "tools": "Mjetet",
       "wholeToolRule": "Ky agjent zbaton një rregull për të gjitha mjetet njëherësh: {{rule}}. Këto ndërprerës janë vetëm për lexim.",
+      "toolRule": "Rregull i ruajtur: {{rule}}",
       "visibility": "Dukshmëria",
       "visibilityPrimary": "Primar — tregohet në zgjedhës",
       "visibilitySubagent": "Subagent — i thirrur vetëm nga të tjerët",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "Zbritje kredish",
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
       "emptyTitle": "Nuk ka historik kredish",
+      "expiredGrant": "Skaduar: {{description}}",
       "googlePlayReceipt": "Dëftesë nga Google Play",
       "kind": {
         "adjustment": "Rregullim",
         "balanceNeutral": "Pa ndikim në bilanc",
         "deduction": "Zbritje",
         "grant": "Kredi të dhuruara",
+        "promotionalCredits": "Kredite promocionale",
         "welcomeCredits": "Kredi mirëseardhjeje",
         "purchase": "Blerje"
+      },
+      "program": {
+        "adminBulkGrant": "Kredi të dhuruara nga administratori",
+        "contributorChampion": "Kredi për kampionin e kontribuesve",
+        "feedback": "Kredi për përshtypje",
+        "influencer": "Kredi influencuesi",
+        "ossMonthlyReset": "Rivendosje mujore OSS",
+        "ossSponsorship": "Kredi sponsorizimi OSS",
+        "pullRequest": "Kredi për kërkesë bashkimi",
+        "usageIssue": "Kredi për problem përdorimi",
+        "vibeDay": "Kredi Vibe day"
       },
       "purchaseFallback": "Blerje kredish",
       "receipt": "Dëftesë",
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
       "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
-      "retentionLimit": "Po shfaqet historiku i kredive më i fundit."
+      "retentionLimit": "Po shfaqet historiku i kredive më i fundit.",
+      "voidedGrant": "Anuluar: {{description}}"
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
@@ -5087,6 +5124,20 @@
       "eu": "Bashkimi Europian",
       "au": "Australi",
       "jp": "Japoni"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Kërkim preferencash",
+    "noMatches": "Asnjë preferencë që përputhet",
+    "emptyDescription": "Provoni një emër tjetër preference ose fjalë kyçe.",
+    "resultsStatus": "Preferenca të gjetura: {{resultCount}}",
+    "keywords": {
+      "signOut": "dil|dalje",
+      "appearance": "temë|skema e ngjyrave",
+      "appUnlock": "biometri|fytyrë|gjurmë gishti",
+      "language": "gjuhë|përkthim",
+      "notifications": "sinjalizime|njoftime",
+      "privacy": "analiza|gjurmim"
     }
   }
 }

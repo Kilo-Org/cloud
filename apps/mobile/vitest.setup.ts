@@ -183,6 +183,25 @@ vi.mock('expo', () => ({
   },
 }));
 
+// `expo-application` answers from the native binary; a test project has none,
+// so its expo module lookup throws. The values are what a dev build reports and
+// no suite asserts on them: a suite that does mocks this module itself and wins.
+vi.mock('expo-application', () => ({
+  applicationId: 'com.kilocode.kiloapp',
+  nativeApplicationVersion: '1.0.0',
+  nativeBuildVersion: '1',
+}));
+
+// The same shape for `expo-device`, which the analytics module reads for the
+// event's form factor and total memory. A test project has no native module to
+// answer it, and no suite asserts on the values: a suite that does mocks this
+// module itself and wins.
+vi.mock('expo-device', () => ({
+  deviceType: null,
+  totalMemory: 0,
+  DeviceType: { UNKNOWN: 0, PHONE: 1, TABLET: 2, DESKTOP: 3, TV: 4 },
+}));
+
 // Haptics are decoration, and the app's wrapper already settles a rejected
 // call; the stub resolves like a device with a haptic engine. The enums keep
 // the library's values so a caller's argument is the same one it sends on a

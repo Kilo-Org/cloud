@@ -56,6 +56,8 @@ type VoiceInputActionsConfig = {
   getOnDraftChange: () => (draft: string) => void;
   getOwner: () => string;
   getUserId: () => string | undefined;
+  // Whether the surface that raised an alert is still mounted.
+  isOwnerAlive: () => boolean;
   openTranscriptionModelPicker: () => void;
 };
 
@@ -190,6 +192,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     getOnDraftChange,
     getOwner,
     getUserId,
+    isOwnerAlive,
     openTranscriptionModelPicker,
   } = config;
 
@@ -292,6 +295,9 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     // starts network recognition; Not now keeps the refusal and starts
     // nothing.
     const raiseOnlineConsentDisclosure = (): void => {
+      // Allow and Not now act only for the surface and account that raised this
+      // disclosure.
+      const stillBoundToRaisingSurface = (): boolean => isOwnerAlive() && getUserId() === userId;
       Alert.alert(
         i18n.t('voiceInput.onlineTitle'),
         i18n.t('voiceInput.onlineMessage', {
@@ -302,17 +308,26 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
             text: i18n.t('common.notNow'),
             style: 'cancel',
             onPress: () => {
-              if (userId) {
-                void writeVoiceNetworkConsent(userId, 'declined');
+              if (!userId || !stillBoundToRaisingSurface()) {
+                return;
               }
+              void writeVoiceNetworkConsent(userId, 'declined');
             },
           },
           {
             text: i18n.t('voiceInput.allow'),
             onPress: () => {
               void (async () => {
+                if (!stillBoundToRaisingSurface()) {
+                  return;
+                }
                 if (userId) {
                   await writeVoiceNetworkConsent(userId, 'granted');
+                }
+                // The write is async: the session starts only while the
+                // disclosure's surface and account still hold.
+                if (!stillBoundToRaisingSurface()) {
+                  return;
                 }
                 await startWith(false);
               })();

@@ -73,6 +73,7 @@ import {
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import { sameHostedGitHubRepositories } from '../persistence/hosted-github-repositories.js';
 import {
   bindingFromLegacyProvider,
   SandboxProviderBindingSchema,
@@ -1624,6 +1625,7 @@ function buildSessionRegistrationCommand(
           requestedEnvironmentRepositories: input.requestedEnvironment?.repositories ?? [],
         }
       : {}),
+    hostedGitHubRepositories: input.hostedGitHubRepositories,
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
@@ -2228,6 +2230,7 @@ export async function sessionCreateIntentFingerprint(
         appendSystemPrompt: input.profile?.overrides?.appendSystemPrompt || undefined,
       },
       repository: repositoryCreateIntent(input.repository),
+      hostedGitHubRepositories: input.hostedGitHubRepositories,
       // Only a client-sent selection is part of the intent; an implicit match is
       // not, so its fingerprint is unchanged. A different selection is a
       // different intent, so a same-key retry conflicts.
@@ -2290,8 +2293,11 @@ async function assertCreateIntentUnchanged(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string; freshAdmission?: boolean }
 ): Promise<void> {
-  if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
+  if (input.hostedGitHubRepositories && (typeof stored !== 'string' || stored.length === 0)) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+  }
+  if (row.canonical_result === null) return;
   const selectable = isExplicitSandboxAllocationChoice(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
@@ -2916,6 +2922,12 @@ async function readSessionMetadata(
     );
   } catch {
     throw creationInProgressError();
+  }
+  if (
+    metadata !== null &&
+    !sameHostedGitHubRepositories(metadata.hostedGitHubRepositories, input.hostedGitHubRepositories)
+  ) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
   }
   if (
     metadata !== null &&

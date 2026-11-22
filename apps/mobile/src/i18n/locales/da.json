@@ -309,6 +309,7 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
+    "availableToSpendInOrganization": "Tilgængelig til forbrug i denne organisation",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -450,6 +451,17 @@
       "location": "Vertex-placering",
       "clientEmail": "Tjenestekontoens e-mailadresse",
       "privateKey": "Tjenestekontoens private nøgle",
+      "privateKeyBlockRequired": "Indsæt hele nøgleblokken, fra BEGIN-linjen til END-linjen.",
+      "privateKeyEncrypted": "Denne nøgleblok er beskyttet med en adgangssætning. Indsæt en tjenestekontonøgle uden adgangssætning.",
+      "names": {
+        "codestral": "Kun ældre Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Log ind med ChatGPT)",
+        "xiaomi": "Xiaomi (betal efter forbrug)",
+        "zai": "Z.ai (betal efter forbrug)",
+        "bedrockByok": "Amazon Bedrock (direkte)",
+        "vertexByok": "Google Vertex AI (direkte)"
+      },
       "modelMappings": "Modeltilknytninger",
       "modelMappingsDescription": "Send en gateway-model til et brugerdefineret deployment-navn.",
       "mappingTitle": "Tilknytning {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Rettelser og forbedringer i {{areas}}.",
     "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
     "changelogAreas": {
-      "signIn": "Log-ind",
-      "profileOrganizations": "Profil & organisationer"
+      "signIn": "log-ind",
+      "profileOrganizations": "profil & organisationer",
+      "chat": "samtale",
+      "notifications": "notifikationer",
+      "integrations": "integrationer"
     }
   },
   "preferences": {
@@ -1199,6 +1214,8 @@
       "emptyTitle": "Ingen notifikationer endnu",
       "emptyCategoryTitle": "Ingen notifikationer i denne kategori",
       "emptyBody": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
+      "emptyBody_one": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
+      "emptyBody_other": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
       "capped": "Viser de seneste notifikationer.",
       "loadError": "Kunne ikke indlæse notifikationshistorikken.",
       "openFailed": "Denne notifikation kan ikke længere åbnes nogen steder."
@@ -1434,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",
+      "deniedManagedByOwner": "Bed en ejer i {{organization}} om at ændre en forbindelse, du ikke kan ændre.",
+      "deniedConnectRole": "Kun ejere, administratorer og faktureringsansvarlige i {{organization}} kan oprette forbindelsen.",
+      "deniedReconnectRole": "Bed en ejer, administrator eller faktureringsansvarlig i {{organization}} om at tilslutte den.",
       "managedOnWebTitle": "Administreres på nettet",
       "managedOnWebShort": "Denne forbindelse administreres på nettet fra en computer.",
       "managedOnWebRepositories": "Vælg repositorier for {{organization}} på nettet fra en computer.",
@@ -1571,7 +1591,9 @@
       "unavailablePersonallySwitchAction": "Skift organisation",
       "unavailableOrganizationTitle": "Rådsgennemgang er ikke tilgængelig",
       "unavailableForOrganization": "Rådsgennemgang kræver Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisation har det ikke lige nu.",
-      "unavailableForOrganizationNeutral": "Rådsgennemgang er ikke tilgængelig for denne organisation lige nu. Prøv igen senere.",
+      "unavailablePlanCheck": "Rådsgennemgang kunne ikke tjekke denne organisations plan. Prøv igen for at tjekke den igen.",
+      "unavailableFlagRollout": "Rådsgennemgang er ikke tilgængelig for denne organisation endnu. Opdater appen til den nyeste version for at få den.",
+      "unavailableForOrganizationMember": "Rådsgennemgang kræver Enterprise-planen med et aktivt abonnement eller en prøveperiode. En ejer af organisationen kan ændre planen.",
       "unavailableOnBitbucket": "Rådsgennemgang er ikke tilgængelig for Bitbucket-kodelagre.",
       "noRepositories": "Der er endnu ikke valgt nogen kodelagre. Vælg først kodelagre i indstillingerne for kodelagre.",
       "specialists": "Specialister",
@@ -2546,8 +2568,7 @@
       "searchPlaceholder": "Søg efter kodelagre",
       "noMatches": "Ingen resultater",
       "noRepositories": "Ingen tilgængelige kodelagre",
-      "noRepositoriesDescription": "Der er ingen kodelagre tilknyttet din konto.",
-      "loading": "Indlæser…",
+      "noRepositoriesDescription": "Tilknyt GitHub eller GitLab for at indlæse kodelagre.",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3440,7 +3461,7 @@
       "manageOnWeb": "Faktureringsindstillinger på nettet",
       "changePlan": "Skift plan",
       "buySeats": "Køb pladser",
-      "managedOnWeb": "Planen, pladserne og automatisk optankning administreres på nettet.",
+      "managedOnWeb": "Planen, pladserne og automatisk optankning administreres på kilo.ai.",
       "setupAutoTopUp": "Konfigurer automatisk optankning",
       "manageAutoTopUp": "Administrer automatisk optankning",
       "opensOnWeb": "Åbner på nettet"
@@ -3626,10 +3647,10 @@
       "nameLabel": "Tilstandens navn",
       "nameRequired": "Angiv et tilstandsnavn.",
       "notFound": "Denne tilstand findes ikke længere.",
-      "restrictionHint": "Kun filer, der matcher dette mønster, kan redigeres. Lad feltet være tomt for at tillade alle filer.",
-      "restrictionInvalid": "Angiv et gyldigt mønster.",
+      "restrictionHint": "Et regulært udtryk vælger, hvilke filer denne tilstand må redigere, for eksempel `\\.md$` kun for markdown-filer. Lad feltet være tomt for at tillade alle filer.",
+      "restrictionInvalid": "Angiv et gyldigt regulært udtryk.",
       "restrictionLabel": "Begrænsningsetiket",
-      "restrictionPattern": "Filmønster",
+      "restrictionPattern": "Filbegrænsning",
       "roleLabel": "Rolledefinition",
       "roleRequired": "Beskriv, hvad denne tilstand gør.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "Vi kan ikke sende e-mail i øjeblikket. Prøv igen senere.",
     "admissionRequired": "Din enhed kan ikke bekræftes. Brug '$t(login.moreSignInOptions)' til at logge ind på en anden enhed eller i browseren.",
     "default": "Noget gik galt. Prøv igen.",
-    "retryableAdmission": "Vi kunne ikke bekræfte denne enhed. Tjek din forbindelse, og prøv igen.",
+    "retryableAdmission": "Kunne ikke bekræfte denne enhed. Prøv igen.",
     "startSignInFailed": "Kunne ikke starte login. Prøv igen.",
     "couldNotOpenBrowser": "Kunne ikke åbne browseren. Prøv igen.",
     "signInTimedOut": "Tiden til at logge ind er udløbet. Prøv igen.",
@@ -4058,7 +4079,8 @@
         "space": "Der er ikke nok ledig lagerplads til denne model. Frigør plads, og prøv igen.",
         "network": "Downloadet blev ikke færdigt. Tjek din forbindelse, og prøv igen.",
         "invalidFile": "Den downloadede fil er ikke en model, som denne app kan køre, så den blev fjernet.",
-        "checksum": "Den downloadede fil matcher ikke sin offentliggjorte kontrolsum, så den blev fjernet. Prøv at downloade igen."
+        "checksum": "Den downloadede fil matcher ikke sin offentliggjorte kontrolsum, så den blev fjernet. Prøv at downloade igen.",
+        "writeFailed": "Denne enhed kunne ikke gemme modellen. Prøv at downloade igen."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "Du er en…",
       "tools": "Værktøjer",
       "wholeToolRule": "Denne agent anvender én regel på alle værktøjer på én gang: {{rule}}. Disse kontakter er skrivebeskyttede.",
+      "toolRule": "Gemt regel: {{rule}}",
       "visibility": "Sigtbarhed",
       "visibilityPrimary": "Primær — vist i vælgeren",
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "Kreditfradrag",
       "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
       "emptyTitle": "Ingen kredithistorik",
+      "expiredGrant": "Udløbet: {{description}}",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Fradrag",
         "grant": "Tildelt kredit",
+        "promotionalCredits": "Kampagnekreditter",
         "welcomeCredits": "Velkomstkredit",
         "purchase": "Køb"
+      },
+      "program": {
+        "adminBulkGrant": "Administratorkredittildeling",
+        "contributorChampion": "Topbidragsyderkredit",
+        "feedback": "Feedbackkredit",
+        "influencer": "Influencerkredit",
+        "ossMonthlyReset": "Nulstilling af sponsorat af åben kildekode",
+        "ossSponsorship": "Kredit for sponsorat af åben kildekode",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Kredit for forbrugsproblem",
+        "vibeDay": "Vibe day-kredit"
       },
       "purchaseFallback": "Kreditkøb",
       "receipt": "Kvittering",
       "receiptA11y": "Åbn kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Der er ingen kvittering for dette køb.",
-      "retentionLimit": "Viser den seneste kredithistorik."
+      "retentionLimit": "Viser den seneste kredithistorik.",
+      "voidedGrant": "Annulleret: {{description}}"
     },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
@@ -5087,6 +5124,20 @@
       "eu": "Den Europæiske Union",
       "au": "Australien",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Søg efter indstillinger",
+    "noMatches": "Ingen matchende indstillinger",
+    "emptyDescription": "Prøv et andet indstillingsnavn eller søgeord.",
+    "resultsStatus": "Indstillinger fundet: {{resultCount}}",
+    "keywords": {
+      "signOut": "log ud|log af",
+      "appearance": "tema|farveskema",
+      "appUnlock": "biometri|ansigtsgenkendelse|fingeraftryk",
+      "language": "sprog|oversættelse",
+      "notifications": "notifikationer|advarsler|pushbeskeder",
+      "privacy": "analyse|sporing"
     }
   }
 }

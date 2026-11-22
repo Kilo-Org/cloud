@@ -5,6 +5,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { enkrypt_sync_state, modelStats, type ModelStats } from '@kilocode/db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 import { requireCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const FAILURE_RETRY_MS = 15 * 1000;
@@ -27,6 +28,8 @@ type CacheState = {
   cached: ModelStatsSnapshot | null;
   inFlight: Promise<ModelStatsSnapshot> | null;
   failure: { retryAt: number; error: unknown } | null;
+  /** The error this client last reported, so one outage logs one line per client. */
+  reportedError?: unknown;
 };
 
 /**
@@ -70,10 +73,30 @@ async function loadEntries(fromDb: ModelStatsLoadClient): Promise<ModelStatsCach
     .orderBy(desc(modelStats.codingIndex));
 }
 
+/** The client a snapshot load uses: the caller's, or the primary when it passes none. */
+export function modelStatsLoadClient(fromDb?: ModelStatsLoadClient): ModelStatsLoadClient {
+  return fromDb ?? db;
+}
+
+/**
+ * Reports every failed load once per client, warm or cold, so an outage stays observable. The
+ * message names what the cache did with that failure, because a cold failure serves nothing.
+ */
+function reportLoadFailure(state: CacheState, error: unknown): void {
+  if (state.reportedError === error) return;
+  state.reportedError = error;
+  const reason = (error instanceof Error ? error.message : String(error))
+    .replace(/\s+/g, ' ')
+    .trim();
+  const served = state.cached ? 'serving the last known-good snapshot' : 'serving no model stats';
+  warnExceptInTest(`[model-stats] snapshot unavailable: ${reason}; ${served}`);
+}
+
 export async function getModelStatsSnapshot({
-  fromDb = db,
+  fromDb,
 }: { fromDb?: ModelStatsLoadClient } = {}): Promise<ModelStatsSnapshot> {
-  const state = cacheFor(fromDb);
+  const client = modelStatsLoadClient(fromDb);
+  const state = cacheFor(client);
   if (state.cached && isModelStatsSnapshotFresh(state.cached)) return state.cached;
   if (state.inFlight) return state.inFlight;
   if (state.failure && Date.now() < state.failure.retryAt) {
@@ -85,7 +108,7 @@ export async function getModelStatsSnapshot({
   const thisLoad = (async () => {
     try {
       const [entries, customLlmsById] = await Promise.all([
-        loadEntries(fromDb),
+        loadEntries(client),
         requireCustomLlmsById(),
       ]);
       const snapshot = {
@@ -97,11 +120,15 @@ export async function getModelStatsSnapshot({
       if (generation === startGeneration) {
         state.cached = snapshot;
         state.failure = null;
+        state.reportedError = undefined;
       }
       return snapshot;
     } catch (error) {
       if (generation === startGeneration) {
         state.failure = { retryAt: Date.now() + FAILURE_RETRY_MS, error };
+        // Report here, not only in the derived views: this catch serves the last known-good
+        // snapshot when it has one, so a warm failure never reaches a caller as a rejection.
+        reportLoadFailure(state, error);
       }
       if (state.cached) return state.cached;
       throw error;

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Uusi tietoturvalöydös ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kriittinen",
+      "high": "Korkea",
+      "medium": "Keskitaso",
+      "low": "Matala"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA-varoitus"
     },

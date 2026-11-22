@@ -2864,8 +2864,16 @@ describe('deleteSessionForCloudAgent clone rollback', () => {
 });
 
 describe('Kilo SDK persisted identity schemas', () => {
-  it('accepts generated message IDs and rejects non-message, slash-bearing, or NUL-bearing IDs', () => {
+  it('accepts every stored message id family and rejects non-message, slash-bearing, or NUL-bearing IDs', () => {
+    // The stored rule checks the shared stem, not the canonical shape: a row the
+    // store already holds keeps the id its sender supplied. Tightening this to
+    // MESSAGE_ID_PATTERN would fail the whole stored page for these ids.
+    expect(messageIdSchema.safeParse('msg_8bcfe5680000ABZa012ABCDEFp').success).toBe(true);
     expect(messageIdSchema.safeParse('msg_storage').success).toBe(true);
+    expect(messageIdSchema.safeParse('msgsynthetic1').success).toBe(true);
+    expect(messageIdSchema.safeParse('msg_1b4e28ba-2fa1-11d2-883f-0016d3cca427').success).toBe(
+      true
+    );
     expect(messageIdSchema.safeParse('other_storage').success).toBe(false);
     expect(messageIdSchema.safeParse('msg_storage/child').success).toBe(false);
     expect(messageIdSchema.safeParse('msg_storage\u0000child').success).toBe(false);

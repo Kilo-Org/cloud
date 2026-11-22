@@ -25,7 +25,8 @@ pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused && pnpm assert:c
 git diff --check
 ```
 
-- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `--config <path>` reads an already-evaluated config instead, resolved from `apps/mobile`. `--profile <name>` selects the contract set, and falls back to `EAS_BUILD_PROFILE`, which the release supplies as `production`. The success line names the resolved profile. Exit 1 is contract drift. Exit 2 is a config it could not evaluate or read. `--profile` selects the contract set only, so a local release-set run needs the production environment. `pnpm test` runs the live guard and the fixture cases for both profiles.
+- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `--config <path>` reads an already-evaluated config instead, resolved from `apps/mobile`. `--profile <name>` selects the contract set, and falls back to `EAS_BUILD_PROFILE`, which the release supplies as `production`. The success line names the resolved profile. Exit 1 is contract drift. Exit 2 is a config it could not evaluate or read. `--profile` selects the contract set only, so a local release-set run needs the production environment. `pnpm test` runs the four guards `assert:colors`, `assert:names`, `assert:resolution` and `assert:config` before Vitest: the chain runs the live config guard, and Vitest runs its fixture cases for both profiles.
+- `pnpm lint` covers `src` and `modules` only: `scripts/` holds Node build guards chained by `pnpm test`, and the app's type-aware React Native rules do not apply there. `pnpm format`, `format:check` and the repo-wide format check still cover them.
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
@@ -212,7 +213,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 
 ## React Native Rules
 
-- Default exports only where Expo Router requires them, in `src/app/`.
+- Default exports only where Expo Router requires them, in `src/app/`, or where a build resolution needs one: `src/lib/chat/remote-mcp-pkce.ts` default-exports because `metro.config.js` resolves `pkce-challenge` to it and the MCP SDK default-imports that package.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
 - Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
@@ -233,6 +234,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - A single-line caller can change horizontal padding, text size, and minimum height.
 - All inputs use physical `pl-*`/`pr-*` for horizontal padding, including caller overrides and zero-inset search fields; Android `TextInput` does not apply logical `paddingInline` from `px-*`.
 - A multiline caller keeps its alignment and line breaks; its physical padding classes override the shared `pl-3 pr-3 pt-2.5 pb-2.5` inset.
+- A text area's accessible name is its label alone. `patches/react-native@0.88.1.patch` keeps `Libraries/Text/TextInput/Multiline/RCTUITextView.mm` from appending the placeholder to an explicit `accessibilityLabel`, and only a text area with no name of its own takes the placeholder as its name; do not re-create a placeholder in JavaScript to work around it.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules

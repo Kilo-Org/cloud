@@ -5,8 +5,10 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { controlPlaneMessages, events } from '../../src/control-plane/session/sqlite-schema.js';
+import type { HostedGitHubRepositories } from '../../src/persistence/hosted-github-repositories.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
+import { worktreeChangesContext } from '../../src/sandbox-session/worktree-changes.js';
 import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
@@ -35,7 +37,7 @@ async function installPeer(stub: DurableObjectStub<SandboxSessionV2>, peer: Fake
   });
 }
 
-async function setup() {
+async function setup(hostedGitHubRepositories?: HostedGitHubRepositories) {
   const sessionId = `workspace_${crypto.randomUUID()}`;
   const stub = sessions.getByName(sessionId);
   const peer = new FakeSandboxPeer();
@@ -47,15 +49,34 @@ async function setup() {
   const registered = await stub.registerSessionFromMetadata({
     metadata: parseSessionMetadata({
       metadataSchemaVersion: 2,
-      identity: { sessionId, userId: 'user_transport', createdOnPlatform: 'cloud-agent-web' },
+      identity: {
+        sessionId,
+        userId: 'user_transport',
+        ...(hostedGitHubRepositories ? { orgId: '123e4567-e89b-42d3-a456-426614174001' } : {}),
+        createdOnPlatform: 'cloud-agent-web',
+      },
       auth: { kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
       agent: { mode: 'code', model: 'test/model' },
-      repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
+      repository: {
+        type: 'github',
+        repo: 'acme/widgets',
+        upstreamBranch: 'main',
+        ...(hostedGitHubRepositories
+          ? { githubIntegrationId: hostedGitHubRepositories.integrationId }
+          : {}),
+      },
+      hostedGitHubRepositories,
       callback: { target: { url: 'https://callback.test/hook' } },
       workspace: {
         sandboxId: await generateSandboxId(sessionId),
         sandboxProvider: 'cloudflare-containers',
-        branchName: 'kilo/test',
+        ...(hostedGitHubRepositories
+          ? {
+              worktreeId: 'worktree_123e4567-e89b-42d3-a456-426614174002',
+              generatedBranchName: 'kilo/test',
+            }
+          : {}),
+        branchName: hostedGitHubRepositories ? 'main' : 'kilo/test',
       },
       lifecycle: { version: 1, timestamp: 1 },
     }),
@@ -120,6 +141,68 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 queued transport recovery', () => {
+  it('prepares the complete promptless hosted checkout again after an idle stop and eviction', async () => {
+    const hosted = {
+      integrationId: '123e4567-e89b-42d3-a456-426614174022',
+      primary: { id: 101, fullName: 'acme/widgets' },
+      additional: [{ id: 102, fullName: 'acme/docs' }],
+    };
+    const { stub, peer, sessionId } = await setup(hosted);
+    expect(await rows(stub)).toEqual([]);
+    expect(peer.prepareCalls).toEqual([]);
+    const metadata = await stub.getMetadata();
+    if (!metadata) throw new Error('Promptless registration did not persist');
+    expect(metadata.hostedGitHubRepositories).toEqual(hosted);
+    await expect(
+      stub.registerSessionFromMetadata({
+        metadata: {
+          ...metadata,
+          hostedGitHubRepositories: { ...hosted, primary: { ...hosted.primary, id: 100 } },
+        },
+        sandboxSelection: { provider: 'cloudflare-containers' },
+      })
+    ).resolves.toMatchObject({ success: false });
+
+    peer.prepareView = peer.view('ready');
+    await stub.send(prompt('first'));
+    const first = peer.prepareCalls.at(-1);
+    expect(first).toMatchObject({
+      spec: {
+        directory: '/workspace',
+        roots: [
+          { directory: '/workspace/widgets', repoFullName: 'acme/widgets', branch: 'main' },
+          {
+            directory: '/workspace/docs',
+            repoFullName: 'acme/docs',
+            branch: 'kilo/test',
+            branchMode: 'working',
+          },
+        ],
+      },
+      credentials: {
+        repository: { hostedRepositoryId: 101, githubIntegrationId: hosted.integrationId },
+        additionalHostedGitHubRepositories: hosted.additional,
+      },
+    });
+    expect(first?.environment).toBeUndefined();
+    expect(JSON.stringify(first?.spec)).not.toContain(hosted.integrationId);
+    expect(worktreeChangesContext(metadata, '/workspace')?.roots).toEqual([
+      { directory: '/workspace/widgets', repoFullName: 'acme/widgets', launch: true },
+      { directory: '/workspace/docs', repoFullName: 'acme/docs', launch: false },
+    ]);
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'first' });
+    await stub.onRoute({ state: 'failed', attemptId: peer.attemptId, reason: 'sandbox_stopped' });
+    await evictAllDurableObjects();
+    const revived = sessions.getByName(sessionId);
+    const reallocated = new FakeSandboxPeer();
+    reallocated.prepareView = reallocated.view('ready');
+    await installPeer(revived, reallocated);
+    await revived.send(prompt('after-idle'));
+    expect(reallocated.prepareCalls.at(-1)?.spec.roots).toEqual(first?.spec.roots);
+    expect(reallocated.prepareCalls.at(-1)?.credentials).toEqual(first?.credentials);
+    expect(reallocated.deliverCalls.at(-1)?.messages).toEqual([prompt('after-idle')]);
+  });
+
   it('keeps command text in queued and failed snapshots before acceptance', async () => {
     const { stub, peer } = await setup();
     await stub.send({

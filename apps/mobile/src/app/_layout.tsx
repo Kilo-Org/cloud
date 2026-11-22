@@ -40,6 +40,10 @@ import { ShareIntentProvider } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import {
+  createLoginRedirectLatch,
+  loginRedirectDecision,
+} from '@/lib/navigation/login-redirect-latch';
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewInstance } from 'react-native';
@@ -58,6 +62,7 @@ import { SettingsConfirmHost } from '@/components/settings-confirm-host';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
+import { isAppLandingSegments } from '@/lib/agent-attachments/picker-launch-restore';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
@@ -77,20 +82,12 @@ import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/contex
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
-import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useNavigationTheme } from '@/lib/hooks/use-navigation-theme';
-import {
-  applyThemePreference,
-  preloadThemePreference,
-  useThemePreference,
-} from '@/lib/hooks/use-theme-preference';
+import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
 import { clearDirectionAttemptAsync } from '@/i18n/direction-attempt';
 import { retryLanguageStartupDirectionAsync } from '@/i18n/startup-direction-run';
-import {
-  preloadLanguagePreference,
-  useLanguagePreference,
-} from '@/lib/hooks/use-language-preference';
+import { useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import { useLanguageStartupPreparation } from '@/lib/hooks/use-language-startup-preparation';
 import {
@@ -98,6 +95,7 @@ import {
   captureLaunchDeepLink,
   clearPendingDeepLink,
   consumePendingDeepLink,
+  getPendingDeepLinkArrival,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
   wasLaunchAppRouteCaptured,
@@ -119,6 +117,10 @@ import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { useTRPC } from '@/lib/trpc';
 import { readNotificationPreviewsIfLoaded } from '@/lib/hooks/agent-push-preference';
+import {
+  isSessionDestinationHref,
+  shouldDeliverPendingDeepLink,
+} from '@/lib/pending-deep-link-delivery';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
@@ -189,9 +191,6 @@ captureLaunchDeepLink();
 // pending deep-link slot the layout already consumes.
 captureSystemSearchLaunch();
 prefetchCurrentUser();
-preloadThemePreference();
-preloadHideBalancePreference();
-preloadLanguagePreference();
 preloadStartupFonts();
 
 function RootLayoutNav({
@@ -554,6 +553,15 @@ function RootLayoutNav({
     [shellGate, onLegalRoute, languageReloadFailed, restoreFailed]
   );
 
+  // The one-dispatch latch for the sign-out login redirect. The decision comes
+  // from `useSegments()`, which only updates after the router commits, so a
+  // sign-out re-emits `redirect-login` on every render while the segments still
+  // name the group being left. A second replace replaces the login route again
+  // — it unmounts and remounts, and the reader sees the destination arrive
+  // twice. The latch is released by the first decision that leaves
+  // `redirect-login`, so the next sign-out dispatches login afresh.
+  const [loginRedirectLatch] = useState(createLoginRedirectLatch);
+
   useEffect(() => {
     // Every settled tag ends startup the same way: record the outcome once and
     // hand the splash over to the reveal.
@@ -568,6 +576,13 @@ function RootLayoutNav({
       }
       router.replace(href);
     };
+    // Every decision passes through the latch: it admits one login dispatch, and
+    // the decision that leaves `redirect-login` releases it for the next
+    // sign-out. Waits hold it, because the tree has settled nowhere yet.
+    const dispatchLoginRedirect = loginRedirectLatch.shouldDispatch({
+      decision: loginRedirectDecision(decision.tag),
+      navigationReady,
+    });
 
     switch (decision.tag) {
       case 'settle-language-error': {
@@ -599,7 +614,9 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-login': {
-        redirect('/(auth)/login');
+        if (dispatchLoginRedirect) {
+          redirect('/(auth)/login');
+        }
         return;
       }
       case 'settle-user-error': {
@@ -640,7 +657,14 @@ function RootLayoutNav({
         throw new Error(`Unhandled bootstrap decision: ${String(exhaustiveCheck)}`);
       }
     }
-  }, [decision, navigationReady, router, setStartupFinished, lastRouteHydratedVersion]);
+  }, [
+    decision,
+    navigationReady,
+    router,
+    setStartupFinished,
+    lastRouteHydratedVersion,
+    loginRedirectLatch,
+  ]);
 
   // Reactive snapshot of the pending deep-link slot so a destination stashed
   // after the gate effect last ran (e.g. a notification tap while signed out,
@@ -742,18 +766,61 @@ function RootLayoutNav({
     if (pendingDeepLink === null || !isShellReady || !navigationReady) {
       return;
     }
+    // The arrival rides in the slot the consume below clears, so it is read
+    // first.
+    const pendingArrival = getPendingDeepLinkArrival();
+    const pending = consumePendingDeepLink();
+    if (!pending) {
+      return;
+    }
+    // A destination the app recovered for itself (a replayed launch Intent, or
+    // a record an earlier process persisted) is stale by construction and must
+    // not open over a screen the person has since reached. The consume above
+    // already cleared the slot and its persisted mirror, so a dropped
+    // destination cannot come back on a later launch.
+    //
+    // At the landing route the two recovered producers part company: only a
+    // launch into this href still opens, while a durable restart record written
+    // by an earlier process is dropped there. Same comparison as the relaunch
+    // repair above — slot and capture come from the same launch Intent.
+    const launchCaptured = wasLaunchLinkHandled();
+    if (
+      !shouldDeliverPendingDeepLink({
+        arrival: pendingArrival,
+        href: pending.href,
+        atLandingRoute: isAppLandingSegments(segments),
+        segments,
+        fromLaunchCapture: launchCaptured !== null && launchCaptured === pending.href,
+      })
+    ) {
+      return;
+    }
     // The shared step switches to the destination's organization before
     // navigating, in the same effect body with nothing awaited between: the
     // route reads the new organization on its first render instead of fetching
     // the old scope and showing an empty list. A destination with no
     // organization (Personal) leaves the selection unchanged.
-    applyConsumedPendingDeepLink(consumePendingDeepLink(), setOrganizationId, href => {
+    applyConsumedPendingDeepLink(pending, setOrganizationId, href => {
       const navigation = resolvePendingNavigation(href);
       if (navigation) {
+        // An automatically recovered session the server no longer has must
+        // leave instead of holding a dead end, the same mark the relaunch
+        // repair sets for its restore. Only the session route takes that mark.
+        if (pendingArrival === 'restored' && isSessionDestinationHref(href)) {
+          noteRestoredRouteOpen(href);
+        }
         router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
       }
     });
-  }, [pendingDeepLink, isShellReady, navigationReady, router, setOrganizationId]);
+  }, [
+    pendingDeepLink,
+    isShellReady,
+    navigationReady,
+    router,
+    setOrganizationId,
+    segments,
+    pathname,
+  ]);
 
   useEffect(() => {
     if (pendingShareId === null || !isShellReady || !navigationReady) {

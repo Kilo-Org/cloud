@@ -309,6 +309,7 @@
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
+    "availableToSpendInOrganization": "برای خرج کردن در این سازمان در دسترس است",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",
@@ -450,6 +451,17 @@
       "location": "موقعیت Vertex",
       "clientEmail": "ایمیل حساب سرویس",
       "privateKey": "کلید خصوصی حساب سرویس",
+      "privateKeyBlockRequired": "بلوک کلید خصوصی را بهطور کامل، از خط BEGIN تا خط END جای‌گذاری کنید.",
+      "privateKeyEncrypted": "این بلوک کلید با عبارت عبور محافظت شده است. کلید حساب سرویسی را جای‌گذاری کنید که عبارت عبور ندارد.",
+      "names": {
+        "codestral": "فقط Codestral قدیمی",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ورود با ChatGPT)",
+        "xiaomi": "Xiaomi (پرداخت به‌ازای مصرف)",
+        "zai": "Z.ai (پرداخت به‌ازای مصرف)",
+        "bedrockByok": "Amazon Bedrock (مستقیم)",
+        "vertexByok": "Google Vertex AI (مستقیم)"
+      },
       "modelMappings": "نگاشت‌های مدل",
       "modelMappingsDescription": "یک مدل درگاه را به یک نام استقرار سفارشی هدایت کنید.",
       "mappingTitle": "نگاشت {{number}}",
@@ -544,7 +556,10 @@
     "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
       "signIn": "ورود",
-      "profileOrganizations": "نمایه & سازمان‌ها"
+      "profileOrganizations": "نمایه & سازمان‌ها",
+      "chat": "گفت‌وگو",
+      "notifications": "اعلان‌ها",
+      "integrations": "یکپارچه‌سازی‌ها"
     }
   },
   "preferences": {
@@ -1199,6 +1214,8 @@
       "emptyTitle": "هنوز اعلانی وجود ندارد",
       "emptyCategoryTitle": "هیچ اعلانی در این دسته وجود ندارد",
       "emptyBody": "اعلان‌هایی که این حساب دریافت می‌کند در اینجا نمایش داده می‌شوند. آن‌ها به مدت {{days}} روز نگهداری می‌شوند.",
+      "emptyBody_one": "اعلان‌هایی که این حساب دریافت می‌کند در اینجا نمایش داده می‌شوند. آن‌ها به مدت {{days}} روز نگهداری می‌شوند.",
+      "emptyBody_other": "اعلان‌هایی که این حساب دریافت می‌کند در اینجا نمایش داده می‌شوند. آن‌ها به مدت {{days}} روز نگهداری می‌شوند.",
       "capped": "جدیدترین اعلان‌ها نمایش داده می‌شوند.",
       "loadError": "بارگذاری تاریخچه اعلان‌ها ممکن نشد.",
       "openFailed": "این اعلان دیگر در هیچ‌جا باز نمی‌شود."
@@ -1434,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "اتصال Bitbucket به {{organization}} از طریق وب و با رایانه مدیریت می‌شود.",
+      "deniedManagedByOwner": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک {{organization}} درخواست کنید.",
+      "deniedConnectRole": "فقط مالکان {{organization}}، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "deniedReconnectRole": "از مالک، مدیر یا مدیر صورتحساب {{organization}} بخواهید آن را دوباره متصل کند.",
       "managedOnWebTitle": "از طریق وب مدیریت می‌شود",
       "managedOnWebShort": "این اتصال از طریق وب و با رایانه مدیریت می‌شود.",
       "managedOnWebRepositories": "مخزن‌های {{organization}} را از طریق وب و با رایانه انتخاب کنید.",
@@ -1571,7 +1591,9 @@
       "unavailablePersonallySwitchAction": "تغییر سازمان",
       "unavailableOrganizationTitle": "بازبینی شورایی در حال حاضر در دسترس نیست",
       "unavailableForOrganization": "بازبینی شورایی به طرح Enterprise با اشتراک فعال یا دوره آزمایشی نیاز دارد. این سازمان در حال حاضر آن را ندارد.",
-      "unavailableForOrganizationNeutral": "بازبینی شورایی برای این سازمان در حال حاضر در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.",
+      "unavailablePlanCheck": "بازبینی شورایی نتوانست طرح این سازمان را بررسی کند. برای بررسی دوباره، تلاش مجدد کنید.",
+      "unavailableFlagRollout": "بازبینی شورایی هنوز برای این سازمان در دسترس نیست. برای دریافت آن، برنامه را به آخرین نسخه به‌روزرسانی کنید.",
+      "unavailableForOrganizationMember": "بازبینی شورایی به طرح Enterprise با اشتراک فعال یا دوره آزمایشی نیاز دارد. مالک سازمان می‌تواند طرح را تغییر دهد.",
       "unavailableOnBitbucket": "بازبینی شورایی برای مخازن Bitbucket در دسترس نیست.",
       "noRepositories": "هنوز مخزنی انتخاب نشده است. ابتدا در تنظیمات مخزن، مخازن را انتخاب کنید.",
       "specialists": "متخصصان",
@@ -2546,8 +2568,7 @@
       "searchPlaceholder": "جست‌وجوی مخازن",
       "noMatches": "موردی پیدا نشد",
       "noRepositories": "هیچ مخزنی در دسترس نیست",
-      "noRepositoriesDescription": "هیچ مخزنی به حساب شما وصل نیست.",
-      "loading": "در حال بارگذاری…",
+      "noRepositoriesDescription": "برای بارگذاری مخازن، GitHub یا GitLab را وصل کنید.",
       "accessibility": "مخزن: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3440,7 +3461,7 @@
       "manageOnWeb": "تنظیمات صورت‌حساب در وب",
       "changePlan": "تغییر طرح",
       "buySeats": "خرید مجوز کاربری",
-      "managedOnWeb": "طرح، مجوزهای کاربری و شارژ خودکار در وب مدیریت می‌شوند.",
+      "managedOnWeb": "طرح، مجوزهای کاربری و شارژ خودکار در kilo.ai مدیریت می‌شوند.",
       "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
       "manageAutoTopUp": "مدیریت شارژ خودکار",
       "opensOnWeb": "در وب باز می‌شود"
@@ -3626,10 +3647,10 @@
       "nameLabel": "نام حالت",
       "nameRequired": "نام حالت را وارد کنید.",
       "notFound": "این حالت دیگر وجود ندارد.",
-      "restrictionHint": "فقط فایل‌هایی که با این الگو مطابقت دارند قابل ویرایش هستند. برای اجازه دادن به همه فایل‌ها آن را خالی بگذارید.",
-      "restrictionInvalid": "الگوی معتبر وارد کنید.",
+      "restrictionHint": "یک عبارت باقاعده تعیین می‌کند این حالت کدام فایل‌ها را می‌تواند ویرایش کند، برای نمونه `\\.md$` فقط برای فایل‌های markdown. برای اجازه دادن به همه فایل‌ها آن را خالی بگذارید.",
+      "restrictionInvalid": "یک عبارت باقاعده معتبر وارد کنید.",
       "restrictionLabel": "برچسب محدودیت",
-      "restrictionPattern": "الگوی فایل",
+      "restrictionPattern": "محدودیت فایل",
       "roleLabel": "تعریف نقش",
       "roleRequired": "کارکرد این حالت را توضیح دهید.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "ارسال ایمیل موقتاً ممکن نیست. لطفاً بعداً دوباره تلاش کنید.",
     "admissionRequired": "دستگاه شما قابل تأیید نیست. از «$t(login.moreSignInOptions)» استفاده کنید تا در دستگاه دیگری یا از طریق وب وارد شوید.",
     "default": "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.",
-    "retryableAdmission": "ما نتوانستیم این دستگاه را تأیید کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    "retryableAdmission": "تأیید این دستگاه ممکن نشد. دوباره تلاش کنید.",
     "startSignInFailed": "شروع ورود ممکن نشد. لطفاً دوباره تلاش کنید.",
     "couldNotOpenBrowser": "باز کردن مرورگر ممکن نشد. لطفاً دوباره تلاش کنید.",
     "signInTimedOut": "مهلت ورود تمام شد. لطفاً دوباره تلاش کنید.",
@@ -4058,7 +4079,8 @@
         "space": "فضای خالی کافی برای این مدل وجود ندارد. فضا آزاد کنید و دوباره تلاش کنید.",
         "network": "دانلود کامل نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
         "invalidFile": "فایل دانلودشده مدلی نیست که این برنامه بتواند اجرا کند، بنابراین حذف شد.",
-        "checksum": "فایل دانلودشده با کد بررسی منتشرشده‌اش مطابقت ندارد، بنابراین حذف شد. دوباره دانلود را امتحان کنید."
+        "checksum": "فایل دانلودشده با کد بررسی منتشرشده‌اش مطابقت ندارد، بنابراین حذف شد. دوباره دانلود را امتحان کنید.",
+        "writeFailed": "این دستگاه نتوانست مدل را ذخیره کند. دوباره دانلود را امتحان کنید."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "شما یک …",
       "tools": "ابزار",
       "wholeToolRule": "این عامل یک قاعده را به‌طور همزمان به همهٔ ابزارها اعمال می‌کند: {{rule}}. این کلیدها فقط‌خواندنی هستند.",
+      "toolRule": "قاعدهٔ ذخیره‌شده: {{rule}}",
       "visibility": "دید",
       "visibilityPrimary": "اولیه — در انتخابگر نشان داده شده است",
       "visibilitySubagent": "Subagent — فقط از دیگران قابل تماس است",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "کسر اعتبار",
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
       "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
+      "expiredGrant": "منقضی شد: {{description}}",
       "googlePlayReceipt": "رسید از Google Play",
       "kind": {
         "adjustment": "اصلاحیه",
         "balanceNeutral": "بدون تأثیر بر موجودی",
         "deduction": "کسر",
         "grant": "اعطای اعتبار",
+        "promotionalCredits": "اعتبار ترویجی",
         "welcomeCredits": "اعتبار خوش‌آمد",
         "purchase": "خرید"
+      },
+      "program": {
+        "adminBulkGrant": "اعطای اعتبار توسط مدیر",
+        "contributorChampion": "اعتبار قهرمان مشارکت‌کنندگان",
+        "feedback": "اعتبار بازخورد",
+        "influencer": "اعتبار اینفلوئنسر",
+        "ossMonthlyReset": "بازنشانی حمایت مالی متن‌باز",
+        "ossSponsorship": "اعتبار حمایت مالی متن‌باز",
+        "pullRequest": "اعتبار پول ریکوئست",
+        "usageIssue": "اعتبار مشکل مصرف",
+        "vibeDay": "اعتبار روز وایب"
       },
       "purchaseFallback": "خرید اعتبار",
       "receipt": "رسید",
       "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
       "receiptUnavailable": "رسیدی برای این خرید موجود نیست.",
-      "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود."
+      "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود.",
+      "voidedGrant": "باطل شد: {{description}}"
     },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
@@ -5087,6 +5124,20 @@
       "eu": "اتحادیه اروپا",
       "au": "استرالیا",
       "jp": "ژاپن"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "جست‌وجوی تنظیمات دلخواه",
+    "noMatches": "تنظیمات موردنظر پیدا نشد",
+    "emptyDescription": "نام تنظیم یا کلیدواژهٔ دیگری را امتحان کنید.",
+    "resultsStatus": "تنظیمات یافت‌شده: {{resultCount}}",
+    "keywords": {
+      "signOut": "خروج|خروج از حساب",
+      "appearance": "پوسته|رنگ‌بندی|حالت تاریک",
+      "appUnlock": "زیست‌سنجی|تشخیص چهره|اثر انگشت",
+      "language": "زبان|ترجمه",
+      "notifications": "اعلان|هشدار",
+      "privacy": "تحلیل داده‌ها|ردیابی"
     }
   }
 }

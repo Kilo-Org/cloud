@@ -72,10 +72,8 @@ import {
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
-import {
-  getReasoningEffort,
-  isReasoningExplicitlyDisabled,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import { getSupportedReasoningEfforts } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import {
   CustomLlmCredentialsSchema,
@@ -201,6 +199,10 @@ async function directByokRoute(
     model: directByokModel,
     stream: request.body.stream === true,
   });
+  const modelMetadata: Readonly<Pick<DirectByokModel, 'id' | 'endpoint'>> = {
+    id: directByokModel.id,
+    endpoint: directByokModel.endpoint,
+  };
 
   return {
     provider: {
@@ -210,7 +212,7 @@ async function directByokRoute(
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;
-        directByok.transformRequest(context);
+        directByok.transformRequest({ ...context, directByokModel: modelMetadata });
       },
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],

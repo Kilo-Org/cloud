@@ -4,6 +4,14 @@ import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 
 export default function SpendAlertsRoute() {
-  const { org } = useLocalSearchParams<{ org?: string | string[] }>();
-  return <SpendAlertsScreen organizationId={normalizeOrgQueryParam(org)} />;
+  const { org, settingsTarget } = useLocalSearchParams<{
+    org?: string | string[];
+    settingsTarget?: string;
+  }>();
+  return (
+    <SpendAlertsScreen
+      organizationId={normalizeOrgQueryParam(org)}
+      settingsTarget={settingsTarget}
+    />
+  );
 }

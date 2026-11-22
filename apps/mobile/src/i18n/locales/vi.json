@@ -309,6 +309,7 @@
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
+    "availableToSpendInOrganization": "Có thể chi tiêu trong tổ chức này",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -450,6 +451,17 @@
       "location": "Vị trí Vertex",
       "clientEmail": "Email tài khoản dịch vụ",
       "privateKey": "Khóa riêng tư của tài khoản dịch vụ",
+      "privateKeyBlockRequired": "Dán toàn bộ khối khóa, từ dòng BEGIN đến dòng END.",
+      "privateKeyEncrypted": "Khối khóa này được bảo vệ bằng cụm mật khẩu. Dán khóa tài khoản dịch vụ không có cụm mật khẩu.",
+      "names": {
+        "codestral": "Chỉ hỗ trợ Codestral cũ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Đăng nhập bằng ChatGPT)",
+        "xiaomi": "Xiaomi (trả theo mức sử dụng)",
+        "zai": "Z.ai (trả theo mức sử dụng)",
+        "bedrockByok": "Amazon Bedrock (trực tiếp)",
+        "vertexByok": "Google Vertex AI (trực tiếp)"
+      },
       "modelMappings": "Ánh xạ mô hình",
       "modelMappingsDescription": "Chuyển một mô hình gateway tới tên deployment tùy chỉnh.",
       "mappingTitle": "Ánh xạ {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Các bản sửa lỗi và cải tiến trong {{areas}}.",
     "changelogFixesPolish": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
     "changelogAreas": {
-      "signIn": "Đăng nhập",
-      "profileOrganizations": "Hồ sơ & tổ chức"
+      "signIn": "đăng nhập",
+      "profileOrganizations": "hồ sơ & tổ chức",
+      "chat": "trò chuyện",
+      "notifications": "thông báo",
+      "integrations": "tích hợp"
     }
   },
   "preferences": {
@@ -638,6 +653,8 @@
       "emptyTitle": "Chưa có thông báo nào",
       "emptyCategoryTitle": "Không có thông báo nào trong danh mục này",
       "emptyBody": "Các thông báo mà tài khoản này nhận được sẽ xuất hiện ở đây. Chúng được lưu trong {{days}} ngày.",
+      "emptyBody_one": "Các thông báo mà tài khoản này nhận được sẽ xuất hiện ở đây. Chúng được lưu trong {{days}} ngày.",
+      "emptyBody_other": "Các thông báo mà tài khoản này nhận được sẽ xuất hiện ở đây. Chúng được lưu trong {{days}} ngày.",
       "capped": "Đang hiển thị các thông báo gần đây nhất.",
       "loadError": "Không thể tải lịch sử thông báo.",
       "openFailed": "Thông báo này không còn mở được ở đâu nữa."
@@ -738,6 +755,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
+      "deniedManagedByOwner": "Hãy yêu cầu chủ sở hữu của {{organization}} thay đổi kết nối mà bạn không thể thay đổi.",
+      "deniedConnectRole": "Chỉ chủ sở hữu, quản trị viên và người quản lý thanh toán của {{organization}} mới có thể kết nối.",
+      "deniedReconnectRole": "Hãy yêu cầu chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của {{organization}} kết nối lại.",
       "managedOnWebTitle": "Quản lý trên web",
       "managedOnWebShort": "Kết nối này được quản lý trên web từ máy tính.",
       "managedOnWebRepositories": "Chọn kho lưu trữ cho {{organization}} trên web từ máy tính.",
@@ -1010,7 +1030,9 @@
       "unavailablePersonallySwitchAction": "Chuyển tổ chức",
       "unavailableOrganizationTitle": "Rà soát hội đồng hiện không khả dụng",
       "unavailableForOrganization": "Rà soát hội đồng cần gói Enterprise có gói đăng ký hoặc bản dùng thử đang hoạt động. Tổ chức này hiện không có gói này.",
-      "unavailableForOrganizationNeutral": "Rà soát hội đồng hiện không khả dụng cho tổ chức này. Vui lòng thử lại sau.",
+      "unavailablePlanCheck": "Rà soát hội đồng không thể kiểm tra gói của tổ chức này. Thử lại để kiểm tra lại.",
+      "unavailableFlagRollout": "Rà soát hội đồng chưa khả dụng cho tổ chức này. Cập nhật ứng dụng lên phiên bản mới nhất để sử dụng.",
+      "unavailableForOrganizationMember": "Rà soát hội đồng cần gói Enterprise có gói đăng ký hoặc bản dùng thử đang hoạt động. Chủ sở hữu tổ chức có thể thay đổi gói.",
       "unavailableOnBitbucket": "Rà soát hội đồng không khả dụng cho kho lưu trữ Bitbucket.",
       "noRepositories": "Chưa chọn kho lưu trữ nào. Hãy chọn kho lưu trữ trong cài đặt kho lưu trữ trước.",
       "specialists": "Chuyên gia",
@@ -1985,8 +2007,7 @@
       "searchPlaceholder": "Tìm kho mã nguồn",
       "noMatches": "Không có kết quả phù hợp",
       "noRepositories": "Không có kho mã nào để chọn",
-      "noRepositoriesDescription": "Tài khoản của bạn chưa kết nối với kho mã nào.",
-      "loading": "Đang tải…",
+      "noRepositoriesDescription": "Để tải kho mã, hãy kết nối GitHub hoặc GitLab.",
       "accessibility": "Kho mã: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3432,7 +3453,7 @@
       "manageOnWeb": "Cài đặt thanh toán trên web",
       "changePlan": "Đổi gói",
       "buySeats": "Mua suất sử dụng",
-      "managedOnWeb": "Gói, suất sử dụng và tự động nạp tiền được quản lý trên web.",
+      "managedOnWeb": "Gói, suất sử dụng và tự động nạp tiền được quản lý tại kilo.ai.",
       "setupAutoTopUp": "Thiết lập tự động nạp tiền",
       "manageAutoTopUp": "Quản lý tự động nạp tiền",
       "opensOnWeb": "Mở trên web"
@@ -3630,10 +3651,10 @@
       "nameLabel": "Tên chế độ",
       "nameRequired": "Nhập tên chế độ.",
       "notFound": "Chế độ này không còn tồn tại.",
-      "restrictionHint": "Chỉ có thể sửa các tệp khớp với mẫu này. Để trống để cho phép mọi tệp.",
-      "restrictionInvalid": "Nhập mẫu hợp lệ.",
+      "restrictionHint": "Biểu thức chính quy chọn các tệp mà chế độ này được phép sửa, ví dụ `\\.md$` chỉ cho tệp markdown. Để trống để cho phép mọi tệp.",
+      "restrictionInvalid": "Nhập biểu thức chính quy hợp lệ.",
       "restrictionLabel": "Nhãn giới hạn",
-      "restrictionPattern": "Mẫu tệp",
+      "restrictionPattern": "Giới hạn tệp",
       "roleLabel": "Định nghĩa vai trò",
       "roleRequired": "Mô tả chức năng của chế độ này.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "Hiện không thể gửi email. Vui lòng thử lại sau.",
     "admissionRequired": "Không thể xác minh thiết bị của bạn. Dùng '$t(login.moreSignInOptions)' để đăng nhập trên thiết bị khác hoặc qua web.",
     "default": "Đã xảy ra lỗi. Vui lòng thử lại.",
-    "retryableAdmission": "Chúng tôi không thể xác minh thiết bị này. Kiểm tra kết nối của bạn và thử lại.",
+    "retryableAdmission": "Không thể xác minh thiết bị này. Hãy thử lại.",
     "startSignInFailed": "Không thể bắt đầu đăng nhập. Vui lòng thử lại.",
     "couldNotOpenBrowser": "Không thể mở trình duyệt. Vui lòng thử lại.",
     "signInTimedOut": "Đã hết thời gian chờ đăng nhập. Vui lòng thử lại.",
@@ -4058,7 +4079,8 @@
         "space": "Không đủ dung lượng trống cho mô hình này. Hãy giải phóng dung lượng và thử lại.",
         "network": "Tải xuống chưa hoàn tất. Kiểm tra kết nối của bạn và thử lại.",
         "invalidFile": "Tệp đã tải xuống không phải là mô hình mà ứng dụng này có thể chạy, nên tệp đã bị xóa.",
-        "checksum": "Tệp đã tải xuống không khớp với mã kiểm tra đã công bố, nên tệp đã bị xóa. Hãy thử tải xuống lại."
+        "checksum": "Tệp đã tải xuống không khớp với mã kiểm tra đã công bố, nên tệp đã bị xóa. Hãy thử tải xuống lại.",
+        "writeFailed": "Thiết bị này không thể lưu mô hình. Hãy thử tải xuống lại."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "Bạn là một…",
       "tools": "Công cụ",
       "wholeToolRule": "Tác nhân này áp dụng một quy tắc cho mọi công cụ cùng lúc: {{rule}}. Các công tắc này chỉ đọc.",
+      "toolRule": "Quy tắc đã lưu: {{rule}}",
       "visibility": "Khả năng hiển thị",
       "visibilityPrimary": "Chính — hiển thị trong bộ chọn",
       "visibilitySubagent": "Subagent — chỉ có thể gọi được từ người khác",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "Khấu trừ tín dụng",
       "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",
       "emptyTitle": "Chưa có lịch sử tín dụng",
+      "expiredGrant": "Đã hết hạn: {{description}}",
       "googlePlayReceipt": "Biên lai từ Google Play",
       "kind": {
         "adjustment": "Điều chỉnh",
         "balanceNeutral": "Không ảnh hưởng số dư",
         "deduction": "Khấu trừ",
         "grant": "Tặng tín dụng",
+        "promotionalCredits": "Tín dụng khuyến mãi",
         "welcomeCredits": "Tín dụng chào mừng",
         "purchase": "Mua"
+      },
+      "program": {
+        "adminBulkGrant": "Tín dụng do quản trị viên tặng",
+        "contributorChampion": "Tín dụng nhà vô địch đóng góp",
+        "feedback": "Tín dụng góp ý",
+        "influencer": "Tín dụng người có ảnh hưởng",
+        "ossMonthlyReset": "Gia hạn tài trợ mã nguồn mở",
+        "ossSponsorship": "Tín dụng tài trợ mã nguồn mở",
+        "pullRequest": "Tín dụng yêu cầu hợp nhất",
+        "usageIssue": "Tín dụng sự cố sử dụng",
+        "vibeDay": "Tín dụng Vibe Day"
       },
       "purchaseFallback": "Mua tín dụng",
       "receipt": "Biên lai",
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
       "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
-      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất."
+      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất.",
+      "voidedGrant": "Đã hủy: {{description}}"
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
@@ -5087,6 +5124,20 @@
       "eu": "Liên minh châu Âu",
       "au": "Úc",
       "jp": "Nhật Bản"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Tìm tùy chọn",
+    "noMatches": "Không có tùy chọn phù hợp",
+    "emptyDescription": "Thử tên tùy chọn hoặc từ khóa khác.",
+    "resultsStatus": "Số tùy chọn tìm thấy: {{resultCount}}",
+    "keywords": {
+      "signOut": "đăng xuất|thoát tài khoản",
+      "appearance": "chủ đề|màu sắc|chế độ tối",
+      "appUnlock": "sinh trắc học|khuôn mặt|vân tay",
+      "language": "ngôn ngữ|bản dịch",
+      "notifications": "cảnh báo|thông báo đẩy",
+      "privacy": "phân tích|theo dõi"
     }
   }
 }

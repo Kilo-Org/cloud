@@ -1,8 +1,9 @@
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AccountSettingsScreen } from '@/components/account-settings-screen';
+import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 import { renderWithProviders } from '@/test/render-with-providers';
 import type * as ReactQuery from '@tanstack/react-query';
 
@@ -10,6 +11,13 @@ const push = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
 const confirm = vi.hoisted(() => vi.fn());
 const signOutWeb = vi.hoisted(() => vi.fn());
+// The signed-in account read: a test flips one field to reach the state it
+// exercises, and the default is the resolved account every other case sees.
+const currentUser = vi.hoisted(() => ({
+  isLoading: false,
+  isFetchError: false,
+  refetch: vi.fn(),
+}));
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -36,13 +44,24 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'user-1' }),
+  useCurrentUserId: () => ({
+    userId: 'user-1',
+    isLoading: currentUser.isLoading,
+    isFetchError: currentUser.isFetchError,
+    refetch: currentUser.refetch,
+  }),
 }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   getResolvedLanguage: () => 'en',
@@ -74,26 +93,47 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
-async function mountAccount(): Promise<ReactTestRenderer> {
-  view = await renderWithProviders(<AccountSettingsScreen />);
+async function mountAccount(settingsTarget?: string): Promise<ReactTestRenderer> {
+  view = await renderWithProviders(<AccountSettingsScreen settingsTarget={settingsTarget} />);
   await act(async () => {
     await vi.dynamicImportSettled();
   });
   return view.renderer;
 }
-function findConfigureRow(renderer: ReactTestRenderer, title: string) {
-  const rows = renderer.root.findAll(
+function findConfigureRows(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(
     node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
   );
-  const row = rows.find(item => item.props.title === title);
+}
+function findConfigureRow(renderer: ReactTestRenderer, title: string) {
+  const row = findConfigureRows(renderer).find(item => item.props.title === title);
   if (!row) {
     throw new Error(`ConfigureRow for ${title} not found`);
   }
   return row;
 }
+function findStateNodes(renderer: ReactTestRenderer, type: 'QueryError' | 'RowSkeleton') {
+  return renderer.root.findAll(node => String(node.type) === type);
+}
+function settingsTargetAncestors(node: ReactTestInstance): ReactTestInstance[] {
+  const ancestors: ReactTestInstance[] = [];
+  for (let parent = node.parent; parent !== null; parent = parent.parent) {
+    if (String(parent.type) === 'SettingsTarget') {
+      ancestors.push(parent);
+    }
+  }
+  return ancestors;
+}
+
+// The test renderer types host props as `unknown`; this names the one shape the
+// mocked wrapper receives.
+type SettingsTargetProps = { item: { id: string } };
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.resetAllMocks();
+  currentUser.isLoading = false;
+  currentUser.isFetchError = false;
 });
 
 describe('AccountSettingsScreen', () => {
@@ -198,5 +238,95 @@ describe('AccountSettingsScreen', () => {
       asked.onConfirm();
     });
     expect(signOutWeb).toHaveBeenCalledTimes(1);
+  });
+
+  it('reserves the rows with skeletons while the account read is pending', async () => {
+    currentUser.isLoading = true;
+    const renderer = await mountAccount();
+
+    expect(findConfigureRows(renderer)).toEqual([]);
+    expect(findStateNodes(renderer, 'RowSkeleton').length).toBeGreaterThan(0);
+  });
+
+  it('offers a failed account read a retry in place of the rows', async () => {
+    currentUser.isFetchError = true;
+    const renderer = await mountAccount();
+
+    expect(findConfigureRows(renderer)).toEqual([]);
+    const [retry] = findStateNodes(renderer, 'QueryError');
+    if (!retry) {
+      throw new Error('missing retry state');
+    }
+
+    act(() => {
+      (retry.props.onRetry as () => void)();
+    });
+    expect(currentUser.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the rows and neither state once the account read resolves', async () => {
+    const renderer = await mountAccount();
+
+    expect(findConfigureRows(renderer).map(row => row.props.title)).toEqual([
+      'Edit profile',
+      'Sign-in methods',
+      'Language',
+      'Trusted hosts',
+      'Passkeys',
+      'Provider keys',
+      'Your data',
+      'Blocked and muted people',
+      'Reports',
+      'Device sessions',
+      'Sign out of all web sessions',
+    ]);
+    expect(findStateNodes(renderer, 'QueryError')).toEqual([]);
+    expect(findStateNodes(renderer, 'RowSkeleton')).toEqual([]);
+  });
+
+  it('wraps every rendered row in the search target its source publishes', async () => {
+    const renderer = await mountAccount();
+    const source = PREFERENCE_SETTINGS_SOURCES.find(
+      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/account'
+    );
+    if (!source) {
+      throw new Error('account settings source missing');
+    }
+
+    const rows = findConfigureRows(renderer);
+    expect(rows.map(renderedRow => String(renderedRow.props.title))).toEqual(
+      source.settings.map(setting => i18n.t(setting.label))
+    );
+
+    // Each real row names the definition the index publishes. A row added
+    // without its SettingsTarget has no ancestor and fails here even though a
+    // flattened id list would still match.
+    const sourceByLabel = new Map(
+      source.settings.map(setting => [i18n.t(setting.label), setting] as const)
+    );
+    for (const renderedRow of rows) {
+      const title = String(renderedRow.props.title);
+      const [target] = settingsTargetAncestors(renderedRow);
+      expect(target, `"${title}" renders without a SettingsTarget`).toBeDefined();
+      expect(target?.props.item).toBe(sourceByLabel.get(title));
+    }
+
+    expect(sourceByLabel.get(i18n.t('profile.signOutWeb.title'))?.id).toBe(
+      'account.browser-sign-out'
+    );
+  });
+
+  it('reveals the browser sign-out row without asking or revoking sessions', async () => {
+    // A search result only reveals its row; the mutation stays behind the
+    // row's own confirmation dialog.
+    const renderer = await mountAccount('account.browser-sign-out');
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(signOutWeb).not.toHaveBeenCalled();
+    const signOutRow = findConfigureRow(renderer, i18n.t('profile.signOutWeb.title'));
+    const [target] = settingsTargetAncestors(signOutRow);
+    const targetProps = target?.props as SettingsTargetProps | undefined;
+    expect(targetProps?.item.id).toBe('account.browser-sign-out');
+    expect(target?.props.onPress).toBeUndefined();
   });
 });

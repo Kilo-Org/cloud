@@ -7,6 +7,7 @@ import {
   sendAdminSlackNotification,
 } from '@kilocode/web-shared/lib/slack/admin-notifications';
 import type { ServiceFeeFlow } from '@kilocode/web-shared/lib/service-fees/types';
+import { trimToNull } from '@kilocode/web-shared/lib/service-fees/values';
 
 export const SERVICE_FEE_MISSED_SENTRY_TAG = 'service_fee_missed';
 
@@ -32,14 +33,8 @@ export type MissedServiceFeeAlertDependencies = {
   captureException?: typeof captureException;
 };
 
-function nonEmpty(value: string | null | undefined): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
 function ownerId(input: MissedServiceFeeAlertInput): string {
-  return nonEmpty(input.organizationId) ?? nonEmpty(input.kiloUserId) ?? 'unknown';
+  return trimToNull(input.organizationId) ?? trimToNull(input.kiloUserId) ?? 'unknown';
 }
 
 function attemptedAtIso(value: Date | string): string {
@@ -69,10 +64,10 @@ export function buildMissedServiceFeeAlertText(input: MissedServiceFeeAlertInput
     `assessment_key=${input.assessmentKey}`,
     `flow=${input.flow}`,
     `owner_id=${ownerId(input)}`,
-    `stripe_checkout_session_id=${nonEmpty(input.stripeCheckoutSessionId) ?? 'none'}`,
-    `stripe_invoice_id=${nonEmpty(input.stripeInvoiceId) ?? 'none'}`,
-    `stripe_payment_intent_id=${nonEmpty(input.stripePaymentIntentId) ?? 'none'}`,
-    `stripe_charge_id=${nonEmpty(input.stripeChargeId) ?? 'none'}`,
+    `stripe_checkout_session_id=${trimToNull(input.stripeCheckoutSessionId) ?? 'none'}`,
+    `stripe_invoice_id=${trimToNull(input.stripeInvoiceId) ?? 'none'}`,
+    `stripe_payment_intent_id=${trimToNull(input.stripePaymentIntentId) ?? 'none'}`,
+    `stripe_charge_id=${trimToNull(input.stripeChargeId) ?? 'none'}`,
     `eligible_subtotal_minor=${input.eligibleSubtotalMinor}`,
     `expected_fee_minor=${input.expectedFeeMinor}`,
     `currency=${input.currency}`,

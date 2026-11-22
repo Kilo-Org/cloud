@@ -44,10 +44,10 @@ import { toast } from 'sonner';
 import {
   DirectUserByokInferenceProviderIdSchema,
   UserByokProviderIdSchema,
-  DirectVertexCredentialsSchema,
   isExperimentalByokProviderId,
   isGatewayUserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/byok/direct-vertex-credentials';
 import {
   checkStructuredCredential,
   getStructuredCredentialKind,

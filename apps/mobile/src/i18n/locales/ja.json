@@ -309,6 +309,7 @@
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
+    "availableToSpendInOrganization": "この組織で支出できる金額",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",
@@ -450,6 +451,17 @@
       "location": "Vertexロケーション",
       "clientEmail": "サービスアカウントのメールアドレス",
       "privateKey": "サービスアカウントの秘密鍵",
+      "privateKeyBlockRequired": "BEGINの行からENDの行まで、キーブロック全体を貼り付けてください。",
+      "privateKeyEncrypted": "このキーブロックはパスフレーズで保護されています。パスフレーズが設定されていないサービスアカウントの秘密鍵を貼り付けてください。",
+      "names": {
+        "codestral": "レガシーCodestral専用",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（ChatGPTでサインイン）",
+        "xiaomi": "Xiaomi（従量課金）",
+        "zai": "Z.ai（従量課金）",
+        "bedrockByok": "Amazon Bedrock（直接）",
+        "vertexByok": "Google Vertex AI（直接）"
+      },
       "modelMappings": "モデルマッピング",
       "modelMappingsDescription": "ゲートウェイモデルをカスタムのデプロイ名にルーティングします。",
       "mappingTitle": "マッピング{{number}}",
@@ -544,7 +556,10 @@
     "changelogFixesPolish": "アプリ全体の修正と改善を行いました。",
     "changelogAreas": {
       "signIn": "サインイン",
-      "profileOrganizations": "プロフィールと組織"
+      "profileOrganizations": "プロフィールと組織",
+      "chat": "チャット",
+      "notifications": "通知",
+      "integrations": "連携"
     }
   },
   "preferences": {
@@ -638,6 +653,8 @@
       "emptyTitle": "通知はまだありません",
       "emptyCategoryTitle": "このカテゴリの通知はありません",
       "emptyBody": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
+      "emptyBody_one": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
+      "emptyBody_other": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
       "capped": "最新の通知を表示しています。",
       "loadError": "通知履歴を読み込めませんでした。",
       "openFailed": "この通知はもうどこからも開けません。"
@@ -738,6 +755,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
+      "deniedManagedByOwner": "変更できない接続については、{{organization}}のオーナーに変更を依頼してください。",
+      "deniedConnectRole": "接続できるのは{{organization}}のオーナー、管理者、請求管理者のみです。",
+      "deniedReconnectRole": "{{organization}}のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "managedOnWebTitle": "Webで管理されています",
       "managedOnWebShort": "この接続は、パソコンからWebで管理されています。",
       "managedOnWebRepositories": "{{organization}}のリポジトリを、パソコンからWebで選択してください。",
@@ -1010,7 +1030,9 @@
       "unavailablePersonallySwitchAction": "組織を切り替え",
       "unavailableOrganizationTitle": "合議レビューはご利用いただけません",
       "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織には現在それがありません。",
-      "unavailableForOrganizationNeutral": "この組織では現在、合議レビューはご利用いただけません。後でもう一度お試しください。",
+      "unavailablePlanCheck": "合議レビューはこの組織のプランを確認できませんでした。再試行して、もう一度確認してください。",
+      "unavailableFlagRollout": "合議レビューは、この組織ではまだご利用いただけません。ご利用いただくには、アプリを最新バージョンに更新してください。",
+      "unavailableForOrganizationMember": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。組織のオーナーはプランを変更できます。",
       "unavailableOnBitbucket": "合議レビューは Bitbucket リポジトリでは利用できません。",
       "noRepositories": "リポジトリがまだ選択されていません。先にリポジトリ設定で選択してください。",
       "specialists": "スペシャリスト",
@@ -1985,8 +2007,7 @@
       "searchPlaceholder": "リポジトリを検索",
       "noMatches": "一致する項目はありません",
       "noRepositories": "利用可能なリポジトリはありません",
-      "noRepositoriesDescription": "このアカウントにはリポジトリが連携されていません。",
-      "loading": "読み込み中…",
+      "noRepositoriesDescription": "リポジトリを読み込むには、GitHubまたはGitLabを連携してください。",
       "accessibility": "リポジトリ：{{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3432,7 +3453,7 @@
       "manageOnWeb": "Webでの請求設定",
       "changePlan": "プランを変更",
       "buySeats": "シートを購入",
-      "managedOnWeb": "プラン、シート数、自動チャージはWebで管理されています。",
+      "managedOnWeb": "プラン、シート数、自動チャージはkilo.ai で管理されています。",
       "setupAutoTopUp": "自動チャージを設定",
       "manageAutoTopUp": "自動チャージを管理",
       "opensOnWeb": "Webで開きます"
@@ -3630,10 +3651,10 @@
       "nameLabel": "モード名",
       "nameRequired": "モード名を入力してください。",
       "notFound": "このモードは存在しません。",
-      "restrictionHint": "このパターンに一致するファイルのみ編集できます。空欄にするとすべてのファイルを許可します。",
-      "restrictionInvalid": "有効なパターンを入力してください。",
+      "restrictionHint": "正規表現はこのモードが編集できるファイルを選択します。たとえば `\\.md$` はマークダウンファイルのみを対象にします。空欄にするとすべてのファイルを許可します。",
+      "restrictionInvalid": "有効な正規表現を入力してください。",
       "restrictionLabel": "制限ラベル",
-      "restrictionPattern": "ファイルパターン",
+      "restrictionPattern": "ファイル制限",
       "roleLabel": "ロール定義",
       "roleRequired": "このモードの役割を説明してください。",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "現在、メールを送信できません。しばらくしてからもう一度お試しください。",
     "admissionRequired": "このデバイスを確認できません。「$t(login.moreSignInOptions)」を選択し、別のデバイスまたはウェブからサインインしてください。",
     "default": "問題が発生しました。もう一度お試しください。",
-    "retryableAdmission": "このデバイスを確認できませんでした。接続を確認して、もう一度お試しください。",
+    "retryableAdmission": "このデバイスを確認できませんでした。もう一度お試しください。",
     "startSignInFailed": "サインインを開始できませんでした。もう一度お試しください。",
     "couldNotOpenBrowser": "ブラウザーを開けませんでした。もう一度お試しください。",
     "signInTimedOut": "サインインがタイムアウトしました。もう一度お試しください。",
@@ -4058,7 +4079,8 @@
         "space": "このモデルに必要な空き容量が足りません。空き容量を増やして、もう一度お試しください。",
         "network": "ダウンロードが完了しませんでした。接続を確認して、もう一度お試しください。",
         "invalidFile": "ダウンロードしたファイルはこのアプリで実行できるモデルではないため、削除されました。",
-        "checksum": "ダウンロードしたファイルが公開されているチェックサムと一致しないため、削除されました。もう一度ダウンロードしてください。"
+        "checksum": "ダウンロードしたファイルが公開されているチェックサムと一致しないため、削除されました。もう一度ダウンロードしてください。",
+        "writeFailed": "このデバイスではモデルを保存できませんでした。もう一度ダウンロードしてください。"
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "あなたは…",
       "tools": "ツール",
       "wholeToolRule": "このエージェントは、すべてのツールに一度に1つのルールを適用します：{{rule}}。これらのスイッチは読み取り専用です。",
+      "toolRule": "保存されたルール：{{rule}}",
       "visibility": "可視性",
       "visibilityPrimary": "プライマリ — ピッカーに表示されます",
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "クレジットの差し引き",
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
+      "expiredGrant": "期限切れ: {{description}}",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
         "balanceNeutral": "残高変動なし",
         "deduction": "差し引き",
         "grant": "クレジット付与",
+        "promotionalCredits": "プロモーションクレジット",
         "welcomeCredits": "ウェルカムクレジット",
         "purchase": "購入"
+      },
+      "program": {
+        "adminBulkGrant": "管理者クレジット付与",
+        "contributorChampion": "コントリビューターチャンピオンクレジット",
+        "feedback": "フィードバッククレジット",
+        "influencer": "インフルエンサークレジット",
+        "ossMonthlyReset": "OSS支援のリセット",
+        "ossSponsorship": "OSS支援クレジット",
+        "pullRequest": "プルリクエストクレジット",
+        "usageIssue": "利用問題クレジット",
+        "vibeDay": "Vibe dayクレジット"
       },
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。",
-      "retentionLimit": "最新のクレジット履歴を表示しています。"
+      "retentionLimit": "最新のクレジット履歴を表示しています。",
+      "voidedGrant": "無効化済み: {{description}}"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
@@ -4912,7 +4949,7 @@
   },
   "organizationGuardrails": {
     "title": "AIガードレール",
-    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。$t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "AIガードレールを管理できるのは組織のオーナーと管理者のみです。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AIガードレールは有効になっていません",
     "unavailable": "Kiloは、リクエストに応じて組織のAIガードレールを有効にします。{{supportEmail}} までお問い合わせください。Kiloチームがお使いの組織に対して有効にします。",
     "contactSupport": "サポートに連絡",
@@ -5054,7 +5091,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "エンタープライズ機能",
     "enterpriseOnly": "プロバイダーとモデルは Enterprise プランで利用できます。",
-    "readOnly": "これらの設定を変更できるのは組織の所有者と管理者のみです。",
+    "readOnly": "これらの設定を変更できるのは組織のオーナーと管理者のみです。",
     "loadError": "プロバイダーとモデルを読み込めませんでした",
     "tabModels": "モデル",
     "tabProviders": "プロバイダー",
@@ -5087,6 +5124,20 @@
       "eu": "欧州連合",
       "au": "オーストラリア",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "設定を検索",
+    "noMatches": "該当する設定がありません",
+    "emptyDescription": "別の設定名やキーワードで検索してください。",
+    "resultsStatus": "見つかった設定：{{resultCount}}件",
+    "keywords": {
+      "signOut": "サインアウト|ログアウト",
+      "appearance": "テーマ|配色",
+      "appUnlock": "生体認証|顔認証|指紋認証",
+      "language": "言語|翻訳",
+      "notifications": "通知|プッシュ通知",
+      "privacy": "データ分析|トラッキング|プライバシー"
     }
   }
 }

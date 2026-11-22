@@ -311,6 +311,7 @@
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
+    "availableToSpendInOrganization": "Dostępne do wydania w tej organizacji",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -452,6 +453,17 @@
       "location": "Lokalizacja Vertex",
       "clientEmail": "Adres e-mail konta usługi",
       "privateKey": "Klucz prywatny konta usługi",
+      "privateKeyBlockRequired": "Wklej cały blok klucza, od wiersza BEGIN do wiersza END.",
+      "privateKeyEncrypted": "Ten blok klucza jest chroniony frazą hasłową. Wklej klucz konta usługi, który nie ma frazy hasłowej.",
+      "names": {
+        "codestral": "Starsza wersja tylko dla Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Zaloguj się przez ChatGPT)",
+        "xiaomi": "Xiaomi (płatność za użycie)",
+        "zai": "Z.ai (płatność za użycie)",
+        "bedrockByok": "Amazon Bedrock (bezpośrednio)",
+        "vertexByok": "Google Vertex AI (bezpośrednio)"
+      },
       "modelMappings": "Mapowania modeli",
       "modelMappingsDescription": "Kieruj model z bramy do niestandardowej nazwy wdrożenia.",
       "mappingTitle": "Mapowanie {{number}}",
@@ -545,8 +557,11 @@
     "changelogFixesIn": "Poprawki i ulepszenia w obszarach: {{areas}}.",
     "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
     "changelogAreas": {
-      "signIn": "Logowanie",
-      "profileOrganizations": "Profil oraz organizacje"
+      "signIn": "logowanie",
+      "profileOrganizations": "profil oraz organizacje",
+      "chat": "czat",
+      "notifications": "powiadomienia",
+      "integrations": "integracje"
     }
   },
   "preferences": {
@@ -640,6 +655,10 @@
       "emptyTitle": "Nie ma jeszcze powiadomień",
       "emptyCategoryTitle": "Brak powiadomień w tej kategorii",
       "emptyBody": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "emptyBody_one": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "emptyBody_few": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "emptyBody_many": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "emptyBody_other": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
       "capped": "Wyświetlane są najnowsze powiadomienia.",
       "loadError": "Nie udało się wczytać historii powiadomień.",
       "openFailed": "Tego powiadomienia nie można już nigdzie otworzyć."
@@ -740,6 +759,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
+      "deniedManagedByOwner": "Poproś właściciela {{organization}} o zmianę połączenia, którego nie możesz zmienić.",
+      "deniedConnectRole": "Tylko właściciele {{organization}}, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
+      "deniedReconnectRole": "Poproś właściciela {{organization}}, administratora lub osobę zarządzającą rozliczeniami, aby je ponownie połączyć.",
       "managedOnWebTitle": "Zarządzane w przeglądarce",
       "managedOnWebShort": "To połączenie jest zarządzane w przeglądarce na komputerze.",
       "managedOnWebRepositories": "Wybierz repozytoria dla {{organization}} w przeglądarce na komputerze.",
@@ -1016,7 +1038,9 @@
       "unavailablePersonallySwitchAction": "Przełącz organizację",
       "unavailableOrganizationTitle": "Przegląd rady nie jest obecnie dostępny",
       "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Ta organizacja obecnie go nie ma.",
-      "unavailableForOrganizationNeutral": "Przegląd rady nie jest obecnie dostępny dla tej organizacji. Spróbuj ponownie później.",
+      "unavailablePlanCheck": "Przegląd rady nie mógł sprawdzić planu tej organizacji. Spróbuj ponownie, aby sprawdzić jeszcze raz.",
+      "unavailableFlagRollout": "Przegląd rady nie jest jeszcze dostępny dla tej organizacji. Zaktualizuj aplikację do najnowszej wersji, aby go uzyskać.",
+      "unavailableForOrganizationMember": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Właściciel organizacji może zmienić plan.",
       "unavailableOnBitbucket": "Przegląd rady nie jest dostępny dla repozytoriów Bitbucket.",
       "noRepositories": "Nie wybrano jeszcze żadnego repozytorium. Najpierw wybierz repozytoria w ustawieniach repozytoriów.",
       "specialists": "Specjaliści",
@@ -2037,8 +2061,7 @@
       "searchPlaceholder": "Wyszukiwanie repozytoriów",
       "noMatches": "Brak wyników",
       "noRepositories": "Brak dostępnych repozytoriów",
-      "noRepositoriesDescription": "Z twoim kontem nie są połączone żadne repozytoria.",
-      "loading": "Wczytywanie…",
+      "noRepositoriesDescription": "Aby wczytać repozytoria, połącz konto GitHub lub GitLab.",
       "accessibility": "Repozytorium: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3556,7 +3579,7 @@
       "manageOnWeb": "Ustawienia rozliczeń w wersji internetowej",
       "changePlan": "Zmień plan",
       "buySeats": "Kup miejsca",
-      "managedOnWeb": "Plan, miejsca i automatyczne doładowanie są zarządzane w wersji internetowej.",
+      "managedOnWeb": "Plan, miejsca i automatyczne doładowanie są zarządzane na kilo.ai.",
       "setupAutoTopUp": "Skonfiguruj automatyczne doładowanie",
       "manageAutoTopUp": "Zarządzaj automatycznym doładowaniem",
       "opensOnWeb": "Otwiera się w przeglądarce"
@@ -3754,10 +3777,10 @@
       "nameLabel": "Nazwa trybu",
       "nameRequired": "Wprowadź nazwę trybu.",
       "notFound": "Ten tryb już nie istnieje.",
-      "restrictionHint": "Edytować można tylko pliki pasujące do tego wzorca. Pozostaw puste, aby zezwolić na wszystkie pliki.",
-      "restrictionInvalid": "Wprowadź prawidłowy wzorzec.",
+      "restrictionHint": "Wyrażenie regularne wybiera pliki, które ten tryb może edytować, na przykład `\\.md$` tylko dla plików markdown. Pozostaw puste, aby zezwolić na wszystkie pliki.",
+      "restrictionInvalid": "Wprowadź prawidłowe wyrażenie regularne.",
       "restrictionLabel": "Etykieta ograniczenia",
-      "restrictionPattern": "Wzorzec plików",
+      "restrictionPattern": "Ograniczenie plików",
       "roleLabel": "Definicja roli",
       "roleRequired": "Opisz, co robi ten tryb.",
       "tool": {
@@ -3841,7 +3864,7 @@
     "emailDeliveryFailed": "Wysyłanie wiadomości e-mail jest chwilowo niedostępne. Spróbuj ponownie później.",
     "admissionRequired": "Nie można zweryfikować twojego urządzenia. Użyj opcji „$t(login.moreSignInOptions)”, aby zalogować się na innym urządzeniu lub w przeglądarce.",
     "default": "Coś poszło nie tak. Spróbuj ponownie.",
-    "retryableAdmission": "Nie udało się zweryfikować tego urządzenia. Sprawdź połączenie i spróbuj ponownie.",
+    "retryableAdmission": "Nie udało się zweryfikować tego urządzenia. Spróbuj ponownie.",
     "startSignInFailed": "Nie udało się rozpocząć logowania. Spróbuj ponownie.",
     "couldNotOpenBrowser": "Nie udało się otworzyć przeglądarki. Spróbuj ponownie.",
     "signInTimedOut": "Upłynął limit czasu logowania. Spróbuj ponownie.",
@@ -4204,7 +4227,8 @@
         "space": "Brak wystarczającej ilości wolnego miejsca na ten model. Zwolnij miejsce i spróbuj ponownie.",
         "network": "Pobieranie nie zostało ukończone. Sprawdź połączenie i spróbuj ponownie.",
         "invalidFile": "Pobrany plik nie jest modelem, który ta aplikacja może uruchomić, więc został usunięty.",
-        "checksum": "Pobrany plik nie zgadza się z opublikowaną sumą kontrolną, więc został usunięty. Spróbuj pobrać go ponownie."
+        "checksum": "Pobrany plik nie zgadza się z opublikowaną sumą kontrolną, więc został usunięty. Spróbuj pobrać go ponownie.",
+        "writeFailed": "To urządzenie nie mogło zapisać modelu. Spróbuj pobrać go ponownie."
       }
     },
     "catalog": {
@@ -4543,6 +4567,7 @@
       "promptPlaceholder": "Jesteś…",
       "tools": "Narzędzia",
       "wholeToolRule": "Ten agent stosuje jedną regułę do wszystkich narzędzi jednocześnie: {{rule}}. Te przełączniki są tylko do odczytu.",
+      "toolRule": "Zapisana reguła: {{rule}}",
       "visibility": "Widoczność",
       "visibilityPrimary": "Podstawowy — pokazany w selektorze",
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",
@@ -4652,20 +4677,34 @@
       "deductionFallback": "Pobranie kredytów",
       "emptyDescription": "Tutaj pojawią się zakupy kredytów, potwierdzenia i wykorzystanie.",
       "emptyTitle": "Brak historii kredytów",
+      "expiredGrant": "Wygasło: {{description}}",
       "googlePlayReceipt": "Potwierdzenie w Google Play",
       "kind": {
         "adjustment": "Korekta",
         "balanceNeutral": "Bez wpływu na saldo",
         "deduction": "Pobranie",
         "grant": "Przyznane kredyty",
+        "promotionalCredits": "Kredyty promocyjne",
         "welcomeCredits": "Kredyty powitalne",
         "purchase": "Zakup"
+      },
+      "program": {
+        "adminBulkGrant": "Kredyty przyznane przez administratora",
+        "contributorChampion": "Kredyty czempiona współtwórców",
+        "feedback": "Kredyty za opinię",
+        "influencer": "Kredyty dla influencerów",
+        "ossMonthlyReset": "Odnowienie sponsoringu OSS",
+        "ossSponsorship": "Kredyty sponsoringu OSS",
+        "pullRequest": "Kredyty za PR",
+        "usageIssue": "Kredyty za problem z użyciem",
+        "vibeDay": "Kredyty Vibe day"
       },
       "purchaseFallback": "Zakup kredytów",
       "receipt": "Potwierdzenie",
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
-      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów."
+      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów.",
+      "voidedGrant": "Unieważniono: {{description}}"
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
@@ -5261,6 +5300,20 @@
       "eu": "Unia Europejska",
       "au": "Australia",
       "jp": "Japonia"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Szukaj w preferencjach",
+    "noMatches": "Brak pasujących preferencji",
+    "emptyDescription": "Spróbuj innej nazwy preferencji lub słowa kluczowego.",
+    "resultsStatus": "Znalezione preferencje: {{resultCount}}",
+    "keywords": {
+      "signOut": "wyloguj|wylogowanie",
+      "appearance": "motyw|kolory|tryb ciemny",
+      "appUnlock": "biometria|twarz|odcisk palca",
+      "language": "język|tłumaczenie",
+      "notifications": "alerty|powiadomienia",
+      "privacy": "analityka|śledzenie|prywatność"
     }
   }
 }

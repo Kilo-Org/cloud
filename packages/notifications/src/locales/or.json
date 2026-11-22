@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "ନୂତନ ସୁରକ୍ଷା ନିଷ୍କର୍ଷ ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "ଗୁରୁତର",
+      "high": "ଉଚ୍ଚ",
+      "medium": "ମଧ୍ୟମ",
+      "low": "ନିମ୍ନ"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA ସତର୍କ"
     },

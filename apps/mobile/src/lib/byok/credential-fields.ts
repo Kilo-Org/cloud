@@ -5,6 +5,8 @@ import {
   validateStructuredCredential,
 } from '@kilocode/app-shared/byok-credentials';
 
+import { canonicalPrivateKey, type PrivateKeyCause } from './private-key';
+
 /**
  * Bedrock's two authentication methods: one API key with its region, or an IAM
  * key pair with the same region. The web form takes either as one JSON object;
@@ -36,18 +38,12 @@ export type ModelMapping = Readonly<{ gatewayModelSlug: string; customModelId: s
 type CredentialField = Readonly<{
   id: CredentialFieldId;
   /**
-   * The value is a secret. A single-line one is masked while it is typed; the
-   * form still asks the keyboard to suggest nothing and learn nothing from
-   * either kind.
+   * The value is a secret. It is masked while it is typed, on both platforms,
+   * which is why no credential field is multiline: React Native masks a
+   * single-line input and cannot mask a multiline one. Its keyboard still
+   * suggests nothing and learns nothing.
    */
   secret: boolean;
-  /**
-   * The value needs more than one line. A PEM private key is the only one. The
-   * field is still marked secret: Android masks a multiline secure input, and
-   * where a platform cannot mask it the value stays readable but the field
-   * still asks the keyboard to suggest nothing and learn nothing.
-   */
-  multiline: boolean;
   /** The copy that names this field on the form. */
   labelKey: string;
 }>;
@@ -64,14 +60,12 @@ export type CredentialForm = Readonly<{
 const API_KEY_FIELD: CredentialField = {
   id: 'apiKey',
   secret: true,
-  multiline: false,
   labelKey: 'profile.providerKeys.apiKeyLabel',
 };
 
 const REGION_FIELD: CredentialField = {
   id: 'region',
   secret: false,
-  multiline: false,
   labelKey: 'profile.providerKeys.region',
 };
 
@@ -82,7 +76,6 @@ const AZURE_FORM: CredentialForm = {
     {
       id: 'resourceName',
       secret: false,
-      multiline: false,
       labelKey: 'profile.providerKeys.resourceName',
     },
   ],
@@ -103,13 +96,11 @@ const BEDROCK_FORMS = {
       {
         id: 'accessKeyId',
         secret: false,
-        multiline: false,
         labelKey: 'profile.providerKeys.accessKeyId',
       },
       {
         id: 'secretAccessKey',
         secret: true,
-        multiline: false,
         labelKey: 'profile.providerKeys.secretAccessKey',
       },
       REGION_FIELD,
@@ -125,25 +116,21 @@ const VERTEX_FORM: CredentialForm = {
     {
       id: 'project',
       secret: false,
-      multiline: false,
       labelKey: 'profile.providerKeys.project',
     },
     {
       id: 'location',
       secret: false,
-      multiline: false,
       labelKey: 'profile.providerKeys.location',
     },
     {
       id: 'clientEmail',
       secret: false,
-      multiline: false,
       labelKey: 'profile.providerKeys.clientEmail',
     },
     {
       id: 'privateKey',
       secret: true,
-      multiline: true,
       labelKey: 'profile.providerKeys.privateKey',
     },
   ],
@@ -192,6 +179,18 @@ export function firstMissingField(
   return null;
 }
 
+/** The Vertex credential one form's fields add up to, with its key in canonical form. */
+function vertexCredential(values: CredentialValues) {
+  return {
+    project: (values.project ?? '').trim(),
+    location: (values.location ?? '').trim(),
+    googleCredentials: {
+      clientEmail: (values.clientEmail ?? '').trim(),
+      privateKey: canonicalPrivateKey(values.privateKey ?? ''),
+    },
+  };
+}
+
 /** The credential's own JSON object, without the empty mappings list. */
 export function credentialPayload(input: {
   providerId: string;
@@ -218,12 +217,16 @@ export function credentialPayload(input: {
           };
     }
     case 'vertex': {
+      const { googleCredentials, ...rest } = vertexCredential(input.values);
+      const stored = googleCredentials.privateKey;
+      // `credentialProblem` refuses a key the gateway cannot sign with, so a
+      // refused read here has already stopped the submit; the wire value stays
+      // a string so a JSON null can never reach the server.
       return {
-        project: value('project'),
-        location: value('location'),
+        ...rest,
         googleCredentials: {
-          clientEmail: value('clientEmail'),
-          privateKey: (input.values.privateKey ?? '').trim(),
+          clientEmail: googleCredentials.clientEmail,
+          privateKey: stored.tag === 'key' ? stored.pem : value('privateKey'),
         },
       };
     }
@@ -237,9 +240,24 @@ export function credentialPayload(input: {
 }
 
 /**
+ * Why the Vertex private key the fields hold is not one the gateway can sign
+ * with, or null when it is. It is the one refusal here about a single field's
+ * value rather than about the credential the fields add up to, so the form
+ * points at the field instead of at the whole form, and names its cause.
+ */
+function privateKeyRefusal(providerId: string, values: CredentialValues): PrivateKeyCause | null {
+  if (getStructuredCredentialKind(providerId) !== 'vertex') {
+    return null;
+  }
+  const key = vertexCredential(values).googleCredentials.privateKey;
+  return key.tag === 'key' ? null : key.cause;
+}
+
+/**
  * Why this credential is refused, by the same check the web BYOK form runs on
- * the JSON it accepts. The form's own required-field check answers its fields;
- * this answers the shape they add up to.
+ * the JSON it accepts, plus the one rule that shape cannot express: the Vertex
+ * private key must be a PEM the gateway can sign with. The form's own
+ * required-field check answers its fields; this answers the value they add up to.
  */
 export function credentialProblem(input: {
   providerId: string;
@@ -247,6 +265,9 @@ export function credentialProblem(input: {
   values: CredentialValues;
   modelMappings: readonly ModelMapping[];
 }): StructuredCredentialProblem | null {
+  if (privateKeyRefusal(input.providerId, input.values) !== null) {
+    return { code: 'invalid-credential' };
+  }
   return validateStructuredCredential(input.providerId, credentialPayload(input));
 }
 
@@ -263,7 +284,19 @@ export type CredentialRead =
    * among the rows the form shows, so the refusal can name the row.
    */
   | { readonly tag: 'incomplete-mapping'; readonly mapping: number }
-  | { readonly tag: 'refused' };
+  /**
+   * The credential's shape is refused. `field` names the one field whose own
+   * value the check refuses, when the refusal is about that value rather than
+   * about the fields together: the field is masked, so a form-wide sentence
+   * would leave the reader with no value to look at and fix. `cause` names why
+   * that value is refused, when the refusal has more than one reason; a field
+   * whose value is refused for one reason carries no cause.
+   */
+  | {
+      readonly tag: 'refused';
+      readonly field?: CredentialFieldId;
+      readonly cause?: PrivateKeyCause;
+    };
 
 /**
  * The credential a structured form holds. `rows` are Azure's mapping rows as
@@ -298,8 +331,15 @@ export function readStructuredCredential(input: {
     values: input.values,
     modelMappings,
   };
+  // The private-key refusal names its field, because the field is masked: a
+  // form-wide sentence would leave the reader nothing to look at. Its cause
+  // decides which sentence the form shows, because the two refusals ask for
+  // different things.
+  const keyRefusal = privateKeyRefusal(input.providerId, input.values);
   if (credentialProblem(credential)) {
-    return { tag: 'refused' };
+    return keyRefusal === null
+      ? { tag: 'refused' }
+      : { tag: 'refused', field: 'privateKey', cause: keyRefusal };
   }
   return { tag: 'ready', credential: JSON.stringify(credentialPayload(credential)) };
 }

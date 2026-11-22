@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nuwe sekuriteitsbevinding ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Krities",
+      "high": "Hoog",
+      "medium": "Matig",
+      "low": "Laag"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA-waarskuwing"
     },

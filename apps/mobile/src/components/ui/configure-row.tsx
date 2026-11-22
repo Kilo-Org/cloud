@@ -70,6 +70,15 @@ type ConfigureRowProps = {
    */
   accessibilityLabel?: string;
   trailing?: ReactNode;
+  /**
+   * The trailing cell must be delivered at the platform touch target in a
+   * stacked row: either a control that reaches it — through its own box or
+   * through a compact `hitSlop` — or the placeholder that reserves the same
+   * line so the row does not move when the real cell lands. A stacked frame
+   * must host it (see `rowTargetHostClass`), because a touch is delivered only
+   * inside an ancestor view; the flat frame needs nothing.
+   */
+  trailingIsTarget?: boolean;
   className?: string;
   /** Test handle for the row's own control, for native E2E scripts. */
   testID?: string;
@@ -91,6 +100,7 @@ export function ConfigureRow({
   disabled,
   accessibilityLabel,
   trailing,
+  trailingIsTarget,
   className,
   testID,
 }: Readonly<ConfigureRowProps>) {
@@ -122,7 +132,11 @@ export function ConfigureRow({
   const showChevron = variant === 'navigation' && Boolean(onPress) && !disabled;
   let rowTrailing: RowTrailingSpec | undefined = undefined;
   if (trailing !== undefined) {
-    rowTrailing = { kind: 'node', node: trailing };
+    rowTrailing = {
+      kind: 'node',
+      node: trailing,
+      ...(trailingIsTarget === true ? { target: true } : {}),
+    };
   } else if (showChevron) {
     rowTrailing = { kind: 'chevron' };
   }

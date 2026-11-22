@@ -77,6 +77,10 @@ vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
 // the list's states are what this suite drives, not the gesture's indicator.
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 
+// The static band reserves its own row above the scroller under reduced motion;
+// this suite asserts where it sits and which control it carries, not its paint.
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
+
 // The failed refresh announces through this adapter, and the real module pulls
 // native deps; the spy records the screen's announcement instead.
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
@@ -616,6 +620,40 @@ describe('OrganizationAuditLogScreen pull to refresh', () => {
     });
     expect(pageQuery.refetch).toHaveBeenCalledTimes(1);
     unmount();
+  });
+
+  it('draws the static band above the list with the same control', async () => {
+    // The band is the pull's visible half under reduced motion, so it sits
+    // beside the scroller rather than inside it: inside, its reserve would move
+    // the first row at rest and scroll away with the rows.
+    pageHook.entries = entries(2);
+    pageHook.hasMore = true;
+    const { renderer, unmount } = await mount();
+
+    const bands = renderer.root.findAllByType('RefreshProgress');
+    expect(bands).toHaveLength(1);
+    const [list] = renderer.root.findAllByType('FlashList');
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    expect(bands[0]?.props.refreshControl).toBe(list.props.refreshControl);
+    unmount();
+  });
+
+  it('draws no band where there is no pull control', async () => {
+    // The empty state's own centered scroller carries the band, and the
+    // first-page error renders no pull at all, so the screen adds neither its
+    // own band nor a pull in either branch. (`EmptyState` is stubbed here, so
+    // what this counts is the screen's own band.)
+    const empty = await mount();
+    expect(empty.renderer.root.findAllByType('RefreshProgress')).toHaveLength(0);
+    empty.unmount();
+
+    pageQuery.isError = true;
+    pageQuery.data = { pages: [], pageParams: [] };
+    const failed = await mount();
+    expect(failed.renderer.root.findAllByType('RefreshProgress')).toHaveLength(0);
+    failed.unmount();
   });
 
   it('keeps the rows and announces the failure when the pull fails', async () => {

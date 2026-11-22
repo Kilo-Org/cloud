@@ -102,14 +102,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const repositories = useSecurityAgentRepositories(scope);
   const query = useMemo(() => toSecurityFindingQuery(filters), [filters]);
   const findings = useSecurityFindings(scope, query);
-  const capacity = useSecurityAnalysisCapacity(scope);
-  // An org scope stores its findings under the `organizations.securityAgent`
-  // tRPC prefix, so the personal prefix alone matches nothing and the screen
-  // never refreshes on focus.
-  useRouteForegroundRefresh(
-    isPersonalSecurityScope(scope) ? [[['securityAgent']]] : [[['organizations', 'securityAgent']]]
-  );
-
   const slaEnabled = config.data?.slaEnabled ?? true;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   // Memoized so a pull-to-refresh (`refreshing`) or a filter change does not
@@ -120,11 +112,20 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   );
   // The capacity notice explains a blocked action, so it only appears when a
   // rendered row actually offers one — never over a list of already-analyzed
-  // findings.
+  // findings. The same flag enables the read: the counters poll while the owner
+  // is at the limit, so a list with no analyzable row must not keep them awake.
   const hasAnalyzableRow = useMemo(
     () => items.some(item => isSecurityFindingAnalyzable(item)),
     [items]
   );
+  const capacity = useSecurityAnalysisCapacity(scope, hasAnalyzableRow);
+  // An org scope stores its findings under the `organizations.securityAgent`
+  // tRPC prefix, so the personal prefix alone matches nothing and the screen
+  // never refreshes on focus.
+  useRouteForegroundRefresh(
+    isPersonalSecurityScope(scope) ? [[['securityAgent']]] : [[['organizations', 'securityAgent']]]
+  );
+
   // Only a delivered page may claim there are no open findings: a read that is
   // paused, never started, or whose pages were cleared has not answered. An
   // unsettled connectivity keeps the skeleton instead of naming the connection.
@@ -199,13 +200,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       setRefreshing(true);
       try {
         // Refresh only — never triggers a new sync. The list shows the
-        // repository fetch failure inline, so every list refresh retries it,
-        // and the capacity counters are on screen, so a pull refreshes them
-        // too instead of leaving the notice and the actions on an older read.
+        // repository fetch failure inline, so every list refresh retries it.
+        // The counters refresh with the same flag that enables their read: a
+        // disabled read's `refetch` still reaches the network, and a pull on a
+        // list with no analyzable row has no notice for its answer.
         const [findingsResult] = await Promise.all([
           findings.refetch(),
           repositories.refetch(),
-          capacity.refetch(),
+          hasAnalyzableRow ? capacity.refetch() : undefined,
         ]);
         if (findingsResult.isError) {
           toast.error(t('common.couldNotRefresh'));

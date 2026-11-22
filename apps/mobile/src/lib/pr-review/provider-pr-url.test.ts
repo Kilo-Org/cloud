@@ -151,6 +151,11 @@ describe('parseProviderPrUrl — GitLab', () => {
     });
   });
 
+  it('returns null for a paren nest deeper than the peel bound', () => {
+    const url = 'https://gitlab.com/g/r/-/merge_requests/5';
+    expect(parseProviderPrUrl('('.repeat(20_000) + url + ')'.repeat(20_000))).toBeNull();
+  });
+
   it('lowercases the host and keeps the scheme', () => {
     const ref = parseProviderPrUrl('https://GITLAB.Example.COM/G/Repo/-/merge_requests/1');
     expect(ref).toEqual({

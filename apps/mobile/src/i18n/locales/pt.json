@@ -311,6 +311,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
+    "availableToSpendInOrganization": "Disponível para gastar nesta organização",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -452,6 +453,17 @@
       "location": "Localização Vertex",
       "clientEmail": "Email da conta de serviço",
       "privateKey": "Chave privada da conta de serviço",
+      "privateKeyBlockRequired": "Cola o bloco completo da chave, desde a linha BEGIN até à linha END.",
+      "privateKeyEncrypted": "Este bloco da chave está protegido por uma frase-passe. Cola uma chave de conta de serviço que não tenha frase-passe.",
+      "names": {
+        "codestral": "Apenas Codestral antigo",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Iniciar sessão com ChatGPT)",
+        "xiaomi": "Xiaomi (pagamento conforme a utilização)",
+        "zai": "Z.ai (pagamento conforme a utilização)",
+        "bedrockByok": "Amazon Bedrock (direto)",
+        "vertexByok": "Google Vertex AI (direto)"
+      },
       "modelMappings": "Mapeamentos de modelos",
       "modelMappingsDescription": "Envia um modelo do gateway para um nome de implementação personalizado.",
       "mappingTitle": "Mapeamento {{number}}",
@@ -545,8 +557,11 @@
     "changelogFixesIn": "Correções e melhorias em {{areas}}.",
     "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
     "changelogAreas": {
-      "signIn": "Início de sessão",
-      "profileOrganizations": "Perfil & organizações"
+      "signIn": "início de sessão",
+      "profileOrganizations": "perfil & organizações",
+      "chat": "conversa",
+      "notifications": "notificações",
+      "integrations": "integrações"
     }
   },
   "preferences": {
@@ -1253,6 +1268,10 @@
       "emptyTitle": "Ainda não há notificações",
       "emptyCategoryTitle": "Ainda não há notificações nesta categoria",
       "emptyBody": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_zero": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_one": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_many": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "emptyBody_other": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
       "capped": "A mostrar as notificações mais recentes.",
       "loadError": "Não foi possível carregar o histórico de notificações.",
       "openFailed": "Esta notificação já não abre em lado nenhum."
@@ -1488,6 +1507,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
+      "deniedManagedByOwner": "Peça a um proprietário de {{organization}} para alterar a conexão que não consegue alterar.",
+      "deniedConnectRole": "Apenas os proprietários, os administradores e os gestores de faturação de {{organization}} o podem ligar.",
+      "deniedReconnectRole": "Peça a um proprietário, administrador ou gestor de faturação de {{organization}} que a volte a ligar.",
       "managedOnWebTitle": "Gerida na Web",
       "managedOnWebShort": "Esta ligação é gerida na Web, a partir de um computador.",
       "managedOnWebRepositories": "Escolhe os repositórios de {{organization}} na Web, a partir de um computador.",
@@ -1629,7 +1651,9 @@
       "unavailablePersonallySwitchAction": "Trocar de organização",
       "unavailableOrganizationTitle": "Revisão do conselho não está disponível",
       "unavailableForOrganization": "A revisão do conselho precisa do plano Enterprise com uma subscrição ou um período de teste ativos. Esta organização não o tem neste momento.",
-      "unavailableForOrganizationNeutral": "A revisão do conselho não está disponível para esta organização neste momento. Tente novamente mais tarde.",
+      "unavailablePlanCheck": "A revisão do conselho não conseguiu verificar o plano desta organização. Tente novamente para verificar outra vez.",
+      "unavailableFlagRollout": "A revisão do conselho ainda não está disponível para esta organização. Atualize a aplicação para a versão mais recente para a obter.",
+      "unavailableForOrganizationMember": "A revisão do conselho precisa do plano Enterprise com uma subscrição ou um período de teste ativos. O proprietário da organização pode alterar o plano.",
       "unavailableOnBitbucket": "A revisão do conselho não está disponível para repositórios Bitbucket.",
       "noRepositories": "Ainda não há repositórios selecionados. Escolhe primeiro repositórios nas definições de repositórios.",
       "specialists": "Especialistas",
@@ -2650,8 +2674,7 @@
       "searchPlaceholder": "Pesquisar repositórios",
       "noMatches": "Sem resultados",
       "noRepositories": "Nenhum repositório disponível",
-      "noRepositoriesDescription": "Nenhum repositório está ligado à sua conta.",
-      "loading": "A carregar…",
+      "noRepositoriesDescription": "Para carregar repositórios, ligue uma conta do GitHub ou do GitLab.",
       "accessibility": "Repositório: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3564,7 +3587,7 @@
       "manageOnWeb": "Definições de faturação na Web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar lugares",
-      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos na Web.",
+      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos em kilo.ai.",
       "setupAutoTopUp": "Configurar carregamento automático",
       "manageAutoTopUp": "Gerir carregamento automático",
       "opensOnWeb": "Abre na web"
@@ -3750,10 +3773,10 @@
       "nameLabel": "Nome do modo",
       "nameRequired": "Introduza um nome de modo.",
       "notFound": "Este modo já não existe.",
-      "restrictionHint": "Só os ficheiros que correspondem a este padrão podem ser editados. Deixe vazio para permitir todos os ficheiros.",
-      "restrictionInvalid": "Introduza um padrão válido.",
+      "restrictionHint": "Uma expressão regular seleciona os ficheiros que este modo pode editar, por exemplo `\\.md$` para apenas ficheiros markdown. Deixe vazio para permitir todos os ficheiros.",
+      "restrictionInvalid": "Introduza uma expressão regular válida.",
       "restrictionLabel": "Etiqueta de restrição",
-      "restrictionPattern": "Padrão de ficheiro",
+      "restrictionPattern": "Restrição de ficheiro",
       "roleLabel": "Definição da função",
       "roleRequired": "Descreva o que este modo faz.",
       "tool": {
@@ -3841,7 +3864,7 @@
     "emailDeliveryFailed": "O envio de emails está temporariamente indisponível. Tenta novamente mais tarde.",
     "admissionRequired": "Não é possível verificar o teu dispositivo. Usa '$t(login.moreSignInOptions)' para iniciar sessão noutro dispositivo ou no site.",
     "default": "Algo correu mal. Tenta novamente.",
-    "retryableAdmission": "Não foi possível verificar este dispositivo. Verifica a tua ligação e tenta novamente.",
+    "retryableAdmission": "Não foi possível verificar este dispositivo. Tenta novamente.",
     "startSignInFailed": "Não foi possível iniciar o processo de início de sessão. Tenta novamente.",
     "couldNotOpenBrowser": "Não foi possível abrir o navegador. Tenta novamente.",
     "signInTimedOut": "O tempo para iniciar sessão esgotou-se. Tenta novamente.",
@@ -4204,7 +4227,8 @@
         "space": "Não há espaço de armazenamento livre suficiente para este modelo. Liberte espaço e tente novamente.",
         "network": "A transferência não terminou. Verifique a sua ligação e tente novamente.",
         "invalidFile": "O ficheiro transferido não é um modelo que esta aplicação possa executar, por isso foi removido.",
-        "checksum": "O ficheiro transferido não corresponde à soma de verificação publicada, por isso foi removido. Tente transferir novamente."
+        "checksum": "O ficheiro transferido não corresponde à soma de verificação publicada, por isso foi removido. Tente transferir novamente.",
+        "writeFailed": "Este dispositivo não conseguiu guardar o modelo. Tente transferir novamente."
       }
     },
     "catalog": {
@@ -4543,6 +4567,7 @@
       "promptPlaceholder": "És um…",
       "tools": "Ferramentas",
       "wholeToolRule": "Este agente aplica uma regra a todas as ferramentas de uma só vez: {{rule}}. Esses interruptores são somente leitura.",
+      "toolRule": "Regra armazenada: {{rule}}",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primário — mostrado no seletor",
       "visibilitySubagent": "Subagente — só pode ser invocado por outros",
@@ -4652,20 +4677,34 @@
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras, recibos e uso de créditos aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
+      "expiredGrant": "Expirado: {{description}}",
       "googlePlayReceipt": "Recibo do Google Play",
       "kind": {
         "adjustment": "Ajuste",
         "balanceNeutral": "Sem efeito no saldo",
         "deduction": "Dedução",
         "grant": "Concessão de créditos",
+        "promotionalCredits": "Créditos promocionais",
         "welcomeCredits": "Créditos de boas-vindas",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessão de créditos pelo administrador",
+        "contributorChampion": "Crédito de campeão contribuidor",
+        "feedback": "Crédito por comentários",
+        "influencer": "Crédito de influencer",
+        "ossMonthlyReset": "Renovação do patrocínio de código aberto",
+        "ossSponsorship": "Crédito de patrocínio de código aberto",
+        "pullRequest": "Crédito por PR",
+        "usageIssue": "Crédito por problema de utilização",
+        "vibeDay": "Crédito por Vibe Day"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
-      "retentionLimit": "A mostrar o histórico de créditos mais recente."
+      "retentionLimit": "A mostrar o histórico de créditos mais recente.",
+      "voidedGrant": "Anulado: {{description}}"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
@@ -5261,6 +5300,20 @@
       "eu": "União Europeia",
       "au": "Austrália",
       "jp": "Japão"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Pesquisar nas preferências",
+    "noMatches": "Nenhuma preferência encontrada",
+    "emptyDescription": "Experimente outro nome de preferência ou palavra-chave.",
+    "resultsStatus": "Preferências encontradas: {{resultCount}}",
+    "keywords": {
+      "signOut": "sair|terminar sessão",
+      "appearance": "tema|cores|modo escuro",
+      "appUnlock": "biometria|rosto|impressão digital",
+      "language": "idioma|língua|tradução",
+      "notifications": "alertas|avisos|notificações",
+      "privacy": "análise de dados|rastreio|privacidade"
     }
   }
 }

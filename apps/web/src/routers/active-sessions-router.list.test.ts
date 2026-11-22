@@ -422,13 +422,14 @@ describe('active-sessions-router.list', () => {
     }
   });
 
-  it('degrades to empty sessions when the worker returns a malformed response', async () => {
+  it('reports a malformed worker response as unavailable', async () => {
     fetchSpy = mockMalformedWorkerResponse();
 
     const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.activeSessions.list();
 
-    expect(result).toEqual({ sessions: [] });
+    await expect(caller.activeSessions.list()).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+    });
   });
 
   describe('organization context filter and title enrichment', () => {

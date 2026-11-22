@@ -5,6 +5,7 @@ import {
   createReadDb,
   isUSRegion,
   replicaAffinityKey,
+  requireIntegerEnv,
   selectReplicaIndex,
   selectReplicaUrls,
   shouldExitOnPoolError,
@@ -493,5 +494,43 @@ describe('drizzle', () => {
       `);
       expect(rows).toEqual([]);
     });
+  });
+});
+
+describe('requireIntegerEnv', () => {
+  it('parses a non-negative integer', () => {
+    expect(requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', '10000')).toBe(10000);
+  });
+
+  it('accepts zero', () => {
+    expect(requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', '0')).toBe(0);
+  });
+
+  it('tolerates surrounding spaces', () => {
+    expect(requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', ' 10000 ')).toBe(10000);
+  });
+
+  it.each(['30s', 'PT30S', '10.5', '1e4', '-5', '0x10'])(
+    'throws for the malformed value %p',
+    value => {
+      expect(() => requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', value)).toThrow(
+        'Invalid required environment variable'
+      );
+      expect(() => requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', value)).toThrow(
+        'POSTGRES_CONNECT_TIMEOUT'
+      );
+    }
+  );
+
+  it('throws when the variable is undefined', () => {
+    expect(() => requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', undefined)).toThrow(
+      'Missing required environment variable POSTGRES_CONNECT_TIMEOUT'
+    );
+  });
+
+  it('throws when the variable is empty', () => {
+    expect(() => requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', '')).toThrow(
+      'Missing required environment variable POSTGRES_CONNECT_TIMEOUT'
+    );
   });
 });

@@ -309,6 +309,7 @@
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
+    "availableToSpendInOrganization": "Beskikbaar om in hierdie organisasie te bestee",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -450,6 +451,17 @@
       "location": "Vertex-ligging",
       "clientEmail": "Diensrekening-e-posadres",
       "privateKey": "Privaat sleutel van diensrekening",
+      "privateKeyBlockRequired": "Plak die hele sleutelblok, vanaf die BEGIN-lyn tot die END-lyn.",
+      "privateKeyEncrypted": "Hierdie sleutelblok is met 'n wagfrase beskerm. Plak 'n diensrekening-sleutel wat geen wagfrase het nie.",
+      "names": {
+        "codestral": "Slegs verouderde Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Meld aan met ChatGPT)",
+        "xiaomi": "Xiaomi (betaal soos jy gebruik)",
+        "zai": "Z.ai (betaal soos jy gebruik)",
+        "bedrockByok": "Amazon Bedrock (direk)",
+        "vertexByok": "Google Vertex AI (direk)"
+      },
       "modelMappings": "Modelkoppelings",
       "modelMappingsDescription": "Stuur 'n gateway-model na 'n pasgemaakte ontplooiingsnaam.",
       "mappingTitle": "Koppeling {{number}}",
@@ -543,8 +555,11 @@
     "changelogFixesIn": "Regstellings en verbeterings in {{areas}}.",
     "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
     "changelogAreas": {
-      "signIn": "Aanmelding",
-      "profileOrganizations": "Profiel & organisasies"
+      "signIn": "aanmelding",
+      "profileOrganizations": "profiel & organisasies",
+      "chat": "klets",
+      "notifications": "kennisgewings",
+      "integrations": "integrasies"
     }
   },
   "preferences": {
@@ -1199,6 +1214,8 @@
       "emptyTitle": "Nog geen kennisgewings nie",
       "emptyCategoryTitle": "Geen kennisgewings in hierdie kategorie nie",
       "emptyBody": "Kennisgewings wat hierdie rekening ontvang, verskyn hier. Hulle word vir {{days}} dae bewaar.",
+      "emptyBody_one": "Kennisgewings wat hierdie rekening ontvang, verskyn hier. Hulle word vir {{days}} dae bewaar.",
+      "emptyBody_other": "Kennisgewings wat hierdie rekening ontvang, verskyn hier. Hulle word vir {{days}} dae bewaar.",
       "capped": "Die mees onlangse kennisgewings word gewys.",
       "loadError": "Kon nie kennisgewingsgeskiedenis laai nie.",
       "openFailed": "Hierdie kennisgewing open nêrens meer nie."
@@ -1434,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
+      "deniedManagedByOwner": "Vra 'n eienaar van {{organization}} om die koppeling te verander wat jy nie kan verander nie.",
+      "deniedConnectRole": "Slegs eienaars, administrateurs en faktureringsbestuurders van {{organization}} kan dit koppel.",
+      "deniedReconnectRole": "Vra 'n eienaar, administrateur of faktureringsbestuurder van {{organization}} om dit weer te koppel.",
       "managedOnWebTitle": "Op die web bestuur",
       "managedOnWebShort": "Hierdie verbinding word op die web vanaf 'n rekenaar bestuur.",
       "managedOnWebRepositories": "Kies die repositories vir {{organization}} op die web vanaf 'n rekenaar.",
@@ -1571,7 +1591,9 @@
       "unavailablePersonallySwitchAction": "Wissel organisasie",
       "unavailableOrganizationTitle": "Raadhersiening is nie op die oomblik beskikbaar nie",
       "unavailableForOrganization": "Raadhersiening verg die Enterprise-plan met 'n aktiewe intekening of proefperiode. Hierdie organisasie het dit nie op die oomblik nie.",
-      "unavailableForOrganizationNeutral": "Raadhersiening is nie op die oomblik vir hierdie organisasie beskikbaar nie. Probeer later weer.",
+      "unavailablePlanCheck": "Raadhersiening kon nie hierdie organisasie se plan nagaan nie. Probeer weer om dit na te gaan.",
+      "unavailableFlagRollout": "Raadhersiening is nog nie vir hierdie organisasie beskikbaar nie. Dateer die app op na die nuutste weergawe om dit te kry.",
+      "unavailableForOrganizationMember": "Raadhersiening verg die Enterprise-plan met 'n aktiewe intekening of proefperiode. 'n Organisasie-eienaar kan die plan verander.",
       "unavailableOnBitbucket": "Raadhersiening is nie beskikbaar vir Bitbucket-bewaarplekke nie.",
       "noRepositories": "Nog geen bewaarplekke gekies nie. Kies eers bewaarplekke in die bewaarplekinstellings.",
       "specialists": "Spesialiste",
@@ -2546,8 +2568,7 @@
       "searchPlaceholder": "Soek bewaarplekke",
       "noMatches": "Geen treffers nie",
       "noRepositories": "Geen bewaarplekke beskikbaar nie",
-      "noRepositoriesDescription": "Geen bewaarplekke is aan jou rekening gekoppel nie.",
-      "loading": "Laai…",
+      "noRepositoriesDescription": "Koppel GitHub of GitLab om bewaarplekke te laai.",
       "accessibility": "Bewaarplek: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3440,7 +3461,7 @@
       "manageOnWeb": "Fakturering-instellings op die web",
       "changePlan": "Verander plan",
       "buySeats": "Koop gebruikersplekke",
-      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word op die web bestuur.",
+      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word by kilo.ai bestuur.",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
       "manageAutoTopUp": "Bestuur outomatiese aanvulling",
       "opensOnWeb": "Maak op die web oop"
@@ -3626,10 +3647,10 @@
       "nameLabel": "Modusnaam",
       "nameRequired": "Voer 'n modusnaam in.",
       "notFound": "Hierdie modus bestaan nie meer nie.",
-      "restrictionHint": "Slegs lêers wat by hierdie patroon pas, kan geredigeer word. Laat dit leeg om alle lêers toe te laat.",
-      "restrictionInvalid": "Voer 'n geldige patroon in.",
+      "restrictionHint": "'n Gereelde uitdrukking kies watter lêers hierdie modus mag redigeer, byvoorbeeld `\\.md$` vir slegs markdown-lêers. Laat dit leeg om alle lêers toe te laat.",
+      "restrictionInvalid": "Voer 'n geldige gereelde uitdrukking in.",
       "restrictionLabel": "Beperkingsetiket",
-      "restrictionPattern": "Lêerpatroon",
+      "restrictionPattern": "Lêerbeperking",
       "roleLabel": "Roldefinisie",
       "roleRequired": "Beskryf wat hierdie modus doen.",
       "tool": {
@@ -3713,7 +3734,7 @@
     "emailDeliveryFailed": "E-pos kan tydelik nie afgelewer word nie. Probeer asseblief later weer.",
     "admissionRequired": "Jou toestel kan nie geverifieer word nie. Gebruik '$t(login.moreSignInOptions)' om op 'n ander toestel of via die web aan te meld.",
     "default": "Iets het verkeerd geloop. Probeer asseblief weer.",
-    "retryableAdmission": "Ons kon nie hierdie toestel verifieer nie. Kontroleer jou verbinding en probeer weer.",
+    "retryableAdmission": "Kon nie hierdie toestel verifieer nie. Probeer weer.",
     "startSignInFailed": "Kon nie aanmelding begin nie. Probeer asseblief weer.",
     "couldNotOpenBrowser": "Kon nie die blaaier oopmaak nie. Probeer asseblief weer.",
     "signInTimedOut": "Die tyd vir aanmelding het verstryk. Probeer asseblief weer.",
@@ -4058,7 +4079,8 @@
         "space": "Daar is nie genoeg gratis berging vir hierdie model nie. Maak spasie vry en probeer weer.",
         "network": "Die aflaai het nie klaargemaak nie. Kontroleer jou verbinding en probeer weer.",
         "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder.",
-        "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer."
+        "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer.",
+        "writeFailed": "Hierdie toestel kon nie die model stoor nie. Probeer die aflaai weer."
       }
     },
     "catalog": {
@@ -4385,6 +4407,7 @@
       "promptPlaceholder": "Jy is 'n…",
       "tools": "Gereedskap",
       "wholeToolRule": "Hierdie agent pas een reël gelyktydig op alle gereedskap toe: {{rule}}. Hierdie skakelaars is slegs-lees.",
+      "toolRule": "Gestoor reël: {{rule}}",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
       "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",
@@ -4494,20 +4517,34 @@
       "deductionFallback": "Kredietaftrekking",
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
       "emptyTitle": "Geen kredietgeskiedenis nie",
+      "expiredGrant": "Verval: {{description}}",
       "googlePlayReceipt": "Kwitansie van Google Play",
       "kind": {
         "adjustment": "Aanpassing",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Aftrekking",
         "grant": "Kredniettoekenning",
+        "promotionalCredits": "Promosiekrediete",
         "welcomeCredits": "Welkomkrediete",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Administrateur-krediettoekenning",
+        "contributorChampion": "Bydraer-kampioenkrediet",
+        "feedback": "Terugvoerkrediet",
+        "influencer": "Influënserkrediet",
+        "ossMonthlyReset": "Herstel van oopbronborgskap",
+        "ossSponsorship": "Oopbronborgskapkrediet",
+        "pullRequest": "Trekversoekkrediet",
+        "usageIssue": "Gebruiksprobleemkrediet",
+        "vibeDay": "Vibe-dagkrediet"
       },
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
       "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
-      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys."
+      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys.",
+      "voidedGrant": "Nietig gemaak: {{description}}"
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
@@ -5087,6 +5124,20 @@
       "eu": "Europese Unie",
       "au": "Australië",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Soek voorkeure",
+    "noMatches": "Geen ooreenstemmende voorkeure",
+    "emptyDescription": "Probeer ’n ander voorkeurnaam of sleutelwoord.",
+    "resultsStatus": "Voorkeure gevind: {{resultCount}}",
+    "keywords": {
+      "signOut": "afmeld|meld af",
+      "appearance": "tema|kleurskema",
+      "appUnlock": "biometrie|gesigherkenning|vingerafdruk",
+      "language": "taal|vertaling",
+      "notifications": "waarskuwings|stootkennisgewings",
+      "privacy": "ontleding|nasporing"
     }
   }
 }

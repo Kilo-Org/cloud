@@ -1,5 +1,9 @@
 import { captureMessage } from '@sentry/nextjs';
-import type { CustomPricingConfig, CustomPricingTiers } from '@kilocode/db/schema-types';
+import type {
+  CustomPricing,
+  CustomPricingConfig,
+  CustomPricingTiers,
+} from '@kilocode/db/schema-types';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
@@ -69,23 +73,33 @@ export function applyPricingTiers(
   return applyPricing(pricing, pricingTiers[0].pricing);
 }
 
+/**
+ * The custom pricing a display path shows: an entry marked `fallbackOnly` is for billing only, so a
+ * model list keeps the catalog price.
+ */
+function applicableCustomPricing(
+  config: CustomPricingConfig,
+  modelId: string
+): CustomPricing | undefined {
+  const customPricing = getCustomPricing(config, modelId);
+  return customPricing && !customPricing.fallbackOnly ? customPricing : undefined;
+}
+
 export function applyCustomPricingToPricing(
   config: CustomPricingConfig,
   modelId: string,
   pricing: OpenRouterCatalogModel['pricing']
 ): OpenRouterCatalogModel['pricing'] {
-  const customPricing = getCustomPricing(config, modelId);
-  return customPricing && !customPricing.fallbackOnly
-    ? applyPricingTiers(pricing, customPricing.pricing)
-    : pricing;
+  const customPricing = applicableCustomPricing(config, modelId);
+  return customPricing ? applyPricingTiers(pricing, customPricing.pricing) : pricing;
 }
 
 export function applyCustomPricingToModel(
   config: CustomPricingConfig,
   model: OpenRouterCatalogModel
 ): OpenRouterCatalogModel {
-  const customPricing = getCustomPricing(config, model.id);
-  if (!customPricing || customPricing.fallbackOnly) return model;
+  const customPricing = applicableCustomPricing(config, model.id);
+  if (!customPricing) return model;
 
   const discountSuffix =
     customPricing.discountPercentage === undefined
@@ -105,6 +119,8 @@ export function calculateCustomCost_mUsd(
   usage: JustTheCostsUsageStats
 ): number | undefined {
   const customPricing = getCustomPricing(config, modelId);
+  // A `fallbackOnly` entry bills this model only when the provider reported no cost, unlike the
+  // display paths, which skip it entirely.
   if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
   return calculateTieredCost_mUsd(customPricing.pricing, modelId, usage);
 }

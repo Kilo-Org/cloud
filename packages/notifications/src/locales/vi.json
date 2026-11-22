@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Phát hiện bảo mật mới ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Nghiêm trọng",
+      "high": "Cao",
+      "medium": "Trung bình",
+      "low": "Thấp"
+    },
     "securityFindingSlaWarning": {
       "title": "Cảnh báo SLA"
     },

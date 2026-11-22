@@ -78,6 +78,11 @@ function liveInvitationCondition(organizationId: string) {
   );
 }
 
+/** A user's membership in an organization that is not soft-deleted. */
+function userMembershipInLiveOrganization(userId: User['id']) {
+  return and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at));
+}
+
 export async function getOrganizationById(
   id: Organization['id'],
   txn?: DrizzleTransaction
@@ -143,9 +148,7 @@ export async function getUserOrganizationsWithSeats(
       organization_memberships,
       eq(organization_memberships.organization_id, organizations.id)
     )
-    .where(
-      and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
-    );
+    .where(userMembershipInLiveOrganization(userId));
 
   const now = new Date();
   return results.map(result => {
@@ -214,9 +217,7 @@ export async function getUserOrgMemberships(
     })
     .from(organization_memberships)
     .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
-    .where(
-      and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
-    );
+    .where(userMembershipInLiveOrganization(userId));
   return rows;
 }
 
@@ -225,7 +226,7 @@ export async function userHasOrganizations(userId: User['id']): Promise<boolean>
     .select({ id: organization_memberships.id })
     .from(organization_memberships)
     .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
-    .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
+    .where(userMembershipInLiveOrganization(userId))
     .limit(1);
   return result.length > 0;
 }
@@ -235,7 +236,7 @@ export async function getSingleUserOrganization(userId: User['id']): Promise<Org
     .select({ organization: organizations })
     .from(organization_memberships)
     .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
-    .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
+    .where(userMembershipInLiveOrganization(userId))
     .limit(2);
   return result.length === 1 ? result[0].organization : null;
 }
@@ -286,7 +287,7 @@ export async function getProfileOrganizations(
       organization_memberships,
       eq(organization_memberships.organization_id, organizations.id)
     )
-    .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
+    .where(userMembershipInLiveOrganization(userId))
     // Deterministic order so callers can treat the first element as a stable
     // default selection (e.g. profile `selectedOrganizationId`). Old form was
     // created_at, id; sales-demo orgs win so profile selectedOrganizationId is
@@ -604,10 +605,13 @@ export async function updateUserRoleInOrganization(
 
 /**
  * Raised when the target organization row is deleted or never existed. Distinct
- * from the SSO-misconfiguration sentence below, which applies only where the
+ * from `ORGANIZATION_SSO_MISCONFIGURED_MESSAGE`, which applies only where the
  * policy status is `misconfigured`.
  */
 export const ORGANIZATION_MISSING_MESSAGE = 'This organization is no longer available';
+
+/** Raised when the organization's SSO policy cannot decide a membership join. */
+export const ORGANIZATION_SSO_MISCONFIGURED_MESSAGE = 'Organization SSO policy is misconfigured';
 
 export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
   'Child organizations can only invite people who are already members of the parent organization.';
@@ -843,7 +847,7 @@ export async function inviteUserToOrganization(
 
     const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
     if (policy.status === 'misconfigured') {
-      throw new Error('Organization SSO policy is misconfigured');
+      throw new Error(ORGANIZATION_SSO_MISCONFIGURED_MESSAGE);
     }
 
     let authenticationRequirement: 'default' | 'workos' = 'default';
@@ -1123,7 +1127,7 @@ export async function acceptOrganizationInvite(
 
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organization.id, tx);
       if (ssoPolicy.status === 'misconfigured') {
-        return failureResult('Organization SSO policy is misconfigured');
+        return failureResult(ORGANIZATION_SSO_MISCONFIGURED_MESSAGE);
       }
 
       const acceptingUserDomain = getLowerDomainFromEmail(acceptingUser.email);

@@ -3,7 +3,12 @@ import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/i
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
-import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import {
+  CONTROL_PLANE_UPSTREAM_BUDGET_MS,
+  fetchWithinBudget,
+  readJsonWithinBudget,
+  readTextWithinBudget,
+} from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
@@ -62,6 +67,30 @@ const connectedInstancesResponseSchema = z.object({
 
 export type ConnectedInstance = z.infer<typeof connectedInstanceSchema>;
 
+/** Longest upstream error excerpt this module logs (matches the security Worker clients). */
+const INSTANCE_ERROR_LOG_EXCERPT_CHARS = 200;
+
+/**
+ * Classifies a failed session-ingest body read.
+ *
+ * Only a body that arrived in full and is not JSON is a bad gateway answer
+ * (`SyntaxError` from `JSON.parse`). Every other failure is a transport
+ * failure — the read outlived its budget (`ServiceFetchTimeoutError`) or the
+ * transfer broke mid-body (`TypeError` from a reset connection or a premature
+ * close) — which is the same failure the fetch stage maps to
+ * `SERVICE_UNAVAILABLE`, so it stays retryable here too.
+ */
+function bodyReadFailureError(error: unknown, malformedMessage: string): TRPCError {
+  if (error instanceof SyntaxError) {
+    return new TRPCError({ code: 'BAD_GATEWAY', message: malformedMessage, cause: error });
+  }
+  return new TRPCError({
+    code: 'SERVICE_UNAVAILABLE',
+    message: 'Session ingest is unavailable',
+    cause: error,
+  });
+}
+
 /**
  * Session Ingest `/api/user/web-ticket` mint response. Parsed at runtime so a
  * malformed 200 fails the mutation instead of returning undefined fields.
@@ -95,9 +124,11 @@ const listInputSchema = z
  * expiry from the worker body.
  *
  * Only a missing worker URL is PRECONDITION_FAILED. A worker that cannot be
- * reached, or does not answer inside the budget, is SERVICE_UNAVAILABLE. A
- * mint response with status 503 or 504 is also SERVICE_UNAVAILABLE. Any other
- * non-2xx or malformed mint response is BAD_GATEWAY.
+ * reached, or does not answer inside the budget, is SERVICE_UNAVAILABLE — the
+ * budget covers the body read too, so a worker that sends headers and then
+ * stalls the body fails the same way. A mint response with status 503 or 504
+ * is also SERVICE_UNAVAILABLE. Any other non-2xx or malformed mint response is
+ * BAD_GATEWAY.
  */
 async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt: number }> {
   if (!SESSION_INGEST_WORKER_URL) {
@@ -112,6 +143,7 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
     expiresIn: 60 * 60,
   });
   const url = `${SESSION_INGEST_WORKER_URL}/api/user/web-ticket`;
+  const startedAt = Date.now();
 
   let response: Response;
   try {
@@ -135,6 +167,12 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
     // was unavailable or outlived its budget inside the worker, so a retry can
     // still mint. Keep that retryability instead of flattening it into a
     // gateway error the client would treat as final.
+    //
+    // Neither branch reads the body, and the status line alone decides the
+    // answer, so the body is released instead of read: minting is a mutation a
+    // session open retries, so every attempt against a stuck worker must not
+    // pin another connection.
+    await response.body?.cancel().catch(() => undefined);
     if (response.status === 503 || response.status === 504) {
       throw new TRPCError({
         code: 'SERVICE_UNAVAILABLE',
@@ -147,7 +185,16 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
     });
   }
 
-  const raw: unknown = await response.json().catch(() => undefined);
+  let raw: unknown;
+  try {
+    raw = await readJsonWithinBudget(
+      response,
+      CONTROL_PLANE_UPSTREAM_BUDGET_MS - (Date.now() - startedAt),
+      CONTROL_PLANE_UPSTREAM_BUDGET_MS
+    );
+  } catch (error) {
+    throw bodyReadFailureError(error, 'Invalid ticket response from session ingest');
+  }
   const parsed = webTicketResponseSchema.safeParse(raw);
   if (!parsed.success) {
     throw new TRPCError({
@@ -215,10 +262,14 @@ export const activeSessionsRouter = createTRPCRouter({
 
   /**
    * Live snapshot of every `kilo remote` instance currently connected for the
-   * authenticated user. Unlike `list` (which swallows upstream errors into
-   * `{sessions: []}`), this throws a `TRPCError` on failure so the mobile
-   * UI can distinguish a retryable transport error from a genuine empty
-   * state. The companion `getToken` call is owned by C2.
+   * authenticated user.
+   *
+   * Both this and `list` report a failed session-ingest read as
+   * `SERVICE_UNAVAILABLE`: neither returns a bare empty list, which reads as
+   * "nothing runs". This procedure classifies failures exactly like
+   * `mintWebTicket` — transport failure or 503/504 stays retryable as
+   * `SERVICE_UNAVAILABLE`, any other non-2xx or malformed body is
+   * `BAD_GATEWAY`. The companion `getToken` call is owned by C2.
    */
   listInstances: baseProcedure.query(async ({ ctx }) => {
     if (!SESSION_INGEST_WORKER_URL) {
@@ -233,37 +284,99 @@ export const activeSessionsRouter = createTRPCRouter({
       expiresIn: 60 * 60,
     });
     const url = `${SESSION_INGEST_WORKER_URL}/api/instances/active`;
+    const startedAt = Date.now();
+    // What the headers left of the one budget both the fetch and the body read
+    // must fit in: a worker that stalls mid-body cannot hold the poll open.
+    const remainingBudgetMs = () => CONTROL_PLANE_UPSTREAM_BUDGET_MS - (Date.now() - startedAt);
 
     let response: Response;
     try {
-      // Bounded: a worker that never answers rejects inside the budget with
-      // `ServiceFetchTimeoutError`, which the catch below maps to the existing
-      // INTERNAL_SERVER_ERROR exactly as any other transport failure.
       response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (error) {
+      // A worker that cannot be reached, or outlives the budget, is retryable:
+      // the caller retries this code instead of treating it as a final fault.
       console.warn('[active-sessions.instances] fetch error:', error);
       throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to reach session-ingest worker',
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
         cause: error,
       });
     }
 
     if (!response.ok) {
-      const body = await response.text().catch(() => '');
+      if (response.status === 503 || response.status === 504) {
+        // The worker reports a retryable condition with 503/504, and that is
+        // already known from the status line. Answer it before touching the
+        // body: a worker that sends the status and then stalls the body must
+        // not hold the poll for the rest of the budget to report an error the
+        // code already knows. Keep it retryable instead of flattening it into a
+        // gateway error the client would treat as final.
+        //
+        // The body is never read, so it is released here: an unread body must
+        // not stay checked out on a polled query, where every poll against a
+        // stuck worker would pin another connection.
+        await response.body?.cancel().catch(() => undefined);
+        console.warn(
+          `[active-sessions.instances] non-2xx: ${response.status} ${response.statusText}`
+        );
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session ingest is unavailable',
+        });
+      }
+      // Every other non-2xx is unclassified text. Read a bounded excerpt of it
+      // inside what the headers left of the budget — never the whole payload on
+      // a polled procedure — and report the failure as a bad gateway.
+      let excerpt: string | null = null;
+      try {
+        // The cap is the excerpt length itself, so a long error page is neither
+        // buffered to its end nor sliced after the fact.
+        const text = await readTextWithinBudget(
+          response,
+          remainingBudgetMs(),
+          CONTROL_PLANE_UPSTREAM_BUDGET_MS,
+          INSTANCE_ERROR_LOG_EXCERPT_CHARS
+        );
+        // The first INSTANCE_ERROR_LOG_EXCERPT_CHARS characters of the upstream
+        // error body, whatever its content type.
+        excerpt = text;
+      } catch {
+        // A body that outlives the budget adds no note; the status below is the
+        // whole report.
+      }
       console.warn(
         `[active-sessions.instances] non-2xx: ${response.status} ${response.statusText}`,
-        body
+        ...(excerpt === null ? [] : [excerpt])
       );
       throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: `Session-ingest worker returned ${response.status}`,
+        code: 'BAD_GATEWAY',
+        message: `Session ingest worker returned ${response.status}`,
       });
     }
 
-    const raw = await response.json();
-    return connectedInstancesResponseSchema.parse(raw);
+    let raw: unknown;
+    try {
+      raw = await readJsonWithinBudget(
+        response,
+        remainingBudgetMs(),
+        CONTROL_PLANE_UPSTREAM_BUDGET_MS
+      );
+    } catch (error) {
+      // A stalled body is the same transport failure the fetch raises; a body
+      // that arrived but is not JSON is a bad gateway answer.
+      console.warn('[active-sessions.instances] body read failed:', error);
+      throw bodyReadFailureError(error, 'Invalid instance response from session ingest');
+    }
+    const parsed = connectedInstancesResponseSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: 'Invalid instance response from session ingest',
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
   }),
 });

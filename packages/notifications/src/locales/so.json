@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Natiijo amni cusub ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Halis daran",
+      "high": "Sare",
+      "medium": "Dhexdhexaad",
+      "low": "Hoose"
+    },
     "securityFindingSlaWarning": {
       "title": "Digniin SLA"
     },

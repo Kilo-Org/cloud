@@ -3,11 +3,23 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { kilo_pass_pause_events } from '@kilocode/db/schema';
 import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
-import { getPreviousIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
+import {
+  getPreviousIssueMonth,
+  parseIssueMonth,
+  shiftIssueMonth,
+} from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;
+
+/** The predicate that identifies the open pause event of one subscription. */
+function openPauseEventWhere(kiloPassSubscriptionId: string) {
+  return and(
+    eq(kilo_pass_pause_events.kilo_pass_subscription_id, kiloPassSubscriptionId),
+    isNull(kilo_pass_pause_events.resumed_at)
+  );
+}
 
 /**
  * Opens a pause event for a subscription. If an open event already exists,
@@ -26,24 +38,14 @@ export async function openPauseEvent(
   const existing = await dbOrTx
     .select({ id: kilo_pass_pause_events.id })
     .from(kilo_pass_pause_events)
-    .where(
-      and(
-        eq(kilo_pass_pause_events.kilo_pass_subscription_id, kiloPassSubscriptionId),
-        isNull(kilo_pass_pause_events.resumed_at)
-      )
-    )
+    .where(openPauseEventWhere(kiloPassSubscriptionId))
     .limit(1);
 
   if (existing.length > 0) {
     await dbOrTx
       .update(kilo_pass_pause_events)
       .set({ resumes_at: resumesAt })
-      .where(
-        and(
-          eq(kilo_pass_pause_events.kilo_pass_subscription_id, kiloPassSubscriptionId),
-          isNull(kilo_pass_pause_events.resumed_at)
-        )
-      );
+      .where(openPauseEventWhere(kiloPassSubscriptionId));
   } else {
     await dbOrTx.insert(kilo_pass_pause_events).values({
       kilo_pass_subscription_id: kiloPassSubscriptionId,
@@ -69,12 +71,7 @@ export async function closePauseEvent(
   await dbOrTx
     .update(kilo_pass_pause_events)
     .set({ resumed_at: resumedAt })
-    .where(
-      and(
-        eq(kilo_pass_pause_events.kilo_pass_subscription_id, kiloPassSubscriptionId),
-        isNull(kilo_pass_pause_events.resumed_at)
-      )
-    );
+    .where(openPauseEventWhere(kiloPassSubscriptionId));
 }
 
 /**
@@ -89,12 +86,7 @@ export async function getOpenPauseEvent(
   const rows = await dbOrTx
     .select()
     .from(kilo_pass_pause_events)
-    .where(
-      and(
-        eq(kilo_pass_pause_events.kilo_pass_subscription_id, params.kiloPassSubscriptionId),
-        isNull(kilo_pass_pause_events.resumed_at)
-      )
-    )
+    .where(openPauseEventWhere(params.kiloPassSubscriptionId))
     .limit(1);
 
   return rows[0] ?? null;
@@ -137,8 +129,8 @@ export async function getPausedMonthSet(
   // Walk backwards from fromIssueMonth for maxMonthsBack months
   let currentMonth = fromIssueMonth;
   for (let i = 0; i < maxMonthsBack; i++) {
-    const monthStart = dayjs(`${currentMonth}T00:00:00.000Z`).utc();
-    const nextMonthStart = monthStart.add(1, 'month');
+    const monthStart = parseIssueMonth(currentMonth);
+    const nextMonthStart = shiftIssueMonth(monthStart, 1);
 
     for (const event of pauseEvents) {
       const pausedAtMs = dayjs(event.paused_at).valueOf();

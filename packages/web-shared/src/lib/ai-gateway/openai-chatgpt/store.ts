@@ -219,6 +219,23 @@ export function decryptOpenAiChatGptConnection(
 }
 
 /**
+ * The payload a save and a successful refresh both write: connected, with the
+ * previous error cleared.
+ */
+export function healthyOpenAiChatGptConnection(
+  connection: OpenAiChatGptConnection
+): OpenAiChatGptConnection {
+  return { ...connection, status: 'connected', error_message: undefined, error_at: undefined };
+}
+
+/** The stored form of a connection payload. */
+export function serializeOpenAiChatGptConnection(
+  connection: OpenAiChatGptConnection
+): EncryptedData {
+  return encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY);
+}
+
+/**
  * The stored payload alone, without the row's `is_enabled`. The status and
  * reconnect-message path reads it: a disabled row must still report the stored
  * status. Routing must use `getOpenAiChatGptStoredConnection` instead, because
@@ -302,13 +319,8 @@ export async function saveOpenAiChatGptConnection(
   connection: OpenAiChatGptConnection,
   createdBy: string
 ): Promise<void> {
-  const stored: OpenAiChatGptConnection = {
-    ...connection,
-    status: 'connected',
-    error_message: undefined,
-    error_at: undefined,
-  };
-  const encrypted_connection = encryptApiKey(JSON.stringify(stored), BYOK_ENCRYPTION_KEY);
+  const stored = healthyOpenAiChatGptConnection(connection);
+  const encrypted_connection = serializeOpenAiChatGptConnection(stored);
   const shape = openAiChatGptOwnerShape(owner);
   // The shared-services row records the connecting person in `created_by`; its
   // reads never match on `kilo_user_id`.
@@ -516,10 +528,7 @@ export async function markOpenAiChatGptConnectionErrored(
 
   await fromDb
     .update(openai_chatgpt_connections)
-    .set({
-      encrypted_connection: encryptApiKey(JSON.stringify(errored), BYOK_ENCRYPTION_KEY),
-      is_enabled: false,
-    })
+    .set({ encrypted_connection: serializeOpenAiChatGptConnection(errored), is_enabled: false })
     .where(openAiChatGptOwnerWhere(owner));
 }
 

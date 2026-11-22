@@ -3,22 +3,19 @@ import 'server-only';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import {
-  OPENAI_CLIENT_ID,
-  OPENAI_CLIENT_SECRET,
-  BYOK_ENCRYPTION_KEY,
-} from '@kilocode/web-shared/lib/config.server';
+import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   OPENAI_RESOURCE,
   OPENAI_TOKEN_ENDPOINT,
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import {
   decryptOpenAiChatGptConnection,
+  healthyOpenAiChatGptConnection,
   markOpenAiChatGptConnectionErrored,
   openAiChatGptOwnerWhere,
   openAiChatGptOwnerKey,
   readOpenAiChatGptConnectionRow,
+  serializeOpenAiChatGptConnection,
   type OpenAiChatGptDatabase,
   type OpenAiChatGptOwner,
 } from './store';
@@ -307,7 +304,7 @@ async function attemptRefresh(
     const accessToken = readStringField(body, 'access_token');
     const expiresIn = readExpiresIn(body);
     if (accessToken && expiresIn) {
-      const updated: OpenAiChatGptConnection = {
+      const updated = healthyOpenAiChatGptConnection({
         ...connection,
         access_token: accessToken,
         refresh_token: readStringField(body, 'refresh_token') ?? refreshToken,
@@ -317,17 +314,11 @@ async function attemptRefresh(
         earliest_refresh_at: readEarliestRefreshAt(body),
         scope: readStringField(body, 'scope') ?? connection.scope,
         token_type: readStringField(body, 'token_type') ?? connection.token_type,
-        status: 'connected',
-        error_message: undefined,
-        error_at: undefined,
-      };
+      });
 
       await tx
         .update(openai_chatgpt_connections)
-        .set({
-          encrypted_connection: encryptApiKey(JSON.stringify(updated), BYOK_ENCRYPTION_KEY),
-          is_enabled: true,
-        })
+        .set({ encrypted_connection: serializeOpenAiChatGptConnection(updated), is_enabled: true })
         .where(openAiChatGptOwnerWhere(owner));
 
       return { kind: 'access_token', accessToken };

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Yangi xavfsizlik xulosasi ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "O‘ta yuqori",
+      "high": "Yuqori",
+      "medium": "O‘rta",
+      "low": "Past"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA ogohlantirishi"
     },

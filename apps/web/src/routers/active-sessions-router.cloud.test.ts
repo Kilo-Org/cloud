@@ -730,11 +730,13 @@ describe('active-sessions-router.list cloud merge', () => {
     ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
   });
 
-  it('worker fetch failure without the cloud flag keeps the legacy empty answer', async () => {
+  it('worker fetch failure without the cloud flag is reported as unavailable', async () => {
     fetchSpy = mockWorkerFailure();
     const caller = await createCallerForUser(regularUser.id);
 
-    await expect(caller.activeSessions.list({})).resolves.toEqual({ sessions: [] });
+    await expect(caller.activeSessions.list({})).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+    });
   });
 
   it('flag on + no heartbeat ids → cloud-only response (no empty inArray)', async () => {

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Жаңа қауіпсіздік табылғаны ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Өте жоғары",
+      "high": "Жоғары",
+      "medium": "Орташа",
+      "low": "Төмен"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA ескертуі"
     },

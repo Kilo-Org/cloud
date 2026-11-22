@@ -518,12 +518,9 @@ export async function listActiveSessions({
           });
         }
         console.warn(`[active-sessions] fetch failed: ${response.status} ${response.statusText}`);
-        if (!includeCloudAgentSessions) {
-          return { sessions: [] as ActiveSession[] };
-        }
         // The merged answer decides at the end of this function (see
         // `upstreamReadFailed`): an empty one here would read as "nothing
-        // runs".
+        // runs", with or without the cloud merge.
         upstreamReadFailed = true;
       } else {
         const raw = await readJsonWithinBudget(
@@ -542,11 +539,8 @@ export async function listActiveSessions({
         });
       }
       console.warn('[active-sessions] error:', error);
-      if (!includeCloudAgentSessions) {
-        return { sessions: [] as ActiveSession[] };
-      }
       // Same reason as the non-OK branch above: an unreachable worker must not
-      // read as "nothing runs".
+      // read as "nothing runs", with or without the cloud merge.
       upstreamReadFailed = true;
     }
   }
@@ -567,8 +561,10 @@ export async function listActiveSessions({
   // and would still add the two reads' latencies together.
   const ids = parsed.sessions.map(s => s.id);
 
-  if (ids.length === 0 && !includeCloudAgentSessions) {
-    // Flag-off empty heartbeats: today's short-circuit (no DB).
+  if (ids.length === 0 && !includeCloudAgentSessions && !upstreamReadFailed) {
+    // Flag-off empty heartbeats: today's short-circuit (no DB). Skipped when
+    // the worker read failed, because the closing guard must report that
+    // instead of answering an empty list that reads as "nothing runs".
     return parsed;
   }
 

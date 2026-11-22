@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "ຮ້າຍແຮງ",
+      "high": "ສູງ",
+      "medium": "ປານກາງ",
+      "low": "ຕ່ຳ"
+    },
     "securityFindingSlaWarning": {
       "title": "ຄຳເຕືອນ SLA"
     },

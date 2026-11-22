@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Constatare de securitate nouă ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Critic",
+      "high": "Ridicat",
+      "medium": "Mediu",
+      "low": "Scăzut"
+    },
     "securityFindingSlaWarning": {
       "title": "Avertisment SLA"
     },

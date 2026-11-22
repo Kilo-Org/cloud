@@ -2,6 +2,9 @@ import { DIRECT_BYOK_PROVIDER_IDS } from '@kilocode/worker-utils/direct-byok-mod
 import * as z from 'zod';
 import { GoogleServiceAccountSigningKeySchema } from '@kilocode/db/schema-types';
 import { VertexCredentialsSchema } from '@kilocode/app-shared/byok-credentials';
+// The canonical provider-slug rule lives in app-shared so the mobile editor and
+// every web read path compare with the same rule.
+import { normalizeInferenceProviderId as normalizeInferenceProviderIdFromAppShared } from '@kilocode/app-shared/organizations/model-access-providers';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -274,12 +277,13 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelNonUserByokInferenceProviderIdSchema.enum['typesafe-ai'],
 } as Record<string, VercelInferenceProviderId | undefined>;
 
+// The rule itself lives in app-shared; this wrapper keeps the `undefined`
+// overload that callers pass an optional provider tag through.
 export function normalizeInferenceProviderId(providerId: string): string;
 export function normalizeInferenceProviderId(providerId: string | undefined): string | undefined;
 export function normalizeInferenceProviderId(providerId: string | undefined) {
   if (!providerId) return providerId;
-  const slashIndex = providerId.indexOf('/');
-  return (slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId).toLowerCase();
+  return normalizeInferenceProviderIdFromAppShared(providerId);
 }
 
 /**
@@ -289,17 +293,7 @@ export function normalizeInferenceProviderId(providerId: string | undefined) {
  * comparison against catalog slugs builds its set from it, so one stored value
  * means the same provider whatever wrote it.
  */
-export function normalizeInferenceProviderIds(providerIds: readonly string[]): string[] {
-  const canonical: string[] = [];
-  const seen = new Set<string>();
-  for (const providerId of providerIds) {
-    const normalized = normalizeInferenceProviderId(providerId.trim());
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    canonical.push(normalized);
-  }
-  return canonical;
-}
+export { normalizeInferenceProviderIds } from '@kilocode/app-shared/organizations/model-access-providers';
 
 export function openRouterToVercelInferenceProviderId(providerId: string): string {
   const normalizedProviderId = normalizeInferenceProviderId(providerId);

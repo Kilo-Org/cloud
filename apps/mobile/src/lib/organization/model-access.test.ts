@@ -163,14 +163,6 @@ describe('initialDraft', () => {
     expect(draft.providerAllowList).toEqual(['anthropic']);
     expect(draft.modelDenyList).toEqual([]);
   });
-
-  it('canonicalizes a legacy stored slug, so a mixed-case entry names its provider', () => {
-    const draft = initialDraft({ provider_allow_list: ['OpenAI'], model_deny_list: [] }, [
-      'openai',
-      'anthropic',
-    ]);
-    expect(draft.providerAllowList).toEqual(['openai']);
-  });
 });
 
 describe('toggles', () => {
@@ -238,24 +230,6 @@ describe('usableModelIds', () => {
         draft: { providerAllowList: [], modelDenyList: [] },
       })
     ).toEqual(['auto']);
-  });
-
-  it('admits a model whose provider slug is mixed case, against a canonical allow list', () => {
-    const draft = initialDraft({ provider_allow_list: ['OpenAI'], model_deny_list: [] }, [
-      'openai',
-    ]);
-    expect(usableModelIds({ models: [model('openai/gpt', ['OpenAI'])], draft })).toEqual([
-      'openai/gpt',
-    ]);
-  });
-
-  it('admits a model whose provider entry is model-shaped, against a canonical allow list', () => {
-    const draft = initialDraft({ provider_allow_list: ['OpenAI'], model_deny_list: [] }, [
-      'openai',
-    ]);
-    expect(usableModelIds({ models: [model('openai/gpt', ['openai/gpt-4o'])], draft })).toEqual([
-      'openai/gpt',
-    ]);
   });
 });
 

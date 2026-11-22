@@ -266,7 +266,11 @@ export function usableModelIds(params: {
   models: readonly CatalogModel[];
   draft: ModelAccessDraft;
 }): string[] {
-  const allowedProviders = new Set(params.draft.providerAllowList);
+  // A draft restored from the form's encrypted store was written before writers
+  // stored the canonical form, and `isModelAccessFormDraft` checks the shape
+  // only, so the comparison set is built from the same canonical form as the
+  // catalog's slugs.
+  const allowedProviders = new Set(normalizeInferenceProviderIds(params.draft.providerAllowList));
   const denied = new Set(params.draft.modelDenyList);
   const usable = new Set<string>();
   for (const model of params.models) {

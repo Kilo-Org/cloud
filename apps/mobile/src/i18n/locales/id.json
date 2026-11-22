@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Tidak dapat memuat riwayat obrolan.",
       "new": "Obrolan baru",
-      "deleteTitle": "Hapus obrolan ini?"
+      "deleteTitle": "Hapus obrolan ini?",
+      "resetNoticeTitle": "Obrolan dan draf di perangkat ini telah dihapus",
+      "resetNoticeBody": "Kilo tidak dapat membuka obrolan yang tersimpan di perangkat ini, jadi obrolan dan drafnya dihapus. Sesi cloud Anda tidak terpengaruh.",
+      "resetNoticeDismiss": "Abaikan pemberitahuan"
     },
     "rename": {
       "title": "Ganti nama obrolan",

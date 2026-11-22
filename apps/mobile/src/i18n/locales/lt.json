@@ -4053,7 +4053,10 @@
     "list": {
       "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
       "new": "Naujas pokalbis",
-      "deleteTitle": "Ištrinti šį pokalbį?"
+      "deleteTitle": "Ištrinti šį pokalbį?",
+      "resetNoticeTitle": "Vietiniai pokalbiai ir juodraščiai išvalyti",
+      "resetNoticeBody": "Kilo negalėjo atidaryti šiame įrenginyje išsaugotų pokalbių, todėl pašalino juos ir jų juodraščius. Jūsų sesijos debesyje nebuvo paveiktos.",
+      "resetNoticeDismiss": "Atmesti pranešimą"
     },
     "rename": {
       "title": "Pervadinti pokalbį",

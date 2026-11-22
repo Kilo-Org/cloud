@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
       "new": "Bisedë e re",
-      "deleteTitle": "Ta fshini këtë bisedë?"
+      "deleteTitle": "Ta fshini këtë bisedë?",
+      "resetNoticeTitle": "Bisedat lokale dhe paraprakët u fshinë",
+      "resetNoticeBody": "Kilo nuk i hapi dot bisedat e ruajtura në këtë pajisje, ndaj i fshiu ato bashkë me paraprakët e tyre. Sesionet e tu në re nuk janë prekur.",
+      "resetNoticeDismiss": "Hidh poshtë njoftimin"
     },
     "rename": {
       "title": "Riemërto bisedën",

@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Söhbət tarixçəsi yüklənə bilmədi.",
       "new": "Yeni söhbət",
-      "deleteTitle": "Bu söhbət silinsin?"
+      "deleteTitle": "Bu söhbət silinsin?",
+      "resetNoticeTitle": "Lokal söhbətlər və qaralamalar təmizləndi",
+      "resetNoticeBody": "Kilo bu cihazda saxlanılan söhbətləri aça bilmədi, ona görə onları və qaralamalarını sildi. Bulud sessiyalarınız təsirlənmədi.",
+      "resetNoticeDismiss": "Bildirişi rədd et"
     },
     "rename": {
       "title": "Söhbətin adını dəyiş",

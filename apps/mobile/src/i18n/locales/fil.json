@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
       "new": "Bagong chat",
-      "deleteTitle": "Burahin ang chat na ito?"
+      "deleteTitle": "Burahin ang chat na ito?",
+      "resetNoticeTitle": "Nabura ang mga chat sa device na ito at mga burador",
+      "resetNoticeBody": "Hindi mabuksan ng Kilo ang mga chat sa device na ito, kaya binura nito ang mga ito at ang mga burador. Hindi apektado ang mga sesyon sa cloud.",
+      "resetNoticeDismiss": "Balewalain ang abiso"
     },
     "rename": {
       "title": "Palitan ang pangalan ng chat",

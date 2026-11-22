@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Enweghị ike ibudata akụkọ nkata.",
       "new": "Nkata ọhụrụ",
-      "deleteTitle": "Hichapụ nkata a?"
+      "deleteTitle": "Hichapụ nkata a?",
+      "resetNoticeTitle": "Ehichapụla nkata na ihe odide mbido dị na ngwaọrụ a",
+      "resetNoticeBody": "Kilo enweghị ike imeghe nkata ndị echekwara na ngwaọrụ a, ya mere o wepụrụ ha na ihe odide mbido ha. E metụtaghị nnọkọ igwe ojii gị.",
+      "resetNoticeDismiss": "Leghara ọkwa a anya"
     },
     "rename": {
       "title": "Gbanwee aha nkata",

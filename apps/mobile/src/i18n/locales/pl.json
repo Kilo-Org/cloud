@@ -4053,7 +4053,10 @@
     "list": {
       "loadFailed": "Nie udało się wczytać historii czatu.",
       "new": "Nowy czat",
-      "deleteTitle": "Usunąć ten czat?"
+      "deleteTitle": "Usunąć ten czat?",
+      "resetNoticeTitle": "Wyczyszczono lokalne czaty i wersje robocze",
+      "resetNoticeBody": "Kilo nie mogło otworzyć czatów zapisanych na tym urządzeniu, więc usunęło je i ich wersje robocze. Twoje sesje w chmurze pozostały nienaruszone.",
+      "resetNoticeDismiss": "Odrzuć powiadomienie"
     },
     "rename": {
       "title": "Zmień nazwę czatu",

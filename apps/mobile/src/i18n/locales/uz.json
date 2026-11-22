@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
       "new": "Yangi chat",
-      "deleteTitle": "Bu chat oʻchirilsinmi?"
+      "deleteTitle": "Bu chat oʻchirilsinmi?",
+      "resetNoticeTitle": "Mahalliy chatlar va qoralamalar tozalandi",
+      "resetNoticeBody": "Kilo bu qurilmada saqlangan chatlarni ocha olmadi, shuning uchun ularni va qoralamalarini oʻchirib tashladi. Bulutdagi seanslaringizga esa taʼsir qilmadi.",
+      "resetNoticeDismiss": "Bildirishnomani e’tiborsiz qoldirish"
     },
     "rename": {
       "title": "Chat nomini o‘zgartirish",

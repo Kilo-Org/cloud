@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
       "new": "Sembang baharu",
-      "deleteTitle": "Padam sembang ini?"
+      "deleteTitle": "Padam sembang ini?",
+      "resetNoticeTitle": "Sembang dan draf setempat telah dikosongkan",
+      "resetNoticeBody": "Kilo tidak dapat membuka sembang yang disimpan pada peranti ini, jadi ia memadamkannya berserta draf. Sesi awan anda tidak terjejas.",
+      "resetNoticeDismiss": "Ketepikan notis"
     },
     "rename": {
       "title": "Namakan semula sembang",

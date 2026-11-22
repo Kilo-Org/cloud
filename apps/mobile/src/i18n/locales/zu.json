@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
       "new": "Ingxoxo entsha",
-      "deleteTitle": "Susa le ngxoxo?"
+      "deleteTitle": "Susa le ngxoxo?",
+      "resetNoticeTitle": "Kususiwe izingxoxo nokusalungiswa kule divayisi",
+      "resetNoticeBody": "I-Kilo ayikwazanga ukuvula izingxoxo ezigcinwe kule divayisi, ngakho izisusile kanye nokusalungiswa kwazo. Amaseshini akho asefini awathintekile.",
+      "resetNoticeDismiss": "Chitha isaziso"
     },
     "rename": {
       "title": "Qamba kabusha ingxoxo",

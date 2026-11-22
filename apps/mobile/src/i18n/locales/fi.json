@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Keskusteluhistoriaa ei voitu ladata.",
       "new": "Uusi keskustelu",
-      "deleteTitle": "Poistetaanko tämä keskustelu?"
+      "deleteTitle": "Poistetaanko tämä keskustelu?",
+      "resetNoticeTitle": "Laitteen keskustelut ja luonnokset poistettu",
+      "resetNoticeBody": "Kilo ei voinut avata tähän laitteeseen tallennettuja keskusteluja, joten se poisti ne ja niiden luonnokset. Pilvessä olevat istuntosi ovat tallessa.",
+      "resetNoticeDismiss": "Sivuuta ilmoitus"
     },
     "rename": {
       "title": "Nimeä keskustelu uudelleen",

@@ -3980,7 +3980,10 @@
     "list": {
       "loadFailed": "No se pudo cargar el historial del chat.",
       "new": "Chat nuevo",
-      "deleteTitle": "¿Eliminar este chat?"
+      "deleteTitle": "¿Eliminar este chat?",
+      "resetNoticeTitle": "Chats locales y borradores eliminados",
+      "resetNoticeBody": "Kilo no pudo abrir los chats guardados en este dispositivo, así que los eliminó junto con sus borradores. Tus sesiones en la nube no se ven afectadas.",
+      "resetNoticeDismiss": "Descartar aviso"
     },
     "rename": {
       "title": "Cambiar nombre del chat",

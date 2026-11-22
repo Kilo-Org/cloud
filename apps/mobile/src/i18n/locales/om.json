@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Seenaa chaat fudhachuu hin dandeenye.",
       "new": "Marii haaraa",
-      "deleteTitle": "Marii kana haquuf?"
+      "deleteTitle": "Marii kana haquuf?",
+      "resetNoticeTitle": "Marii fi wixineen meeshaa kanaa haqamaniiru",
+      "resetNoticeBody": "Kilo marii meeshaa kana irratti olkaa'aman banuu hin dandeenye, kanaaf isaan fi wixineewwan isaanii haqe. Turtiiwwan keessan duumessa keessa jiran hin tuqamne.",
+      "resetNoticeDismiss": "Beeksisa dhiisi"
     },
     "rename": {
       "title": "Maqaa marii jijjiiri",

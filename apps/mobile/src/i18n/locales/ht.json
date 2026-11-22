@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Pa t ka chaje istwa chat la.",
       "new": "Nouvo chat",
-      "deleteTitle": "Efase chat sa a?"
+      "deleteTitle": "Efase chat sa a?",
+      "resetNoticeTitle": "Yo efase chat lokal yo ak bwouyon yo",
+      "resetNoticeBody": "Kilo pa t ka louvri chat yo ki sove sou aparèy sa a, kidonk li efase yo ak bwouyon yo. Sesyon yo nan nwaj la pa afekte.",
+      "resetNoticeDismiss": "Rejte avi a"
     },
     "rename": {
       "title": "Chanje non chat la",

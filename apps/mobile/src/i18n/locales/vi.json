@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Không thể tải lịch sử trò chuyện.",
       "new": "Cuộc trò chuyện mới",
-      "deleteTitle": "Xóa cuộc trò chuyện này?"
+      "deleteTitle": "Xóa cuộc trò chuyện này?",
+      "resetNoticeTitle": "Đã xóa cuộc trò chuyện và bản nháp trên thiết bị",
+      "resetNoticeBody": "Kilo không thể mở các cuộc trò chuyện đã lưu trên thiết bị này, nên đã xóa chúng cùng các bản nháp. Các phiên trên đám mây của bạn không bị ảnh hưởng.",
+      "resetNoticeDismiss": "Bỏ qua thông báo"
     },
     "rename": {
       "title": "Đổi tên cuộc trò chuyện",

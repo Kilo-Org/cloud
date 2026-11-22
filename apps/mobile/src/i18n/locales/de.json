@@ -3907,7 +3907,10 @@
     "list": {
       "loadFailed": "Chatverlauf konnte nicht geladen werden.",
       "new": "Neuer Chat",
-      "deleteTitle": "Diesen Chat löschen?"
+      "deleteTitle": "Diesen Chat löschen?",
+      "resetNoticeTitle": "Lokale Chats und Entwürfe gelöscht",
+      "resetNoticeBody": "Kilo konnte die lokal gespeicherten Chats nicht öffnen und hat sie samt ihren Entwürfen gelöscht. Deine Cloud-Sitzungen sind nicht betroffen.",
+      "resetNoticeDismiss": "Hinweis ausblenden"
     },
     "rename": {
       "title": "Chat umbenennen",

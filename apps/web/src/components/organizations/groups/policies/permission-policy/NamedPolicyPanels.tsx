@@ -269,45 +269,49 @@ export function NamedPolicyLibraryPanel({
                       : 'Unlinked'}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      helpers.push({
-                        type: 'named-policy-editor',
-                        policyId: policy.id,
-                        defaultKind: policy.kind,
-                      })
-                    }
-                  >
-                    Edit
-                  </Button>
-                  {confirming === policy.id ? (
+                {editable && (
+                  <div className="flex flex-wrap gap-2">
                     <Button
-                      variant="destructive"
+                      variant="outline"
                       size="sm"
-                      disabled={policy.attachments.length > 0 || remove.isPending}
-                      onClick={async () => {
-                        try {
-                          await remove.mutateAsync({ organizationId, policyId: policy.id });
-                          toast.success('Policy deleted.');
-                          setConfirming(null);
-                        } catch (error) {
-                          toast.error(
-                            error instanceof Error ? error.message : 'Could not delete the policy.'
-                          );
-                        }
-                      }}
+                      onClick={() =>
+                        helpers.push({
+                          type: 'named-policy-editor',
+                          policyId: policy.id,
+                          defaultKind: policy.kind,
+                        })
+                      }
                     >
-                      Confirm delete
+                      Edit
                     </Button>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={() => setConfirming(policy.id)}>
-                      Delete
-                    </Button>
-                  )}
-                </div>
+                    {confirming === policy.id ? (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={policy.attachments.length > 0 || remove.isPending}
+                        onClick={async () => {
+                          try {
+                            await remove.mutateAsync({ organizationId, policyId: policy.id });
+                            toast.success('Policy deleted.');
+                            setConfirming(null);
+                          } catch (error) {
+                            toast.error(
+                              error instanceof Error
+                                ? error.message
+                                : 'Could not delete the policy.'
+                            );
+                          }
+                        }}
+                      >
+                        Confirm delete
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => setConfirming(policy.id)}>
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </li>
           ))}

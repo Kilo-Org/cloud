@@ -17,7 +17,12 @@
 
 import { type QueryErrorVariant } from '@/components/query-error';
 import { type BannerState } from '@/lib/offline-banner-state';
-import { isTerminalTrpcCode, readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
+import {
+  isTerminalTrpcCode,
+  isTrpcClientError,
+  readTrpcErrorField,
+  trpcErrorVariant,
+} from '@/lib/trpc-error';
 
 export type ProfileReadErrorView = {
   variant: QueryErrorVariant;
@@ -36,7 +41,10 @@ export function selectProfileReadErrorView({
     return { variant: 'offline', showRetry: true, titleKey: 'profiles.loadFailed' };
   }
   const code = readTrpcErrorField(error, 'code');
-  const terminal = isTerminalTrpcCode(code);
+  // Only a tRPC client error carries a server verdict: a non-tRPC error whose
+  // bare top-level `code` happens to look terminal (a domain or transport code)
+  // never proved the request itself is doomed, so it stays retryable.
+  const terminal = isTrpcClientError(error) && isTerminalTrpcCode(code);
   const reported = trpcErrorVariant(error);
   // A terminal refusal that is not an access outcome (a malformed id in a deep
   // link, an unprocessable read) means this profile cannot be opened. The

@@ -84,7 +84,10 @@ async function mountCouncil() {
   const queryClient = createTestQueryClient();
   queryClientRef.current = queryClient;
   const holder: Holder = { gate: null };
-  const view = await renderWithProviders(<CouncilProbe holder={holder} />, { queryClient, wrapper });
+  const view = await renderWithProviders(<CouncilProbe holder={holder} />, {
+    queryClient,
+    wrapper,
+  });
   return { view, queryClient, holder };
 }
 
@@ -114,7 +117,7 @@ describe('council gate', () => {
 
   it('holds the surface blank only until the first answer settles', async () => {
     const answer = deferredAnswer();
-    transport.mockImplementation(async () => answer.promise);
+    transport.mockImplementation(() => answer.promise);
 
     const { view, holder } = await mountCouncil();
     await flush();
@@ -134,12 +137,20 @@ describe('council gate', () => {
     // refusal with the blank surface and the reader would lose the button.
     let attempt = 0;
     const retryAnswer = deferredAnswer();
-    transport.mockImplementation(async () => {
+    transport.mockImplementation(() => {
       attempt += 1;
       if (attempt === 1) {
-        return Response.json(
-          { error: { message: 'Internal server error', code: -32603, data: { code: 'INTERNAL_SERVER_ERROR' } } },
-          { status: 500 }
+        return Promise.resolve(
+          Response.json(
+            {
+              error: {
+                message: 'Internal server error',
+                code: -32603,
+                data: { code: 'INTERNAL_SERVER_ERROR' },
+              },
+            },
+            { status: 500 }
+          )
         );
       }
       return retryAnswer.promise;

@@ -98,18 +98,18 @@ export function useCouncilGate(scope: string): CouncilGate {
   // ever settled. `isFetched` counts the answers it has landed and survives the
   // re-read, which is what separates a first read from the refusal's own Retry.
   const settled = entitlement.isFetched;
-  const hasAnswer = entitlement.data !== undefined;
+  const answer = entitlement.data;
   let refusalReason: CouncilRefusalReason | null = null;
   if (!qualified) {
     refusalReason = 'flagUnavailable';
-  } else if (settled && !hasAnswer) {
+  } else if (settled && answer === undefined) {
     // Settled without an answer: the plan check itself failed.
     refusalReason = 'entitlementErrored';
-  } else if (hasAnswer && entitlement.data?.entitled !== true) {
+  } else if (answer !== undefined && !answer.entitled) {
     refusalReason = 'refused';
   }
   return {
-    allowed: qualified && (entitlement.data?.entitled ?? false),
+    allowed: qualified && (answer?.entitled ?? false),
     // Only a read that has never answered holds the surface blank, so the
     // refusal and its busy Retry stay painted while that Retry runs.
     pending: qualified && !settled,

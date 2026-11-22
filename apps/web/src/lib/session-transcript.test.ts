@@ -89,7 +89,7 @@ it('reconstructs ordered sync-only messages and reports incomplete messages', as
   });
   expect(v2SnapshotToLogEntries(transcript ?? { messages: [] }).at(-1)).toMatchObject({
     eventType: 'status',
-    message: 'Transcript incomplete: 1 message could not be loaded.',
+    message: 'Transcript incomplete: 1 message has missing content.',
   });
   expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
     `https://sync.test${path}`,

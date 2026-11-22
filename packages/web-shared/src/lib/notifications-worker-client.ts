@@ -6,6 +6,7 @@ import {
   type GlanceableScopeRefreshRequest,
   type InternalDispatchAgentBriefingRequest,
   type InternalDispatchLowBalanceRequest,
+  type InternalDispatchRequest,
   type InternalDispatchSecurityFindingRequest,
   type InternalDispatchSecurityLifecycleRequest,
   type InternalDispatchSpendAlertRequest,
@@ -16,12 +17,105 @@ import {
 } from '@kilocode/web-shared/lib/config.server';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 
-type DispatchBody =
-  | InternalDispatchAgentBriefingRequest
-  | InternalDispatchLowBalanceRequest
-  | InternalDispatchSecurityFindingRequest
-  | InternalDispatchSecurityLifecycleRequest
-  | InternalDispatchSpendAlertRequest;
+type InternalWorkerEndpointSpec = {
+  /** Absolute path of the route on the notifications worker. */
+  path: string;
+  /** Completes the `; skipping ...` phrase of each configuration-skip log line. */
+  skipSubject: string;
+  /** Prefix of the `Error` built for a non-OK response. */
+  failureLabel: string;
+  /** The Sentry `endpoint` tag value. */
+  tag: string;
+};
+
+const DISPATCH_ENDPOINT: InternalWorkerEndpointSpec = {
+  path: '/internal/v1/dispatch',
+  skipSubject: 'push dispatch',
+  failureLabel: 'Notifications worker dispatch failed',
+  tag: 'dispatch',
+};
+
+const GLANCEABLE_REFRESH_ENDPOINT: InternalWorkerEndpointSpec = {
+  path: '/internal/v1/glanceable-refresh',
+  skipSubject: 'glanceable refresh',
+  failureLabel: 'Notifications worker glanceable refresh failed',
+  tag: 'glanceable-refresh',
+};
+
+type InternalWorkerEndpoint = { url: URL; secret: string; failureLabel: string };
+
+type InternalPostResult =
+  | { ok: true; response: Response }
+  | { ok: false; status: number; error: Error };
+
+/**
+ * Resolves one worker endpoint behind its three configuration gates, in the
+ * order the worker's logs and tests expect: a configured base URL, a base URL
+ * that parses as https or loopback http, then an internal API secret. Returns
+ * `null` after logging which gate skipped the call, so the caller only has to
+ * return its never-rejects value.
+ */
+function resolveInternalWorkerEndpoint(
+  spec: InternalWorkerEndpointSpec
+): InternalWorkerEndpoint | null {
+  if (!NOTIFICATIONS_WORKER_URL) {
+    console.error(
+      `[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping ${spec.skipSubject}`
+    );
+    return null;
+  }
+  const url = parseInternalServiceEndpoint(NOTIFICATIONS_WORKER_URL, spec.path);
+  if (!url) {
+    console.error(
+      `[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not an https or loopback http endpoint; skipping ${spec.skipSubject}`
+    );
+    return null;
+  }
+  if (!INTERNAL_API_SECRET) {
+    console.error(
+      `[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping ${spec.skipSubject}`
+    );
+    return null;
+  }
+  return { url, secret: INTERNAL_API_SECRET, failureLabel: spec.failureLabel };
+}
+
+/**
+ * One POST attempt against a resolved worker endpoint. A non-OK response
+ * becomes a labelled `Error` for the caller to capture; a network or abort
+ * rejection propagates so the caller's `catch` still sees it.
+ */
+async function postInternal(
+  endpoint: InternalWorkerEndpoint,
+  body: InternalDispatchRequest | GlanceableScopeRefreshRequest,
+  { timeoutMs, headers = {} }: { timeoutMs: number; headers?: Record<string, string> }
+): Promise<InternalPostResult> {
+  const response = await fetch(endpoint.url.toString(), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-Internal-Secret': endpoint.secret,
+      ...headers,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (response.ok) {
+    return { ok: true, response };
+  }
+
+  const errorText = await response.text().catch(() => '');
+  return {
+    ok: false,
+    status: response.status,
+    error: new Error(
+      `${endpoint.failureLabel}: ${response.status} ${response.statusText}${
+        errorText ? ` - ${errorText}` : ''
+      }`
+    ),
+  };
+}
 
 /**
  * In-call retry schedule (exponential backoff) for a dispatch the worker
@@ -49,27 +143,9 @@ function sleep(ms: number): Promise<void> {
  * bounded in-call retry. A partial failure that a retry delivered is a
  * structured warning, never an alert.
  */
-async function dispatchInternal(body: DispatchBody): Promise<boolean> {
-  if (!NOTIFICATIONS_WORKER_URL) {
-    console.error(
-      '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping push dispatch'
-    );
-    return false;
-  }
-  const dispatchUrl = parseInternalServiceEndpoint(
-    NOTIFICATIONS_WORKER_URL,
-    '/internal/v1/dispatch'
-  );
-  if (!dispatchUrl) {
-    console.error(
-      '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not an https or loopback http endpoint; skipping push dispatch'
-    );
-    return false;
-  }
-  if (!INTERNAL_API_SECRET) {
-    console.error(
-      '[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping push dispatch'
-    );
+async function dispatchInternal(body: InternalDispatchRequest): Promise<boolean> {
+  const endpoint = resolveInternalWorkerEndpoint(DISPATCH_ENDPOINT);
+  if (!endpoint) {
     return false;
   }
 
@@ -85,35 +161,27 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
   // client-side warning/capture for the same dispatch. Context stays free of
   // recipient identifiers: counts and stable failure reasons only.
   const dispatchId = crypto.randomUUID();
-  const tags = { source: 'notifications-worker-client', endpoint: 'dispatch', kind: body.kind };
+  const tags = {
+    source: 'notifications-worker-client',
+    endpoint: DISPATCH_ENDPOINT.tag,
+    kind: body.kind,
+  };
   try {
     for (let attempt = 0; ; attempt++) {
-      const response = await fetch(dispatchUrl.toString(), {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'X-Internal-Secret': INTERNAL_API_SECRET,
-          'X-Dispatch-Id': dispatchId,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
+      const result = await postInternal(endpoint, body, {
+        timeoutMs: 30_000,
+        headers: { 'X-Dispatch-Id': dispatchId },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        const error = new Error(
-          `Notifications worker dispatch failed: ${response.status} ${response.statusText}${
-            errorText ? ` - ${errorText}` : ''
-          }`
-        );
-        captureException(error, {
+      if (!result.ok) {
+        captureException(result.error, {
           tags,
-          extra: { status: response.status, kind: body.kind, dispatchId, attempt: attempt + 1 },
+          extra: { status: result.status, kind: body.kind, dispatchId, attempt: attempt + 1 },
         });
         return false;
       }
 
-      const payload: unknown = await response.json().catch(() => null);
+      const payload: unknown = await result.response.json().catch(() => null);
       const parsed = internalDispatchResponseSchema.safeParse(payload);
       const failed = parsed.success
         ? parsed.data.perRecipient.filter(recipient => recipient.outcome === 'failed')
@@ -256,60 +324,31 @@ export async function dispatchSecurityLifecyclePush(
  * card.
  */
 export async function refreshGlanceableScope(input: GlanceableScopeRefreshRequest): Promise<void> {
-  if (!NOTIFICATIONS_WORKER_URL) {
-    console.error(
-      '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping glanceable refresh'
-    );
-    return;
-  }
-  const refreshUrl = parseInternalServiceEndpoint(
-    NOTIFICATIONS_WORKER_URL,
-    '/internal/v1/glanceable-refresh'
-  );
-  if (!refreshUrl) {
-    console.error(
-      '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not an https or loopback http endpoint; skipping glanceable refresh'
-    );
-    return;
-  }
-  if (!INTERNAL_API_SECRET) {
-    console.error(
-      '[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping glanceable refresh'
-    );
+  const endpoint = resolveInternalWorkerEndpoint(GLANCEABLE_REFRESH_ENDPOINT);
+  if (!endpoint) {
     return;
   }
 
+  const tags = {
+    source: 'notifications-worker-client',
+    endpoint: GLANCEABLE_REFRESH_ENDPOINT.tag,
+  };
   try {
-    const response = await fetch(refreshUrl.toString(), {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'X-Internal-Secret': INTERNAL_API_SECRET,
-      },
-      body: JSON.stringify(input),
-      // The registration mutation awaits this. The worker's refresh is one
-      // snapshot fetch plus parallel APNs sends, so 10s is generous; past it
-      // the retired row is still superseded and the next refresh ends the card,
-      // and the shorter bound keeps a hung worker from holding the caller's
-      // token-mutation queue.
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      const error = new Error(
-        `Notifications worker glanceable refresh failed: ${response.status} ${response.statusText}${
-          errorText ? ` - ${errorText}` : ''
-        }`
-      );
-      captureException(error, {
-        tags: { source: 'notifications-worker-client', endpoint: 'glanceable-refresh' },
-        extra: { status: response.status },
+    // The registration mutation awaits this. The worker's refresh is one
+    // snapshot fetch plus parallel APNs sends, so 10s is generous; past it
+    // the retired row is still superseded and the next refresh ends the card,
+    // and the shorter bound keeps a hung worker from holding the caller's
+    // token-mutation queue.
+    const result = await postInternal(endpoint, input, { timeoutMs: 10_000 });
+    if (!result.ok) {
+      captureException(result.error, {
+        tags,
+        extra: { status: result.status },
       });
     }
   } catch (error) {
     captureException(error, {
-      tags: { source: 'notifications-worker-client', endpoint: 'glanceable-refresh' },
+      tags,
     });
   }
 }

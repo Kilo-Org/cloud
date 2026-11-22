@@ -2071,7 +2071,9 @@ introduced are not backfilled; explicit management by ID still checks their line
 `getMessageResult` returns the message status, structured failure with stage and code, final
 assistant message ID and text, gate result, and last seen branch when available. It also returns
 a preparation summary for the requested message with attempt status, failed step label and safe
-reason, without commands or output. Clients can use bounded polling instead of completion callbacks.
+reason, without commands or output. Only the final message settled by an outcome captures an
+assistant answer. Prefer completion callbacks for notification when a batch drains and for recent
+activity, which polling does not return. Use bounded polling to check a specific message's result.
 
 Rollout: existing workspaces adopt their creating chat's authorization on first use, with the same
 authorization ID, so MCP credentials issued before the rollout stay valid until their own expiry.

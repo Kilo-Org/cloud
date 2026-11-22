@@ -653,6 +653,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
       gateResult: 'fail',
       lastAssistantMessageText: 'Answer for m2',
     });
+    await evictAllDurableObjects();
     const earlierResult = await stub.getMessageResult('m1');
     expect(earlierResult).toMatchObject({ type: 'found', result: { status: 'completed' } });
     expect(earlierResult).not.toHaveProperty('result.assistant');
@@ -661,6 +662,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
       result: {
         status: 'completed',
         assistant: { messageId: 'msg_assistant', text: 'Answer for m2' },
+        branch: 'main',
       },
     });
   });

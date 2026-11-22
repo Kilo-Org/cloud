@@ -1,4 +1,3 @@
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
   fetchMetadata,
   readStoredMetadata,
@@ -6,11 +5,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import { FAILURE_BACKOFF_MS } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import {
-  OPENAI_CHATGPT_API_KEY_ENV,
-  OPENAI_CHATGPT_API_URL,
-  readOpenAiChatGptPartnerKey,
-} from './upstream';
+import { OPENAI_CHATGPT_API_URL, readOpenAiChatGptPartnerKey } from './upstream';
 
 /**
  * Which models the partner project can actually serve.
@@ -97,7 +92,9 @@ function parseServedModelIds(body: unknown): Set<string> {
  */
 export const openAiServedModelsMetadataSource: MetadataSource<Set<string>> = {
   url: MODELS_URL,
-  headers: () => ({ authorization: `Bearer ${getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV)}` }),
+  // The same trimmed read the gate uses, so a whitespace-padded value cannot
+  // pass the gate and then be sent as a broken bearer credential.
+  headers: () => ({ authorization: `Bearer ${readOpenAiChatGptPartnerKey() ?? ''}` }),
   parse: parseServedModelIds,
 };
 

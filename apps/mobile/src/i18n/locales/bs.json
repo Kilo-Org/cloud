@@ -5190,5 +5190,19 @@
       "au": "Australija",
       "jp": "Japan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Pretraga postavki",
+    "noMatches": "Nema odgovarajućih postavki",
+    "emptyDescription": "Pokušaj s drugim nazivom postavke ili ključnom riječi.",
+    "resultsStatus": "Pronađene postavke: {{resultCount}}",
+    "keywords": {
+      "signOut": "odjava|odjavi se",
+      "appearance": "tema|boje|shema boja",
+      "appUnlock": "biometrija|prepoznavanje lica|otisak prsta",
+      "language": "jezik|prijevod",
+      "notifications": "obavijesti|upozorenja",
+      "privacy": "analitika|praćenje"
+    }
   }
 }

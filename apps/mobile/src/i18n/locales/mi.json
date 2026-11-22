@@ -5103,5 +5103,19 @@
       "au": "Ahitereiria",
       "jp": "Hapani"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Rapua ngā manakohanga",
+    "noMatches": "Kāore he manakohanga e ōrite ana",
+    "emptyDescription": "Whakamātauria tētahi atu ingoa manakohanga, kupu matua rānei.",
+    "resultsStatus": "Ngā manakohanga i kitea: {{resultCount}}",
+    "keywords": {
+      "signOut": "takiputa|puta atu",
+      "appearance": "āhua|kaupapa|huinga tae",
+      "appUnlock": "tautuhi koiora|kanohi|tā matimati",
+      "language": "reo|whakamāoritanga",
+      "notifications": "whakamōhiotanga|matohi",
+      "privacy": "tātaritanga|aroturuki|matatapu"
+    }
   }
 }

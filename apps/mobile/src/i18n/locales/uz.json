@@ -5103,5 +5103,19 @@
       "au": "Avstraliya",
       "jp": "Yaponiya"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Sozlamalarni qidirish",
+    "noMatches": "Mos sozlamalar topilmadi",
+    "emptyDescription": "Boshqa sozlama nomi yoki kalit so'z bilan qidiring.",
+    "resultsStatus": "Topilgan sozlamalar: {{resultCount}}",
+    "keywords": {
+      "signOut": "chiqish|seans",
+      "appearance": "mavzu|rang|uslub",
+      "appUnlock": "biometriya|yuz|barmoq",
+      "language": "til|tarjima",
+      "notifications": "bildirishnomalar|ogohlantirishlar",
+      "privacy": "tahlil|kuzatuv"
+    }
   }
 }

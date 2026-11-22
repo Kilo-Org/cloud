@@ -5103,5 +5103,19 @@
       "au": "Avustralya",
       "jp": "Japonya"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Tercih ara",
+    "noMatches": "Eşleşen tercih bulunamadı",
+    "emptyDescription": "Farklı bir tercih adı veya anahtar kelime deneyin.",
+    "resultsStatus": "Bulunan tercihler: {{resultCount}}",
+    "keywords": {
+      "signOut": "çıkış|oturumu kapat|hesaptan çıkış",
+      "appearance": "tema|renk düzeni|koyu mod",
+      "appUnlock": "biyometri|yüz tanıma|parmak izi",
+      "language": "dil|çeviri",
+      "notifications": "uyarılar|anlık bildirimler",
+      "privacy": "analiz|takip|gizlilik"
+    }
   }
 }

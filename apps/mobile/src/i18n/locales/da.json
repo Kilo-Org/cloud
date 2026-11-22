@@ -5103,5 +5103,19 @@
       "au": "Australien",
       "jp": "Japan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Søg efter indstillinger",
+    "noMatches": "Ingen matchende indstillinger",
+    "emptyDescription": "Prøv et andet indstillingsnavn eller søgeord.",
+    "resultsStatus": "Indstillinger fundet: {{resultCount}}",
+    "keywords": {
+      "signOut": "log ud|log af",
+      "appearance": "tema|farveskema",
+      "appUnlock": "biometri|ansigtsgenkendelse|fingeraftryk",
+      "language": "sprog|oversættelse",
+      "notifications": "notifikationer|advarsler|pushbeskeder",
+      "privacy": "analyse|sporing"
+    }
   }
 }

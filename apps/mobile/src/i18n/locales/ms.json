@@ -5103,5 +5103,19 @@
       "au": "Australia",
       "jp": "Jepun"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Cari keutamaan",
+    "noMatches": "Tiada keutamaan yang sepadan",
+    "emptyDescription": "Cuba nama keutamaan atau kata kunci lain.",
+    "resultsStatus": "Keutamaan ditemui: {{resultCount}}",
+    "keywords": {
+      "signOut": "log keluar|keluar akaun",
+      "appearance": "tema|skema warna",
+      "appUnlock": "biometrik|wajah|cap jari",
+      "language": "bahasa|terjemahan",
+      "notifications": "makluman|amaran|pemberitahuan",
+      "privacy": "analitik|penjejakan"
+    }
   }
 }

@@ -5103,5 +5103,19 @@
       "au": "Australië",
       "jp": "Japan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Soek voorkeure",
+    "noMatches": "Geen ooreenstemmende voorkeure",
+    "emptyDescription": "Probeer ’n ander voorkeurnaam of sleutelwoord.",
+    "resultsStatus": "Voorkeure gevind: {{resultCount}}",
+    "keywords": {
+      "signOut": "afmeld|meld af",
+      "appearance": "tema|kleurskema",
+      "appUnlock": "biometrie|gesigherkenning|vingerafdruk",
+      "language": "taal|vertaling",
+      "notifications": "waarskuwings|stootkennisgewings",
+      "privacy": "ontleding|nasporing"
+    }
   }
 }

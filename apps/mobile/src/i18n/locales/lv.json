@@ -5190,5 +5190,19 @@
       "au": "Austrālija",
       "jp": "Japāna"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Iestatījumu meklēšana",
+    "noMatches": "Nav atbilstošu iestatījumu",
+    "emptyDescription": "Mēģiniet citu iestatījuma nosaukumu vai atslēgvārdu.",
+    "resultsStatus": "Atrastie iestatījumi: {{resultCount}}",
+    "keywords": {
+      "signOut": "izrakstīties|iziet|beigt sesiju",
+      "appearance": "tēma|krāsu shēma",
+      "appUnlock": "biometrija|sejas atpazīšana|pirksta nospiedums",
+      "language": "valoda|tulkojums",
+      "notifications": "brīdinājumi|paziņojumi",
+      "privacy": "analītika|izsekošana"
+    }
   }
 }

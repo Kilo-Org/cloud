@@ -5364,5 +5364,19 @@
       "au": "An Astráil",
       "jp": "An tSeapáin"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Cuardach roghanna",
+    "noMatches": "Níl aon roghanna ag teacht leis an gcuardach",
+    "emptyDescription": "Bain triail as ainm rogha eile nó eochairfhocal eile.",
+    "resultsStatus": "Roghanna aimsithe: {{resultCount}}",
+    "keywords": {
+      "signOut": "sínigh amach|logáil amach",
+      "appearance": "téama|scéim dathanna",
+      "appUnlock": "bithmhéadracht|aghaidh|méarlorg",
+      "language": "teanga|aistriúchán",
+      "notifications": "foláirimh|fógraí",
+      "privacy": "anailísíocht|rianú"
+    }
   }
 }

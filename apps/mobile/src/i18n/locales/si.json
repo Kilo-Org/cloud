@@ -5103,5 +5103,19 @@
       "au": "ඕස්ට්‍රේලියාව",
       "jp": "ජපානය"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "මනාප සොයන්න",
+    "noMatches": "ගැළපෙන මනාප නැත",
+    "emptyDescription": "වෙනත් මනාපයක නමක් හෝ මූලපදයක් යොදා බලන්න.",
+    "resultsStatus": "හමු වූ මනාප: {{resultCount}}",
+    "keywords": {
+      "signOut": "පිටවන්න|ගිණුමෙන් පිටවීම",
+      "appearance": "තේමාව|වර්ණ පටිපාටිය",
+      "appUnlock": "ජෛවමිතික|මුහුණ|ඇඟිලි සලකුණ",
+      "language": "භාෂාව|පරිවර්තනය",
+      "notifications": "ඇඟවීම්|දැනුම්දීම්",
+      "privacy": "විශ්ලේෂණ|ලුහුබැඳීම"
+    }
   }
 }

@@ -5103,5 +5103,19 @@
       "au": "Austraalia",
       "jp": "Jaapan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Eelistuste otsing",
+    "noMatches": "Sobivaid eelistusi ei leitud",
+    "emptyDescription": "Proovi mõnda muud eelistuse nime või märksõna.",
+    "resultsStatus": "Leitud eelistusi: {{resultCount}}",
+    "keywords": {
+      "signOut": "logi välja|väljalogimine",
+      "appearance": "teema|värviskeem",
+      "appUnlock": "biomeetria|näotuvastus|sõrmejälg",
+      "language": "keel|tõlge",
+      "notifications": "märguanded|tõuketeavitused",
+      "privacy": "analüütika|jälgimine"
+    }
   }
 }

@@ -5103,5 +5103,19 @@
       "au": "Aostralia",
       "jp": "Japana"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Karohy ny safidy",
+    "noMatches": "Tsy misy safidy mifanaraka",
+    "emptyDescription": "Manandrama anaran-tsafidy na teny fikarohana hafa.",
+    "resultsStatus": "Safidy hita: {{resultCount}}",
+    "keywords": {
+      "signOut": "mivoaha|fivoahana",
+      "appearance": "bika|endrika|loko",
+      "appUnlock": "biometrika|tarehy|dian-tanana",
+      "language": "fiteny|fandikan-teny",
+      "notifications": "fampandrenesana|fanairana",
+      "privacy": "fanadihadiana|fanarahana"
+    }
   }
 }

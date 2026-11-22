@@ -1,11 +1,10 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { announceForA11y } from '@/lib/a11y/announce';
+import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
@@ -19,8 +18,8 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * person dismisses it: a loss this large must not disappear on a relaunch.
  *
  * The card arrives without a press, so a screen reader has to learn about it.
- * Android reads the polite live region as the node is added; iOS has no live
- * region, so the body is announced once there. The card is not itself
+ * The live region below covers Android; `useStatusAnnouncement` speaks the
+ * body once where there is no live region. The card is not itself
  * `accessible`: that would shadow the dismiss control inside it.
  */
 export function LocalResetNoticeCard({ onDismiss }: { readonly onDismiss: () => void }) {
@@ -28,11 +27,7 @@ export function LocalResetNoticeCard({ onDismiss }: { readonly onDismiss: () => 
   const colors = useThemeColors();
   const body = t('modelChat.list.resetNoticeBody');
 
-  useEffect(() => {
-    if (Platform.OS !== 'android') {
-      announceForA11y(body);
-    }
-  }, [body]);
+  useStatusAnnouncement(body);
 
   return (
     <View

@@ -555,7 +555,10 @@
     "changelogFixesPolish": "အက်ပ်တစ်ခုလုံးတွင် ပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ။",
     "changelogAreas": {
       "signIn": "အကောင့်ဝင်ခြင်း",
-      "profileOrganizations": "ပရိုဖိုင် ရော အဖွဲ့အစည်းများ ရော"
+      "profileOrganizations": "ပရိုဖိုင် ရော အဖွဲ့အစည်းများ ရော",
+      "chat": "စကားဝိုင်း",
+      "notifications": "အသိပေးချက်များ",
+      "integrations": "ပေါင်းစပ်မှုများ"
     }
   },
   "preferences": {

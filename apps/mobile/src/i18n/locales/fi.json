@@ -554,8 +554,11 @@
     "changelogFixesIn": "Korjauksia ja parannuksia seuraaviin osioihin: {{areas}}.",
     "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
-      "signIn": "Kirjautuminen",
-      "profileOrganizations": "Profiili & organisaatiot"
+      "signIn": "kirjautuminen",
+      "profileOrganizations": "profiili & organisaatiot",
+      "chat": "keskustelu",
+      "notifications": "ilmoitukset",
+      "integrations": "integraatiot"
     }
   },
   "preferences": {

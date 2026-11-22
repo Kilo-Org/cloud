@@ -972,11 +972,11 @@ function listConjunctionOf(tag) {
  * render from these keys, so each of them becomes one item of the list.
  */
 const CHANGELOG_AREA_KEYS = [
-  'common.chat',
-  'common.notifications',
-  'integrations.title',
   'profile.changelogAreas.signIn',
   'profile.changelogAreas.profileOrganizations',
+  'profile.changelogAreas.chat',
+  'profile.changelogAreas.notifications',
+  'profile.changelogAreas.integrations',
 ];
 
 /**

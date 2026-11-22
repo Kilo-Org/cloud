@@ -554,8 +554,11 @@
     "changelogFixesIn": "Διορθώσεις και βελτιώσεις στα εξής: {{areas}}.",
     "changelogFixesPolish": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
     "changelogAreas": {
-      "signIn": "Σύνδεση",
-      "profileOrganizations": "Προφίλ & οργανισμοί"
+      "signIn": "σύνδεση",
+      "profileOrganizations": "προφίλ & οργανισμοί",
+      "chat": "συνομιλία",
+      "notifications": "ειδοποιήσεις",
+      "integrations": "ενσωματώσεις"
     }
   },
   "preferences": {

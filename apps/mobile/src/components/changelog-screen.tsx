@@ -54,16 +54,18 @@ const keyExtractor = (section: ChangelogSection) => section.version;
 
 /**
  * The label one area reads as. The three agent products keep their own names in
- * Latin in every locale, the way the app names them elsewhere; the rest reuse
- * the labels the app paints in its own chrome instead of a second wording.
+ * Latin in every locale, the way the app names them elsewhere; every other area
+ * reads its copy from `profile.changelogAreas.*`, whose values are written for
+ * the middle of the fixes sentence, so a catalog supplies the casing its own
+ * sentence needs instead of the capitalized chrome label.
  */
 const AREA_LABELS = {
   cloudAgent: () => 'Cloud Agent',
   securityAgent: () => 'Security Agent',
   codeReviewer: () => 'Code Reviewer',
-  chat: (t: TFunction) => t('common.chat'),
-  notifications: (t: TFunction) => t('common.notifications'),
-  integrations: (t: TFunction) => t('integrations.title'),
+  chat: (t: TFunction) => t('profile.changelogAreas.chat'),
+  notifications: (t: TFunction) => t('profile.changelogAreas.notifications'),
+  integrations: (t: TFunction) => t('profile.changelogAreas.integrations'),
   signIn: (t: TFunction) => t('profile.changelogAreas.signIn'),
   profileOrganizations: (t: TFunction) => t('profile.changelogAreas.profileOrganizations'),
 } as const satisfies Record<ChangelogArea, (t: TFunction) => string>;

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Келесі бөлімдердегі түзетулер мен жақсартулар: {{areas}}.",
     "changelogFixesPolish": "Бүкіл қолданбадағы түзетулер мен жақсартулар.",
     "changelogAreas": {
-      "signIn": "Кіру",
-      "profileOrganizations": "Профиль мен ұйымдар"
+      "signIn": "кіру",
+      "profileOrganizations": "профиль мен ұйымдар",
+      "chat": "чат",
+      "notifications": "хабарландырулар",
+      "integrations": "интеграциялар"
     }
   },
   "preferences": {

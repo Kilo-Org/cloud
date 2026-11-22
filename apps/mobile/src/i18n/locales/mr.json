@@ -555,7 +555,10 @@
     "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल व संस्था"
+      "profileOrganizations": "प्रोफाइल व संस्था",
+      "chat": "चॅट",
+      "notifications": "सूचना",
+      "integrations": "इंटिग्रेशन्स"
     }
   },
   "preferences": {

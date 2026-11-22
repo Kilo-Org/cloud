@@ -555,7 +555,10 @@
     "changelogFixesPolish": "સમગ્ર એપમાં ભૂલ સુધારા અને સુધારણાઓ.",
     "changelogAreas": {
       "signIn": "સાઇન-ઇન",
-      "profileOrganizations": "પ્રોફાઇલ તથા સંસ્થાઓ"
+      "profileOrganizations": "પ્રોફાઇલ તથા સંસ્થાઓ",
+      "chat": "ચેટ",
+      "notifications": "સૂચનાઓ",
+      "integrations": "ઇન્ટિગ્રેશન્સ"
     }
   },
   "preferences": {

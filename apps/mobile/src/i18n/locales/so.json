@@ -554,8 +554,11 @@
     "changelogFixesIn": "Hagaajinno iyo horumarin lagu sameeyay {{areas}}.",
     "changelogFixesPolish": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
     "changelogAreas": {
-      "signIn": "Gelitaanka",
-      "profileOrganizations": "Xogta shakhsiga & ururada"
+      "signIn": "gelitaanka",
+      "profileOrganizations": "xogta shakhsiga & ururada",
+      "chat": "sheekaysi",
+      "notifications": "ogeysiisyada",
+      "integrations": "isku-xidhka"
     }
   },
   "preferences": {

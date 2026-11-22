@@ -555,7 +555,10 @@
     "changelogFixesPolish": "چاککردن و باشترکردن لە سەرتاسەری ئەپەکەدا.",
     "changelogAreas": {
       "signIn": "چوونەژوورەوە",
-      "profileOrganizations": "پرۆفایل و ڕێکخراوەکان"
+      "profileOrganizations": "پرۆفایل و ڕێکخراوەکان",
+      "chat": "گفتوگۆ",
+      "notifications": "ئاگادارکردنەوەکان",
+      "integrations": "یەکخستنەکان"
     }
   },
   "preferences": {

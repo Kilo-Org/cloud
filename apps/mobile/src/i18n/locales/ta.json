@@ -555,7 +555,10 @@
     "changelogFixesPolish": "செயலி முழுவதும் திருத்தங்களும் மேம்பாடுகளும்.",
     "changelogAreas": {
       "signIn": "உள்நுழைவு",
-      "profileOrganizations": "சுயவிவரமும் நிறுவனங்களும்"
+      "profileOrganizations": "சுயவிவரமும் நிறுவனங்களும்",
+      "chat": "அரட்டை",
+      "notifications": "அறிவிப்புகள்",
+      "integrations": "ஒருங்கிணைப்புகள்"
     }
   },
   "preferences": {

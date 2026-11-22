@@ -555,7 +555,10 @@
     "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
     "changelogAreas": {
       "signIn": "Giriş",
-      "profileOrganizations": "Profil ilə təşkilatlar"
+      "profileOrganizations": "Profil ilə təşkilatlar",
+      "chat": "Söhbət",
+      "notifications": "Bildirişlər",
+      "integrations": "İnteqrasiyalar"
     }
   },
   "preferences": {

@@ -2738,6 +2738,54 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
 
+  it('never retries a user-pool block automatically after an empty completion', async () => {
+    // The same transient shape the platform lane retries once: a lone `step_finish` with
+    // no assistant text and no spend. A user-owned generation must never be replayed by
+    // the runner on its own — a second paid call would be a second generation nobody asked
+    // for — so the empty answer is graded as-is and the block records it.
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: {
+        ...snapshot.run,
+        purpose: 'user',
+        admission_marker: '2026-06-16T00:00:00.000Z',
+      },
+    });
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: 0,
+      costUsd: 0,
+      eventCount: 2,
+      lastEventTypes: ['step_finish'],
+    });
+
+    await processJob(env, deciderMessage());
+
+    // Exactly one invocation: neither the in-process retry nor its ledger restart ran.
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(restartPaidCase).not.toHaveBeenCalled();
+    expect(deletePendingDeciderOutput).not.toHaveBeenCalled();
+    // What the block records instead: the empty answer is a measured zero, never retried.
+    expect(upsertCaseResult).toHaveBeenCalledTimes(1);
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        case_id: benchCase.id,
+        score: 0,
+        cost_usd: 0,
+        retried: false,
+        exit_code: 0,
+      }),
+      expect.anything()
+    );
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+  });
+
   it.each([
     { name: 'a signal kill before any event', timedOut: false, eventCount: 0, calls: 2 },
     { name: 'a timeout', timedOut: true, eventCount: 0, calls: 1 },

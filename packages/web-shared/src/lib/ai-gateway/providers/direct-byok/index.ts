@@ -105,6 +105,8 @@ function convertModel(
 ): DirectByokModelListing {
   const id = formatDirectByokModelId(provider, model);
   const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
+  const hasVision = model.flags?.includes('vision') ?? false;
+  const hasReasoning = model.flags?.includes('reasoning') ?? false;
   return {
     id,
     canonical_slug: id,
@@ -114,8 +116,8 @@ function convertModel(
     description: model.description ?? '',
     context_length: model.context_length,
     architecture: {
-      modality: model.flags?.includes('vision') ? 'text+image-\u003Etext' : 'text-\u003Etext',
-      input_modalities: ['text'].concat(model.flags?.includes('vision') ? ['image'] : []),
+      modality: hasVision ? 'text+image-\u003Etext' : 'text-\u003Etext',
+      input_modalities: ['text'].concat(hasVision ? ['image'] : []),
       output_modalities: ['text'],
       tokenizer: 'Other',
       instruct_type: null,
@@ -136,7 +138,7 @@ function convertModel(
     },
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools'].concat(
-      model.flags?.includes('reasoning') ? ['reasoning'] : []
+      hasReasoning ? ['reasoning'] : []
     ),
     default_parameters: {},
     hasUserByokAvailable: true,
@@ -145,7 +147,7 @@ function convertModel(
       ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
       reasoning_options:
         model.reasoning_options ??
-        (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),
+        (hasReasoning ? getFallbackReasoningOptions(id) : undefined),
     }),
   };
 }

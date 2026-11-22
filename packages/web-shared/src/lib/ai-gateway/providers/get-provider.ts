@@ -72,10 +72,8 @@ import {
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
-import {
-  getReasoningEffort,
-  isReasoningExplicitlyDisabled,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import { getSupportedReasoningEfforts } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import {
   CustomLlmCredentialsSchema,

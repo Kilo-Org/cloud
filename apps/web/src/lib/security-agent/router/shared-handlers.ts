@@ -1,5 +1,5 @@
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationTarget,
@@ -357,7 +357,7 @@ async function assembleAuditReportResponse<TExtra>(params: {
 // `security`-domain ledger BEFORE it reaches the security-sync Worker, so
 // admission is not optional. A client `operationKey` is kept as sent, and a
 // keyless client gets a server-minted key over the owner scope, the intent and
-// the target (`mintedSubmissionOperationKey`), so a repeated intent replays the
+// the target (`resolveSubmissionKey`), so a repeated intent replays the
 // settled result or conflicts instead of queueing a second command. The Worker
 // dedupes the command itself by `operation_key`, so the Worker settles the
 // ledger row from the terminal command state. The `getCommandStatus` handler
@@ -464,31 +464,15 @@ function submissionKeyDigest(value: string, length: number): string {
   return createHash('sha256').update(value).digest('hex').slice(0, length);
 }
 
-/**
- * Operation key minted on the server for a submission whose client sent none.
- *
- * It digests the owner scope, the intent, the ledger resource key of the target
- * and the current dedupe window, so two submissions for one target inside a
- * window share an identity: the ledger replays a settled command or conflicts
- * while it is in flight. Another repository, finding or dismissal input is
- * another target and gets its own key, and a submission in a later window is
- * another intent that runs.
- *
- * A window whose submission settled as failed, or that was interrupted, is
- * released instead: a settled failure cannot replay, so the key is re-derived
- * from that row and the next attempt runs. Each release generation is consumed
- * once along a bounded chain, so a retry after a failure runs, a repeat of that
- * retry dedupes, and a run of repeated failures still yields a runnable key
- * without an unbounded read.
- */
-async function mintedSubmissionOperationKey(params: {
-  ctx: TRPCContext;
+type SubmissionScope = {
   owner: SecurityReviewOwner;
   intent: 'manual_sync' | 'dismiss_finding';
   resourceKey: string;
-}): Promise<string> {
-  const window = Math.floor(Date.now() / SUBMISSION_DEDUPE_WINDOW_MS);
-  const base = `mt:${params.intent}:${submissionKeyDigest(
+};
+
+/** The dedupe identity of one target, intent and bucket. */
+function submissionWindowKey(params: SubmissionScope, window: number): string {
+  return `mt:${params.intent}:${submissionKeyDigest(
     [
       'security:submission',
       securityOwnerScopeKey(params.owner),
@@ -498,19 +482,74 @@ async function mintedSubmissionOperationKey(params: {
     ].join(':'),
     48
   )}`;
-  let key = base;
-  for (let step = 0; step < SUBMISSION_RELEASE_CHAIN_LIMIT; step += 1) {
+}
+
+/**
+ * Resolves one released generation of a bucket, or reports that its row is
+ * absent or live. The key at the start of every iteration was just read, so the
+ * returned key is always one that can be admitted: a repeat replays a settled
+ * result or conflicts in flight, and a released generation steps to a re-derived
+ * key. Past the chain cap the window has spent its retries, so a distinct
+ * identity is minted and this submission still runs; the worker's per-owner
+ * lease still keeps two runs apart.
+ */
+async function releaseChain(params: {
+  ctx: TRPCContext;
+  base: string;
+}): Promise<{ key: string; live: boolean }> {
+  let key = params.base;
+  for (let step = 0; step <= SUBMISSION_RELEASE_CHAIN_LIMIT; step += 1) {
     const previous = await getOperation(db, {
       userId: params.ctx.user.id,
       domain: 'security',
       operationKey: key,
     });
-    if (!previous || !RELEASED_SUBMISSION_STATUSES.has(previous.status)) {
-      return key;
+    if (!previous) return { key, live: false };
+    if (!RELEASED_SUBMISSION_STATUSES.has(previous.status)) return { key, live: true };
+    if (step === SUBMISSION_RELEASE_CHAIN_LIMIT) {
+      // The window has spent its retries: mint a distinct identity so this
+      // submission can still run.
+      return { key: `${key}:x${submissionKeyDigest(randomUUID(), 8)}`, live: false };
     }
-    key = `${base}:r${submissionKeyDigest(previous.id, 16)}`;
+    key = `${params.base}:r${submissionKeyDigest(previous.id, 16)}`;
   }
-  return key;
+  return { key, live: false };
+}
+
+/**
+ * Operation key for a submission whose client sent none.
+ *
+ * It digests the owner scope, the intent, the ledger resource key of the target
+ * and a dedupe window, so two submissions for one target inside a window share
+ * an identity: the ledger replays a settled command or conflicts while it is in
+ * flight. The window is at least one bucket and at most two, so a live or
+ * settled identity from the bucket that just ended still answers a repeat.
+ * Another repository, finding or dismissal input is another target and gets its
+ * own key, and a submission in a later window is another intent that runs.
+ *
+ * A window whose submission settled as failed, or that was interrupted, is
+ * released instead: a settled failure cannot replay, so the key is re-derived
+ * from that row and the next attempt runs. A released window is walked along a
+ * bounded chain, so a retry after a failure runs and a repeat of that retry
+ * dedupes; past the cap a distinct identity is minted, and the worker's
+ * per-owner lease still keeps two runs apart.
+ */
+async function resolveSubmissionKey(
+  params: SubmissionScope & { ctx: TRPCContext }
+): Promise<string> {
+  const currentWindow = Math.floor(Date.now() / SUBMISSION_DEDUPE_WINDOW_MS);
+  const candidates: [string, string] = [
+    submissionWindowKey(params, currentWindow),
+    submissionWindowKey(params, currentWindow - 1),
+  ];
+
+  let fallback: string | null = null;
+  for (const base of candidates) {
+    const { key, live } = await releaseChain({ ctx: params.ctx, base });
+    if (live) return key;
+    fallback ??= key;
+  }
+  return fallback ?? candidates[0];
 }
 
 /** Trimmed, whitespace-collapsed comment, so cosmetic spacing is not a key-reuse mismatch. */
@@ -1769,7 +1808,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const resourceKey = securitySyncLedgerResourceKey(securityOwner, input.repoFullName);
         const operationKey =
           input.operationKey ??
-          (await mintedSubmissionOperationKey({
+          (await resolveSubmissionKey({
             ctx,
             owner: securityOwner,
             intent: 'manual_sync',
@@ -1889,7 +1928,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         );
         const operationKey =
           input.operationKey ??
-          (await mintedSubmissionOperationKey({
+          (await resolveSubmissionKey({
             ctx,
             owner: securityOwner,
             intent: 'dismiss_finding',

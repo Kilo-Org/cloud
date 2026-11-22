@@ -1803,8 +1803,24 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
   });
 
+  it('answers a repeat from the previous bucket while its row is live', async () => {
+    mockGetOperation
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(ledgerRow({ id: 'ledger-row-previous', status: 'admitted' }));
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const previousBucketKey = mockGetOperation.mock.calls[1]?.[1] as { operationKey: string };
+    const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(admitted.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}$/);
+    expect(admitted.operationKey).toBe(previousBucketKey.operationKey);
+  });
+
   it('re-derives the minted key past a released window and keeps the plain key when the window settled', async () => {
-    mockGetOperation.mockResolvedValue(ledgerRow({ status: 'failed' }));
+    mockGetOperation.mockResolvedValueOnce(ledgerRow({ status: 'failed' })).mockResolvedValue(null);
     mockSubmitManualSecuritySync.mockResolvedValue(accepted);
 
     await expect(
@@ -1841,6 +1857,21 @@ describe('security operation ledger (P1-A-08e)', () => {
     const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
     expect(admitted.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}:r[0-9a-f]{16}$/);
     expect(admitted.operationKey).not.toBe(firstReleaseKey.operationKey);
+  });
+
+  it('mints a distinct identity when a window has spent its release chain', async () => {
+    mockGetOperation.mockResolvedValue(ledgerRow({ status: 'failed' }));
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(admitted.operationKey).toMatch(
+      /^mt:manual_sync:[0-9a-f]{48}(:r[0-9a-f]{16})*:x[0-9a-f]{8}$/
+    );
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
   });
 
   it('replays a settled manual sync without re-submitting or re-tracking', async () => {

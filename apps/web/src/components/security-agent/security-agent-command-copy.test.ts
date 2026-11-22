@@ -7,6 +7,7 @@ import {
   manualAnalysisAdmissionCopy,
   securityAgentCommandAdmissionCopy,
   securityCommandInProgressCopy,
+  securityCommandReplayedCopy,
 } from './security-agent-command-copy';
 
 describe('securityAgentCommandAdmissionCopy', () => {
@@ -49,5 +50,16 @@ describe('securityAgentCommandAdmissionCopy', () => {
       description: 'Wait for it to finish before trying again.',
     });
     expect(securityCommandInProgressCopy('start_analysis')).toBeNull();
+  });
+
+  it('names a replayed submission as already sent', () => {
+    expect(securityCommandReplayedCopy.sync).toEqual({
+      title: 'Sync already ran',
+      description: 'No new sync was queued. Findings update when that run completes.',
+    });
+    expect(securityCommandReplayedCopy.dismiss_finding).toEqual({
+      title: 'Dismissal already sent',
+      description: 'No new dismissal was queued.',
+    });
   });
 });

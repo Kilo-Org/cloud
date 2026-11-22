@@ -93,3 +93,17 @@ export function isSecurityCommandInProgressError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message === SECURITY_OPERATION_IN_PROGRESS_MESSAGE;
 }
+
+/** Toast for a submission whose identity already settled inside the window. */
+export const securityCommandReplayedCopy = {
+  sync: {
+    title: 'Sync already ran',
+    description: 'No new sync was queued. Findings update when that run completes.',
+  },
+  dismiss_finding: {
+    title: 'Dismissal already sent',
+    description: 'No new dismissal was queued.',
+  },
+} as const satisfies Partial<
+  Record<SecurityAgentAdmissionAction, { title: string; description: string }>
+>;

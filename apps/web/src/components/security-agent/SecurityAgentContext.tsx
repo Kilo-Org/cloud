@@ -28,6 +28,7 @@ import {
   isSecurityCommandInProgressError,
   securityAgentCommandAdmissionCopy,
   securityCommandInProgressCopy,
+  securityCommandReplayedCopy,
 } from './security-agent-command-copy';
 import {
   deletedSecurityAgentFindingsScopes,
@@ -786,7 +787,13 @@ function useSecurityAgentProviderValue(
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
         dispatchProviderState({ type: 'set-github-error', error: null });
-        toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        if ('replayed' in data) {
+          toast.info(securityCommandReplayedCopy.sync.title, {
+            description: securityCommandReplayedCopy.sync.description,
+          });
+        } else {
+          toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        }
         trackCommand(data.commandId);
       },
       onError: error => {
@@ -813,7 +820,13 @@ function useSecurityAgentProviderValue(
   const { mutate: orgDismissMutate, isPending: isOrgDismissPending } = useMutation(
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
       onSuccess: data => {
-        toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        if ('replayed' in data) {
+          toast.info(securityCommandReplayedCopy.dismiss_finding.title, {
+            description: securityCommandReplayedCopy.dismiss_finding.description,
+          });
+        } else {
+          toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        }
         trackCommand(data.commandId);
       },
       onError: error => {
@@ -986,7 +999,13 @@ function useSecurityAgentProviderValue(
     trpc.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
         dispatchProviderState({ type: 'set-github-error', error: null });
-        toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        if ('replayed' in data) {
+          toast.info(securityCommandReplayedCopy.sync.title, {
+            description: securityCommandReplayedCopy.sync.description,
+          });
+        } else {
+          toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        }
         trackCommand(data.commandId);
       },
       onError: error => {
@@ -1013,7 +1032,13 @@ function useSecurityAgentProviderValue(
   const { mutate: personalDismissMutate, isPending: isPersonalDismissPending } = useMutation(
     trpc.securityAgent.dismissFinding.mutationOptions({
       onSuccess: data => {
-        toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        if ('replayed' in data) {
+          toast.info(securityCommandReplayedCopy.dismiss_finding.title, {
+            description: securityCommandReplayedCopy.dismiss_finding.description,
+          });
+        } else {
+          toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        }
         trackCommand(data.commandId);
       },
       onError: error => {

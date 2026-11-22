@@ -85,15 +85,16 @@ function parseServedModelIds(body: unknown): Set<string> {
 }
 
 /**
- * The metadata-cache cron refreshes this source, and `isOpenAiModelServed`
- * reads its stored row and refetches it on the request path. That second reader
- * is why `timeoutMs` stays at `REQUEST_TIMEOUT_MS`: a request waits on it.
+ * The metadata-cache cron refreshes this source and `isOpenAiModelServed` reads
+ * its stored row and refetches it on the request path. The descriptor is shared,
+ * so it keeps `fetchMetadata`'s own batch timeout; the request path passes its
+ * shorter `REQUEST_TIMEOUT_MS` deadline per call, and `AbortSignal.any` keeps
+ * whichever bound is tighter.
  */
 export const openAiServedModelsMetadataSource: MetadataSource<Set<string>> = {
   url: MODELS_URL,
   headers: () => ({ authorization: `Bearer ${getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV)}` }),
   parse: parseServedModelIds,
-  timeoutMs: REQUEST_TIMEOUT_MS,
 };
 
 async function fetchServedModelIds(): Promise<Set<string> | null> {
@@ -101,7 +102,11 @@ async function fetchServedModelIds(): Promise<Set<string> | null> {
   if (stored) return stored;
 
   try {
-    return (await fetchMetadata(openAiServedModelsMetadataSource)).data;
+    return (
+      await fetchMetadata(openAiServedModelsMetadataSource, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+    ).data;
   } catch {
     return null;
   }
@@ -116,8 +121,9 @@ async function fetchServedModelIds(): Promise<Set<string> | null> {
  * `FAILURE_BACKOFF_MS` so a burst of eligible requests does not each pay the lookup
  * and its timeout, so a bad answer costs the short window and never the hour a
  * good list is reused for. Each lookup reads the list the metadata cache refresh
- * stored, and refetches the same descriptor through `fetchMetadata` only when no
- * usable row exists; the metadata cache is the only request path.
+ * stored, and refetches the same descriptor through `fetchMetadata` under
+ * `REQUEST_TIMEOUT_MS` only when no usable row exists; the metadata cache is the
+ * only request path.
  */
 export async function isOpenAiModelServed(modelId: string): Promise<boolean> {
   if (getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV).trim().length === 0) return true;

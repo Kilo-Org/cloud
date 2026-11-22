@@ -192,7 +192,15 @@ describe('isOpenAiModelServed', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('bounds the descriptor a request waits on', () => {
-    expect(openAiServedModelsMetadataSource.timeoutMs).toBe(2000);
+  it('bounds only the request path, leaving the batch timeout to fetchMetadata', async () => {
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockResolvedValue(modelsResponse(['gpt-5-nano']));
+
+    await isOpenAiModelServed('gpt-5-nano');
+
+    expect(timeoutSpy.mock.calls.map(([ms]) => ms)).toContain(2_000);
+    // The shared descriptor must stay unset: the metadata-cache cron reads it and
+    // keeps fetchMetadata's own batch bound.
+    expect(openAiServedModelsMetadataSource.timeoutMs).toBeUndefined();
   });
 });

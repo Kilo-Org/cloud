@@ -48,6 +48,13 @@ describe('allowLists.domain', () => {
     ]);
   });
 
+  test('canonicalize provider allow list matches a stored mixed-case slug to the catalog slug', () => {
+    expect(canonicalizeProviderAllowList(['OpenAI', ' anthropic/vertex ', ''])).toEqual([
+      'anthropic',
+      'openai',
+    ]);
+  });
+
   test('legacy provider deny list can be inverted into an allow list snapshot', () => {
     const allowed = deriveProviderAllowListFromLegacyDenyList(['openai'], ['anthropic', 'openai']);
     expect(allowed).toEqual(['anthropic']);

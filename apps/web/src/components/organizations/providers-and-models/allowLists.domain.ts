@@ -1,4 +1,5 @@
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 export type OpenRouterModelSlugSnapshot = {
   slug: string;
@@ -34,7 +35,7 @@ export function canonicalizeDenyList(raw: ReadonlyArray<string>): string[] {
 
 export function canonicalizeProviderAllowList(raw: ReadonlyArray<string> | undefined): string[] {
   if (!raw) return [];
-  return sortUniqueStrings(raw);
+  return sortUniqueStrings(normalizeInferenceProviderIds(raw));
 }
 
 export function deriveProviderAllowListFromLegacyDenyList(

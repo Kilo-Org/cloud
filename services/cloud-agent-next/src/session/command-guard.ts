@@ -452,10 +452,10 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   ]),
   // The redirect operator is written with or without a space before the target,
   // so one rule covers both spellings and either operator. A rule sees the
-  // command text the runtime classifies, which is the first node of a compound
-  // line, so a redirect that a later node carries stays outside these rules; a
-  // write whose target is an argument, such as a copy or a move, keeps its
-  // target in that text and stays covered.
+  // command text the runtime classifies, which for a compound line is one node
+  // at a time and not the redirection that node carries, so that redirection
+  // stays outside these rules; a write whose target is an argument, such as a
+  // copy or a move, keeps its target in that text and stays covered.
   '*> *config',
   '*> *confi?',
   '*>config',

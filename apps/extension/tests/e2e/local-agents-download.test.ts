@@ -159,8 +159,9 @@ const recordDropsOnPage = async (page: Page): Promise<void> => {
  * The panel's own local-agents settings section, showing the paired CLI's
  * entry. The dialog is the one `enableLocalAgents` opened, and the section
  * re-reads storage on every change, so the agent appears once the session
- * exists; `scrollIntoViewIfNeeded` brings the row on screen, because the dialog
- * scrolls internally and a full-page capture cannot reach past a fixed overlay.
+ * exists. The capture is the section itself rather than the whole panel: the
+ * dialog's other cards carry the signed-in account, and this evidence is about
+ * the paired agent, so only that section's own pixels leave the machine.
  */
 const screenshotConnectedAgent = async (sidePanel: Page, path: string): Promise<void> => {
   await sidePanel.bringToFront();
@@ -169,8 +170,10 @@ const screenshotConnectedAgent = async (sidePanel: Page, path: string): Promise<
   const connected = dialog.getByText('Connected agents');
   await expect(connected).toBeVisible({ timeout: 15_000 });
   await expect(dialog.getByText('loopback', { exact: true })).toBeVisible();
+  const section = dialog.locator('section[aria-label="Local agents"]');
+  await expect(section).toBeVisible();
   await connected.scrollIntoViewIfNeeded();
-  await sidePanel.screenshot({ fullPage: true, path });
+  await section.screenshot({ path });
 };
 
 /*

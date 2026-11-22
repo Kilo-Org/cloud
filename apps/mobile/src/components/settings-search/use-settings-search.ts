@@ -9,7 +9,7 @@ import {
   type SettingsPath,
   type SettingsSearchSource,
 } from '@/lib/settings-search/definitions';
-import { searchSettings } from '@/lib/settings-search/match';
+import { prepareSettingsSearch } from '@/lib/settings-search/match';
 
 /**
  * One resolved result: the entry a select handler navigates with, and the
@@ -51,9 +51,6 @@ const KEYWORD_COPY = {
 
 /** The breadcrumb separator between nested screen names. */
 const CONTEXT_SEPARATOR = ' · ';
-
-/** No entries while the query is empty; a stable identity for the idle state. */
-const NO_ENTRIES: readonly SettingsSearchEntry[] = [];
 
 /** No results while the query is empty; a stable identity for the idle state. */
 const NO_RESULTS: readonly SettingsSearchResult[] = [];
@@ -106,10 +103,11 @@ export function useSettingsSearch(sources: readonly SettingsSearchSource[]) {
 
   // The translated index changes with the language, the sources and entering
   // search — not with each keystroke; each keyword's synonyms are resolved once
-  // and shared by every setting that names it.
-  const entries = useMemo(() => {
+  // and shared by every setting that names it, and the matcher folds the whole
+  // index once for the locale instead of re-folding it per query.
+  const search = useMemo(() => {
     if (!active) {
-      return NO_ENTRIES;
+      return null;
     }
     const resolved: SettingsSearchEntry[] = [];
     const keywordsById = new Map<SettingsKeyword, readonly string[]>();
@@ -131,13 +129,10 @@ export function useSettingsSearch(sources: readonly SettingsSearchSource[]) {
         }
       }
     }
-    return resolved;
-  }, [active, sources, t]);
+    return prepareSettingsSearch(resolved, locale);
+  }, [active, locale, sources, t]);
 
-  const results = useMemo(
-    () => (active ? searchSettings(entries, query, locale) : NO_RESULTS),
-    [active, entries, locale, query]
-  );
+  const results = useMemo(() => (search === null ? NO_RESULTS : search(query)), [query, search]);
 
   const clear = useCallback(() => {
     setQuery('');

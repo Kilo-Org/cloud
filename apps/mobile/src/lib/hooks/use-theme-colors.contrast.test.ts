@@ -502,9 +502,12 @@ describe('disabled switch pair contrast (non-text)', () => {
   });
 
   // A disabled row has to read as unavailable beside a live one. The track keeps
-  // its position's live hue on purpose, so the measured guarantee is the
-  // same-position distance plus a grip that no live pair paints.
-  it('every theme: each disabled half stays apart from its own live half', () => {
+  // its position's live hue on purpose, so the distance is measured on the row
+  // that paints its own live off track: `PreferenceRow`'s light override
+  // (`mutedForeground`). On a host that keeps the shared light off pair the
+  // disabled track is that same token at reduced opacity, so only the grip
+  // separates the two, which the grip case below asserts for both schemes.
+  it('every theme: each disabled half stays apart from the live half of the row it is measured on', () => {
     for (const { themeName, on, off, live } of pairs) {
       expect(
         contrastRatio(on.track, live.onTrack),
@@ -526,6 +529,17 @@ describe('disabled switch pair contrast (non-text)', () => {
         ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
       }
     }
+  });
+
+  // The shared light off pair is the token the disabled off track is built
+  // from, so a host that keeps it has no track distance to measure. Its
+  // separation from a live control is the grip alone, and that must hold on the
+  // shared pair literally, not only against `PreferenceRow`'s override.
+  it('light: on the shared off pair the grip alone separates a disabled row from a live one', () => {
+    const { colors, off, grip } = pairs[0];
+    const liveOffTrack = colors.mutedSoft;
+    expect(contrastRatio(off.track, liveOffTrack)).toBeLessThan(MIN_VISIBLE_SURFACE_RATIO);
+    expect(contrastRatio(grip, liveOffTrack)).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
   });
 
   // The figures the primitive's doc comment cites, so a palette or alpha change

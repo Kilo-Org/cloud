@@ -53,9 +53,14 @@ function textActionBoxStyle() {
  * buttons.
  *
  * Two placeholders, chosen by whether a cell will land. `TEXT_ACTION_SKELETON_CLASS`
- * holds the compact button's own `sm` frame (`min-h-[36px]`), for the case
- * where the settled row renders that button, so the row does not move when it
- * lands: 36 + `py-3`'s 21 is the 57pt band the button lays out.
+ * holds the compact button's own frame contract — the same `min-h-[36px]` and
+ * padding as `COMPACT_BUTTON_FRAME_CLASS` — for the case where the settled row
+ * renders that button, so the row does not move when it lands: the button's
+ * 36pt frame plus `py-3`'s 21 lays out the same 57pt band. The frame is a
+ * minimum because it lets a label scaled by large Dynamic Type grow the button
+ * instead of clipping it; the placeholder has no label of its own, so it cannot
+ * grow with Dynamic Type, and the row still moves by the difference at a large
+ * font scale.
  * `TEXT_ACTION_PENDING_BAND_CLASS` holds the row's own content band, for the
  * case where the settled row renders no cell at all (a viewer whose role cannot
  * manage): such a row settles on its text column, which a 36px placeholder
@@ -66,14 +71,18 @@ function textActionBoxStyle() {
  * Explicit px, because NativeWind's rem is 14pt here and `h-9` would measure
  * 31.5pt against the button's 36pt frame.
  */
-export const TEXT_ACTION_SKELETON_CLASS = 'h-[36px] w-24 rounded-md';
+export const TEXT_ACTION_SKELETON_CLASS = 'min-h-[36px] w-24 rounded-md';
 
 /**
  * The placeholder for a pending read that settles without a cell. The flat row
  * is `min-h-[48px] px-4 py-3`, and `py-3` is 10.5pt a side, so its content band
  * is `48 - 2 * 10.5 = 27pt`; the placeholder matches that band, so a row with
  * no settled cell neither grows while pending nor shrinks when the read lands.
- * Spelled in px because an `h-6`/`h-7` rem height does not land on 27pt.
+ * This is the one band `ROW_FRAME_CONTENT_DP` names, and the mounted suite
+ * asserts the two agree. Spelled as a literal, in px, because the bundler's
+ * scanner only emits a utility it reads in source, so an interpolated
+ * `h-[27px]` would never reach the stylesheet, and because an `h-6`/`h-7` rem
+ * height does not land on 27pt.
  */
 export const TEXT_ACTION_PENDING_BAND_CLASS = 'h-[27px] w-24 rounded-md';
 

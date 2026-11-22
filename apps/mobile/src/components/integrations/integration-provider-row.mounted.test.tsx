@@ -13,7 +13,9 @@ import {
   TEXT_ACTION_SKELETON_CLASS,
 } from '@/components/ui/row-trailing';
 import {
+  COMPACT_BUTTON_FRAME_CLASS,
   COMPACT_BUTTON_HIT_SLOP,
+  ROW_FRAME_CONTENT_DP,
   tapTargetReachDp,
   textActionRowOverhangDp,
   textActionTargetClass,
@@ -84,9 +86,6 @@ function integrationRow(overrides: Partial<IntegrationRow> = {}): IntegrationRow
 }
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-
-/** The shared `Button`'s `sm` size class list (`button.tsx`). */
-const COMPACT_BUTTON_CLASS = 'min-h-[36px] rounded-md px-3 py-1.5';
 
 /** The height a class list compiles to through the app's own theme, in dp. */
 async function compiledBoxHeight(className: string): Promise<number | undefined> {
@@ -263,14 +262,13 @@ describe('IntegrationProviderRow action cell', () => {
       const skeletonClass = withCell ? TEXT_ACTION_SKELETON_CLASS : TEXT_ACTION_PENDING_BAND_CLASS;
 
       expect(controls(root)).toHaveLength(0);
-      expect(root.findAllByType('Skeleton')).toHaveLength(1);
-      expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(skeletonClass);
+      const marks = root.findAllByType('Skeleton');
+      expect(marks.map(node => node.props.className)).toEqual([skeletonClass]);
       // Compiled, not compared as a string: NativeWind's rem is 14pt, so `h-9`
       // would reserve 31.5pt. A cell that lands is the compact button, so its
-      // placeholder holds that same height; a row that settles with no cell
-      // holds the content band instead: `48 - 2 * 10.5 = 27pt`.
-      const settled = withCell ? await compiledBoxHeight(COMPACT_BUTTON_CLASS) : 27;
-      expect(await compiledBoxHeight(skeletonClass)).toBe(settled);
+      // placeholder holds that frame; no cell holds `ROW_FRAME_CONTENT_DP`.
+      const frame = await compiledBoxHeight(COMPACT_BUTTON_FRAME_CLASS);
+      expect(await compiledBoxHeight(skeletonClass)).toBe(withCell ? frame : ROW_FRAME_CONTENT_DP);
       // Only a row that will host a cell marks its stacked line: a stacked frame
       // hosts the cell at the target so Android delivers its reach.
       expect(sharedRow(root).props.trailingIsTarget).toBe(withCell);
@@ -313,11 +311,7 @@ describe('IntegrationProviderRow action cell', () => {
       row: { provider: 'bitbucket', installed: true, canDisconnectNatively: false },
     },
   ])('keeps the $name button compact and reaching the target by hitSlop', async ({ name, row }) => {
-    const root = renderRow({
-      row: integrationRow(row),
-      scope: 'organization',
-      role: 'owner',
-    });
+    const root = renderRow({ row: integrationRow(row), scope: 'organization', role: 'owner' });
     const [button] = root.findAll(node => Object.is(node.type, 'Button'));
     if (!button) {
       throw new Error(`the ${name} row rendered no button`);
@@ -331,7 +325,7 @@ describe('IntegrationProviderRow action cell', () => {
 
     // The compiled compact frame plus the `hitSlop` every `sm` pressable gets.
     const reach = tapTargetReachDp(
-      (await compiledBoxHeight(COMPACT_BUTTON_CLASS)) as number,
+      (await compiledBoxHeight(COMPACT_BUTTON_FRAME_CLASS)) as number,
       COMPACT_BUTTON_HIT_SLOP.top
     );
     expect(reach).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);

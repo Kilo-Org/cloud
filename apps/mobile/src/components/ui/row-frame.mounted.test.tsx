@@ -3,9 +3,10 @@ import { type ComponentProps, createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
-import { compiledDimensions } from '@/test/native-dimensions';
+import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import {
+  ROW_FRAME_CONTENT_DP,
   ROW_FRAME_CONTENT_PRESS_CLASS,
   ROW_TARGET_CLASS,
   rowTargetHostClass,
@@ -85,6 +86,14 @@ describe('RowFrame geometry', () => {
     expect(ROW_FRAME_CLASS.split(' ')).toEqual(
       expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3'])
     );
+  });
+
+  it('derives the row’s content band from its frame and padding', async () => {
+    // `ROW_FRAME_CONTENT_DP` is what a placeholder and an overhang cancel
+    // derive from, so it has to equal the compiled frame less the compiled
+    // padding the row renders, not a hand-counted 27.
+    const frame = await compiledLengthDp(ROW_FRAME_CLASS, 'minHeight');
+    expect(frame - 2 * (await compiledLengthDp('py-3', 'paddingBlock'))).toBe(ROW_FRAME_CONTENT_DP);
   });
 
   it('gives a static row no pressable and no interactive state', () => {

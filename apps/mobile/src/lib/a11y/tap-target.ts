@@ -227,11 +227,13 @@ export const COMPACT_CONTROL_ROW_END_CLASS = '-me-[7px]';
 
 /**
  * A settings row's content band: the row's 48pt frame
- * (`ROW_FRAME_CLASS`) less its 10.5pt vertical padding a side. A trailing
- * control that contributes more than this sets the row's height, so it must
- * cancel down to it.
+ * (`ROW_FRAME_CLASS`) less its 10.5pt vertical padding a side, spelled
+ * `min-h-[48px]` less `py-3` twice. A trailing control that contributes more
+ * than this sets the row's height, so it must cancel down to it, and a
+ * placeholder that stands in for such a control derives its own height from
+ * this number.
  */
-const ROW_FRAME_CONTENT_DP = 27;
+export const ROW_FRAME_CONTENT_DP = 27;
 
 /**
  * The vertical margin a full {@link TOUCH_TARGET_DP} control cancels per side
@@ -357,6 +359,14 @@ export const FIELD_CLEAR_BOX_CLASS = 'h-[48px] w-[48px] -my-[7px] items-center j
  * 6 per side.
  */
 export const COMPACT_BUTTON_HIT_SLOP = { top: 5, bottom: 5, left: 5, right: 5 } as const;
+
+/**
+ * The frame the shared `Button` renders at its compact size (`sm`). The size is
+ * a minimum, not a fixed height, so a label scaled by large Dynamic Type grows
+ * the button instead of clipping it; the frame plus
+ * {@link COMPACT_BUTTON_HIT_SLOP} reaches the design target.
+ */
+export const COMPACT_BUTTON_FRAME_CLASS = 'min-h-[36px] rounded-md px-3 py-1.5';
 
 /**
  * The frame a compact `h-11` control renders, in pt. NativeWind's rem is 14pt

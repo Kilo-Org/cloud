@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { toast } from 'sonner-native';
 
 import { mergeRepositoryOptions, type RepoOption } from '@/components/profiles/repo-bindings-model';
+import { agentProfileMutationErrorMessage } from '@/lib/agent-profile-error-copy';
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
 import { type AgentRepoBinding } from '@/lib/hooks/agent-profile-types';
 import { keepPreviousDataForQueryKey } from '@/lib/hooks/use-agent-profiles';
@@ -71,7 +72,7 @@ export function useRepoBindingMutations(organizationId?: string) {
       void queryClient.invalidateQueries(bindingsFilter);
     },
     onError: (error: { message: string }) => {
-      toast.error(error.message);
+      toast.error(agentProfileMutationErrorMessage(error.message));
     },
   };
 

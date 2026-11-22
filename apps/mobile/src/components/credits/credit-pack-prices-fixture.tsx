@@ -363,17 +363,20 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
   //
   // The hand-off names the state that made it. This component stays mounted
   // across a link for another state, so a bare flag would leave the next state
-  // without the tile it exists to show. A tap in a state that never publishes a
-  // failure also keeps its own tile: only the failed state runs the purchase.
+  // without the tile it exists to show, and the hand-off therefore survives a
+  // link for another state. Only the state that runs a purchase may clear: an
+  // inert tap publishes no replacement, so clearing there would take away the
+  // refusal the failed state published and leave nothing to paint.
   const [tappedState, setTappedState] = useState<CreditPackPricesFixtureState | null>(null);
   const tapped = tapDriven && tappedState === state;
   const errorMessageKey = tapped
     ? (failedFailure?.failure.messageKey ?? null)
     : initialErrorMessageKey(state);
   const clearError = useCallback(() => {
-    if (tapDriven) {
-      setTappedState(state);
+    if (!tapDriven) {
+      return;
     }
+    setTappedState(state);
     for (const [key, phase] of states) {
       if (phase.status === 'failed') {
         clearPurchaseFailure(key, () => true);

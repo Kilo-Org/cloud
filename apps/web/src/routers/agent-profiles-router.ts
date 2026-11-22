@@ -1,5 +1,6 @@
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -36,14 +37,17 @@ import {
 /**
  * Mutating anything on an organization-owned profile — its content, its MCP
  * servers, its default flag, or the profile itself — is reserved for
- * organization owners and admins. Plain members keep read access through
+ * organization owners and admins, and refuses an organization whose trial ended
+ * without a bypass. The role check runs first, so a plain member keeps the
+ * message that names the missing role. Plain members keep read access through
  * `list`, `listCombined`, and `get`.
  */
-async function ensureOrganizationManageAccess(
+async function ensureOrganizationProfileWriteAccess(
   ctx: Parameters<typeof ensureOrganizationAccess>[0],
   organizationId: string
 ): Promise<void> {
   await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
+  await requireActiveSubscriptionOrTrial(organizationId);
 }
 
 // Input schemas
@@ -530,7 +534,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
@@ -580,7 +584,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileService.updateProfile(db, input.profileId, owner, {
@@ -600,7 +604,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const owner = getOwner(input.organizationId, ctx.user.id);
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       try {
         await profileService.deleteProfile(db, input.profileId, owner);
@@ -629,7 +633,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileService.setDefaultProfile(db, input.profileId, owner);
@@ -644,7 +648,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileService.clearDefaultProfile(db, input.profileId, owner);
@@ -664,7 +668,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileVarsService.setVar(
@@ -693,7 +697,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileVarsService.deleteVar(db, input.profileId, input.key, owner);
@@ -712,7 +716,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileCommandsService.setCommands(db, input.profileId, input.commands, owner);
@@ -733,7 +737,7 @@ export const agentProfilesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await repoBindingService.bindProfileToRepo(
@@ -758,7 +762,7 @@ export const agentProfilesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await repoBindingService.unbindRepo(db, owner, input.repoFullName, input.platform);
@@ -798,7 +802,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
@@ -837,7 +841,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
@@ -874,7 +878,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileMcpService.deleteMcpServer(db, input.profileId, input.mcpServerId, owner);
@@ -895,7 +899,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileMcpService.setMcpEnabled(
@@ -923,7 +927,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       return profileSkillsService.createCustomSkill(
@@ -953,7 +957,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
@@ -987,7 +991,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileSkillsService.updateSkill(
@@ -1019,7 +1023,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileSkillsService.deleteSkill(db, input.profileId, input.skillId, owner);
@@ -1040,7 +1044,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileSkillsService.setSkillEnabled(
@@ -1068,7 +1072,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
@@ -1106,7 +1110,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
@@ -1146,7 +1150,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileAgentsService.deleteAgent(db, input.profileId, input.agentId, owner);
@@ -1164,7 +1168,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
@@ -1204,7 +1208,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
@@ -1244,7 +1248,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileKiloCommandsService.deleteKiloCommand(
@@ -1267,7 +1271,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileKiloCommandsService.setKiloCommandEnabled(
@@ -1290,7 +1294,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileKiloCommandsService.reorderKiloCommands(
@@ -1317,7 +1321,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       return profileInstructionsService.createInstruction(
@@ -1341,7 +1345,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileInstructionsService.updateInstruction(
@@ -1367,7 +1371,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileInstructionsService.deleteInstruction(
@@ -1393,7 +1397,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileInstructionsService.setInstructionEnabled(
@@ -1446,7 +1450,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationManageAccess(ctx, input.organizationId);
+        await ensureOrganizationProfileWriteAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       if (IMPORT_CATEGORIES.every(category => input.selection[category].length === 0)) {

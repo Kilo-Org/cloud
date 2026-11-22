@@ -12,8 +12,16 @@ import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
  * in fact act. It is separate from `read-only` because a caller that shows
  * either an action or a statement about who may act must not claim the
  * read-only one for a user whose role it has not learned yet.
+ *
+ * `plan-ended` is the organization subscription gate: the membership row
+ * carries the server's `isTrialExpiredForEnforcement`, which the organization
+ * hub reads too. It applies only to a caller who could otherwise act, so an
+ * unknown role stays `resolving` — the app must not state either refusal
+ * before the role is known — and a narrow role keeps `read-only`, because that
+ * is the rule its reader can act on: ask an owner. A membership row that is
+ * absent leaves the plan unknown, and an unknown plan is not a lapsed one.
  */
-export type OrganizationProfilePermission = 'resolving' | 'allowed' | 'read-only';
+export type OrganizationProfilePermission = 'resolving' | 'allowed' | 'read-only' | 'plan-ended';
 
 /**
  * Resolve the profile-create permission for `organizationId`. Personal scope
@@ -23,12 +31,15 @@ export type OrganizationProfilePermission = 'resolving' | 'allowed' | 'read-only
 export function useOrganizationProfilePermission(
   organizationId?: string
 ): OrganizationProfilePermission {
-  const { role, isResolving, isError } = useOrgBoundary(organizationId);
+  const { role, org, isResolving, isError } = useOrgBoundary(organizationId);
   if (organizationId === undefined) {
     return 'allowed';
   }
   if (isResolving || isError) {
     return 'resolving';
   }
-  return canManageOrganization(role) ? 'allowed' : 'read-only';
+  if (!canManageOrganization(role)) {
+    return 'read-only';
+  }
+  return org?.isTrialExpiredForEnforcement === true ? 'plan-ended' : 'allowed';
 }

@@ -12,6 +12,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 const ACTION = 'Profile action';
 
 const SENTENCE = i18n.t('profiles.organizationRoleRequired');
+const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEnded');
 
 describe('ProfileManageSlot', () => {
   it('allowed: renders the child and not the sentence', async () => {
@@ -49,6 +50,27 @@ describe('ProfileManageSlot', () => {
       .map(node => node.props.children);
 
     expect(texts).toEqual([SENTENCE]);
+    expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('plan-ended: renders the ended-plan sentence in place of the action', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        ProfileManageSlot,
+        { permission: 'plan-ended' },
+        createElement('Action', null, ACTION)
+      )
+    );
+
+    const texts = renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .map(node => node.props.children);
+
+    // The plan, not the role, is what stops this manager: an action here would
+    // be refused by the server on every press.
+    expect(texts).toEqual([PLAN_ENDED_SENTENCE]);
     expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
 
     unmount();

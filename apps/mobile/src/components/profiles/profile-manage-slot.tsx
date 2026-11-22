@@ -7,16 +7,19 @@ import { type OrganizationProfilePermission } from '@/lib/hooks/use-can-manage-p
 
 /**
  * The manage-action slot of a profile section: the same place in the layout
- * holds either the caller's action or the sentence that names who may change
- * the profile.
+ * holds either the caller's action or the sentence that names why it is
+ * absent.
  *
  * An organization member sees no add, edit or delete control, and a section
  * without one of those reads as broken unless it says why. `read-only` states
  * the reason in the action's own slot, so a member and a manager read the same
- * screen in the same place. `resolving` renders neither: the role is not known
- * yet, so an action would be refused by the server for a member and the
- * sentence would tell an owner they cannot act on what they can. `allowed`
- * renders the caller's action, and nothing when the caller has none.
+ * screen in the same place. `plan-ended` does the same for a manager whose
+ * organization has no plan left: the server refuses the write, and an action
+ * that is always refused reads as broken, so the sentence that names the lapsed
+ * plan occupies the slot instead of a control. `resolving` renders neither: the
+ * role is not known yet, so an action would be refused by the server for a
+ * member and the sentence would tell an owner they cannot act on what they can.
+ * `allowed` renders the caller's action, and nothing when the caller has none.
  */
 export function ProfileManageSlot({
   permission,
@@ -29,13 +32,15 @@ export function ProfileManageSlot({
   if (permission === 'allowed') {
     return <>{children}</>;
   }
-  if (permission !== 'read-only') {
+  if (permission === 'resolving') {
     return null;
   }
   return (
     <View className="items-center">
       <Text variant="muted" className="text-center">
-        {t('profiles.organizationRoleRequired')}
+        {permission === 'plan-ended'
+          ? t('common.organizationTrialEnded')
+          : t('profiles.organizationRoleRequired')}
       </Text>
     </View>
   );

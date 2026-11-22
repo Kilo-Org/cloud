@@ -5,10 +5,12 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import {
+  organizations,
   agent_environment_profiles,
   agent_environment_profile_vars,
   agent_environment_profile_commands,
   agent_environment_profile_agents,
+  agent_environment_profile_instructions,
   agent_environment_profile_repo_bindings,
   cloud_agent_webhook_triggers,
   cli_sessions_v2,
@@ -133,6 +135,8 @@ describe('Agent Profiles Router', () => {
   let billingManagerUser: User;
   let otherUser: User;
   let organizationA: Organization;
+  let lapsedOwnerUser: User;
+  let lapsedOrganization: Organization;
 
   beforeAll(async () => {
     // Create test users
@@ -161,6 +165,11 @@ describe('Agent Profiles Router', () => {
       google_user_name: 'Other User',
     });
 
+    lapsedOwnerUser = await insertTestUser({
+      google_user_email: 'agent-profiles-lapsed-owner@example.com',
+      google_user_name: 'Agent Profiles Lapsed Owner',
+    });
+
     // Create test organization
     organizationA = await createTestOrganization('Agent Profiles Test Org', ownerUser.id, 100000);
 
@@ -168,6 +177,24 @@ describe('Agent Profiles Router', () => {
     await addUserToOrganization(organizationA.id, adminUser.id, 'admin');
     await addUserToOrganization(organizationA.id, memberUser.id, 'member');
     await addUserToOrganization(organizationA.id, billingManagerUser.id, 'billing_manager');
+
+    // A teams organization whose trial hard-expired 30 days ago: seats stay
+    // required, no seat purchase exists, and no sponsorship or suppressed
+    // messaging bypass replaces the trial. The entitlement classifies it as
+    // expired for enforcement, so its profile writes must refuse.
+    lapsedOrganization = await createTestOrganization(
+      'Agent Profiles Lapsed Org',
+      lapsedOwnerUser.id,
+      100000,
+      undefined,
+      true
+    );
+    await db
+      .update(organizations)
+      .set({
+        free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .where(eq(organizations.id, lapsedOrganization.id));
   });
 
   afterEach(async () => {
@@ -205,6 +232,12 @@ describe('Agent Profiles Router', () => {
     await db
       .delete(agent_environment_profiles)
       .where(eq(agent_environment_profiles.owned_by_organization_id, organizationA.id));
+    await db
+      .delete(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.owned_by_organization_id, lapsedOrganization.id));
+    await db
+      .delete(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.owned_by_user_id, lapsedOwnerUser.id));
   });
 
   describe('User Profiles', () => {
@@ -2600,6 +2633,168 @@ describe('Agent Profiles Router', () => {
             profileId,
             instructionId,
           });
+        });
+      });
+
+      /**
+       * The same write surface refuses an organization whose trial hard-expired
+       * with no bypass: `requireActiveSubscriptionOrTrial` answers FORBIDDEN with
+       * the sentence `organizations.update` shows. Rows are seeded directly,
+       * because the router's own create is one of the refused calls.
+       */
+      describe('organization profile writes are refused once the trial ends', () => {
+        async function expectWriteRejected(attempt: Promise<unknown>): Promise<void> {
+          await expect(attempt).rejects.toMatchObject({
+            code: 'FORBIDDEN',
+            message: 'Organization trial has expired.',
+          });
+        }
+
+        async function seedLapsedProfile(name: string): Promise<string> {
+          const [profile] = await db
+            .insert(agent_environment_profiles)
+            .values({
+              owned_by_organization_id: lapsedOrganization.id,
+              created_by_user_id: lapsedOwnerUser.id,
+              name,
+            })
+            .returning({ id: agent_environment_profiles.id });
+          return profile.id;
+        }
+
+        async function seedInstruction(profileId: string): Promise<string> {
+          const [instruction] = await db
+            .insert(agent_environment_profile_instructions)
+            .values({
+              profile_id: profileId,
+              name: 'lapsed-rules',
+              content: 'Follow the lapsed rules.',
+            })
+            .returning({ id: agent_environment_profile_instructions.id });
+          return instruction.id;
+        }
+
+        test('setInstructionEnabled: refuses and keeps the stored flag', async () => {
+          const caller = await createCallerForUser(lapsedOwnerUser.id);
+          const profileId = await seedLapsedProfile('Lapsed Toggle Profile');
+          const instructionId = await seedInstruction(profileId);
+
+          await expectWriteRejected(
+            caller.agentProfiles.setInstructionEnabled({
+              organizationId: lapsedOrganization.id,
+              profileId,
+              instructionId,
+              enabled: false,
+            })
+          );
+
+          const [stored] = await db
+            .select({ enabled: agent_environment_profile_instructions.enabled })
+            .from(agent_environment_profile_instructions)
+            .where(eq(agent_environment_profile_instructions.id, instructionId));
+          expect(stored.enabled).toBe(true);
+        });
+
+        test('create: refuses and stores no profile', async () => {
+          const caller = await createCallerForUser(lapsedOwnerUser.id);
+
+          await expectWriteRejected(
+            caller.agentProfiles.create({
+              organizationId: lapsedOrganization.id,
+              name: 'Lapsed New Profile',
+            })
+          );
+
+          const stored = await db
+            .select({ id: agent_environment_profiles.id })
+            .from(agent_environment_profiles)
+            .where(
+              and(
+                eq(agent_environment_profiles.owned_by_organization_id, lapsedOrganization.id),
+                eq(agent_environment_profiles.name, 'Lapsed New Profile')
+              )
+            );
+          expect(stored).toHaveLength(0);
+        });
+
+        test('setVar and bindToRepo: refuse and write no row', async () => {
+          const caller = await createCallerForUser(lapsedOwnerUser.id);
+          const profileId = await seedLapsedProfile('Lapsed Binding Profile');
+
+          await expectWriteRejected(
+            caller.agentProfiles.setVar({
+              organizationId: lapsedOrganization.id,
+              profileId,
+              key: 'LAPSED_VAR',
+              value: 'lapsed-value',
+              isSecret: false,
+            })
+          );
+          await expectWriteRejected(
+            caller.agentProfiles.bindToRepo({
+              organizationId: lapsedOrganization.id,
+              profileId,
+              repoFullName: 'acme/lapsed',
+              platform: 'github',
+            })
+          );
+
+          const vars = await db
+            .select({ id: agent_environment_profile_vars.id })
+            .from(agent_environment_profile_vars)
+            .where(eq(agent_environment_profile_vars.profile_id, profileId));
+          expect(vars).toHaveLength(0);
+
+          const bindings = await db
+            .select({ id: agent_environment_profile_repo_bindings.id })
+            .from(agent_environment_profile_repo_bindings)
+            .where(eq(agent_environment_profile_repo_bindings.profile_id, profileId));
+          expect(bindings).toHaveLength(0);
+        });
+
+        test('a personal write by the same owner still succeeds', async () => {
+          const caller = await createCallerForUser(lapsedOwnerUser.id);
+
+          const created = await caller.agentProfiles.create({ name: 'Lapsed Owner Personal' });
+          await caller.agentProfiles.setVar({
+            profileId: created.id,
+            key: 'PERSONAL_VAR',
+            value: 'personal-value',
+            isSecret: false,
+          });
+
+          const stored = await db
+            .select({ value: agent_environment_profile_vars.value })
+            .from(agent_environment_profile_vars)
+            .where(eq(agent_environment_profile_vars.profile_id, created.id));
+          expect(stored).toHaveLength(1);
+        });
+
+        test('an organization with a live trial still allows the write', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const { id: profileId } = await caller.agentProfiles.create({
+            organizationId: organizationA.id,
+            name: 'Live Trial Profile',
+          });
+          const { id: instructionId } = await caller.agentProfiles.createInstruction({
+            organizationId: organizationA.id,
+            profileId,
+            name: 'live-rules',
+            content: 'Follow the live rules.',
+          });
+
+          await caller.agentProfiles.setInstructionEnabled({
+            organizationId: organizationA.id,
+            profileId,
+            instructionId,
+            enabled: false,
+          });
+
+          const [stored] = await db
+            .select({ enabled: agent_environment_profile_instructions.enabled })
+            .from(agent_environment_profile_instructions)
+            .where(eq(agent_environment_profile_instructions.id, instructionId));
+          expect(stored.enabled).toBe(false);
         });
       });
 

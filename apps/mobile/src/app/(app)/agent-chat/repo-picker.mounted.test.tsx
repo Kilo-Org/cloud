@@ -223,6 +223,11 @@ describe('repository picker empty state', () => {
     expect(routerMock.push).toHaveBeenCalledWith(
       '/(app)/(tabs)/(3_profile)/integrations?org=org-1'
     );
+    // The order is the point: the pop leaves this route before the push joins
+    // the stack the composer left, so a push first would land under the picker.
+    const popOrder = routerMock.back.mock.invocationCallOrder[0] ?? 0;
+    const pushOrder = routerMock.push.mock.invocationCallOrder[0] ?? 0;
+    expect(popOrder).toBeLessThan(pushOrder);
     expect(slotBridge.onSelect).not.toHaveBeenCalled();
   });
 });

@@ -3435,7 +3435,7 @@
         "unknown": "د پلټنې پېښه"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "حالت \"{{name}}\" (پېژندونکی: {{slug}})",
         "modeUpdate": "حالت \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} د {{role}} په توګه اضافه شو",
         "memberRemoved": "{{email}} لرې شو",
         "memberParentAdded": "{{email}} د مورني سازمان {{parent}} څخه اضافه شو",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "د استنباط سیمه: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "حالت \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "حالت \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "نړیوال ډیفالټ",
           "specific": "{{model}}",

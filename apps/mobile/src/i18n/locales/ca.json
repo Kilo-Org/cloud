@@ -3497,7 +3497,7 @@
         "unknown": "Esdeveniment d'auditoria"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Mode \"{{name}}\" (identificador: {{slug}})",
         "modeUpdate": "Mode \"{{name}}\": {{changes}}",
         "field": {
@@ -3517,7 +3517,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Afegit {{email}} com a {{role}}",
         "memberRemoved": "Eliminat {{email}}",
         "memberParentAdded": "Afegit {{email}} de l'organització principal {{parent}}",
@@ -3559,7 +3559,7 @@
         "settingAdvancedPoliciesRegion": "Regió d'inferència: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Mode \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Mode \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Predeterminat global",
           "specific": "{{model}}",

@@ -3559,7 +3559,7 @@
         "unknown": "Auditná udalosť"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Režim \"{{name}}\" (identifikátor: {{slug}})",
         "modeUpdate": "Režim \"{{name}}\": {{changes}}",
         "field": {
@@ -3579,7 +3579,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} pridaný ako {{role}}",
         "memberRemoved": "{{email}} odstránený",
         "memberParentAdded": "{{email}} pridaný z materskej organizácie {{parent}}",
@@ -3621,7 +3621,7 @@
         "settingAdvancedPoliciesRegion": "Región inferencie: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Režim \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Režim \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Globálne predvolené",
           "specific": "{{model}}",

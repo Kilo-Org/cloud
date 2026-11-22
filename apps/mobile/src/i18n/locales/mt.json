@@ -3621,7 +3621,7 @@
         "unknown": "Avveniment tal-awditjar"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Mod \"{{name}}\" (identifikatur: {{slug}})",
         "modeUpdate": "Mod \"{{name}}\": {{changes}}",
         "field": {
@@ -3641,7 +3641,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Miżjud {{email}} bħala {{role}}",
         "memberRemoved": "Mneħħi {{email}}",
         "memberParentAdded": "Miżjud {{email}} mill-organizzazzjoni omm {{parent}}",
@@ -3683,7 +3683,7 @@
         "settingAdvancedPoliciesRegion": "Reġjun tal-inferenza: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Mod \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Mod \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Predefinit globali",
           "specific": "{{model}}",

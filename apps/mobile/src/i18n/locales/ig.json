@@ -3435,7 +3435,7 @@
         "unknown": "Ihe omume nyocha"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Ọnọdụ \"{{name}}\" (njirimara: {{slug}})",
         "modeUpdate": "Ọnọdụ \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Agbakwunyere {{email}} dị ka {{role}}",
         "memberRemoved": "Ewepụrụ {{email}}",
         "memberParentAdded": "Agbakwunyere {{email}} site n'ụlọ ọrụ nne {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Mpaghara ntule: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Ọnọdụ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Ọnọdụ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Ndabara zuru ụwa",
           "specific": "{{model}}",

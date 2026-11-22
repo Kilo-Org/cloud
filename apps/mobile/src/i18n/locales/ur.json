@@ -3435,7 +3435,7 @@
         "unknown": "آڈٹ ایونٹ"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "موڈ “{{name}}” (شناخت کنندہ: {{slug}})",
         "modeUpdate": "موڈ “{{name}}”: {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} کو {{role}} کے طور پر شامل کیا گیا",
         "memberRemoved": "{{email}} کو ہٹایا گیا",
         "memberParentAdded": "{{email}} کو بنیادی تنظیم {{parent}} سے شامل کیا گیا",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "انفرنس کا خطہ: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "موڈ “{{mode}}”: {{previous}} → {{next}}",
+        "settingAutoRoute": "موڈ “{{mode}}”: {{change}}",
         "settingDefaultBehavior": {
           "global": "عالمی ڈیفالٹ",
           "specific": "{{model}}",

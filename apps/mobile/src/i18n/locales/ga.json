@@ -3621,7 +3621,7 @@
         "unknown": "Imeacht iniúchta"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Mód \"{{name}}\" (aitheantóir: {{slug}})",
         "modeUpdate": "Mód \"{{name}}\": {{changes}}",
         "field": {
@@ -3641,7 +3641,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} curtha leis mar {{role}}",
         "memberRemoved": "{{email}} bainte",
         "memberParentAdded": "{{email}} curtha leis ó mhátheagraíocht {{parent}}",
@@ -3683,7 +3683,7 @@
         "settingAdvancedPoliciesRegion": "Réigiún tátail: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Mód \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Mód \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Réamhshocrú domhanda",
           "specific": "{{model}}",

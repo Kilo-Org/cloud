@@ -3435,7 +3435,7 @@
         "unknown": "Ouditgebeurtenis"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modus \"{{name}}\" (identifiseerder: {{slug}})",
         "modeUpdate": "Modus \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} as {{role}} bygevoeg",
         "memberRemoved": "{{email}} verwyder",
         "memberParentAdded": "{{email}} vanaf hooforganisasie {{parent}} bygevoeg",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Inferensiestreek: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modus \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Modus \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Globale verstek",
           "specific": "{{model}}",

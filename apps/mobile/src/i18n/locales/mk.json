@@ -3435,7 +3435,7 @@
         "unknown": "Настан од ревизија"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Режим „{{name}}“ (идентификатор: {{slug}})",
         "modeUpdate": "Режим „{{name}}“: {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Додаден {{email}} како {{role}}",
         "memberRemoved": "Отстранет {{email}}",
         "memberParentAdded": "Додаден {{email}} од родителска организација {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Регион за инференција: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Режим „{{mode}}“: {{previous}} → {{next}}",
+        "settingAutoRoute": "Режим „{{mode}}“: {{change}}",
         "settingDefaultBehavior": {
           "global": "Глобално стандардно",
           "specific": "{{model}}",

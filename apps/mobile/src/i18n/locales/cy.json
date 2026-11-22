@@ -3683,7 +3683,7 @@
         "unknown": "Digwyddiad archwilio"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modd \"{{name}}\" (dynodydd: {{slug}})",
         "modeUpdate": "Modd \"{{name}}\": {{changes}}",
         "field": {
@@ -3703,7 +3703,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Ychwanegwyd {{email}} fel {{role}}",
         "memberRemoved": "Tynnwyd {{email}}",
         "memberParentAdded": "Ychwanegwyd {{email}} o'r rhiant-sefydliad {{parent}}",
@@ -3745,7 +3745,7 @@
         "settingAdvancedPoliciesRegion": "Rhanbarth casgliadu: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modd \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Modd \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Diofyn byd-eang",
           "specific": "{{model}}",

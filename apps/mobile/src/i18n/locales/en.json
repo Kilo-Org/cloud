@@ -3539,7 +3539,7 @@
         "unknown": "Audit event"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Mode \"{{name}}\" (identifier: {{slug}})",
         "modeUpdate": "Mode \"{{name}}\": {{changes}}",
         "field": {
@@ -3559,7 +3559,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Added {{email}} as {{role}}",
         "memberRemoved": "Removed {{email}}",
         "memberParentAdded": "Added {{email}} from parent organization {{parent}}",
@@ -3601,7 +3601,7 @@
         "settingAdvancedPoliciesRegion": "Inference region: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Mode \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Mode \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Global default",
           "specific": "{{model}}",

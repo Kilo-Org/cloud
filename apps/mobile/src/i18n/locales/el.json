@@ -3435,7 +3435,7 @@
         "unknown": "Συμβάν ελέγχου"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Λειτουργία \"{{name}}\" (αναγνωριστικό: {{slug}})",
         "modeUpdate": "Λειτουργία \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Προστέθηκε {{email}} ως {{role}}",
         "memberRemoved": "Αφαιρέθηκε {{email}}",
         "memberParentAdded": "Προστέθηκε {{email}} από τον μητρικό οργανισμό {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Περιοχή εξαγωγής συμπερασμάτων: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Λειτουργία \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Λειτουργία \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Καθολική προεπιλογή",
           "specific": "{{model}}",

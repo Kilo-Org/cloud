@@ -3435,7 +3435,7 @@
         "unknown": "ऑडिट घटना"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "मोड \"{{name}}\" (ओळखकर्ता: {{slug}})",
         "modeUpdate": "मोड \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ला {{role}} म्हणून जोडले",
         "memberRemoved": "{{email}} काढले",
         "memberParentAdded": "मूळ संस्था {{parent}} मधून {{email}} जोडले",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "इन्फरन्स प्रदेश: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "मोड \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "मोड \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ग्लोबल डीफॉल्ट",
           "specific": "{{model}}",

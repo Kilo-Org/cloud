@@ -3435,7 +3435,7 @@
         "unknown": "Endurskoðunaratburður"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Hamur \"{{name}}\" (auðkenni: {{slug}})",
         "modeUpdate": "Hamur \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} bætt við sem {{role}}",
         "memberRemoved": "{{email}} fjarlægt",
         "memberParentAdded": "{{email}} bætt við frá móðurfélagi {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Ályktunarsvæði: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Hamur \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Hamur \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Altækt sjálfgefið",
           "specific": "{{model}}",

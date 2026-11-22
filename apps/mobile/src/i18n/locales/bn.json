@@ -3435,7 +3435,7 @@
         "unknown": "অডিট ইভেন্ট"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "মোড \"{{name}}\" (আইডেন্টিফায়ার: {{slug}})",
         "modeUpdate": "মোড \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} কে {{role}} হিসেবে যোগ করা হয়েছে",
         "memberRemoved": "{{email}} অপসারণ করা হয়েছে",
         "memberParentAdded": "মূল সংস্থা {{parent}} থেকে {{email}} যোগ করা হয়েছে",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ইনফারেন্স অঞ্চল: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "মোড \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "মোড \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "বৈশ্বিক ডিফল্ট",
           "specific": "{{model}}",

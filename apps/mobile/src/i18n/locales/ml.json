@@ -3435,7 +3435,7 @@
         "unknown": "ഓഡിറ്റ് ഇവന്റ്"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "മോഡ് \"{{name}}\" (ഐഡന്റിഫയർ: {{slug}})",
         "modeUpdate": "മോഡ് \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} എന്നയാളെ {{role}} ആയി ചേർത്തു",
         "memberRemoved": "{{email}} എന്നയാളെ നീക്കം ചെയ്തു",
         "memberParentAdded": "പേരന്റ് ഓർഗനൈസേഷൻ {{parent}}-ൽ നിന്ന് {{email}} എന്നയാളെ ചേർത്തു",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ഇൻഫറൻസ് പ്രദേശം: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "മോഡ് \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "മോഡ് \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ആഗോള ഡിഫോൾട്ട്",
           "specific": "{{model}}",

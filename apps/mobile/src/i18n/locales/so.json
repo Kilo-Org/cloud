@@ -3435,7 +3435,7 @@
         "unknown": "Dhacdo hubin"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Qaabka \"{{name}}\" (aqoonsiga: {{slug}})",
         "modeUpdate": "Qaabka \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} lagu daray {{role}} ahaan",
         "memberRemoved": "{{email}} la saaray",
         "memberParentAdded": "{{email}} laga soo daray ururka sare {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Gobolka falanqaynta: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Qaabka \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Qaabka \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Caadiga guud",
           "specific": "{{model}}",

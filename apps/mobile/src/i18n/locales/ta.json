@@ -3435,7 +3435,7 @@
         "unknown": "தணிக்கை நிகழ்வு"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "முறை \"{{name}}\" (அடையாளங்காட்டி: {{slug}})",
         "modeUpdate": "முறை \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} {{role}} ஆகச் சேர்க்கப்பட்டார்",
         "memberRemoved": "{{email}} அகற்றப்பட்டார்",
         "memberParentAdded": "தாய் நிறுவனம் {{parent}} இலிருந்து {{email}} சேர்க்கப்பட்டார்",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "அனுமானப் பிராந்தியம்: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "முறை \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "முறை \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "உலகளாவிய இயல்புநிலை",
           "specific": "{{model}}",

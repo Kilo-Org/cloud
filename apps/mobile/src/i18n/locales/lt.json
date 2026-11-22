@@ -3559,7 +3559,7 @@
         "unknown": "Audito įvykis"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Režimas „{{name}}“ (identifikatorius: {{slug}})",
         "modeUpdate": "Režimas „{{name}}“: {{changes}}",
         "field": {
@@ -3579,7 +3579,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} pridėtas kaip {{role}}",
         "memberRemoved": "{{email}} pašalintas",
         "memberParentAdded": "{{email}} pridėtas iš patronuojančios organizacijos {{parent}}",
@@ -3621,7 +3621,7 @@
         "settingAdvancedPoliciesRegion": "Inferencijos regionas: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Režimas „{{mode}}“: {{previous}} → {{next}}",
+        "settingAutoRoute": "Režimas „{{mode}}“: {{change}}",
         "settingDefaultBehavior": {
           "global": "Visuotinis numatytasis",
           "specific": "{{model}}",

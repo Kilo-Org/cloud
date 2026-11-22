@@ -3435,7 +3435,7 @@
         "unknown": "เหตุการณ์ตรวจสอบ"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "โหมด \"{{name}}\" (ตัวระบุ: {{slug}})",
         "modeUpdate": "โหมด \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "เพิ่ม {{email}} เป็น {{role}}",
         "memberRemoved": "ลบ {{email}}",
         "memberParentAdded": "เพิ่ม {{email}} จากองค์กรแม่ {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ภูมิภาคการอนุมาน: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "โหมด \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "โหมด \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ค่าเริ่มต้นส่วนกลาง",
           "specific": "{{model}}",

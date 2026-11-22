@@ -3551,7 +3551,7 @@
         "unknown": "Подія аудиту"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Режим «{{name}}» (ідентифікатор: {{slug}})",
         "modeUpdate": "Режим «{{name}}»: {{changes}}",
         "field": {
@@ -3571,7 +3571,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Додано {{email}} як {{role}}",
         "memberRemoved": "Видалено {{email}}",
         "memberParentAdded": "Додано {{email}} з батьківської організації {{parent}}",
@@ -3613,7 +3613,7 @@
         "settingAdvancedPoliciesRegion": "Регіон інференсу: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Режим «{{mode}}»: {{previous}} → {{next}}",
+        "settingAutoRoute": "Режим «{{mode}}»: {{change}}",
         "settingDefaultBehavior": {
           "global": "Глобальне значення за замовчуванням",
           "specific": "{{model}}",

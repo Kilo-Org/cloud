@@ -3489,7 +3489,7 @@
         "unknown": "אירוע ביקורת"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "מצב \"{{name}}\" (מזהה: {{slug}})",
         "modeUpdate": "מצב \"{{name}}\": {{changes}}",
         "field": {
@@ -3509,7 +3509,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "נוסף {{email}} בתפקיד {{role}}",
         "memberRemoved": "הוסר {{email}}",
         "memberParentAdded": "נוסף {{email}} מארגון האם {{parent}}",
@@ -3551,7 +3551,7 @@
         "settingAdvancedPoliciesRegion": "אזור הסקה: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "מצב \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "מצב \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ברירת מחדל גלובלית",
           "specific": "{{model}}",

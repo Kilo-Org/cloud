@@ -3427,7 +3427,7 @@
         "unknown": "Sự kiện kiểm tra"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Chế độ \"{{name}}\" (mã định danh: {{slug}})",
         "modeUpdate": "Chế độ \"{{name}}\": {{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Đã thêm {{email}} với vai trò {{role}}",
         "memberRemoved": "Đã xóa {{email}}",
         "memberParentAdded": "Đã thêm {{email}} từ tổ chức mẹ {{parent}}",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "Khu vực suy luận: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Chế độ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Chế độ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Mặc định toàn cục",
           "specific": "{{model}}",

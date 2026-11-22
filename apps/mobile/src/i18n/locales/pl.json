@@ -3551,7 +3551,7 @@
         "unknown": "Zdarzenie audytu"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Tryb \"{{name}}\" (identyfikator: {{slug}})",
         "modeUpdate": "Tryb \"{{name}}\": {{changes}}",
         "field": {
@@ -3571,7 +3571,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Dodano {{email}} jako {{role}}",
         "memberRemoved": "Usunięto {{email}}",
         "memberParentAdded": "Dodano {{email}} z organizacji nadrzędnej {{parent}}",
@@ -3613,7 +3613,7 @@
         "settingAdvancedPoliciesRegion": "Region wnioskowania: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Tryb \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Tryb \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Domyślne globalne",
           "specific": "{{model}}",

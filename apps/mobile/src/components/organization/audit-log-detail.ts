@@ -6,7 +6,7 @@ import {
 } from '@kilocode/app-shared/organizations';
 import { type TFunction } from 'i18next';
 
-import { isolateBidiText } from '@/lib/bidi';
+import { isolateBidiText, isolateLtrBidiText } from '@/lib/bidi';
 import { formatList, formatPrefixedMoney } from '@/lib/format';
 
 /**
@@ -36,6 +36,7 @@ export function auditEntryDetail(
     list: (values: readonly string[]) => formatList(values, locale),
     state: (enabled: boolean) =>
       t(enabled ? 'organization.auditLog.detail.enabled' : 'organization.auditLog.detail.disabled'),
+    change: (previous: string, next: string) => isolateLtrBidiText(`${previous} → ${next}`),
   });
   return render === undefined ? undefined : t(render.key, render.values);
 }
@@ -48,6 +49,12 @@ type Tools = Readonly<{
   isolated: (value: string) => string;
   list: (values: readonly string[]) => string;
   state: (enabled: boolean) => string;
+  /**
+   * An old value and a new value as one run read left to right. A paragraph in
+   * a right-to-left language would otherwise lay the pair out right to left and
+   * the reader would take the new value for the old one.
+   */
+  change: (previous: string, next: string) => string;
 }>;
 
 /** One sentence: its catalog key and the values it interpolates. */
@@ -152,7 +159,7 @@ const DEFAULT_BEHAVIOR_KEYS = {
  * the type check here until its template exists.
  */
 function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefined {
-  const { t, locale, isolated, list, state } = tools;
+  const { t, locale, isolated, list, state, change } = tools;
   const templates: AuditTemplates = {
     'mode.identity': d => ({
       key: 'organization.auditLog.detail.modeIdentity',
@@ -175,15 +182,14 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
           name: isolated(d.name),
           slug: isolated(d.slug),
           changes: list(
-            d.fields.map(change => {
-              const field = t(FIELD_KEYS[change.field]);
-              if (change.previous === undefined || change.next === undefined) {
+            d.fields.map(entry => {
+              const field = t(FIELD_KEYS[entry.field]);
+              if (entry.previous === undefined || entry.next === undefined) {
                 return field;
               }
               return t('organization.auditLog.detail.fieldChange', {
                 field,
-                previous: isolated(change.previous),
-                next: isolated(change.next),
+                change: change(entry.previous, entry.next),
               });
             })
           ),
@@ -195,8 +201,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
       key: 'organization.auditLog.detail.memberRole',
       values: {
         email: isolated(d.email),
-        previous: t(ROLE_KEYS[d.previous]),
-        next: t(ROLE_KEYS[d.next]),
+        change: change(t(ROLE_KEYS[d.previous]), t(ROLE_KEYS[d.next])),
       },
     }),
     'member.added': d => ({
@@ -381,7 +386,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
           };
     },
     'setting.defaultModel': d => defaultModelRow(d, tools),
-    // The sentence reads "<from> → <to>", so it needs both arms. A route that
+    // The sentence reads "<old> → <new>", so it needs both arms. A route that
     // was only set, or only cleared, has one, and the row shows its event name
     // alone rather than a dangling arrow.
     'setting.autoRoute': d =>
@@ -391,8 +396,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
             key: 'organization.auditLog.detail.settingAutoRoute',
             values: {
               mode: isolated(d.mode),
-              previous: isolated(d.previous),
-              next: isolated(d.next),
+              change: change(d.previous, d.next),
             },
           },
     'setting.defaultBehavior': d => ({
@@ -597,7 +601,7 @@ function defaultModelRow(
   detail: Extract<AuditDetail, { id: 'setting.defaultModel' }>,
   tools: Tools
 ): Render | undefined {
-  const { t, isolated } = tools;
+  const { t, isolated, change } = tools;
   if (detail.previous === undefined) {
     if (detail.next === undefined) {
       return undefined;
@@ -617,8 +621,7 @@ function defaultModelRow(
     key: 'organization.auditLog.detail.fieldChange',
     values: {
       field: t(DEFAULT_MODEL_FIELD_KEY),
-      previous: isolated(detail.previous),
-      next: isolated(detail.next),
+      change: change(detail.previous, detail.next),
     },
   };
 }

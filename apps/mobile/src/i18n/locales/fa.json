@@ -3435,7 +3435,7 @@
         "unknown": "رویداد حسابرسی"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "حالت \"{{name}}\" (شناسه: {{slug}})",
         "modeUpdate": "حالت \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} به‌عنوان {{role}} اضافه شد",
         "memberRemoved": "{{email}} حذف شد",
         "memberParentAdded": "{{email}} از سازمان مادر {{parent}} اضافه شد",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "منطقه استنتاج: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "حالت \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "حالت \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "پیش‌فرض سراسری",
           "specific": "{{model}}",

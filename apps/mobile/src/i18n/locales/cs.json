@@ -3559,7 +3559,7 @@
         "unknown": "Událost auditu"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Režim \"{{name}}\" (identifikátor: {{slug}})",
         "modeUpdate": "Režim \"{{name}}\": {{changes}}",
         "field": {
@@ -3579,7 +3579,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Přidán {{email}} jako {{role}}",
         "memberRemoved": "Odebrán {{email}}",
         "memberParentAdded": "Přidán {{email}} z nadřazené organizace {{parent}}",
@@ -3621,7 +3621,7 @@
         "settingAdvancedPoliciesRegion": "Region inference: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Režim \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Režim \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Globální výchozí",
           "specific": "{{model}}",

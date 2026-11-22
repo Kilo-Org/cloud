@@ -3497,7 +3497,7 @@
         "unknown": "Audita notikums"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Režīms \"{{name}}\" (identifikators: {{slug}})",
         "modeUpdate": "Režīms \"{{name}}\": {{changes}}",
         "field": {
@@ -3517,7 +3517,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Pievienots {{email}} kā {{role}}",
         "memberRemoved": "Noņemts {{email}}",
         "memberParentAdded": "Pievienots {{email}} no mātes organizācijas {{parent}}",
@@ -3559,7 +3559,7 @@
         "settingAdvancedPoliciesRegion": "Secināšanas reģions: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Režīms \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Režīms \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Globālais noklusējums",
           "specific": "{{model}}",

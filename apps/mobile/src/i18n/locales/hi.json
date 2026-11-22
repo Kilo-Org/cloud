@@ -3427,7 +3427,7 @@
         "unknown": "ऑडिट इवेंट"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "मोड \"{{name}}\" (आइडेंटिफ़ायर: {{slug}})",
         "modeUpdate": "मोड \"{{name}}\": {{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} को {{role}} के रूप में जोड़ा गया",
         "memberRemoved": "{{email}} हटाया गया",
         "memberParentAdded": "मुख्य संगठन {{parent}} से {{email}} जोड़ा गया",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "इन्फ़रेंस क्षेत्र: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "मोड \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "मोड \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "वैश्विक डिफ़ॉल्ट",
           "specific": "{{model}}",

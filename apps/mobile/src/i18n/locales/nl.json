@@ -3427,7 +3427,7 @@
         "unknown": "Auditgebeurtenis"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modus \"{{name}}\" (identificatie: {{slug}})",
         "modeUpdate": "Modus \"{{name}}\": {{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} toegevoegd als {{role}}",
         "memberRemoved": "{{email}} verwijderd",
         "memberParentAdded": "{{email}} toegevoegd vanuit bovenliggende organisatie {{parent}}",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "Inferentieregio: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modus \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Modus \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Globale standaard",
           "specific": "{{model}}",

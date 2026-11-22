@@ -3435,7 +3435,7 @@
         "unknown": "Tarkastustapahtuma"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Tila \"{{name}}\" (tunniste: {{slug}})",
         "modeUpdate": "Tila \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Lisätty {{email}} roolilla {{role}}",
         "memberRemoved": "Poistettu {{email}}",
         "memberParentAdded": "Lisätty {{email}} emo-organisaatiosta {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Päättelyalue: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Tila \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Tila \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Yleinen oletus",
           "specific": "{{model}}",

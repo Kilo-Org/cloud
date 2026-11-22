@@ -3435,7 +3435,7 @@
         "unknown": "Umcimbi wokucwaninga"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Imodi \"{{name}}\" (isihlonzi: {{slug}})",
         "modeUpdate": "Imodi \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Kungezwe {{email}} njengo-{{role}}",
         "memberRemoved": "Kususwe {{email}}",
         "memberParentAdded": "Kungezwe {{email}} kusuka enhlanganweni engumzali {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Isifunda sokucabanga: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Imodi \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Imodi \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Okuzenzakalelayo jikelele",
           "specific": "{{model}}",

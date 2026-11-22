@@ -3559,7 +3559,7 @@
         "unknown": "Падзея аўдыту"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Рэжым \"{{name}}\" (ідэнтыфікатар: {{slug}})",
         "modeUpdate": "Рэжым \"{{name}}\": {{changes}}",
         "field": {
@@ -3579,7 +3579,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Дададзены {{email}} як {{role}}",
         "memberRemoved": "Выдалены {{email}}",
         "memberParentAdded": "Дададзены {{email}} з мацярынскай арганізацыі {{parent}}",
@@ -3621,7 +3621,7 @@
         "settingAdvancedPoliciesRegion": "Рэгіён інферэнсу: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Рэжым \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Рэжым \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Глабальнае па змаўчанні",
           "specific": "{{model}}",

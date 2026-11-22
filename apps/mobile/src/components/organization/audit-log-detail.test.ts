@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { AUDIT_DETAIL_IDS, type AuditDetail } from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { auditEntryDetail } from './audit-log-detail';
 
 const t = i18n.t.bind(i18n);
@@ -65,6 +66,33 @@ describe('auditEntryDetail', () => {
   it('keeps a value that can carry its own direction inside an isolate', async () => {
     const rendered = await renderIn('ar', { id: 'member.removed', email: 'ada@example.com' });
     expect(rendered).toContain('\u2068ada@example.com\u2069');
+  });
+
+  it('reads an old value then a new value in one left-to-right run', async () => {
+    // A right-to-left paragraph lays an unisolated pair out right to left, so
+    // the reader takes the new value for the old one. One left-to-right
+    // isolate pins the order of the pair.
+    const rendered = await renderIn('ar', {
+      id: 'member.role',
+      email: 'ada@example.com',
+      previous: 'member',
+      next: 'admin',
+    });
+    const oldRole = i18n.t('organization.auditLog.detail.role.member');
+    const newRole = i18n.t('organization.auditLog.detail.role.admin');
+    expect(rendered).toContain(isolateLtrBidiText(`${oldRole} → ${newRole}`));
+    // Inside that run the logical order is the old value, then the arrow, then
+    // the new value.
+    const run = rendered?.slice(rendered.indexOf('\u2066')) ?? '';
+    const oldAt = run.indexOf(oldRole);
+    const arrowAt = run.indexOf(' → ');
+    const newAt = run.indexOf(newRole);
+    expect(oldAt).toBeGreaterThanOrEqual(0);
+    expect(arrowAt).toBeGreaterThan(oldAt);
+    expect(newAt).toBeGreaterThan(arrowAt);
+    // Neither value keeps an isolate of its own inside the run.
+    expect(run).not.toContain(isolateLtrBidiText(oldRole));
+    expect(run).not.toContain(isolateLtrBidiText(newRole));
   });
 
   it('renders no detail for an event whose name already says everything', () => {

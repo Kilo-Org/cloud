@@ -3435,7 +3435,7 @@
         "unknown": "Peristiwa audit"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "mod \"{{name}}\" (pengecam: {{slug}})",
         "modeUpdate": "mod \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ditambah sebagai {{role}}",
         "memberRemoved": "{{email}} dikeluarkan",
         "memberParentAdded": "{{email}} ditambah daripada organisasi induk {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "wilayah inferens: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "mod \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "mod \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Lalai global",
           "specific": "{{model}}",

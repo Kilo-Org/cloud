@@ -3435,7 +3435,7 @@
         "unknown": "Audit-gertaera"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modua \"{{name}}\" (identifikatzailea: {{slug}})",
         "modeUpdate": "Modua \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} gehitu da {{role}} gisa",
         "memberRemoved": "{{email}} kendu da",
         "memberParentAdded": "{{email}} gehitu da {{parent}} erakunde nagusitik",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Inferentzia-eskualdea: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modua \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Modua \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Global lehenetsia",
           "specific": "{{model}}",

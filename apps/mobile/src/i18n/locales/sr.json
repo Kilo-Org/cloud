@@ -3497,7 +3497,7 @@
         "unknown": "Događaj revizije"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Režim „{{name}}“ (identifikator: {{slug}})",
         "modeUpdate": "Režim „{{name}}“: {{changes}}",
         "field": {
@@ -3517,7 +3517,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} dodat kao {{role}}",
         "memberRemoved": "{{email}} uklonjen",
         "memberParentAdded": "{{email}} dodat iz nadređene organizacije {{parent}}",
@@ -3559,7 +3559,7 @@
         "settingAdvancedPoliciesRegion": "Region izvršavanja: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Režim „{{mode}}“: {{previous}} → {{next}}",
+        "settingAutoRoute": "Režim „{{mode}}“: {{change}}",
         "settingDefaultBehavior": {
           "global": "Globalno podrazumevano",
           "specific": "{{model}}",

@@ -3551,7 +3551,7 @@
         "unknown": "Событие аудита"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Режим «{{name}}» (идентификатор: {{slug}})",
         "modeUpdate": "Режим «{{name}}»: {{changes}}",
         "field": {
@@ -3571,7 +3571,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} добавлен как {{role}}",
         "memberRemoved": "{{email}} удалён",
         "memberParentAdded": "{{email}} добавлен из родительской организации {{parent}}",
@@ -3613,7 +3613,7 @@
         "settingAdvancedPoliciesRegion": "Регион инференса: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Режим «{{mode}}»: {{previous}} → {{next}}",
+        "settingAutoRoute": "Режим «{{mode}}»: {{change}}",
         "settingDefaultBehavior": {
           "global": "Глобальное значение по умолчанию",
           "specific": "{{model}}",

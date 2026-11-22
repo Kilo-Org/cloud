@@ -3437,7 +3437,7 @@
         "unknown": "ఆడిట్ ఈవెంట్"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "మోడ్ \"{{name}}\" (ఐడెంటిఫైయర్: {{slug}})",
         "modeUpdate": "మోడ్ \"{{name}}\": {{changes}}",
         "field": {
@@ -3457,7 +3457,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} {{role}}గా జోడించబడ్డారు",
         "memberRemoved": "{{email}} తొలగించబడ్డారు",
         "memberParentAdded": "పేరెంట్ సంస్థ {{parent}} నుండి {{email}} జోడించబడ్డారు",
@@ -3499,7 +3499,7 @@
         "settingAdvancedPoliciesRegion": "ఇన్ఫరెన్స్ ప్రాంతం: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "మోడ్ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "మోడ్ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "గ్లోబల్ డిఫాల్ట్",
           "specific": "{{model}}",

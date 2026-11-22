@@ -3435,7 +3435,7 @@
         "unknown": "ເຫດການກວດສອບ"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "ໂໝດ \"{{name}}\" (ຕົວລະບຸ: {{slug}})",
         "modeUpdate": "ໂໝດ \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "ເພີ່ມ {{email}} ເປັນ {{role}}",
         "memberRemoved": "ເອົາ {{email}} ອອກ",
         "memberParentAdded": "ເພີ່ມ {{email}} ຈາກອົງກອນແມ່ {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ພູມິພາກການອະນຸມານ: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "ໂໝດ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "ໂໝດ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ຄ່າເລີ່ມຕົ້ນທົ່ວອົງກອນ",
           "specific": "{{model}}",

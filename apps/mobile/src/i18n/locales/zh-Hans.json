@@ -3427,7 +3427,7 @@
         "unknown": "审计事件"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "模式“{{name}}”（标识符：{{slug}}）",
         "modeUpdate": "模式“{{name}}”：{{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "已添加 {{email}} 为{{role}}",
         "memberRemoved": "已移除 {{email}}",
         "memberParentAdded": "已从父组织 {{parent}} 添加 {{email}}",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "推理区域：{{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "模式“{{mode}}”：{{previous}} → {{next}}",
+        "settingAutoRoute": "模式“{{mode}}”：{{change}}",
         "settingDefaultBehavior": {
           "global": "全局默认",
           "specific": "{{model}}",

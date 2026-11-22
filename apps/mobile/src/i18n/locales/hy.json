@@ -3435,7 +3435,7 @@
         "unknown": "Աուդիտի իրադարձություն"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Ռեժիմ \"{{name}}\" (նույնացուցիչ՝ {{slug}})",
         "modeUpdate": "Ռեժիմ \"{{name}}\"՝ {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Ավելացվեց {{email}} որպես {{role}}",
         "memberRemoved": "Հեռացվեց {{email}}",
         "memberParentAdded": "Ավելացվեց {{email}}՝ {{parent}} մայր կազմակերպությունից",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Եզրակացության տարածաշրջան՝ {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Ռեժիմ \"{{mode}}\"՝ {{previous}} → {{next}}",
+        "settingAutoRoute": "Ռեժիմ \"{{mode}}\"՝ {{change}}",
         "settingDefaultBehavior": {
           "global": "Գլոբալ լռելյայն",
           "specific": "{{model}}",

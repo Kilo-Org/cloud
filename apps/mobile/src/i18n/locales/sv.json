@@ -3435,7 +3435,7 @@
         "unknown": "Granskningshändelse"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Läge \"{{name}}\" (identifierare: {{slug}})",
         "modeUpdate": "Läge \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Lade till {{email}} som {{role}}",
         "memberRemoved": "Tog bort {{email}}",
         "memberParentAdded": "Lade till {{email}} från moderorganisationen {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Inferensregion: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Läge \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Läge \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Global standard",
           "specific": "{{model}}",

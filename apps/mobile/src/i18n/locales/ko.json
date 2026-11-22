@@ -3427,7 +3427,7 @@
         "unknown": "감사 이벤트"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "모드 \"{{name}}\" (식별자: {{slug}})",
         "modeUpdate": "모드 \"{{name}}\": {{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}}을(를) {{role}}(으)로 추가함",
         "memberRemoved": "{{email}}을(를) 제거함",
         "memberParentAdded": "상위 조직 {{parent}}에서 {{email}}을(를) 추가함",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "추론 리전: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "모드 \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "모드 \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "전역 기본값",
           "specific": "{{model}}",

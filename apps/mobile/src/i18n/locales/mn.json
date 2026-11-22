@@ -3435,7 +3435,7 @@
         "unknown": "Аудитын үйл явдал"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Горим «{{name}}» (танигч: {{slug}})",
         "modeUpdate": "Горим «{{name}}»: {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} хаягийг {{role}} болгон нэмсэн",
         "memberRemoved": "{{email}} хаягийг хассан",
         "memberParentAdded": "{{parent}} эх байгууллагаас {{email}} хаягийг нэмсэн",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Дүгнэлт гаргах бүс: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Горим «{{mode}}»: {{previous}} → {{next}}",
+        "settingAutoRoute": "Горим «{{mode}}»: {{change}}",
         "settingDefaultBehavior": {
           "global": "Глобал өгөгдмөл",
           "specific": "{{model}}",

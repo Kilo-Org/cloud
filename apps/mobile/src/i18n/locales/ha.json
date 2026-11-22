@@ -3435,7 +3435,7 @@
         "unknown": "Aukuwar bincike"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Yanayi \"{{name}}\" (alama: {{slug}})",
         "modeUpdate": "Yanayi \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "An ƙara {{email}} a matsayin {{role}}",
         "memberRemoved": "An cire {{email}}",
         "memberParentAdded": "An ƙara {{email}} daga babbar ƙungiya {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Yankin yin hasashe: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Yanayi \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Yanayi \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Na asali na duniya",
           "specific": "{{model}}",

@@ -3435,7 +3435,7 @@
         "unknown": "စစ်ဆေးမှု ဖြစ်ရပ်"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "မုဒ် \"{{name}}\" (အမှတ်အသား: {{slug}})",
         "modeUpdate": "မုဒ် \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ကို {{role}} အဖြစ် ထည့်သွင်းခဲ့သည်",
         "memberRemoved": "{{email}} ကို ဖယ်ရှားခဲ့သည်",
         "memberParentAdded": "မိခင်အဖွဲ့အစည်း {{parent}} မှ {{email}} ကို ထည့်သွင်းခဲ့သည်",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ကောက်ချက်ချမှုဒေသ: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "မုဒ် \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "မုဒ် \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "အလုံးစုံ ပုံသေ",
           "specific": "{{model}}",

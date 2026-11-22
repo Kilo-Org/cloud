@@ -3435,7 +3435,7 @@
         "unknown": "Kaganapan sa audit"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modo \"{{name}}\" (identifier: {{slug}})",
         "modeUpdate": "Modo \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Idinagdag si {{email}} bilang {{role}}",
         "memberRemoved": "Inalis si {{email}}",
         "memberParentAdded": "Idinagdag si {{email}} mula sa pangunahing organisasyon {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Rehiyon ng inference: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modo \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Modo \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Global na default",
           "specific": "{{model}}",

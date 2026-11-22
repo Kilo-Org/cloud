@@ -3435,7 +3435,7 @@
         "unknown": "Ìṣẹ̀lẹ̀ àyẹ̀wò"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Ipò \"{{name}}\" (ìdánimọ̀: {{slug}})",
         "modeUpdate": "Ipò \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "A fíkún {{email}} gẹ́gẹ́ bí {{role}}",
         "memberRemoved": "A yọ {{email}} kúrò",
         "memberParentAdded": "A fíkún {{email}} láti àjọ-óbí {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Ẹkùn ìṣàyẹ̀wò àwòṣe: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Ipò \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Ipò \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Àkọ́kọ́ àjọ",
           "specific": "{{model}}",

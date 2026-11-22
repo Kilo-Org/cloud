@@ -3427,7 +3427,7 @@
         "unknown": "稽核事件"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "模式「{{name}}」（識別碼：{{slug}}）",
         "modeUpdate": "模式「{{name}}」：{{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "已新增 {{email}} 為{{role}}",
         "memberRemoved": "已移除 {{email}}",
         "memberParentAdded": "已新增來自父組織 {{parent}} 的 {{email}}",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "推論區域：{{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "模式「{{mode}}」：{{previous}} → {{next}}",
+        "settingAutoRoute": "模式「{{mode}}」：{{change}}",
         "settingDefaultBehavior": {
           "global": "全域預設",
           "specific": "{{model}}",

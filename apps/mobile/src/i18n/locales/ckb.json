@@ -3435,7 +3435,7 @@
         "unknown": "ڕووداوی وردبینی"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "مۆد \"{{name}}\" (ناسێنەر: {{slug}})",
         "modeUpdate": "مۆد \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} وەک {{role}} زیادکرا",
         "memberRemoved": "{{email}} لابرا",
         "memberParentAdded": "{{email}} لە ڕێکخراوی سەرەکی {{parent}} زیادکرا",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ناوچەی ئینفەرێنس: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "مۆد \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "مۆد \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "بنەڕەتی گشتی",
           "specific": "{{model}}",

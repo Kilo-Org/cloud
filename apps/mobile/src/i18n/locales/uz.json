@@ -3435,7 +3435,7 @@
         "unknown": "Audit hodisasi"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Rejim \"{{name}}\" (identifikator: {{slug}})",
         "modeUpdate": "Rejim \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} {{role}} sifatida qo'shildi",
         "memberRemoved": "{{email}} olib tashlandi",
         "memberParentAdded": "{{email}} {{parent}} ota tashkilotidan qo'shildi",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Xulosa chiqarish hududi: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Rejim \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Rejim \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Umumiy standart",
           "specific": "{{model}}",

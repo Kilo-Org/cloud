@@ -3435,7 +3435,7 @@
         "unknown": "Tukio la ukaguzi"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Hali \"{{name}}\" (kitambulisho: {{slug}})",
         "modeUpdate": "Hali \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ameongezwa kama {{role}}",
         "memberRemoved": "{{email}} ameondolewa",
         "memberParentAdded": "{{email}} ameongezwa kutoka shirika mama {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Eneo la utambuzi: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Hali \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Hali \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Chaguo-msingi la jumla",
           "specific": "{{model}}",

@@ -3435,7 +3435,7 @@
         "unknown": "Revisjonshendelse"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modus «{{name}}» (identifikator: {{slug}})",
         "modeUpdate": "Modus «{{name}}»: {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "La til {{email}} som {{role}}",
         "memberRemoved": "Fjernet {{email}}",
         "memberParentAdded": "La til {{email}} fra overordnet organisasjon {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Inferensregion: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modus «{{mode}}»: {{previous}} → {{next}}",
+        "settingAutoRoute": "Modus «{{mode}}»: {{change}}",
         "settingDefaultBehavior": {
           "global": "Global standard",
           "specific": "{{model}}",

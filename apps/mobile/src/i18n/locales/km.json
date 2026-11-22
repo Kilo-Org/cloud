@@ -3435,7 +3435,7 @@
         "unknown": "ព្រឹត្តិការណ៍សវនកម្ម"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "របៀប \"{{name}}\" (អត្តសញ្ញាណ៖ {{slug}})",
         "modeUpdate": "របៀប \"{{name}}\"៖ {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "បានបន្ថែម {{email}} ជា {{role}}",
         "memberRemoved": "បានដក {{email}}",
         "memberParentAdded": "បានបន្ថែម {{email}} ពីអង្គការមេ {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "តំបន់អនុមាន៖ {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "របៀប \"{{mode}}\"៖ {{previous}} → {{next}}",
+        "settingAutoRoute": "របៀប \"{{mode}}\"៖ {{change}}",
         "settingDefaultBehavior": {
           "global": "លំនាំដើមសកល",
           "specific": "{{model}}",

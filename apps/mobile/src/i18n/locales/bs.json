@@ -3497,7 +3497,7 @@
         "unknown": "Revizijski događaj"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Način rada \"{{name}}\" (identifikator: {{slug}})",
         "modeUpdate": "Način rada \"{{name}}\": {{changes}}",
         "field": {
@@ -3517,7 +3517,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Dodan {{email}} kao {{role}}",
         "memberRemoved": "Uklonjen {{email}}",
         "memberParentAdded": "Dodan {{email}} iz matične organizacije {{parent}}",
@@ -3559,7 +3559,7 @@
         "settingAdvancedPoliciesRegion": "Regija inferencije: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Način rada \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Način rada \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Globalno zadano",
           "specific": "{{model}}",

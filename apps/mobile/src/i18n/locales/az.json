@@ -3435,7 +3435,7 @@
         "unknown": "Audit hadisəsi"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Rejim \"{{name}}\" (identifikator: {{slug}})",
         "modeUpdate": "Rejim \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} {{role}} olaraq əlavə edildi",
         "memberRemoved": "{{email}} çıxarıldı",
         "memberParentAdded": "{{email}} {{parent}} ana təşkilatından əlavə edildi",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "İnferens regionu: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Rejim \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Rejim \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Qlobal standart",
           "specific": "{{model}}",

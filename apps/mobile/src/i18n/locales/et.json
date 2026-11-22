@@ -3435,7 +3435,7 @@
         "unknown": "Auditi sündmus"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Režiim \"{{name}}\" (identifikaator: {{slug}})",
         "modeUpdate": "Režiim \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Lisatud {{email}} rolliga {{role}}",
         "memberRemoved": "Eemaldatud {{email}}",
         "memberParentAdded": "Lisatud {{email}} emaorganisatsioonist {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Järeldusepiirkond: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Režiim \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Režiim \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Globaalne vaikeväärtus",
           "specific": "{{model}}",

@@ -3435,7 +3435,7 @@
         "unknown": "Evento de auditoría"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modo \"{{name}}\" (identificador: {{slug}})",
         "modeUpdate": "Modo \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Engadido {{email}} como {{role}}",
         "memberRemoved": "Eliminado {{email}}",
         "memberParentAdded": "Engadido {{email}} da organización nai {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Rexión de inferencia: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modo \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Modo \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Predeterminado global",
           "specific": "{{model}}",

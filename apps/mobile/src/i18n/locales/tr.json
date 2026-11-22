@@ -3427,7 +3427,7 @@
         "unknown": "Denetim olayı"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Mod \"{{name}}\" (tanımlayıcı: {{slug}})",
         "modeUpdate": "Mod \"{{name}}\": {{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}}, {{role}} olarak eklendi",
         "memberRemoved": "{{email}} kaldırıldı",
         "memberParentAdded": "{{email}}, {{parent}} üst kuruluşundan eklendi",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "Çıkarım bölgesi: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Mod \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Mod \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Genel varsayılan",
           "specific": "{{model}}",

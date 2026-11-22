@@ -3435,7 +3435,7 @@
         "unknown": "Ngjarje auditimi"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Mënyra \"{{name}}\" (identifikuesi: {{slug}})",
         "modeUpdate": "Mënyra \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "U shtua {{email}} si {{role}}",
         "memberRemoved": "U hoq {{email}}",
         "memberParentAdded": "U shtua {{email}} nga organizata mëmë {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Rajoni i inferencës: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Mënyra \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Mënyra \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Parazgjedhja globale",
           "specific": "{{model}}",

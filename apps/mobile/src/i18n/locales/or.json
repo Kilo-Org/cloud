@@ -3435,7 +3435,7 @@
         "unknown": "ଅଡିଟ୍ ଇଭେଣ୍ଟ"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "ମୋଡ୍ \"{{name}}\" (ପରିଚାୟକ: {{slug}})",
         "modeUpdate": "ମୋଡ୍ \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ଙ୍କୁ {{role}} ଭାବେ ଯୋଡ଼ାଗଲା",
         "memberRemoved": "{{email}} ଙ୍କୁ ଅପସାରଣ କରାଗଲା",
         "memberParentAdded": "{{email}} ଙ୍କୁ {{parent}} ପିତୃ ସଂଗଠନରୁ ଯୋଡ଼ାଗଲା",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ଇନଫରେନ୍ସ ଅଞ୍ଚଳ: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "ମୋଡ୍ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "ମୋଡ୍ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ସାମଗ୍ରିକ ଡିଫଲ୍ଟ",
           "specific": "{{model}}",

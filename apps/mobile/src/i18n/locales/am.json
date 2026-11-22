@@ -3435,7 +3435,7 @@
         "unknown": "የኦዲት ክስተት"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "ሁነታ \"{{name}}\" (መለያ: {{slug}})",
         "modeUpdate": "ሁነታ \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} እንደ {{role}} ተጨምሯል",
         "memberRemoved": "{{email}} ተወግዷል",
         "memberParentAdded": "{{email}} ከዋና ድርጅት {{parent}} ተጨምሯል",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "የኢንፈረንስ ክልል: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "ሁነታ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "ሁነታ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ዓለምአቀፍ ነባሪ",
           "specific": "{{model}}",

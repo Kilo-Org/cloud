@@ -3675,7 +3675,7 @@
         "unknown": "حدث تدقيق"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "الوضع \"{{name}}\" (المعرّف: {{slug}})",
         "modeUpdate": "الوضع \"{{name}}\": {{changes}}",
         "field": {
@@ -3695,7 +3695,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "تمت إضافة {{email}} بصفة {{role}}",
         "memberRemoved": "تمت إزالة {{email}}",
         "memberParentAdded": "تمت إضافة {{email}} من المؤسسة الأم {{parent}}",
@@ -3737,7 +3737,7 @@
         "settingAdvancedPoliciesRegion": "منطقة الاستدلال: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "الوضع \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "الوضع \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "افتراضي عام",
           "specific": "{{model}}",

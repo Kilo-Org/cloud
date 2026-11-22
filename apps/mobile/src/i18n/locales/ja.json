@@ -3427,7 +3427,7 @@
         "unknown": "監査イベント"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "モード「{{name}}」（識別子：{{slug}}）",
         "modeUpdate": "モード「{{name}}」：{{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}}を{{role}}として追加しました",
         "memberRemoved": "{{email}}を削除しました",
         "memberParentAdded": "親組織{{parent}}から{{email}}を追加しました",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "推論リージョン：{{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "モード「{{mode}}」：{{previous}} → {{next}}",
+        "settingAutoRoute": "モード「{{mode}}」：{{change}}",
         "settingDefaultBehavior": {
           "global": "全体のデフォルト",
           "specific": "{{model}}",

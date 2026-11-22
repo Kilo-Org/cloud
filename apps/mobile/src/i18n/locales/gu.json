@@ -3435,7 +3435,7 @@
         "unknown": "ઑડિટ ઇવેન્ટ"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "મોડ \"{{name}}\" (ઓળખક: {{slug}})",
         "modeUpdate": "મોડ \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ને {{role}} તરીકે ઉમેર્યું",
         "memberRemoved": "{{email}} ને દૂર કર્યું",
         "memberParentAdded": "મુખ્ય સંસ્થા {{parent}} માંથી {{email}} ને ઉમેર્યું",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ઇન્ફરન્સ પ્રદેશ: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "મોડ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "મોડ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ગ્લોબલ ડિફૉલ્ટ",
           "specific": "{{model}}",

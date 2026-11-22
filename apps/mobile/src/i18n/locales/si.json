@@ -3435,7 +3435,7 @@
         "unknown": "විගණන සිදුවීම"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "ප්‍රකාරය \"{{name}}\" (හඳුන්වනය: {{slug}})",
         "modeUpdate": "ප්‍රකාරය \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} {{role}} ලෙස එකතු කරන ලදී",
         "memberRemoved": "{{email}} ඉවත් කරන ලදී",
         "memberParentAdded": "{{email}} මව් සංවිධානය {{parent}} වෙතින් එකතු කරන ලදී",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "අනුමාන කලාපය: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "ප්‍රකාරය \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "ප්‍රකාරය \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ගෝලීය පෙරනිමිය",
           "specific": "{{model}}",

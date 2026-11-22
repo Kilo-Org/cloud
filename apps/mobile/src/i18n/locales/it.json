@@ -3489,7 +3489,7 @@
         "unknown": "Evento di controllo"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modalità \"{{name}}\" (identificatore: {{slug}})",
         "modeUpdate": "Modalità \"{{name}}\": {{changes}}",
         "field": {
@@ -3509,7 +3509,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Aggiunto {{email}} come {{role}}",
         "memberRemoved": "Rimosso {{email}}",
         "memberParentAdded": "Aggiunto {{email}} dall'organizzazione principale {{parent}}",
@@ -3551,7 +3551,7 @@
         "settingAdvancedPoliciesRegion": "Regione di inferenza: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modalità \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Modalità \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Predefinito globale",
           "specific": "{{model}}",

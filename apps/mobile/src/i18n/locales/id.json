@@ -3427,7 +3427,7 @@
         "unknown": "Peristiwa audit"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Mode \"{{name}}\" (Pengenal: {{slug}})",
         "modeUpdate": "Mode \"{{name}}\": {{changes}}",
         "field": {
@@ -3447,7 +3447,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ditambahkan sebagai {{role}}",
         "memberRemoved": "{{email}} dihapus",
         "memberParentAdded": "{{email}} ditambahkan dari organisasi induk {{parent}}",
@@ -3489,7 +3489,7 @@
         "settingAdvancedPoliciesRegion": "Wilayah inferensi: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Mode \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Mode \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Default global",
           "specific": "{{model}}",

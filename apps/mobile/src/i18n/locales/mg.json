@@ -3435,7 +3435,7 @@
         "unknown": "Hetsika fanaraha-maso"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Fomba fiasa \"{{name}}\" (famantarana: {{slug}})",
         "modeUpdate": "Fomba fiasa \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Nampidirina {{email}} ho {{role}}",
         "memberRemoved": "Nesorina {{email}}",
         "memberParentAdded": "Nampidirina {{email}} avy amin'ny fikambanana ray {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Faritra fanodinana: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Fomba fiasa \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Fomba fiasa \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Mahazatra maneran-tany",
           "specific": "{{model}}",

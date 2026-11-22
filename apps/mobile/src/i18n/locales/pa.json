@@ -3435,7 +3435,7 @@
         "unknown": "ਆਡਿਟ ਇਵੈਂਟ"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "ਮੋਡ \"{{name}}\" (ਪਛਾਣਕਰਤਾ: {{slug}})",
         "modeUpdate": "ਮੋਡ \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ਨੂੰ {{role}} ਵਜੋਂ ਸ਼ਾਮਲ ਕੀਤਾ",
         "memberRemoved": "{{email}} ਹਟਾਇਆ",
         "memberParentAdded": "ਪੇਰੈਂਟ ਸੰਸਥਾ {{parent}} ਤੋਂ {{email}} ਸ਼ਾਮਲ ਕੀਤਾ",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ਇਨਫਰੈਂਸ ਖੇਤਰ: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "ਮੋਡ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "ਮੋਡ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ਗਲੋਬਲ ਡਿਫਾਲਟ",
           "specific": "{{model}}",

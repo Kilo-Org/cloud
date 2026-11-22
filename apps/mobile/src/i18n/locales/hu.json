@@ -3435,7 +3435,7 @@
         "unknown": "Auditesemény"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Mód \"{{name}}\" (azonosító: {{slug}})",
         "modeUpdate": "Mód \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} hozzáadva mint {{role}}",
         "memberRemoved": "{{email}} eltávolítva",
         "memberParentAdded": "{{email}} hozzáadva {{parent}} anyaszervezetből",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Következtetési régió: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Mód \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Mód \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Globális alapértelmezés",
           "specific": "{{model}}",

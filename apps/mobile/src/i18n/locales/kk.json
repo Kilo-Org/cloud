@@ -3435,7 +3435,7 @@
         "unknown": "Аудит оқиғасы"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Режим \"{{name}}\" (идентификатор: {{slug}})",
         "modeUpdate": "Режим \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} {{role}} ретінде қосылды",
         "memberRemoved": "{{email}} шығарылды",
         "memberParentAdded": "{{parent}} бас ұйымынан {{email}} қосылды",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Инференс аймағы: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Режим \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Режим \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Жаһандық әдепкі",
           "specific": "{{model}}",

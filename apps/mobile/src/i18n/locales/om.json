@@ -3435,7 +3435,7 @@
         "unknown": "Taatee odiitii"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Haala \"{{name}}\" (eenyummeessaa: {{slug}})",
         "modeUpdate": "Haala \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} akka {{role}}tti dabalame",
         "memberRemoved": "{{email}} haqame",
         "memberParentAdded": "{{email}} dhaabbataa haadhaa {{parent}} irraa dabalame",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "Naannoo raawwii: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Haala \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "Haala \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "Durtii waliigalaa",
           "specific": "{{model}}",

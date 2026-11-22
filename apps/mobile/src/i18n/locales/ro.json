@@ -3497,7 +3497,7 @@
         "unknown": "Eveniment de audit"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "Modul „{{name}}” (identificator: {{slug}})",
         "modeUpdate": "Modul „{{name}}”: {{changes}}",
         "field": {
@@ -3517,7 +3517,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "Adăugat {{email}} ca {{role}}",
         "memberRemoved": "Eliminat {{email}}",
         "memberParentAdded": "Adăugat {{email}} din organizația părinte {{parent}}",
@@ -3559,7 +3559,7 @@
         "settingAdvancedPoliciesRegion": "Regiune de inferență: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "Modul „{{mode}}”: {{previous}} → {{next}}",
+        "settingAutoRoute": "Modul „{{mode}}”: {{change}}",
         "settingDefaultBehavior": {
           "global": "Implicit global",
           "specific": "{{model}}",

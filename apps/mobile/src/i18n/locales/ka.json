@@ -3435,7 +3435,7 @@
         "unknown": "აუდიტის მოვლენა"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "რეჟიმი \"{{name}}\" (იდენტიფიკატორი: {{slug}})",
         "modeUpdate": "რეჟიმი \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} დაემატა როგორც {{role}}",
         "memberRemoved": "{{email}} მოიხსნა",
         "memberParentAdded": "{{email}} დაემატა მშობელი ორგანიზაციიდან {{parent}}",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ინფერენსის რეგიონი: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "რეჟიმი \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "რეჟიმი \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "გლობალური ნაგულისხმევი",
           "specific": "{{model}}",

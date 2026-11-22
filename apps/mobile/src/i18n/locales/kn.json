@@ -3435,7 +3435,7 @@
         "unknown": "ಆಡಿಟ್ ಘಟನೆ"
       },
       "detail": {
-        "fieldChange": "{{field}}: {{previous}} → {{next}}",
+        "fieldChange": "{{field}}: {{change}}",
         "modeIdentity": "ಮೋಡ್ \"{{name}}\" (ಐಡೆಂಟಿಫೈಯರ್: {{slug}})",
         "modeUpdate": "ಮೋಡ್ \"{{name}}\": {{changes}}",
         "field": {
@@ -3455,7 +3455,7 @@
           "billing_manager": "$t(organization.members.roles.billingManager)",
           "member": "$t(organization.members.roles.member)"
         },
-        "memberRole": "{{email}}: {{previous}} → {{next}}",
+        "memberRole": "{{email}}: {{change}}",
         "memberAdded": "{{email}} ಅನ್ನು {{role}} ಆಗಿ ಸೇರಿಸಲಾಗಿದೆ",
         "memberRemoved": "{{email}} ಅನ್ನು ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
         "memberParentAdded": "{{email}} ಅನ್ನು {{parent}} ಮೂಲ ಸಂಸ್ಥೆಯಿಂದ ಸೇರಿಸಲಾಗಿದೆ",
@@ -3497,7 +3497,7 @@
         "settingAdvancedPoliciesRegion": "ಇನ್ಫರೆನ್ಸ್ ಪ್ರದೇಶ: {{region}}",
         "settingDefaultModelSet": "{{next}}",
         "settingDefaultModelRemoved": "{{previous}}",
-        "settingAutoRoute": "ಮೋಡ್ \"{{mode}}\": {{previous}} → {{next}}",
+        "settingAutoRoute": "ಮೋಡ್ \"{{mode}}\": {{change}}",
         "settingDefaultBehavior": {
           "global": "ಜಾಗತಿಕ ಡೀಫಾಲ್ಟ್",
           "specific": "{{model}}",

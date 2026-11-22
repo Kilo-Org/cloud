@@ -18,6 +18,7 @@ import {
   VIEW_HOST_PAGE,
   viewArguments,
   viewHeightOf,
+  viewSizeLimitLabel,
 } from '@/lib/chat/remote-mcp-app';
 import { type RemoteMcpToolView } from '@/lib/chat/remote-mcp-state';
 import { deviceZone } from '@/lib/chat/tool-set';
@@ -54,6 +55,7 @@ type ViewState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'document'; readonly html: string }
   | { readonly kind: 'empty' }
+  | { readonly kind: 'tooLarge' }
   | { readonly kind: 'unavailable' };
 
 /** The page's call that puts a labeled document in the sandbox, as a JS literal. */
@@ -218,6 +220,13 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
         <View className="absolute inset-0 items-center justify-center px-4">
           <Text className="text-center text-xs text-muted-foreground">
             {t('modelChat.mcp.app.empty')}
+          </Text>
+        </View>
+      ) : null}
+      {documentState.kind === 'tooLarge' ? (
+        <View className="absolute inset-0 items-center justify-center px-4">
+          <Text className="text-center text-xs text-muted-foreground">
+            {t('modelChat.mcp.app.tooLarge', { size: viewSizeLimitLabel() })}
           </Text>
         </View>
       ) : null}

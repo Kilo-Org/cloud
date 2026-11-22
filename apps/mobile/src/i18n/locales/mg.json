@@ -3953,6 +3953,9 @@
       "fieldName": "Anarana aseho",
       "fieldUrl": "URL-n'ny mpizara",
       "fieldUrlInvalid": "Ampidiro URL mpizara mety.",
+      "fieldUrlCredentials": "Esory ao amin'ny URL ny anarana mpampiasa sy ny tenimiafina.",
+      "fieldUrlFragment": "Esory ao amin'ny URL ny ampahany misy ny #.",
+      "fieldUrlInsecure": "Ampidiro ny URL https, na http ho an'ny localhost ihany.",
       "duplicateUrl": "Efa voatahiry io URL io.",
       "serverNotFound": "Tsy voatahiry intsony ity mpizara ity.",
       "enableServer": "Alefaso ity mpizara ity: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Interfasan'ny fitaovana",
         "failed": "Tsy tafiditra ny interfasan'ity fitaovana ity.",
+        "tooLarge": "Mihoatra ny fetra {{size}} ny interfasan'ity fitaovana ity.",
         "empty": "Tsy misy zavatra haseho ao amin'ny interfasan'ity fitaovana ity."
       }
     },

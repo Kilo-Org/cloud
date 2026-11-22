@@ -4026,6 +4026,9 @@
       "fieldName": "Prikazano ime",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Unesite važeći URL servera.",
+      "fieldUrlCredentials": "Uklonite korisničko ime i lozinku iz URL-a.",
+      "fieldUrlFragment": "Uklonite dio URL-a sa znakom #.",
+      "fieldUrlInsecure": "Unesite https URL, ili http samo za localhost.",
       "duplicateUrl": "Taj URL je već sačuvan.",
       "serverNotFound": "Ovaj server više nije sačuvan.",
       "enableServer": "Omogući ovaj server: {{name}}",
@@ -4052,6 +4055,7 @@
       "app": {
         "label": "Sučelje alata",
         "failed": "Sučelje ovog alata nije se moglo učitati.",
+        "tooLarge": "Sučelje ovog alata veće je od ograničenja od {{size}}.",
         "empty": "Sučelje ovog alata nema ništa za prikaz."
       }
     },

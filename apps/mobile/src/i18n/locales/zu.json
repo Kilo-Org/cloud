@@ -3953,6 +3953,9 @@
       "fieldName": "Igama eliboniswayo",
       "fieldUrl": "URL yeseva",
       "fieldUrlInvalid": "Faka i-URL yeseva evumelekile.",
+      "fieldUrlCredentials": "Susa igama lomsebenzisi nephasiwedi kule-URL.",
+      "fieldUrlFragment": "Susa ingxenye ye-# ye-URL.",
+      "fieldUrlInsecure": "Faka i-URL ye-https, noma i-http ye-localhost kuphela.",
       "duplicateUrl": "Le-URL ilondoloziwe kudala.",
       "serverNotFound": "Iseva ayisalondoloziwe.",
       "enableServer": "Nika amandla le seve: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Isixhumi esibonakalayo sethuluzi",
         "failed": "Ayikwazanga ukulayisha isixhumi esibonakalayo salesi thuluzi.",
+        "tooLarge": "Isixhumi esibonakalayo salesi thuluzi sikhulu kunomkhawulo we-{{size}}.",
         "empty": "Isixhumi esibonakalayo salesi thuluzi asinakho okufanele kuboniswe."
       }
     },

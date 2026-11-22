@@ -3953,6 +3953,9 @@
       "fieldName": "Magaca la muujiyo",
       "fieldUrl": "URL-ka serverka",
       "fieldUrlInvalid": "Geli URL server sax ah.",
+      "fieldUrlCredentials": "Ka saar magaca isticmaalaha iyo furaha sirta URL-ka.",
+      "fieldUrlFragment": "Ka saar qaybta # ee URL-ka.",
+      "fieldUrlInsecure": "Geli URL https ah, ama http oo kaliya loogu talagalay localhost.",
       "duplicateUrl": "URL-kaas mar hore ayaa la keydiyay.",
       "serverNotFound": "Serverkan mar dambe lama keydin.",
       "enableServer": "Daar serverkan: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Isdhexgalka qalabka",
         "failed": "Isdhexgalka qalabkan lama soo dejin karin.",
+        "tooLarge": "Isdhexgalka qalabkan wuu ka weyn yahay xadka {{size}}.",
         "empty": "Isdhexgalka qalabkan wax la muujiyo ma jiro."
       }
     },

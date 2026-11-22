@@ -3953,6 +3953,9 @@
       "fieldName": "Emri i shfaqur",
       "fieldUrl": "URL-ja e serverit",
       "fieldUrlInvalid": "Fut një URL të vlefshme serveri.",
+      "fieldUrlCredentials": "Hiq emrin e përdoruesit dhe fjalëkalimin nga URL-ja.",
+      "fieldUrlFragment": "Hiq pjesën me # nga URL-ja.",
+      "fieldUrlInsecure": "Fut një URL https, ose http vetëm për localhost.",
       "duplicateUrl": "Kjo URL është tashmë e ruajtur.",
       "serverNotFound": "Ky server nuk është më i ruajtur.",
       "enableServer": "Aktivizo këtë server: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Ndërfaqja e mjetit",
         "failed": "Ndërfaqja e këtij mjeti nuk mund të ngarkohej.",
+        "tooLarge": "Ndërfaqja e këtij mjeti është më e madhe se kufiri prej {{size}}.",
         "empty": "Ndërfaqja e këtij mjeti nuk ka gjë për të shfaqur."
       }
     },

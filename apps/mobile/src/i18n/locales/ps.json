@@ -3953,6 +3953,9 @@
       "fieldName": "ښکارېدونکی نوم",
       "fieldUrl": "د سرور URL",
       "fieldUrlInvalid": "د سرور سم URL ولیکئ.",
+      "fieldUrlCredentials": "د کارونکي نوم او پټنوم له URL څخه لرې کړئ.",
+      "fieldUrlFragment": "د URL # برخه لرې کړئ.",
+      "fieldUrlInsecure": "د https URL ولیکئ، یا یوازې د localhost لپاره http وکاروئ.",
       "duplicateUrl": "دا URL لا دمخه خوندي دی.",
       "serverNotFound": "دا سرور نور خوندي نه دی.",
       "enableServer": "دا سرور فعال کړئ: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "د وسیلې انټرفیس",
         "failed": "د دې وسیلې انټرفیس لوډ نه شو.",
+        "tooLarge": "د دې وسیلې انټرفیس له {{size}} حد څخه لوی دی.",
         "empty": "د دې وسیلې په انټرفیس کې د ښودلو لپاره هیڅ نشته."
       }
     },

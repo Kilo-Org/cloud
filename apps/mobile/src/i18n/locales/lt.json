@@ -4099,6 +4099,9 @@
       "fieldName": "Rodomas pavadinimas",
       "fieldUrl": "Serverio URL",
       "fieldUrlInvalid": "Įveskite galiojantį serverio URL.",
+      "fieldUrlCredentials": "Pašalinkite vartotojo vardą ir slaptažodį iš URL.",
+      "fieldUrlFragment": "Pašalinkite # dalį iš URL.",
+      "fieldUrlInsecure": "Įveskite https URL, o http galimas tik localhost.",
       "duplicateUrl": "Šis URL jau išsaugotas.",
       "serverNotFound": "Šis serveris nebėra išsaugotas.",
       "enableServer": "Įjungti šį serverį: {{name}}",
@@ -4122,6 +4125,7 @@
       "app": {
         "label": "Įrankio sąsaja",
         "failed": "Nepavyko įkelti šio įrankio sąsajos.",
+        "tooLarge": "Šio įrankio sąsaja yra didesnė už {{size}} ribą.",
         "empty": "Šio įrankio sąsajoje nėra ką rodyti."
       },
       "serverToolCount_one": "{{count}} įrankis",

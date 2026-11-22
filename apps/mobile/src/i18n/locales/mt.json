@@ -4172,6 +4172,9 @@
       "fieldName": "Isem muri",
       "fieldUrl": "URL tas-server",
       "fieldUrlInvalid": "Daħħal URL tas-server validu.",
+      "fieldUrlCredentials": "Neħħi l-isem tal-utent u l-password mill-URL.",
+      "fieldUrlFragment": "Neħħi l-parti # tal-URL.",
+      "fieldUrlInsecure": "Daħħal URL bl-https, jew http biss għal localhost.",
       "duplicateUrl": "Dan l-URL tas-server diġà hija salvata.",
       "serverNotFound": "Dan is-server m'għadux isalvat.",
       "enableServer": "Ippermetti dan is-server: {{name}}",
@@ -4200,6 +4203,7 @@
       "app": {
         "label": "Interfaċċa tal-għodda",
         "failed": "L-interfaċċa ta' din l-għodda ma rnexxietx tgħabba.",
+        "tooLarge": "L-interfaċċa ta' din l-għodda hija akbar mil-limitu ta' {{size}}.",
         "empty": "L-interfaċċa ta' din l-għodda m'għandha xejn li turi."
       }
     },

@@ -3953,6 +3953,9 @@
       "fieldName": "Sýnt heiti",
       "fieldUrl": "Slóð þjóns",
       "fieldUrlInvalid": "Sláðu inn gilda slóð þjóns.",
+      "fieldUrlCredentials": "Fjarlægðu notandanafn og lykilorð úr slóðinni.",
+      "fieldUrlFragment": "Fjarlægðu #-hlutann úr slóðinni.",
+      "fieldUrlInsecure": "Sláðu inn https-slóð, eða http aðeins fyrir localhost.",
       "duplicateUrl": "Þessi slóð er þegar vistuð.",
       "serverNotFound": "Þessi þjónn er ekki lengur vistaður.",
       "enableServer": "Virkja þennan þjón: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Viðmót tóls",
         "failed": "Ekki tókst að hlaða viðmóti tólsins.",
+        "tooLarge": "Viðmót tólsins fer yfir {{size}} hámarkið.",
         "empty": "Viðmót tólsins hefur ekkert til að sýna."
       }
     },

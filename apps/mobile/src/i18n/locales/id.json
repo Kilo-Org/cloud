@@ -3953,6 +3953,9 @@
       "fieldName": "Nama tampilan",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Masukkan URL server yang valid.",
+      "fieldUrlCredentials": "Hapus nama pengguna dan kata sandi dari URL.",
+      "fieldUrlFragment": "Hapus bagian # dari URL.",
+      "fieldUrlInsecure": "Masukkan URL https, atau http hanya untuk localhost.",
       "duplicateUrl": "URL tersebut sudah disimpan.",
       "serverNotFound": "Server ini tidak lagi tersimpan.",
       "enableServer": "Aktifkan server ini: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Antarmuka alat",
         "failed": "Antarmuka alat ini tidak dapat dimuat.",
+        "tooLarge": "Antarmuka alat ini lebih besar dari batas {{size}}.",
         "empty": "Antarmuka alat ini tidak memiliki apa pun untuk ditampilkan."
       }
     },

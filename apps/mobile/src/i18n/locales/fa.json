@@ -3953,6 +3953,9 @@
       "fieldName": "نام نمایشی",
       "fieldUrl": "نشانی URL سرور",
       "fieldUrlInvalid": "یک نشانی URL معتبر سرور وارد کنید.",
+      "fieldUrlCredentials": "نام کاربری و گذرواژه را از نشانی حذف کنید.",
+      "fieldUrlFragment": "بخش # را از نشانی حذف کنید.",
+      "fieldUrlInsecure": "یک نشانی https وارد کنید، یا http فقط برای localhost.",
       "duplicateUrl": "این نشانی URL قبلاً ذخیره شده است.",
       "serverNotFound": "این سرور دیگر ذخیره نشده است.",
       "enableServer": "فعال‌کردن این سرور: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "رابط ابزار",
         "failed": "رابط این ابزار بارگذاری نشد.",
+        "tooLarge": "رابط این ابزار از حد {{size}} بزرگ‌تر است.",
         "empty": "رابط این ابزار چیزی برای نمایش ندارد."
       }
     },

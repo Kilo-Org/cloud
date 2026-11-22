@@ -4026,6 +4026,9 @@
       "fieldName": "Nume afișat",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Introdu un URL de server valid.",
+      "fieldUrlCredentials": "Elimină numele de utilizator și parola din URL.",
+      "fieldUrlFragment": "Elimină partea cu # din URL.",
+      "fieldUrlInsecure": "Introdu un URL https sau http numai pentru localhost.",
       "duplicateUrl": "Acest URL este deja salvat.",
       "serverNotFound": "Acest server nu mai este salvat.",
       "enableServer": "Activează acest server: {{name}}",
@@ -4052,6 +4055,7 @@
       "app": {
         "label": "Interfața instrumentului",
         "failed": "Interfața acestui instrument nu a putut fi încărcată.",
+        "tooLarge": "Interfața acestui instrument este mai mare decât limita de {{size}}.",
         "empty": "Interfața acestui instrument nu are nimic de afișat."
       }
     },

@@ -166,9 +166,27 @@ describe('the server form', () => {
     expect(mcpServerFormError(draft({ url: '' }))).toEqual({ url: 'common.required' });
   });
 
-  it('refuses a URL the store would refuse', () => {
-    expect(mcpServerFormError(draft({ url: 'ftp://remote.example/mcp' }))).toEqual({
+  it('says a URL that does not parse is invalid', () => {
+    expect(mcpServerFormError(draft({ url: 'not a url' }))).toEqual({
       url: 'modelChat.mcp.fieldUrlInvalid',
+    });
+  });
+
+  it('says an insecure endpoint must be https', () => {
+    expect(mcpServerFormError(draft({ url: 'ftp://remote.example/mcp' }))).toEqual({
+      url: 'modelChat.mcp.fieldUrlInsecure',
+    });
+  });
+
+  it('says a fragment has to go', () => {
+    expect(mcpServerFormError(draft({ url: 'https://remote.example/mcp#tools' }))).toEqual({
+      url: 'modelChat.mcp.fieldUrlFragment',
+    });
+  });
+
+  it('says the credentials in the address have to go', () => {
+    expect(mcpServerFormError(draft({ url: 'https://user:pass@remote.example/mcp' }))).toEqual({
+      url: 'modelChat.mcp.fieldUrlCredentials',
     });
   });
 

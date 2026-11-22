@@ -3953,6 +3953,9 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Skriv inn en gyldig server-URL.",
+      "fieldUrlCredentials": "Fjern brukernavnet og passordet fra server-URL-en.",
+      "fieldUrlFragment": "Fjern #-delen av server-URL-en.",
+      "fieldUrlInsecure": "Skriv inn en https-URL, eller http bare for localhost.",
       "duplicateUrl": "Denne server-URL-en er allerede lagret.",
       "serverNotFound": "Denne serveren er ikke lenger lagret.",
       "enableServer": "Aktiver denne serveren: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Verktøygrensesnitt",
         "failed": "Kunne ikke laste inn grensesnittet for dette verktøyet.",
+        "tooLarge": "Grensesnittet for dette verktøyet er større enn grensen på {{size}}.",
         "empty": "Grensesnittet for dette verktøyet har ingenting å vise."
       }
     },

@@ -3953,6 +3953,9 @@
       "fieldName": "Görünen ad",
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
+      "fieldUrlCredentials": "Kullanıcı adını ve parolayı URL'den kaldırın.",
+      "fieldUrlFragment": "URL'deki # bölümünü kaldırın.",
+      "fieldUrlInsecure": "https adresi girin, http'yi yalnızca localhost için kullanın.",
       "duplicateUrl": "Bu URL zaten kayıtlı.",
       "serverNotFound": "Bu sunucu artık kayıtlı değil.",
       "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Araç arayüzü",
         "failed": "Bu aracın arayüzü yüklenemedi.",
+        "tooLarge": "Bu aracın arayüzü {{size}} sınırından daha büyük.",
         "empty": "Bu aracın arayüzünde gösterilecek bir şey yok."
       }
     },

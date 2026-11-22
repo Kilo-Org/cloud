@@ -3953,6 +3953,9 @@
       "fieldName": "ناوی پیشاندراو",
       "fieldUrl": "URL ی سێرڤەر",
       "fieldUrlInvalid": "URLی سێرڤەری دروست بنووسە.",
+      "fieldUrlCredentials": "ناوی بەکارهێنەر و وشەی نهێنی لە URLەکە بسڕەوە.",
+      "fieldUrlFragment": "بەشی # لە URLەکە بسڕەوە.",
+      "fieldUrlInsecure": "URLێکی https بنووسە، یان http تەنها بۆ localhost.",
       "duplicateUrl": "ئەم URLە پێشتر پاشەکەوت کراوە.",
       "serverNotFound": "ئەم سێرڤەرە چیتر پاشەکەوت نەکراوە.",
       "enableServer": "چالاککردنی ئەم سێرڤەرە: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "ڕووکاری ئامراز",
         "failed": "ڕووکاری ئەم ئامرازە بار نەکرا.",
+        "tooLarge": "ڕووکاری ئەم ئامرازە لە سنووری {{size}} گەورەترە.",
         "empty": "ڕووکاری ئەم ئامرازە هیچ شتێکی نییە بۆ پیشاندان."
       }
     },

@@ -3953,6 +3953,9 @@
       "fieldName": "Orúkọ tí a fi hàn",
       "fieldUrl": "URL olupin",
       "fieldUrlInvalid": "Tẹ URL olupin tí ó tọ́ sí.",
+      "fieldUrlCredentials": "Yọ orúkọ olùmúlò àti ọ̀rọ̀ ìpamọ́ kúrò nínú URL.",
+      "fieldUrlFragment": "Yọ apá # náà kúrò nínú URL.",
+      "fieldUrlInsecure": "Tẹ URL https, tàbí http fún localhost nìkan.",
       "duplicateUrl": "URL yẹn ti fipamọ́ tẹ́lẹ̀.",
       "serverNotFound": "Olupin yìí kò fipamọ́ mọ́.",
       "enableServer": "Mú olupin yìí ṣiṣẹ́: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Ẹ̀rọ ìjápọ̀",
         "failed": "A kò le gbé ẹ̀rọ ìjápọ̀ yìí sókè.",
+        "tooLarge": "Ẹ̀rọ ìjápọ̀ yìí tóbi ju ààlà {{size}} lọ.",
         "empty": "Ẹ̀rọ ìjápọ̀ yìí kò ní nnkan láti fihàn."
       }
     },

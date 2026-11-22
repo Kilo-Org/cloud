@@ -4245,6 +4245,9 @@
       "fieldName": "Enw dangos",
       "fieldUrl": "URL gweinydd",
       "fieldUrlInvalid": "Rhowch URL gweinydd dilys.",
+      "fieldUrlCredentials": "Tynnwch yr enw defnyddiwr a'r cyfrinair o'r URL.",
+      "fieldUrlFragment": "Tynnwch y rhan # o'r URL.",
+      "fieldUrlInsecure": "Rhowch URL https, neu http yn unig ar gyfer localhost.",
       "duplicateUrl": "Mae'r URL hwnnw eisoes wedi'i gadw.",
       "serverNotFound": "Nid yw'r gweinydd hwn wedi'i gadw mwyach.",
       "enableServer": "Galluogi'r gweinydd hwn: {{name}}",
@@ -4274,6 +4277,7 @@
       "app": {
         "label": "Rhyngwyneb yr offeryn",
         "failed": "Methwyd llwytho rhyngwyneb yr offeryn hwn.",
+        "tooLarge": "Mae rhyngwyneb yr offeryn hwn yn fwy na'r terfyn {{size}}.",
         "empty": "Does dim byd i'w ddangos yng rhyngwyneb yr offeryn hwn."
       }
     },

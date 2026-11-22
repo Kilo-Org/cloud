@@ -3953,6 +3953,9 @@
       "fieldName": "Sunan da ake nunawa",
       "fieldUrl": "URL na sabar",
       "fieldUrlInvalid": "Shigar da ingantaccen URL na sabar.",
+      "fieldUrlCredentials": "Cire sunan mai amfani da kalmar sirri daga URL ɗin.",
+      "fieldUrlFragment": "Cire sashen # daga URL ɗin.",
+      "fieldUrlInsecure": "Shigar da URL ɗin https, ko http kawai don localhost.",
       "duplicateUrl": "An riga an ajiye wannan URL.",
       "serverNotFound": "Ba a ajiye wannan sabar ba a yanzu.",
       "enableServer": "Kunna wannan sabar: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Mahaɗin kayan aiki",
         "failed": "An kasa loda mahaɗin kayan aiki.",
+        "tooLarge": "Mahaɗin wannan kayan aiki ya fi iyakar {{size}} girma.",
         "empty": "Mahaɗin kayan aiki bai nuna komai ba."
       }
     },

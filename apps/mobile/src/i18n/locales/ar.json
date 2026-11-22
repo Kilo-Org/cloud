@@ -4245,6 +4245,9 @@
       "fieldName": "الاسم المعروض",
       "fieldUrl": "عنوان URL للخادم",
       "fieldUrlInvalid": "أدخل عنوان URL صالحًا للخادم.",
+      "fieldUrlCredentials": "أزل اسم المستخدم وكلمة المرور من عنوان URL.",
+      "fieldUrlFragment": "أزل الجزء الذي يبدأ بـ # من عنوان URL.",
+      "fieldUrlInsecure": "أدخل عنوان URL يستخدم https، أو استخدم http فقط مع localhost.",
       "duplicateUrl": "عنوان URL هذا محفوظ بالفعل.",
       "serverNotFound": "لم يعد هذا الخادم محفوظًا.",
       "enableServer": "تفعيل هذا الخادم: {{name}}",
@@ -4268,6 +4271,7 @@
       "app": {
         "label": "واجهة الأداة",
         "failed": "تعذّر تحميل واجهة هذه الأداة.",
+        "tooLarge": "واجهة هذه الأداة أكبر من حد {{size}}.",
         "empty": "لا تحتوي واجهة هذه الأداة على أي شيء للعرض."
       },
       "serverToolCount_zero": "{{count}} أدوات",

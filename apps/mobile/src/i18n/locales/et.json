@@ -3953,6 +3953,9 @@
       "fieldName": "Kuvatav nimi",
       "fieldUrl": "Serveri URL",
       "fieldUrlInvalid": "Sisesta kehtiv serveri URL.",
+      "fieldUrlCredentials": "Eemalda serveri URL-ist kasutajanimi ja parool.",
+      "fieldUrlFragment": "Eemalda serveri URL-ist osa, mis algab märgiga #.",
+      "fieldUrlInsecure": "Sisesta https-URL või http ainult localhosti jaoks.",
       "duplicateUrl": "See URL on juba salvestatud.",
       "serverNotFound": "See server ei ole enam salvestatud.",
       "enableServer": "Luba see server: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "Tööriista liides",
         "failed": "Selle tööriista liidest ei õnnestunud laadida.",
+        "tooLarge": "Selle tööriista liides on suurem kui {{size}} piirmäär.",
         "empty": "Selle tööriista liidesel pole midagi näidata."
       }
     },

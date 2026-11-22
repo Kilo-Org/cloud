@@ -3953,6 +3953,9 @@
       "fieldName": "顯示名稱",
       "fieldUrl": "伺服器 URL",
       "fieldUrlInvalid": "請輸入有效的伺服器 URL。",
+      "fieldUrlCredentials": "請從伺服器 URL 中刪除使用者名稱與密碼。",
+      "fieldUrlFragment": "請刪除伺服器 URL 中的 # 部分。",
+      "fieldUrlInsecure": "請輸入 https URL，只有 localhost 可以使用 http。",
       "duplicateUrl": "該 URL 已儲存。",
       "serverNotFound": "該伺服器已不再儲存。",
       "enableServer": "啟用此伺服器：{{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "工具介面",
         "failed": "無法載入此工具的介面。",
+        "tooLarge": "此工具的介面已超過 {{size}} 上限。",
         "empty": "此工具的介面沒有可顯示的內容。"
       }
     },

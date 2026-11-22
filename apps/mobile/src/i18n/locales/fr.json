@@ -4026,6 +4026,9 @@
       "fieldName": "Nom affiché",
       "fieldUrl": "URL du serveur",
       "fieldUrlInvalid": "Saisissez une URL de serveur valide.",
+      "fieldUrlCredentials": "Supprimez le nom d'utilisateur et le mot de passe de l'adresse.",
+      "fieldUrlFragment": "Supprimez la partie # de l'adresse.",
+      "fieldUrlInsecure": "Saisissez une adresse https, ou http uniquement pour localhost.",
       "duplicateUrl": "Cette URL est déjà enregistrée.",
       "serverNotFound": "Ce serveur n'est plus enregistré.",
       "enableServer": "Activer ce serveur : {{name}}",
@@ -4052,6 +4055,7 @@
       "app": {
         "label": "Interface de l'outil",
         "failed": "L'interface de cet outil n'a pas pu se charger.",
+        "tooLarge": "L'interface de cet outil est plus grande que la limite de {{size}}.",
         "empty": "L'interface de cet outil n'a rien à afficher."
       }
     },

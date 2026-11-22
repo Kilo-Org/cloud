@@ -3953,6 +3953,9 @@
       "fieldName": "প্রদর্শিত নাম",
       "fieldUrl": "সার্ভার URL",
       "fieldUrlInvalid": "একটি বৈধ সার্ভার URL লিখুন।",
+      "fieldUrlCredentials": "URL থেকে ব্যবহারকারীর নাম ও পাসওয়ার্ড মুছে ফেলুন।",
+      "fieldUrlFragment": "URL থেকে # অংশটি মুছে ফেলুন।",
+      "fieldUrlInsecure": "একটি https URL লিখুন, অথবা শুধুমাত্র localhost-এর জন্য http ব্যবহার করুন।",
       "duplicateUrl": "এই URL ইতিমধ্যে সংরক্ষিত আছে।",
       "serverNotFound": "এই সার্ভার আর সংরক্ষিত নেই।",
       "enableServer": "এই সার্ভার সক্রিয় করুন: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "টুল ইন্টারফেস",
         "failed": "এই টুলের ইন্টারফেস লোড করা যায়নি।",
+        "tooLarge": "এই টুলের ইন্টারফেস {{size}} সীমার চেয়ে বড়।",
         "empty": "এই টুলের ইন্টারফেসে দেখানোর কিছু নেই।"
       }
     },

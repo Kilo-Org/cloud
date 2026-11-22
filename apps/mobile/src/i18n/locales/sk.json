@@ -4099,6 +4099,9 @@
       "fieldName": "Zobrazovaný názov",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Zadajte platnú URL servera.",
+      "fieldUrlCredentials": "Odstráňte používateľské meno a heslo z URL.",
+      "fieldUrlFragment": "Odstráňte časť URL obsahujúcu #.",
+      "fieldUrlInsecure": "Zadajte URL s https, alebo http iba pre localhost.",
       "duplicateUrl": "Táto URL je už uložená.",
       "serverNotFound": "Tento server už nie je uložený.",
       "enableServer": "Povoliť tento server: {{name}}",
@@ -4126,6 +4129,7 @@
       "app": {
         "label": "Rozhranie nástroja",
         "failed": "Rozhranie tohto nástroja sa nepodarilo načítať.",
+        "tooLarge": "Rozhranie tohto nástroja je väčšie ako limit {{size}}.",
         "empty": "Rozhranie tohto nástroja nemá čo zobraziť."
       }
     },

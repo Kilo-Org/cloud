@@ -3953,6 +3953,9 @@
       "fieldName": "ਦਿਖਾਇਆ ਨਾਮ",
       "fieldUrl": "ਸਰਵਰ URL",
       "fieldUrlInvalid": "ਇੱਕ ਵੈਧ ਸਰਵਰ URL ਦਾਖਲ ਕਰੋ।",
+      "fieldUrlCredentials": "ਪਤੇ ਵਿੱਚੋਂ ਵਰਤੋਂਕਾਰ ਨਾਮ ਅਤੇ ਪਾਸਵਰਡ ਹਟਾਓ।",
+      "fieldUrlFragment": "ਪਤੇ ਦਾ # ਵਾਲਾ ਹਿੱਸਾ ਹਟਾਓ।",
+      "fieldUrlInsecure": "ਇੱਕ https ਪਤਾ ਦਾਖਲ ਕਰੋ, ਜਾਂ ਸਿਰਫ਼ localhost ਲਈ http।",
       "duplicateUrl": "ਇਹ URL ਪਹਿਲਾਂ ਹੀ ਸੰਭਾਲਿਆ ਗਿਆ ਹੈ।",
       "serverNotFound": "ਇਹ ਸਰਵਰ ਹੁਣ ਸੰਭਾਲਿਆ ਨਹੀਂ ਰਿਹਾ।",
       "enableServer": "ਇਹ ਸਰਵਰ ਚਾਲੂ ਕਰੋ: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "ਸਾਧਨ ਇੰਟਰਫੇਸ",
         "failed": "ਇਸ ਸਾਧਨ ਦਾ ਇੰਟਰਫੇਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ.",
+        "tooLarge": "ਇਸ ਸਾਧਨ ਦਾ ਇੰਟਰਫੇਸ {{size}} ਸੀਮਾ ਤੋਂ ਵੱਡਾ ਹੈ।",
         "empty": "ਇਸ ਸਾਧਨ ਦੇ ਇੰਟਰਫੇਸ ਵਿੱਚ ਵੇਖਾਉਣ ਲਈ ਕੁਝ ਵੀ ਨਹੀਂ ਹੈ."
       }
     },

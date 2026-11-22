@@ -3953,6 +3953,9 @@
       "fieldName": "प्रदर्शित नाम",
       "fieldUrl": "सर्वर URL",
       "fieldUrlInvalid": "मान्य सर्वर URL दर्ज करें।",
+      "fieldUrlCredentials": "URL से उपयोगकर्ता नाम और पासवर्ड हटाएँ।",
+      "fieldUrlFragment": "URL का # वाला भाग हटाएँ।",
+      "fieldUrlInsecure": "https URL दर्ज करें, या केवल localhost के लिए http।",
       "duplicateUrl": "यह URL पहले से सहेजा गया है।",
       "serverNotFound": "यह सर्वर अब सहेजा हुआ नहीं है।",
       "enableServer": "इस सर्वर को सक्षम करें: {{name}}",
@@ -3978,6 +3981,7 @@
       "app": {
         "label": "टूल इंटरफ़ेस",
         "failed": "इस टूल का इंटरफ़ेस लोड नहीं हो सका।",
+        "tooLarge": "इस टूल का इंटरफ़ेस {{size}} की सीमा से बड़ा है।",
         "empty": "इस टूल के इंटरफ़ेस में दिखाने के लिए कुछ नहीं है।"
       }
     },

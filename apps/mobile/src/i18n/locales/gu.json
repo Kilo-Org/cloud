@@ -3953,6 +3953,9 @@
       "fieldName": "દર્શાવેલ નામ",
       "fieldUrl": "સર્વર URL",
       "fieldUrlInvalid": "માન્ય સર્વર URL દાખલ કરો.",
+      "fieldUrlCredentials": "સર્વર URL માંથી વપરાશકર્તાનું નામ અને પાસવર્ડ દૂર કરો.",
+      "fieldUrlFragment": "સર્વર URL નો # ભાગ દૂર કરો.",
+      "fieldUrlInsecure": "https સર્વર URL દાખલ કરો, અથવા ફક્ત localhost માટે http દાખલ કરો.",
       "duplicateUrl": "આ URL પહેલેથી સાચવેલું છે.",
       "serverNotFound": "આ સર્વર હવે સાચવેલો નથી.",
       "enableServer": "આ સર્વર સક્ષમ કરો: {{name}}",
@@ -3976,6 +3979,7 @@
       "app": {
         "label": "સાધન ઇન્ટરફેસ",
         "failed": "આ સાધનનું ઇન્ટરફેસ લોડ થઈ શક્યું નથી.",
+        "tooLarge": "આ સાધનનું ઇન્ટરફેસ {{size}} મર્યાદા કરતાં મોટું છે.",
         "empty": "આ સાધનના ઇન્ટરફેસમાં બતાવવા માટે કંઈ નથી."
       },
       "serverToolCount_one": "{{count}} સાધન",

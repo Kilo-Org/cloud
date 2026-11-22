@@ -47,6 +47,16 @@ export function viewArguments(input: Readonly<Record<string, unknown>>) {
 export const MAX_VIEW_BYTES = 1_000_000;
 
 /**
+ * The cap as copy names it, in megabytes. The catalog interpolates this string,
+ * so a changed `MAX_VIEW_BYTES` cannot leave the sentence saying an old limit.
+ */
+export function viewSizeLimitLabel(): string {
+  const megabytes = MAX_VIEW_BYTES / 1_000_000;
+  const size = Number.isInteger(megabytes) ? String(megabytes) : megabytes.toFixed(1);
+  return `${size} MB`;
+}
+
+/**
  * One origin a policy may name: a scheme, an exact host and an optional port.
  * Anything else — a wildcard host, a path, credentials, `'unsafe-inline'`, a
  * bare word — is dropped, because the policy is the resource's own request and

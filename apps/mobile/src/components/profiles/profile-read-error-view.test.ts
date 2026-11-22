@@ -58,10 +58,14 @@ describe('selectProfileReadErrorView', () => {
     ).toEqual({ variant: 'timeout', showRetry: true, titleKey: null });
   });
 
-  it('keeps a non-tRPC error with a bare terminal code retryable', () => {
-    expect(
-      selectProfileReadErrorView({ error: { code: 'FORBIDDEN' }, connectivity: 'online' })
-    ).toEqual({ variant: 'permission', showRetry: true, titleKey: null });
+  it('keeps a non-tRPC error with a bare terminal code retryable under the server copy', () => {
+    for (const error of [{ code: 'FORBIDDEN' }, { code: 'NOT_FOUND' }, { code: 'BAD_REQUEST' }]) {
+      expect(selectProfileReadErrorView({ error, connectivity: 'online' })).toEqual({
+        variant: 'server',
+        showRetry: true,
+        titleKey: 'profiles.loadFailed',
+      });
+    }
   });
 
   it('treats a confirmed-offline device as connectivity even for a terminal code', () => {

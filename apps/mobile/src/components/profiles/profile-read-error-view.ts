@@ -40,17 +40,21 @@ export function selectProfileReadErrorView({
     // body says nothing about the request itself.
     return { variant: 'offline', showRetry: true, titleKey: 'profiles.loadFailed' };
   }
+  const envelope = isTrpcClientError(error);
   const code = readTrpcErrorField(error, 'code');
   // Only a tRPC client error carries a server verdict: a non-tRPC error whose
-  // bare top-level `code` happens to look terminal (a domain or transport code)
-  // never proved the request itself is doomed, so it stays retryable.
-  const terminal = isTrpcClientError(error) && isTerminalTrpcCode(code);
+  // bare top-level `code` happens to look terminal or access-like (a domain or
+  // transport code) proved nothing about the request, so it stays retryable and
+  // keeps the neutral copy. A client deadline is the one non-envelope failure
+  // with its own reading, and it stays retryable too.
+  const terminal = envelope && isTerminalTrpcCode(code);
   const reported = trpcErrorVariant(error);
+  const answered = envelope || reported === 'timeout' ? reported : 'server';
   // A terminal refusal that is not an access outcome (a malformed id in a deep
   // link, an unprocessable read) means this profile cannot be opened. The
   // not-found copy states that; the server copy would ask for a retry no
   // control offers.
-  const variant = terminal && reported === 'server' ? 'not-found' : reported;
+  const variant = terminal && answered === 'server' ? 'not-found' : answered;
   return {
     variant,
     showRetry: !terminal,

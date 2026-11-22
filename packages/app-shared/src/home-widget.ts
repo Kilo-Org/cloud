@@ -160,9 +160,7 @@ const WAKE_RETRY_MS = 15 * 60 * 1000;
  * Callers read this value instead of testing the predicate and keeping a
  * boolean beside a status a later branch can contradict.
  */
-function terminalStatusOf(
-  status: GlanceableAgentsSnapshotStatus
-): GlanceableTerminalStatus | null {
+function terminalStatusOf(status: GlanceableAgentsSnapshotStatus): GlanceableTerminalStatus | null {
   return isTerminalGlanceableStatus(status) ? status : null;
 }
 

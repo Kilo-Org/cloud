@@ -119,6 +119,58 @@ const expectNothingSaved = async (downloadsPath: string): Promise<void> => {
   await expect.poll(() => tempDownloadFiles(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
 };
 
+/*
+ * Makes the drop page show what a drop handed it, on the page itself.
+ *
+ * The fixture's own listener reports the names to `/drop-received` and keeps
+ * nothing, so the page's visible state never changes on its own. This second
+ * listener renders that same `dataTransfer` into a `#drop-record` paragraph —
+ * the names and byte counts the browser really described — and keeps the files
+ * and their read results on `window` for the assertions that check bytes, not
+ * names. The screenshot of the page is therefore a picture of the page's own
+ * record, taken only after that record was asserted.
+ *
+ * Installed after a navigation: a new document drops every listener with it.
+ */
+const recordDropsOnPage = async (page: Page): Promise<void> => {
+  await page.evaluate(`
+    const zone = document.querySelector('#zone');
+    const record = document.createElement('p');
+    record.id = 'drop-record';
+    record.textContent = 'Drop record: nothing received yet';
+    zone.after(record);
+    zone.addEventListener('drop', event => {
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      window.__droppedFiles = files.map(file => ({ name: file.name, size: file.size }));
+      window.__droppedReads = Promise.all(
+        files.map(file => file.text().then(() => 'readable', error => String(error)))
+      );
+      record.textContent =
+        files.length === 0
+          ? 'Drop record: nothing received'
+          : 'Drop record: ' + files.map(file => file.name + ' (' + file.size + ' bytes)').join(', ');
+    });
+  `);
+};
+
+/**
+ * The panel's own local-agents settings section, showing the paired CLI's
+ * entry. The dialog is the one `enableLocalAgents` opened, and the section
+ * re-reads storage on every change, so the agent appears once the session
+ * exists; `scrollIntoViewIfNeeded` brings the row on screen, because the dialog
+ * scrolls internally and a full-page capture cannot reach past a fixed overlay.
+ */
+const screenshotConnectedAgent = async (sidePanel: Page, path: string): Promise<void> => {
+  await sidePanel.bringToFront();
+  const dialog = sidePanel.getByRole('dialog', { name: 'Settings panel' });
+  await expect(dialog).toBeVisible();
+  const connected = dialog.getByText('Connected agents');
+  await expect(connected).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByText('loopback', { exact: true })).toBeVisible();
+  await connected.scrollIntoViewIfNeeded();
+  await sidePanel.screenshot({ fullPage: true, path });
+};
+
 test('a guarded click cancels the download, and the approved retry keeps it', async () => {
   test.setTimeout(120_000);
   const fixture = await startDownloadFixture();
@@ -1034,7 +1086,8 @@ test('a payment-form submit receives its own approval, and so does the file it s
   }
 });
 
-test('a drop that carries local file paths needs the upload approval', async () => {
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('a drop that carries local file paths needs the upload approval', async ({}, testInfo) => {
   test.setTimeout(180_000);
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
@@ -1079,6 +1132,15 @@ test('a drop that carries local file paths needs the upload approval', async () 
 
     expect(navigated).toMatchObject({ isError: false, kind: 'result' });
 
+    await recordDropsOnPage(agentPage);
+    const dropRecord = agentPage.locator('#drop-record');
+
+    await expect(dropRecord).toHaveText('Drop record: nothing received yet');
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('drop-page-before.png'),
+    });
+
     // A `region` is not an interactive role, so it carries no `[ref=eN]`: the drop names a unique CSS selector.
     const args = { element: 'Drop zone', paths: [localPath], target: '#zone' };
 
@@ -1095,6 +1157,8 @@ test('a drop that carries local file paths needs the upload approval', async () 
 
     expect(token).not.toBe('');
     await expect.poll(() => fixture.dropReceived(), { timeout: 5000 }).toStrictEqual([]);
+    // The refusal happened before the tool ran, so the page's own record still shows nothing.
+    await expect(dropRecord).toHaveText('Drop record: nothing received yet');
 
     // 2. The human approved: the same drop runs and the page receives the one file.
     const approved = await session.callTool('browser_drop', args, grants, [token]);
@@ -1103,6 +1167,13 @@ test('a drop that carries local file paths needs the upload approval', async () 
     await expect
       .poll(() => fixture.dropReceived(), { timeout: 20_000 })
       .toStrictEqual([['drop-proof.txt']]);
+    // The page shows the file the approved drop handed it, with the 18 bytes the local file holds.
+    await expect(dropRecord).toHaveText('Drop record: drop-proof.txt (18 bytes)');
+    expect(await agentPage.evaluate('window.__droppedReads')).toStrictEqual(['readable']);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('drop-page-after.png'),
+    });
 
     // 3. A drop of page-made data is not an upload: it runs on its own.
     const dataOnly = await session.callTool(
@@ -1112,6 +1183,9 @@ test('a drop that carries local file paths needs the upload approval', async () 
     );
 
     expect(dataOnly).toMatchObject({ isError: false, kind: 'result' });
+
+    // The panel is the last capture: bringing it to the front makes the fixture page a background tab.
+    await screenshotConnectedAgent(sidePanel, testInfo.outputPath('extension-connected-agent.png'));
   } finally {
     await rm(localDir, { force: true, recursive: true });
     await launch.close();
@@ -1194,7 +1268,8 @@ test('the no-permission fallback refuses the same click and names the grant', as
   }
 });
 
-test('a drop naming an absent local file is still the upload step, and the page receives nothing', async () => {
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('a drop naming an absent local file is still the upload step, and the page receives nothing', async ({}, testInfo) => {
   test.setTimeout(120_000);
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
@@ -1233,17 +1308,16 @@ test('a drop naming an absent local file is still the upload step, and the page 
 
     expect(navigated).toMatchObject({ isError: false, kind: 'result' });
 
-    // The page is the only witness to what a drop really handed it: the fixture reports names, so the file's byte
-    // Count and whether those bytes can be read at all are recorded here, before any drop exists to reach this page.
-    await agentPage.evaluate(`
-      document.querySelector('#zone').addEventListener('drop', event => {
-        const files = Array.from(event.dataTransfer?.files ?? []);
-        window.__droppedFiles = files.map(file => ({ name: file.name, size: file.size }));
-        window.__droppedReads = Promise.all(
-          files.map(file => file.text().then(() => 'readable', error => String(error)))
-        );
-      });
-    `);
+    // The page is the only witness to what a drop really handed it: it reports names to the fixture, and the helper
+    // Also records the file's byte count and whether those bytes can be read at all, before any drop reaches this page.
+    await recordDropsOnPage(agentPage);
+    const dropRecord = agentPage.locator('#drop-record');
+
+    await expect(dropRecord).toHaveText('Drop record: nothing received yet');
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('drop-page-before.png'),
+    });
 
     // The guard decides the call before the tool runs, so a path that is not on disk is classified the same way a
     // Readable one is: the upload approval is what the call needs, and no read of the paths happens first.
@@ -1265,6 +1339,7 @@ test('a drop naming an absent local file is still the upload step, and the page 
     expect(token).not.toBe('');
     // Refused before the tool: the page's own handler never ran, so it reported no drop.
     await expect.poll(() => fixture.dropReceived(), { timeout: 5000 }).toStrictEqual([]);
+    await expect(dropRecord).toHaveText('Drop record: nothing received yet');
 
     // The approval buys the step, and the tool answers as it always does — it dispatched a drag the browser accepted.
     // Nothing was delivered: the file the page was handed holds no bytes and cannot be read, so the page's report of
@@ -1287,6 +1362,14 @@ test('a drop naming an absent local file is still the upload step, and the page 
     await expect
       .poll(() => fixture.dropReceived(), { timeout: 20_000 })
       .toStrictEqual([['absent-proof.txt']]);
+    // The page shows the name it was handed with no bytes behind it: the refusal and the approval both happened,
+    // And what reached the page is the empty file the browser described.
+    await expect(dropRecord).toHaveText('Drop record: absent-proof.txt (0 bytes)');
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('drop-page-after.png'),
+    });
+    await screenshotConnectedAgent(sidePanel, testInfo.outputPath('extension-connected-agent.png'));
   } finally {
     await launch.close();
     await hub.close();

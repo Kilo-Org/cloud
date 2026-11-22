@@ -18,7 +18,7 @@ import {
   VIEW_HOST_PAGE,
   viewArguments,
   viewHeightOf,
-  viewSizeLimitLabel,
+  viewSizeLimit,
 } from '@/lib/chat/remote-mcp-app';
 import { type RemoteMcpToolView } from '@/lib/chat/remote-mcp-state';
 import { deviceZone } from '@/lib/chat/tool-set';
@@ -226,7 +226,7 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
       {documentState.kind === 'tooLarge' ? (
         <View className="absolute inset-0 items-center justify-center px-4">
           <Text className="text-center text-xs text-muted-foreground">
-            {t('modelChat.mcp.app.tooLarge', { size: viewSizeLimitLabel() })}
+            {t('modelChat.mcp.app.tooLarge', { size: viewSizeLimit(i18n.language) })}
           </Text>
         </View>
       ) : null}

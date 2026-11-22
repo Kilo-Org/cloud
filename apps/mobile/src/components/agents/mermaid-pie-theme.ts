@@ -12,6 +12,11 @@
  * percentage text reads as a cut-out of the slice. The slice stroke is that
  * same colour, so one wedge's outline parts it from the next without drawing a
  * second, unrelated colour into the chart.
+ *
+ * Light mode is out of scope here, and carries the same defect: mermaid's
+ * light theme derives `pie1` as `#ECECFF`, which is 1.12:1 on the light
+ * diagram page. It needs its own ramp against that page, and its own ink for
+ * the fills that ramp would use, so it is deliberately not changed here.
  */
 
 /** The dark diagram page: the app's `background` token, and the surface

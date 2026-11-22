@@ -62,6 +62,29 @@ export function BitbucketConnectSheet({ scope }: Readonly<{ scope: string | unde
   );
 }
 
+/**
+ * A denial's description as one paragraph per reason. A lone paragraph stays
+ * the bare string, so a sentence that already names the organization reads as
+ * one sentence; two or more become separate muted paragraphs in the same body
+ * token, one paragraph gap apart, so the reader sees two reasons rather than
+ * one cramped paragraph at a different size.
+ */
+function denialParagraphs(paragraphs: readonly string[]): ReactNode {
+  const [only] = paragraphs;
+  if (paragraphs.length === 1 && only !== undefined) {
+    return only;
+  }
+  return (
+    <View className="items-center gap-2">
+      {paragraphs.map((paragraph, index) => (
+        <Text key={index} variant="muted" className="text-center">
+          {paragraph}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -146,7 +169,10 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (status.isError && status.data == null) {
       return isPermissionDeniedError(status.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.bitbucketAdminOnlyDescription')}
+          description={denialParagraphs([
+            t('prReview.connect.contextLine', { organization: org.organizationName }),
+            t('prReview.connect.bitbucketAdminOnlyDescription'),
+          ])}
           showBack={false}
         />
       ) : (
@@ -162,7 +188,10 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (readiness.isError && readiness.data == null) {
       return isPermissionDeniedError(readiness.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.bitbucketAdminOnlyDescription')}
+          description={denialParagraphs([
+            t('prReview.connect.contextLine', { organization: org.organizationName }),
+            t('prReview.connect.bitbucketAdminOnlyDescription'),
+          ])}
           showBack={false}
         />
       ) : (
@@ -181,8 +210,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       // who may reconnect it, and a first connect asks for whoever holds the
       // permission. The reconnect and owner sentences name the organization
       // whose rule refused, so a person in several of them reads which one this
-      // is; the first connect sentence is the shared ask the composer's
-      // Bitbucket card states beside the same restriction.
+      // is. The first connect sentence is the shared ask the composer's
+      // Bitbucket card states beside the same restriction, and it leaves the
+      // organization implicit, so it is stated under the organization line.
       let deniedDescription = t('prReview.connect.bitbucketAdminOnlyDescription');
       if (managesExisting) {
         deniedDescription = t('codeReviewer.bitbucketConnect.deniedManagedByOwner', {
@@ -217,26 +247,22 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
             }}
           />
         );
-      // The denial sentence stays the state's description. The plan line is a
-      // second paragraph in the same muted body token, one paragraph gap under
-      // it, so the reader sees two reasons rather than one cramped paragraph at
-      // a different size.
+      // The organization line leads the shared ask sentence, because that
+      // sentence leaves the organization implicit and the header names only the
+      // platform; the owner and reconnect sentences already name it, so they
+      // stay the one paragraph. The plan line closes the first-connect list when
+      // the plan blocks too.
+      const deniedParagraphs =
+        managesExisting || integrationId !== null
+          ? [deniedDescription]
+          : [
+              t('prReview.connect.contextLine', { organization: org.organizationName }),
+              deniedDescription,
+              ...(deniedPlanLine === undefined ? [] : [deniedPlanLine]),
+            ];
       return (
         <PermissionDenied
-          description={
-            deniedPlanLine === undefined ? (
-              deniedDescription
-            ) : (
-              <View className="items-center gap-2">
-                <Text variant="muted" className="text-center">
-                  {deniedDescription}
-                </Text>
-                <Text variant="muted" className="text-center">
-                  {deniedPlanLine}
-                </Text>
-              </View>
-            )
-          }
+          description={denialParagraphs(deniedParagraphs)}
           showBack={false}
           action={deniedAction}
         />

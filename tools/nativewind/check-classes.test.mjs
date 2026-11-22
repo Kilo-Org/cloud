@@ -1022,9 +1022,11 @@ test('names the line a layout class is written on, past the escape before it', (
 });
 
 // Every escape the offset map walks is a branch of its own, and the tree has
-// none of them today, so each is exercised only here. Each fixture writes
-// `mt-[6px]` as the first thing on its own source line, behind the escape named
-// in its row, and the expected line is that class's own line.
+// none of them today, so each is exercised only here. A quoted escape must sit
+// in a `{…}` expression: a bare attribute string is not cooked, so it takes the
+// identity path and would exercise nothing. Each fixture writes `mt-[6px]` as
+// the first thing on its own source line, behind the escape named in its row,
+// and the expected line is that class's own line.
 test('maps every escape branch to the line the class is written on', () => {
   const cases = [
     [
@@ -1033,8 +1035,8 @@ test('maps every escape branch to the line the class is written on', () => {
         'export function Screen() {',
         '  return (',
         '    <View',
-        '      className="\\x41\\u0020\\',
-        'mt-[6px]" />',
+        '      className={"\\x41\\u0020\\',
+        'mt-[6px]"} />',
         '  );',
         '}',
       ].join('\n'),
@@ -1045,8 +1047,8 @@ test('maps every escape branch to the line the class is written on', () => {
         'export function Screen() {',
         '  return (',
         '    <View',
-        '      className="\\u{1F600}\\u0020\\',
-        'mt-[6px]" />',
+        '      className={"\\u{1F600}\\u0020\\',
+        'mt-[6px]"} />',
         '  );',
         '}',
       ].join('\n'),

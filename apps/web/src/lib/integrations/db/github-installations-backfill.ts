@@ -85,7 +85,11 @@ export async function backfillGitHubInstallations(
     }
     const appType = row.github_app_type ?? 'standard';
     // One snapshot for the peer set, the link and the role claim, under the identity lock.
+    // The wait is bounded like the other writers of this lock: a contended installation fails fast and the operator reruns the command.
     await db.transaction(async (tx: DbTransaction) => {
+      await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+      await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+      await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '60s'`);
       await lockGitHubInstallationIdentity(tx, appType, installationId);
       const peers = await tx
         .select({ id: platform_integrations.id })

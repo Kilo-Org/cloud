@@ -3726,6 +3726,45 @@ describe('GitHub installation persistence', () => {
     ).resolves.toHaveLength(1);
     expect(result).toMatchObject({ linked: 1 });
   });
+
+  test('bounds the backfill lock wait and stays retryable', async () => {
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: ownerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '990013',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        github_installation_id: null,
+        repository_access: 'all',
+      })
+      .returning();
+    const lockHeld = Promise.withResolvers<number>();
+    const releaseHolder = Promise.withResolvers<void>();
+    const holder = db.transaction(async tx => {
+      await lockGitHubInstallationIdentity(tx, 'standard', '990013');
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      lockHeld.resolve(backend.rows[0]!.pid);
+      await releaseHolder.promise;
+    });
+    try {
+      await githubTestTimeout(lockHeld.promise, 'backfill lock holder');
+      await expect(backfillGitHubInstallations()).rejects.toMatchObject({
+        cause: expect.objectContaining({ code: '55P03' }),
+      });
+    } finally {
+      releaseHolder.resolve();
+    }
+    await githubTestTimeout(holder, 'backfill lock release');
+
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({ linked: 1 });
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({ github_installation_id: expect.any(String) });
+  }, 30_000);
 });
 
 async function waitForBlockedGitHubOwnerLock(

@@ -4179,7 +4179,13 @@
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",
       "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena.",
-      "cannotUse": "Modeli hii haiwezi kutumia: {{items}}."
+      "cannotUse": "Modeli hii haiwezi kutumia: {{items}}.",
+      "cannotUseOptions": "Modeli hii haiwezi kujaza: {{items}}.",
+      "tools": {
+        "time": "Muda",
+        "settingsList": "Onyesha mipangilio",
+        "settingsSet": "Badilisha mipangilio"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"

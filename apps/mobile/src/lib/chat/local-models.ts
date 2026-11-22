@@ -15,7 +15,7 @@ import {
   nativeModelClient,
   type NativeModelEvent,
 } from './native-model-client';
-import { type NativeOmission, omittedTools } from './native-tool-schema';
+import { omittedTools } from './native-tool-schema';
 import { offeredTools } from './offered-tools';
 
 /** One on-device provider. The harness still owns the conversation; this supplies inference. */
@@ -40,12 +40,24 @@ type SystemProvider = Exclude<LocalProvider, 'gguf'>;
  *
  * `unknown` is the store's own answer before anyone has handed it the offered
  * tools; `none` is a model that takes every tool it is offered; `some` names
- * the tools, and the arguments of a tool, this model cannot run.
+ * what this model cannot run. The two lists stay apart because they say
+ * different things: a tool in `tools` never reaches the model, while an
+ * argument in `arguments` is one optional field dropped from a tool the model
+ * still receives.
  */
 export type LocalModelToolUse =
   | { readonly kind: 'unknown' }
   | { readonly kind: 'none' }
-  | { readonly kind: 'some'; readonly unusable: readonly string[] };
+  | {
+      readonly kind: 'some';
+      /** Whole tools the model never sees. */
+      readonly tools: readonly string[];
+      /** One optional argument dropped from a tool that still reaches the model. */
+      readonly arguments: readonly {
+        readonly tool: string;
+        readonly argument: string;
+      }[];
+    };
 
 /** What the settings sheet and the model picker show for one system provider. */
 export type LocalModelStatus = {
@@ -196,8 +208,12 @@ function statusesOf(): readonly LocalModelStatus[] {
  * Only a check that has not answered is `unknown`: before the answer there is
  * nothing to say. Every settled answer is one of two facts. A model that runs
  * no tool loop runs none of the offered tools, whatever their schemas look
- * like, so it names all of them. A model that runs the loop names only what the
- * converter leaves out.
+ * like, so every tool it is offered is left out and no argument is. A model
+ * that runs the loop names only what the converter leaves out, split into the
+ * tools it never sees and the optional arguments it sees a tool without.
+ *
+ * A name appears once in each list, in the order the offered tools put it: two
+ * tools can leave out the same argument path, and the copy names it once.
  */
 export function toolUseOf(
   availability: NativeAvailability | undefined,
@@ -209,16 +225,34 @@ export function toolUseOf(
   if (availability.tools !== true) {
     return offered.length === 0
       ? { kind: 'none' }
-      : { kind: 'some', unusable: offered.map(tool => tool.name) };
+      : {
+          kind: 'some',
+          tools: [...new Set(offered.map(tool => tool.name))],
+          arguments: [],
+        };
   }
-  const unusable = [
-    ...new Set(
-      omittedTools(offeredTools(offered)).map((omission: NativeOmission) =>
-        omission.kind === 'tool' ? omission.tool : `${omission.tool}.${omission.argument}`
-      )
-    ),
-  ];
-  return unusable.length === 0 ? { kind: 'none' } : { kind: 'some', unusable };
+  const tools: string[] = [];
+  const toolNames = new Set<string>();
+  const dropped: { tool: string; argument: string }[] = [];
+  const argumentPaths = new Set<string>();
+  for (const omission of omittedTools(offeredTools(offered))) {
+    if (omission.kind === 'tool') {
+      if (!toolNames.has(omission.tool)) {
+        toolNames.add(omission.tool);
+        tools.push(omission.tool);
+      }
+    } else {
+      // The argument belongs to its tool, so two tools may drop the same path.
+      const path = `${omission.tool}\u0000${omission.argument}`;
+      if (!argumentPaths.has(path)) {
+        argumentPaths.add(path);
+        dropped.push({ tool: omission.tool, argument: omission.argument });
+      }
+    }
+  }
+  return tools.length === 0 && dropped.length === 0
+    ? { kind: 'none' }
+    : { kind: 'some', tools, arguments: dropped };
 }
 
 statuses = statusesOf();

@@ -4327,7 +4327,13 @@
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
       "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą.",
-      "cannotUse": "Šis modelis nepalaiko: {{items}}."
+      "cannotUse": "Šis modelis nepalaiko: {{items}}.",
+      "cannotUseOptions": "Šis modelis negali užpildyti: {{items}}.",
+      "tools": {
+        "time": "Laikas",
+        "settingsList": "Rodyti nustatymus",
+        "settingsSet": "Keisti nustatymus"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"

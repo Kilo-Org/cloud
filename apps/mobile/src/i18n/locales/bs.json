@@ -4253,7 +4253,13 @@
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}}%",
       "downloadFailed": "Preuzimanje nije završeno. Provjerite vezu i slobodan prostor za pohranu, pa pokušajte ponovo.",
-      "cannotUse": "Ovaj model ne može koristiti: {{items}}."
+      "cannotUse": "Ovaj model ne može koristiti: {{items}}.",
+      "cannotUseOptions": "Ovaj model ne može popuniti: {{items}}.",
+      "tools": {
+        "time": "Vrijeme",
+        "settingsList": "Prikaži postavke",
+        "settingsSet": "Izmijeni postavke"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"

@@ -4179,7 +4179,13 @@
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
       "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining.",
-      "cannotUse": "Ushbu model quyidagilardan foydalana olmaydi: {{items}}."
+      "cannotUse": "Ushbu model quyidagilardan foydalana olmaydi: {{items}}.",
+      "cannotUseOptions": "Ushbu model quyidagilarni to‘ldira olmaydi: {{items}}.",
+      "tools": {
+        "time": "Vaqt",
+        "settingsList": "Sozlamalarni ko‘rsatish",
+        "settingsSet": "Sozlamalarni o‘zgartirish"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"

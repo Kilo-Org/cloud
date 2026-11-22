@@ -4202,7 +4202,13 @@
       "downloading": "Downloading…",
       "downloadProgress": "Downloading… {{percent}}%",
       "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again.",
-      "cannotUse": "This model can't use: {{items}}."
+      "cannotUse": "This model can't use: {{items}}.",
+      "cannotUseOptions": "This model can't fill in: {{items}}.",
+      "tools": {
+        "time": "Time",
+        "settingsList": "Show settings",
+        "settingsSet": "Change settings"
+      }
     },
     "webSearch": {
       "title": "Search the web",

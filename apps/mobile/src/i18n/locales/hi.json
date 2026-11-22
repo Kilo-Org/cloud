@@ -4179,7 +4179,13 @@
       "downloading": "डाउनलोड हो रहा है…",
       "downloadProgress": "डाउनलोड हो रहा है… {{percent}}%",
       "downloadFailed": "डाउनलोड पूरा नहीं हो सका। अपना कनेक्शन और खाली स्टोरेज जांचें, फिर से कोशिश करें।",
-      "cannotUse": "यह मॉडल इनका इस्तेमाल नहीं कर सकता: {{items}}।"
+      "cannotUse": "यह मॉडल इनका इस्तेमाल नहीं कर सकता: {{items}}।",
+      "cannotUseOptions": "यह मॉडल इन्हें भर नहीं सकता: {{items}}।",
+      "tools": {
+        "time": "समय",
+        "settingsList": "सेटिंग्स दिखाएँ",
+        "settingsSet": "सेटिंग्स बदलें"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "यह मॉडल सोचने के स्तर का समर्थन करता है"

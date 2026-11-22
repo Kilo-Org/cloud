@@ -4179,7 +4179,13 @@
       "downloading": "다운로드 중…",
       "downloadProgress": "다운로드 중… {{percent}}%",
       "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요.",
-      "cannotUse": "이 모델은 다음 기능을 사용할 수 없습니다: {{items}}."
+      "cannotUse": "이 모델은 다음 기능을 사용할 수 없습니다: {{items}}.",
+      "cannotUseOptions": "이 모델은 다음 항목을 채울 수 없습니다: {{items}}.",
+      "tools": {
+        "time": "시간",
+        "settingsList": "설정 보기",
+        "settingsSet": "설정 변경"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "이 모델은 추론 강도를 지원합니다"

@@ -4179,7 +4179,13 @@
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
       "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen.",
-      "cannotUse": "Denne model kan ikke bruge: {{items}}."
+      "cannotUse": "Denne model kan ikke bruge: {{items}}.",
+      "cannotUseOptions": "Denne model kan ikke udfylde: {{items}}.",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Vis indstillinger",
+        "settingsSet": "Ændr indstillinger"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"

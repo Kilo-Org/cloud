@@ -4179,7 +4179,13 @@
       "downloading": "Iyadawuniloda…",
       "downloadProgress": "Iyadawuniloda… {{percent}}%",
       "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi.",
-      "cannotUse": "Le modeli ayikwazi ukusebenzisa: {{items}}."
+      "cannotUse": "Le modeli ayikwazi ukusebenzisa: {{items}}.",
+      "cannotUseOptions": "Le modeli ayikwazi ukugcwalisa: {{items}}.",
+      "tools": {
+        "time": "Isikhathi",
+        "settingsList": "Bonisa izilungiselelo",
+        "settingsSet": "Shintsha izilungiselelo"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Le modeli isekela umzamo wokucabanga"

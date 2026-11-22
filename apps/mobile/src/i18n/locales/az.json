@@ -4179,7 +4179,13 @@
       "downloading": "Endirilir…",
       "downloadProgress": "Endirilir… {{percent}}%",
       "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin.",
-      "cannotUse": "Bu model bunlardan istifadə edə bilməz: {{items}}"
+      "cannotUse": "Bu model bunlardan istifadə edə bilməz: {{items}}",
+      "cannotUseOptions": "Bu model bunları doldura bilməz: {{items}}.",
+      "tools": {
+        "time": "Vaxt",
+        "settingsList": "Tənzimləmələri göstər",
+        "settingsSet": "Tənzimləmələri dəyişdir"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"

@@ -4327,7 +4327,13 @@
       "downloading": "Pobieranie…",
       "downloadProgress": "Pobieranie… {{percent}}%",
       "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie.",
-      "cannotUse": "Ten model nie obsługuje: {{items}}."
+      "cannotUse": "Ten model nie obsługuje: {{items}}.",
+      "cannotUseOptions": "Ten model nie może wypełnić: {{items}}.",
+      "tools": {
+        "time": "Czas",
+        "settingsList": "Pokaż ustawienia",
+        "settingsSet": "Zmień ustawienia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"

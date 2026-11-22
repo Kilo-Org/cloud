@@ -4179,7 +4179,13 @@
       "downloading": "Ana saukewa…",
       "downloadProgress": "Ana saukewa… {{percent}}%",
       "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa.",
-      "cannotUse": "Wannan samfurin ba zai iya amfani da: {{items}} ba."
+      "cannotUse": "Wannan samfurin ba zai iya amfani da: {{items}} ba.",
+      "cannotUseOptions": "Wannan samfurin ba zai iya cika: {{items}} ba.",
+      "tools": {
+        "time": "Lokaci",
+        "settingsList": "Nuna saituna",
+        "settingsSet": "Canza saituna"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Wannan samfurin yana goyon bayan matakin tunani"

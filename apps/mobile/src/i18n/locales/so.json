@@ -4179,7 +4179,13 @@
       "downloading": "Waa la soo dejinayaa…",
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",
       "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale.",
-      "cannotUse": "Moodeelkan ma isticmaali karo: {{items}}."
+      "cannotUse": "Moodeelkan ma isticmaali karo: {{items}}.",
+      "cannotUseOptions": "Moodeelkan ma buuxin karo: {{items}}.",
+      "tools": {
+        "time": "Waqti",
+        "settingsList": "Muuji dejinta",
+        "settingsSet": "Beddel dejinta"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"

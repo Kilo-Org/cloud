@@ -4179,7 +4179,13 @@
       "downloading": "Wird heruntergeladen…",
       "downloadProgress": "Wird heruntergeladen… {{percent}} %",
       "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut.",
-      "cannotUse": "Dieses Modell kann Folgendes nicht nutzen: {{items}}."
+      "cannotUse": "Dieses Modell kann Folgendes nicht nutzen: {{items}}.",
+      "cannotUseOptions": "Dieses Modell kann Folgendes nicht ausfüllen: {{items}}.",
+      "tools": {
+        "time": "Zeit",
+        "settingsList": "Einstellungen anzeigen",
+        "settingsSet": "Einstellungen ändern"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"

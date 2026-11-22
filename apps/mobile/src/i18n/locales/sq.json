@@ -4179,7 +4179,13 @@
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
       "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri.",
-      "cannotUse": "Ky model nuk mund t'i përdorë: {{items}}."
+      "cannotUse": "Ky model nuk mund t'i përdorë: {{items}}.",
+      "cannotUseOptions": "Ky model nuk mund t'i plotësojë: {{items}}.",
+      "tools": {
+        "time": "Koha",
+        "settingsList": "Shfaq cilësimet",
+        "settingsSet": "Ndrysho cilësimet"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"

@@ -4179,7 +4179,13 @@
       "downloading": "ডাউনলোড হচ্ছে…",
       "downloadProgress": "ডাউনলোড হচ্ছে… {{percent}}%",
       "downloadFailed": "ডাউনলোড শেষ হয়নি। আপনার কানেকশন ও খালি স্টোরেজ দেখে নিয়ে আবার চেষ্টা করুন।",
-      "cannotUse": "এই মডেল ব্যবহার করতে পারে না: {{items}}।"
+      "cannotUse": "এই মডেল ব্যবহার করতে পারে না: {{items}}।",
+      "cannotUseOptions": "এই মডেল পূরণ করতে পারে না: {{items}}।",
+      "tools": {
+        "time": "সময়",
+        "settingsList": "সেটিংস দেখান",
+        "settingsSet": "সেটিংস পরিবর্তন করুন"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "এই মডেল চিন্তার মাত্রা সমর্থন করে"

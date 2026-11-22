@@ -4253,7 +4253,13 @@
       "downloading": "מתבצעת הורדה…",
       "downloadProgress": "מתבצעת הורדה… {{percent}}%",
       "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב.",
-      "cannotUse": "המודל הזה לא יכול להשתמש ב: {{items}}."
+      "cannotUse": "המודל הזה לא יכול להשתמש ב: {{items}}.",
+      "cannotUseOptions": "המודל הזה לא יכול למלא: {{items}}.",
+      "tools": {
+        "time": "שעה",
+        "settingsList": "הצג הגדרות",
+        "settingsSet": "שנה הגדרות"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"

@@ -4179,7 +4179,13 @@
       "downloading": "Laddar ned…",
       "downloadProgress": "Laddar ned… {{percent}} %",
       "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen.",
-      "cannotUse": "Den här modellen kan inte använda: {{items}}."
+      "cannotUse": "Den här modellen kan inte använda: {{items}}.",
+      "cannotUseOptions": "Den här modellen kan inte fylla i: {{items}}.",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Visa inställningar",
+        "settingsSet": "Ändra inställningar"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"

@@ -4179,7 +4179,13 @@
       "downloading": "Sæki…",
       "downloadProgress": "Sæki… {{percent}}%",
       "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur.",
-      "cannotUse": "Þetta líkan getur ekki notað: {{items}}."
+      "cannotUse": "Þetta líkan getur ekki notað: {{items}}.",
+      "cannotUseOptions": "Þetta líkan getur ekki fyllt út: {{items}}.",
+      "tools": {
+        "time": "Tími",
+        "settingsList": "Sýna stillingar",
+        "settingsSet": "Breyta stillingum"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"

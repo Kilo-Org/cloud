@@ -4179,7 +4179,13 @@
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",
       "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti.",
-      "cannotUse": "See mudel ei toeta: {{items}}."
+      "cannotUse": "See mudel ei toeta: {{items}}.",
+      "cannotUseOptions": "See mudel ei toeta täitmist: {{items}}.",
+      "tools": {
+        "time": "Aeg",
+        "settingsList": "Näita seadeid",
+        "settingsSet": "Muuda seadeid"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"

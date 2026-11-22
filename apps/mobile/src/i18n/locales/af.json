@@ -4179,7 +4179,13 @@
       "downloading": "Laai tans af…",
       "downloadProgress": "Laai tans af… {{percent}}%",
       "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer.",
-      "cannotUse": "Hierdie model kan nie die volgende gebruik nie: {{items}}."
+      "cannotUse": "Hierdie model kan nie die volgende gebruik nie: {{items}}.",
+      "cannotUseOptions": "Hierdie model kan nie die volgende invul nie: {{items}}.",
+      "tools": {
+        "time": "Tyd",
+        "settingsList": "Wys instellings",
+        "settingsSet": "Verander instellings"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"

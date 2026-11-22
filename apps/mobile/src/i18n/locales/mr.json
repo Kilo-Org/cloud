@@ -4179,7 +4179,13 @@
       "downloading": "डाउनलोड होत आहे…",
       "downloadProgress": "डाउनलोड होत आहे… {{percent}}%",
       "downloadFailed": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन आणि मोकळी स्टोरेज जागा तपासा, मग पुन्हा प्रयत्न करा.",
-      "cannotUse": "हे मॉडेल यांचा वापर करू शकत नाही: {{items}}."
+      "cannotUse": "हे मॉडेल यांचा वापर करू शकत नाही: {{items}}.",
+      "cannotUseOptions": "हे मॉडेल भरू शकत नाही: {{items}}।",
+      "tools": {
+        "time": "वेळ",
+        "settingsList": "सेटिंग्ज दाखवा",
+        "settingsSet": "सेटिंग्ज बदला"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "हे मॉडेल विचारांची पातळी समर्थित करते"

@@ -4179,7 +4179,13 @@
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
       "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。",
-      "cannotUse": "このモデルでは次の機能を利用できません：{{items}}。"
+      "cannotUse": "このモデルでは次の機能を利用できません：{{items}}。",
+      "cannotUseOptions": "このモデルでは次の項目を入力できません：{{items}}。",
+      "tools": {
+        "time": "時刻",
+        "settingsList": "設定を表示",
+        "settingsSet": "設定を変更"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"

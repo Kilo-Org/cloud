@@ -4179,7 +4179,13 @@
       "downloading": "Letöltés…",
       "downloadProgress": "Letöltés… {{percent}}%",
       "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra.",
-      "cannotUse": "Ez a modell nem tudja használni a következő eszközöket: {{items}}."
+      "cannotUse": "Ez a modell nem tudja használni a következő eszközöket: {{items}}.",
+      "cannotUseOptions": "Ez a modell nem tudja kitölteni a következő mezőket: {{items}}.",
+      "tools": {
+        "time": "Idő",
+        "settingsList": "Beállítások megjelenítése",
+        "settingsSet": "Beállítások módosítása"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"

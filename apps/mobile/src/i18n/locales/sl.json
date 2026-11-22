@@ -4327,7 +4327,13 @@
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
       "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova.",
-      "cannotUse": "Ta model ne podpira: {{items}}."
+      "cannotUse": "Ta model ne podpira: {{items}}.",
+      "cannotUseOptions": "Ta model ne more izpolniti: {{items}}.",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Prikaži nastavitve",
+        "settingsSet": "Spremeni nastavitve"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"

@@ -4327,7 +4327,13 @@
       "downloading": "Stahování…",
       "downloadProgress": "Stahování… {{percent}} %",
       "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu.",
-      "cannotUse": "Tento model nemůže použít: {{items}}."
+      "cannotUse": "Tento model nemůže použít: {{items}}.",
+      "cannotUseOptions": "Tento model nemůže vyplnit: {{items}}.",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobrazit nastavení",
+        "settingsSet": "Změnit nastavení"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"

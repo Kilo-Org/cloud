@@ -4179,7 +4179,13 @@
       "downloading": "ښکته کېږي…",
       "downloadProgress": "ښکته کېږي… {{percent}}%",
       "downloadFailed": "ښکته کول بشپړ نه شو. خپل اتصال او خالي ځای وګورئ، بیا هڅه وکړئ.",
-      "cannotUse": "دا ماډل دا نشي کارولای: {{items}}."
+      "cannotUse": "دا ماډل دا نشي کارولای: {{items}}.",
+      "cannotUseOptions": "دا ماډل دا نشي ډکولای: {{items}}۔",
+      "tools": {
+        "time": "وخت",
+        "settingsList": "امستنې ښودل",
+        "settingsSet": "امستنې بدلول"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "دا ماډل د فکر کچه ملاتړ کوي"

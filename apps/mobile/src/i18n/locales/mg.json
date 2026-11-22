@@ -4179,7 +4179,13 @@
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",
       "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray.",
-      "cannotUse": "Tsy azon'ity modely ity ampiasaina: {{items}}."
+      "cannotUse": "Tsy azon'ity modely ity ampiasaina: {{items}}.",
+      "cannotUseOptions": "Tsy azon'ity modely ity fenoina: {{items}}.",
+      "tools": {
+        "time": "Ora",
+        "settingsList": "Asehoy ny fikirana",
+        "settingsSet": "Ovao ny fikirana"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"

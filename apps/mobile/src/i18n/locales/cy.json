@@ -4475,7 +4475,13 @@
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
       "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni.",
-      "cannotUse": "Ni all y model hwn ddefnyddio: {{items}}."
+      "cannotUse": "Ni all y model hwn ddefnyddio: {{items}}.",
+      "cannotUseOptions": "Ni all y model hwn lenwi: {{items}}.",
+      "tools": {
+        "time": "Amser",
+        "settingsList": "Dangos gosodiadau",
+        "settingsSet": "Newid gosodiadau"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"

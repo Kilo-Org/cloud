@@ -4253,7 +4253,13 @@
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
       "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz.",
-      "cannotUse": "Šis modelis nevar izmantot: {{items}}."
+      "cannotUse": "Šis modelis nevar izmantot: {{items}}.",
+      "cannotUseOptions": "Šis modelis nevar aizpildīt: {{items}}.",
+      "tools": {
+        "time": "Laiks",
+        "settingsList": "Rādīt iestatījumus",
+        "settingsSet": "Mainīt iestatījumus"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"

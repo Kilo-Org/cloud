@@ -4475,7 +4475,13 @@
       "downloading": "جارٍ التنزيل…",
       "downloadProgress": "جارٍ التنزيل… {{percent}}%",
       "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى.",
-      "cannotUse": "لا يمكن لهذا النموذج استخدام: {{items}}."
+      "cannotUse": "لا يمكن لهذا النموذج استخدام: {{items}}.",
+      "cannotUseOptions": "لا يمكن لهذا النموذج تعبئة: {{items}}.",
+      "tools": {
+        "time": "الوقت",
+        "settingsList": "عرض الإعدادات",
+        "settingsSet": "تغيير الإعدادات"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "يدعم هذا النموذج جهد التفكير"

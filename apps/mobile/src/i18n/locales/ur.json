@@ -4179,7 +4179,13 @@
       "downloading": "ڈاؤن لوڈ ہو رہا ہے…",
       "downloadProgress": "ڈاؤن لوڈ ہو رہا ہے… {{percent}}%",
       "downloadFailed": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن اور خالی اسٹوریج چیک کریں، پھر دوبارہ کوشش کریں۔",
-      "cannotUse": "یہ ماڈل ان کا استعمال نہیں کر سکتا: {{items}}۔"
+      "cannotUse": "یہ ماڈل ان کا استعمال نہیں کر سکتا: {{items}}۔",
+      "cannotUseOptions": "یہ ماڈل انہیں بھر نہیں سکتا: {{items}}۔",
+      "tools": {
+        "time": "وقت",
+        "settingsList": "ترتیبات دکھائیں",
+        "settingsSet": "ترتیبات تبدیل کریں"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"

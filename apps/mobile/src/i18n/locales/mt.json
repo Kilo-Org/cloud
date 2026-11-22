@@ -4401,7 +4401,13 @@
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
       "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova.",
-      "cannotUse": "Dan il-mudell ma jistax juża: {{items}}."
+      "cannotUse": "Dan il-mudell ma jistax juża: {{items}}.",
+      "cannotUseOptions": "Dan il-mudell ma jistax jimla: {{items}}.",
+      "tools": {
+        "time": "Ħin",
+        "settingsList": "Uri l-impostazzjonijiet",
+        "settingsSet": "Biddel l-impostazzjonijiet"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"

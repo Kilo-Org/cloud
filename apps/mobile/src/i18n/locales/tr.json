@@ -4179,7 +4179,13 @@
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",
       "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin.",
-      "cannotUse": "Bu model şunları kullanamaz: {{items}}."
+      "cannotUse": "Bu model şunları kullanamaz: {{items}}.",
+      "cannotUseOptions": "Bu model şunları dolduramaz: {{items}}.",
+      "tools": {
+        "time": "Saat",
+        "settingsList": "Ayarları göster",
+        "settingsSet": "Ayarları değiştir"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"

@@ -4179,7 +4179,13 @@
       "downloading": "Nagda-download…",
       "downloadProgress": "Nagda-download… {{percent}}%",
       "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli.",
-      "cannotUse": "Hindi magagamit ng modelong ito ang: {{items}}."
+      "cannotUse": "Hindi magagamit ng modelong ito ang: {{items}}.",
+      "cannotUseOptions": "Hindi mapupunan ng modelong ito ang: {{items}}.",
+      "tools": {
+        "time": "Oras",
+        "settingsList": "Ipakita ang mga setting",
+        "settingsSet": "Baguhin ang mga setting"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"

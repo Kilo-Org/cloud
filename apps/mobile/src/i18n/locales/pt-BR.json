@@ -4327,7 +4327,13 @@
       "downloading": "Baixando…",
       "downloadProgress": "Baixando… {{percent}}%",
       "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente.",
-      "cannotUse": "Este modelo não pode usar: {{items}}."
+      "cannotUse": "Este modelo não pode usar: {{items}}.",
+      "cannotUseOptions": "Este modelo não pode preencher: {{items}}.",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar configurações",
+        "settingsSet": "Alterar configurações"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"

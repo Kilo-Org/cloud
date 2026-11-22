@@ -4179,7 +4179,13 @@
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",
       "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại.",
-      "cannotUse": "Mô hình này không thể sử dụng: {{items}}."
+      "cannotUse": "Mô hình này không thể sử dụng: {{items}}.",
+      "cannotUseOptions": "Mô hình này không thể điền: {{items}}.",
+      "tools": {
+        "time": "Thời gian",
+        "settingsList": "Hiển thị cài đặt",
+        "settingsSet": "Thay đổi cài đặt"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"

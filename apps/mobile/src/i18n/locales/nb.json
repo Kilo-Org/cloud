@@ -4179,7 +4179,13 @@
       "downloading": "Laster ned …",
       "downloadProgress": "Laster ned … {{percent}} %",
       "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen.",
-      "cannotUse": "Denne modellen kan ikke bruke: {{items}}."
+      "cannotUse": "Denne modellen kan ikke bruke: {{items}}.",
+      "cannotUseOptions": "Denne modellen kan ikke fylle ut: {{items}}.",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Vis innstillinger",
+        "settingsSet": "Endre innstillinger"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Denne modellen støtter resonneringsinnsats"

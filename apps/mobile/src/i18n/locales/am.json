@@ -4179,7 +4179,13 @@
       "downloading": "በመውረድ ላይ…",
       "downloadProgress": "በመውረድ ላይ… {{percent}}%",
       "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
-      "cannotUse": "ይህ ሞዴል የሚከተሉትን መጠቀም አይችልም፦ {{items}}።"
+      "cannotUse": "ይህ ሞዴል የሚከተሉትን መጠቀም አይችልም፦ {{items}}።",
+      "cannotUseOptions": "ይህ ሞዴል የሚከተሉትን መሙላት አይችልም፦ {{items}}።",
+      "tools": {
+        "time": "ጊዜ",
+        "settingsList": "ቅንብሮችን አሳይ",
+        "settingsSet": "ቅንብሮችን ቀይር"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"

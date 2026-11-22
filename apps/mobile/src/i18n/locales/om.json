@@ -4179,7 +4179,13 @@
       "downloading": "Buufamaa jira…",
       "downloadProgress": "Buufamaa jira… {{percent}}%",
       "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali.",
-      "cannotUse": "Moodeela kun fayyadamuu hin danda'u: {{items}}."
+      "cannotUse": "Moodeela kun fayyadamuu hin danda'u: {{items}}.",
+      "cannotUseOptions": "Moodeela kun guutuu hin danda'u: {{items}}.",
+      "tools": {
+        "time": "Yeroo",
+        "settingsList": "Qindaa'ina agarsiisi",
+        "settingsSet": "Qindaa'ina jijjiiri"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"

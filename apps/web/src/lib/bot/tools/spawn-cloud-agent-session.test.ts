@@ -93,7 +93,13 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   buildGitLabCloneUrl: jest.fn(),
   validateGitLabRepoAccessForOrganization: jest.fn(),
   validateGitLabRepoAccessForUser: jest.fn(),
-  fetchGitLabRepositoriesForUser: jest.fn(),
+}));
+
+const mockFetchGitLabProjectAccessLevel = jest.fn<(...args: unknown[]) => Promise<number | null>>();
+
+jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  fetchGitLabProjectAccessLevel: (...args: unknown[]) => mockFetchGitLabProjectAccessLevel(...args),
+  GITLAB_ACCESS_LEVELS: { GUEST: 10, REPORTER: 20, DEVELOPER: 30, MAINTAINER: 40, OWNER: 50 },
 }));
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -151,16 +157,6 @@ let mockValidateGitLabRepoAccessForOrganization: jest.MockedFunction<
   typeof ValidateGitLabRepoAccessForOrganization
 >;
 let mockGetBotUserId: jest.MockedFunction<typeof GetBotUserId>;
-let mockFetchGitLabRepositoriesForUser: jest.MockedFunction<
-  (
-    userId: string,
-    forceRefresh?: boolean
-  ) => Promise<{
-    integrationInstalled: boolean;
-    repositories: { id: number; name: string; fullName: string; private: boolean }[];
-    instanceUrl?: string;
-  }>
->;
 
 describe('spawnCloudAgentSession delegation', () => {
   // Dynamic imports keep the mocked modules' lazy `server-only` / config
@@ -182,7 +178,6 @@ describe('spawnCloudAgentSession delegation', () => {
     );
     mockBuildGitLabCloneUrl = jest.mocked(gitlab.buildGitLabCloneUrl);
     mockValidateGitLabRepoAccessForUser = jest.mocked(gitlab.validateGitLabRepoAccessForUser);
-    mockFetchGitLabRepositoriesForUser = jest.mocked(gitlab.fetchGitLabRepositoriesForUser);
     mockValidateGitLabRepoAccessForOrganization = jest.mocked(
       gitlab.validateGitLabRepoAccessForOrganization
     );
@@ -229,11 +224,7 @@ describe('spawnCloudAgentSession delegation', () => {
     mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('https://gitlab.com');
     mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/group/repo.git');
     mockValidateGitLabRepoAccessForUser.mockResolvedValue(true);
-    mockFetchGitLabRepositoriesForUser.mockResolvedValue({
-      integrationInstalled: true,
-      repositories: [{ id: 1, name: 'repo', fullName: 'group/repo', private: true }],
-      instanceUrl: 'https://gitlab.com',
-    });
+    mockFetchGitLabProjectAccessLevel.mockResolvedValue(30);
     mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockLinkUploadedAttachmentsFn.mockResolvedValue(linkedAttachmentKeys);
@@ -522,7 +513,12 @@ describe('spawnCloudAgentSession delegation', () => {
       'bot-user-1',
       'group/repo'
     );
-    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', true);
+    expect(mockGetGitLabTokenForUser).toHaveBeenCalledWith('user-9');
+    expect(mockFetchGitLabProjectAccessLevel).toHaveBeenCalledWith(
+      'gitlab-token',
+      'group/repo',
+      'https://gitlab.com'
+    );
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         gitUrl: 'https://gitlab.com/group/repo.git',
@@ -533,51 +529,35 @@ describe('spawnCloudAgentSession delegation', () => {
     );
   });
 
-  it('prepares an organization Slack GitLab session when the requester connection reaches the project', async () => {
+  it('refuses an organization Slack GitLab project when the requester has no GitLab connection', async () => {
     mockGetGitLabTokenForUser.mockResolvedValue(undefined);
 
-    await expect(
-      spawnCloudAgentSession(
-        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
-        'model',
-        { ...organizationIntegration, platform: 'slack' },
-        'auth-token',
-        'request-gitlab-no-identity',
-        undefined,
-        { chatPlatform: 'slack', payerUserId: 'user-9', requesterUserId: 'user-9' }
-      )
-    ).resolves.toEqual({
-      response:
-        'Cloud Agent session started. I will post the final result back in this thread when it completes.',
-      cloudAgentSessionId: 'cloud-session-1',
-      kiloSessionId: 'kilo-session-1',
-    });
+    const result = await spawnCloudAgentSession(
+      { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      { ...organizationIntegration, platform: 'slack' },
+      'auth-token',
+      'request-gitlab-no-identity',
+      undefined,
+      { chatPlatform: 'slack', payerUserId: 'user-9', requesterUserId: 'user-9' }
+    );
+
+    expect(result.response).toContain('`group/repo`');
+    expect(result.response).toContain('GitLab connection in Kilo Code settings');
+    expect(result).not.toHaveProperty('cloudAgentSessionId');
     expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
       'organization-1',
       'bot-user-1',
       'group/repo'
     );
-    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', true);
-    expect(mockGetGitLabTokenForOrganization).toHaveBeenCalledWith('organization-1', 'bot-user-1');
-    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
-    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-9', true);
-    expect(mockPrepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        gitUrl: 'https://gitlab.com/group/repo.git',
-        gitToken: 'gitlab-org-token',
-        platform: 'gitlab',
-        kilocodeOrganizationId: 'organization-1',
-        createdOnPlatform: 'slack',
-      })
-    );
+    expect(mockGetGitLabTokenForUser).toHaveBeenCalledWith('user-9');
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
-  it('refuses an organization GitLab project when the requester connection does not reach it', async () => {
-    mockFetchGitLabRepositoriesForUser.mockResolvedValue({
-      integrationInstalled: true,
-      repositories: [{ id: 2, name: 'other', fullName: 'group/other', private: true }],
-      instanceUrl: 'https://gitlab.com',
-    });
+  it('refuses an organization GitLab project when the requester holds no write access to it', async () => {
+    mockFetchGitLabProjectAccessLevel.mockResolvedValue(20);
 
     const result = await spawnCloudAgentSession(
       { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
@@ -590,10 +570,14 @@ describe('spawnCloudAgentSession delegation', () => {
     );
 
     expect(result.response).toContain('`group/repo`');
-    expect(result.response).toContain('GitLab connection in Kilo Code settings');
+    expect(result.response).toContain('write access');
     expect(result).not.toHaveProperty('cloudAgentSessionId');
+    expect(mockFetchGitLabProjectAccessLevel).toHaveBeenCalledWith(
+      'gitlab-token',
+      'group/repo',
+      'https://gitlab.com'
+    );
     expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
-    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
     expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });
@@ -724,8 +708,8 @@ describe('spawnCloudAgentSession delegation', () => {
     expect(mockPrepareSession).toHaveBeenCalled();
   });
 
-  it('returns the retry reply when the requester lookup fails', async () => {
-    mockFetchGitLabRepositoriesForUser.mockRejectedValueOnce(new Error('lookup unavailable'));
+  it('returns the retry reply when the requester access lookup fails', async () => {
+    mockFetchGitLabProjectAccessLevel.mockRejectedValueOnce(new Error('lookup unavailable'));
 
     const result = await spawnCloudAgentSession(
       { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },

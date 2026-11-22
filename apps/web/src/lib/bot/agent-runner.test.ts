@@ -15,9 +15,9 @@ import {
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
   validateGitLabRepoAccessForOrganization,
-  fetchGitLabRepositoriesForUser,
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { fetchGitLabProjectAccessLevel } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
@@ -112,7 +112,10 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   buildGitLabCloneUrl: jest.fn(),
   validateGitLabRepoAccessForOrganization: jest.fn(),
   validateGitLabRepoAccessForUser: jest.fn(),
-  fetchGitLabRepositoriesForUser: jest.fn(),
+}));
+jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  fetchGitLabProjectAccessLevel: jest.fn(),
+  GITLAB_ACCESS_LEVELS: { GUEST: 10, REPORTER: 20, DEVELOPER: 30, MAINTAINER: 40, OWNER: 50 },
 }));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: jest.fn(async () => 'bot-user-1'),
@@ -255,11 +258,7 @@ beforeEach(() => {
   });
   jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
   jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
-  jest.mocked(fetchGitLabRepositoriesForUser).mockResolvedValue({
-    integrationInstalled: true,
-    repositories: [{ id: 3, name: 'project', fullName: 'group/project', private: true }],
-    instanceUrl: 'https://gitlab.com',
-  });
+  jest.mocked(fetchGitLabProjectAccessLevel).mockResolvedValue(30);
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
@@ -483,7 +482,11 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
           'bot-user-1',
           gitlabProject
         );
-        expect(fetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', true);
+        expect(fetchGitLabProjectAccessLevel).toHaveBeenCalledWith(
+          'gitlab-token',
+          gitlabProject,
+          'https://gitlab.com'
+        );
         expect(getGitLabTokenForOrganization).toHaveBeenCalledWith('org-1', 'bot-user-1');
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({

@@ -144,15 +144,10 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({
     canGoBack: () => false,
     push: () => undefined,
+    navigate: () => undefined,
     setParams: () => undefined,
   }),
   useScrollToTop: () => undefined,
-}));
-// The "Back to profile" recovery goes through the push-then-retire hook that
-// keeps Android Fabric alive; its own mechanics have their own
-// suite, so here it stands in for the navigation call.
-vi.mock('@/lib/navigation/stack-safe-replace', () => ({
-  useStackSafeReplace: () => ({ replace: () => undefined }),
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),

@@ -19,14 +19,14 @@ const attentionKv = vi.hoisted(() => ({
   getItem: vi.fn<() => Promise<string | null>>().mockResolvedValue(null),
   setItem: vi.fn().mockResolvedValue(undefined),
 }));
-const routerReplace = vi.hoisted(() => vi.fn());
+const routerNavigate = vi.hoisted(() => vi.fn());
 // Mutable so a test can present a different route: the tabs layout reads these
 // segments to decide whether a form sheet covers the tab's screen.
 const segments = vi.hoisted(() => ({
   current: ['(app)', '(tabs)', '(0_home)'] as readonly string[],
 }));
 
-export { attentionKv, fetchSessions, organization, routerReplace, segments };
+export { attentionKv, fetchSessions, organization, routerNavigate, segments };
 
 vi.mock('@/lib/persist/encrypted-kv', () => attentionKv);
 vi.mock('@/lib/trpc', () => {
@@ -54,17 +54,10 @@ vi.mock('expo-router', () => ({
   usePathname: () => '/',
   useSegments: () => segments.current,
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ setParams: vi.fn() }),
+  useRouter: () => ({ navigate: routerNavigate, setParams: vi.fn() }),
   useNavigation: () => ({ isFocused: () => false }),
   useFocusEffect: () => undefined,
   useScrollToTop: () => undefined,
-}));
-// The "Back to profile" recovery goes through the push-then-retire hook that
-// keeps Android Fabric alive; its own mechanics have their own
-// suite, so here it stands in for the navigation call, which these suites
-// assert stays uncalled while the tab is covered.
-vi.mock('@/lib/navigation/stack-safe-replace', () => ({
-  useStackSafeReplace: () => ({ replace: routerReplace }),
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn().mockResolvedValue(null) }));

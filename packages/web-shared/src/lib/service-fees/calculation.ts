@@ -137,7 +137,7 @@ function assertSafeInteger(value: number, label: string): void {
 }
 
 function bigintToSafeInteger(value: bigint, label: string): number {
-  if (value < BigInt(0) && value < -MAX_SAFE_INTEGER) {
+  if (value < -MAX_SAFE_INTEGER) {
     throw new Error(`${label} exceeds safe integer range`);
   }
   if (value > MAX_SAFE_INTEGER) {

@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "emptyReadOnlyTitle": "Geen boodskappe in hierdie sessie nie",
-      "renameAccessibility": "Hernoem sessie: {{title}}",
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
       "historyTooLarge": "Hierdie sessie se transkripsie is te groot om te laai.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Die versoek het uitgeval voordat dit voltooi kon word. Probeer asseblief weer."
   },
   "screenHeader": {
-    "openMenu": "Maak spyskaart oop",
-    "openMenuFor": "Maak spyskaart vir {{title}} oop"
+    "openMenu": "Maak spyskaart oop"
   },
   "picker": {
     "optionsExpired": "Opsies verval",

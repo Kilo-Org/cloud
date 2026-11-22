@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Ozi adịbeghị",
       "emptyReadOnlyTitle": "Enweghị ozi na nnọkọ a",
-      "renameAccessibility": "Gbanwee aha nnọkọ: {{title}}",
       "cloningSession": "Na-emepụta oyiri nnọkọ",
       "couldNotLoadThisSession": "Enweghị ike ibudata nnọkọ a.",
       "historyTooLarge": "Ndebe nke okwu nnọkọ a buru ibu karịa ka a ga-ebugo ya.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Arịrịọ ahụ enweghị ike imecha tupu oge ya agwụ. Biko nwaa ọzọ."
   },
   "screenHeader": {
-    "openMenu": "Mepee ndepụta nhọrọ",
-    "openMenuFor": "Mepee ndepụta nhọrọ maka {{title}}"
+    "openMenu": "Mepee ndepụta nhọrọ"
   },
   "picker": {
     "optionsExpired": "Oge nhọrọ agwụla",

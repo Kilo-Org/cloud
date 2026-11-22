@@ -2338,7 +2338,6 @@
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
       "emptyReadOnlyTitle": "No messages in this session",
-      "renameAccessibility": "Rename session: {{title}}",
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",
       "historyTooLarge": "This session's transcript is too large to load.",
@@ -3277,8 +3276,7 @@
     "timeoutDescription": "The request timed out before it finished. Try again."
   },
   "screenHeader": {
-    "openMenu": "Open menu",
-    "openMenuFor": "Open menu for {{title}}"
+    "openMenu": "Open menu"
   },
   "picker": {
     "optionsExpired": "Options expired",

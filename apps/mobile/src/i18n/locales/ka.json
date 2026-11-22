@@ -2246,7 +2246,6 @@
       "scrollToBottom": "ბოლომდე გადახვევა",
       "emptyTitle": "შეტყობინებები ჯერ არ არის",
       "emptyReadOnlyTitle": "ამ სესიაში შეტყობინებები არ არის",
-      "renameAccessibility": "სესიის სახელის შეცვლა: {{title}}",
       "cloningSession": "სესია კლონირდება…",
       "couldNotLoadThisSession": "ამ სესიის ჩატვირთვა ვერ მოხერხდა.",
       "historyTooLarge": "ამ სესიის ჩანაწერი ჩასატვირთად ზედმეტად დიდია.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "მოთხოვნა ვერ დასრულდა დროზე. სცადე ხელახლა."
   },
   "screenHeader": {
-    "openMenu": "მენიუს გახსნა",
-    "openMenuFor": "მენიუს გახსნა: {{title}}"
+    "openMenu": "მენიუს გახსნა"
   },
   "picker": {
     "optionsExpired": "არჩევანის ვარიანტები მოძველდა",

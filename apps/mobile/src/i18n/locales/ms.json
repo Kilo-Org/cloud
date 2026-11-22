@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
       "emptyReadOnlyTitle": "Tiada mesej dalam sesi ini",
-      "renameAccessibility": "Namakan semula sesi: {{title}}",
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuatkan.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },
   "screenHeader": {
-    "openMenu": "Buka menu",
-    "openMenuFor": "Buka menu untuk {{title}}"
+    "openMenu": "Buka menu"
   },
   "picker": {
     "optionsExpired": "Pilihan tamat tempoh",

@@ -1684,7 +1684,6 @@
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "emptyReadOnlyTitle": "Bu oturumda mesaj yok",
-      "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
@@ -2611,8 +2610,7 @@
     "timeoutDescription": "İstek tamamlanmadan zaman aşımına uğradı. Lütfen tekrar dene."
   },
   "screenHeader": {
-    "openMenu": "Menüyü aç",
-    "openMenuFor": "{{title}} için menüyü aç"
+    "openMenu": "Menüyü aç"
   },
   "picker": {
     "optionsExpired": "Seçeneklerin süresi doldu",

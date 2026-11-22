@@ -2344,7 +2344,6 @@
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
       "emptyReadOnlyTitle": "V tej seji ni sporočil",
-      "renameAccessibility": "Preimenuj sejo: {{title}}",
       "cloningSession": "Kloniranje seje",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "historyTooLarge": "Zapis te seje je prevelik za nalaganje.",
@@ -3295,8 +3294,7 @@
     "timeoutDescription": "Odgovora strežnika nismo prejeli pravočasno. Poskusi znova."
   },
   "screenHeader": {
-    "openMenu": "Odpri meni",
-    "openMenuFor": "Odpri meni za {{title}}"
+    "openMenu": "Odpri meni"
   },
   "picker": {
     "optionsExpired": "Možnosti niso več veljavne",

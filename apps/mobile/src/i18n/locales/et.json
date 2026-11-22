@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
       "emptyReadOnlyTitle": "Selles seansis pole sõnumeid",
-      "renameAccessibility": "Nimeta seanss ümber: {{title}}",
       "cloningSession": "Seanssi kloonitakse",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",
       "historyTooLarge": "Selle seansi üleskirjutus on laadimiseks liiga suur.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },
   "screenHeader": {
-    "openMenu": "Ava menüü",
-    "openMenuFor": "Ava {{title}} menüü"
+    "openMenu": "Ava menüü"
   },
   "picker": {
     "optionsExpired": "Valikud aegunud",

@@ -2344,7 +2344,6 @@
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
       "emptyReadOnlyTitle": "Žiadne správy v tejto relácii",
-      "renameAccessibility": "Premenovať reláciu: {{title}}",
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
       "historyTooLarge": "Pepis tejto relácie je na načítanie príliš veľký.",
@@ -3295,8 +3294,7 @@
     "timeoutDescription": "Požiadavka trvala príliš dlho. Skúste to znova."
   },
   "screenHeader": {
-    "openMenu": "Otvoriť ponuku",
-    "openMenuFor": "Otvoriť ponuku pre {{title}}"
+    "openMenu": "Otvoriť ponuku"
   },
   "picker": {
     "optionsExpired": "Platnosť možností sa skončila",

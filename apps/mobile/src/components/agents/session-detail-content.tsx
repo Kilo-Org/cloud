@@ -2990,9 +2990,7 @@ export function SessionDetailContent({
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
-                  onTitlePressAccessibilityHint: t('agentChat.session.renameAccessibility', {
-                    title: rename.title,
-                  }),
+                  onTitlePressAccessibilityHint: t('agentChat.session.renameSession'),
                 }
               : {})}
           />

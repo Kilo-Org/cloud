@@ -2246,7 +2246,6 @@
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
       "emptyReadOnlyTitle": "આ સત્રમાં કોઈ સંદેશ નથી",
-      "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
       "cloningSession": "સત્રની નકલ બની રહી છે",
       "couldNotLoadThisSession": "આ સત્ર લોડ કરી શકાયું નહીં",
       "historyTooLarge": "આ સત્રનું ટ્રાન્સ્ક્રિપ્ટ લોડ કરવા માટે ખૂબ મોટું છે.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "વિનંતી પૂરી થાય તે પહેલાં જ સમય સમાપ્ત થઈ ગયો. કૃપા કરીને ફરી પ્રયાસ કરો."
   },
   "screenHeader": {
-    "openMenu": "મેનૂ ખોલો",
-    "openMenuFor": "{{title}} માટે મેનૂ ખોલો"
+    "openMenu": "મેનૂ ખોલો"
   },
   "picker": {
     "optionsExpired": "વિકલ્પોની મુદત પૂરી થઈ",

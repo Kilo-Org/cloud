@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",
       "emptyReadOnlyTitle": "Энэ сессид мессеж байхгүй",
-      "renameAccessibility": "Сессийн нэрийг өөрчлөх: {{title}}",
       "cloningSession": "Сессийг хуулбарлаж байна",
       "couldNotLoadThisSession": "Энэ сессийг ачаалж чадсангүй.",
       "historyTooLarge": "Энэ сессийн бичлэг нь ачаалахад хэт том байна.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Хүсэлт дуусахаас өмнө хугацаа дууслаа. Дахин оролдоно уу."
   },
   "screenHeader": {
-    "openMenu": "Цэс нээх",
-    "openMenuFor": "{{title}}-ийн цэс нээх"
+    "openMenu": "Цэс нээх"
   },
   "picker": {
     "optionsExpired": "Сонголтуудын хугацаа дууссан",

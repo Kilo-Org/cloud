@@ -1730,7 +1730,6 @@
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
       "emptyReadOnlyTitle": "В этом сеансе нет сообщений",
-      "renameAccessibility": "Переименовать сеанс: {{title}}",
       "cloningSession": "Клонирование сеанса",
       "couldNotLoadThisSession": "Не удалось загрузить этот сеанс.",
       "historyTooLarge": "Транскрипт этого сеанса слишком велик для загрузки.",
@@ -2681,8 +2680,7 @@
     "timeoutDescription": "Сервер не ответил вовремя. Попробуйте снова."
   },
   "screenHeader": {
-    "openMenu": "Открыть меню",
-    "openMenuFor": "Открыть меню «{{title}}»"
+    "openMenu": "Открыть меню"
   },
   "picker": {
     "optionsExpired": "Варианты устарели",

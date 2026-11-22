@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Gara jalaatti siqsi",
       "emptyTitle": "Hanga ammaatti ergaan hin jiru",
       "emptyReadOnlyTitle": "Turtii kana keessatti ergaan hin jiru",
-      "renameAccessibility": "Maqaa turtii jijjiiri: {{title}}",
       "cloningSession": "Turtii kopii gochaa jira",
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
       "historyTooLarge": "Galcheen turtii kanaa fe'uu baay'ee guddaa dha.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Kallattiin yeroo dheeraa waadaa'ee xumurutti hin gahine. Irra deebi'ii yaali."
   },
   "screenHeader": {
-    "openMenu": "Baafata bani",
-    "openMenuFor": "Baafata {{title}} bani"
+    "openMenu": "Baafata bani"
   },
   "picker": {
     "optionsExpired": "Filannoowwan yeroon isaanii darbeera",

@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei vielä viestejä",
       "emptyReadOnlyTitle": "Tässä istunnossa ei ole viestejä",
-      "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "historyTooLarge": "Tämän istunnon keskustelutallenne on liian suuri ladattavaksi.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Pyyntö ei valmistunut ajassa. Yritä uudelleen."
   },
   "screenHeader": {
-    "openMenu": "Avaa valikko",
-    "openMenuFor": "Avaa valikko: {{title}}"
+    "openMenu": "Avaa valikko"
   },
   "picker": {
     "optionsExpired": "Vaihtoehdot vanhentuneet",

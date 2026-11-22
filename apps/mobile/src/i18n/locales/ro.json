@@ -2295,7 +2295,6 @@
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
       "emptyReadOnlyTitle": "Niciun mesaj în această sesiune",
-      "renameAccessibility": "Redenumește sesiunea: {{title}}",
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
       "historyTooLarge": "Transcrierea acestei sesiuni este prea mare pentru a fi încărcată.",
@@ -3234,8 +3233,7 @@
     "timeoutDescription": "Cererea a expirat înainte de a se finaliza. Încearcă din nou."
   },
   "screenHeader": {
-    "openMenu": "Deschide meniul",
-    "openMenuFor": "Deschide meniul pentru {{title}}"
+    "openMenu": "Deschide meniul"
   },
   "picker": {
     "optionsExpired": "Opțiunile au expirat",

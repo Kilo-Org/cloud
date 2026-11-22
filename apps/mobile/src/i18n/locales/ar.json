@@ -1776,7 +1776,6 @@
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
       "emptyReadOnlyTitle": "لا توجد رسائل في هذه الجلسة",
-      "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
       "cloningSession": "جارٍ استنساخ الجلسة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
       "historyTooLarge": "بروكول هذه الجلسة كبير جدًا بحيث لا يمكن تحميله.",
@@ -2751,8 +2750,7 @@
     "timeoutDescription": "انتهت مهلة الطلب قبل اكتماله. أعد المحاولة."
   },
   "screenHeader": {
-    "openMenu": "فتح القائمة",
-    "openMenuFor": "فتح قائمة {{title}}"
+    "openMenu": "فتح القائمة"
   },
   "picker": {
     "optionsExpired": "انتهت صلاحية الخيارات",

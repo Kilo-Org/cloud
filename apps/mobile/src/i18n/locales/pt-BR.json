@@ -1697,7 +1697,6 @@
       "scrollToBottom": "Rolar para o final",
       "emptyTitle": "Nenhuma mensagem ainda",
       "emptyReadOnlyTitle": "Nenhuma mensagem nesta sessão",
-      "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "Clonando sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
       "historyTooLarge": "A transcrição desta sessão é grande demais para carregar.",
@@ -2681,8 +2680,7 @@
     "timeoutDescription": "A solicitação esgotou o tempo limite antes de ser concluída. Tente novamente."
   },
   "screenHeader": {
-    "openMenu": "Abrir menu",
-    "openMenuFor": "Abrir menu de {{title}}"
+    "openMenu": "Abrir menu"
   },
   "picker": {
     "optionsExpired": "Opções expiradas",

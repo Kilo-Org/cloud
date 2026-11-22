@@ -2442,7 +2442,6 @@
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
       "emptyReadOnlyTitle": "Dim negeseuon yn y sesiwn hon",
-      "renameAccessibility": "Ailenwi sesiwn: {{title}}",
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "historyTooLarge": "Mae trawsgrifiad y sesiwn hon yn rhy fawr i'w llwytho.",
@@ -3417,8 +3416,7 @@
     "timeoutDescription": "Daeth amser y cais i ben cyn iddo orffen. Ceisiwch eto."
   },
   "screenHeader": {
-    "openMenu": "Agor y ddewislen",
-    "openMenuFor": "Agor y ddewislen ar gyfer {{title}}"
+    "openMenu": "Agor y ddewislen"
   },
   "picker": {
     "optionsExpired": "Daeth yr opsiynau i ben",

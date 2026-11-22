@@ -2246,7 +2246,6 @@
       "scrollToBottom": "ਸਭ ਤੋਂ ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
       "emptyReadOnlyTitle": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
-      "renameAccessibility": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ: {{title}}",
       "cloningSession": "ਸੈਸ਼ਨ ਕਲੋਨ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "couldNotLoadThisSession": "ਇਹ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "historyTooLarge": "ਇਸ ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ ਲੋਡ ਕਰਨ ਲਈ ਬਹੁਤ ਵੱਡੀ ਹੈ।",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "ਬੇਨਤੀ ਪੂਰੀ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਹੀ ਸਮਾਂ ਸਮਾਪਤ ਹੋ ਗਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "screenHeader": {
-    "openMenu": "ਮੀਨੂ ਖੋਲ੍ਹੋ",
-    "openMenuFor": "{{title}} ਲਈ ਮੀਨੂ ਖੋਲ੍ਹੋ"
+    "openMenu": "ਮੀਨੂ ਖੋਲ੍ਹੋ"
   },
   "picker": {
     "optionsExpired": "ਵਿਕਲਪਾਂ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ",

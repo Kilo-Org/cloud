@@ -2344,7 +2344,6 @@
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
       "emptyReadOnlyTitle": "У гэтым сеансе няма паведамленняў",
-      "renameAccessibility": "Перайменаваць сеанс: {{title}}",
       "cloningSession": "Кланаванне сеанса",
       "couldNotLoadThisSession": "Не ўдалося загрузіць гэты сеанс.",
       "historyTooLarge": "Транскрыпт гэтага сеанса занадта вялікі, каб загрузіць.",
@@ -3295,8 +3294,7 @@
     "timeoutDescription": "Запыт не паспеў выканацца ў адведзены час. Паспрабуйце яшчэ раз."
   },
   "screenHeader": {
-    "openMenu": "Адкрыць меню",
-    "openMenuFor": "Адкрыць меню для {{title}}"
+    "openMenu": "Адкрыць меню"
   },
   "picker": {
     "optionsExpired": "Тэрмін дзеяння варыянтаў скончыўся",

@@ -2246,7 +2246,6 @@
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
       "emptyReadOnlyTitle": "Kalfadhigan farriimo kuma jiraan",
-      "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
       "historyTooLarge": "Qoralka kalfadhigan waa aad u weyn yahay si la soo shubo.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Codsigu wuu waqtiga ka baxay ka hor inta uu dhammaado. Fadlan mar kale isku day."
   },
   "screenHeader": {
-    "openMenu": "Fur liiska",
-    "openMenuFor": "Fur liiska {{title}}"
+    "openMenu": "Fur liiska"
   },
   "picker": {
     "optionsExpired": "Waqtigii doorashooyinku wuu dhacay",

@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
       "emptyReadOnlyTitle": "Pa gen mesaj nan sesyon sa a",
-      "renameAccessibility": "Chanje non sesyon an: {{title}}",
       "cloningSession": "Ap klone sesyon an",
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",
       "historyTooLarge": "Transksipsyon sesyon sa a twò gwo pou chaje.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Demann lan te depase delè li. Tanpri eseye ankò."
   },
   "screenHeader": {
-    "openMenu": "Louvri meni an",
-    "openMenuFor": "Louvri meni pou {{title}}"
+    "openMenu": "Louvri meni an"
   },
   "picker": {
     "optionsExpired": "Opsyon ekspire",

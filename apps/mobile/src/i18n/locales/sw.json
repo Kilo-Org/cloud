@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
       "emptyReadOnlyTitle": "Hakuna ujumbe katika kikao hiki",
-      "renameAccessibility": "Badilisha jina la kikao: {{title}}",
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
       "historyTooLarge": "Andiko la kikao hiki ni kikubwa mno kupakia.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Ombi limeisha muda kabla ya kutimizwa. Tafadhali jaribu tena."
   },
   "screenHeader": {
-    "openMenu": "Fungua menyu",
-    "openMenuFor": "Fungua menyu ya {{title}}"
+    "openMenu": "Fungua menyu"
   },
   "picker": {
     "optionsExpired": "Muda wa chaguo umeisha",

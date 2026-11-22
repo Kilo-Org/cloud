@@ -2246,7 +2246,6 @@
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
       "emptyTitle": "अहिलेसम्म कुनै सन्देश छैन",
       "emptyReadOnlyTitle": "यो सत्रमा कुनै सन्देश छैन",
-      "renameAccessibility": "सत्रको नाम बदल्नुहोस्: {{title}}",
       "cloningSession": "सत्रको प्रतिलिपि बनाउँदै",
       "couldNotLoadThisSession": "यो सत्र लोड गर्न सकिएन।",
       "historyTooLarge": "यो सत्रको प्रतिलिपि लोड गर्न धेरै ठूलो छ।",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "अनुरोध समय सकिनुअघि पूरा भएन। कृपया फेरि प्रयास गर्नुहोस्।"
   },
   "screenHeader": {
-    "openMenu": "मेनु खोल्नुहोस्",
-    "openMenuFor": "{{title}} का लागि मेनु खोल्नुहोस्"
+    "openMenu": "मेनु खोल्नुहोस्"
   },
   "picker": {
     "optionsExpired": "विकल्पहरूको म्याद सकियो",

@@ -1684,7 +1684,6 @@
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "emptyReadOnlyTitle": "此会话中无消息",
-      "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
       "historyTooLarge": "此会话的对话记录过大，无法加载。",
@@ -2611,8 +2610,7 @@
     "timeoutDescription": "请求超时，未能完成。请重试。"
   },
   "screenHeader": {
-    "openMenu": "打开菜单",
-    "openMenuFor": "打开 {{title}} 的菜单"
+    "openMenu": "打开菜单"
   },
   "picker": {
     "optionsExpired": "选项已过期",

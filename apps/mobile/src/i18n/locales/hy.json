@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Ոլորել մինչև վերջ",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
       "emptyReadOnlyTitle": "Այս նստաշրջանում հաղորդագրություններ չկան",
-      "renameAccessibility": "Վերանվանել նստաշրջանը՝ {{title}}",
       "cloningSession": "Նստաշրջանը կլոնավորվում է",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նստաշրջանը։",
       "historyTooLarge": "Այս նստաշրջանի արձանագրությունը չափազանց մեծ է՝ բեռնելու համար։",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Հարցումը չհասցրեց ավարտվել և ընդհատվեց։ Փորձիր կրկին։"
   },
   "screenHeader": {
-    "openMenu": "Բացել ընտրացանկը",
-    "openMenuFor": "Բացել {{title}}-ի ընտրացանկը"
+    "openMenu": "Բացել ընտրացանկը"
   },
   "picker": {
     "optionsExpired": "Ընտրանքների ժամկետն անցել է",

@@ -2246,7 +2246,6 @@
       "scrollToBottom": "ಕೊನೆಯವರೆಗೆ ಸ್ಕ್ರಾಲ್ ಮಾಡಿ",
       "emptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
       "emptyReadOnlyTitle": "ಈ ಸೆಶನ್ನಲ್ಲಿ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
-      "renameAccessibility": "{{title}} ಸೆಶನ್‌ನ ಹೆಸರು ಬದಲಾಯಿಸಿ",
       "cloningSession": "ಸೆಶನ್‌ನ ಪ್ರತಿ ರಚಿಸಲಾಗುತ್ತಿದೆ",
       "couldNotLoadThisSession": "ಈ ಸೆಶನ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "historyTooLarge": "ಈ ಸೆಶನ್‌ನ ಪ್ರತಿಲೇಖನ ಲೋಡ್ ಮಾಡಲು ತುಂಬಾ ದೊಡ್ಡದಾಗಿದೆ.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "ವಿನಂತಿ ಪೂರ್ಣಗೊಳ್ಳುವ ಮೊದಲೇ ಸಮಯ ಮುಗಿದಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
   "screenHeader": {
-    "openMenu": "ಮೆನು ತೆರೆಯಿರಿ",
-    "openMenuFor": "{{title}} ಗಾಗಿ ಮೆನು ತೆರೆಯಿರಿ"
+    "openMenu": "ಮೆನು ತೆರೆಯಿರಿ"
   },
   "picker": {
     "optionsExpired": "ಆಯ್ಕೆಗಳ ಅವಧಿ ಮುಗಿದಿದೆ",

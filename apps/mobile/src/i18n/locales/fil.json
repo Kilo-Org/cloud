@@ -2246,7 +2246,6 @@
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
       "emptyReadOnlyTitle": "Walang mensahe ang sesyong ito",
-      "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",
       "cloningSession": "Kinokopya ang sesyon",
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
       "historyTooLarge": "Sobrang laki ng transkrip ng sesyong ito para i-load.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Nag-timeout ang kahilingan bago ito natapos. Pakisubukang muli."
   },
   "screenHeader": {
-    "openMenu": "Buksan ang menu",
-    "openMenuFor": "Buksan ang menu para sa {{title}}"
+    "openMenu": "Buksan ang menu"
   },
   "picker": {
     "optionsExpired": "Nag-expire ang mga opsyon",

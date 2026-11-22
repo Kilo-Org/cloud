@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
       "emptyReadOnlyTitle": "Bu sessiyada xabarlar yo'q",
-      "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "historyTooLarge": "Bu sessiya transkripti yuklash uchun juda katta.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "So'rov tugashidan oldin vaqt tugadi. Iltimos, qayta urinib ko'ring."
   },
   "screenHeader": {
-    "openMenu": "Menyuni ochish",
-    "openMenuFor": "{{title}} uchun menyuni ochish"
+    "openMenu": "Menyuni ochish"
   },
   "picker": {
     "optionsExpired": "Variantlar eskirgan",

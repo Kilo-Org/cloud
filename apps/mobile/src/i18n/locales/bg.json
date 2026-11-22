@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Превърти до края",
       "emptyTitle": "Все още няма съобщения",
       "emptyReadOnlyTitle": "В тази сесия няма съобщения",
-      "renameAccessibility": "Преименувай сесията: {{title}}",
       "cloningSession": "Клониране на сесия",
       "couldNotLoadThisSession": "Не успяхме да заредим тази сесия.",
       "historyTooLarge": "Записът на тази сесия е твърде голям за зареждане.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Заявката не приключи в определеното време. Опитай отново."
   },
   "screenHeader": {
-    "openMenu": "Отвори менюто",
-    "openMenuFor": "Отвори менюто за {{title}}"
+    "openMenu": "Отвори менюто"
   },
   "picker": {
     "optionsExpired": "Опциите вече не са достъпни",

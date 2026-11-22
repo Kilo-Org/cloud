@@ -2246,7 +2246,6 @@
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",
       "emptyReadOnlyTitle": "په دې ناسته کې پیغامونه نشته",
-      "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
       "historyTooLarge": "د دې ناستې لیکن د بارولو لپاره ډېره لویه ده.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "غوښتنه له بشپړېدو دمخه ودرېده. مهرباني وکړئ بیا هڅه وکړئ."
   },
   "screenHeader": {
-    "openMenu": "مینو پرانیزئ",
-    "openMenuFor": "د {{title}} مینو پرانیزئ"
+    "openMenu": "مینو پرانیزئ"
   },
   "picker": {
     "optionsExpired": "د غوراویو موده پای ته رسېدلې",

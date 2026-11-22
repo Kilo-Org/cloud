@@ -2246,7 +2246,6 @@
       "scrollToBottom": "အောက်ခြေသို့ ဆွဲချပါ",
       "emptyTitle": "မက်ဆေ့ခ်ျ မရှိသေးပါ",
       "emptyReadOnlyTitle": "ဤစက်ရှင်တွင် မက်ဆေ့ခ်ျ မရှိပါ",
-      "renameAccessibility": "{{title}} စက်ရှင်ကို အမည်ပြောင်းပါ",
       "cloningSession": "စက်ရှင်ကို မိတ္တူပွားနေသည်",
       "couldNotLoadThisSession": "ဤစက်ရှင်ကို ဖွင့်၍မရပါ။",
       "historyTooLarge": "ဤစက်ရှင်၏ မှတ်တမ်းသည် ဖွင့်ရန် ကြီးမားလွန်းသည်။",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "တောင်းဆိုချက်သည် မပြီးဆုံးမီ အချိန်ကုန်သွားပါသည်။ ထပ်ကြိုးစားပါ။"
   },
   "screenHeader": {
-    "openMenu": "မီနူးကို ဖွင့်ပါ",
-    "openMenuFor": "{{title}} အတွက် မီနူးကို ဖွင့်ပါ"
+    "openMenu": "မီနူးကို ဖွင့်ပါ"
   },
   "picker": {
     "optionsExpired": "ရွေးစရာများ သက်တမ်းကုန်ပြီ",

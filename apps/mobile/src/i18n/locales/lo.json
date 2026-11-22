@@ -2246,7 +2246,6 @@
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "emptyReadOnlyTitle": "ບໍ່ມີຂໍ້ຄວາມໃນເຊດຊັນນີ້",
-      "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
       "cloningSession": "ກຳລັງສ້າງສຳເນົາເຊດຊັນ",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້ໄດ້.",
       "historyTooLarge": "ບົດບັນທຶກຂອງເຊດຊັນນີ້ໃຫຍ່ເກີນໄປ ບໍ່ສາມາດໂຫຼດໄດ້.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "ຄຳຮ້ອງຂໍໃຊ້ເວລາເກີນກຳນົດໂດຍບໍ່ສຳເລັດ. ກະລຸນາລອງອີກຄັ້ງ."
   },
   "screenHeader": {
-    "openMenu": "ເປີດເມນູ",
-    "openMenuFor": "ເປີດເມນູສຳລັບ {{title}}"
+    "openMenu": "ເປີດເມນູ"
   },
   "picker": {
     "optionsExpired": "ຕົວເລືອກໝົດອາຍຸແລ້ວ",

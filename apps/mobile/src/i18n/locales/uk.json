@@ -1730,7 +1730,6 @@
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
       "emptyReadOnlyTitle": "У цьому сеансі немає повідомлень",
-      "renameAccessibility": "Перейменувати сеанс: {{title}}",
       "cloningSession": "Клонування сеансу",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс.",
       "historyTooLarge": "Транскрипт цього сеанса завеликий для завантаження.",
@@ -2681,8 +2680,7 @@
     "timeoutDescription": "Час очікування запиту минув, і він не завершився. Спробуйте ще раз."
   },
   "screenHeader": {
-    "openMenu": "Відкрити меню",
-    "openMenuFor": "Відкрити меню для {{title}}"
+    "openMenu": "Відкрити меню"
   },
   "picker": {
     "optionsExpired": "Варіанти застаріли",

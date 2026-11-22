@@ -2246,7 +2246,6 @@
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",
       "emptyReadOnlyTitle": "Ingen meldinger i denne økten",
-      "renameAccessibility": "Gi økten nytt navn: {{title}}",
       "cloningSession": "Kloner økten",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
       "historyTooLarge": "Øktens logg er for stor til å laste inn.",
@@ -3173,8 +3172,7 @@
     "timeoutDescription": "Forespørselen tok for lang tid og ble avbrutt. Prøv igjen."
   },
   "screenHeader": {
-    "openMenu": "Åpne meny",
-    "openMenuFor": "Åpne meny for {{title}}"
+    "openMenu": "Åpne meny"
   },
   "picker": {
     "optionsExpired": "Valgene er utløpt",

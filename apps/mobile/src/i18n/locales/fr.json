@@ -186,7 +186,31 @@
     "privateRepositoryA11y": "{{name}}, dépôt privé",
     "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
     "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer.",
-    "viewOnGitHub": "Voir la PR sur GitHub"
+    "organizationTrialEndedBillingAtKiloAi": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation sur kilo.ai, puis réessayer.",
+    "viewOnGitHub": "Voir la PR sur GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Puce",
+        "nestedBulletPoint": "Puce imbriquée",
+        "orderedItem": "Élément de liste {n}",
+        "nestedOrderedItem": "Élément de liste imbriqué {n}"
+      },
+      "blockquote": {
+        "quote": "Citation",
+        "nestedQuote": "Citation imbriquée"
+      },
+      "table": {
+        "row": "Ligne {n} : {content}"
+      },
+      "math": {
+        "equation": "Maths : {latex}"
+      },
+      "rotor": {
+        "headings": "Titres",
+        "links": "Liens",
+        "images": "Images"
+      }
+    }
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -280,9 +304,13 @@
     "credits": "Crédits",
     "failedToLoadBalance": "Échec du chargement du solde. Touchez pour réessayer.",
     "balanceLoadFailed": "Échec du chargement du solde",
+    "balanceUnreachable": "Impossible de joindre le serveur. Réessayez.",
+    "balanceAccessDenied": "Vous n'avez pas l'autorisation de voir ce solde.",
+    "balanceUnavailable": "Le solde n'a pas pu être chargé.",
     "hideBalance": "Masquer le solde",
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
+    "availableToSpendInOrganization": "Disponible pour vos dépenses dans cette organisation",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "deleteAccountTitle": "Supprimer le compte ?",
@@ -424,6 +452,17 @@
       "location": "Emplacement Vertex",
       "clientEmail": "E-mail du compte de service",
       "privateKey": "Clé privée du compte de service",
+      "privateKeyBlockRequired": "Collez le bloc de clé entier, de la ligne BEGIN à la ligne END.",
+      "privateKeyEncrypted": "Ce bloc de clé est protégé par une phrase secrète. Collez une clé de compte de service sans phrase secrète.",
+      "names": {
+        "codestral": "Codestral hérité uniquement",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Se connecter avec ChatGPT)",
+        "xiaomi": "Xiaomi (paiement à l’usage)",
+        "zai": "Z.ai (paiement à l’usage)",
+        "bedrockByok": "Amazon Bedrock (facturation directe)",
+        "vertexByok": "Google Vertex AI (facturation directe)"
+      },
       "modelMappings": "Correspondances de modèles",
       "modelMappingsDescription": "Associez un modèle de la passerelle à un nom de déploiement personnalisé.",
       "mappingTitle": "Correspondance {{number}}",
@@ -503,14 +542,25 @@
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
       "viewReceipt": "Voir l'accusé de réception"
     },
+    "reportReceipts": {
+      "title": "Signalements",
+      "rowSubtitle": "Signalements que vous avez déposés et leurs résultats",
+      "emptyTitle": "Aucun signalement pour l'instant",
+      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire ou d'une réponse de l'IA apparaissent ici.",
+      "couldNotLoad": "Impossible de charger vos signalements",
+      "capped": "Affichage de vos signalements les plus récents."
+    },
     "changelog": "Nouveautés",
     "changelogVersionPending": "Les notes de la version {{version}} arriveront avec la prochaine mise à jour de l'application.",
     "changelogGroupNew": "Nouveau",
     "changelogFixesIn": "Corrections et améliorations dans les sections suivantes : {{areas}}.",
     "changelogFixesPolish": "Corrections et améliorations dans toute l'application.",
     "changelogAreas": {
-      "signIn": "Connexion",
-      "profileOrganizations": "Profil & organisations"
+      "signIn": "connexion",
+      "profileOrganizations": "profil & organisations",
+      "chat": "discussion",
+      "notifications": "alertes & notifications",
+      "integrations": "intégrations"
     }
   },
   "notifications": {
@@ -676,7 +726,7 @@
       "managedOnWebRepositories": "Choisissez les dépôts de {{organization}} sur le web, depuis un ordinateur.",
       "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
-      "descriptionOverview": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le sur l'écran suivant.",
+      "descriptionOverview": "Créez un jeton d'accès à l'espace de travail, puis collez-le sur l'écran suivant.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail",
       "tokenRefused": "Bitbucket n'a pas accepté ce jeton d'accès à l'espace de travail. Vérifiez qu'il dispose des autorisations ci-dessus, puis réessayez."
@@ -738,7 +788,7 @@
       "gateHidden": "Masqué",
       "gateNone": "Aucun",
       "noFindings": "Aucun signalement",
-      "findingsUnavailable": "Les résultats ne sont pas disponibles, car cette revue a échoué.",
+      "findingsUnavailable": "Les résultats ne sont pas disponibles.",
       "findingsInProgress": "Cette revue est toujours en cours. Les signalements apparaîtront ici une fois qu'elle sera terminée.",
       "findingsEndedWithoutResults": "Cette revue s'est terminée avant de produire le moindre signalement.",
       "serviceUnavailable": "Impossible de joindre le service de revue de code. Relancez la revue lorsque le service sera disponible.",
@@ -1856,7 +1906,7 @@
       "searchPlaceholder": "Rechercher des dépôts",
       "noMatches": "Aucun résultat",
       "noRepositories": "Aucun dépôt disponible",
-      "noRepositoriesDescription": "Aucun dépôt n'est lié à votre compte.",
+      "noRepositoriesDescription": "Connectez GitHub ou GitLab pour charger des dépôts.",
       "loading": "Chargement…",
       "accessibility": "Dépôt : {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3460,7 +3510,7 @@
       "manageOnWeb": "Paramètres de facturation sur le web",
       "changePlan": "Changer de formule",
       "buySeats": "Acheter des licences",
-      "managedOnWeb": "La formule, les licences et la recharge automatique sont gérées sur le web.",
+      "managedOnWeb": "La formule, les licences et la recharge automatique sont gérées sur kilo.ai.",
       "setupAutoTopUp": "Configurer la recharge automatique",
       "manageAutoTopUp": "Gérer la recharge automatique",
       "opensOnWeb": "S'ouvre sur le web"
@@ -3654,6 +3704,7 @@
       "identifierLabel": "Identifiant",
       "identifierRequired": "Saisissez un identifiant.",
       "identifierTaken": "Un autre mode utilise déjà cet identifiant.",
+      "identifierTooLong": "Limitez l'identifiant à {{max}} caractères ou moins.",
       "nameLabel": "Nom du mode",
       "nameRequired": "Saisissez un nom de mode.",
       "notFound": "Ce mode n'existe plus.",
@@ -3742,7 +3793,7 @@
     "emailDeliveryFailed": "L'envoi d'e-mails est temporairement indisponible. Réessayez plus tard.",
     "admissionRequired": "Impossible de vérifier votre appareil. Utilisez « $t(login.moreSignInOptions) » pour vous connecter sur un autre appareil ou depuis un navigateur.",
     "default": "Une erreur s'est produite. Réessayez.",
-    "retryableAdmission": "Nous n'avons pas pu vérifier cet appareil. Vérifiez votre connexion et réessayez.",
+    "retryableAdmission": "Impossible de vérifier cet appareil. Réessayez.",
     "startSignInFailed": "Impossible de lancer la connexion. Réessayez.",
     "couldNotOpenBrowser": "Impossible d'ouvrir le navigateur. Veuillez réessayer.",
     "signInTimedOut": "Le délai de connexion a expiré. Réessayez.",
@@ -3814,6 +3865,42 @@
     "nextScheduled": "Prochaines exécutions",
     "answerNeeded": "Réponse requise",
     "waitingToRetry": "Nouvelle tentative en attente",
+    "countNoun": {
+      "needsInput_one": "Intervention requise",
+      "needsInput_many": "Intervention requise",
+      "needsInput_other": "Intervention requise",
+      "running_one": "En cours",
+      "running_many": "En cours",
+      "running_other": "En cours",
+      "scheduled_one": "Planifiée",
+      "scheduled_many": "Planifiées",
+      "scheduled_other": "Planifiées",
+      "idle_one": "En veille",
+      "idle_many": "En veille",
+      "idle_other": "En veille"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Intervention requise",
+      "needsInput_many": "{{displayCount}} Intervention requise",
+      "needsInput_other": "{{displayCount}} Intervention requise",
+      "running_one": "{{displayCount}} En cours",
+      "running_many": "{{displayCount}} En cours",
+      "running_other": "{{displayCount}} En cours",
+      "scheduled_one": "{{displayCount}} Planifiée",
+      "scheduled_many": "{{displayCount}} Planifiées",
+      "scheduled_other": "{{displayCount}} Planifiées",
+      "idle_one": "{{displayCount}} En veille",
+      "idle_many": "{{displayCount}} En veille",
+      "idle_other": "{{displayCount}} En veille"
+    },
+    "footer": {
+      "checked": "Vérifié {{time}}",
+      "lastKnown": "Dernier état connu · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Prochaine exécution {{time}}",
+      "wasDue": "Était prévu {{time}}"
+    },
     "step": {
       "editing": "Modification",
       "reading": "Lecture",
@@ -4060,7 +4147,8 @@
         "space": "L'espace de stockage disponible est insuffisant pour ce modèle. Libérez de l'espace et réessayez.",
         "network": "Le téléchargement ne s'est pas terminé. Vérifiez votre connexion et réessayez.",
         "invalidFile": "Le fichier téléchargé n'est pas un modèle que cette application peut exécuter ; il a donc été supprimé.",
-        "checksum": "Le fichier téléchargé ne correspond pas à sa somme de contrôle publiée ; il a donc été supprimé. Réessayez le téléchargement."
+        "checksum": "Le fichier téléchargé ne correspond pas à sa somme de contrôle publiée ; il a donc été supprimé. Réessayez le téléchargement.",
+        "writeFailed": "Cet appareil n'a pas pu enregistrer le modèle. Réessayez le téléchargement."
       }
     },
     "catalog": {
@@ -4243,7 +4331,7 @@
     "personalDefaultDescription": "Chargé automatiquement lorsqu'aucun dépôt n'a de profil épinglé.",
     "organizationDefaultDescription": "Chargé automatiquement pour les membres qui n’ont aucun défaut personnel.",
     "setAsDefault": "Définir par défaut",
-    "saveFailed": "Impossible d'enregistrer le profil",
+    "saveFailed": "Impossible d'enregistrer le profil. Réessayez.",
     "organizationRoleRequired": "Seuls les propriétaires et les administrateurs de l'organisation peuvent modifier les profils de l'organisation.",
     "deleteTitle": "Supprimer le profil",
     "deleteMessage": "Cela supprime définitivement le profil et ses paramètres. Cela ne peut pas être annulé.",
@@ -4393,6 +4481,7 @@
       "promptPlaceholder": "Vous êtes un…",
       "tools": "Outils",
       "wholeToolRule": "Cet agent applique une règle à tous les outils à la fois : {{rule}}. Ces interrupteurs sont en lecture seule.",
+      "toolRule": "Règle enregistrée : {{rule}}",
       "visibility": "Visibilité",
       "visibilityPrimary": "Primaire — affiché dans le sélecteur",
       "visibilitySubagent": "Sous-agent — appelable uniquement par d'autres",
@@ -4502,19 +4591,34 @@
       "deductionFallback": "Déduction de crédits",
       "emptyDescription": "Vos achats de crédits, reçus et consommations apparaîtront ici.",
       "emptyTitle": "Aucun historique de crédits",
+      "expiredGrant": "Expiré : {{description}}",
       "googlePlayReceipt": "Reçu disponible sur Google Play",
       "kind": {
         "adjustment": "Ajustement",
         "balanceNeutral": "Sans effet sur le solde",
         "deduction": "Déduction",
         "grant": "Crédits offerts",
+        "promotionalCredits": "Crédits promotionnels",
+        "welcomeCredits": "Crédits de bienvenue",
         "purchase": "Achat"
+      },
+      "program": {
+        "adminBulkGrant": "Crédits accordés par un administrateur",
+        "contributorChampion": "Crédit de champion des contributeurs",
+        "feedback": "Crédit pour avis",
+        "influencer": "Crédit influenceur",
+        "ossMonthlyReset": "Renouvellement du soutien aux logiciels libres",
+        "ossSponsorship": "Crédit de soutien aux logiciels libres",
+        "pullRequest": "Crédit pour PR",
+        "usageIssue": "Crédit pour incident d’utilisation",
+        "vibeDay": "Crédit Vibe Day"
       },
       "purchaseFallback": "Achat de crédits",
       "receipt": "Reçu",
       "receiptA11y": "Ouvrir le reçu pour {{description}}, {{amount}}, du {{date}}",
       "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat.",
-      "retentionLimit": "Affichage de l'historique de crédits le plus récent."
+      "retentionLimit": "Affichage de l'historique de crédits le plus récent.",
+      "voidedGrant": "Annulé : {{description}}"
     },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
@@ -4771,6 +4875,8 @@
     "connectedTo": "Connecté à {{account}}",
     "disconnected": "{{provider}} déconnecté",
     "disconnectFailed": "Impossible de déconnecter {{provider}}",
+    "disconnectRetry": "Slack n'a pas pu confirmer la déconnexion. Réessayez.",
+    "disconnectNeedsSupport": "Kilo n'a pas pu lire l'accès Slack enregistré pour cette connexion. Contactez l'assistance pour terminer la déconnexion.",
     "couldNotLoad": "Impossible de charger les intégrations",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
     "managedByOwner": "Demandez à un propriétaire de l'organisation de modifier une connexion que vous ne pouvez pas modifier.",
@@ -4937,12 +5043,15 @@
     "inputDescription": "Analyse chaque entrée avec Enkrypt AI, y compris les résultats d'outils. Lorsque Enkrypt est indisponible, les requêtes sont envoyées sans analyse plutôt que rejetées.",
     "outputTitle": "Garde-fous de sortie",
     "outputDescription": "Analyse les réponses avec Enkrypt AI avant qu'elles ne parviennent aux membres. Désactivé tant que vous ne l'activez pas.",
+    "outputUnavailable": "Kilo n'a pas activé l'analyse des sorties pour cette organisation, donc les réponses ne sont pas vérifiées et il n'y a rien à configurer ici. Contactez {{supportEmail}} pour en faire la demande.",
     "detectorsHint": "Bloquer rejette une requête signalée. Journaliser uniquement l'enregistre sans retarder la requête.",
     "detectorsHintOutput": "Bloquer fait échouer une réponse signalée. Journaliser uniquement l'enregistre sans retarder la réponse.",
     "choiceLog": "Journaliser uniquement",
     "applyTo": "Appliquer à",
     "applyToAllMembers": "Tous les membres",
     "applyKiloDefault": "Appliquer la configuration par défaut de Kilo",
+    "applyKiloDefaultEnglishNote": "Le texte de la politique par défaut de Kilo est en anglais, car Kilo Gateway l'applique exactement tel qu'il est écrit.",
+    "applyKiloDefaultReplaceMessage": "La politique par défaut de Kilo est rédigée en anglais et remplace ce que vous avez défini dans Violation de politique. Le texte saisi dans le champ du texte de la politique ne peut pas être récupéré.",
     "invalidSavedTitle": "Impossible de lire les paramètres enregistrés des détecteurs d'entrée",
     "invalidSavedBody": "Les requêtes sont bloquées jusqu'à ce que les détecteurs d'entrée soient de nouveau enregistrés. Les détecteurs ci-dessous reprennent la configuration par défaut de Kilo.",
     "invalidSavedOutputTitle": "Impossible de lire les paramètres enregistrés des détecteurs de sortie",
@@ -5078,6 +5187,7 @@
     "providersNeedCatalog": "Les interrupteurs des fournisseurs restent en lecture seule tant que le catalogue complet des modèles n'est pas chargé. Appuyez sur Réessayer ci-dessus pour les modifier.",
     "providersEmpty": "Aucun fournisseur ne correspond à cette recherche.",
     "providersNone": "Aucun fournisseur n'est disponible pour cette organisation.",
+    "providersUnavailable": "Impossible de charger la liste des fournisseurs.",
     "allowAllShown": "Autoriser tous ceux affichés",
     "denyAllShown": "Refuser tous ceux affichés",
     "gatewaysDescription": "Kilo achemine les requêtes de modèles via Vercel AI Gateway ou OpenRouter. Une passerelle désactivée fait échouer ces requêtes.",
@@ -5096,6 +5206,20 @@
       "eu": "Union européenne",
       "au": "Australie",
       "jp": "Japon"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Rechercher une préférence",
+    "noMatches": "Aucune préférence correspondante",
+    "emptyDescription": "Essayez un autre nom de préférence ou un autre mot-clé.",
+    "resultsStatus": "Préférences trouvées : {{resultCount}}",
+    "keywords": {
+      "signOut": "déconnexion|se déconnecter",
+      "appearance": "thème|couleurs|mode sombre",
+      "appUnlock": "biométrie|visage|empreinte digitale",
+      "language": "langue|traduction",
+      "notifications": "alertes|notifications",
+      "privacy": "statistiques|suivi|confidentialité"
     }
   }
 }

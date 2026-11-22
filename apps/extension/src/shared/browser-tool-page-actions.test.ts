@@ -1,6 +1,6 @@
 /* eslint-disable jest/no-conditional-in-test, max-lines, require-await, typescript-eslint/require-await, unicorn/no-useless-undefined, vitest/prefer-called-once -- Fake session and tabs API return verbatim async responses so each per-tool assertion reads the union's own branch; the config also mandates toHaveBeenCalledTimes for single calls. */
 import { describe, expect, it, vi } from 'vitest';
-import { RUN_CODE_UNSUPPORTED_ERROR } from './browser-agent-checks';
+import { AGENT_TAB_OUTSIDE_GROUP_ERROR, RUN_CODE_UNSUPPORTED_ERROR } from './browser-agent-checks';
 import type { BrowserToolDialog, BrowserToolResolvedTarget } from './browser-tool-session';
 import {
   BROWSER_TOOL_NO_DIALOG_ERROR,
@@ -98,7 +98,7 @@ const inspectableTab = (id: number, title: string, url: string): BrowserTabInfo 
 
 const createFakeTabsApi = (initialTabs: BrowserTabInfo[]) => {
   const tabs = [...initialTabs];
-  const creates: { url?: string }[] = [];
+  const creates: { active?: boolean; url?: string }[] = [];
   const removes: number[] = [];
   const updates: { active: boolean; tabId: number }[] = [];
 
@@ -126,7 +126,7 @@ const createFakeTabsApi = (initialTabs: BrowserTabInfo[]) => {
       }
     },
     update: async (tabId, updateProperties) => {
-      updates.push({ active: updateProperties.active, tabId });
+      updates.push({ active: updateProperties.active === true, tabId });
 
       return tabs.find(tab => tab.id === tabId) ?? {};
     },
@@ -299,7 +299,7 @@ describe('browser-tool-page-actions', () => {
       });
     });
 
-    it('opens a new tab at the requested url', async () => {
+    it('opens a new tab at the requested url without taking the foreground', async () => {
       const tabs = tabsWithOnePage();
 
       const result = await runPageBrowserTool(
@@ -309,7 +309,7 @@ describe('browser-tool-page-actions', () => {
         { tabId: 1, tabsApi: tabs.tabsApi }
       );
 
-      expect(tabs.creates).toStrictEqual([{ url: 'https://new.example.com/' }]);
+      expect(tabs.creates).toStrictEqual([{ active: false, url: 'https://new.example.com/' }]);
       expect(result).toStrictEqual({
         ok: true,
         value: { selected: true, tabId: 99, title: 'New tab', url: 'https://new.example.com/' },
@@ -372,7 +372,81 @@ describe('browser-tool-page-actions', () => {
       });
     });
 
-    it('withholds the title and url of a tab the agent may not read', async () => {
+    it('lists only the agent session group and numbers it from zero', async () => {
+      // The user's own tab (1) sits in the same window; the agent's session holds only tab 2.
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'Bank', 'https://bank.example.com/'),
+        inspectableTab(2, 'Second', 'https://second.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool('kilo_browser_tabs', { action: 'list' }, undefined, {
+        agentAccess: {
+          actOrigins: [],
+          groupTabs: [2],
+          navigateOrigins: [],
+          readableOrigins: ['https://bank.example.com'],
+        },
+        tabId: 2,
+        tabsApi: tabs.tabsApi,
+      });
+
+      // A read grant for the user's origin does not put their tab in the list: the session group is the boundary.
+      expect(result).toStrictEqual({
+        ok: true,
+        value: '- 0: (current) [Second](https://second.example.com/)',
+      });
+      expect(JSON.stringify(result)).not.toContain('bank.example.com');
+    });
+
+    it('hides how many tabs the user has open', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'Bank', 'https://bank.example.com/'),
+        inspectableTab(2, 'Agent', 'https://agent.example.com/'),
+        inspectableTab(3, 'Mail', 'https://mail.example.com/'),
+        inspectableTab(4, 'Shop', 'https://shop.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool('kilo_browser_tabs', { action: 'list' }, undefined, {
+        agentAccess: { actOrigins: [], groupTabs: [2], navigateOrigins: [], readableOrigins: [] },
+        tabId: 2,
+        tabsApi: tabs.tabsApi,
+      });
+
+      // A withheld entry per user tab would still report the count: three tabs they did not open for the agent.
+      expect(result).toStrictEqual({
+        ok: true,
+        value: '- 0: (current) [Agent](https://agent.example.com/)',
+      });
+    });
+
+    it('lists a shared tab beside the session tab, numbered in list order', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'Bank', 'https://bank.example.com/'),
+        inspectableTab(2, 'Agent', 'https://agent.example.com/'),
+        inspectableTab(3, 'Shared', 'https://shared.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool('kilo_browser_tabs', { action: 'list' }, undefined, {
+        agentAccess: {
+          actOrigins: [],
+          groupTabs: [2, 3],
+          navigateOrigins: [],
+          readableOrigins: [],
+        },
+        tabId: 2,
+        tabsApi: tabs.tabsApi,
+      });
+
+      expect(result).toStrictEqual({
+        ok: true,
+        value: [
+          '- 0: (current) [Agent](https://agent.example.com/)',
+          '- 1: [Shared](https://shared.example.com/)',
+        ].join('\n'),
+      });
+    });
+
+    it('matches the text Playwright MCP prints for the same tabs', async () => {
       const tabs = createFakeTabsApi([
         inspectableTab(1, 'First', 'https://first.example.com/'),
         inspectableTab(2, 'Second', 'https://second.example.com/'),
@@ -381,10 +455,31 @@ describe('browser-tool-page-actions', () => {
       const result = await runPageBrowserTool('kilo_browser_tabs', { action: 'list' }, undefined, {
         agentAccess: {
           actOrigins: [],
-          groupTabs: [],
+          groupTabs: [1, 2],
           navigateOrigins: [],
-          readableOrigins: ['https://first.example.com'],
+          readableOrigins: [],
         },
+        tabId: 2,
+        tabsApi: tabs.tabsApi,
+      });
+
+      // Upstream's own list output for two pages, one current.
+      expect(result).toStrictEqual({
+        ok: true,
+        value: [
+          '- 0: [First](https://first.example.com/)',
+          '- 1: (current) [Second](https://second.example.com/)',
+        ].join('\n'),
+      });
+    });
+
+    it('keeps listing every tab for a side-panel caller', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'First', 'https://first.example.com/'),
+        inspectableTab(2, 'Second', 'https://second.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool('kilo_browser_tabs', { action: 'list' }, undefined, {
         tabId: 2,
         tabsApi: tabs.tabsApi,
       });
@@ -394,10 +489,130 @@ describe('browser-tool-page-actions', () => {
         value: {
           tabs: [
             { index: 0, selected: false, title: 'First', url: 'https://first.example.com/' },
-            { index: 1, selected: true, title: '', url: '[origin withheld]' },
+            { index: 1, selected: true, title: 'Second', url: 'https://second.example.com/' },
           ],
         },
       });
+    });
+
+    it('selects the listed index, not the index counting the user tabs', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'Bank', 'https://bank.example.com/'),
+        inspectableTab(2, 'Agent', 'https://agent.example.com/'),
+        inspectableTab(3, 'Other agent tab', 'https://other.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'select', index: 1 },
+        undefined,
+        {
+          agentAccess: {
+            actOrigins: [],
+            groupTabs: [2, 3],
+            navigateOrigins: [],
+            readableOrigins: [],
+          },
+          tabId: 2,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      // The agent list holds tabs 2 and 3, so its index 1 is tab 3 — not the browser's index 1, which is tab 2.
+      expect(tabs.updates).toStrictEqual([{ active: true, tabId: 3 }]);
+      expect(result).toStrictEqual({
+        ok: true,
+        value: {
+          selected: true,
+          tabId: 3,
+          title: 'Other agent tab',
+          url: 'https://other.example.com/',
+        },
+      });
+    });
+
+    it('closes the listed index, not the index counting the user tabs', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'Bank', 'https://bank.example.com/'),
+        inspectableTab(2, 'Agent', 'https://agent.example.com/'),
+        inspectableTab(3, 'Other agent tab', 'https://other.example.com/'),
+      ]);
+      const { dispose, session } = createFakeSession();
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'close', index: 1 },
+        session,
+        {
+          agentAccess: {
+            actOrigins: [],
+            groupTabs: [2, 3],
+            navigateOrigins: [],
+            readableOrigins: [],
+          },
+          tabId: 2,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(tabs.removes).toStrictEqual([3]);
+      // The closed tab is not the agent's target, so the target's session survives.
+      expect(dispose).not.toHaveBeenCalled();
+      expect(result).toStrictEqual({ ok: true, value: 'Closed the tab.' });
+    });
+
+    it('refuses an index past the agent list that names the user’s tab', async () => {
+      // The agent's tab comes first in browser order, so browser index 1 is the user's tab and lies past the list.
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'Agent', 'https://agent.example.com/'),
+        inspectableTab(2, 'Bank', 'https://bank.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'select', index: 1 },
+        undefined,
+        {
+          agentAccess: { actOrigins: [], groupTabs: [1], navigateOrigins: [], readableOrigins: [] },
+          tabId: 1,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(result).toStrictEqual({ error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false });
+      expect(tabs.updates).toStrictEqual([]);
+    });
+
+    it('answers one refusal for every index past the agent list, never the browser’s tab count', async () => {
+      // One reachable tab and four inspectable ones: a different answer for 1-3 than for 4 would report how many tabs the browser holds.
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'Agent', 'https://agent.example.com/'),
+        inspectableTab(2, 'Bank', 'https://bank.example.com/'),
+        inspectableTab(3, 'Mail', 'https://mail.example.com/'),
+        inspectableTab(4, 'Docs', 'https://docs.example.com/'),
+        inspectableTab(5, 'News', 'https://news.example.com/'),
+      ]);
+      const options = {
+        agentAccess: {
+          actOrigins: [],
+          groupTabs: [1],
+          navigateOrigins: [],
+          readableOrigins: [],
+        },
+        tabId: 1,
+        tabsApi: tabs.tabsApi,
+      };
+      const answers = await Promise.all(
+        [1, 2, 3, 4, 9].map(index =>
+          runPageBrowserTool('kilo_browser_tabs', { action: 'select', index }, undefined, options)
+        )
+      );
+
+      for (const answer of answers) {
+        expect(answer).toStrictEqual({ error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false });
+      }
+
+      expect(tabs.updates).toStrictEqual([]);
     });
 
     it('lists a tab in the agent session group even without a read grant', async () => {
@@ -414,9 +629,9 @@ describe('browser-tool-page-actions', () => {
         tabsApi: tabs.tabsApi,
       });
 
-      expect(result).toMatchObject({
+      expect(result).toStrictEqual({
         ok: true,
-        value: { tabs: [{ title: 'Second', url: 'https://second.example.com/' }] },
+        value: '- 0: (current) [Second](https://second.example.com/)',
       });
     });
 
@@ -675,10 +890,8 @@ describe('browser-tool-page-actions', () => {
         method: 'Page.handleJavaScriptDialog',
         params: { accept: true, promptText: 'yes' },
       });
-      expect(result).toStrictEqual({
-        ok: true,
-        value: { accepted: true, message: 'Continue?', type: 'confirm' },
-      });
+      // The message is shown with the modal state, to a caller allowed to read it, and never echoed here.
+      expect(result).toStrictEqual({ ok: true, value: { accepted: true, type: 'confirm' } });
     });
 
     it('reports no dialog when none is open', async () => {

@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import { MAX_RUNNING_RUNS_PER_QUEUE } from './db';
 import { dispatchScheduler, type BenchmarkJobMessage } from './run';
 import {
   acquireInitializationLease,
@@ -448,4 +449,31 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       { model: live, status: 'ready' },
     ]);
   });
+
+  it('finalizes every settled run of the four queues at their run cap in one dispatch pass', async () => {
+    const runIds = Array.from(
+      { length: MAX_RUNNING_RUNS_PER_QUEUE * 4 },
+      (_, index) => `settled-${String(index).padStart(2, '0')}`
+    );
+    for (const [index, runId] of runIds.entries()) {
+      insertRun(runId, index % 2 === 0 ? 'platform' : 'user', 1, 1);
+      await scheduleRunChunks(setupDb, {
+        runId,
+        entries: [{ model: `${runId}/model-0`, variant: null }],
+        repetitions: 1,
+        caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+        chunkSize: 1,
+      });
+      sqlite
+        .prepare(`INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at)
+          VALUES (?, ?, '', 0, 0, 0, ?)`)
+        .run(runId, `${runId}/model-0`, new Date(NOW).toISOString());
+    }
+
+    await dispatchScheduler(env);
+
+    expect(
+      sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_runs WHERE status = 'completed'").get()
+    ).toEqual({ n: runIds.length });
+  }, 30_000);
 });

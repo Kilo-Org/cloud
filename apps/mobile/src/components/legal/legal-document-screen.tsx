@@ -112,10 +112,12 @@ export function LegalDocumentScreen({
             <Text>{t('common.legalDocumentEnglishOnly')}</Text>
           </Card>
         ) : null}
-        {/* A selectable body becomes one focusable selection block per
-            paragraph group, so a screen reader meets legal prose as controls.
-            The body reads as plain text instead, as every other link-bearing
-            markdown surface renders it. */}
+        {/* The screen renders the served body as it arrives, so a scroll that
+            reaches its last words has shown every section before them. A
+            selectable body becomes one focusable selection block per paragraph
+            group, so a screen reader meets legal prose as controls. The body
+            reads as plain text instead, as every other link-bearing markdown
+            surface renders it. */}
         <MarkdownText
           value={state.html}
           documentDirection="ltr"

@@ -381,6 +381,13 @@ export const createRuntimeBrowserBridge = ({
       throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabBusy, TAB_BUSY_ERROR);
     }
 
+    if (outcome.kind === 'unsupported') {
+      throw new LocalAgentRpcError(
+        LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+        outcome.result.ok ? 'This browser cannot run the tool.' : outcome.result.error
+      );
+    }
+
     if (outcome.result.ok) {
       const content = contentOf(outcome.result);
 
@@ -562,8 +569,12 @@ export const createRuntimeBrowserBridge = ({
         return callOnOwnTab(parsed.data, input);
       }
 
-      // A repeat of a refused `browser_tabs new` carries its token, and the runtime drives the tab that step opened.
-      return runOnTab(parsed.data, input, { tabId: existing });
+      // The step is always the call the model made: the runtime may run `browser_tabs new` as the navigate on the
+      // Tab it opens, and the refusal it answers must still bind the model's own tool and arguments.
+      return runOnTab(parsed.data, input, {
+        step: { arguments: parsed.data.arguments, toolName: parsed.data.name },
+        tabId: existing,
+      });
     },
 
     closeSession: async input => {

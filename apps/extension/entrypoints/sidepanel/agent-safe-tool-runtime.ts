@@ -23,7 +23,8 @@ const runSafeToolCall = async (
   signal: AbortSignal | undefined
 ): Promise<EvalTabResult> => {
   if (isBrowserToolCall(toolCall)) {
-    return executeKiloBrowserToolCall(toolCall, browserCaller, signal);
+    // This runtime only ever runs safe mode's read-only set.
+    return executeKiloBrowserToolCall(toolCall, { caller: browserCaller, safeMode: true }, signal);
   }
 
   if (toolCall.name === 'web_search') {

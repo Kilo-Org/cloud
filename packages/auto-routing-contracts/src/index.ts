@@ -261,6 +261,8 @@ export {
   estimateRoutingTokens,
   PROMPT_WALK_MAX_DEPTH,
   type ClassifierApiKind,
+  type MediaPartModality,
+  type NormalizeOverrides,
 } from './normalize';
 
 export * from './reasoning';

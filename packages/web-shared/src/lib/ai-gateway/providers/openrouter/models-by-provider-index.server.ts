@@ -32,7 +32,7 @@ type ProviderIndexCacheState = {
 
 export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterResponse | undefined>;
 
-type ProviderIndexLoaderOptions = {
+export type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
   fetchOpenRouterModels: () => Promise<GatewayModelMap>;
   fetchVercelModels: () => Promise<GatewayModelMap>;

@@ -69,6 +69,63 @@ the adapter's optional members, because a stub adapter has none.
 
 ## 3. Topology and identities
 
+### Network secrets
+
+Environment and profile rows can use `delivery: 'network'`. Existing rows keep `env` delivery.
+Network values store `{ "network": <RSA+AES envelope> }`, not an ordinary envelope.
+Older Workers reject this wrapper instead of delivering plaintext during a rollout or rollback.
+The profile merge carries encrypted `networkSecrets` separately from environment values.
+Only Cloudflare Containers can prepare a workspace with network secrets. Other providers fail
+with `Network secrets require a Cloudflare sandbox`; no plaintext fallback exists.
+
+The Sandbox DO stores one encrypted network-secret snapshot per workspace scope in
+`network_secret_snapshots`. Each entry has a `kcp1` alias with purpose `secret`.
+Allocation changes retire active grants, not this snapshot. Reissued grants reuse its aliases.
+Route release keeps the snapshot. Workspace or standalone session deletion removes it.
+The spec and wrapper receive only `KEY=<alias>`.
+Workspace setup commands and agent commands use the same aliases.
+
+Cloudflare snapshot builders also receive aliases in their setup environment. The environment
+coordinator stores encrypted, build-scoped grants and owns their allocation and deadline.
+Builder aliases use the same `kcp1` purpose and resolver RPC contract. Every fresh Cloudflare
+builder installs outbound interception, with or without network secrets, because a refused start
+can retain interception rules. All builder HTTP(S) egress therefore invokes `ContainersOutbound`
+once per request. Build tools must trust the injected CA; a client with pinned certificates fails.
+The shared resolver routes
+their `environment-build:<id>` scope to that coordinator, and uses the same admission helper.
+The proxy still authenticates the platform container identity. Only an active `preparing` build
+can resolve its aliases. Capture, cancellation, expiry, and terminal cleanup revoke them.
+Vercel builders refuse network secrets. Build aliases expire with the build; saved tool configuration
+should reference the variable name rather than persist an expanded build alias.
+
+`ContainersOutbound` checks egress policy, then routes network aliases before SCM forwarding.
+Restricted egress includes the snapshot's exact secret hosts. The existing credential admission
+checks the live allocation, container binding, owner, scope membership, and grant expiry.
+The existing `resolveCredential` RPC decrypts a network value only for an admitted request.
+The provider-neutral substitution module supports header values and Basic passwords.
+It replaces exact alias tokens only, pins the Host header, and never follows redirects.
+
+Network secrets require HTTPS on port 443. IP literals, local or metadata names, Kilo endpoints,
+and managed SCM endpoints cannot receive them. `npm.pkg.github.com` is an explicit exception.
+Configured Kilo and GitLab hosts are checked again at grant creation and resolution.
+An unknown alias, wrong host, unsupported URL placement, or mixed SCM/network request receives
+a specific `403 network_secret_*` response. Temporary resolver faults return retryable
+`503 network_secret_unavailable`, not an unknown-secret error. The retry flag follows the resolver's
+classification; permanent policy failures return a value-free denial. No upstream request follows a denial.
+Bodies and responses are not substituted. Header echoes and exchanged tokens can expose values.
+Clients that validate token formats locally can fail because they see an alias.
+
+Egress audit records include `credentialKey` and `credentialDecision` for one credential, or a
+`credentialDecisions` list on the same record for multiple credentials. They never include values,
+aliases, request paths, or query strings. A wrong host fails immediately instead of producing
+an unclear upstream authentication error. Token-format checks can fail before a request exists.
+
+Feature-era private route and audit records are not backward-compatible with pre-feature Workers.
+A rollback must retain a Worker version that understands these records. The PostgreSQL wrapper
+still prevents an older reader from projecting a network value as a plaintext environment variable.
+
+### Ownership
+
 - One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`.
 - Sandbox ownership has exactly two supported forms: **one standalone session without a workspace
   per sandbox**, or **one workspace per sandbox, containing any number of sessions**. Sessions in
@@ -793,7 +850,97 @@ keep environment snapshots and existing history/worktree recovery.
   The snapshot
   holds only the disk: like an environment snapshot, restore applies the current credentials,
   env, secrets and MCP configuration from the route before accepting work.
-  Existing native sessions are reused; missing native sessions use history-only recovery.
+  Existing native sessions are reused when their record names this workspace directory; a record
+  that names another directory takes history-only recovery, as Kilo v2 already requires.
+  Missing native sessions use history-only recovery.
+  A re-pointed record keeps the fields the import body can carry, including the wider shapes a record
+  may hold: the import accepts a summary that carries file diffs and a revert that carries a patch
+  diff, and the record read back returns the patch diff unchanged and each diff entry with its file,
+  additions, deletions and status. The import body cannot carry the record's own `metadata`, `agent`,
+  `model`, `path`, `cost` or `tokens`: it accepts those keys and silently drops them. A re-point
+  therefore clears the stored value of each. The record's own `slug` is carried: the import body has
+  a `slug` field, so a re-point keeps the share URL naming the record's own slug.
+  The native import also cannot carry a session permission ruleset or a session `metadata`, so both
+  obligations are remembered in one marker file per session beside the wrapper's durable state:
+  `$HOME/.kilo-control/rulesets/<encoded session id>.json` holds `{ permission?, metadata? }`,
+  either obligation may be present alone, and the file is deleted when neither remains. A marker
+  that holds a bare JSON array is read as `{ permission: array }`, which is the shape the earlier
+  code wrote. `agent` and `model` stay cleared on purpose: every prompt sends its own agent and
+  model from the route payload, so the stored pair is a mirror that no turn reads. `path` is not
+  restored either: no wrapper code reads it, and the import leaves it empty.
+  The marker goes down before the import commits the row, and the ruleset is applied right after the
+  metadata restore. Writing the marker before the import is what makes the guarantee hold: a marker
+  written only after a failed apply would leave a window where the process dies between the import
+  and the write, and the committed record then owes a ruleset and a metadata that nothing remembers.
+  The record's own `permission` is authoritative: when the marker and the record both hold a
+  ruleset, the record's set is the one applied, because the marker exists only because the native
+  import clears the row, and it is a durable copy of an obligation rather than a second source of
+  truth. The marker is rewritten before the import and only when it does not already name what the
+  record carries, so a directory that refuses the write cannot fail a route whose obligation is
+  already recorded. A rewrite that fails fails the route retryably with the record untouched, so the
+  retried prepare makes the same comparison again. A rule that only the marker held is dropped
+  rather than applied: the record's authenticated permission is the state of the session, and this
+  module is its only writer through the native API. Once the record's set is applied, the marker is
+  reduced to what is still owed and removed when nothing remains, so a rule the record does not
+  carry is not left behind as a standing obligation.
+  The wrapper restores `metadata` right after the import and before it applies the ruleset, because
+  metadata holds the session goal a user sees: a ruleset that cannot be applied throws, and the
+  next prepare settles that obligation without running the create path again, so a restore placed
+  after the apply would never reach the record. A metadata restore that fails is logged and does
+  not fail the route: the record is already committed, the metadata carries no authorization
+  decision, and the obligation stays recorded so the next prepare retries it.
+  The record's own `metadata` is authoritative in the same way its `permission` is: the wrapper
+  supplies an owed value only where the import left the record empty. The update replaces the whole
+  value and the server normalizes what it stores, so a record that carries a value may hold a newer
+  goal than the copy the marker kept, and writing that copy back would revert the user's own goal.
+  A marker obligation the record already satisfies is dropped without a write.
+  Every prepare settles both obligations through `settleOutstandingRuleset`, before the probe and
+  again after a successful history restore; a settle that finds no record leaves the marker in place
+  for the create path, which applies what it owes to the record it imports. A create path whose
+  marker already covers what the record carries does not rewrite it.
+  The ruleset is cleared only after the apply succeeds, and the apply is skipped when the record
+  already holds every rule, because the native update appends rather than replaces; a marker that
+  cannot be cleared is therefore not a failure, since the next prepare finds the stored rules and
+  does not repeat them. The marker ends with the record it describes: a worktree deletion removes the
+  marker of each session it deletes, because no later prepare can apply a ruleset to a record that no
+  longer exists. A release does not remove it, because release only stops the session and the record
+  survives with its obligation. A record that still names another directory never satisfies the
+  obligation, because the rules it carries belong to that directory; the marker waits for the record
+  the import re-points, and the settle first replaces the marker's metadata copy with that record's
+  own value, because the re-pointing import clears the column and that read is the last that can see
+  it. A marker that owes only a ruleset still takes that value. The remembered ruleset and a
+  record's own permission are parsed as rulesets before use: a value that is not a ruleset is never
+  applied and never becomes the record's grants, because a ruleset widens what the agent may do. A
+  marker that is present but not a ruleset fails the prepare with a permanent session-import reason
+  instead of reading as nothing owed, since reading it as nothing owed would drop rules the record
+  never received.
+  The marker directory is created `0700` and tightened to `0700` when it exists, and the file is
+  `0600`. There is no fallback to a shared temporary directory: a process without a home
+  directory cannot name the store, so recording or reading an obligation fails retryably instead of
+  reading as nothing owed, and forgetting one does nothing. The `0700` directory and the `0600` file
+  are defence in depth only while the wrapper and the agent share one uid inside the sandbox; a real
+  boundary needs wrapper-owned state outside any location the agent can write, which is a
+  sandbox-level change.
+  A record whose own permission is present but not a ruleset fails the create path the same way,
+  before the import, and the record is left unchanged: no rules are applied, so a later prepare in
+  the same allocation reads that record again and fails the same way until the record is replaced.
+  The settle path refuses a record that names the route directory and carries such a permission in
+  exactly the same way: it sends no update, keeps the remembered ruleset because the record is left
+  unchanged, and fails the prepare. A record under another directory is still treated as absent, so
+  the marker simply waits for the import to re-point it. Both entry points therefore refuse, rather
+  than prepare a route whose record lacks the rules it owes.
+  A marker or session read that cannot answer fails the prepare as retryable and sends no permission
+  update, because the retried step reads the same durable state and the native update appends. A
+  marker that cannot be written before the import fails as retryable too, because no record is
+  committed yet; a marker that reads but is not a ruleset, and a record whose permission is not a
+  ruleset, fail as the permanent session-import reason. The message names the store path and the
+  underlying cause in the wrapper log only — the marker path for a marker that cannot be
+  interpreted, the record's id for a record whose permission is not a ruleset — while the session
+  frame still carries the session-import reason with no detail. A settle whose permission update
+  fails fails retryably and reports the same session-import reason, because the marker is intact and
+  the retried step reads it again. An apply or a settle interrupted by the step budget's abort
+  reports the abort rather than the permanent or retryable ruleset classification, so the step keeps
+  its own classification and retry budget, and the marker stays for the next prepare.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads
@@ -2601,3 +2748,28 @@ cp packages/session-ingest-contracts/src/cloud-agent-billing.ts services/cloud-a
 ```
 
 The mirror test requires exact source equality. Verify the standalone Docker wrapper build after schema changes.
+
+
+### Runtime proxy origin proof rollout
+
+Origin proof support ships in two releases. Deploy the compatibility release fully
+before merging the enforcement release. A PR merge alone is not the deployment gate.
+
+1. **Compatibility:** Containers outbound and Vercel network policies add
+   `x-kilo-runtime-proxy-origin`. The facade, Session DO, Sandbox DO RPC inputs and
+   Session Sync authorization binding accept and forward the optional proof.
+   Allocations do not require proof yet. Session Sync still omits the proof when
+   it calls the authorization binding, so its deployment order does not matter.
+2. **Enforcement:** Deploy Session Sync proof forwarding before Cloud Agent.
+   Cloud Agent then marks new allocations and requires their platform proof.
+   Existing allocations remain exempt until they stop.
+
+Before the enforcement release, verify that every active Cloud Agent version has
+the compatibility readers and outbound proof injection. Search Worker logs for
+`runtime_proxy_origin_proof_unavailable`: each line is an egress that sent no proof.
+Also run one live Vercel sandbox request that sets its own
+`x-kilo-runtime-proxy-origin`. The facade must receive only the injected proof.
+Readers treat a value that is not exactly one proof, such as a joined duplicate,
+as absent. Keep the releases separate;
+deploying both PRs together removes the compatibility boundary. For a rollback after
+enforcement, use the compatibility release as the Cloud Agent rollback target.

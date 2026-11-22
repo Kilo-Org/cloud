@@ -373,8 +373,8 @@ describe('applyProviderSpecificLogic reasoning placeholders', () => {
   async function apply(model: string, responseTransforms: ReasoningDetailsTransform | null) {
     const request = makeChatRequest({});
     request.body.model = model;
-    await applyProviderSpecificLogic(
-      {
+    await applyProviderSpecificLogic({
+      provider: {
         type: 'openrouter',
         apiUrl: 'https://example.com/v1',
         apiUrlOverrides: {},
@@ -385,18 +385,18 @@ describe('applyProviderSpecificLogic reasoning placeholders', () => {
         responseTransforms,
         async transformRequest() {},
       },
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
     return chatAssistant(request);
   }
 

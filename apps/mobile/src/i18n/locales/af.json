@@ -185,7 +185,31 @@
     "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
     "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar.",
     "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer.",
-    "viewOnGitHub": "Bekyk PR op GitHub"
+    "organizationTrialEndedBillingAtKiloAi": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering by kilo.ai opdateer en dan weer probeer.",
+    "viewOnGitHub": "Bekyk PR op GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Kolpunt",
+        "nestedBulletPoint": "Ingeneste kolpunt",
+        "orderedItem": "Lysitem {n}",
+        "nestedOrderedItem": "Ingeneste lysitem {n}"
+      },
+      "blockquote": {
+        "quote": "Aanhaling",
+        "nestedQuote": "Ingeneste aanhaling"
+      },
+      "table": {
+        "row": "Ry {n}: {content}"
+      },
+      "math": {
+        "equation": "Wiskunde: {latex}"
+      },
+      "rotor": {
+        "headings": "Opskrifte",
+        "links": "Skakels",
+        "images": "Prente"
+      }
+    }
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -279,9 +303,13 @@
     "credits": "Krediete",
     "failedToLoadBalance": "Die saldo kon nie gelaai word nie. Tik om weer te probeer.",
     "balanceLoadFailed": "Kon nie saldo laai nie",
+    "balanceUnreachable": "Kon nie die bediener bereik nie. Probeer weer.",
+    "balanceAccessDenied": "Jy het nie toegang om hierdie saldo te sien nie.",
+    "balanceUnavailable": "Die saldo kan nie gelaai word nie.",
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
+    "availableToSpendInOrganization": "Beskikbaar om in hierdie organisasie te bestee",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -423,6 +451,17 @@
       "location": "Vertex-ligging",
       "clientEmail": "Diensrekening-e-posadres",
       "privateKey": "Privaat sleutel van diensrekening",
+      "privateKeyBlockRequired": "Plak die hele sleutelblok, vanaf die BEGIN-lyn tot die END-lyn.",
+      "privateKeyEncrypted": "Hierdie sleutelblok is met 'n wagfrase beskerm. Plak 'n diensrekening-sleutel wat geen wagfrase het nie.",
+      "names": {
+        "codestral": "Slegs verouderde Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Meld aan met ChatGPT)",
+        "xiaomi": "Xiaomi (betaal soos jy gebruik)",
+        "zai": "Z.ai (betaal soos jy gebruik)",
+        "bedrockByok": "Amazon Bedrock (direk)",
+        "vertexByok": "Google Vertex AI (direk)"
+      },
       "modelMappings": "Modelkoppelings",
       "modelMappingsDescription": "Stuur 'n gateway-model na 'n pasgemaakte ontplooiingsnaam.",
       "mappingTitle": "Koppeling {{number}}",
@@ -502,14 +541,25 @@
       "nextStepFinal": "Die appèlbesluit is finaal. Geen verdere appèl kan ingedien word nie.",
       "viewReceipt": "Bekyk ontvangsbewys"
     },
+    "reportReceipts": {
+      "title": "Verslae",
+      "rowSubtitle": "Verslae wat jy ingedien het en die uitkomste daarvan",
+      "emptyTitle": "Nog geen verslae nie",
+      "emptyDescription": "Verslae wat jy van 'n kommentaar of 'n KI-antwoord indien, verskyn hier.",
+      "couldNotLoad": "Kon nie jou verslae laai nie",
+      "capped": "Wys jou mees onlangse verslae."
+    },
     "changelog": "Wat is nuut",
     "changelogVersionPending": "Die notas vir {{version}} kom met die volgende toepassingsopdatering.",
     "changelogGroupNew": "Nuut",
     "changelogFixesIn": "Regstellings en verbeterings in {{areas}}.",
     "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
     "changelogAreas": {
-      "signIn": "Aanmelding",
-      "profileOrganizations": "Profiel & organisasies"
+      "signIn": "aanmelding",
+      "profileOrganizations": "profiel & organisasies",
+      "chat": "klets",
+      "notifications": "kennisgewings",
+      "integrations": "integrasies"
     }
   },
   "preferences": {
@@ -1274,7 +1324,7 @@
       "couldNotGetLatest": "Die jongste data kon nie verkry word nie.",
       "byline": "#{{number}} deur {{author}}",
       "noFindings": "Daar is geen bevindings nie.",
-      "findingsUnavailable": "Resultate is nie beskikbaar nie omdat hierdie hersiening misluk het.",
+      "findingsUnavailable": "Resultate is nie beskikbaar nie.",
       "findingsInProgress": "Hierdie hersiening is nog besig. Bevindings verskyn hier wanneer dit klaar is.",
       "findingsEndedWithoutResults": "Hierdie hersiening het geëindig voordat dit enige bevindings opgelewer het.",
       "serviceUnavailable": "Die kodehersieningsdiens kon nie bereik word nie. Probeer die hersiening weer wanneer die diens beskikbaar is.",
@@ -1405,7 +1455,7 @@
       "managedOnWebRepositories": "Kies die repositories vir {{organization}} op die web vanaf 'n rekenaar.",
       "description": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
       "descriptionReconnect": "Skep weer vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
-      "descriptionOverview": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit op die volgende skerm.",
+      "descriptionOverview": "Skep 'n toegangstoken vir die werkruimte en plak dit op die volgende skerm.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",
       "tokenPlaceholder": "Toegangstoken vir die werkruimte",
       "tokenRefused": "Bitbucket het nie hierdie toegangstoken vir die werkruimte aanvaar nie. Kontroleer dat dit die toestemmings hierbo het en probeer dan weer."
@@ -2512,7 +2562,7 @@
       "searchPlaceholder": "Soek bewaarplekke",
       "noMatches": "Geen treffers nie",
       "noRepositories": "Geen bewaarplekke beskikbaar nie",
-      "noRepositoriesDescription": "Geen bewaarplekke is aan jou rekening gekoppel nie.",
+      "noRepositoriesDescription": "Koppel GitHub of GitLab om bewaarplekke te laai.",
       "loading": "Laai…",
       "accessibility": "Bewaarplek: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3406,7 +3456,7 @@
       "manageOnWeb": "Fakturering-instellings op die web",
       "changePlan": "Verander plan",
       "buySeats": "Koop gebruikersplekke",
-      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word op die web bestuur.",
+      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word by kilo.ai bestuur.",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
       "manageAutoTopUp": "Bestuur outomatiese aanvulling",
       "opensOnWeb": "Maak op die web oop"
@@ -3588,6 +3638,7 @@
       "identifierLabel": "Identifiseerder",
       "identifierRequired": "Voer 'n identifiseerder in.",
       "identifierTaken": "Hierdie identifiseerder word reeds deur 'n ander modus gebruik.",
+      "identifierTooLong": "Hou die identifiseerder op {{max}} karakters of minder.",
       "nameLabel": "Modusnaam",
       "nameRequired": "Voer 'n modusnaam in.",
       "notFound": "Hierdie modus bestaan nie meer nie.",
@@ -3678,7 +3729,7 @@
     "emailDeliveryFailed": "E-pos kan tydelik nie afgelewer word nie. Probeer asseblief later weer.",
     "admissionRequired": "Jou toestel kan nie geverifieer word nie. Gebruik '$t(login.moreSignInOptions)' om op 'n ander toestel of via die web aan te meld.",
     "default": "Iets het verkeerd geloop. Probeer asseblief weer.",
-    "retryableAdmission": "Ons kon nie hierdie toestel verifieer nie. Kontroleer jou verbinding en probeer weer.",
+    "retryableAdmission": "Kon nie hierdie toestel verifieer nie. Probeer weer.",
     "startSignInFailed": "Kon nie aanmelding begin nie. Probeer asseblief weer.",
     "couldNotOpenBrowser": "Kon nie die blaaier oopmaak nie. Probeer asseblief weer.",
     "signInTimedOut": "Die tyd vir aanmelding het verstryk. Probeer asseblief weer.",
@@ -3750,6 +3801,34 @@
     "nextScheduled": "Volgende geskeduleerde",
     "answerNeeded": "Antwoord nodig",
     "waitingToRetry": "Wag om weer te probeer",
+    "countNoun": {
+      "needsInput_one": "Wag op invoer",
+      "needsInput_other": "Wag op invoer",
+      "running_one": "Besig",
+      "running_other": "Besig",
+      "scheduled_one": "Geskeduleer",
+      "scheduled_other": "Geskeduleer",
+      "idle_one": "Onaktief",
+      "idle_other": "Onaktief"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Wag op invoer",
+      "needsInput_other": "{{displayCount}} Wag op invoer",
+      "running_one": "{{displayCount}} Besig",
+      "running_other": "{{displayCount}} Besig",
+      "scheduled_one": "{{displayCount}} Geskeduleer",
+      "scheduled_other": "{{displayCount}} Geskeduleer",
+      "idle_one": "{{displayCount}} Onaktief",
+      "idle_other": "{{displayCount}} Onaktief"
+    },
+    "footer": {
+      "checked": "Gekontroleer {{time}}",
+      "lastKnown": "Laas bekend · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Volgende uitvoering {{time}}",
+      "wasDue": "Was verwag {{time}}"
+    },
     "step": {
       "editing": "Wysig",
       "reading": "Lees",
@@ -3995,7 +4074,8 @@
         "space": "Daar is nie genoeg gratis berging vir hierdie model nie. Maak spasie vry en probeer weer.",
         "network": "Die aflaai het nie klaargemaak nie. Kontroleer jou verbinding en probeer weer.",
         "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder.",
-        "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer."
+        "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer.",
+        "writeFailed": "Hierdie toestel kon nie die model stoor nie. Probeer die aflaai weer."
       }
     },
     "catalog": {
@@ -4173,7 +4253,7 @@
     "personalDefaultDescription": "Outomaties gelaai wanneer geen bewaarplek 'n vasgespelde profiel het nie.",
     "organizationDefaultDescription": "Outo-gelaai vir lede wat geen persoonlike verstek het nie.",
     "setAsDefault": "Stel as verstek",
-    "saveFailed": "Kon nie profiel stoor nie",
+    "saveFailed": "Kon nie profiel stoor nie. Probeer weer.",
     "organizationRoleRequired": "Slegs organisasie-eienaars en administrateurs kan organisasieprofiele verander.",
     "deleteTitle": "Vee profiel uit",
     "deleteMessage": "Dit verwyder die profiel en sy instellings permanent. Dit kan nie ongedaan gemaak word nie.",
@@ -4322,6 +4402,7 @@
       "promptPlaceholder": "Jy is 'n…",
       "tools": "Gereedskap",
       "wholeToolRule": "Hierdie agent pas een reël gelyktydig op alle gereedskap toe: {{rule}}. Hierdie skakelaars is slegs-lees.",
+      "toolRule": "Gestoor reël: {{rule}}",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
       "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",
@@ -4431,19 +4512,34 @@
       "deductionFallback": "Kredietaftrekking",
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
       "emptyTitle": "Geen kredietgeskiedenis nie",
+      "expiredGrant": "Verval: {{description}}",
       "googlePlayReceipt": "Kwitansie van Google Play",
       "kind": {
         "adjustment": "Aanpassing",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Aftrekking",
         "grant": "Kredniettoekenning",
+        "promotionalCredits": "Promosiekrediete",
+        "welcomeCredits": "Welkomkrediete",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Administrateur-krediettoekenning",
+        "contributorChampion": "Bydraer-kampioenkrediet",
+        "feedback": "Terugvoerkrediet",
+        "influencer": "Influënserkrediet",
+        "ossMonthlyReset": "Herstel van oopbronborgskap",
+        "ossSponsorship": "Oopbronborgskapkrediet",
+        "pullRequest": "Trekversoekkrediet",
+        "usageIssue": "Gebruiksprobleemkrediet",
+        "vibeDay": "Vibe-dagkrediet"
       },
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
       "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
-      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys."
+      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys.",
+      "voidedGrant": "Nietig gemaak: {{description}}"
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
@@ -4692,6 +4788,8 @@
     "connectedTo": "Gekoppel aan {{account}}",
     "disconnected": "{{provider}} ontkoppel",
     "disconnectFailed": "Kon nie {{provider}} ontkoppel nie",
+    "disconnectRetry": "Slack kon nie die ontkoppeling bevestig nie. Probeer weer.",
+    "disconnectNeedsSupport": "Kilo kon nie die toegang lees wat vir hierdie koppeling gestoor is nie. Kontak ondersteuning om die ontkoppeling te voltooi.",
     "couldNotLoad": "Kon nie integrasies laai nie",
     "permissionDenied": "Jy het nie toestemming om hierdie integrasies te bestuur nie.",
     "managedByOwner": "Vra 'n eienaar van die organisasie om 'n koppeling te verander wat jy nie kan verander nie.",
@@ -4858,12 +4956,15 @@
     "inputDescription": "Skandeer elke invoer met Enkrypt AI, insluitend gereedskapresultate. Wanneer Enkrypt nie beskikbaar is nie, word versoeke ongeskandeer gestuur in plaas daarvan om verwerp te word.",
     "outputTitle": "Veiligheidsreëls vir uitvoer",
     "outputDescription": "Skandeer antwoorde met Enkrypt AI voordat lede dit ontvang. Af tensy jy dit aanskakel.",
+    "outputUnavailable": "Kilo het nie uitvoerskandering vir hierdie organisasie geaktiveer nie, so antwoorde word nie nagegaan nie en daar is niks om hier te stel nie. Kontak {{supportEmail}} om dit aan te vra.",
     "detectorsHint": "Blokkeer verwerp 'n gevlagde versoek. Slegs aanteken hou rekord daarvan sonder om die versoek te vertraag.",
     "detectorsHintOutput": "Blokkeer laat 'n gevlagde antwoord misluk. Slegs aanteken hou rekord daarvan sonder om die antwoord te vertraag.",
     "choiceLog": "Slegs aanteken",
     "applyTo": "Pas toe op",
     "applyToAllMembers": "Alle lede",
     "applyKiloDefault": "Pas Kilo-verstek toe",
+    "applyKiloDefaultEnglishNote": "Kilo se verstekbeleidsteks is in Engels, want die Kilo Gateway pas dit presies toe soos dit geskryf is.",
+    "applyKiloDefaultReplaceMessage": "Kilo se verstekbeleid is in Engels geskryf en vervang wat jy by Beleidsoortreding gestel het. Die teks wat jy in die beleidsteks-veld ingevul het, kan nie herwin word nie.",
     "invalidSavedTitle": "Gestoorde instellings vir invoerdetektors kan nie gelees word nie",
     "invalidSavedBody": "Versoeke word geblokkeer totdat die invoerdetektors weer gestoor word. Die detektors hieronder begin by Kilo-verstek.",
     "invalidSavedOutputTitle": "Gestoorde instellings vir uitvoerdetektors kan nie gelees word nie",
@@ -4999,6 +5100,7 @@
     "providersNeedCatalog": "Verskafferskakelaars bly leesalleen totdat die volledige modelkatalogus gelaai het. Tik hierbo op Probeer weer om hulle te wysig.",
     "providersEmpty": "Geen verskaffers pas by hierdie soektog nie.",
     "providersNone": "Geen verskaffers is vir hierdie organisasie beskikbaar nie.",
+    "providersUnavailable": "Die verskafferslys kon nie laai nie.",
     "allowAllShown": "Laat almal wat gewys word toe",
     "denyAllShown": "Weier almal wat gewys word",
     "gatewaysDescription": "Kilo roeteer modelversoeke deur Vercel AI Gateway of OpenRouter. 'n Afgeskakelde gateway laat daardie versoeke misluk.",
@@ -5017,6 +5119,20 @@
       "eu": "Europese Unie",
       "au": "Australië",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Soek voorkeure",
+    "noMatches": "Geen ooreenstemmende voorkeure",
+    "emptyDescription": "Probeer ’n ander voorkeurnaam of sleutelwoord.",
+    "resultsStatus": "Voorkeure gevind: {{resultCount}}",
+    "keywords": {
+      "signOut": "afmeld|meld af",
+      "appearance": "tema|kleurskema",
+      "appUnlock": "biometrie|gesigherkenning|vingerafdruk",
+      "language": "taal|vertaling",
+      "notifications": "waarskuwings|stootkennisgewings",
+      "privacy": "ontleding|nasporing"
     }
   }
 }

@@ -21,6 +21,22 @@ import {
 } from '@/lib/organization/guardrails-draft';
 
 /**
+ * The output guardrail's place when the organization cannot configure it. The
+ * title stays so the reader sees which guardrail the sentence is about and does
+ * not go looking for it elsewhere; the description carries the reason and what
+ * to do, and there is no switch because nothing here can be turned on yet.
+ */
+export function OutputGuardrailsUnavailableSection() {
+  const { t } = useTranslation();
+  return (
+    <SettingsSection
+      title={t('organizationGuardrails.outputTitle')}
+      description={t('organizationGuardrails.outputUnavailable')}
+    />
+  );
+}
+
+/**
  * The output guardrail: what Kilo scans in a model's response before a member
  * receives it. Each detector carries its own editor, so the section maps the
  * detector ids to the fields they add.

@@ -4,6 +4,7 @@ import {
   type WorkspaceSnapshotIdentity,
 } from '../sandbox/workspace-snapshot.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -570,12 +571,17 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    /** The platform-added sandbox egress proof, when the request carried one. */
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
   /**
    * Asks the Sandbox DO to serve the handle on behalf of a surviving member of
    * the scope when this Session DO cannot resolve it locally.
    */
-  resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution>;
+  resolveScopeHandle(input: {
+    handle: string;
+    originProof?: string;
+  }): Promise<ScopeHandleResolution>;
   /** The locator a wiped issuer uses to keep resolving through a survivor. */
   getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
     scopeId: string;
@@ -1531,7 +1537,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * proxy endpoint. The handle is minted and bound by the Sandbox DO when it
    * sends `session.prepare` on a connected socket (R1).
    */
-  async resolveRuntimeCredentialProxyGrant(handle: string): Promise<{
+  async resolveRuntimeCredentialProxyGrant(
+    handle: string,
+    originProof?: string
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1571,6 +1580,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               kiloSessionId,
               directory,
               handle,
+              originProof,
             },
             correlation: { sessionId: metadata.identity.sessionId, kiloSessionId, sandboxId },
           });
@@ -1581,13 +1591,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       });
     } catch (error) {
       const fenceOutcome = classifyRuntimeProxyFenceError(error);
-      // A stale accepted handle is a 401 denial; never serve the scope view or
-      // fall back. A fence transport failure rethrows the retryable 503.
+      // A stale accepted handle denies. A fence transport failure, and every
+      // other outcome, rethrows so the facade answers its retryable 503.
       if (fenceOutcome === 'deny') return null;
       if (fenceOutcome === 'retry') throw error;
-      // A revoked/expired authorization threw. Fall through to scope resolution
-      // so a surviving member can still serve; if none can, the original outcome
-      // (a 503) is preserved below.
+      // A revoked or expired local runtime authorization is the one outcome
+      // that scope resolution serves, through a surviving member.
       localError = error;
     }
     if (local)
@@ -1598,7 +1607,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (localError !== null) throw localError;
       return null;
     }
-    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle);
+    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle, originProof);
     if (fromScope) return fromScope;
     if (localError !== null) throw localError;
     return null;
@@ -1618,7 +1627,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * any failure to reach a decision within the total bound throws so the facade
    * returns its existing retryable 503 `Credential unavailable`.
    */
-  private async resolveRuntimeCredentialProxyGrantFromScope(handle: string): Promise<{
+  private async resolveRuntimeCredentialProxyGrantFromScope(
+    handle: string,
+    originProof: string | undefined
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1631,7 +1643,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       outcome = await withTimeout(
         withDORetry(
           () => this.scopeResolutionPeer() ?? peer,
-          current => current.resolveScopeHandle({ handle }),
+          current => current.resolveScopeHandle({ handle, originProof }),
           'resolveScopeHandle'
         ),
         this.sessionTimers().scopeResolutionMs,
@@ -1823,6 +1835,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameHostedGitHubRepositories(
+        existing.hostedGitHubRepositories,
+        metadata.hostedGitHubRepositories
+      ) &&
+      (existing.hostedGitHubRepositories === undefined ||
+        existing.workspace?.generatedBranchName === metadata.workspace?.generatedBranchName) &&
       sameSandboxProviderBinding(
         getSandboxProviderBinding(existing),
         getSandboxProviderBinding(metadata)

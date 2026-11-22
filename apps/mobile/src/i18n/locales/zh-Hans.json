@@ -185,7 +185,31 @@
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
     "privateRepositoryA11y": "{{name}}，私有仓库",
     "legalDocumentEnglishOnly": "本文件仅提供英文版本。",
-    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。"
+    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。",
+    "organizationTrialEndedBillingAtKiloAi": "组织的试用期已结束，且没有生效的套餐。您可以在 kilo.ai 更新账单信息，然后重试。",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "项目符号",
+        "nestedBulletPoint": "嵌套项目符号",
+        "orderedItem": "列表项 {n}",
+        "nestedOrderedItem": "嵌套列表项 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "嵌套引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数学：{latex}"
+      },
+      "rotor": {
+        "headings": "标题",
+        "links": "链接",
+        "images": "图片"
+      }
+    }
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -279,9 +303,13 @@
     "credits": "额度",
     "failedToLoadBalance": "加载余额失败。点击重试。",
     "balanceLoadFailed": "加载余额失败",
+    "balanceUnreachable": "无法连接到服务器。请重试。",
+    "balanceAccessDenied": "你没有查看此余额的权限。",
+    "balanceUnavailable": "无法加载余额。",
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
+    "availableToSpendInOrganization": "可用于此组织内支出",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
@@ -423,6 +451,17 @@
       "location": "Vertex 位置",
       "clientEmail": "服务账号邮箱",
       "privateKey": "服务账号私钥",
+      "privateKeyBlockRequired": "请粘贴完整密钥块，从 BEGIN 行到 END 行。",
+      "privateKeyEncrypted": "此密钥块受口令保护。请粘贴不含口令的服务账号密钥。",
+      "names": {
+        "codestral": "旧版仅 Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（使用 ChatGPT 登录）",
+        "xiaomi": "Xiaomi（按量付费）",
+        "zai": "Z.ai（按量付费）",
+        "bedrockByok": "Amazon Bedrock（直连）",
+        "vertexByok": "Google Vertex AI（直连）"
+      },
       "modelMappings": "模型映射",
       "modelMappingsDescription": "将网关模型映射到自定义部署名称。",
       "mappingTitle": "映射 {{number}}",
@@ -502,6 +541,14 @@
       "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
       "viewReceipt": "查看回执"
     },
+    "reportReceipts": {
+      "title": "举报记录",
+      "rowSubtitle": "你提交的举报及其处理结果",
+      "emptyTitle": "暂无举报",
+      "emptyDescription": "你从评论或 AI 回复中提交的举报将显示在这里。",
+      "couldNotLoad": "无法加载你的举报",
+      "capped": "仅显示你最近的举报。"
+    },
     "changelog": "更新内容",
     "changelogVersionPending": "{{version}} 版本的更新说明将随下次应用更新提供。",
     "changelogGroupNew": "新增",
@@ -509,7 +556,10 @@
     "changelogFixesPolish": "全应用范围的修复与改进。",
     "changelogAreas": {
       "signIn": "登录",
-      "profileOrganizations": "个人资料与组织"
+      "profileOrganizations": "个人资料与组织",
+      "chat": "聊天",
+      "notifications": "通知",
+      "integrations": "集成"
     }
   },
   "preferences": {
@@ -708,7 +758,7 @@
       "managedOnWebRepositories": "请在电脑上通过网页版为 {{organization}} 选择仓库。",
       "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
       "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
-      "descriptionOverview": "为 {{organization}} 创建工作区访问令牌，然后在下一个页面中粘贴。",
+      "descriptionOverview": "创建工作区访问令牌，然后在下一个页面中粘贴。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌",
       "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
@@ -770,7 +820,7 @@
       "gateHidden": "已隐藏",
       "gateNone": "无",
       "noFindings": "未发现问题",
-      "findingsUnavailable": "由于本次审查失败，结果不可用。",
+      "findingsUnavailable": "结果不可用。",
       "findingsInProgress": "本次审查仍在进行中，完成后问题将显示在这里。",
       "findingsEndedWithoutResults": "本次审查提前结束，未产生任何问题。",
       "serviceUnavailable": "无法连接到代码审查服务。请在服务可用时重试审查。",
@@ -1950,7 +2000,7 @@
       "searchPlaceholder": "搜索仓库",
       "noMatches": "未找到匹配项",
       "noRepositories": "暂无可用仓库",
-      "noRepositoriesDescription": "你的账户尚未连接任何仓库。",
+      "noRepositoriesDescription": "要加载仓库，请连接 GitHub 或 GitLab。",
       "loading": "正在加载……",
       "accessibility": "仓库：{{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3398,7 +3448,7 @@
       "manageOnWeb": "网页版账单设置",
       "changePlan": "更改套餐",
       "buySeats": "购买席位",
-      "managedOnWeb": "套餐、席位和自动充值在网页版中管理。",
+      "managedOnWeb": "套餐、席位和自动充值在 kilo.ai 中管理。",
       "setupAutoTopUp": "设置自动充值",
       "manageAutoTopUp": "管理自动充值",
       "opensOnWeb": "在网页中打开"
@@ -3592,6 +3642,7 @@
       "identifierLabel": "标识符",
       "identifierRequired": "请输入标识符。",
       "identifierTaken": "另一个模式已使用此标识符。",
+      "identifierTooLong": "标识符请保持在 {{max}} 个字符以内。",
       "nameLabel": "模式名称",
       "nameRequired": "请输入模式名称。",
       "notFound": "此模式已不存在。",
@@ -3678,7 +3729,7 @@
     "emailDeliveryFailed": "暂时无法发送邮件。请稍后重试。",
     "admissionRequired": "无法验证你的设备。请选择“$t(login.moreSignInOptions)”，在其他设备或网页端登录。",
     "default": "出了点问题。请重试。",
-    "retryableAdmission": "无法验证此设备。请检查网络连接后重试。",
+    "retryableAdmission": "无法验证此设备。请重试。",
     "startSignInFailed": "无法发起登录。请重试。",
     "couldNotOpenBrowser": "无法打开浏览器。请重试。",
     "signInTimedOut": "登录超时。请重试。",
@@ -3750,6 +3801,34 @@
     "nextScheduled": "下次计划",
     "answerNeeded": "等待回答",
     "waitingToRetry": "等待重试",
+    "countNoun": {
+      "needsInput_one": "等待输入",
+      "needsInput_other": "等待输入",
+      "running_one": "处理中",
+      "running_other": "处理中",
+      "scheduled_one": "已计划",
+      "scheduled_other": "已计划",
+      "idle_one": "空闲",
+      "idle_other": "空闲"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 等待输入",
+      "needsInput_other": "{{displayCount}} 等待输入",
+      "running_one": "{{displayCount}} 处理中",
+      "running_other": "{{displayCount}} 处理中",
+      "scheduled_one": "{{displayCount}} 已计划",
+      "scheduled_other": "{{displayCount}} 已计划",
+      "idle_one": "{{displayCount}} 空闲",
+      "idle_other": "{{displayCount}} 空闲"
+    },
+    "footer": {
+      "checked": "上次确认 {{time}}",
+      "lastKnown": "上次已知状态 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "下次运行 {{time}}",
+      "wasDue": "原定 {{time}}"
+    },
     "step": {
       "editing": "编辑中",
       "reading": "读取中",
@@ -3995,7 +4074,8 @@
         "space": "没有足够的可用存储空间来存放此模型。请释放空间后重试。",
         "network": "下载未完成。请检查你的网络连接后重试。",
         "invalidFile": "下载的文件不是此应用可以运行的模型，因此已被移除。",
-        "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。"
+        "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。",
+        "writeFailed": "此设备无法保存该模型。请重试下载。"
       }
     },
     "catalog": {
@@ -4173,7 +4253,7 @@
     "personalDefaultDescription": "当没有存储库具有固定配置文件时自动加载。",
     "organizationDefaultDescription": "为没有个人默认值的会员自动加载。",
     "setAsDefault": "设为默认",
-    "saveFailed": "无法保存配置文件",
+    "saveFailed": "无法保存配置文件。请重试。",
     "organizationRoleRequired": "只有组织所有者和管理员可以更改组织配置文件。",
     "deleteTitle": "删除配置文件",
     "deleteMessage": "这将永久删除配置文件及其设置。此操作无法撤消。",
@@ -4322,6 +4402,7 @@
       "promptPlaceholder": "你是一个…",
       "tools": "工具",
       "wholeToolRule": "此智能体会同时对每个工具应用一条规则：{{rule}}。这些开关为只读状态。",
+      "toolRule": "已存储的规则：{{rule}}",
       "visibility": "可见性",
       "visibilityPrimary": "主代理 — 显示在选择器中",
       "visibilitySubagent": "子代理 — 仅可由其他代理调用",
@@ -4431,19 +4512,34 @@
       "deductionFallback": "积分扣除",
       "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
       "emptyTitle": "暂无积分记录",
+      "expiredGrant": "已过期：{{description}}",
       "googlePlayReceipt": "收据位于 Google Play",
       "kind": {
         "adjustment": "调整",
         "balanceNeutral": "余额不变",
         "deduction": "扣除",
         "grant": "赠送积分",
+        "promotionalCredits": "促销积分",
+        "welcomeCredits": "欢迎积分",
         "purchase": "购买"
+      },
+      "program": {
+        "adminBulkGrant": "管理员发放的积分",
+        "contributorChampion": "贡献者冠军积分",
+        "feedback": "反馈积分",
+        "influencer": "网红积分",
+        "ossMonthlyReset": "开源赞助重置",
+        "ossSponsorship": "开源赞助积分",
+        "pullRequest": "拉取请求积分",
+        "usageIssue": "用量问题积分",
+        "vibeDay": "Vibe Day 积分"
       },
       "purchaseFallback": "积分购买",
       "receipt": "收据",
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
       "receiptUnavailable": "此购买暂无可用收据。",
-      "retentionLimit": "仅显示最近的积分记录。"
+      "retentionLimit": "仅显示最近的积分记录。",
+      "voidedGrant": "已作废：{{description}}"
     },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
@@ -4692,6 +4788,8 @@
     "connectedTo": "已连接到 {{account}}",
     "disconnected": "已断开 {{provider}} 的连接",
     "disconnectFailed": "无法断开 {{provider}} 的连接",
+    "disconnectRetry": "Slack 无法确认已断开连接。请重试。",
+    "disconnectNeedsSupport": "Kilo 无法读取为此连接保存的 Slack 访问权限。请联系技术支持以完成断开连接。",
     "couldNotLoad": "无法加载集成",
     "permissionDenied": "你没有管理这些集成的权限。",
     "managedByOwner": "请联系组织所有者更改你无法更改的连接。",
@@ -4858,12 +4956,15 @@
     "inputDescription": "使用 Enkrypt AI 扫描每个输入，包括工具结果。当 Enkrypt 不可用时，请求不会被拒绝，而是在未经扫描的情况下发送。",
     "outputTitle": "输出护栏",
     "outputDescription": "在成员收到响应之前，使用 Enkrypt AI 扫描响应。除非你将其开启，否则处于关闭状态。",
+    "outputUnavailable": "Kilo 尚未为这个组织启用输出扫描，因此响应不会被检查，这里也没有可设置的内容。如需申请启用，请联系 {{supportEmail}}。",
     "detectorsHint": "阻止会拒绝被标记的请求。仅记录会将其记录下来，但不会延迟请求。",
     "detectorsHintOutput": "阻止会让被标记的响应失败。仅记录会将其记录下来，但不会延迟响应。",
     "choiceLog": "仅记录",
     "applyTo": "应用于",
     "applyToAllMembers": "所有成员",
     "applyKiloDefault": "应用 Kilo 默认设置",
+    "applyKiloDefaultEnglishNote": "Kilo 的默认策略文本是英文，因为 Kilo Gateway 会完全按原文应用。",
+    "applyKiloDefaultReplaceMessage": "Kilo 的默认策略以英文编写，并替换你在违反策略中设置的内容。你在策略文本字段中输入的文本无法恢复。",
     "invalidSavedTitle": "无法读取已保存的输入检测器设置",
     "invalidSavedBody": "在重新保存输入检测器之前，请求会被阻止。下面的检测器将从 Kilo 默认设置开始。",
     "invalidSavedOutputTitle": "无法读取已保存的输出检测器设置",
@@ -4999,6 +5100,7 @@
     "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
     "providersEmpty": "没有匹配此搜索的提供商。",
     "providersNone": "此组织没有可用的提供商。",
+    "providersUnavailable": "无法加载提供商列表。",
     "allowAllShown": "允许所有显示的项",
     "denyAllShown": "拒绝所有显示的项",
     "gatewaysDescription": "Kilo 通过 Vercel AI Gateway 或 OpenRouter 路由模型请求。已禁用的网关会使这些请求失败。",
@@ -5017,6 +5119,20 @@
       "eu": "欧盟",
       "au": "澳大利亚",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "搜索偏好设置",
+    "noMatches": "未找到匹配的偏好设置",
+    "emptyDescription": "请尝试其他设置名称或关键词。",
+    "resultsStatus": "已找到{{resultCount}}项偏好设置",
+    "keywords": {
+      "signOut": "退出登录|登出",
+      "appearance": "主题|配色|外观",
+      "appUnlock": "生物识别|人脸|指纹",
+      "language": "语言|翻译",
+      "notifications": "提醒|推送|通知",
+      "privacy": "数据分析|跟踪|隐私"
     }
   }
 }

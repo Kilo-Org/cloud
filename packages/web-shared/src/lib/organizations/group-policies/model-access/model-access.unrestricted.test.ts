@@ -50,8 +50,7 @@ function context(
       anthropic_user_profile_id: null,
     },
     defaultPolicies: [],
-    groupIds: [],
-    groupPolicies: [],
+    groups: [],
     policyRevision: 1,
     ...overrides,
   };

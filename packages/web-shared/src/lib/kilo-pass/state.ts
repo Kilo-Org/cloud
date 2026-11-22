@@ -36,18 +36,8 @@ export type KiloPassSubscriptionState = {
   resumesAt: string | null;
 };
 
-type KiloPassSubscriptionRowForState = {
-  subscriptionId: string;
-  stripeSubscriptionId: string | null;
-  paymentProvider: KiloPassPaymentProvider;
-  providerSubscriptionId: string | null;
-  tier: KiloPassTier;
-  cadence: KiloPassCadence;
-  status: StripeSubscriptionStatus;
-  cancelAtPeriodEnd: boolean;
-  currentStreakMonths: number;
-  nextYearlyIssueAt: string | null;
-  startedAt: string | null;
+/** The columns `getKiloPassStateForUser` reads, keyed to the state they project into. */
+type KiloPassSubscriptionRowForState = Omit<KiloPassSubscriptionState, 'endedAt' | 'resumesAt'> & {
   endedAt: string | null;
   createdAt: string;
 };
@@ -56,7 +46,7 @@ function toKiloPassSubscriptionState(
   selected: KiloPassSubscriptionRowForState,
   overrides: Pick<KiloPassSubscriptionState, 'status' | 'cancelAtPeriodEnd' | 'resumesAt'> & {
     /** A date a caller derives instead of the stored one, such as a store expiry. */
-    endedAt?: string | null;
+    endedAt?: string;
   }
 ): KiloPassSubscriptionState {
   return {
@@ -149,7 +139,7 @@ export async function getKiloPassStateForUser(
         cancelAtPeriodEnd: false,
         // A store pass ends when its last recorded purchase expires, so that
         // expiry is the date the pass ended.
-        endedAt: normalizeTimestampToIso(latestStorePurchase?.expires_at ?? null),
+        endedAt: normalizeTimestampToIso(latestStorePurchase?.expires_at ?? null) ?? undefined,
         resumesAt: null,
       });
     }

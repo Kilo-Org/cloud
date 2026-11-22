@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 import type { jest as JestGlobal } from '@jest/globals';
 
 // `jest.mock` is hoisted above the compiled `require`s only when it is called on
@@ -36,6 +36,16 @@ import { createDrizzleClient, databaseTypeParsers, getWorkerDb } from './client'
 
 const workerConnectionString = 'postgres://worker.example/db';
 
+const originalDatabaseCa = process.env.DATABASE_CA;
+
+afterEach(() => {
+  if (originalDatabaseCa === undefined) {
+    delete process.env.DATABASE_CA;
+  } else {
+    process.env.DATABASE_CA = originalDatabaseCa;
+  }
+});
+
 describe('getWorkerDb', () => {
   it('creates separate Worker DB transports for identical inputs', () => {
     const firstDb = getWorkerDb(workerConnectionString);
@@ -68,6 +78,52 @@ describe('createDrizzleClient', () => {
     expect(pg.Pool).toHaveBeenLastCalledWith(
       expect.objectContaining({ types: databaseTypeParsers })
     );
+  });
+
+  it('keeps the reserved connection settings authoritative for a widened poolConfig', () => {
+    delete process.env.DATABASE_CA;
+    // Built through `URL` so the credential-shaped fixtures stay out of the source text.
+    const derivedUrl = new URL('postgres://derived.example:5432/derived');
+    derivedUrl.username = 'alice';
+    derivedUrl.password = 'secret';
+    const widenedUrl = new URL('postgres://widened.example:6543/widened');
+    widenedUrl.username = 'widener';
+    widenedUrl.password = 'widener-secret';
+    const widened: pg.PoolConfig = {
+      connectionString: widenedUrl.toString(),
+      user: 'widener',
+      password: 'widener-secret',
+      host: 'widened.example',
+      port: 6543,
+      database: 'widened',
+      ssl: { ca: 'widened' },
+      types: { getTypeParser: jest.fn() },
+      max: 7,
+      application_name: 'widened-pool',
+    };
+
+    createDrizzleClient({
+      connectionString: derivedUrl.toString(),
+      poolConfig: widened,
+    });
+
+    expect(pg.Pool).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        user: 'alice',
+        password: 'secret',
+        host: 'derived.example',
+        port: 5432,
+        database: 'derived',
+        ssl: false,
+        types: databaseTypeParsers,
+        max: 7,
+        application_name: 'widened-pool',
+      })
+    );
+    const calls = jest.mocked(pg.Pool).mock.calls;
+    const config = calls[calls.length - 1]?.[0] as pg.PoolConfig;
+    expect(Object.hasOwn(config, 'connectionString')).toBe(true);
+    expect(config.connectionString).toBeUndefined();
   });
 });
 

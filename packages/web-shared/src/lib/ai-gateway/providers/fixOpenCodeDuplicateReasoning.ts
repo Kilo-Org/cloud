@@ -21,33 +21,28 @@ export function fixOpenCodeDuplicateReasoning(
     const encryptedDataSet = new Set<string>();
     const textSet = new Set<string>();
     const signatureSet = new Set<string>();
+    const isDuplicate = (seen: Set<string>, value: string) => {
+      if (seen.has(value)) {
+        requestMutated = true;
+        return true;
+      }
+      seen.add(value);
+      return false;
+    };
     msgWithReasoning.reasoning_details = msgWithReasoning.reasoning_details.filter(rd => {
       if (rd.type === ReasoningDetailType.Encrypted && rd.data) {
-        if (!encryptedDataSet.has(rd.data)) {
-          encryptedDataSet.add(rd.data);
-          return true;
-        }
-        requestMutated = true;
-        return false;
+        return !isDuplicate(encryptedDataSet, rd.data);
       }
       if (rd.type === ReasoningDetailType.Text) {
         if (isClaudeModel(requestedModel) && !rd.signature) {
           requestMutated = true;
           return false;
         }
-        if (rd.signature) {
-          if (signatureSet.has(rd.signature)) {
-            requestMutated = true;
-            return false;
-          }
-          signatureSet.add(rd.signature);
+        if (rd.signature && isDuplicate(signatureSet, rd.signature)) {
+          return false;
         }
-        if (rd.text) {
-          if (textSet.has(rd.text)) {
-            requestMutated = true;
-            return false;
-          }
-          textSet.add(rd.text);
+        if (rd.text && isDuplicate(textSet, rd.text)) {
+          return false;
         }
         return true;
       }

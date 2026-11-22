@@ -186,7 +186,31 @@
     "privateRepositoryA11y": "{{name}}, repositori privat",
     "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès.",
     "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar.",
-    "viewOnGitHub": "Mostra la PR a GitHub"
+    "organizationTrialEndedBillingAtKiloAi": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació a kilo.ai i tornar-ho a provar.",
+    "viewOnGitHub": "Mostra la PR a GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punt de llista",
+        "nestedBulletPoint": "Punt de llista niuat",
+        "orderedItem": "Element de la llista {n}",
+        "nestedOrderedItem": "Element de la llista niuat {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita niuada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemàtiques: {latex}"
+      },
+      "rotor": {
+        "headings": "Encapçalaments",
+        "links": "Enllaços",
+        "images": "Imatges"
+      }
+    }
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -280,9 +304,13 @@
     "credits": "Crèdits",
     "failedToLoadBalance": "No s'ha pogut carregar el saldo. Toca per tornar-ho a provar.",
     "balanceLoadFailed": "No s'ha pogut carregar el saldo",
+    "balanceUnreachable": "No s'ha pogut contactar amb el servidor. Torna-ho a provar.",
+    "balanceAccessDenied": "No tens permís per veure aquest saldo.",
+    "balanceUnavailable": "No s'ha pogut carregar el saldo.",
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
+    "availableToSpendInOrganization": "Disponible per gastar en aquesta organització",
     "signOutTitle": "Vols tancar la sessió?",
     "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball.",
     "deleteAccountTitle": "Vols eliminar el compte?",
@@ -424,6 +452,17 @@
       "location": "Ubicació de Vertex",
       "clientEmail": "Correu electrònic del compte de servei",
       "privateKey": "Clau privada del compte de servei",
+      "privateKeyBlockRequired": "Enganxa tot el bloc de clau, des de la línia BEGIN fins a la línia END.",
+      "privateKeyEncrypted": "Aquest bloc de clau està protegit amb una frase de contrasenya. Enganxa una clau del compte de servei que no tingui cap frase de contrasenya.",
+      "names": {
+        "codestral": "Només Codestral antic",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Inicia la sessió amb ChatGPT)",
+        "xiaomi": "Xiaomi (pagament per ús)",
+        "zai": "Z.ai (pagament per ús)",
+        "bedrockByok": "Amazon Bedrock (directe)",
+        "vertexByok": "Google Vertex AI (directe)"
+      },
       "modelMappings": "Assignacions de models",
       "modelMappingsDescription": "Envia un model de la passarel·la a un nom de desplegament personalitzat.",
       "mappingTitle": "Assignació {{number}}",
@@ -503,14 +542,25 @@
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
       "viewReceipt": "Mostra el comprovant"
     },
+    "reportReceipts": {
+      "title": "Denúncies",
+      "rowSubtitle": "Les denúncies que has presentat i els seus resultats",
+      "emptyTitle": "Encara no hi ha denúncies",
+      "emptyDescription": "Les denúncies que presentis des d'un comentari o d'una resposta d'IA apareixeran aquí.",
+      "couldNotLoad": "No s'han pogut carregar les teves denúncies",
+      "capped": "Es mostren les teves denúncies més recents."
+    },
     "changelog": "Novetats",
     "changelogVersionPending": "Les notes de la versió {{version}} arribaran amb la propera actualització de l'app.",
     "changelogGroupNew": "Nou",
     "changelogFixesIn": "Correccions i millores a {{areas}}.",
     "changelogFixesPolish": "Correccions i millores a tota l'aplicació.",
     "changelogAreas": {
-      "signIn": "Inici de sessió",
-      "profileOrganizations": "Perfil & organitzacions"
+      "signIn": "inici de sessió",
+      "profileOrganizations": "perfil & organitzacions",
+      "chat": "xat",
+      "notifications": "notificacions",
+      "integrations": "integracions"
     }
   },
   "preferences": {
@@ -1301,7 +1351,7 @@
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",
       "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "No hi ha incidències.",
-      "findingsUnavailable": "Els resultats no estan disponibles perquè aquesta revisió ha fallat.",
+      "findingsUnavailable": "Els resultats no estan disponibles.",
       "findingsInProgress": "Aquesta revisió encara està en curs. Les incidències apareixeran aquí quan finalitzi.",
       "findingsEndedWithoutResults": "Aquesta revisió ha finalitzat abans de produir cap incidència.",
       "serviceUnavailable": "No s'ha pogut connectar amb el servei de revisió de codi. Torna a provar la revisió quan el servei estigui disponible.",
@@ -1432,7 +1482,7 @@
       "managedOnWebRepositories": "Tria els repositoris de {{organization}} al web des d'un ordinador.",
       "description": "Crea un testimoni d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
       "descriptionReconnect": "Crea un testimoni nou d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
-      "descriptionOverview": "Crea un testimoni d'accés a l'espai de treball per a {{organization}} i enganxa'l a la pantalla següent.",
+      "descriptionOverview": "Crea un testimoni d'accés a l'espai de treball i enganxa'l a la pantalla següent.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
       "tokenPlaceholder": "Testimoni d'accés a l'espai de treball",
       "tokenRefused": "Bitbucket no ha acceptat aquest testimoni d'accés a l'espai de treball. Comprova que tingui els permisos indicats a dalt i torna-ho a provar."
@@ -2564,7 +2614,7 @@
       "searchPlaceholder": "Cerca de repositoris",
       "noMatches": "Cap coincidència",
       "noRepositories": "Cap repositori disponible",
-      "noRepositoriesDescription": "No hi ha cap repositori connectat al teu compte.",
+      "noRepositoriesDescription": "Connecta GitHub o GitLab per carregar repositoris.",
       "loading": "Carregant…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3468,7 +3518,7 @@
       "manageOnWeb": "Configuració de la facturació al web",
       "changePlan": "Canvia el pla",
       "buySeats": "Compra llicències",
-      "managedOnWeb": "El pla, les llicències i la recàrrega automàtica es gestionen al web.",
+      "managedOnWeb": "El pla, les llicències i la recàrrega automàtica es gestionen a kilo.ai.",
       "setupAutoTopUp": "Configura la recàrrega automàtica",
       "manageAutoTopUp": "Gestiona la recàrrega automàtica",
       "opensOnWeb": "S'obre al web"
@@ -3650,6 +3700,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Introdueix un identificador.",
       "identifierTaken": "Un altre mode ja utilitza aquest identificador.",
+      "identifierTooLong": "Mantingues l'identificador en {{max}} caràcters o menys.",
       "nameLabel": "Nom del mode",
       "nameRequired": "Introdueix un nom de mode.",
       "notFound": "Aquest mode ja no existeix.",
@@ -3742,7 +3793,7 @@
     "emailDeliveryFailed": "L'enviament de correus electrònics no està disponible temporalment. Torna-ho a provar més tard.",
     "admissionRequired": "No es pot verificar el teu dispositiu. Utilitza «$t(login.moreSignInOptions)» per iniciar la sessió en un altre dispositiu o des del web.",
     "default": "S'ha produït un error. Torna-ho a provar.",
-    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comprova la connexió i torna-ho a provar.",
+    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Torna-ho a provar.",
     "startSignInFailed": "No s'ha pogut iniciar la sessió. Torna-ho a provar.",
     "couldNotOpenBrowser": "No s'ha pogut obrir el navegador. Torna-ho a provar.",
     "signInTimedOut": "S'ha esgotat el temps per iniciar la sessió. Torna-ho a provar.",
@@ -3814,6 +3865,42 @@
     "nextScheduled": "Properes programades",
     "answerNeeded": "Pendent de resposta",
     "waitingToRetry": "Pendent de reintent",
+    "countNoun": {
+      "needsInput_one": "Pendent de resposta",
+      "needsInput_many": "Pendent de resposta",
+      "needsInput_other": "Pendent de resposta",
+      "running_one": "En curs",
+      "running_many": "En curs",
+      "running_other": "En curs",
+      "scheduled_one": "Programada",
+      "scheduled_many": "Programades",
+      "scheduled_other": "Programades",
+      "idle_one": "En espera",
+      "idle_many": "En espera",
+      "idle_other": "En espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Pendent de resposta",
+      "needsInput_many": "{{displayCount}} Pendent de resposta",
+      "needsInput_other": "{{displayCount}} Pendent de resposta",
+      "running_one": "{{displayCount}} En curs",
+      "running_many": "{{displayCount}} En curs",
+      "running_other": "{{displayCount}} En curs",
+      "scheduled_one": "{{displayCount}} Programada",
+      "scheduled_many": "{{displayCount}} Programades",
+      "scheduled_other": "{{displayCount}} Programades",
+      "idle_one": "{{displayCount}} En espera",
+      "idle_many": "{{displayCount}} En espera",
+      "idle_other": "{{displayCount}} En espera"
+    },
+    "footer": {
+      "checked": "Comprovat {{time}}",
+      "lastKnown": "Últim estat conegut · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Propera execució {{time}}",
+      "wasDue": "S’esperava {{time}}"
+    },
     "step": {
       "editing": "Edició",
       "reading": "Lectura",
@@ -4060,7 +4147,8 @@
         "space": "No hi ha prou espai d'emmagatzematge lliure per a aquest model. Allibera espai i torna-ho a provar.",
         "network": "La descàrrega no s'ha acabat. Comprova la connexió i torna-ho a provar.",
         "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat.",
-        "checksum": "El fitxer descarregat no coincideix amb la suma de verificació publicada, així que s'ha eliminat. Torna a provar la descàrrega."
+        "checksum": "El fitxer descarregat no coincideix amb la suma de verificació publicada, així que s'ha eliminat. Torna a provar la descàrrega.",
+        "writeFailed": "Aquest dispositiu no ha pogut desar el model. Torna a provar la descàrrega."
       }
     },
     "catalog": {
@@ -4243,7 +4331,7 @@
     "personalDefaultDescription": "Es carrega automàticament quan cap dipòsit té un perfil fixat.",
     "organizationDefaultDescription": "Es carrega automàticament per als membres que no tenen cap predeterminat personal.",
     "setAsDefault": "Estableix com a predeterminat",
-    "saveFailed": "No s'ha pogut desar el perfil",
+    "saveFailed": "No s'ha pogut desar el perfil. Torna-ho a provar.",
     "organizationRoleRequired": "Només els propietaris i els administradors de l'organització poden canviar els perfils de l'organització.",
     "deleteTitle": "Suprimeix el perfil",
     "deleteMessage": "Això elimina permanentment el perfil i la seva configuració. Això no es pot desfer.",
@@ -4393,6 +4481,7 @@
       "promptPlaceholder": "Ets un…",
       "tools": "Eines",
       "wholeToolRule": "Aquest agent aplica una regla a cada eina alhora: {{rule}}. Aquests interruptors són de només lectura.",
+      "toolRule": "Regla desada: {{rule}}",
       "visibility": "Visibilitat",
       "visibilityPrimary": "Principal — es mostra al selector",
       "visibilitySubagent": "Subagent — només es pot trucar des d'altres",
@@ -4502,19 +4591,34 @@
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
+      "expiredGrant": "Caducat: {{description}}",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
         "adjustment": "Ajust",
         "balanceNeutral": "Sense efecte en el saldo",
         "deduction": "Deducció",
         "grant": "Concessió de crèdits",
+        "promotionalCredits": "Crèdits promocionals",
+        "welcomeCredits": "Crèdits de benvinguda",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessió de crèdits de l'administrador",
+        "contributorChampion": "Crèdit de campió dels col·laboradors",
+        "feedback": "Crèdit per comentaris",
+        "influencer": "Crèdit d'influencer",
+        "ossMonthlyReset": "Renovació mensual del patrocini de codi obert",
+        "ossSponsorship": "Crèdit de patrocini de codi obert",
+        "pullRequest": "Crèdit per PR",
+        "usageIssue": "Crèdit per problema d'ús",
+        "vibeDay": "Crèdit del dia Vibe"
       },
       "purchaseFallback": "Compra de crèdits",
       "receipt": "Rebut",
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
-      "retentionLimit": "Es mostra l'historial de crèdits més recent."
+      "retentionLimit": "Es mostra l'historial de crèdits més recent.",
+      "voidedGrant": "Anul·lat: {{description}}"
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
@@ -4771,6 +4875,8 @@
     "connectedTo": "Connectat a {{account}}",
     "disconnected": "S'ha desconnectat {{provider}}",
     "disconnectFailed": "No s'ha pogut desconnectar {{provider}}",
+    "disconnectRetry": "Slack no ha pogut confirmar la desconnexió. Torna-ho a provar.",
+    "disconnectNeedsSupport": "Kilo no ha pogut llegir l'accés de Slack desat per a aquesta connexió. Contacta amb l'equip de suport per acabar de desconnectar-la.",
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "managedByOwner": "Demana a un propietari de l'organització que canviï una connexió que no pots canviar.",
@@ -4937,12 +5043,15 @@
     "inputDescription": "Analitza cada entrada amb Enkrypt AI, inclosos els resultats de les eines. Quan Enkrypt no està disponible, les sol·licituds s'envien sense analitzar en lloc de ser rebutjades.",
     "outputTitle": "Salvaguardes de sortida",
     "outputDescription": "Analitza les respostes amb Enkrypt AI abans que les rebin els membres. Està desactivat tret que l'activis.",
+    "outputUnavailable": "Kilo no ha activat l'anàlisi de sortida per a aquesta organització, així que les respostes no es comproven i aquí no hi ha res a configurar. Contacta amb {{supportEmail}} per sol·licitar-ho.",
     "detectorsHint": "«Bloqueig» rebutja una sol·licitud marcada. «Només registre» la registra sense endarrerir la sol·licitud.",
     "detectorsHintOutput": "«Bloqueig» fa fallar una resposta marcada. «Només registre» la registra sense endarrerir la resposta.",
     "choiceLog": "Només registre",
     "applyTo": "Aplica a",
     "applyToAllMembers": "Tots els membres",
     "applyKiloDefault": "Aplica el valor per defecte de Kilo",
+    "applyKiloDefaultEnglishNote": "El text de la política predeterminada de Kilo és en anglès, perquè Kilo Gateway l'aplica exactament tal com està escrit.",
+    "applyKiloDefaultReplaceMessage": "La política predeterminada de Kilo està escrita en anglès i substitueix el que has definit a Infracció de la política. El text que has introduït al camp de text de la política no es pot recuperar.",
     "invalidSavedTitle": "No es pot llegir la configuració desada dels detectors d'entrada",
     "invalidSavedBody": "Les sol·licituds es bloquegen fins que es tornin a desar els detectors d'entrada. Els detectors següents parteixen del valor per defecte de Kilo.",
     "invalidSavedOutputTitle": "No es pot llegir la configuració desada dels detectors de sortida",
@@ -5078,6 +5187,7 @@
     "providersNeedCatalog": "Els interruptors dels proveïdors són de només lectura fins que es carregui el catàleg complet de models. Toca Torna-ho a provar a dalt per editar-los.",
     "providersEmpty": "Cap proveïdor coincideix amb aquesta cerca.",
     "providersNone": "No hi ha cap proveïdor disponible per a aquesta organització.",
+    "providersUnavailable": "No s'ha pogut carregar la llista de proveïdors.",
     "allowAllShown": "Permet tots els mostrats",
     "denyAllShown": "Denega tots els mostrats",
     "gatewaysDescription": "Kilo encamina les sol·licituds de models a través de Vercel AI Gateway o OpenRouter. Si una passarel·la està desactivada, aquestes sol·licituds fallen.",
@@ -5096,6 +5206,20 @@
       "eu": "Unió Europea",
       "au": "Austràlia",
       "jp": "Japó"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cerca a les preferències",
+    "noMatches": "No s'ha trobat cap preferència",
+    "emptyDescription": "Prova amb un altre nom de preferència o una altra paraula clau.",
+    "resultsStatus": "Preferències trobades: {{resultCount}}",
+    "keywords": {
+      "signOut": "tancar sessió|sortir",
+      "appearance": "tema|colors",
+      "appUnlock": "biometria|reconeixement facial|empremta digital",
+      "language": "idioma|traducció",
+      "notifications": "avisos|alertes|notificacions",
+      "privacy": "analítica|seguiment"
     }
   }
 }

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Seba ta' sigurtà ġdid ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritiku",
+      "high": "Għoli",
+      "medium": "Medju",
+      "low": "Baxx"
+    },
     "securityFindingSlaWarning": {
       "title": "Twissija tal-SLA"
     },

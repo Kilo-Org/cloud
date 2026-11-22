@@ -972,11 +972,11 @@ function listConjunctionOf(tag) {
  * render from these keys, so each of them becomes one item of the list.
  */
 const CHANGELOG_AREA_KEYS = [
-  'common.chat',
-  'common.notifications',
-  'integrations.title',
   'profile.changelogAreas.signIn',
   'profile.changelogAreas.profileOrganizations',
+  'profile.changelogAreas.chat',
+  'profile.changelogAreas.notifications',
+  'profile.changelogAreas.integrations',
 ];
 
 /**
@@ -1215,17 +1215,27 @@ const QUOTE_PAIRS = [
 const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
+ * One matcher per quote pair, compiled once for the process. The pattern
+ * depends only on the pair, and `String.prototype.matchAll` clones the expression
+ * it is handed, so a shared instance keeps no position between values; building
+ * them per call repeated the same sixteen compiles for every catalog value.
+ */
+const QUOTE_PATTERNS = QUOTE_PAIRS.map(
+  ([open, close]) =>
+    new RegExp(
+      `${escapeRegExp(open)}([^${escapeRegExp(close)}\n]{2,60})${escapeRegExp(close)}`,
+      'gu'
+    )
+);
+
+/**
  * Every quoted run short enough to name a control. A translator who spells a
  * button label instead of naming its key leaves the run here, where the
  * English-label check below can see it.
  */
 function quotedRuns(value) {
   const runs = new Set();
-  for (const [open, close] of QUOTE_PAIRS) {
-    const pattern = new RegExp(
-      `${escapeRegExp(open)}([^${escapeRegExp(close)}\n]{2,60})${escapeRegExp(close)}`,
-      'gu'
-    );
+  for (const pattern of QUOTE_PATTERNS) {
     for (const match of value.matchAll(pattern)) {
       runs.add(match[1].trim());
     }
@@ -1630,13 +1640,29 @@ const SCRIPT_ENTRIES = Object.entries(SCRIPT_PATTERNS);
 /** Languages whose own orthography needs more than one script. */
 const MULTI_SCRIPT_LANGUAGES = { ja: ['Hiragana', 'Katakana', 'Han'] };
 
+/**
+ * The script of each character already resolved. A letter matches the first few
+ * entries, but a space, digit, punctuation mark or placeholder brace matches
+ * none and would pay the whole table on every appearance; the answer depends
+ * only on the character, so it is looked up once. `null` is the "no script
+ * claims it" answer, cached with the rest.
+ */
+const SCRIPT_OF_CHARACTER = new Map();
+
 function scriptOf(char) {
-  for (const [name, pattern] of SCRIPT_ENTRIES) {
+  const known = SCRIPT_OF_CHARACTER.get(char);
+  if (known !== undefined) {
+    return known;
+  }
+  let name = null;
+  for (const [candidate, pattern] of SCRIPT_ENTRIES) {
     if (pattern.test(char)) {
-      return name;
+      name = candidate;
+      break;
     }
   }
-  return null;
+  SCRIPT_OF_CHARACTER.set(char, name);
+  return name;
 }
 
 /** Every script in `values`, counted, so the dominant one can be picked. */
@@ -1685,6 +1711,9 @@ function pushBaseKey(key) {
  */
 const COUNT_PLACEHOLDERS = new Set(['count', 'displayCount', 'itemCount', 'steps']);
 
+/** Placeholder sets already built, per English catalog and family base. */
+const FAMILY_PLACEHOLDERS = new WeakMap();
+
 /**
  * Every `{{token}}` an English plural family uses, across the base key and all
  * of its categories. A language may need one of those tokens in a category
@@ -1694,8 +1723,22 @@ const COUNT_PLACEHOLDERS = new Set(['count', 'displayCount', 'itemCount', 'steps
  * singular form for 21, 101 and the like, so their `_one` value has to
  * interpolate the count. A category may therefore add a token its English
  * family already uses; it may never drop one English requires in that category.
+ *
+ * The set depends only on the English map and the base, so it is built once per
+ * catalog and base and read afterwards: the locale loop asks for the same few
+ * bases once per added plural category and once per placeholder mismatch.
+ * Callers treat a returned set as read-only.
  */
 function familyPlaceholders(english, base) {
+  let families = FAMILY_PLACEHOLDERS.get(english);
+  if (families === undefined) {
+    families = new Map();
+    FAMILY_PLACEHOLDERS.set(english, families);
+  }
+  const known = families.get(base);
+  if (known !== undefined) {
+    return known;
+  }
   const tokens = new Set();
   for (const [key, value] of english) {
     if (key !== base && pluralBaseKey(key) !== base) {
@@ -1705,6 +1748,7 @@ function familyPlaceholders(english, base) {
       tokens.add(token);
     }
   }
+  families.set(base, tokens);
   return tokens;
 }
 
@@ -1776,8 +1820,11 @@ function checkPushLocaleRegistry({ root, catalog, present, supported }) {
     return problems;
   }
   const entry = parseSourceEntry(root, root, localeModule, read.text);
-  for (const problem of entry.problems) {
-    problems.push(problem);
+  if (entry.problems.length > 0) {
+    // The tree a failed parse yields is not the one the walk below reads, so
+    // "no push locale registry" would repeat the cause the parse error already
+    // names.
+    return [...problems, ...entry.problems];
   }
 
   const imported = new Map();
@@ -2590,13 +2637,21 @@ function checkMobileEnglishIdentical({ catalogName, english, localeValues }) {
   const problems = [];
   // A mobile key whose value equals English in every non-English locale was
   // never translated. Allowlist the proper nouns and format-only strings that
-  // are legitimately identical; fail everything else. Only a catalog that was
-  // read can say a key was never translated, so an unreadable one is left out.
+  // are legitimately identical. Only a catalog that was read can say a key was
+  // never translated, so an unreadable one is left out.
   if (localeValues.size === 0) {
     return problems;
   }
   for (const [key, englishValue] of english) {
     if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
+      continue;
+    }
+    // A value with prose of its own is judged per locale by
+    // checkMobileLocaleEnglishCopy, which also applies MOBILE_ENGLISH_COPY_EXCEPTIONS.
+    // This rule is the only reporter for a value with no prose to translate:
+    // a placeholder-only string or a capitalised product name that no locale
+    // changed. Reporting a prose value here as well would name one defect twice.
+    if (carriesEnglishProse(englishValue)) {
       continue;
     }
     let allEqual = true;
@@ -2672,46 +2727,6 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
   return problems;
 }
 
-/**
- * The policy fields a scan reads on one catalog descriptor. Every catalog
- * needs a called-key reader and a base-key reader, one that names the key the
- * source calls and one that names the key a consumer appends its part to;
- * `keyPrefixOf` stays null when the catalog builds no key from a template
- * head; the copy-rule list holds the checks its English strings must pass, so
- * it must hold at least one rule and every entry must be one; the destructive
- * collection is a real decision, because an entry that leaves the field out
- * reads as one that chose not to collect. A misconfigured entry is reported as
- * a named problem and the audit skips its scan entirely, instead of dying on
- * the missing part after the run has collected problems of its own — those
- * would never be printed.
- */
-function checkScanPolicy(catalog) {
-  const missing = [];
-  if (typeof catalog.calledKeyOf !== 'function') {
-    missing.push('calledKeyOf');
-  }
-  if (typeof catalog.baseKeyOf !== 'function') {
-    missing.push('baseKeyOf');
-  }
-  if (typeof catalog.keyPrefixOf !== 'function' && catalog.keyPrefixOf !== null) {
-    missing.push('keyPrefixOf');
-  }
-  if (
-    !Array.isArray(catalog.englishCopyRules) ||
-    catalog.englishCopyRules.length === 0 ||
-    !catalog.englishCopyRules.every(rule => typeof rule === 'function')
-  ) {
-    missing.push('englishCopyRules');
-  }
-  if (typeof catalog.collectsDestructiveKeys !== 'boolean') {
-    missing.push('collectsDestructiveKeys');
-  }
-  return missing.map(
-    field =>
-      `${catalog.name}: the catalog descriptor declares no usable ${field}; every entry of catalogsOf declares its scan policy`
-  );
-}
-
 /** Every key the source names exists, and every English key is used. */
 function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies }) {
   const problems = [];
@@ -2723,6 +2738,62 @@ function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFami
   for (const key of english.keys()) {
     if (!source.referenced.has(key) && !source.referenced.has(baseKeyOf(key))) {
       problems.push(`${catalogName}: en.json defines "${key}", which no source file uses`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * The four severity levels, as the two catalogs name them: the key the push
+ * title reads, then the key the app's finding rows read. The push titles and
+ * the app show the same level, so one language must spell it the same way in
+ * both places.
+ */
+const SEVERITY_WORDING_PAIRS = [
+  ['internal.securityFindingSeverity.critical', 'common.critical'],
+  ['internal.securityFindingSeverity.high', 'securityAgent.sla.high'],
+  ['internal.securityFindingSeverity.medium', 'securityAgent.sla.medium'],
+  ['internal.securityFindingSeverity.low', 'securityAgent.sla.low'],
+];
+
+/**
+ * One severity level, one word, in both catalogs.
+ *
+ * The push title renders a level through the push catalog, and the app's
+ * finding rows render the same level through the mobile catalog. A language
+ * that spells a level two ways shows one reader two words for one finding, so
+ * every pair in `SEVERITY_WORDING_PAIRS` must read the same. English is
+ * compared first, then every tag both catalogs carry; a tag only one of them
+ * has holds nothing to compare.
+ *
+ * A pair either side does not define is skipped: a fixture tree carries partial
+ * catalogs, and the missing-key rules already report a real gap. A problem line
+ * names both keys and both values, so the developer can fix either side.
+ */
+function checkSeverityWordingParity(parsedCatalogs) {
+  const problems = [];
+  const mobile = parsedCatalogs.get('mobile');
+  const notifications = parsedCatalogs.get('notifications');
+  if (mobile === undefined || notifications === undefined) {
+    return problems;
+  }
+  const views = [['en', notifications.english, mobile.english]];
+  for (const [tag, pushValues] of notifications.localeValues) {
+    const mobileValues = mobile.localeValues.get(tag);
+    if (mobileValues !== undefined) {
+      views.push([tag, pushValues, mobileValues]);
+    }
+  }
+  for (const [tag, pushValues, mobileValues] of views) {
+    for (const [pushKey, mobileKey] of SEVERITY_WORDING_PAIRS) {
+      const pushWord = pushValues.get(pushKey);
+      const mobileWord = mobileValues.get(mobileKey);
+      if (pushWord === undefined || mobileWord === undefined || pushWord === mobileWord) {
+        continue;
+      }
+      problems.push(
+        `notifications/${tag}: "${pushKey}" reads "${pushWord}" but mobile "${mobileKey}" reads "${mobileWord}"`
+      );
     }
   }
   return problems;
@@ -2787,24 +2858,16 @@ export function checkCatalogs(root = ROOT) {
   const supported = tags === null ? null : new Set(tags);
 
   const catalogs = catalogsOf(root);
-  const unscannable = new Set();
-  for (const catalog of catalogs) {
-    const policyProblems = checkScanPolicy(catalog);
-    problems.push(...policyProblems);
-    if (policyProblems.length > 0) {
-      // A descriptor without its policy cannot be scanned: scanSource would
-      // call the missing reader and die partway through the tree, so the
-      // named problems above would never be printed. Skipping the catalog
-      // keeps the diagnostic what the developer sees.
-      unscannable.add(catalog);
-    }
-  }
-  const scannable = catalogs.filter(catalog => !unscannable.has(catalog));
+  // The parsed English map and locale values of each catalog a scan read, keyed
+  // by catalog name. A rule that compares the two catalogs reads them here; a
+  // catalog whose English parse failed stays out, so the rule cannot compare
+  // against a catalog the audit already reported as unreadable.
+  const parsedCatalogs = new Map();
   // The tag set of each catalog folder serves both the registry checks and the
   // per-catalog checks, so one refused listing reports one line here and skips
   // the rules that need the set.
   const presentByCatalog = new Map();
-  for (const catalog of scannable) {
+  for (const catalog of catalogs) {
     try {
       presentByCatalog.set(catalog, new Set(catalogTags(catalog.dir)));
     } catch (error) {
@@ -2813,14 +2876,14 @@ export function checkCatalogs(root = ROOT) {
       presentByCatalog.set(catalog, null);
     }
   }
-  for (const catalog of scannable) {
+  for (const catalog of catalogs) {
     const present = presentByCatalog.get(catalog);
     if (catalog.localeRegistry && present !== null) {
       problems.push(...checkPushLocaleRegistry({ root, catalog, present, supported }));
     }
   }
 
-  for (const catalog of scannable) {
+  for (const catalog of catalogs) {
     const catalogName = catalog.name;
     const present = presentByCatalog.get(catalog);
     if (present === null) {
@@ -2889,6 +2952,7 @@ export function checkCatalogs(root = ROOT) {
     });
     problems.push(...locales.problems);
     const { localeValues } = locales;
+    parsedCatalogs.set(catalogName, { english, localeValues });
 
     for (const rule of catalog.englishCopyRules) {
       problems.push(...rule({ catalogName, english, localeValues }));
@@ -2898,6 +2962,10 @@ export function checkCatalogs(root = ROOT) {
       ...checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies })
     );
   }
+
+  // Placed after the per-catalog loop, because the rule compares the two
+  // catalogs and needs both of their parsed maps.
+  problems.push(...checkSeverityWordingParity(parsedCatalogs));
 
   return { problems, languages: tags === null ? null : tags.length };
 }
@@ -2916,7 +2984,10 @@ function run() {
       console.error(`... and ${found.length - shown.length} more`);
     }
     console.error(`\ncheck-catalogs: ${found.length} problem(s)`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   console.log(`check-catalogs: ${languages} languages, every catalog matches en.json`);

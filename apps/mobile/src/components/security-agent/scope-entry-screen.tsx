@@ -105,10 +105,10 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const isError = configSettled
     ? !isEnabledResolved && (isGithubStatusUnknown || capability.status === 'error')
     : isConfigUnread || capability.status === 'error' || permission.isError;
-  const isPaused =
-    permission.fetchStatus === 'paused' ||
-    config.fetchStatus === 'paused' ||
-    capability.fetchStatus === 'paused';
+  // The config and GitHub status reads report a pause; the capability read
+  // settles offline through the hook that owns the shared options, so it
+  // never contributes a pause here.
+  const isPaused = permission.fetchStatus === 'paused' || config.fetchStatus === 'paused';
 
   const hasIntegration = permission.data?.hasIntegration ?? false;
   const hasPermissions = permission.data?.hasPermissions ?? false;
@@ -305,12 +305,18 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // A failed or pending mount-time mint keeps this setup screen up; the
       // button resolves (re-mints) the URL on press. An error-only page here
       // made the landing permanently unusable on a transient backend failure.
+      //
+      // The audit action resolves after the capability read, so the band is
+      // reserved at its height from the first frame: the icon cannot grow the
+      // header when it lands.
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
             title={t('common.securityAgent')}
             subtitle={scopeTitle}
             headerRight={auditAction}
+            headerRightWidth={48}
+            reserveHeaderRightSpace
           />
           {!connectUrl && isMinting ? (
             <ScopeEntryBodySkeleton />
@@ -351,6 +357,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
             title={t('common.securityAgent')}
             subtitle={scopeTitle}
             headerRight={auditAction}
+            headerRightWidth={48}
+            reserveHeaderRightSpace
           />
           {!reauthUrl && !connectUrl && isMinting ? (
             <ScopeEntryBodySkeleton />

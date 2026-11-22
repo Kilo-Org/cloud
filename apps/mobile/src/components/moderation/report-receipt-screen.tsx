@@ -23,29 +23,23 @@ import {
   COMPACT_CONTROL_HIT_SLOP_DP,
   STATE_ACTION_CLASS,
 } from '@/lib/a11y/tap-target';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import { APPEAL_KEYS, statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import { i18n } from '@/i18n';
 
 const ACCOUNT_ROUTE = '/(app)/(tabs)/(3_profile)/account' as Href;
 
 const ReceiptParamSchema = z.object({ 'receipt-id': z.uuid() });
-
-const TRIAGE_KEYS = {
-  received: 'profile.reportReceipt.triageReceived',
-  open: 'profile.reportReceipt.triageOpen',
-  actioned: 'profile.reportReceipt.triageActioned',
-  rejected: 'profile.reportReceipt.triageRejected',
-} as const;
-
-const APPEAL_KEYS = {
-  none: 'profile.reportReceipt.appealNone',
-  submitted: 'profile.reportReceipt.appealSubmitted',
-  accepted: 'profile.reportReceipt.appealAccepted',
-  rejected: 'profile.reportReceipt.appealRejected',
-} as const;
 
 const NEXT_STEP_KEYS = {
   received: 'profile.reportReceipt.nextStepReceived',
@@ -79,16 +73,6 @@ function nextStepKey(triageStatus: string, appealStatus: string): string | null 
 }
 
 /**
- * Translates a status the server reports, through the key its dictionary holds.
- * An unrecognised status is shown as the server sent it, so a status added on the
- * server is readable rather than blank.
- */
-function statusLabel(dictionary: Readonly<Record<string, string>>, status: string): string {
-  const key = dictionary[status];
-  return key === undefined ? status : i18n.t(key);
-}
-
-/**
  * The state of one moderation report, and the way to appeal it.
  *
  * The receipt id arrives as a route parameter, so it is validated as a UUID
@@ -115,7 +99,13 @@ export function ReportReceiptScreen() {
   const receipt = useQuery({
     ...trpc.moderation.getReportReceipt.queryOptions({ receiptId: receiptId ?? '' }),
     enabled: receiptId !== null,
+    // A paused first read leaves the skeleton on screen with no retry: the
+    // read neither answers nor fails while the online manager holds the device
+    // offline. It settles instead, and the reconnect refetch comes with it.
+    ...SETTLE_WHILE_OFFLINE,
   });
+  // Reactive: a connectivity commit re-picks the failure's variant.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   const appeal = useMutation(
     trpc.moderation.appealReport.mutationOptions({
@@ -150,13 +140,25 @@ export function ReportReceiptScreen() {
   if (receipt.isError) {
     // A receipt the server does not hold for this reader is not retryable; a
     // failure that could pass keeps its retry.
-    if (receipt.error.data?.code === 'NOT_FOUND') {
+    if (readTrpcErrorField(receipt.error, 'code') === 'NOT_FOUND') {
       return <InvalidRouteState backTo={ACCOUNT_ROUTE} />;
     }
+    // The read settles offline (`SETTLE_WHILE_OFFLINE`), so a failure the
+    // server never answered names the connection, and only a failure that can
+    // pass on a second attempt offers the retry.
+    const kind = classifyReadFailureKind({
+      errors: [receipt.error],
+      isPaused: receipt.fetchStatus === 'paused',
+      connectivity: committedConnectivity,
+    });
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.reportReceipt.title')} />
-        <QueryError onRetry={() => void receipt.refetch()} isRetrying={receipt.isFetching} />
+        <QueryError
+          variant={readFailureKindVariant(kind)}
+          onRetry={readFailureKindIsRetryable(kind) ? () => void receipt.refetch() : undefined}
+          isRetrying={receipt.isFetching}
+        />
       </View>
     );
   }

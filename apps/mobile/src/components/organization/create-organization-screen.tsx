@@ -5,33 +5,106 @@ import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type TextInputProps, View } from 'react-native';
+import { z } from 'zod';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useRouteFocused } from '@/lib/navigation/route-focus';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organization-navigation';
 import { useOrganization } from '@/lib/organization-context';
+import { CREATE_ORGANIZATION_FORM_DRAFT_KEY } from '@/lib/persist/drafts';
+import { type FormDraftState, useFormDraft } from '@/lib/persist/use-form-draft';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
 import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 import { staleOrganizationScopeExit } from './organization-scope-model';
 
-/** One line under the field: a failure the person can act on, or a result. */
-type CreateMessage = { text: string; tone: 'error' | 'notice' };
+/**
+ * One line under the field: a failure the person can act on, or a result. The
+ * attempt counter keys the status line so a retry that fails with the same
+ * words as the failure before it still re-announces — a repeated message is
+ * a new event for a screen-reader user, not a re-render of the old one.
+ */
+type CreateMessage = { text: string; tone: 'error' | 'notice'; attempt: number };
 
 /** The navigation object a screen of a Stack sees. */
 type StackNavigation = {
   getState: () => { index: number; routes: { name: string }[] };
 };
+
+/**
+ * The name this create form holds. A language change that flips the text
+ * direction reloads the JS bundle without running cleanup, so the typed name is
+ * persisted here instead of living only in this component.
+ */
+type CreateOrganizationFormDraft = { name: string };
+
+const createOrganizationFormDraftSchema = z.object({ name: z.string() });
+
+/** Shape guard for a stored draft; a value another build wrote stays stored. */
+function isCreateOrganizationFormDraft(value: unknown): value is CreateOrganizationFormDraft {
+  return createOrganizationFormDraftSchema.safeParse(value).success;
+}
+
+/** The empty field's value props, in the same shape the loaded body writes. */
+const EMPTY_NAME_TEXT_PROPS: Pick<TextInputProps, 'value' | 'defaultValue'> =
+  Platform.OS === 'android' ? { value: '' } : { defaultValue: '' };
+
+type NameFieldProps = Readonly<{
+  /** The create is in flight, or the draft has not loaded: the field takes no edits. */
+  disabled: boolean;
+  textProps: Pick<TextInputProps, 'value' | 'defaultValue'>;
+  onChangeText?: (value: string) => void;
+  onSubmitEditing?: () => void;
+}>;
+
+/**
+ * The one field this screen asks for. The loading chrome and the loaded body
+ * share it, so the field's geometry and its Android-vs-iOS value handling can
+ * never drift apart.
+ */
+function NameField({ disabled, textProps, onChangeText, onSubmitEditing }: NameFieldProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Text className="text-sm font-medium text-foreground">
+        {t('organization.create.nameLabel')}
+      </Text>
+      <Input
+        accessible
+        accessibilityLabel={t('organization.create.nameLabel')}
+        // The primitive owns the single-line box (`min-h-[44px]`,
+        // physical `pl-3 pr-3`, `leading-[normal]`); the call site keeps
+        // its own chrome and text size.
+        className="rounded-md border border-input bg-background text-sm text-foreground"
+        placeholder={t('organization.hub.renamePlaceholder')}
+        maxLength={ORGANIZATION_NAME_MAX_LENGTH}
+        // The body writes the controlled value per keystroke on Android, so the
+        // framework suggestion popup stays off — it crashes against rewritten
+        // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
+        {...textProps}
+        autoFocus={Platform.OS !== 'android' && !disabled}
+        editable={!disabled}
+        onChangeText={onChangeText}
+        onSubmitEditing={onSubmitEditing}
+        returnKeyType="done"
+        accessibilityState={{ disabled }}
+      />
+    </>
+  );
+}
 
 /**
  * Creates an organization with the same defaults the web create flow uses:
@@ -45,6 +118,84 @@ type StackNavigation = {
  */
 export function CreateOrganizationScreen() {
   const { t } = useTranslation();
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const draft = useFormDraft<CreateOrganizationFormDraft>({
+    userId,
+    isIdentityLoading,
+    entityKey: CREATE_ORGANIZATION_FORM_DRAFT_KEY,
+    validate: isCreateOrganizationFormDraft,
+  });
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={t('organization.create.title')} backFallback={PROFILE_TAB_HREF} />
+      {/* A create has no server row to show: the body mounts only once the draft
+          answered, so its field starts with the restored name (an uncontrolled
+          iOS field reads `defaultValue` once). Until then the chrome keeps the
+          loaded geometry with the field disabled and empty. */}
+      {draft.kind === 'ready' ? (
+        <CreateOrganizationReady draft={draft} />
+      ) : (
+        <CreateOrganizationLoading />
+      )}
+    </View>
+  );
+}
+
+/**
+ * The body once the draft answered. Split from the wrapper so the ready branch
+ * is narrowed once here, where both handler props are bound to the draft's own
+ * `save` and `clear`.
+ */
+function CreateOrganizationReady({
+  draft,
+}: Readonly<{ draft: Extract<FormDraftState<CreateOrganizationFormDraft>, { kind: 'ready' }> }>) {
+  // `jsx-handler-names` wants a local binding per handler prop.
+  const saveDraftName = draft.save;
+  const clearDraftName = draft.clear;
+  return (
+    <CreateOrganizationBody
+      initialName={draft.value?.name ?? ''}
+      onDraftChange={saveDraftName}
+      onDraftClear={clearDraftName}
+    />
+  );
+}
+
+/** The create form's chrome while the draft loads: the same rows, nothing typed. */
+function CreateOrganizationLoading() {
+  const { t } = useTranslation();
+  return (
+    <TabScreenScrollView
+      className="flex-1"
+      contentContainerClassName={SCREEN_BODY_CLASS}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text variant="muted">{t('organization.create.description')}</Text>
+      <View className="gap-2">
+        <NameField disabled textProps={EMPTY_NAME_TEXT_PROPS} />
+      </View>
+      <Text variant="caption">{t('organization.create.trialNote')}</Text>
+      <Button className={STATE_ACTION_CLASS} disabled>
+        <Text>{t('organization.create.title')}</Text>
+      </Button>
+    </TabScreenScrollView>
+  );
+}
+
+type CreateOrganizationBodyProps = Readonly<{
+  /** The stored name, or '' when the key holds none. */
+  initialName: string;
+  onDraftChange: (value: CreateOrganizationFormDraft) => void;
+  onDraftClear: () => void;
+}>;
+
+function CreateOrganizationBody({
+  initialName,
+  onDraftChange,
+  onDraftClear,
+}: CreateOrganizationBodyProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const stackSafeRouter = useStackSafeReplace();
@@ -56,9 +207,9 @@ export function CreateOrganizationScreen() {
   // the create is pending and after it fails, and its text input applies the
   // committed props on every one of those commits, so Android alone mirrors the
   // text into state; iOS keeps an uncontrolled field and reads the ref.
-  const nameRef = useRef('');
-  const [text, setText] = useState('');
-  const [canSubmit, setCanSubmit] = useState(false);
+  const nameRef = useRef(initialName);
+  const [text, setText] = useState(initialName);
+  const [canSubmit, setCanSubmit] = useState(() => hasVisibleText(initialName));
   const [message, setMessage] = useState<CreateMessage | null>(null);
   // The submit control stays disabled from the tap until the completion ends,
   // so it never looks actionable while the lock below drops its taps.
@@ -67,6 +218,14 @@ export function CreateOrganizationScreen() {
   // or the list refresh runs must not move the active organization. The
   // completion reads these live values, never the render that started it.
   const aliveRef = useRef(true);
+  // Counts the reported status lines this mount has shown, so the status line's
+  // announcement key (its `key` prop) changes with every report even when the
+  // words are identical.
+  const attemptRef = useRef(0);
+  const report = useCallback((line: string, tone: CreateMessage['tone']) => {
+    setMessage({ text: line, tone, attempt: attemptRef.current });
+    attemptRef.current += 1;
+  }, []);
   const focusedRef = useRef(routeFocused);
   const selectOrganizationRef = useRef(setOrganizationId);
   // A create that already succeeded must not repeat while the list refresh
@@ -87,6 +246,10 @@ export function CreateOrganizationScreen() {
 
   const completeCreate = useCallback(
     async (organizationId: string) => {
+      // The create landed: the stored draft has become the organization's
+      // record, so it is dropped before the list refresh (which can outlast
+      // this screen) and can never seed a later create.
+      onDraftClear();
       try {
         // The membership has to be in the cached list before the selection
         // moves, or the boundary would read the fresh selection as a lost
@@ -105,7 +268,7 @@ export function CreateOrganizationScreen() {
           trpc.organizations.list.queryKey()
         );
         if (memberships?.some(entry => entry.organizationId === organizationId) !== true) {
-          setMessage({ text: t('organization.create.createdNotListed'), tone: 'notice' });
+          report(t('organization.create.createdNotListed'), 'notice');
           return;
         }
         selectOrganizationRef.current(organizationId);
@@ -132,28 +295,35 @@ export function CreateOrganizationScreen() {
         setSettling(false);
       }
     },
-    [navigation, queryClient, router, stackSafeRouter, t, trpc]
+    [navigation, onDraftClear, queryClient, report, router, stackSafeRouter, t, trpc]
   );
 
-  const createOrganization = useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (input: { name: string }) =>
-      trpcClient.organizations.create.mutate({ name: input.name, autoAddCreator: true }),
-    // The refresh that has to land before the selection moves runs after this
-    // callback returns. Awaiting it here would keep the button busy, and the
-    // field disabled, for as long as that refresh takes.
-    onSuccess: ({ organization }) => {
-      void completeCreate(organization.id);
-    },
-    onError: (error: unknown) => {
-      submitLockedRef.current = false;
-      setSettling(false);
-      // A create runs outside any organization, so the reader holds no role in
-      // one: the copy names the owner who can change its plan, and the line
-      // offers no step of its own.
-      setMessage({ text: organizationErrorMessage(error), tone: 'error' });
-    },
-  });
+  const createOrganization = useMutation(
+    trpc.organizations.create.mutationOptions({
+      // Reachability is the create's outcome, not a precondition: the default
+      // `networkMode: 'online'` pauses the mutation while the connectivity
+      // manager reports the device offline, so the request is never sent and
+      // `isPending` never settles — the button keeps its spinner and the field
+      // stays disabled for as long as the outage lasts, with no failure
+      // surface. Attempting the request instead lets it fail through the normal
+      // path: `onError` releases the form and reports the failure.
+      networkMode: 'always',
+      // The refresh that has to land before the selection moves runs after this
+      // callback returns. Awaiting it here would keep the button busy, and the
+      // field disabled, for as long as that refresh takes.
+      onSuccess: ({ organization }) => {
+        void completeCreate(organization.id);
+      },
+      onError: (error: unknown) => {
+        submitLockedRef.current = false;
+        setSettling(false);
+        // A create runs outside any organization, so the reader holds no role
+        // in one: the copy names the owner who can change its plan, and the
+        // line offers no step of its own.
+        report(organizationErrorMessage(error), 'error');
+      },
+    })
+  );
 
   const submit = () => {
     if (createOrganization.isPending || submitLockedRef.current) {
@@ -161,82 +331,71 @@ export function CreateOrganizationScreen() {
     }
     const name = nameRef.current.trim();
     if (!hasVisibleText(name)) {
-      setMessage({ text: t('organization.create.nameRequired'), tone: 'error' });
+      report(t('organization.create.nameRequired'), 'error');
       return;
     }
     setMessage(null);
     submitLockedRef.current = true;
     setSettling(true);
-    createOrganization.mutate({ name });
+    // The server's default for `autoAddCreator` is false, so the caller only
+    // becomes the new organization's owner when the request asks for it.
+    createOrganization.mutate({ name, autoAddCreator: true });
   };
 
   const pending = createOrganization.isPending;
   const textProps: Pick<TextInputProps, 'value' | 'defaultValue'> =
-    Platform.OS === 'android' ? { value: text } : { defaultValue: '' };
+    Platform.OS === 'android' ? { value: text } : { defaultValue: initialName };
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.create.title')} backFallback={PROFILE_TAB_HREF} />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        showsVerticalScrollIndicator={false}
+    <TabScreenScrollView
+      className="flex-1"
+      contentContainerClassName={SCREEN_BODY_CLASS}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text variant="muted">{t('organization.create.description')}</Text>
+      <View className="gap-2">
+        <NameField
+          disabled={pending}
+          textProps={textProps}
+          onChangeText={value => {
+            nameRef.current = value;
+            if (Platform.OS === 'android') {
+              setText(value);
+            }
+            setCanSubmit(hasVisibleText(value));
+            if (message != null) {
+              setMessage(null);
+            }
+            // An empty field is no draft: clearing the entry is what restores
+            // an empty form, and a save of '' would restore a blank name.
+            if (value.length === 0) {
+              onDraftClear();
+            } else {
+              onDraftChange({ name: value });
+            }
+          }}
+          onSubmitEditing={submit}
+        />
+      </View>
+      <Text variant="caption">{t('organization.create.trialNote')}</Text>
+      {message == null ? null : (
+        // Keyed on the attempt counter: TalkBack/VoiceOver announce a repeated
+        // identical failure as a new event.
+        <AccessibleStatus
+          key={message.attempt}
+          message={message.text}
+          tone={message.tone === 'error' ? 'error' : 'status'}
+          className="text-sm"
+        />
+      )}
+      <Button
+        className={STATE_ACTION_CLASS}
+        onPress={submit}
+        disabled={!canSubmit || settling}
+        loading={pending}
       >
-        <Text variant="muted">{t('organization.create.description')}</Text>
-        <View className="gap-2">
-          <Text className="text-sm font-medium text-foreground">
-            {t('organization.create.nameLabel')}
-          </Text>
-          <Input
-            accessible
-            accessibilityLabel={t('organization.create.nameLabel')}
-            // The primitive owns the single-line box (`min-h-[44px]`,
-            // physical `pl-3 pr-3`, `leading-[normal]`); the call site keeps
-            // its own chrome and text size.
-            className="rounded-md border border-input bg-background text-sm text-foreground"
-            placeholder={t('organization.hub.renamePlaceholder')}
-            maxLength={ORGANIZATION_NAME_MAX_LENGTH}
-            // The screen writes the controlled value per keystroke on
-            // Android, so the framework suggestion popup stays off — it
-            // crashes against rewritten text (see
-            // REWRITTEN_INPUT_AUTO_CORRECT).
-            autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
-            {...textProps}
-            autoFocus={Platform.OS !== 'android'}
-            editable={!pending}
-            onChangeText={value => {
-              nameRef.current = value;
-              if (Platform.OS === 'android') {
-                setText(value);
-              }
-              setCanSubmit(hasVisibleText(value));
-              if (message != null) {
-                setMessage(null);
-              }
-            }}
-            onSubmitEditing={submit}
-            returnKeyType="done"
-            accessibilityState={{ disabled: pending }}
-          />
-        </View>
-        <Text variant="caption">{t('organization.create.trialNote')}</Text>
-        {message == null ? null : (
-          <Text
-            className={message.tone === 'error' ? 'text-sm text-destructive' : undefined}
-            variant={message.tone === 'error' ? undefined : 'muted'}
-          >
-            {message.text}
-          </Text>
-        )}
-        <Button
-          className={STATE_ACTION_CLASS}
-          onPress={submit}
-          disabled={!canSubmit || settling}
-          loading={pending}
-        >
-          <Text>{t('organization.create.title')}</Text>
-        </Button>
-      </TabScreenScrollView>
-    </View>
+        <Text>{t('organization.create.title')}</Text>
+      </Button>
+    </TabScreenScrollView>
   );
 }

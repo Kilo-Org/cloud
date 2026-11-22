@@ -1,14 +1,20 @@
 /* eslint-disable max-lines, max-classes-per-file, vitest/max-expects -- the page-global fakes below need several instanceof-identity classes in this one test file, and one contract is several assertions */
 import { describe, expect, it, vi } from 'vitest';
+// eslint-disable-next-line import/no-nodejs-modules -- the snapshot walker runs against a real DOM
+import { JSDOM } from 'jsdom';
 import {
   FIREFOX_PLATFORM_LIMIT,
   FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
   MAX_BROWSER_TOOL_CONSOLE_MESSAGES,
+  MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH,
   MAX_BROWSER_TOOL_NETWORK_REQUESTS,
+  MAX_BROWSER_TOOL_REFS,
   createBrowserToolSession,
   getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
+import { BROWSER_TOOL_DIALOG_OPEN_ERROR } from './browser-tool-dialog';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
+import { STALE_REF_ERROR } from './browser-agent-checks';
 import { TAB_TAKEN_ERROR } from './browser-caller';
 import type {
   BrowserScriptingApi,
@@ -75,6 +81,7 @@ const createDebuggerApi = ({
   emitDetach: (tabId: number, reason?: string) => void;
   emitEvent: (tabId: number, method: string, params?: Record<string, unknown>) => void;
   setDocumentNodeId: (nextDocumentNodeId: number) => void;
+  setFrameTree: (payload: Record<string, unknown>) => void;
   setVisibilityState: (nextVisibilityState: string) => void;
 } => {
   const attachCalls: number[] = [];
@@ -83,6 +90,7 @@ const createDebuggerApi = ({
   const detachListeners: ChromeDebuggerDetachListener[] = [];
   const eventListeners: ChromeDebuggerEventListener[] = [];
   let currentDocumentNodeId = documentNodeId;
+  let frameTree: Record<string, unknown> | undefined = undefined;
   let currentVisibilityState = visibilityState;
 
   const api: ChromeDebuggerApi = {
@@ -130,6 +138,10 @@ const createDebuggerApi = ({
 
       if (method === 'DOM.querySelectorAll') {
         return { nodeIds: selectorMatches };
+      }
+
+      if (method === 'Page.getFrameTree' && frameTree !== undefined) {
+        return frameTree;
       }
 
       if (method === 'Page.getLayoutMetrics') {
@@ -181,6 +193,9 @@ const createDebuggerApi = ({
     },
     setDocumentNodeId: nextDocumentNodeId => {
       currentDocumentNodeId = nextDocumentNodeId;
+    },
+    setFrameTree: payload => {
+      frameTree = payload;
     },
     setVisibilityState: nextVisibilityState => {
       currentVisibilityState = nextVisibilityState;
@@ -306,7 +321,7 @@ const createScriptingApi = (
       readonly args: string[];
       readonly func: (...args: string[]) => InjectionResult;
       readonly target: { readonly tabId: number; readonly documentIds?: string[] };
-      readonly world: 'MAIN';
+      readonly world: 'ISOLATED' | 'MAIN';
     }): Promise<BrowserScriptingInjectionResult[]> => {
       const code = details.args[0] ?? '';
 
@@ -488,6 +503,119 @@ const createExecutingScriptingSession = () => {
       tabId: 7,
       tabsApi: tabsApi.api,
     }),
+  };
+};
+
+type TabUpdatedListener = (
+  tabId: number,
+  changeInfo: { readonly status?: string; readonly url?: string }
+) => void;
+
+const SHOP_ORIGIN = 'https://shop.example.com';
+const PAY_ORIGIN = 'https://pay.example.com';
+
+/**
+ * One tab behind two real documents: the shop page (frame 0) and the pay
+ * frame it embeds (frame 4). MAIN-world code runs in the document its target
+ * frame names; the ISOLATED probe answers the frame tree.
+ */
+const createFramedScriptingSession = () => {
+  const shop = new JSDOM('<body><button>Top</button><iframe></iframe></body>', {
+    url: `${SHOP_ORIGIN}/`,
+  });
+  const pay = new JSDOM('<body><button>Buy</button><input></body>', { url: `${PAY_ORIGIN}/` });
+  const documents = new Map([
+    [0, shop],
+    [4, pay],
+  ]);
+  const frameAnswers = [
+    { frameId: 0, origin: SHOP_ORIGIN, owners: [4], parentFrameId: null },
+    { frameId: 4, origin: PAY_ORIGIN, owners: [], parentFrameId: 0 },
+  ];
+  const isolatedKinds: string[] = [];
+  const mainWorldFrames: (number | undefined)[] = [];
+  const pressedIn = new Set<string>();
+
+  for (const [name, dom] of [
+    ['shop', shop],
+    ['pay', pay],
+  ] as const) {
+    dom.window.document.addEventListener('keydown', () => {
+      pressedIn.add(name);
+    });
+  }
+  const updatedListeners: TabUpdatedListener[] = [];
+  const scriptingApi: BrowserScriptingApi = {
+    executeScript: async details => {
+      if (details.world === 'ISOLATED') {
+        isolatedKinds.push(details.args[0] ?? '');
+
+        return details.args[0] === 'frame'
+          ? frameAnswers.map(({ frameId, ...answer }) => ({
+              frameId,
+              result: JSON.stringify({ ...answer, url: `${answer.origin}/` }),
+            }))
+          : [];
+      }
+
+      const frameId = details.target.frameIds?.[0];
+      const dom = documents.get(frameId ?? 0);
+      const results: unknown[] = [];
+
+      mainWorldFrames.push(frameId);
+
+      if (dom !== undefined) {
+        Object.defineProperty(dom.window.HTMLElement.prototype, 'scrollIntoView', {
+          configurable: true,
+          value: vi.fn(),
+        });
+        await withPageGlobals(
+          {
+            Event: dom.window.Event,
+            HTMLInputElement: dom.window.HTMLInputElement,
+            HTMLSelectElement: dom.window.HTMLSelectElement,
+            HTMLTextAreaElement: dom.window.HTMLTextAreaElement,
+            KeyboardEvent: dom.window.KeyboardEvent,
+            MouseEvent: dom.window.MouseEvent,
+            document: dom.window.document,
+            location: dom.window.location,
+            window: dom.window,
+          },
+          async () => {
+            results.push(await executeWrappedPageCode(details.args[0] ?? ''));
+          }
+        );
+      }
+
+      return [{ documentId: `doc-${String(frameId ?? 0)}`, result: results[0] }];
+    },
+  };
+  const tabsApi: BrowserTabsApi = {
+    ...createTabsApi().api,
+    onUpdated: {
+      addListener: listener => {
+        updatedListeners.push(listener);
+      },
+      removeListener: () => {},
+    },
+  };
+
+  return {
+    emitUpdated: (
+      tabId: number,
+      changeInfo: { readonly status?: string; readonly url?: string }
+    ) => {
+      for (const listener of updatedListeners) {
+        listener(tabId, changeInfo);
+      }
+    },
+    isolatedKinds,
+    mainWorldFrames,
+    pay,
+    // Where a dispatched key landed, by document name: the tab's own document versus the frame's.
+    pressedIn: () => [...pressedIn].toSorted(),
+    session: createBrowserToolSession({ scriptingApi, tabId: 7, tabsApi }),
+    shop,
   };
 };
 
@@ -946,6 +1074,116 @@ describe('browser tool session', () => {
     expect(session.takeDialog()).toBeUndefined();
   });
 
+  it('forgets a frame origin when its frame detaches, keeping the frames that remain', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    // The fake answers this one read: the origins a dialog is judged by come from the frame tree.
+    debuggerApi.setFrameTree({
+      frameTree: {
+        childFrames: [
+          { frame: { id: 'gone', securityOrigin: 'https://gone.example.com', url: 'about:blank' } },
+          { frame: { id: 'kept', securityOrigin: 'https://kept.example.com', url: 'about:blank' } },
+        ],
+        frame: {
+          id: 'main',
+          securityOrigin: 'https://main.example.com',
+          url: 'https://main.example.com/',
+        },
+      },
+    });
+    await session.send('Page.getFrameTree');
+
+    debuggerApi.emitEvent(7, 'Page.frameDetached', { frameId: 'gone', reason: 'remove' });
+
+    // A dialog in the detached frame names no origin any more, while the remaining frame still does.
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      frameId: 'gone',
+      message: 'Gone',
+      type: 'alert',
+    });
+    expect(session.takeDialog()?.origin).toBeUndefined();
+
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      frameId: 'kept',
+      message: 'Kept',
+      type: 'alert',
+    });
+    expect(session.takeDialog()?.origin).toBe('https://kept.example.com');
+  });
+
+  it('bounds the page-written dialog message like every other page text', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      defaultPrompt: 'x'.repeat(10_000),
+      message: 'y'.repeat(10_000),
+      type: 'prompt',
+    });
+    const dialog = session.takeDialog();
+
+    expect(dialog?.message).toBe(`${'y'.repeat(MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH)}...`);
+    expect(dialog?.defaultValue).toBe(`${'x'.repeat(MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH)}...`);
+  });
+
+  it('refuses page commands while a dialog is open, sends its answer, and takes commands again once it closes', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+    const sentBefore = debuggerApi.commands.length;
+
+    await expect(session.send('Runtime.evaluate', { expression: '1' })).rejects.toThrow(
+      BROWSER_TOOL_DIALOG_OPEN_ERROR
+    );
+    await expect(
+      session.send('Input.dispatchMouseEvent', { type: 'mousePressed' })
+    ).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
+    // A refused command never reaches the page, so it cannot wait behind the dialog.
+    expect(debuggerApi.commands).toHaveLength(sentBefore);
+
+    await session.send('Page.handleJavaScriptDialog', { accept: true });
+    expect(debuggerApi.commands.at(-1)).toStrictEqual({
+      method: 'Page.handleJavaScriptDialog',
+      params: { accept: true },
+    });
+
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', { result: true });
+    await expect(session.send('Runtime.evaluate', { expression: '2' })).resolves.toStrictEqual({});
+  });
+
+  it('stops waiting for a page read in flight when the page opens a dialog', async () => {
+    const { debuggerApi, session } = createSession({
+      gate: { command: 'Page.getFrameTree', wait: Promise.withResolvers<void>().promise },
+    });
+
+    await session.attach();
+    const read = session.send('Page.getFrameTree');
+
+    await vi.waitFor(() => {
+      expect(debuggerApi.commands.at(-1)?.method).toBe('Page.getFrameTree');
+    });
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+
+    await expect(read).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
+  });
+
+  it('refuses a page-code eval at once while a dialog is open, instead of waiting it out', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+    const sentBefore = debuggerApi.commands.length;
+
+    // The workflow eval path runs page code through the session; on an open dialog it would sit out its 5 s timeout.
+    await expect(session.evaluateInTab('return 1')).resolves.toStrictEqual({
+      error: BROWSER_TOOL_DIALOG_OPEN_ERROR,
+      ok: false,
+    });
+    expect(debuggerApi.commands).toHaveLength(sentBefore);
+  });
+
   it('resolves a snapshot ref to its backend node id and a selector through the DOM domain', async () => {
     const { debuggerApi, session } = createSession();
 
@@ -1276,7 +1514,7 @@ describe('browser tool session', () => {
 });
 
 const scriptingSnapshotPayload = {
-  lines: ['- button "Go" e1'],
+  lines: ['- button "Go" [ref=e1]'],
   nextRef: 1,
   refs: [{ ref: 'e1', selector: 'button.go' }],
 };
@@ -1286,6 +1524,19 @@ const scriptingSnapshotPayload = {
 const scriptingResultForCode = (code: string): unknown =>
   code.includes('__buildAria') ? scriptingSnapshotPayload : 'ok';
 
+/** A snapshot whose page registered more refs than the cap while its returned text names only e1 and e2. */
+const oversizedSnapshotPayload = {
+  lines: ['- button "One" [ref=e1]', '- button "Two" [ref=e2]'],
+  nextRef: MAX_BROWSER_TOOL_REFS + 1,
+  refs: Array.from({ length: MAX_BROWSER_TOOL_REFS + 1 }, (_slot, index) => ({
+    ref: `e${String(index + 1)}`,
+    selector: `#node-${String(index + 1)}`,
+  })),
+};
+
+const oversizedSnapshotResultForCode = (code: string): unknown =>
+  code.includes('__buildAria') ? oversizedSnapshotPayload : 'ok';
+
 describe('browser tool session scripting backend', () => {
   it('selects the scripting backend when chrome.debugger is unavailable', () => {
     const { session } = createScriptingSession();
@@ -1293,6 +1544,364 @@ describe('browser tool session scripting backend', () => {
 
     expect(session.backend).toBe('scripting');
     expect(debuggerBackedSession.backend).toBe('debugger');
+  });
+
+  it('navigates through the tabs API and answers only once the page has loaded', async () => {
+    type Updated = (tabId: number, changeInfo: { readonly status?: string }) => void;
+    const listeners: Updated[] = [];
+    const updates: unknown[] = [];
+    let shown = { title: 'Tab', url: 'https://example.com/' };
+    const tabsApi: BrowserTabsApi = {
+      get: tabId => ({ id: tabId, ...shown }),
+      onUpdated: {
+        addListener: listener => {
+          listeners.push(listener);
+        },
+        removeListener: () => {
+          listeners.length = 0;
+        },
+      },
+      query: () => [],
+      update: (tabId, properties) => {
+        updates.push(properties);
+        shown = { title: 'Next', url: 'https://example.com/next' };
+
+        return { id: tabId };
+      },
+    };
+    const emit = (status: string) => {
+      for (const listener of listeners) {
+        listener(7, { status });
+      }
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: createScriptingApi().api,
+      tabId: 7,
+      tabsApi,
+    });
+    let settled = false;
+    const navigated = (async () => {
+      const result = await session.callTool('browser_navigate', { url: '/next' });
+
+      settled = true;
+
+      return result;
+    })();
+
+    await vi.waitFor(() => {
+      expect(updates).toStrictEqual([{ url: 'https://example.com/next' }]);
+    });
+    emit('loading');
+    await flushPendingWork();
+    expect(settled).toBe(false);
+
+    emit('complete');
+
+    await expect(navigated).resolves.toStrictEqual({
+      ok: true,
+      value: { title: 'Next', url: 'https://example.com/next' },
+    });
+    expect(listeners).toHaveLength(0);
+  });
+
+  it('answers a same-document navigation once its url changes, without a load', async () => {
+    type Updated = (
+      tabId: number,
+      changeInfo: { readonly status?: string; readonly url?: string }
+    ) => void;
+    const listeners: Updated[] = [];
+    let shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+    const emitUrl = (status: string, url: string) => {
+      shown = { status, title: 'Tab', url };
+      for (const listener of listeners) {
+        listener(7, { url });
+      }
+    };
+    const tabsApi: BrowserTabsApi = {
+      get: tabId => ({ id: tabId, ...shown }),
+      onUpdated: {
+        addListener: listener => {
+          listeners.push(listener);
+        },
+        removeListener: () => {
+          listeners.length = 0;
+        },
+      },
+      query: () => [],
+      update: tabId => ({ id: tabId }),
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: createScriptingApi().api,
+      tabId: 7,
+      tabsApi,
+    });
+    let settled = false;
+    const navigated = (async () => {
+      const result = await session.callTool('browser_navigate', { url: '#next' });
+
+      settled = true;
+
+      return result;
+    })();
+
+    await vi.waitFor(() => {
+      expect(listeners).toHaveLength(1);
+    });
+    // A cross-document navigation can report its url while the tab is still loading: that is not the end.
+    emitUrl('loading', 'https://example.com/other');
+    await flushPendingWork();
+    expect(settled).toBe(false);
+
+    emitUrl('complete', 'https://example.com/page#next');
+
+    await expect(navigated).resolves.toStrictEqual({
+      ok: true,
+      value: { title: 'Tab', url: 'https://example.com/page#next' },
+    });
+  });
+
+  it('ends a back navigation that went nowhere instead of waiting for a load', async () => {
+    vi.useFakeTimers();
+
+    try {
+      type Updated = (tabId: number, changeInfo: { readonly status?: string }) => void;
+      const listeners: Updated[] = [];
+      const shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+      const tabsApi: BrowserTabsApi = {
+        get: tabId => ({ id: tabId, ...shown }),
+        onUpdated: {
+          addListener: listener => {
+            listeners.push(listener);
+          },
+          removeListener: () => {
+            listeners.length = 0;
+          },
+        },
+        query: () => [],
+        update: tabId => ({ id: tabId }),
+      };
+      const session = createBrowserToolSession({
+        scriptingApi: createScriptingApi().api,
+        tabId: 7,
+        tabsApi,
+      });
+      let settled = false;
+      const navigated = (async () => {
+        const result = await session.callTool('browser_navigate_back', {});
+
+        settled = true;
+
+        return result;
+      })();
+
+      // A no-op: history.back() with no entry reports nothing at all.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(settled).toBe(true);
+
+      // Let the full timeout fire too, so a slow answer cannot outlive the test.
+      await vi.advanceTimersByTimeAsync(15_000);
+      await expect(navigated).resolves.toStrictEqual({
+        error: 'The page has no history entry to go back to.',
+        ok: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the quiet grace when only the title of the page changes', async () => {
+    vi.useFakeTimers();
+
+    try {
+      type Updated = (tabId: number, changeInfo: Record<string, unknown>) => void;
+      const listeners: Updated[] = [];
+      const shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+      const tabsApi: BrowserTabsApi = {
+        get: tabId => ({ id: tabId, ...shown }),
+        onUpdated: {
+          addListener: listener => {
+            listeners.push(listener);
+          },
+          removeListener: () => {
+            listeners.length = 0;
+          },
+        },
+        query: () => [],
+        update: tabId => ({ id: tabId }),
+      };
+      const session = createBrowserToolSession({
+        scriptingApi: createScriptingApi().api,
+        tabId: 7,
+        tabsApi,
+      });
+      let settled = false;
+      const navigated = (async () => {
+        const result = await session.callTool('browser_navigate_back', {});
+
+        settled = true;
+
+        return result;
+      })();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The browser also reports title and favicon changes; neither is a navigation this action started.
+      for (const listener of listeners) {
+        listener(7, { favIconUrl: 'https://example.com/favicon.ico' });
+        listener(7, { title: 'Renamed' });
+      }
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(settled).toBe(true);
+      await vi.advanceTimersByTimeAsync(15_000);
+      await expect(navigated).resolves.toStrictEqual({
+        error: 'The page has no history entry to go back to.',
+        ok: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for the load of a navigation the browser already reported', async () => {
+    vi.useFakeTimers();
+
+    try {
+      type Updated = (tabId: number, changeInfo: { readonly status?: string }) => void;
+      const listeners: Updated[] = [];
+      let shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+      const tabsApi: BrowserTabsApi = {
+        get: tabId => ({ id: tabId, ...shown }),
+        onUpdated: {
+          addListener: listener => {
+            listeners.push(listener);
+          },
+          removeListener: () => {
+            listeners.length = 0;
+          },
+        },
+        query: () => [],
+        update: tabId => ({ id: tabId }),
+      };
+      const session = createBrowserToolSession({
+        scriptingApi: createScriptingApi().api,
+        tabId: 7,
+        tabsApi,
+      });
+      let settled = false;
+      const navigated = (async () => {
+        const result = await session.callTool('browser_navigate_back', {});
+
+        settled = true;
+
+        return result;
+      })();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(listeners.length).toBeGreaterThan(0);
+
+      const emit = (status: string) => {
+        for (const listener of listeners) {
+          listener(7, { status });
+        }
+      };
+
+      // The browser reported a load: a slow commit must not be read as nothing happening.
+      emit('loading');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(settled).toBe(false);
+
+      shown = { status: 'complete', title: 'Back', url: 'https://example.com/previous' };
+      emit('complete');
+
+      await expect(navigated).resolves.toStrictEqual({
+        ok: true,
+        value: { title: 'Back', url: 'https://example.com/previous' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not end a cross-document navigation on its first url-only update', async () => {
+    type Updated = (
+      tabId: number,
+      changeInfo: { readonly status?: string; readonly url?: string }
+    ) => void;
+    const listeners: Updated[] = [];
+    let shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+    const emit = (changeInfo: { readonly status?: string; readonly url?: string }) => {
+      for (const listener of listeners) {
+        listener(7, changeInfo);
+      }
+    };
+    const tabsApi: BrowserTabsApi = {
+      get: tabId => ({ id: tabId, ...shown }),
+      onUpdated: {
+        addListener: listener => {
+          listeners.push(listener);
+        },
+        removeListener: () => {
+          listeners.length = 0;
+        },
+      },
+      query: () => [],
+      update: tabId => ({ id: tabId }),
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: createScriptingApi().api,
+      tabId: 7,
+      tabsApi,
+    });
+    let settled = false;
+    const navigated = (async () => {
+      const result = await session.callTool('browser_navigate_back', {});
+
+      settled = true;
+
+      return result;
+    })();
+
+    await vi.waitFor(() => {
+      expect(listeners).toHaveLength(1);
+    });
+    // The new document's url arrives before any loading status: the tab still reports the old document as complete.
+    shown = { status: 'complete', title: 'Tab', url: 'https://example.com/previous' };
+    emit({ url: 'https://example.com/previous' });
+    await flushPendingWork();
+    expect(settled).toBe(false);
+
+    emit({ status: 'loading' });
+    emit({ status: 'complete' });
+
+    await expect(navigated).resolves.toStrictEqual({
+      ok: true,
+      value: { title: 'Tab', url: 'https://example.com/previous' },
+    });
+  });
+
+  it('refuses a data: navigation without touching the tab', async () => {
+    const updates: unknown[] = [];
+    const tabsApi: BrowserTabsApi = {
+      ...createTabsApi().api,
+      onUpdated: { addListener: () => {}, removeListener: () => {} },
+      update: (tabId, properties) => {
+        updates.push(properties);
+
+        return { id: tabId };
+      },
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: createScriptingApi().api,
+      tabId: 7,
+      tabsApi,
+    });
+
+    await expect(
+      session.callTool('browser_navigate', { url: 'data:text/html,<p>hi</p>' })
+    ).resolves.toStrictEqual({
+      error: 'Refusing to navigate to a data: URL.',
+      ok: false,
+    });
+    expect(updates).toStrictEqual([]);
   });
 
   it('sends the page the canonical WebMCP signature it rebuilds', async () => {
@@ -1351,7 +1960,7 @@ describe('browser tool session scripting backend', () => {
 
     await expect(session.callTool('kilo_browser_snapshot')).resolves.toStrictEqual({
       ok: true,
-      value: '- button "Go" e1',
+      value: '- button "Go" [ref=e1]',
     });
 
     await session.callTool('kilo_browser_click', { target: 'e1' });
@@ -1372,6 +1981,293 @@ describe('browser tool session scripting backend', () => {
 
     expect(input.value).toBe('Ada');
     expect(input.events.map(event => event.type)).toStrictEqual(['input', 'change']);
+  });
+
+  it('renders the snapshot contract format: refs, label names and printed-ancestor depth', async () => {
+    const dom = new JSDOM(
+      '<body><h1>Parity</h1><p>idle</p>' +
+        '<label>Name <input id="name"></label>' +
+        '<label><input type="checkbox" checked> Agree</label>' +
+        '<label>Color <select><option>Red</option><option>Blue</option></select></label>' +
+        '<div><span id="caption">Send it</span><button aria-labelledby="caption">x</button></div>' +
+        '<section><iframe title="Pay"></iframe></section>' +
+        '</body>'
+    );
+    const { session } = createExecutingScriptingSession();
+
+    await withPageGlobals(
+      { document: dom.window.document, location: dom.window.location, window: dom.window },
+      async () => {
+        await expect(session.callTool('browser_snapshot', {})).resolves.toStrictEqual({
+          ok: true,
+          value: [
+            '- heading "Parity"[level=1]',
+            '- paragraph "idle"',
+            '- textbox "Name" [ref=e1]',
+            '- checkbox "Agree" [ref=e2][checked]',
+            '- combobox "Color" [ref=e3]',
+            '  - option "Red" [ref=e4]',
+            '  - option "Blue" [ref=e5]',
+            '- text: Send it',
+            '- button "Send it" [ref=e6]',
+            '- iframe [ref=e7]',
+          ].join('\n'),
+        });
+      }
+    );
+  });
+
+  it('keeps the snapshot refs after a find, which only adds its own', async () => {
+    const dom = new JSDOM('<body><button id="go">Go</button><p>idle</p></body>');
+    const { session } = createExecutingScriptingSession();
+
+    await withPageGlobals(
+      { document: dom.window.document, location: dom.window.location, window: dom.window },
+      async () => {
+        await expect(session.callTool('browser_snapshot', {})).resolves.toStrictEqual({
+          ok: true,
+          value: '- button "Go" [ref=e1]\n- paragraph "idle"',
+        });
+        await expect(session.callTool('browser_find', { text: 'go' })).resolves.toStrictEqual({
+          ok: true,
+          value: 'Found 1 matching line(s):\n\n- button "Go" [ref=e2]\n- paragraph "idle"',
+        });
+        await expect(session.resolveTarget('e1')).resolves.toMatchObject({ kind: 'selector' });
+        await expect(session.resolveTarget('e2')).resolves.toMatchObject({ kind: 'selector' });
+      }
+    );
+  });
+
+  it('splices a granted frame without a ref on its line, which would only reach the owner element', async () => {
+    const { isolatedKinds, session } = createFramedScriptingSession();
+
+    await expect(
+      session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] })
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: [
+        '- button "Top" [ref=e1]',
+        '- iframe',
+        '  - button "Buy" [ref=e3]',
+        '  - textbox [ref=e4]',
+      ].join('\n'),
+    });
+    await expect(session.resolveTarget('e2')).resolves.toBeUndefined();
+    expect(isolatedKinds).toStrictEqual(['frame']);
+  });
+
+  it('resolves the hosted frame from the frames read after the snapshot, not the call’s earlier inventory', async () => {
+    // The inventory was read before the snapshot ran; this fake says it saw no iframe at all.
+    const { isolatedKinds, session } = createFramedScriptingSession();
+    const readFrames = vi.fn(() =>
+      Promise.resolve({
+        childSessions: new Map<string, string>(),
+        complete: true,
+        frames: [
+          { id: '0', origin: SHOP_ORIGIN, url: `${SHOP_ORIGIN}/` },
+          { id: '4', origin: PAY_ORIGIN, parentId: '0', url: `${PAY_ORIGIN}/` },
+        ],
+        owners: new Map<string, readonly (string | undefined)[]>([
+          ['0', []],
+          ['4', []],
+        ]),
+      })
+    );
+
+    await expect(
+      session.callTool(
+        'browser_snapshot',
+        {},
+        { readFrames, readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+      )
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: [
+        '- button "Top" [ref=e1]',
+        '- iframe',
+        '  - button "Buy" [ref=e3]',
+        '  - textbox [ref=e4]',
+      ].join('\n'),
+    });
+    // Frame owners come from a read taken after the snapshot, so they align with the lines it printed.
+    expect(isolatedKinds).toStrictEqual(['frame']);
+  });
+
+  it('makes every scripting ref stale once the tab starts loading another document', async () => {
+    const { emitUpdated, session } = createFramedScriptingSession();
+
+    await session.callTool('browser_snapshot', {});
+    emitUpdated(7, { url: `${SHOP_ORIGIN}/#section` });
+    emitUpdated(8, { status: 'loading' });
+    await expect(session.resolveTarget('e1')).resolves.toMatchObject({ kind: 'selector' });
+
+    emitUpdated(7, { status: 'loading' });
+
+    await expect(session.resolveTarget('e1')).resolves.toBeUndefined();
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
+      error: STALE_REF_ERROR,
+      ok: false,
+    });
+  });
+
+  it('runs a ref from a granted frame in that frame, never in the top document', async () => {
+    const { mainWorldFrames, pay, session, shop } = createFramedScriptingSession();
+    const clicked: string[] = [];
+
+    shop.window.document.querySelector('button')?.addEventListener('click', () => {
+      clicked.push('shop');
+    });
+    pay.window.document.querySelector('button')?.addEventListener('click', () => {
+      clicked.push('pay');
+    });
+
+    await session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    // Both documents name their button `body > button`; only the frame id tells them apart.
+    await expect(session.resolveTarget('e3')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+    await expect(session.resolveTarget('e1')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+    // The input exists only in the frame, so its match is counted in the frame's document.
+    await expect(session.resolveTarget('e4')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > input',
+    });
+
+    mainWorldFrames.length = 0;
+
+    await expect(session.callTool('browser_click', { target: 'e3' })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Clicked ref=e3 with the left button.',
+    });
+    expect(clicked).toStrictEqual(['pay']);
+    expect(mainWorldFrames).toStrictEqual([4]);
+
+    await expect(
+      session.callTool('browser_fill_form', {
+        fields: [
+          { name: 'Top', target: 'e1', type: 'textbox', value: 'a' },
+          { name: 'Card', target: 'e4', type: 'textbox', value: 'b' },
+        ],
+      })
+    ).resolves.toStrictEqual({
+      error:
+        'browser_fill_form fields live in different frames: fill each frame with its own call.',
+      ok: false,
+    });
+
+    await expect(session.callTool('browser_snapshot', { target: 'e3' })).resolves.toStrictEqual({
+      ok: true,
+      value: '- button "Buy" [ref=e5]',
+    });
+    await expect(session.resolveTarget('e5')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+  });
+
+  it('presses a key in the frame a typed ref focused, across the separate calls the runtime makes', async () => {
+    const { mainWorldFrames, pressedIn, session } = createFramedScriptingSession();
+
+    // The runtime binds a fresh view per tool message; only the caller key is the same.
+    const typeCall = session.bindCaller('cli-session');
+    const pressCall = session.bindCaller('cli-session');
+
+    await typeCall.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    const typed = await typeCall.callTool(
+      'browser_type',
+      { target: 'e4', text: 'igor@example.com' },
+      { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+    );
+
+    expect(typed).toMatchObject({ ok: true });
+    mainWorldFrames.length = 0;
+
+    await expect(pressCall.callTool('browser_press_key', { key: 'Enter' })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Pressed Enter.',
+    });
+    // Enter must reach the field's own document: the top document's <iframe> element would swallow it.
+    expect(pressedIn()).toStrictEqual(['pay']);
+    expect(mainWorldFrames).toStrictEqual([4]);
+  });
+
+  it('keeps the previous focus when a type call fails', async () => {
+    const { mainWorldFrames, pressedIn, session } = createFramedScriptingSession();
+
+    const typeCall = session.bindCaller('cli-session');
+    const pressCall = session.bindCaller('cli-session');
+
+    const failed = await typeCall.callTool(
+      'browser_type',
+      { target: 'e404', text: 'x' },
+      { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+    );
+
+    expect(failed.ok).toBe(false);
+    mainWorldFrames.length = 0;
+
+    await pressCall.callTool('browser_press_key', { key: 'Enter' });
+
+    expect(pressedIn()).toStrictEqual(['shop']);
+    expect(mainWorldFrames).toStrictEqual([undefined]);
+  });
+
+  it('caps a caller’s merged refs, dropping the oldest earlier refs first', async () => {
+    const { session } = createScriptingSession();
+
+    session.registerRefs(
+      Array.from({ length: MAX_BROWSER_TOOL_REFS }, (_slot, index) => ({
+        ref: `e${String(index + 1)}`,
+        selector: `#node-${String(index + 1)}`,
+      })),
+      { merge: true }
+    );
+    session.registerRefs([{ ref: 'e9999', selector: '#late' }], { merge: true });
+
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
+      error: STALE_REF_ERROR,
+      ok: false,
+    });
+    await expect(session.callTool('browser_click', { target: 'e2' })).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('never evicts the refs of the registration it is making', async () => {
+    const { session } = createScriptingSession();
+
+    session.registerRefs(
+      Array.from({ length: MAX_BROWSER_TOOL_REFS + 1 }, (_slot, index) => ({
+        ref: `e${String(index + 1)}`,
+        selector: `#node-${String(index + 1)}`,
+      })),
+      { merge: true }
+    );
+
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('registers only the refs a snapshot’s returned text names', async () => {
+    const { session } = createScriptingSession({ result: oversizedSnapshotResultForCode });
+
+    await expect(session.callTool('browser_snapshot', {})).resolves.toMatchObject({ ok: true });
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toMatchObject({
+      ok: true,
+    });
+    await expect(session.resolveTarget('e3')).resolves.toBeUndefined();
   });
 
   it('types slowly character by character with key events through the injected code', async () => {
@@ -1478,11 +2374,14 @@ describe('browser tool session scripting backend', () => {
     }
   );
 
-  it('names the upstream tool in the Firefox error and keeps it off the debugger backend', () => {
+  it('names the tool the way the caller called it and keeps it off the debugger backend', () => {
     const { session } = createScriptingSession();
 
     expect(getFirefoxUnsupportedToolError('browser_console_messages')).toBe(
-      `kilo_browser_console_messages is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+      `browser_console_messages is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+    );
+    expect(getFirefoxUnsupportedToolError('kilo_browser_drag')).toBe(
+      `kilo_browser_drag is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
     );
     expect(session.getToolUnavailableError('kilo_browser_console_messages')).toContain(
       FIREFOX_PLATFORM_LIMIT

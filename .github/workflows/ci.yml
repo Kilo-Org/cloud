@@ -1060,7 +1060,6 @@ jobs:
       NODE_ENV: test
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
       POSTGRES_CONNECT_TIMEOUT: 30000
-      POSTGRES_MAX_QUERY_TIME: 30000
       UPSTASH_REDIS_REST_URL: http://localhost:8079
       UPSTASH_REDIS_REST_TOKEN: example_token
       JEST_MAX_WORKERS: 4
@@ -1144,7 +1143,6 @@ jobs:
       NODE_ENV: test
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
       POSTGRES_CONNECT_TIMEOUT: 30000
-      POSTGRES_MAX_QUERY_TIME: 30000
       UPSTASH_REDIS_REST_URL: http://localhost:8079
       UPSTASH_REDIS_REST_TOKEN: example_token
       JEST_MAX_WORKERS: 2
@@ -1230,7 +1228,7 @@ jobs:
         run: pnpm install --frozen-lockfile --filter 'web...' --filter kilocode-monorepo
 
       - name: Dependency cycle check
-        run: pnpm run dependency-cycle-check
+        run: pnpm run web:dependency-cycle-check
 
   # Required check. A skipped job (nothing relevant changed) passes; a failed
   # or cancelled job fails this one. Besides the web tests it covers the web

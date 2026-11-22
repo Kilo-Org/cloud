@@ -185,7 +185,31 @@
     "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri",
     "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
     "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa.",
-    "viewOnGitHub": "Duba PR a GitHub"
+    "organizationTrialEndedBillingAtKiloAi": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi a kilo.ai, sannan ka sake gwadawa.",
+    "viewOnGitHub": "Duba PR a GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Dige",
+        "nestedBulletPoint": "Dige na ciki",
+        "orderedItem": "Abu na jeri {n}",
+        "nestedOrderedItem": "Abu na jeri na ciki {n}"
+      },
+      "blockquote": {
+        "quote": "Ambato",
+        "nestedQuote": "Ambato na ciki"
+      },
+      "table": {
+        "row": "Layi {n}: {content}"
+      },
+      "math": {
+        "equation": "Lissafi: {latex}"
+      },
+      "rotor": {
+        "headings": "Kanuna",
+        "links": "Mahaɗa",
+        "images": "Hotuna"
+      }
+    }
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -279,9 +303,13 @@
     "credits": "Kuɗin amfani",
     "failedToLoadBalance": "An kasa loda ragowar kuɗi. Danna don sake gwadawa.",
     "balanceLoadFailed": "An kasa loda ragowar kuɗi",
+    "balanceUnreachable": "Ba a iya isa uwar garken ba. Sake gwadawa.",
+    "balanceAccessDenied": "Ba ka da izinin ganin wannan ma'auni.",
+    "balanceUnavailable": "An kasa loda ma'aunin.",
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
+    "availableToSpendInOrganization": "Akwai don kashe kuɗi a wannan ƙungiyar",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",
@@ -423,6 +451,17 @@
       "location": "Wurin Vertex",
       "clientEmail": "Imel na asusun sabis",
       "privateKey": "Maɓallin sirri na asusun sabis",
+      "privateKeyBlockRequired": "Liƙa dukan shingen maɓallin, daga layin BEGIN zuwa layin END.",
+      "privateKeyEncrypted": "Wannan shingen maɓallin yana da kariya ta kalmar sirri. Liƙa maɓallin asusun sabis wanda ba shi da kalmar sirri.",
+      "names": {
+        "codestral": "Tsohon Codestral kawai",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Shiga da ChatGPT)",
+        "xiaomi": "Xiaomi (biya gwargwadon amfani)",
+        "zai": "Z.ai (biya gwargwadon amfani)",
+        "bedrockByok": "Amazon Bedrock (kai tsaye)",
+        "vertexByok": "Google Vertex AI (kai tsaye)"
+      },
       "modelMappings": "Taswirorin samfura",
       "modelMappingsDescription": "Tura samfurin gateway zuwa sunan deployment na musamman.",
       "mappingTitle": "Taswira {{number}}",
@@ -502,14 +541,25 @@
       "nextStepFinal": "Hukuncin ɗaukaka ƙara ya zama na ƙarshe. Ba za a iya gabatar da wata ɗaukaka ƙara ba.",
       "viewReceipt": "Duba rasidi"
     },
+    "reportReceipts": {
+      "title": "Rahotanni",
+      "rowSubtitle": "Rahotannin da ka gabatar da sakamakonsu",
+      "emptyTitle": "Babu rahotanni tukuna",
+      "emptyDescription": "Rahotannin da ka gabatar daga sharhi ko amsar AI suna bayyana a nan.",
+      "couldNotLoad": "Ba a iya loda rahotanninka ba",
+      "capped": "Ana nuna rahotanninka na baya-bayan nan."
+    },
     "changelog": "Sabbin abubuwa",
     "changelogVersionPending": "Bayanan siga {{version}} za su zo da sabuntawar manhaja ta gaba.",
     "changelogGroupNew": "Sabbi",
     "changelogFixesIn": "Gyare-gyare da ingantawa a {{areas}}.",
     "changelogFixesPolish": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
     "changelogAreas": {
-      "signIn": "Shiga",
-      "profileOrganizations": "Bayanan martaba & ƙungiyoyi"
+      "signIn": "shiga",
+      "profileOrganizations": "bayanan martaba & ƙungiyoyi",
+      "chat": "tattaunawa",
+      "notifications": "sanarwa",
+      "integrations": "haɗe-haɗe"
     }
   },
   "preferences": {
@@ -1274,7 +1324,7 @@
       "couldNotGetLatest": "An kasa samun sabbin bayanai.",
       "byline": "#{{number}} daga {{author}}",
       "noFindings": "Ba a gano wata matsala ba.",
-      "findingsUnavailable": "Babu sakamako saboda wannan bita ta gaza.",
+      "findingsUnavailable": "Sakamako ba su samuwa.",
       "findingsInProgress": "Wannan bitar na ci gaba har yanzu. Sakamakon zai bayyana a nan a lokacin da ta kammala.",
       "findingsEndedWithoutResults": "Wannan bitar ta ƙare kafin ta samar da wani sakamako.",
       "serviceUnavailable": "An kasa haɗawa da sabis ɗin bitar lambar shiri. Sake gwada bitar lokacin da sabis ɗin ya samu.",
@@ -1405,7 +1455,7 @@
       "managedOnWebRepositories": "Zaɓi ma'ajiyoyi don {{organization}} a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionReconnect": "Ƙirƙiri sabuwar lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
-      "descriptionOverview": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a shafi na gaba.",
+      "descriptionOverview": "Ƙirƙiri lambar izinin shiga muhallin aiki, sannan ka manna ta a shafi na gaba.",
       "scopes": "Asusu: karantawa · Ma'ajiyoyi: karantawa/rubutawa · Buƙatun haɗa canje-canje: karantawa · Hanyoyin sanarwa ta yanar gizo: karantawa/rubutawa",
       "tokenPlaceholder": "Lambar izinin shiga muhallin aiki",
       "tokenRefused": "Bitbucket bai karɓi wannan lambar izinin shiga muhallin aikin ba. Ka duba cewa tana da izinin da ke sama, sannan ka sake gwadawa."
@@ -2516,7 +2566,7 @@
       "searchPlaceholder": "Binciken ma'ajiyoyi",
       "noMatches": "Babu abin da ya dace",
       "noRepositories": "Babu ma'ajiyoyin da za a zaɓa",
-      "noRepositoriesDescription": "Babu ma'ajiyoyi da aka haɗa da asusunka.",
+      "noRepositoriesDescription": "Haɗa GitHub ko GitLab don loda ma'ajiyoyi.",
       "loading": "Ana loda…",
       "accessibility": "Ma'ajiya: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3406,7 +3456,7 @@
       "manageOnWeb": "Saitunan biyan kuɗi a yanar gizo",
       "changePlan": "Canza tsari",
       "buySeats": "Sayi gurabe",
-      "managedOnWeb": "Ana sarrafa tsari, gurabe da ƙara kuɗi ta atomatik a yanar gizo.",
+      "managedOnWeb": "Ana sarrafa tsari, gurabe da ƙara kuɗi ta atomatik a kilo.ai.",
       "setupAutoTopUp": "Saita ƙara kuɗi ta atomatik",
       "manageAutoTopUp": "Sarrafa ƙara kuɗi ta atomatik",
       "opensOnWeb": "Yana buɗewa a yanar gizo"
@@ -3588,6 +3638,7 @@
       "identifierLabel": "Alamar ganowa",
       "identifierRequired": "Shigar da alamar ganowa.",
       "identifierTaken": "Wani yanayi ya riga ya yi amfani da wannan alamar ganowa.",
+      "identifierTooLong": "Ka riƙe alamar ganowa a cikin haruffa {{max}} ko ƙasa da haka.",
       "nameLabel": "Sunan yanayi",
       "nameRequired": "Shigar da sunan yanayi.",
       "notFound": "Wannan yanayin ba ya wanzu kuma.",
@@ -3678,7 +3729,7 @@
     "emailDeliveryFailed": "Ba a iya aika imel a yanzu. Sake gwadawa daga baya.",
     "admissionRequired": "Ba a iya tabbatar da na'urarka ba. Yi amfani da '$t(login.moreSignInOptions)' don shiga a wata na'ura ko ta yanar gizo.",
     "default": "An samu matsala. Da fatan za ka sake gwadawa.",
-    "retryableAdmission": "Ba mu iya tabbatar da wannan na'urar ba. Duba haɗinka na intanet ka sake gwadawa.",
+    "retryableAdmission": "Ba a iya tabbatar da wannan na'urar ba. Sake gwadawa.",
     "startSignInFailed": "An kasa fara shiga. Sake gwadawa.",
     "couldNotOpenBrowser": "Ba a iya buɗe burauza ba. Sake gwadawa.",
     "signInTimedOut": "Wa'adin shiga ya ƙare. Sake gwadawa.",
@@ -3750,6 +3801,34 @@
     "nextScheduled": "Na gaba da aka tsara",
     "answerNeeded": "Ana buƙatar amsa",
     "waitingToRetry": "Ana jiran sake gwadawa",
+    "countNoun": {
+      "needsInput_one": "Ana buƙatar bayani",
+      "needsInput_other": "Ana buƙatar bayani",
+      "running_one": "Ana aiki",
+      "running_other": "Ana aiki",
+      "scheduled_one": "An tsara",
+      "scheduled_other": "An tsara",
+      "idle_one": "A jiran aiki",
+      "idle_other": "A jiran aiki"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Ana buƙatar bayani",
+      "needsInput_other": "{{displayCount}} Ana buƙatar bayani",
+      "running_one": "{{displayCount}} Ana aiki",
+      "running_other": "{{displayCount}} Ana aiki",
+      "scheduled_one": "{{displayCount}} An tsara",
+      "scheduled_other": "{{displayCount}} An tsara",
+      "idle_one": "{{displayCount}} A jiran aiki",
+      "idle_other": "{{displayCount}} A jiran aiki"
+    },
+    "footer": {
+      "checked": "An duba {{time}}",
+      "lastKnown": "Na ƙarshe da aka sani · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Aiki na gaba {{time}}",
+      "wasDue": "An tsammanin {{time}}"
+    },
     "step": {
       "editing": "Ana gyarawa",
       "reading": "Ana karatu",
@@ -3995,7 +4074,8 @@
         "space": "Babu isasshen sarari kyauta don wannan samfurin. Ka yantar da sarari sannan ka sake gwadawa.",
         "network": "Saukarwar ba ta kammala ba. Duba haɗin ka sannan ka sake gwadawa.",
         "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi.",
-        "checksum": "Fayil ɗin da aka sauke bai yi daidai da checksum ɗinsa da aka wallafa ba, don haka an cire shi. Sake gwada saukewa."
+        "checksum": "Fayil ɗin da aka sauke bai yi daidai da checksum ɗinsa da aka wallafa ba, don haka an cire shi. Sake gwada saukewa.",
+        "writeFailed": "Wannan na'urar ba ta iya adana samfurin ba. Ka sake gwada saukewa."
       }
     },
     "catalog": {
@@ -4173,7 +4253,7 @@
     "personalDefaultDescription": "An ɗora ta atomatik lokacin da babu wurin ajiya da ke da bayanin martaba.",
     "organizationDefaultDescription": "An ɗora ta atomatik don membobi waɗanda ba su da tsoho na sirri.",
     "setAsDefault": "Saita azaman tsoho",
-    "saveFailed": "An kasa ajiye bayanan martaba",
+    "saveFailed": "An kasa ajiye bayanan martaba. Ka sake gwadawa.",
     "organizationRoleRequired": "Masu ƙungiya da masu gudanarwa kawai za su iya canza bayanan martaban ƙungiya.",
     "deleteTitle": "Share bayanin martaba",
     "deleteMessage": "Wannan yana cire bayanan martaba da saitunan sa har abada. Ba za a iya soke wannan ba.",
@@ -4322,6 +4402,7 @@
       "promptPlaceholder": "Kai mataimaki ne…",
       "tools": "Kayan aiki",
       "wholeToolRule": "Wannan wakili yana amfani da doka ɗaya ga kowane kayan aiki a lokaci ɗaya: {{rule}}. Waɗannan maɓallan karantawa kawai ne.",
+      "toolRule": "Doka da aka adana: {{rule}}",
       "visibility": "Ganuwa",
       "visibilityPrimary": "Na farko — wanda aka nuna a cikin mai ɗaukar hoto",
       "visibilitySubagent": "Subagent — kawai kira daga wasu",
@@ -4431,19 +4512,34 @@
       "deductionFallback": "Cire kiredit",
       "emptyDescription": "Sayayyar kiredit, rasitai, da amfani za su bayyana a nan.",
       "emptyTitle": "Babu tarihin kiredit",
+      "expiredGrant": "Lokaci ya ƙare: {{description}}",
       "googlePlayReceipt": "Rasiti daga Google Play",
       "kind": {
         "adjustment": "Gyara",
         "balanceNeutral": "Ba ya canja ma'auni",
         "deduction": "Cirewa",
         "grant": "Kyautar kiredit",
+        "promotionalCredits": "Kiredit ɗin talla",
+        "welcomeCredits": "Kiredit na maraba",
         "purchase": "Saye"
+      },
+      "program": {
+        "adminBulkGrant": "Kyautar kiredit daga mai gudanarwa",
+        "contributorChampion": "Kiredit na gwarzon mai ba da gudummawa",
+        "feedback": "Kiredit na ra'ayi",
+        "influencer": "Kiredit na mai tasiri",
+        "ossMonthlyReset": "Sake saitin OSS na wata-wata",
+        "ossSponsorship": "Kiredit na tallafin OSS",
+        "pullRequest": "Kiredit na buƙatar haɗa canje-canje",
+        "usageIssue": "Kiredit na matsalar amfani",
+        "vibeDay": "Kiredit na Vibe Day"
       },
       "purchaseFallback": "Sayen kiredit",
       "receipt": "Rasiti",
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
       "receiptUnavailable": "Babu rasiti don wannan sayayya.",
-      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan."
+      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan.",
+      "voidedGrant": "An soke: {{description}}"
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
@@ -4692,6 +4788,8 @@
     "connectedTo": "An haɗa da {{account}}",
     "disconnected": "An cire haɗin {{provider}}",
     "disconnectFailed": "Ba a iya cire haɗin {{provider}} ba",
+    "disconnectRetry": "Slack ya kasa tabbatar da cire haɗin. Sake gwadawa.",
+    "disconnectNeedsSupport": "Kilo ya kasa karanta damar Slack da aka ajiye don wannan haɗin. Tuntuɓi masu tallafi don kammala cire haɗin.",
     "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
     "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
     "managedByOwner": "Ka roƙi mamallakin ƙungiya ya canza haɗin da ba za ka iya canza ba.",
@@ -4858,12 +4956,15 @@
     "inputDescription": "Yana duba kowace shigarwa da Enkrypt AI, har da sakamakon kayan aiki. Idan Enkrypt ba ya samuwa, ana aika buƙatu ba tare da duba su ba maimakon a ƙi su.",
     "outputTitle": "Shingayen tsaro na fitarwa",
     "outputDescription": "Yana duba martani da Enkrypt AI kafin membobi su karɓe su. A kashe ne sai kun kunna shi.",
+    "outputUnavailable": "Kilo bai kunna duba fitarwa ba ga wannan ƙungiya, saboda haka ba a duba martani kuma babu abin da za a saita a nan. Tuntuɓi {{supportEmail}} don neman hakan.",
     "detectorsHint": "Toshewa yana ƙin buƙatar da aka yi wa alama. Rubuta kawai yana yin rikodin ta ba tare da jinkirta buƙatar ba.",
     "detectorsHintOutput": "Toshewa yana sa martanin da aka yi wa alama ya gaza. Rubuta kawai yana yin rikodin shi ba tare da jinkirta martanin ba.",
     "choiceLog": "Rubuta kawai",
     "applyTo": "Aiwatar da shi ga",
     "applyToAllMembers": "Dukan membobi",
     "applyKiloDefault": "Aiwatar da Kilo na Asali",
+    "applyKiloDefaultEnglishNote": "Rubutun manufar Kilo na asali cikin Turanci yake, domin Kilo Gateway yana aiwatar da shi daidai yadda aka rubuta.",
+    "applyKiloDefaultReplaceMessage": "Manufar Kilo ta asali an rubuta ta cikin Turanci kuma tana maye gurbin abin da ka saita a Keta manufa. Rubutun da ka shigar a filin rubutun manufa ba za a iya dawo da shi ba.",
     "invalidSavedTitle": "Ba a iya karanta saitunan gano shigarwar da aka ajiye ba",
     "invalidSavedBody": "Ana toshe buƙatu har sai an sake ajiye masu gano shigarwa. Masu gano da ke ƙasa suna farawa daga Kilo na Asali.",
     "invalidSavedOutputTitle": "Ba a iya karanta saitunan gano fitarwar da aka ajiye ba",
@@ -4999,6 +5100,7 @@
     "providersNeedCatalog": "Maɓallan masu bayarwa za su kasance na karatu kawai har sai cikakken kundin samfura ya loda. Danna Sake gwadawa a sama don gyara su.",
     "providersEmpty": "Babu masu bayarwa da suka dace da wannan bincike.",
     "providersNone": "Babu masu bayarwa da ke samuwa ga wannan ƙungiya.",
+    "providersUnavailable": "Ba a iya loda jerin masu bayarwa ba.",
     "allowAllShown": "Ba da izini ga duk waɗanda aka nuna",
     "denyAllShown": "Hana duk waɗanda aka nuna",
     "gatewaysDescription": "Kilo yana tura buƙatun samfuri ta Vercel AI Gateway ko OpenRouter. Ƙofar shiga da aka kashe tana sa waɗannan buƙatun su gaza.",
@@ -5017,6 +5119,20 @@
       "eu": "Ƙungiyar Tarayyar Turai",
       "au": "Ostiraliya",
       "jp": "Jafan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Nemo zaɓuɓɓuka",
+    "noMatches": "Babu zaɓuɓɓukan da suka dace",
+    "emptyDescription": "Gwada wani sunan zaɓi ko kalmar nema.",
+    "resultsStatus": "Zaɓuɓɓukan da aka samu: {{resultCount}}",
+    "keywords": {
+      "signOut": "fita|fita daga asusu",
+      "appearance": "jigo|launi|kamanni",
+      "appUnlock": "bayanan halitta|fuska|sawun yatsa",
+      "language": "harshe|fassara",
+      "notifications": "sanarwa|faɗakarwa",
+      "privacy": "nazari|bibiyar bayanai|sirri"
     }
   }
 }

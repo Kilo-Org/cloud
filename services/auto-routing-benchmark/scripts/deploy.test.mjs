@@ -201,11 +201,20 @@ async function until(predicate) {
   }
 }
 
-function diagnostics(result) {
-  assert.doesNotMatch(
-    result.stdout + result.stderr,
-    /untrusted-(?:stdout|stderr|response)-canary|existing-claim|replacement-owner|operator-pause-/
-  );
+function diagnostics(result, { commandOutput = false } = {}) {
+  if (commandOutput) {
+    assert.match(result.stderr, /--- wrangler stderr \(last \d+ lines\) ---/);
+    assert.match(result.stderr, /\u2718 \[ERROR\] A request to the Cloudflare API/);
+    assert.doesNotMatch(
+      result.stdout + result.stderr,
+      /fixture-secret-value-9f3c|fixture-api-token-value|BEARERTOKEN|existing-claim|replacement-owner|operator-pause-/
+    );
+  } else {
+    assert.doesNotMatch(
+      result.stdout + result.stderr,
+      /untrusted-(?:stdout|stderr|response)-canary|existing-claim|replacement-owner|operator-pause-/
+    );
+  }
   const rows = result.stdout
     .trim()
     .split('\n')
@@ -223,9 +232,9 @@ function released(state) {
   assert.deepEqual({ ...state.lock() }, { token: null, lease_until: 0 });
 }
 
-function failed(result, reason) {
+function failed(result, reason, options) {
   assert.equal(result.code, 1);
-  assert.equal(diagnostics(result).at(-1).reason, reason);
+  assert.equal(diagnostics(result, options).at(-1).reason, reason);
 }
 
 test(
@@ -660,17 +669,95 @@ test(
 );
 
 test(
+  're-runs the container rollout once when the Worker is live but the rollout did not apply',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'once' });
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows.filter(row => row.event === 'benchmark_deploy_half_applied').map(row => row.rollout),
+      ['rerun', 'rerun-ok']
+    );
+    assert.equal(state.count('deploy_half_applied'), 1);
+    assert.equal(state.count('deploy_completed'), 1);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+    released(state);
+
+    const next = await state.start();
+    assert.equal(next.code, 0, next.stdout);
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+  }
+);
+
+test(
+  'reports a failed rollout re-run and does not let the next deploy trust the marker',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'always' });
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows.filter(row => row.event === 'benchmark_deploy_half_applied').map(row => row.rollout),
+      ['rerun', 'rerun-failed']
+    );
+    assert.equal(state.count('deploy_completed'), 0);
+    released(state);
+
+    const next = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: '' });
+    assert.equal(next.code, 0, next.stdout);
+    const nextRows = diagnostics(next);
+    assert.ok(
+      nextRows.some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed !== 'unchanged'
+      )
+    );
+    assert.equal(state.count('deploy_containers_none'), 0);
+  }
+);
+
+test(
+  'does not re-run the rollout when the applied container state is unknown',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'once',
+      BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'missing',
+    });
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows
+        .filter(row => row.event === 'benchmark_deploy_deploy_failure_state')
+        .map(row => ({ live: row.live, applied: row.applied })),
+      [{ live: 'ours', applied: 'unknown' }]
+    );
+    assert.equal(rows.filter(row => row.event === 'benchmark_deploy_half_applied').length, 0);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.deployedMessages().length, 1);
+    released(state);
+  }
+);
+
+test(
   'does not trust the marker of a deploy whose image never reached the containers',
   { timeout: 15_000 },
   async t => {
     const state = fixture(t);
     state.rollOut(`container-inputs:${'0'.repeat(64)}`);
-    const failed = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_IMAGE_PUSH_FAIL: '1' });
-    assert.equal(failed.code, 1);
+    const failedRun = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_IMAGE_PUSH_FAIL: '1' });
+    assert.equal(failedRun.code, 1);
     assert.match(state.deployedMessages().at(-1), CONTAINER_MARKER);
+    diagnostics(failedRun, { commandOutput: true });
     const result = await state.start();
     assert.equal(result.code, 0, result.stdout);
-    assert.equal(state.count('deploy_containers_configured'), 2);
+    assert.equal(state.count('deploy_containers_configured'), 3);
     assert.equal(state.count('deploy_containers_none'), 0);
     assert.ok(
       diagnostics(result).some(
@@ -1046,24 +1133,51 @@ test(
 );
 
 test(
-  'releases the dispatch lease when deployment fails without exposing command output',
+  'prints the last wrangler output with secrets redacted when the deploy command fails',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_FAIL: '1' });
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_FAIL: '1',
+      BENCHMARK_DEPLOY_FIXTURE_SECRET: 'fixture-secret-value-9f3c',
+    });
     const result = await state.start();
-    failed(result, 'command_failed');
+    failed(result, 'command_failed', { commandOutput: true });
+    assert.match(result.stderr, /token='\[redacted\]'/);
+    assert.match(result.stderr, /CLOUDFLARE_API_TOKEN=\[redacted\]/);
+    assert.match(result.stderr, /authorization=\[redacted\]/);
+    assert.match(result.stderr, /--- end wrangler output ---/);
     assert.equal(state.count('deploy_failed'), 1);
     released(state);
   }
 );
 
-test('does not deploy when migrations fail', { timeout: 15_000 }, async t => {
-  const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_MIGRATION_FAIL: '1' });
-  const result = await state.start();
-  failed(result, 'command_failed');
-  assert.equal(state.count('deploy_started'), 0);
-  released(state);
-});
+test(
+  'does not deploy and prints redacted output when migrations fail',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_MIGRATION_FAIL: '1',
+      BENCHMARK_DEPLOY_FIXTURE_SECRET: 'fixture-secret-value-9f3c',
+    });
+    const result = await state.start();
+    failed(result, 'command_failed', { commandOutput: true });
+    assert.equal(state.count('deploy_started'), 0);
+    released(state);
+  }
+);
+
+test(
+  'keeps a successful deploy quiet and does not print command output',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.doesNotMatch(result.stderr, /--- wrangler/);
+    diagnostics(result);
+    released(state);
+  }
+);
 
 test('lease loss before migrations prevents any deployment work', { timeout: 15_000 }, async t => {
   const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_LOSE_ON_RENEW: '1' });

@@ -5,7 +5,10 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  MODE_SLUG_MAX_LENGTH,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -27,7 +30,7 @@ import {
   mutateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -50,11 +53,11 @@ const CreateModeInputSchema = OrganizationIdInputSchema.extend({
   name: z
     .string()
     .min(1, 'Mode name is required')
-    .max(100, 'Mode name must be less than 100 characters'),
+    .max(100, 'Mode name must be 100 characters or fewer'),
   slug: z
     .string()
     .min(1, 'Mode slug is required')
-    .max(50, 'Mode slug must be less than 50 characters')
+    .max(MODE_SLUG_MAX_LENGTH, `Mode slug must be ${MODE_SLUG_MAX_LENGTH} characters or fewer`)
     .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens'),
   config: ModeConfigInputSchema.optional(),
   route_model: RouteModelInputSchema,
@@ -62,12 +65,16 @@ const CreateModeInputSchema = OrganizationIdInputSchema.extend({
 
 const UpdateModeInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
-  name: z.string().min(1).max(100).optional(),
+  name: z
+    .string()
+    .min(1, 'Mode name is required')
+    .max(100, 'Mode name must be 100 characters or fewer')
+    .optional(),
   slug: z
     .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-z0-9-]+$/)
+    .min(1, 'Mode slug is required')
+    .max(MODE_SLUG_MAX_LENGTH, `Mode slug must be ${MODE_SLUG_MAX_LENGTH} characters or fewer`)
+    .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens')
     .optional(),
   config: ModeConfigInputSchema.optional(),
   route_model: RouteModelInputSchema,
@@ -114,7 +121,7 @@ async function applyOrganizationAutoRouteChange(
     delete routes[modeSlug];
   } else {
     const validation = await validateOrganizationAutoTarget(organization, routeModel, {
-      dbClient: tx,
+      read: tx ? { tx } : { fromDb: readDb },
     });
 
     if (validation.kind === 'error') {

@@ -47,6 +47,10 @@ import {
 } from './session-start.js';
 import { preflightSessionCreation } from './session-creation-preflight.js';
 import { assertOrganizationMembership } from './organization-membership.js';
+import {
+  additionalHostedRepositoryIdsSchema,
+  assertHostedWorkspaceUser,
+} from './hosted-workspace-repositories.js';
 
 /** Authenticated IDE/Agent Manager Session Host origin. */
 const AGENT_MANAGER_ORIGIN = 'agent-manager';
@@ -63,6 +67,7 @@ export const CreateHostedWorkspaceInput = z
     operationKey: z.uuid(),
     clientProvenance: z.literal('agent-manager'),
     repository: RepositoryInputSchema,
+    additionalRepositoryIds: additionalHostedRepositoryIdsSchema.optional(),
     profile: RequiredProfileInput.optional(),
     message: z
       .object({
@@ -184,13 +189,13 @@ const createHostedWorkspaceHandler = protectedProcedure
   .input(CreateHostedWorkspaceInput)
   .output(CreateHostedWorkspaceOutput)
   .mutation(async ({ input, ctx }): Promise<HostedWorkspaceCreateResult> => {
-    if (ctx.botId !== undefined || ctx.cloudAgentAuthority !== undefined) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' });
-    }
+    assertHostedWorkspaceUser(ctx);
     const request = await preflightSessionCreation(
       hostedWorkspaceCreateRequest(input),
       ctx,
-      'createHostedWorkspace'
+      'createHostedWorkspace',
+      undefined,
+      { hostedAdditionalRepositoryIds: input.additionalRepositoryIds }
     );
     const registration = await createSessionWithLedger(
       request,

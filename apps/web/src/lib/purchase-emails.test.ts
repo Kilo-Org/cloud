@@ -1214,10 +1214,13 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   });
 
   async function applyStripeFundedKiloClawPeriod(
-    params: Parameters<typeof creditBillingModule.applyStripeFundedKiloClawPeriod>[0]
+    params: Omit<
+      Parameters<typeof creditBillingModule.applyStripeFundedKiloClawPeriod>[0],
+      'stripeSubscriptionStatus'
+    >
   ): Promise<boolean> {
     const mod = await import('@/lib/kiloclaw/credit-billing');
-    return mod.applyStripeFundedKiloClawPeriod(params);
+    return mod.applyStripeFundedKiloClawPeriod({ ...params, stripeSubscriptionStatus: 'active' });
   }
 
   async function enrollWithCredits(
@@ -1402,15 +1405,18 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
     });
 
+    // Stripe never bills an ended subscription again; resubscribing creates a new one.
+    const periodStart = new Date().toISOString();
     const applied = await applyStripeFundedKiloClawPeriod({
       userId: user.id,
       metadataInstanceId: instance.id,
-      stripeSubscriptionId,
+      stripeSubscriptionId: `sub_resubscribed_${crypto.randomUUID()}`,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
       priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+      checkoutConfirmedAt: periodStart,
       amountMicrodollars: 9_000_000,
-      periodStart: new Date().toISOString(),
+      periodStart,
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
     });
 
@@ -1480,15 +1486,18 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       .set({ status: 'canceled' })
       .where(eq(kiloclaw_subscriptions.id, subscription.id));
 
+    // Stripe never bills an ended subscription again; resubscribing creates a new one.
+    const resubscribedAt = new Date().toISOString();
     const applied = await applyStripeFundedKiloClawPeriod({
       userId: user.id,
       metadataInstanceId: instance.id,
-      stripeSubscriptionId,
+      stripeSubscriptionId: `sub_resubscribed_${crypto.randomUUID()}`,
       stripePaymentId: `ch_second_${crypto.randomUUID()}`,
       plan: 'standard',
       priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+      checkoutConfirmedAt: resubscribedAt,
       amountMicrodollars: 9_000_000,
-      periodStart: new Date().toISOString(),
+      periodStart: resubscribedAt,
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
     });
 

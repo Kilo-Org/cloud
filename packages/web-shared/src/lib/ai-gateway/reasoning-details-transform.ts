@@ -163,5 +163,7 @@ export function applyReasoningDetailsResponseTransform(
       break;
     case null:
       break;
+    default:
+      return transform satisfies never;
   }
 }

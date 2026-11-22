@@ -48,16 +48,13 @@ export async function organizationMemberCatalog(params: {
   kiloUserId: string;
   countryCode: string | null;
   endpoint: string;
-}): Promise<OpenRouterModelsResponse | null> {
+}): Promise<OpenRouterModelsResponse> {
   const result = await getAvailableModelsForOrganization(
     params.organizationId,
     { type: 'member', kiloUserId: params.kiloUserId },
     'member',
     { fromDb: readDb, countryCode: params.countryCode }
   );
-  if (!result) {
-    return null;
-  }
   const [models, customRouters] = await Promise.all([
     addAutoRoutingModels(result.data),
     usableCustomRouters({

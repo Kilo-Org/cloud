@@ -20,6 +20,10 @@ import {
 import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { getStripePriceIdForClawPlan } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import {
+  cancelSubscriptionForEndedStripeSubscription,
+  isEndedStripeSubscriptionStatus,
+} from '@/lib/kiloclaw/ended-stripe-subscription';
 
 const RETIREMENT_ACTOR = { actorType: 'system', actorId: 'kiloclaw-commit-retirement' } as const;
 const logWarning = sentryLogger('kiloclaw-commit-retirement', 'warning');
@@ -210,6 +214,9 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
   }
 
   const live = await stripe.subscriptions.retrieve(subscription.stripe_subscription_id);
+  if (isEndedStripeSubscriptionStatus(live.status)) {
+    return cancelGuardedSubscriptionForEndedStripeSubscription(subscription);
+  }
   const boundary = deriveKiloClawCommitFinalBoundary({
     commitEndsAt: subscription.commit_ends_at,
     currentPeriodEndsAt: subscription.current_period_end,
@@ -275,6 +282,41 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
     guarded = true;
   });
   return { guarded };
+}
+
+/**
+ * The Stripe subscription never renewed again: a deleted webhook was missed or
+ * refused. Cancel the local row so lifecycle enforcement can reach it.
+ */
+async function cancelGuardedSubscriptionForEndedStripeSubscription(
+  subscription: KiloClawSubscription
+): Promise<{ guarded: boolean }> {
+  return db.transaction(async tx => {
+    const [current] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id))
+      .for('update')
+      .limit(1);
+    if (
+      !current ||
+      current.status !== 'active' ||
+      current.stripe_subscription_id !== subscription.stripe_subscription_id
+    ) {
+      return { guarded: false };
+    }
+    const { before, after } = await cancelSubscriptionForEndedStripeSubscription(tx, current.id);
+    if (!after) return { guarded: false };
+    await insertKiloClawSubscriptionChangeLog(tx, {
+      subscriptionId: after.id,
+      actor: RETIREMENT_ACTOR,
+      action: 'canceled',
+      reason: 'commit_retirement_provider_subscription_ended',
+      before,
+      after,
+    });
+    return { guarded: true };
+  });
 }
 
 export async function makeKiloClawStripeSubscriptionNonRenewing(

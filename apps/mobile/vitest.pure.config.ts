@@ -42,6 +42,8 @@ export default defineProject({
     execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
       'plugins/**/*.test.ts',
+      // Node-environment contract tests for the app scripts.
+      'scripts/**/*.test.ts',
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/i18n/**/*.test.ts',
@@ -85,9 +87,11 @@ export default defineProject({
       'src/lib/app-actions/**/!(*.mounted).test.tsx',
       'modules/kilo-app-actions/*.test.ts',
       'modules/kilo-apple-model/*.test.ts',
+      'modules/home-widget-refresh/*.test.ts',
       'modules/kilo-launcher-surfaces/*.test.ts',
       'src/lib/query/**/*.test.ts',
       'src/lib/settings/**/*.test.ts',
+      'src/lib/settings-search/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/lib/tool-summary-translation/**/*.test.ts',
       'src/lib/todos/**/*.test.ts',

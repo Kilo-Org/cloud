@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Okutholakele okusha kokuphepha ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Okubucayi",
+      "high": "Okuphezulu",
+      "medium": "Okumaphakathi",
+      "low": "Okuphansi"
+    },
     "securityFindingSlaWarning": {
       "title": "Isixwayiso se-SLA"
     },

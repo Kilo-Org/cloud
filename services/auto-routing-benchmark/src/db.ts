@@ -60,6 +60,7 @@ import {
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
+import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
 import {
   parseProfileState,
   profileFailureAssignments,
@@ -67,7 +68,6 @@ import {
   wireProfileFailure,
   type ProfileFailure,
 } from './profile-failure';
-import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -94,6 +94,11 @@ const RUN_MODEL_INSERT_BATCH_SIZE = 18;
 // of a small fixed clause. 30 keeps each one well inside D1's 100-variable
 // ceiling — the same ceiling that once stranded every pending profile in prod.
 const PROFILE_ENTRY_FILTER_BATCH_SIZE = 30;
+
+// Statements that filter on a page of run ids bind one variable per id plus the
+// fixed clause. `GET /admin/runs` caps a page at 100 ids, so 90 leaves room for
+// that clause inside D1's 100-variable ceiling.
+const RUN_ID_FILTER_BATCH_SIZE = 90;
 
 /**
  * Rows per config INSERT. D1 allows 100 bound variables per statement and the
@@ -126,6 +131,7 @@ export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
     p50LatencyMs: row.p50_latency_ms,
     p95LatencyMs: row.p95_latency_ms,
     cases: row.cases,
+    costedCases: row.costed_cases,
     errors: row.errors,
     timeouts: row.timeouts,
     routeAccuracy: row.route_accuracy,
@@ -278,6 +284,69 @@ export async function getLiveContainerLanes(db: D1Database): Promise<number> {
   return row?.lanes ?? 0;
 }
 
+/** Active decider runs one (router, queue) may hold at once. */
+export const MAX_RUNNING_RUNS_PER_QUEUE = 4;
+
+const QueueRunOccupancySchema = z.object({
+  activeRuns: z.number().int(),
+  startingRunId: z.string().nullable(),
+});
+export type QueueRunOccupancy = z.infer<typeof QueueRunOccupancySchema>;
+
+export type RunAdmission = { admitted: true } | { admitted: false; occupancy: QueueRunOccupancy };
+
+/**
+ * Running decider runs of one (router ?1, queue ?2), and the oldest of them that
+ * has not finished materializing its chunks (no `scheduler_runs` marker yet).
+ */
+const QUEUE_RUN_OCCUPANCY_SQL = `
+  SELECT COUNT(*) AS activeRuns,
+    MIN(CASE WHEN NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE scheduler_runs.run_id = run.id)
+      THEN run.id END) AS startingRunId
+  FROM benchmark_runs AS run
+  WHERE run.router = ?1 AND run.kind = 'decider' AND run.purpose = ?2 AND run.status = 'running'
+`;
+
+/**
+ * Inserts a decider run only while its (router ?2, queue ?15) has no starting run
+ * and fewer than ?17 active runs, so the check and the insert are one statement.
+ * The run records the measurement revision it was started under (?16).
+ */
+const ADMIT_DECIDER_RUN_SQL = `
+  INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
+    kind, status, started_at, min_accuracy, switch_cost_factor, best_accuracy_switch_threshold,
+    max_concurrency, benchmark_user_id, benchmark_org_id, repetitions,
+    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision)
+  SELECT ?1, ?2, ?3, ?4, 'decider', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
+    ?16
+  WHERE NOT EXISTS (
+    SELECT 1 FROM benchmark_runs AS active
+    WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
+      AND active.status = 'running'
+      AND NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE scheduler_runs.run_id = active.id)
+  ) AND (
+    SELECT COUNT(*) FROM benchmark_runs AS active
+    WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
+      AND active.status = 'running'
+  ) < ?17
+`;
+
+export async function getQueueRunOccupancy(
+  db: D1Database,
+  router: AutoRouter,
+  purpose: BenchmarkRunPurpose
+): Promise<QueueRunOccupancy> {
+  return QueueRunOccupancySchema.parse(
+    await db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(router, purpose).first()
+  );
+}
+
+/**
+ * Writes a run with its model rows and carried summaries in one batch. A decider
+ * run is admitted by the same statement that inserts it: only while no run of its
+ * (router, queue) is still starting and fewer than MAX_RUNNING_RUNS_PER_QUEUE are
+ * active, so overlapping drains cannot both start one. A refused run leaves no rows.
+ */
 export async function insertRun(
   db: D1Database,
   run: {
@@ -296,13 +365,14 @@ export async function insertRun(
     repetitions: number;
     classifier_max_p95_latency_ms: number | null;
     engine_identity: string;
+    measurement_revision?: number;
     purpose?: BenchmarkRunPurpose;
   },
   models: RunModelRow[],
   carriedSummaries: BenchmarkModelSummary[]
-): Promise<void> {
+): Promise<RunAdmission> {
   const orm = drizzle(db);
-  const insertRunStmt = orm.insert(benchmarkRuns).values({
+  const row = {
     id: run.id,
     router: run.router ?? 'efficient',
     accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
@@ -319,25 +389,18 @@ export async function insertRun(
     repetitions: run.repetitions,
     classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
     engine_identity: run.engine_identity,
+    measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
     purpose: run.purpose ?? 'platform',
-  });
+  } satisfies typeof benchmarkRuns.$inferInsert;
 
-  if (models.length === 0 && carriedSummaries.length === 0) {
-    await insertRunStmt;
-    return;
-  }
-
-  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [insertRunStmt];
-
-  if (models.length > 0) {
-    for (let i = 0; i < models.length; i += RUN_MODEL_INSERT_BATCH_SIZE) {
-      stmts.push(orm.insert(runModels).values(models.slice(i, i + RUN_MODEL_INSERT_BATCH_SIZE)));
-    }
+  const dependents = [];
+  for (let i = 0; i < models.length; i += RUN_MODEL_INSERT_BATCH_SIZE) {
+    dependents.push(orm.insert(runModels).values(models.slice(i, i + RUN_MODEL_INSERT_BATCH_SIZE)));
   }
 
   for (let i = 0; i < carriedSummaries.length; i += MODEL_SUMMARY_INSERT_BATCH_SIZE) {
     const summaryChunk = carriedSummaries.slice(i, i + MODEL_SUMMARY_INSERT_BATCH_SIZE);
-    stmts.push(
+    dependents.push(
       orm.insert(modelSummaries).values(
         summaryChunk.map(s => ({
           run_id: run.id,
@@ -354,6 +417,7 @@ export async function insertRun(
           p50_latency_ms: s.p50LatencyMs,
           p95_latency_ms: s.p95LatencyMs,
           cases: s.cases,
+          costed_cases: s.costedCases,
           errors: s.errors,
           timeouts: s.timeouts,
           route_accuracy: s.routeAccuracy,
@@ -363,7 +427,56 @@ export async function insertRun(
     );
   }
 
-  await orm.batch(stmts);
+  if (row.kind === 'classifier') {
+    await orm.batch([orm.insert(benchmarkRuns).values(row), ...dependents]);
+    return { admitted: true };
+  }
+
+  // D1 runs a batch as one transaction: a refused run's model and summary rows are
+  // written under its id and deleted again before the batch commits.
+  const [inserted, occupancy] = await db.batch([
+    db
+      .prepare(ADMIT_DECIDER_RUN_SQL)
+      .bind(
+        row.id,
+        row.router,
+        row.accuracy_noise_band,
+        row.frontier_min_accuracy_delta,
+        row.started_at,
+        row.min_accuracy,
+        row.switch_cost_factor,
+        row.best_accuracy_switch_threshold,
+        row.max_concurrency,
+        row.benchmark_user_id,
+        row.benchmark_org_id,
+        row.repetitions,
+        row.classifier_max_p95_latency_ms,
+        row.engine_identity,
+        row.purpose,
+        row.measurement_revision,
+        MAX_RUNNING_RUNS_PER_QUEUE
+      ),
+    db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(row.router, row.purpose),
+    ...dependents.map(query => {
+      const built = query.toSQL();
+      return db.prepare(built.sql).bind(...built.params);
+    }),
+    ...(dependents.length > 0
+      ? ['run_models', 'model_summaries'].map(table =>
+          db
+            .prepare(
+              `DELETE FROM ${table} WHERE run_id = ?1
+                AND NOT EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ?1)`
+            )
+            .bind(row.id)
+        )
+      : []),
+  ]);
+  if ((inserted.meta.changes ?? 0) > 0) return { admitted: true };
+  return {
+    admitted: false,
+    occupancy: QueueRunOccupancySchema.parse(occupancy.results[0]),
+  };
 }
 
 export async function getRunWithModels(
@@ -409,6 +522,10 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         output_prefix: row.output_prefix,
         event_count: row.event_count,
         last_event_types: row.last_event_types,
+        tool_calls: row.tool_calls,
+        tool_names: row.tool_names,
+        step_count: row.step_count,
+        final_finish_reason: row.final_finish_reason,
         rep: row.rep,
         timed_out: row.timed_out,
         prompt_revision: row.prompt_revision,
@@ -446,19 +563,21 @@ export const PRIOR_CASE_RESULTS_REUSE_SQL = `
           AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
           AND run.started_at < profile.invalidated_at
       )
-      AND NOT (source.prompt_revision < ?
-        AND source.case_id IN (SELECT value FROM json_each(?)))
+      AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+        WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
   )
   INSERT INTO case_results (
     run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
     input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
     error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-    event_count, last_event_types, rep, timed_out, prompt_revision
+    event_count, last_event_types, tool_calls, tool_names, step_count,
+    final_finish_reason, rep, timed_out, prompt_revision
   )
   SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
     input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
     error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-    event_count, last_event_types, rep, timed_out, prompt_revision
+    event_count, last_event_types, tool_calls, tool_names, step_count,
+    final_finish_reason, rep, timed_out, prompt_revision
   FROM ranked WHERE reuse_rank = 1
   ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
 `;
@@ -490,8 +609,8 @@ export const PRIOR_PENDING_OUTPUTS_REUSE_SQL = `
         AND json_type(source.payload, '$.result.timedOut') = 'false'
         AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
       ELSE 0 END
-      AND NOT (source.prompt_revision < ?
-        AND source.case_id IN (SELECT value FROM json_each(?)))
+      AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+        WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
       AND NOT EXISTS (
         SELECT 1 FROM case_results AS graded
         WHERE graded.run_id = source.run_id AND graded.model = source.model
@@ -513,8 +632,8 @@ export const PRIOR_PENDING_OUTPUTS_REUSE_SQL = `
 
 /**
  * Copy each pair's newest compatible graded case (and recoverable pending output) from
- * earlier runs into this run. A result for one of `skipOldCaseIds` measured under an
- * older prompt transport is never copied, so those cases run again.
+ * earlier runs into this run. A result measured below its case's entry in
+ * `minimumRevisions` (src/measurement-revision.ts) is never copied, so that case runs again.
  */
 export async function reuseDeciderCaseResults(
   db: D1Database,
@@ -524,11 +643,10 @@ export async function reuseDeciderCaseResults(
     engineIdentity: string;
     repetitions: number;
     entries: readonly BenchmarkPair[];
-    skipOldCaseIds: readonly string[];
-    promptRevision: number;
+    minimumRevisions: Readonly<Record<string, number>>;
   }
 ): Promise<number> {
-  const skipCaseIds = JSON.stringify(params.skipOldCaseIds);
+  const minimumRevisions = JSON.stringify(params.minimumRevisions);
   let copied = 0;
   for (let offset = 0; offset < params.entries.length; offset += 10) {
     const statements: D1PreparedStatement[] = [];
@@ -540,8 +658,7 @@ export async function reuseDeciderCaseResults(
         params.repetitions,
         entry.model,
         variantToStorage(entry.variant),
-        params.promptRevision,
-        skipCaseIds,
+        minimumRevisions,
         params.runId,
       ];
       statements.push(
@@ -651,6 +768,32 @@ export async function getRoutingCaseResultsForEntries(
   return [...pairs.values()];
 }
 
+export type ProbeCaseCount = { model: string; variant: string; run_id: string; probes: number };
+
+/**
+ * Probe results each pair's provenance run holds at `revision` or newer. A pair counts as
+ * probe-complete only when `probes` reaches the number of probe cases (src/probe/eligibility.ts);
+ * run completion already guarantees every repetition produced a row.
+ */
+export async function countProbeCaseResults(
+  db: D1Database,
+  params: { runIds: readonly string[]; caseIds: readonly string[]; revision: number }
+): Promise<ProbeCaseCount[]> {
+  if (params.runIds.length === 0 || params.caseIds.length === 0) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT run_id, model, variant, COUNT(DISTINCT case_id) AS probes
+       FROM case_results
+       WHERE run_id IN (SELECT value FROM json_each(?))
+         AND case_id IN (SELECT value FROM json_each(?))
+         AND prompt_revision >= ?
+       GROUP BY run_id, model, variant`
+    )
+    .bind(JSON.stringify(params.runIds), JSON.stringify(params.caseIds), params.revision)
+    .all<ProbeCaseCount>();
+  return results;
+}
+
 export async function getExistingCaseResultIds(
   db: D1Database,
   params: {
@@ -700,17 +843,27 @@ const PendingDeciderOutputSchema = z.object({
     stderrTail: z.string(),
     eventCount: z.number(),
     lastEventTypes: z.array(z.string()),
+    // Absent from outputs saved before tool evidence was recorded.
+    tools: z
+      .object({
+        calls: z.number().int().nonnegative(),
+        names: z.array(z.string()),
+        steps: z.number().int().nonnegative(),
+        finalFinishReason: z.string().nullable(),
+      })
+      .nullable()
+      .default(null),
     timedOut: z.boolean(),
     unavailableModelId: z.string().min(1).optional(),
   }),
   retried: z.boolean(),
-  // From the row's prompt_revision column; absent when the output is about to be saved by
-  // this worker, which uses PROMPT_TRANSPORT_REVISION.
-  promptRevision: z.number().int().optional(),
   attemptStartedAt: z.number().int().nonnegative().optional(),
 });
 
 export type PendingDeciderOutput = z.infer<typeof PendingDeciderOutputSchema>;
+
+/** A pending output with the measurement revision of the paid call that produced it. */
+export type StoredDeciderOutput = PendingDeciderOutput & { promptRevision: number };
 
 function pendingDeciderOutputPredicate(key: PendingDeciderOutputKey) {
   return and(
@@ -725,7 +878,7 @@ function pendingDeciderOutputPredicate(key: PendingDeciderOutputKey) {
 export async function getPendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey
-): Promise<PendingDeciderOutput | null> {
+): Promise<StoredDeciderOutput | null> {
   const row = await drizzle(db)
     .select({
       payload: pendingDeciderOutputs.payload,
@@ -742,7 +895,7 @@ export async function getPendingDeciderOutput(
 export async function savePendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey,
-  output: PendingDeciderOutput,
+  output: StoredDeciderOutput,
   execution?: { token: string; attemptStartedAt?: number }
 ): Promise<boolean> {
   const { promptRevision, ...payload } = output;
@@ -768,7 +921,7 @@ export async function savePendingDeciderOutput(
       key.case_id,
       key.rep,
       JSON.stringify(payload),
-      promptRevision ?? PROMPT_TRANSPORT_REVISION,
+      promptRevision,
       execution?.token ?? null,
       execution?.attemptStartedAt ?? null
     )
@@ -913,6 +1066,7 @@ export async function replaceModelSummaries(
           p50_latency_ms: s.p50LatencyMs,
           p95_latency_ms: s.p95LatencyMs,
           cases: s.cases,
+          costed_cases: s.costedCases,
           errors: s.errors,
           timeouts: s.timeouts,
           route_accuracy: s.routeAccuracy,
@@ -981,13 +1135,13 @@ export async function listRuns(
   return runRows.map(mapRunRow);
 }
 
-export async function existsRunningRun(db: D1Database, router: AutoRouter): Promise<boolean> {
-  const run = await drizzle(db)
+export async function listRunningRunIds(db: D1Database, router: AutoRouter): Promise<string[]> {
+  const runs = await drizzle(db)
     .select({ id: benchmarkRuns.id })
     .from(benchmarkRuns)
     .where(and(eq(benchmarkRuns.router, router), eq(benchmarkRuns.status, 'running')))
-    .get();
-  return run !== undefined;
+    .orderBy(asc(benchmarkRuns.started_at), asc(benchmarkRuns.id));
+  return runs.map(run => run.id);
 }
 
 export type RunProgressCountRow = {
@@ -996,6 +1150,7 @@ export type RunProgressCountRow = {
   router: AutoRouter;
   repetitions: number;
   engineIdentity: string;
+  measurementRevision: number;
   enqueuedModels: number;
   completedCases: number;
   failedCases: number;
@@ -1018,6 +1173,7 @@ export async function listRunProgressCounts(
       router: benchmarkRuns.router,
       repetitions: benchmarkRuns.repetitions,
       engineIdentity: benchmarkRuns.engine_identity,
+      measurementRevision: benchmarkRuns.measurement_revision,
       enqueuedModels: sql<number>`(
         SELECT COUNT(*) FROM ${runModels}
         WHERE ${runModels.run_id} = ${benchmarkRuns.id} AND ${runModels.enqueued} = 1
@@ -1039,9 +1195,150 @@ export async function listRunProgressCounts(
     router: row.router,
     repetitions: row.repetitions,
     engineIdentity: row.engineIdentity,
+    measurementRevision: row.measurementRevision,
     enqueuedModels: Number(row.enqueuedModels),
     completedCases: Number(row.completedCases),
     failedCases: Number(row.failedCases),
+  }));
+}
+
+export type RunTotalsRow = {
+  runId: string;
+  totalCostUsd: number | null;
+  measuredCases: number;
+  erroredCases: number;
+};
+
+/**
+ * Statement {@link listRunTotals} runs; exported for the query-plan test. One
+ * bounded index seek on case_results per run in the page, grouped by run — a
+ * page of runs never ships their case rows.
+ */
+export function listRunTotalsStatement(orm: ReturnType<typeof drizzle>, runIds: readonly string[]) {
+  return orm
+    .select({
+      runId: caseResults.run_id,
+      totalCostUsd: sql<number | null>`SUM(${caseResults.cost_usd})`,
+      measuredCases: count(),
+      erroredCases: sql<number>`SUM(
+        CASE WHEN ${caseResults.error} IS NOT NULL OR ${caseResults.timed_out} = 1 THEN 1 ELSE 0 END
+      )`,
+    })
+    .from(caseResults)
+    .where(inArray(caseResults.run_id, [...runIds]))
+    .groupBy(caseResults.run_id);
+}
+
+/**
+ * Cost and case tallies for every run among `runIds` in one statement. Runs
+ * without any graded case are absent from the result, and a run whose cases
+ * reported no cost carries a null total.
+ */
+export async function listRunTotals(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<RunTotalsRow[]> {
+  if (runIds.length === 0) return [];
+  const rows = await listRunTotalsStatement(drizzle(db), runIds);
+  return rows.map(row => ({
+    runId: row.runId,
+    totalCostUsd: row.totalCostUsd === null ? null : Number(row.totalCostUsd),
+    measuredCases: Number(row.measuredCases),
+    erroredCases: Number(row.erroredCases),
+  }));
+}
+
+/**
+ * Enqueued model ids per run for the runs among `runIds`, in one statement per
+ * batch of ids. A skipped (not enqueued) model is absent: it was measured by an
+ * earlier run. A model enqueued at two reasoning variants is one id, because the
+ * list answers "which models did this run measure", not "how many pairs".
+ */
+export async function listRunModelIds(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<Map<string, string[]>> {
+  if (runIds.length === 0) return new Map();
+  const orm = drizzle(db);
+  const models = new Map<string, string[]>();
+  for (let i = 0; i < runIds.length; i += RUN_ID_FILTER_BATCH_SIZE) {
+    const rows = await orm
+      .selectDistinct({ runId: runModels.run_id, model: runModels.model })
+      .from(runModels)
+      .where(
+        and(
+          inArray(runModels.run_id, runIds.slice(i, i + RUN_ID_FILTER_BATCH_SIZE)),
+          eq(runModels.enqueued, true)
+        )
+      );
+    for (const row of rows) {
+      const list = models.get(row.runId);
+      if (list) list.push(row.model);
+      else models.set(row.runId, [row.model]);
+    }
+  }
+  // DISTINCT removes the duplicates of one run's variants; a run id belongs to
+  // exactly one batch, so no list is assembled twice.
+  return models;
+}
+
+export type RunModelTotalsRow = {
+  model: string;
+  variant: string;
+  scoreSum: number;
+  cases: number;
+  costedCases: number;
+  costSum: number | null;
+  errors: number;
+  timeouts: number;
+  routeGraded: number;
+  routeHits: number;
+};
+
+/**
+ * Statement {@link listRunModelTotals} runs; exported for the query-plan test.
+ * One index seek on the run's case rows, grouped by the exact pair.
+ */
+export function listRunModelTotalsStatement(orm: ReturnType<typeof drizzle>, runId: string) {
+  return orm
+    .select({
+      model: caseResults.model,
+      variant: caseResults.variant,
+      scoreSum: sql<number>`SUM(${caseResults.score})`,
+      cases: count(),
+      costedCases: sql<number>`COUNT(${caseResults.cost_usd})`,
+      costSum: sql<number | null>`SUM(${caseResults.cost_usd})`,
+      errors: sql<number>`SUM(CASE WHEN ${caseResults.error} IS NOT NULL THEN 1 ELSE 0 END)`,
+      timeouts: sql<number>`SUM(CASE WHEN ${caseResults.timed_out} = 1 THEN 1 ELSE 0 END)`,
+      routeGraded: sql<number>`COUNT(${caseResults.route_hit})`,
+      routeHits: sql<number>`COALESCE(SUM(CASE WHEN ${caseResults.route_hit} THEN 1 ELSE 0 END), 0)`,
+    })
+    .from(caseResults)
+    .where(eq(caseResults.run_id, runId))
+    .groupBy(caseResults.model, caseResults.variant);
+}
+
+/**
+ * Per-(model, variant) case aggregates for one run, summed over every route.
+ * The caller turns the sums into the accuracy and cost means a reader sees.
+ * Variant is storage form.
+ */
+export async function listRunModelTotals(
+  db: D1Database,
+  runId: string
+): Promise<RunModelTotalsRow[]> {
+  const rows = await listRunModelTotalsStatement(drizzle(db), runId);
+  return rows.map(row => ({
+    model: row.model,
+    variant: row.variant,
+    scoreSum: Number(row.scoreSum),
+    cases: Number(row.cases),
+    costedCases: Number(row.costedCases),
+    costSum: row.costSum === null ? null : Number(row.costSum),
+    errors: Number(row.errors),
+    timeouts: Number(row.timeouts),
+    routeGraded: Number(row.routeGraded),
+    routeHits: Number(row.routeHits),
   }));
 }
 
@@ -1065,9 +1362,10 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
     );
 }
 
-// The currently-running run of a (kind, purpose), if any (used for the
-// one-active-run-per-slot admission pre-check). Platform and profile hold
-// independent slots. Stale runs are swept to 'failed' before this is consulted.
+// The running run of a (kind, purpose), if any. Classifier admission relies on
+// it: a classifier run derives one winner, so only one may run at a time.
+// Decider queues hold several runs; their drain reads getQueueRunOccupancy.
+// Stale runs are swept to 'failed' before this is consulted.
 export async function getRunningRun(
   db: D1Database,
   kind: BenchmarkKind,
@@ -1143,8 +1441,8 @@ export async function markProfilesRunningForRun(
   if (entries.length === 0) return [];
   const orm = drizzle(db);
   // Returns the entries this run actually claimed. An entry already claimed by
-  // the other queue's run updates 0 rows and is dropped, so the pair is
-  // measured once instead of being benchmarked (and billed) twice.
+  // another run updates 0 rows and is dropped, so the pair is measured once
+  // instead of being benchmarked (and billed) twice.
   const claimed: BenchmarkPair[] = [];
   for (const entry of entries) {
     const result = await orm
@@ -1206,13 +1504,13 @@ function readyProfileForRemeasure() {
 }
 
 /**
- * Copy every result of each claimed re-measure's previous run into this run, except the
- * `skipOldCaseIds` results measured under an older prompt transport. Failed and timed-out
- * results are copied too: only the skipped cases run again.
+ * Copy every result of each claimed re-measure's previous run into this run, except results
+ * measured below their case's entry in `minimumRevisions`. Failed and timed-out results are
+ * copied too: only the cases below their minimum, and cases the previous run never had, run.
  */
 export async function copyRemeasureBaselines(
   db: D1Database,
-  params: { runId: string; skipOldCaseIds: readonly string[]; promptRevision: number }
+  params: { runId: string; minimumRevisions: Readonly<Record<string, number>> }
 ): Promise<number> {
   const result = await db
     .prepare(`
@@ -1220,14 +1518,16 @@ export async function copyRemeasureBaselines(
         run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
         input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
         error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-        event_count, last_event_types, rep, timed_out, prompt_revision
+        event_count, last_event_types, tool_calls, tool_names, step_count,
+        final_finish_reason, rep, timed_out, prompt_revision
       )
       SELECT r.run_id, source.model, source.variant, source.case_id, source.route_key,
         source.score, source.latency_ms, source.cost_usd, source.input_tokens,
         source.cached_input_tokens, source.output_tokens, source.reasoning_tokens,
         source.error, source.fallback_reason,
         source.route_hit, source.retried, source.exit_code, source.output_prefix,
-        source.event_count, source.last_event_types, source.rep, source.timed_out,
+        source.event_count, source.last_event_types, source.tool_calls, source.tool_names,
+        source.step_count, source.final_finish_reason, source.rep, source.timed_out,
         source.prompt_revision
       FROM profile_remeasures AS r
       JOIN benchmark_profiles AS p ON p.router = r.router AND p.model = r.model
@@ -1236,11 +1536,11 @@ export async function copyRemeasureBaselines(
       JOIN case_results AS source ON source.run_id = p.run_id
         AND source.model = p.model AND source.variant = p.variant
       WHERE r.run_id = ?
-        AND NOT (source.prompt_revision < ?
-          AND source.case_id IN (SELECT value FROM json_each(?)))
+        AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+          WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
       ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
     `)
-    .bind(params.runId, params.promptRevision, JSON.stringify(params.skipOldCaseIds))
+    .bind(params.runId, JSON.stringify(params.minimumRevisions))
     .run();
   return result.meta.changes ?? 0;
 }
@@ -2072,6 +2372,7 @@ export async function getLatestSummariesByModel(
       p50_latency_ms: modelSummaries.p50_latency_ms,
       p95_latency_ms: modelSummaries.p95_latency_ms,
       cases: modelSummaries.cases,
+      costed_cases: modelSummaries.costed_cases,
       errors: modelSummaries.errors,
       timeouts: modelSummaries.timeouts,
       route_accuracy: modelSummaries.route_accuracy,

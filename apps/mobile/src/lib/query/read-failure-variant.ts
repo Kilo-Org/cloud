@@ -1,9 +1,65 @@
 import { type BannerState } from '@/lib/offline-banner-state';
-import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
+import {
+  isControlPlaneTimeout,
+  isPermissionDeniedError,
+  isTerminalTrpcCode,
+  isTrpcClientError,
+  readTrpcErrorField,
+} from '@/lib/trpc-error';
 import { z } from 'zod';
 
 /** The presentation of a failed first load: who the failure blames. */
 export type ReadFailureVariant = 'offline' | 'server';
+
+/**
+ * Which of the app's failure kinds a read landed in. A surface that reads
+ * through more than one call (a card over a balance and an identity, a list
+ * over its repositories and its rows) names ONE kind for the whole surface, so
+ * the reader cannot be told two different things about one failure.
+ *
+ * Only `retryable`, `offline` and `timeout` can succeed on a second attempt: a
+ * refusal is refused again, a missing item is the answer, and a terminal
+ * contract failure needs different input rather than another request.
+ */
+export type ReadFailureKind =
+  | 'offline'
+  | 'timeout'
+  | 'permission'
+  | 'not-found'
+  | 'terminal'
+  | 'retryable';
+
+/** True when asking the server again can plausibly succeed. */
+export function readFailureKindIsRetryable(kind: ReadFailureKind): boolean {
+  return kind === 'retryable' || kind === 'offline' || kind === 'timeout';
+}
+
+/** The `QueryError` variant that carries each kind's copy. */
+const VARIANT_BY_KIND = {
+  offline: 'offline',
+  timeout: 'timeout',
+  permission: 'permission',
+  'not-found': 'not-found',
+  // A terminal code the app has no better sentence for keeps the server's
+  // copy: the read was answered, so neither the connection nor a missing item
+  // describes it.
+  terminal: 'server',
+  retryable: 'server',
+} as const satisfies Record<
+  ReadFailureKind,
+  'offline' | 'timeout' | 'permission' | 'not-found' | 'server'
+>;
+
+/**
+ * The `QueryError` variant that carries the kind's copy: the connection's own
+ * wording, a deadline's own wording, the refusal, the removed item, or the
+ * server's failure. Plain strings so this module stays free of components.
+ */
+export function readFailureKindVariant(
+  kind: ReadFailureKind
+): 'offline' | 'timeout' | 'permission' | 'not-found' | 'server' {
+  return VARIANT_BY_KIND[kind];
+}
 
 export type SelectReadFailureVariantInput = {
   /** Errors of the reads whose failure produced the error view. */
@@ -56,7 +112,52 @@ export function isReadPausedBeforeData(read: {
   return read.isPending && read.fetchStatus === 'paused' && read.connectivity !== 'unknown';
 }
 
-function servedAnswer(error: unknown): boolean {
+/**
+ * Names the kind of a failed first load, for the surfaces that must pick copy
+ * and an action from it.
+ *
+ * A client-side deadline comes first: the app's own control-plane deadline
+ * rejects with an error that carries no tRPC code and no HTTP status, so the
+ * "no server answer" rule would call a slow-but-reachable server unreachable.
+ * Its own copy names the wait, and a retry is the fix.
+ *
+ * Then the connection, but only when no read reached the server: a coded
+ * answer proves the server was reachable, so a refusal beside a transport
+ * error is still a refusal. After that, a refusal outranks a terminal code (a
+ * `FORBIDDEN` is itself terminal, and the refusal copy is the one that
+ * explains it); `NOT_FOUND` is the one terminal code that has its own copy,
+ * and every other terminal code keeps the server's.
+ */
+export function classifyReadFailureKind({
+  errors,
+  isPaused,
+  connectivity,
+}: SelectReadFailureVariantInput): ReadFailureKind {
+  if (errors.some(error => isControlPlaneTimeout(error))) {
+    return 'timeout';
+  }
+  if (classifyReadFailureVariant({ errors, isPaused, connectivity }) === 'offline') {
+    return 'offline';
+  }
+  if (errors.some(error => isPermissionDeniedError(error))) {
+    return 'permission';
+  }
+  if (errors.some(error => readTrpcErrorField(error, 'code') === 'NOT_FOUND')) {
+    return 'not-found';
+  }
+  if (errors.some(error => isTerminalTrpcCode(readTrpcErrorField(error, 'code')))) {
+    return 'terminal';
+  }
+  return 'retryable';
+}
+
+/**
+ * True when the failed read reached the server: a tRPC envelope carrying a
+ * code, or an HTTP status on the answer. A transport rejection carries
+ * neither — a `TRPCClientError` over a failed fetch has no `data.code` — so
+ * the connection owns that failure, not the backend.
+ */
+export function servedAnswer(error: unknown): boolean {
   // A bare top-level `code` is not a server answer on its own: transport and
   // abort errors carry one too (the Expo fetch cancellation names itself in
   // `code`). Only a real tRPC error envelope, or a status the answer carried,

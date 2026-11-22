@@ -277,7 +277,31 @@
     "privateRepositoryA11y": "{{name}}, private repository",
     "legalDocumentEnglishOnly": "This document is available in English only.",
     "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
-    "viewOnGitHub": "View PR on GitHub"
+    "organizationTrialEndedBillingAtKiloAi": "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again.",
+    "viewOnGitHub": "View PR on GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bullet point",
+        "nestedBulletPoint": "Nested bullet point",
+        "orderedItem": "List item {n}",
+        "nestedOrderedItem": "Nested list item {n}"
+      },
+      "blockquote": {
+        "quote": "Blockquote",
+        "nestedQuote": "Nested blockquote"
+      },
+      "table": {
+        "row": "Row {n}: {content}"
+      },
+      "math": {
+        "equation": "Math: {latex}"
+      },
+      "rotor": {
+        "headings": "Headings",
+        "links": "Links",
+        "images": "Images"
+      }
+    }
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -371,9 +395,13 @@
     "credits": "Credits",
     "failedToLoadBalance": "Failed to load balance. Tap to retry.",
     "balanceLoadFailed": "Couldn't load balance",
+    "balanceUnreachable": "Could not reach the server. Try again.",
+    "balanceAccessDenied": "You don't have permission to view this balance.",
+    "balanceUnavailable": "Balance couldn't be loaded.",
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
+    "availableToSpendInOrganization": "Available to spend in this organization",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",
@@ -515,6 +543,17 @@
       "location": "Vertex location",
       "clientEmail": "Service account email",
       "privateKey": "Service account private key",
+      "privateKeyBlockRequired": "Paste the whole key block, from the BEGIN line to the END line.",
+      "privateKeyEncrypted": "This key block is passphrase-protected. Paste a service account key that has no passphrase.",
+      "names": {
+        "codestral": "Legacy Codestral-only",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Sign in with ChatGPT)",
+        "xiaomi": "Xiaomi (pay as you go)",
+        "zai": "Z.ai (pay as you go)",
+        "bedrockByok": "Amazon Bedrock (direct)",
+        "vertexByok": "Google Vertex AI (direct)"
+      },
       "modelMappings": "Model mappings",
       "modelMappingsDescription": "Send a gateway model to a custom deployment name.",
       "mappingTitle": "Mapping {{number}}",
@@ -594,13 +633,24 @@
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
       "viewReceipt": "View receipt"
     },
+    "reportReceipts": {
+      "title": "Reports",
+      "rowSubtitle": "Reports you filed and their outcomes",
+      "emptyTitle": "No reports yet",
+      "emptyDescription": "Reports you file from a comment or an AI response appear here.",
+      "couldNotLoad": "Could not load your reports",
+      "capped": "Showing your most recent reports."
+    },
     "changelog": "What's New",
     "changelogGroupNew": "New",
     "changelogFixesIn": "Fixes and improvements in {{areas}}.",
     "changelogFixesPolish": "Bug fixes and polish.",
     "changelogAreas": {
-      "signIn": "Sign-in",
-      "profileOrganizations": "Profile & organizations"
+      "signIn": "sign-in",
+      "profileOrganizations": "profile & organizations",
+      "chat": "chat",
+      "notifications": "notifications",
+      "integrations": "integrations"
     },
     "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
@@ -1366,7 +1416,7 @@
       "couldNotGetLatest": "Couldn't get the latest.",
       "byline": "#{{number}} by {{author}}",
       "noFindings": "No findings",
-      "findingsUnavailable": "Results are unavailable because this review failed.",
+      "findingsUnavailable": "Results are unavailable.",
       "findingsInProgress": "This review is still in progress. Findings appear here when it finishes.",
       "findingsEndedWithoutResults": "This review ended before it produced any findings.",
       "serviceUnavailable": "Could not reach the code review service. Retry the review when the service is available.",
@@ -1497,7 +1547,7 @@
       "managedOnWebRepositories": "Choose repositories for {{organization}} on the web from a computer.",
       "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
       "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
-      "descriptionOverview": "Create a Workspace Access Token for {{organization}}, then paste it on the next screen.",
+      "descriptionOverview": "Create a Workspace Access Token, then paste it on the next screen.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
       "tokenPlaceholder": "Workspace access token",
       "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."
@@ -2616,7 +2666,7 @@
       "searchPlaceholder": "Search repositories...",
       "noMatches": "No matches",
       "noRepositories": "No repositories available",
-      "noRepositoriesDescription": "No repositories are connected to your account.",
+      "noRepositoriesDescription": "Connect GitHub or GitLab to load repositories.",
       "loading": "Loading...",
       "accessibility": "Repository: {{label}}"
     },
@@ -3510,7 +3560,7 @@
       "manageOnWeb": "Billing settings on the web",
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
-      "managedOnWeb": "The plan, seats and auto top-up are managed on the web.",
+      "managedOnWeb": "The plan, seats and auto top-up are managed at kilo.ai.",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
       "opensOnWeb": "Opens on the web"
@@ -3692,6 +3742,7 @@
       "identifierLabel": "Identifier",
       "identifierRequired": "Enter an identifier.",
       "identifierTaken": "Another mode already uses this identifier.",
+      "identifierTooLong": "Keep the identifier to {{max}} characters or fewer.",
       "nameLabel": "Mode name",
       "nameRequired": "Enter a mode name.",
       "notFound": "This mode no longer exists.",
@@ -3782,7 +3833,7 @@
     "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
     "admissionRequired": "Your device can't be verified. Use '$t(login.moreSignInOptions)' to sign in on another device or through the web.",
     "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again.",
+    "retryableAdmission": "We could not verify this device. Please try again.",
     "startSignInFailed": "Failed to start sign in. Please try again.",
     "couldNotOpenBrowser": "Could not open browser. Please try again.",
     "signInTimedOut": "Sign-in timed out. Please try again.",
@@ -3842,6 +3893,34 @@
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",
     "waitingToRetry": "Waiting to retry",
+    "countNoun": {
+      "needsInput_one": "Needs input",
+      "needsInput_other": "Needs input",
+      "running_one": "Working",
+      "running_other": "Working",
+      "scheduled_one": "Scheduled",
+      "scheduled_other": "Scheduled",
+      "idle_one": "Idle",
+      "idle_other": "Idle"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Needs input",
+      "needsInput_other": "{{displayCount}} Needs input",
+      "running_one": "{{displayCount}} Working",
+      "running_other": "{{displayCount}} Working",
+      "scheduled_one": "{{displayCount}} Scheduled",
+      "scheduled_other": "{{displayCount}} Scheduled",
+      "idle_one": "{{displayCount}} Idle",
+      "idle_other": "{{displayCount}} Idle"
+    },
+    "footer": {
+      "checked": "Checked {{time}}",
+      "lastKnown": "Last known · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Next run {{time}}",
+      "wasDue": "Was due {{time}}"
+    },
     "step": {
       "editing": "Editing",
       "reading": "Reading",
@@ -4018,7 +4097,8 @@
         "space": "There isn't enough free storage for this model. Free up space and try again.",
         "network": "The download didn't finish. Check your connection and try again.",
         "invalidFile": "The downloaded file isn't a model this app can run, so it was removed.",
-        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again."
+        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again.",
+        "writeFailed": "This device couldn't save the model. Try the download again."
       }
     },
     "catalog": {
@@ -4265,7 +4345,7 @@
     "personalDefaultDescription": "Auto-loaded when no repository has a pinned profile.",
     "organizationDefaultDescription": "Auto-loaded for members who have no personal default.",
     "setAsDefault": "Set as default",
-    "saveFailed": "Couldn't save profile",
+    "saveFailed": "Couldn't save the profile. Try again.",
     "organizationRoleRequired": "Only organization owners and admins can change organization profiles.",
     "deleteTitle": "Delete profile",
     "deleteMessage": "This permanently removes the profile and its settings. This cannot be undone.",
@@ -4414,6 +4494,7 @@
       "promptPlaceholder": "You are a …",
       "tools": "Tools",
       "wholeToolRule": "This agent applies one rule for every tool at once: {{rule}}. These switches are read-only.",
+      "toolRule": "Stored rule: {{rule}}",
       "visibility": "Visibility",
       "visibilityPrimary": "Primary — shown in the picker",
       "visibilitySubagent": "Subagent — only callable from others",
@@ -4523,19 +4604,34 @@
       "deductionFallback": "Credit deduction",
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
       "emptyTitle": "No credit history",
+      "expiredGrant": "Expired: {{description}}",
       "googlePlayReceipt": "Receipt from Google Play",
       "kind": {
         "adjustment": "Adjustment",
         "balanceNeutral": "Balance neutral",
         "deduction": "Deduction",
         "grant": "Credit grant",
+        "promotionalCredits": "Promotional credits",
+        "welcomeCredits": "Welcome credits",
         "purchase": "Purchase"
+      },
+      "program": {
+        "adminBulkGrant": "Admin credit grant",
+        "contributorChampion": "Contributor champion credit",
+        "feedback": "Feedback credit",
+        "influencer": "Influencer credit",
+        "ossMonthlyReset": "OSS sponsorship reset",
+        "ossSponsorship": "OSS sponsorship credit",
+        "pullRequest": "Pull request credit",
+        "usageIssue": "Usage issue credit",
+        "vibeDay": "Vibe day credit"
       },
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase.",
-      "retentionLimit": "Showing the most recent credit history."
+      "retentionLimit": "Showing the most recent credit history.",
+      "voidedGrant": "Voided: {{description}}"
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
@@ -4692,6 +4788,8 @@
     "connectedTo": "Connected to {{account}}",
     "disconnected": "{{provider}} disconnected",
     "disconnectFailed": "Could not disconnect {{provider}}",
+    "disconnectRetry": "Slack could not confirm the disconnect. Try again.",
+    "disconnectNeedsSupport": "Kilo could not read the Slack access saved for this connection. Contact support to finish disconnecting it.",
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
     "managedByOwner": "Ask an organization owner to change connections you can't edit.",
@@ -4858,12 +4956,15 @@
     "inputDescription": "Check every input with Enkrypt AI, including tool results such as file reads and command output. If Enkrypt is unavailable, requests are sent unscanned rather than rejected.",
     "outputTitle": "Output guardrails",
     "outputDescription": "Check model responses with Enkrypt AI before your members receive them. Off unless you turn it on, separately from input guardrails.",
+    "outputUnavailable": "Kilo has not enabled output scanning for this organization, so responses are not checked and there is nothing to set here. Contact {{supportEmail}} to request it.",
     "detectorsHint": "Block stops a flagged request. Log only records detections without delaying the request.",
     "detectorsHintOutput": "Block replaces a flagged response with an error. Log only records detections without delaying the response.",
     "choiceLog": "Log only",
     "applyTo": "Apply to",
     "applyToAllMembers": "All members",
     "applyKiloDefault": "Apply Kilo Default",
+    "applyKiloDefaultEnglishNote": "Kilo's default policy text is in English, because the gateway applies it exactly as written.",
+    "applyKiloDefaultReplaceMessage": "Kilo's default policy is written in English and replaces what you set in Policy violation. Text you entered in the policy text field cannot be recovered.",
     "invalidSavedTitle": "Saved input detector settings can't be read",
     "invalidSavedBody": "Requests are blocked until the input detectors are saved again. Review the detectors below, which start from Kilo Default.",
     "invalidSavedOutputTitle": "Saved output detector settings can't be read",
@@ -4999,6 +5100,7 @@
     "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
     "providersEmpty": "No providers match this search.",
     "providersNone": "No providers are available for this organization.",
+    "providersUnavailable": "Couldn't load the provider list.",
     "allowAllShown": "Allow all shown",
     "denyAllShown": "Deny all shown",
     "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",
@@ -5017,6 +5119,20 @@
       "eu": "European Union",
       "au": "Australia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Search settings",
+    "noMatches": "No matching settings",
+    "emptyDescription": "Try a different setting name or keyword.",
+    "resultsStatus": "Settings found: {{resultCount}}",
+    "keywords": {
+      "signOut": "logout|log off",
+      "appearance": "theme|color scheme",
+      "appUnlock": "biometrics|face ID|fingerprint",
+      "language": "locale|translation",
+      "notifications": "alerts|push notifications",
+      "privacy": "analytics|tracking"
     }
   }
 }

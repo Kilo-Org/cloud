@@ -12,6 +12,21 @@ export type CreditPurchaseEntry =
 export type CreditDeduction = RouterOutputs['user']['getCreditBlocks']['deductions'][number];
 
 /**
+ * One positive credit grant the person did not buy: a welcome grant, a
+ * referral bonus, a Kilo Pass month, an admin grant, or an accounting
+ * adjustment.
+ */
+export type CreditGrant = RouterOutputs['user']['getCreditGrantHistory']['grants'][number];
+
+/**
+ * Why a grant row was written, which decides its title. The server classifies
+ * its own categories (`referral`, `welcome`, `kilo_pass`, `promotional`, the
+ * standing programs, `adjustment`); this is not {@link CreditGrantKind}, which
+ * captions a ledger row's source.
+ */
+export type CreditGrantReason = CreditGrant['kind'];
+
+/**
  * Where a paid credit grant came from. The web credits page reads the same
  * column to label a grant, and the purchase row needs it to decide between a
  * Stripe receipt and the store that sold the pack.
@@ -96,6 +111,12 @@ export type CreditHistoryItem =
        * (an expiry) instead of that grant a second time.
        */
       readonly grantListed: boolean;
+    }
+  | {
+      readonly kind: 'grant';
+      readonly key: string;
+      readonly grant: CreditGrant;
+      readonly sortDate: string;
     };
 
 /**
@@ -114,22 +135,31 @@ function sortTimeOf(value: string): number {
 
 /**
  * The single chronological list the screen renders: purchases (which carry a
- * receipt) and the ledger's grants, expiries, and deductions.
+ * receipt), the positive grants the person did not buy, and the ledger's
+ * grants, expiries, and deductions.
  *
  * Purchases arrive paged and the ledger does not, so a ledger row that is newer
  * than the oldest loaded purchase still sorts above it; the two sources cannot
  * disagree on a timestamp because both are stored on the same credit row. A
  * ledger row whose grant already has its purchase row is flagged so the row
- * prints the expiry alone, and the purchase stays one row.
+ * prints the expiry alone, and the purchase stays one row. A grant whose expiry
+ * row already prints it is likewise left out here, so every existing purchase
+ * and deduction row keeps its rendering.
  */
 export function buildCreditHistoryItems(
   purchases: readonly CreditPurchaseEntry[],
-  deductions: readonly CreditDeduction[]
+  deductions: readonly CreditDeduction[],
+  grants: readonly CreditGrant[]
 ): CreditHistoryItem[] {
   // The two reads overlap: an expiry row names the grant it closed, and a paid
   // grant is also a purchase row with its receipt. Only the purchase pages the
   // screen holds can be duplicated, so the loaded ids decide.
   const listedPurchaseIds = new Set(purchases.map(entry => entry.id));
+  // The same overlap for a free grant: its expiry row prints the grant itself,
+  // so listing the grant again would read as two grants.
+  const printedGrantIds = new Set(
+    deductions.flatMap(deduction => (deduction.purchase ? [deduction.purchase.id] : []))
+  );
   const items: CreditHistoryItem[] = [
     ...purchases.map((entry): CreditHistoryItem => ({
       kind: 'purchase',
@@ -137,6 +167,14 @@ export function buildCreditHistoryItems(
       entry,
       sortDate: entry.date,
     })),
+    ...grants
+      .filter(grant => !printedGrantIds.has(grant.id))
+      .map((grant): CreditHistoryItem => ({
+        kind: 'grant',
+        key: `grant:${grant.id}`,
+        grant,
+        sortDate: grant.date,
+      })),
     ...deductions.map((deduction): CreditHistoryItem => {
       const grant = deduction.purchase;
       return {

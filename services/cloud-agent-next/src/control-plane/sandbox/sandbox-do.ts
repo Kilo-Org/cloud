@@ -131,6 +131,16 @@ import {
 } from '../../sandbox-control/startup-failure.js';
 import type { GrantDiagnostic } from '../../sandbox-control/grant-diagnostic.js';
 import {
+  routeNetworkSecretSnapshot,
+  deleteNetworkSecretSnapshot,
+} from './network-secret-snapshot.js';
+import type { NetworkSecretGrant } from '../../network-secrets/grants.js';
+import { NetworkSecretConfigurationError } from '../../network-secrets/errors.js';
+import { admitNetworkSecretCredential } from '../../network-secrets/admission.js';
+import type { NetworkSecretResolution } from '../../network-secrets/contract.js';
+import { parseControlPlaneCredential } from '../../shared/control-plane-credential.js';
+import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
+import {
   hasRuntimeCredentialProxy,
   prepareCredentialGrant,
   resolveSessionCredential,
@@ -1618,6 +1628,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       await this.retireRoute(parsed.sessionId);
       if (parsed.reason !== 'standalone_session_deleted') return;
+      deleteNetworkSecretSnapshot(this.db, parsed.sessionId);
       const sandboxClass = classifySandboxId(this.sandboxId);
       if (sandboxClass === 'shared' || sandboxClass === 'legacy-shared') return;
       if ((await listRoutes(this.db)).length !== 0) return;
@@ -1811,6 +1822,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const routes = await listRoutes(this.db);
       if (deleteWorkspaceSnapshot(this.db, parsed.worktreeId, 'workspace_deleted'))
         this.broadcastStatusSnapshots(await this.readAllocation());
+      deleteNetworkSecretSnapshot(this.db, parsed.worktreeId);
       this.fenceWorkspaceSnapshot('workspace_deleted');
       const target = worktreeOwnedRoutes(routes, parsed);
       const state = await this.readAllocation();
@@ -2482,8 +2494,35 @@ export class SandboxControlV2 extends DurableObject<Env> {
     outboundContainerId: string;
     url: string;
     method: string;
-  }): Promise<{ credential: string } | null> {
+  }): Promise<{ credential: string } | NetworkSecretResolution | null> {
     await this.initialized;
+    if (parseControlPlaneCredential(input.credential)?.purpose === 'secret') {
+      try {
+        return await admitNetworkSecretCredential(
+          input.credential,
+          {
+            ...this.scmAdmissionDependencies(),
+            grantAdmitted: hasRuntimeCredentialProxy,
+            readContext: async () => ({
+              ...(await this.readScmAdmissionContext()),
+              available: true,
+              identityBinding: '',
+            }),
+            authenticate: async context =>
+              context.outboundContainerId === input.outboundContainerId
+                ? { ok: true, isCurrent: () => true }
+                : { ok: false, status: 403, code: 'invalid_identity' },
+          },
+          this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+          [...(this.env.WORKER_URL ? [this.env.WORKER_URL] : []), CLOUD_AGENT_SESSION_SYNC_ORIGIN],
+          input.url
+        );
+      } catch (error) {
+        throw Object.assign(new Error('Network secret resolution unavailable'), {
+          retryable: error instanceof Error && Reflect.get(error, 'retryable') === true,
+        });
+      }
+    }
     try {
       const result = await admitScmRequest(
         {
@@ -2568,6 +2607,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     kiloSessionId: string;
     directory: string;
     handle?: string;
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null> {
     await this.initialized;
     if (
@@ -2709,7 +2749,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * none served (the facade returns a retryable 503); `denied` is a known denial
    * on every candidate (including a handle not in the accepted set).
    */
-  async resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution> {
+  async resolveScopeHandle(input: {
+    handle: string;
+    originProof?: string;
+  }): Promise<ScopeHandleResolution> {
     await this.initialized;
     if (
       typeof input?.handle !== 'string' ||
@@ -3225,7 +3268,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private pinFromInput(
     input: EnsureAllocationInput,
     repositoryUrl?: string,
-    kiloToken?: string
+    kiloToken?: string,
+    networkSecrets: readonly NetworkSecretGrant[] = []
   ): StoredProviderPin {
     const policy = egressPolicySchema.safeParse(input);
     if (!policy.success) throw new ProviderCreationError('invalid_configuration');
@@ -3259,6 +3303,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         : {
             egressAllowlist: buildNativeEgressAllowlist({
               allowlist: policy.data.egressAllowlist ?? [],
+              networkSecretHosts: networkSecrets.flatMap(secret => secret.allowedHosts),
               env: this.env,
               repositoryUrl,
               kiloToken,
@@ -3570,7 +3615,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
         selectedPin = this.pinFromInput(
           sandboxSelection,
           repository && repository.type !== 'github' ? repository.url : undefined,
-          source.kiloToken
+          source.kiloToken,
+          routeNetworkSecretSnapshot(this.db, {
+            env: this.env,
+            source,
+            sandboxId: this.sandboxId,
+            sessionId: spec.sessionId,
+            environment,
+          })
         );
       }
       if (
@@ -3582,13 +3634,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
         throw new ProviderCreationError('invalid_configuration');
       }
     } catch (error) {
-      if (!(error instanceof ProviderCreationError)) throw error;
+      if (
+        !(error instanceof ProviderCreationError) &&
+        !(error instanceof NetworkSecretConfigurationError)
+      )
+        throw error;
       const attemptId = crypto.randomUUID();
       const route = await failRoute(
         this.routeContext(state),
         { ...spec, attemptId },
         attemptId,
-        'invalid_configuration'
+        error instanceof NetworkSecretConfigurationError
+          ? 'network_secret_configuration_invalid'
+          : 'invalid_configuration'
       );
       return routeView(route, state.kind === 'connected');
     }
@@ -3705,6 +3763,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.git ? { git: spec.git } : {}),
     };
     const scopeId = source.scopeId ?? spec.sessionId;
+    if (
+      Object.keys(source.networkSecrets ?? {}).length > 0 &&
+      provider !== 'cloudflare-containers'
+    ) {
+      throw new Error('Network secrets require a Cloudflare sandbox');
+    }
+    const networkSecrets = routeNetworkSecretSnapshot(this.db, {
+      env: this.env,
+      source,
+      sandboxId: this.sandboxId,
+      sessionId: spec.sessionId,
+      environment,
+    });
     const scopes = listScopeGrants(this.db);
     const existing = scopes.find(
       grant => grant.scopeId === scopeId && hasRuntimeCredentialProxy(grant)
@@ -3727,6 +3798,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         env: this.env,
         source,
         sessionId: spec.sessionId,
+        networkSecrets,
         sandboxId: this.sandboxId,
         provider,
         containmentEnabled: this.credentialContainmentEnabled(),
@@ -5256,7 +5328,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
       });
       const updated =
         adoptCandidate && replacingCanonical ? setAllMemberHandles(seeded, finalHandle) : seeded;
-      if (updated === grant) return { kind: 'handle', handle: finalHandle };
+      // A served handle must resolve at the facade for this fence, so a member row
+      // that already holds the string is returned only while the accepted set
+      // still carries it. A live handle keeps its own unexpired entry, so this
+      // normally returns at once; the membership test is the local guarantee that
+      // the rows, the accepted set and the adoption marker agree. Otherwise the
+      // claim continues to verification and the accepted-entry transaction below.
+      if (updated === grant) {
+        const accepted = acceptedDigests.has(await digestRuntimeProxyHandle(finalHandle));
+        if (accepted) return { kind: 'handle', handle: finalHandle };
+      }
 
       const claims = await verifyRuntimeCredentialProxyHandle(this.env, finalHandle);
       if (!claims || claims.userId !== input.ownerId) return { kind: 'fail' };
@@ -5268,7 +5349,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const match = await lookupAcceptedHandle(this.ctx.storage, finalHandle, fence, now);
         if (match === undefined || match.scopeGrantId !== scopeKey) return { kind: 'fail' };
       }
-      if (!(await this.applyCandidateGrantPolicy(updated))) return { kind: 'fail' };
+      // A grant the rows do not change needs no policy refresh: the member rows
+      // already carry the handle, and the maintenance path skips the same call
+      // for an unchanged grant so a transient provider failure cannot fail a
+      // preparation that writes no new shaping.
+      if (updated !== grant && !(await this.applyCandidateGrantPolicy(updated))) {
+        return { kind: 'fail' };
+      }
 
       const entry =
         adoptCandidate && candidate !== null && candidateDigest !== null

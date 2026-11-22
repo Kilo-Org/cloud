@@ -54,6 +54,8 @@ const PartnerSkipReasonSchema = z.enum([
   'provider-settings',
   'unsupported-reasoning-effort',
   'invalid-credentials',
+  /** The partner's upstream failed earlier in the session; see `partner-upstream-error-cache.ts`. */
+  'recent-upstream-error',
 ]);
 
 export type PartnerSkipReason = z.infer<typeof PartnerSkipReasonSchema>;

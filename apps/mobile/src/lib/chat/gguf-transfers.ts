@@ -12,6 +12,7 @@ import {
   removeQuietly,
   type Settled,
   settled,
+  STORAGE_HEADROOM_BYTES,
 } from './gguf-records';
 
 /** One file of a model: the model itself, then its projector when it has one. */
@@ -72,15 +73,21 @@ export function activeDownload(input: {
   };
 }
 
+/** How the finished files ended up: in place, refused by the device, or gone. */
+export type GgufMove = 'moved' | 'refused' | 'missing';
+
 /**
  * Moves every finished transfer that is still a partial file to its model name.
  * A move that failed is no verdict on the bytes, so a file an earlier attempt
- * left at a model name is cleared and the remaining moves run once more. False
- * when a file is neither a partial nor in place afterwards.
+ * left at a model name is cleared and the remaining moves run once more.
+ * `moved` when every file ends at its model name, `refused` when the device
+ * refused a move and the file is still partial or its state is unknown, and
+ * `missing` when no move was refused and a file is at neither place.
  */
-export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
-  if (moveAll(storage, transfers)) {
-    return true;
+export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTransfer[]): GgufMove {
+  const first = moveAll(storage, transfers);
+  if (first === 'moved') {
+    return 'moved';
   }
   const names = new Set(storage.list());
   for (const transfer of transfers) {
@@ -89,24 +96,30 @@ export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTran
       removeQuietly(storage, transfer.name);
     }
   }
-  return moveAll(storage, transfers);
+  const second = moveAll(storage, transfers);
+  if (second === 'moved') {
+    return 'moved';
+  }
+  // A refusal is the actionable cause even when a file also vanished: the
+  // device state is unknown, so the file is not called missing.
+  return first === 'refused' || second === 'refused' ? 'refused' : 'missing';
 }
 
-function moveAll(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
+function moveAll(storage: GgufStorage, transfers: readonly GgufTransfer[]): GgufMove {
   const names = new Set(storage.list());
   try {
     for (const transfer of transfers) {
       // A move that already happened is never repeated or undone: its partial is gone.
       if (!names.has(transfer.part) && !names.has(transfer.name)) {
-        return false;
+        return 'missing';
       }
       if (names.has(transfer.part)) {
         storage.move(transfer.part, transfer.name);
       }
     }
-    return true;
+    return 'moved';
   } catch {
-    return false;
+    return 'refused';
   }
 }
 
@@ -127,9 +140,32 @@ export function transferResult(
   return size < expected ? 'short' : 'long';
 }
 
+/** Whether a model of this size fits, counting the room a finished model needs. */
+export function fitsOnDevice(storage: GgufStorage, expected: number | undefined): boolean {
+  return expected === undefined || storage.freeBytes() >= expected + STORAGE_HEADROOM_BYTES;
+}
+
 /** Whether a finished transfer may run once more before the download is called failed. */
 export function mayRetryTransfer(download: GgufActiveDownload): boolean {
   return download.attempts < ATTEMPTS;
+}
+
+/** Drops every partial file an earlier attempt at these transfers left behind. */
+export function clearPartials(storage: GgufStorage, transfers: readonly GgufTransfer[]): void {
+  for (const transfer of transfers) {
+    removeQuietly(storage, transfer.part);
+  }
+}
+
+/**
+ * Moves the download on to the next transfer, which starts from zero with its
+ * own attempts: the finished file's bytes join the running total.
+ */
+export function advanceTransfer(download: GgufActiveDownload, size: number): void {
+  download.done += size;
+  download.step += 1;
+  download.restarted = false;
+  download.attempts = 1;
 }
 
 /** A transfer that stopped short is started from zero once more, and a file that was refused is read once more. */
@@ -259,6 +295,24 @@ export function transferStart(download: GgufActiveDownload): GgufTransfer {
   return transfer;
 }
 
+/**
+ * Opens one transfer file. The device can refuse the call — a permission or
+ * input/output refusal, which says nothing about free space — so a refusal is
+ * answered here and the caller reports it as the download's failure. Both the
+ * first transfer and every later one open through this.
+ */
+export function openTransfer(
+  storage: GgufStorage,
+  transfer: { readonly url: string; readonly part: string },
+  report: (progress: { readonly bytesWritten: number; readonly totalBytes: number }) => void
+): GgufDownloadTask | undefined {
+  try {
+    return storage.createDownload(transfer.url, transfer.part, report);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Moves a paused download back to downloading. False when it cannot resume. */
 export function requestResume(download: GgufActiveDownload): boolean {
   if (!resumable(download)) {
@@ -267,6 +321,12 @@ export function requestResume(download: GgufActiveDownload): boolean {
   download.phase = 'downloading';
   download.resuming = true;
   return true;
+}
+
+/** The task answered its pause: the download is paused and no request is in flight. */
+export function markPaused(download: GgufActiveDownload): void {
+  download.phase = 'paused';
+  download.pausing = false;
 }
 
 /** One bar for the whole model: the finished transfers, the current one, and those to come. */

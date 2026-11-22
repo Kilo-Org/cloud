@@ -15,8 +15,9 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 
-import { LAYOUT_RULES, checkParsedFile } from './check-classes.mjs';
+import { LAYOUT_RULES, checkParsedFile, layoutFindingText } from './check-classes.mjs';
 import { parseSourceEntry } from '../lib/source-files.mjs';
 
 // The rule cases read the repository's own files: the checker resolves the app's
@@ -33,9 +34,16 @@ const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'fs-entries.mjs', 'source
  * repository's app tree because the Intl rule decides by it whether the
  * formatter rule applies; the shared parse entry reads nothing from that path
  * but the text it is given.
+ *
+ * The layout rules now return records the report formats where it prints them,
+ * so this flattens them the same way: every assertion below reads the printable
+ * lines, in the order the report prints them.
  */
 function check(relative, text) {
-  return checkParsedFile(parseSourceEntry(MOBILE_ROOT, REPO, join(REPO, relative), text));
+  const { problems, layout } = checkParsedFile(
+    parseSourceEntry(MOBILE_ROOT, REPO, join(REPO, relative), text)
+  );
+  return [...problems, ...layout.map(layoutFindingText)];
 }
 
 /** The diagnostics of several files, in the order they are listed. */
@@ -241,6 +249,23 @@ test('accepts all-side padding moved to contentContainerClassName', () => {
   );
 });
 
+test('flags a variant-prefixed padding on a scroll container own className', () => {
+  // A variant selects when the padding applies and `!` only raises its
+  // specificity, so each of these insets the scroll view itself exactly as a
+  // bare `px-4` does. The tokens come back deduped and sorted, one diagnostic
+  // for the element, and the content container's own classes stay out of it.
+  assert.deepEqual(
+    screenProblems(
+      screen(
+        '<ScrollView className="ios:px-4 ios:px-4 android:pe-3 !pl-2 ios:!pr-2 flex-1" contentContainerClassName="gap-3" />'
+      )
+    ),
+    [
+      'apps/mobile/src/screen.tsx:3: <ScrollView> carries "!pl-2 android:pe-3 ios:!pr-2 ios:px-4" on its own className; move it to contentContainerClassName or the RTL layout offsets by it',
+    ]
+  );
+});
+
 test('reads padding from a cn() className expression on a scroll container', () => {
   const found = check(
     'apps/mobile/src/screen.tsx',
@@ -421,6 +446,15 @@ test('flags a runtime Text import under any name and allows the type-only forms'
   assert.match(text, /mixed\.tsx:1: imports Text from 'react-native'/);
   assert.doesNotMatch(text, /type-aliased/);
   assert.doesNotMatch(text, /type-import/);
+});
+
+test('exempts the shared Text module by its own path, not by a suffix', () => {
+  const source = "import { Text } from 'react-native';\n";
+  assert.deepEqual(check('apps/mobile/src/components/ui/text.tsx', source), []);
+  assert.match(
+    check('packages/app-shared/src/components/ui/text.tsx', source).join('\n'),
+    /imports Text from 'react-native'/
+  );
 });
 
 test('runs the whole audit over a clean tree through the CLI and ignores test scaffolding', context => {
@@ -716,16 +750,21 @@ test('checkParsedFile reports one file and keeps no state between calls', contex
   writeFileSync(
     join(root, 'probe.mjs'),
     [
-      "import { checkParsedFile } from './tools/nativewind/check-classes.mjs';",
+      "import { checkParsedFile, layoutFindingText } from './tools/nativewind/check-classes.mjs';",
       "import { parseSourceEntry } from './tools/lib/source-files.mjs';",
       `const source = ${JSON.stringify(source)};`,
       `const absolute = ${JSON.stringify(absolute)};`,
       `const dir = ${JSON.stringify(dir)};`,
       `const root = ${JSON.stringify(root)};`,
       'const entry = parseSourceEntry(dir, root, absolute, source);',
-      'const first = checkParsedFile(entry);',
-      'const firstAgain = checkParsedFile(entry);',
-      'const clean = checkParsedFile(parseSourceEntry(dir, root, absolute, "export const a = 1;"));',
+      // The printable lines of one call, built the way the report builds them.
+      'const lines = entry => {',
+      '  const { problems, layout } = checkParsedFile(entry);',
+      '  return [...problems, ...layout.map(layoutFindingText)];',
+      '};',
+      'const first = lines(entry);',
+      'const firstAgain = lines(entry);',
+      'const clean = lines(parseSourceEntry(dir, root, absolute, "export const a = 1;"));',
       'console.log(JSON.stringify({ first, firstAgain, clean }));',
     ].join('\n')
   );
@@ -983,6 +1022,30 @@ test('accepts px-4 and vertical padding on a scroll body', () => {
     layoutProblems(
       SCREEN_FILE,
       screen('<FlashList contentContainerClassName="gap-6 px-4 pt-3" />')
+    ),
+    []
+  );
+});
+
+test('flags a variant-prefixed page inset on a scroll body', () => {
+  // The gutter rule reads a token's utility part, so a prefixed or important
+  // inset is the same page inset the bare spelling writes, and the two RTL
+  // rules stay pinned to one spelling.
+  for (const classes of ['ios:px-6', '!ps-8']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    ).filter(problem => problem.includes('[L2]'));
+    assert.equal(found.length, 1, classes);
+    assert.match(
+      found[0],
+      new RegExp(`\\[L2\\] "${classes} on <DetailScreenScrollView> contentContainerClassName"`)
+    );
+  }
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<DetailScreenScrollView contentContainerClassName="px-4" />')
     ),
     []
   );
@@ -1691,4 +1754,118 @@ test('reports an @theme inline block holding no colour token as the theme failur
   // The rule has no token to build its pattern from, so it must not run.
   assert.doesNotMatch(result.stderr, /bg-primary\/50/);
   assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+});
+
+test('--write-layout-baseline refuses when a walked file cannot be read', async context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />'),
+  });
+  const unreadable = join(root, 'apps/mobile/src/screen.tsx');
+  // The fixture's own copy of the checker, so the run it exposes walks the
+  // fixture and would write there: one file's read fails, every other read is
+  // the filesystem's.
+  const { run } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const errors = [];
+  const originalError = console.error;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.error = message => {
+    errors.push(String(message));
+  };
+  // The injected writer is what a refused run must not reach: touching the
+  // baseline file itself would prove nothing about which writer ran.
+  let written = 0;
+  let exitCode;
+  try {
+    run({
+      read: (file, ...rest) => {
+        if (file === unreadable) {
+          throw new Error('EACCES: permission denied');
+        }
+        return readFileSync(file, ...rest);
+      },
+      writeBaseline: () => {
+        written += 1;
+      },
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.error = originalError;
+    process.exitCode = previousExitCode;
+  }
+  assert.equal(exitCode, 1, errors.join('\n'));
+  assert.equal(written, 0);
+  const report = errors.join('\n');
+  assert.match(report, /apps\/mobile\/src\/screen\.tsx: cannot read: EACCES: permission denied/);
+  assert.match(report, /check-classes: 1 problem\(s\)/);
+  // A baseline written here would record a tree the audit never checked.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('--write-layout-baseline refuses when a fixture source does not parse', context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/broken.tsx': 'export const a = <View className=; />;\n',
+  });
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'tools/nativewind/check-classes.mjs'), '--write-layout-baseline'],
+    { cwd: root, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stderr, /broken\.tsx:\d+: cannot parse: /);
+  assert.match(result.stderr, /check-classes: [1-9]\d* problem\(s\)/);
+  assert.doesNotMatch(result.stdout, /wrote/);
+  // The refused file may hold any number of violations, so no count is safe.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('run writes and reads the baseline through its injected seams', async context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />'),
+  });
+  const { run } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const written = [];
+  let reads = 0;
+  // The admitted run ends on its summary line, and a passing case owns that
+  // output instead of letting it land in the suite's.
+  const originalLog = console.log;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.log = () => {};
+  let exitCode;
+  try {
+    run({ writeBaseline: findings => written.push(findings) });
+    run({
+      readBaseline: () => {
+        reads += 1;
+        return { 'apps/mobile/src/screen.tsx': { L1: 1 } };
+      },
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.log = originalLog;
+    process.exitCode = previousExitCode;
+  }
+  // The injected writer received this run's findings instead of the file.
+  assert.equal(written.length, 1);
+  assert.equal(written[0].get('apps/mobile/src/screen.tsx').get('L1').length, 1);
+  // The injected reader supplied the admitted baseline, so the run passed.
+  assert.equal(reads, 1);
+  assert.doesNotMatch(String(exitCode ?? ''), /1/);
+  // Neither seam touched the tracked baseline: the fixture has no such file.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
 });

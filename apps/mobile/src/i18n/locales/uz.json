@@ -185,7 +185,31 @@
     "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
     "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya",
     "legalDocumentEnglishOnly": "Ushbu hujjat faqat ingliz tilida mavjud.",
-    "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin."
+    "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
+    "organizationTrialEndedBillingAtKiloAi": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Ro‘yxat belgisi",
+        "nestedBulletPoint": "Ichma-ich ro‘yxat belgisi",
+        "orderedItem": "Ro‘yxat elementi {n}",
+        "nestedOrderedItem": "Ichma-ich ro‘yxat elementi {n}"
+      },
+      "blockquote": {
+        "quote": "Iqtibos",
+        "nestedQuote": "Ichma-ich iqtibos"
+      },
+      "table": {
+        "row": "Qator {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Sarlavhalar",
+        "links": "Havolalar",
+        "images": "Rasmlar"
+      }
+    }
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -279,9 +303,13 @@
     "credits": "Kreditlar",
     "failedToLoadBalance": "Balansni yuklab bo'lmadi. Qayta urinish uchun bosing.",
     "balanceLoadFailed": "Balansni yuklab bo'lmadi",
+    "balanceUnreachable": "Serverga ulanib bo'lmadi. Qayta urinib ko'ring.",
+    "balanceAccessDenied": "Bu balansni ko'rishga ruxsatingiz yo'q.",
+    "balanceUnavailable": "Balans yuklanmadi.",
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
+    "availableToSpendInOrganization": "Bu tashkilotda sarflash uchun mavjud",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
@@ -423,6 +451,17 @@
       "location": "Vertex joylashuvi",
       "clientEmail": "Xizmat hisobi e-pochtasi",
       "privateKey": "Xizmat hisobi shaxsiy kaliti",
+      "privateKeyBlockRequired": "Butun kalit blokini BEGIN qatoridan END qatorigacha joylang.",
+      "privateKeyEncrypted": "Bu kalit bloki parol iborasi bilan himoyalangan. Parol iborasi bo'lmagan xizmat hisobi kalitini joylang.",
+      "names": {
+        "codestral": "Faqat eski Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT bilan kirish)",
+        "xiaomi": "Xiaomi (foydalanishga qarab to'lov)",
+        "zai": "Z.ai (foydalanishga qarab to'lov)",
+        "bedrockByok": "Amazon Bedrock (to'g'ridan-to'g'ri)",
+        "vertexByok": "Google Vertex AI (to'g'ridan-to'g'ri)"
+      },
       "modelMappings": "Model moslashuvlari",
       "modelMappingsDescription": "Gateway modelini maxsus deployment nomiga yo'naltiring.",
       "mappingTitle": "Moslashuv {{number}}",
@@ -502,14 +541,25 @@
       "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
     },
+    "reportReceipts": {
+      "title": "Shikoyatlar",
+      "rowSubtitle": "Yuborgan shikoyatlaringiz va ularning natijalari",
+      "emptyTitle": "Hozircha shikoyatlar yo'q",
+      "emptyDescription": "Izoh yoki AI javobidan yuborgan shikoyatlaringiz shu yerda ko'rinadi.",
+      "couldNotLoad": "Shikoyatlaringizni yuklab bo'lmadi",
+      "capped": "Eng so'nggi shikoyatlaringiz ko'rsatilmoqda."
+    },
     "changelog": "Yangiliklar",
     "changelogVersionPending": "{{version}} versiyasi yangiliklari ilovaning keyingi yangilanishi bilan keladi.",
     "changelogGroupNew": "Yangi",
     "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
     "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
-      "signIn": "Kirish",
-      "profileOrganizations": "Profil hamda tashkilotlar"
+      "signIn": "kirish",
+      "profileOrganizations": "profil hamda tashkilotlar",
+      "chat": "suhbat",
+      "notifications": "bildirishnomalar",
+      "integrations": "integratsiyalar"
     }
   },
   "preferences": {
@@ -1274,7 +1324,7 @@
       "couldNotGetLatest": "Eng so'nggi ma'lumotlarni olib bo'lmadi.",
       "byline": "#{{number}}, muallif: {{author}}",
       "noFindings": "Muammolar topilmadi.",
-      "findingsUnavailable": "Bu ko'rib chiqish muvaffaqiyatsiz tugagani uchun natijalar mavjud emas.",
+      "findingsUnavailable": "Natijalar mavjud emas.",
       "findingsInProgress": "Bu ko'rib chiqish hali davom etmoqda. Tugagach, muammolar shu yerda paydo bo'ladi.",
       "findingsEndedWithoutResults": "Bu ko'rib chiqish hech qanday muammo aniqlamaydan tugadi.",
       "serviceUnavailable": "Kodni ko'rib chiqish xizmatiga ulanib bo'lmadi. Xizmat mavjud bo'lganda ko'rib chiqishni qayta urinib ko'ring.",
@@ -1405,7 +1455,7 @@
       "managedOnWebRepositories": "{{organization}} uchun repozitoriylarni kompyuterdan veb orqali tanlang.",
       "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
-      "descriptionOverview": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni keyingi ekranda joylashtiring.",
+      "descriptionOverview": "Ish maydoniga kirish tokenini yarating va uni keyingi ekranda joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni",
       "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
@@ -2512,7 +2562,7 @@
       "searchPlaceholder": "Repozitoriylarni qidirish",
       "noMatches": "Mos natija topilmadi",
       "noRepositories": "Repozitoriyalar yo'q",
-      "noRepositoriesDescription": "Hisobingizga ulangan repozitoriyalar yo'q.",
+      "noRepositoriesDescription": "Repozitoriyalarni yuklash uchun GitHub yoki GitLabni ulang.",
       "loading": "Yuklanmoqda…",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3406,7 +3456,7 @@
       "manageOnWeb": "Veb-saytdagi to'lovlar sozlamalari",
       "changePlan": "Tarifni o'zgartirish",
       "buySeats": "O'rin sotib olish",
-      "managedOnWeb": "Tarif, o'rinlar va avtomatik to'ldirish veb-saytda boshqariladi.",
+      "managedOnWeb": "Tarif, o'rinlar va avtomatik to'ldirish kilo.ai saytida boshqariladi.",
       "setupAutoTopUp": "Avtomatik to'ldirishni sozlash",
       "manageAutoTopUp": "Avtomatik to'ldirishni boshqarish",
       "opensOnWeb": "Vebda ochiladi"
@@ -3588,6 +3638,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Identifikator kiriting.",
       "identifierTaken": "Bu identifikatordan boshqa rejim allaqachon foydalanmoqda.",
+      "identifierTooLong": "Identifikatorni {{max}} ta belgi yoki undan kam qilib saqlang.",
       "nameLabel": "Rejim nomi",
       "nameRequired": "Rejim nomini kiriting.",
       "notFound": "Bu rejim endi mavjud emas.",
@@ -3678,7 +3729,7 @@
     "emailDeliveryFailed": "Xat yuborish xizmati vaqtincha ishlamayapti. Keyinroq qayta urinib ko'ring.",
     "admissionRequired": "Qurilmangizni tekshirib bo‘lmadi. Boshqa qurilmada yoki veb-sayt orqali kirish uchun '$t(login.moreSignInOptions)' dan foydalaning.",
     "default": "Xatolik yuz berdi. Qayta urinib ko‘ring.",
-    "retryableAdmission": "Bu qurilmani tekshirib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+    "retryableAdmission": "Bu qurilmani tekshirib boʻlmadi. Qayta urinib koʻring.",
     "startSignInFailed": "Kirishni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "couldNotOpenBrowser": "Brauzerni ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "signInTimedOut": "Kirish uchun ajratilgan vaqt tugadi. Qayta urinib ko'ring.",
@@ -3750,6 +3801,34 @@
     "nextScheduled": "Keyingi rejalashtirilganlar",
     "answerNeeded": "Javob kutilmoqda",
     "waitingToRetry": "Qayta urinish kutilmoqda",
+    "countNoun": {
+      "needsInput_one": "Javob kutilmoqda",
+      "needsInput_other": "Javob kutilmoqda",
+      "running_one": "Ishlamoqda",
+      "running_other": "Ishlamoqda",
+      "scheduled_one": "Rejalashtirilgan",
+      "scheduled_other": "Rejalashtirilgan",
+      "idle_one": "Kutmoqda",
+      "idle_other": "Kutmoqda"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Javob kutilmoqda",
+      "needsInput_other": "{{displayCount}} Javob kutilmoqda",
+      "running_one": "{{displayCount}} Ishlamoqda",
+      "running_other": "{{displayCount}} Ishlamoqda",
+      "scheduled_one": "{{displayCount}} Rejalashtirilgan",
+      "scheduled_other": "{{displayCount}} Rejalashtirilgan",
+      "idle_one": "{{displayCount}} Kutmoqda",
+      "idle_other": "{{displayCount}} Kutmoqda"
+    },
+    "footer": {
+      "checked": "Tekshirilgan {{time}}",
+      "lastKnown": "So‘nggi ma’lum holat · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Keyingi ishga tushish {{time}}",
+      "wasDue": "Kutilgan edi {{time}}"
+    },
     "step": {
       "editing": "Tahrirlanmoqda",
       "reading": "O'qilmoqda",
@@ -3995,7 +4074,8 @@
         "space": "Bu model uchun yetarli bo‘sh joy yo‘q. Joy bo‘shatib, qayta urinib ko‘ring.",
         "network": "Yuklab olish tugallanmadi. Ulanishni tekshirib, qayta urinib ko‘ring.",
         "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi.",
-        "checksum": "Yuklab olingan fayl e’lon qilingan nazorat summasiga mos kelmaydi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring."
+        "checksum": "Yuklab olingan fayl e’lon qilingan nazorat summasiga mos kelmaydi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring.",
+        "writeFailed": "Bu qurilma modelni saqlay olmadi. Qayta yuklab olib ko‘ring."
       }
     },
     "catalog": {
@@ -4173,7 +4253,7 @@
     "personalDefaultDescription": "Hech bir omborda mahkamlangan profil bo'lmasa, avtomatik yuklanadi.",
     "organizationDefaultDescription": "Shaxsiy standarti bo'lmagan a'zolar uchun avtomatik yuklanadi.",
     "setAsDefault": "Standart sifatida o'rnating",
-    "saveFailed": "Profilni saqlab bo‘lmadi",
+    "saveFailed": "Profilni saqlab bo‘lmadi. Qayta urinib ko‘ring.",
     "organizationRoleRequired": "Faqat tashkilot egalar va administratorlar tashkilot profilini o'zgartirishi mumkin.",
     "deleteTitle": "Profilni o'chirish",
     "deleteMessage": "Bu profil va uning sozlamalarini butunlay olib tashlaydi. Buni ortga qaytarib bo‘lmaydi.",
@@ -4322,6 +4402,7 @@
       "promptPlaceholder": "Siz …",
       "tools": "Asboblar",
       "wholeToolRule": "Bu agent bir vaqtning o'zida har bir asbobga bitta qoidani qo'llaydi: {{rule}}. Bu almashtirgichlar faqat o'qish uchun.",
+      "toolRule": "Saqlangan qoida: {{rule}}",
       "visibility": "Ko'rinish",
       "visibilityPrimary": "Asosiy — tanlovchida ko'rsatilgan",
       "visibilitySubagent": "Subagent — faqat boshqalar tomonidan chaqirilishi mumkin",
@@ -4431,19 +4512,34 @@
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
+      "expiredGrant": "Muddati tugagan: {{description}}",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
         "adjustment": "Tuzatish",
         "balanceNeutral": "Balansga ta’sir qilmaydi",
         "deduction": "Yechib olish",
         "grant": "Bepul kredit",
+        "promotionalCredits": "Rag'bat kreditlari",
+        "welcomeCredits": "Xush kelibsiz krediti",
         "purchase": "Xarid"
+      },
+      "program": {
+        "adminBulkGrant": "Administrator tomonidan berilgan kredit",
+        "contributorChampion": "Hissa qo'shuvchilar chempioni krediti",
+        "feedback": "Fikr-mulohaza uchun kredit",
+        "influencer": "Influencer krediti",
+        "ossMonthlyReset": "Ochiq kodli loyihalar homiyligining oylik yangilanishi",
+        "ossSponsorship": "Ochiq kodli loyihalarga homiylik krediti",
+        "pullRequest": "PR uchun kredit",
+        "usageIssue": "Foydalanish muammosi uchun kredit",
+        "vibeDay": "Vibe kuni krediti"
       },
       "purchaseFallback": "Kredit xaridi",
       "receipt": "Chek",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
-      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda."
+      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
+      "voidedGrant": "Bekor qilingan: {{description}}"
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
@@ -4692,6 +4788,8 @@
     "connectedTo": "{{account}} hisobiga ulangan",
     "disconnected": "{{provider}} xizmati uzildi",
     "disconnectFailed": "{{provider}} xizmatini uzib boʻlmadi",
+    "disconnectRetry": "Slack uzilishni tasdiqlay olmadi. Qayta urinib ko'ring.",
+    "disconnectNeedsSupport": "Kilo bu ulanish uchun saqlangan Slack ruxsatini o'qiy olmadi. Uzishni yakunlash uchun yordam xizmatiga murojaat qiling.",
     "couldNotLoad": "Integratsiyalarni yuklab boʻlmadi",
     "permissionDenied": "Sizda bu integratsiyalarni boshqarish uchun ruxsat yoʻq.",
     "managedByOwner": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasiga murojaat qiling.",
@@ -4858,12 +4956,15 @@
     "inputDescription": "Har bir kirishni Enkrypt AI bilan skanerlaydi, jumladan asbob natijalarini. Enkrypt mavjud bo'lmaganda so'rovlar rad etilish o'rniga skanerlanmasdan yuboriladi.",
     "outputTitle": "Chiqish himoya to'siqlari",
     "outputDescription": "A'zolar javoblarni olishidan oldin ularni Enkrypt AI bilan skanerlaydi. Siz yoqmaguningizcha o'chirilgan.",
+    "outputUnavailable": "Kilo bu tashkilot uchun chiqishni skanerlashni yoqmagan, shuning uchun javoblar tekshirilmaydi va bu yerda sozlanadigan hech narsa yo'q. Buni so'rash uchun {{supportEmail}} bilan bog'laning.",
     "detectorsHint": "Bloklash belgilangan so'rovni rad etadi. Faqat jurnalga yozish uni kechiktirmasdan qayd etadi.",
     "detectorsHintOutput": "Bloklash belgilangan javobni rad etadi. Faqat jurnalga yozish uni kechiktirmasdan qayd etadi.",
     "choiceLog": "Faqat jurnalga yozish",
     "applyTo": "Qo'llash",
     "applyToAllMembers": "Barcha a'zolarga",
     "applyKiloDefault": "Kilo standartini qo'llash",
+    "applyKiloDefaultEnglishNote": "Kilo standart siyosatining matni ingliz tilida, chunki Kilo Gateway uni yozilganidek aynan qo'llaydi.",
+    "applyKiloDefaultReplaceMessage": "Kilo standart siyosati ingliz tilida yozilgan va Siyosat buzilishi bo'limida belgilaganlaringizni almashtiradi. Siyosat matni maydoniga kiritgan matnni tiklab bo'lmaydi.",
     "invalidSavedTitle": "Saqlangan kirish detektori sozlamalarini o'qib bo'lmaydi",
     "invalidSavedBody": "Kirish detektorlari qayta saqlanmaguncha so'rovlar bloklanadi. Quyidagi detektorlar Kilo standartidan boshlanadi.",
     "invalidSavedOutputTitle": "Saqlangan chiqish detektori sozlamalarini o'qib bo'lmaydi",
@@ -4999,6 +5100,7 @@
     "providersNeedCatalog": "To'liq modellar katalogi yuklanmaguncha provayder kalitlari faqat o'qish uchun bo'ladi. Ularni tahrirlash uchun yuqoridagi Qayta urinish tugmasini bosing.",
     "providersEmpty": "Bu qidiruvga mos provayder topilmadi.",
     "providersNone": "Bu tashkilot uchun hech qanday provayder mavjud emas.",
+    "providersUnavailable": "Provayderlar ro'yxatini yuklab bo'lmadi.",
     "allowAllShown": "Ko'rsatilganlarning barchasiga ruxsat berish",
     "denyAllShown": "Ko'rsatilganlarning barchasini taqiqlash",
     "gatewaysDescription": "Kilo model so'rovlarini Vercel AI Gateway yoki OpenRouter orqali yo'naltiradi. O'chirilgan shlyuz bu so'rovlarni muvaffaqiyatsiz qiladi.",
@@ -5017,6 +5119,20 @@
       "eu": "Yevropa Ittifoqi",
       "au": "Avstraliya",
       "jp": "Yaponiya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Sozlamalarni qidirish",
+    "noMatches": "Mos sozlamalar topilmadi",
+    "emptyDescription": "Boshqa sozlama nomi yoki kalit so'z bilan qidiring.",
+    "resultsStatus": "Topilgan sozlamalar: {{resultCount}}",
+    "keywords": {
+      "signOut": "chiqish|seans",
+      "appearance": "mavzu|rang|uslub",
+      "appUnlock": "biometriya|yuz|barmoq",
+      "language": "til|tarjima",
+      "notifications": "bildirishnomalar|ogohlantirishlar",
+      "privacy": "tahlil|kuzatuv"
     }
   }
 }

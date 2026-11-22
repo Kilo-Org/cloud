@@ -176,7 +176,7 @@ export function SlackIntegrationDetails({
   const handleInstall = () => {
     setIsStartingSlackConnection(true);
     window.location.href =
-      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.SLACK, organizationId);
+      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.SLACK, { organizationId });
   };
 
   const handleUninstall = async () => {

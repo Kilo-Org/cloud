@@ -3,6 +3,7 @@ import { getShareExtensionKey } from 'expo-share-intent';
 import { agentChatPickerFixtureRoute } from '@/lib/agent-chat-picker-fixture';
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
 import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
+import { contextPickerFixtureRoute } from '@/lib/context-picker-fixture';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { applyForceStatePath } from '@/lib/force-state-fixture';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
@@ -125,6 +126,13 @@ export function redirectSystemPath({
     if (handlePrReviewCopyFixturePath(path)) {
       return null;
     }
+    // Dev-only account picker sheet, opened with the bridge Home's header
+    // writes (`dev/context-picker-fixture`) so the sheet renders its accounts
+    // instead of the "Options expired" shell a bare route link produces.
+    const contextPickerFixture = contextPickerFixtureRoute(path);
+    if (contextPickerFixture) {
+      return contextPickerFixture;
+    }
     if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/button-label-fixture';
     }
@@ -151,6 +159,9 @@ export function redirectSystemPath({
     }
     if (/(?:^|\/)dev\/save-profile-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/save-profile-sheet-fixture';
+    }
+    if (/(?:^|\/)dev\/mcp-form-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/mcp-form-sheet-fixture';
     }
     if (/(?:^|\/)dev\/account-picker-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/account-picker-sheet-fixture';

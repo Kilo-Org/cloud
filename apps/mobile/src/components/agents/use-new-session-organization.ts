@@ -25,14 +25,15 @@ export function useNewSessionOrganization(): NewSessionOrganizationScope {
   const routeOrganizationId = Array.isArray(searchParams.organizationId)
     ? searchParams.organizationId[0]
     : searchParams.organizationId;
-  return {
-    ...resolveNewSessionOrganization({
-      routeOrganizationId,
-      isCloneEntry,
-      activeOrganizationId: organizationId,
-      isActiveResolved: isLoaded,
-    }),
+  const organization = resolveNewSessionOrganization({
+    routeOrganizationId,
     isCloneEntry,
-    usesActiveAccount: !isCloneEntry && !routeOrganizationId,
+    activeOrganizationId: organizationId,
+    isActiveResolved: isLoaded,
+  });
+  return {
+    ...organization,
+    isCloneEntry,
+    usesActiveAccount: organization.accountSource === 'active',
   };
 }

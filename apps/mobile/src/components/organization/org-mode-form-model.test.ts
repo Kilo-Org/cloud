@@ -1,7 +1,9 @@
+import { MODE_SLUG_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { describe, expect, it } from 'vitest';
 
 import {
   isOrgModeFormDirty,
+  isOrgModeFormDraft,
   type OrgMode,
   orgModeConfigInput,
   orgModeFormSaveValues,
@@ -74,9 +76,20 @@ describe('validateOrgModeForm', () => {
     expect(validateOrgModeForm(values({ slug: 'review_er' }), existing)).toEqual({
       slug: 'identifierInvalid',
     });
-    expect(validateOrgModeForm(values({ slug: 'a'.repeat(51) }), existing)).toEqual({
-      slug: 'identifierInvalid',
-    });
+    // A character outside the set is the character-set refusal, however long the
+    // text is: the set is checked first, so this never reads as merely too long.
+    expect(
+      validateOrgModeForm(values({ slug: `${'a'.repeat(MODE_SLUG_MAX_LENGTH)}A` }), existing)
+    ).toEqual({ slug: 'identifierInvalid' });
+  });
+
+  it('refuses a slug past the server bound, and accepts one at it', () => {
+    expect(
+      validateOrgModeForm(values({ slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH) }), existing)
+    ).toEqual({});
+    expect(
+      validateOrgModeForm(values({ slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH + 1) }), existing)
+    ).toEqual({ slug: 'identifierTooLong' });
   });
 
   it('refuses a slug another mode holds, and keeps the edited mode its own', () => {
@@ -145,6 +158,19 @@ describe('orgModeFormSaveValues', () => {
 
   it('keeps an identifier the person typed on create', () => {
     expect(orgModeFormSaveValues(values({ slug: 'auditor' }), 'create', []).slug).toBe('auditor');
+  });
+
+  it('derives an identifier the form accepts from a name past the bound', () => {
+    // 99 characters: 25 three-letter words joined by hyphens. The fold is far
+    // longer than the server's bound, so the derivation must clamp it, not the
+    // form.
+    const name = Array.from({ length: 25 }, () => 'abc').join('-');
+    expect(name).toHaveLength(99);
+    const saved = orgModeFormSaveValues(values({ slug: '', name }), 'create', []);
+
+    expect(saved.slug.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
+    expect(saved.slug).toMatch(/^[a-z0-9-]+$/);
+    expect(validateOrgModeForm(saved, [])).toEqual({});
   });
 
   it('never derives one on update, so a cleared identifier is reported missing', () => {
@@ -257,5 +283,21 @@ describe('orgModeConfigInput', () => {
     expect(
       orgModeConfigInput(values({ groups: [], editFileRegex: '\\.md$' }), 'create').groups
     ).toEqual([]);
+  });
+});
+
+describe('isOrgModeFormDraft', () => {
+  it('accepts the whole form, tool groups included', () => {
+    expect(isOrgModeFormDraft(values())).toBe(true);
+    expect(isOrgModeFormDraft(values({ groups: ['read', 'edit', 'mcp'] }))).toBe(true);
+  });
+
+  it('refuses another build’s value instead of coercing it', () => {
+    expect(isOrgModeFormDraft({ ...values(), name: 42 })).toBe(false);
+    expect(isOrgModeFormDraft({ ...values(), groups: ['read', 'deploy'] })).toBe(false);
+    // A key this build does not know is another build's draft, not this one's.
+    expect(isOrgModeFormDraft({ ...values(), extra: 'x' })).toBe(false);
+    expect(isOrgModeFormDraft({ ...values(), groups: undefined })).toBe(false);
+    expect(isOrgModeFormDraft(null)).toBe(false);
   });
 });

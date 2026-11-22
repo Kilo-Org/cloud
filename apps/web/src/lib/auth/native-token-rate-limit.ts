@@ -1,22 +1,20 @@
 import 'server-only';
-import { checkRateLimit } from '@vercel/firewall';
 import { createHmac } from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { callerAddressFromHeaders } from './caller-address';
-import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
+import { checkFirewallRateLimit } from './firewall-rate-limit';
 
 /**
  * Vercel Firewall rate limits for the native sign-in exchange. The rules live in
- * the project's firewall configuration, so `checkRateLimit` answers `not-found`
- * for an id that is not configured there and this module reports that answer
- * once a minute per rule.
+ * the project's firewall configuration. Both checks go through the shared
+ * check, which reports a rule that is not configured or an answer the firewall
+ * blocked through the once-per-rule-per-minute throttle.
  *
- * The address rule runs before the admission gate, so one client address cannot
- * spend the provider calls that admission and identity verification make: the
- * exchange proceeds only on an answer that permits it. The account rule runs
- * once the account is known, before any device session or refresh token is
- * written; it reports a rule that is not configured and lets the exchange
- * finish, because the provider calls it covers have already happened by then.
+ * The address rule runs before the admission gate and proceeds only on `allowed`.
+ * The account rule runs once the account is known and takes no refusal decision
+ * of its own, so an unconfigured rule and a blocked answer the rule did not
+ * limit let the exchange finish. Both rules use source
+ * `native_token_rate_limit`.
  */
 const ADDRESS_RATE_LIMIT_ID = 'native-token-address';
 const USER_RATE_LIMIT_ID = 'native-token-user';
@@ -27,56 +25,34 @@ function accountRateLimitKey(kiloUserId: string): string {
   return `${USER_RATE_LIMIT_ID}:${digest}`;
 }
 
-function reportMissingRule(rateLimitId: string): void {
-  reportFirewallRateLimitIssue(
-    rateLimitId,
-    'native_token_rate_limit',
-    `Firewall rate limit '${rateLimitId}' is not configured`
-  );
+/**
+ * True when one client address is exchanging device credentials too fast.
+ * Refuses unless the limiter confirmed the exchange may proceed.
+ */
+export async function isNativeTokenAddressRateLimited(request: Request): Promise<boolean> {
+  const address = callerAddressFromHeaders(request.headers);
+  const limit = await checkFirewallRateLimit(ADDRESS_RATE_LIMIT_ID, {
+    source: 'native_token_rate_limit',
+    request,
+    rateLimitKey: `${ADDRESS_RATE_LIMIT_ID}:${address}`,
+    blockedMessage: `Firewall rate limit '${ADDRESS_RATE_LIMIT_ID}' did not permit the exchange`,
+  });
+  return limit !== 'allowed';
 }
 
 /**
- * Reports the address rule's answer. A rule that is not configured and an answer
- * that the firewall blocked both refuse the exchange, and both are reported
- * through the shared once-per-rule-per-minute throttle.
+ * True when one account is exchanging device credentials too fast. The shared
+ * check reports a rule that is not configured or an answer the firewall
+ * blocked, and only a limited answer refuses the exchange.
  */
-function reportAddressRuleIssue(error: 'not-found' | 'blocked'): void {
-  if (error === 'not-found') {
-    reportMissingRule(ADDRESS_RATE_LIMIT_ID);
-    return;
-  }
-  reportFirewallRateLimitIssue(
-    ADDRESS_RATE_LIMIT_ID,
-    'native_token_rate_limit',
-    `Firewall rate limit '${ADDRESS_RATE_LIMIT_ID}' did not permit the exchange`
-  );
-}
-
-/** True when one client address is exchanging device credentials too fast. */
-export async function isNativeTokenAddressRateLimited(request: Request): Promise<boolean> {
-  const address = callerAddressFromHeaders(request.headers);
-  const { rateLimited, error } = await checkRateLimit(ADDRESS_RATE_LIMIT_ID, {
-    request,
-    rateLimitKey: `${ADDRESS_RATE_LIMIT_ID}:${address}`,
-  });
-  if (error) {
-    reportAddressRuleIssue(error);
-    return true;
-  }
-  return rateLimited;
-}
-
-/** True when one account is exchanging device credentials too fast. */
 export async function isNativeTokenUserRateLimited(
   request: Request,
   kiloUserId: string
 ): Promise<boolean> {
-  const { rateLimited, error } = await checkRateLimit(USER_RATE_LIMIT_ID, {
+  const limit = await checkFirewallRateLimit(USER_RATE_LIMIT_ID, {
+    source: 'native_token_rate_limit',
     request,
     rateLimitKey: accountRateLimitKey(kiloUserId),
   });
-  if (error === 'not-found') {
-    reportMissingRule(USER_RATE_LIMIT_ID);
-  }
-  return rateLimited;
+  return limit === 'limited';
 }

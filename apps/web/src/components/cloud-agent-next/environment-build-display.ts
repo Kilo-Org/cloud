@@ -81,6 +81,9 @@ const FAILURE_TEXT: Record<string, string> = {
   canceled: 'The build was canceled.',
   not_found: 'The environment was not found.',
   unsupported_provider: 'Snapshot builds are unavailable for this account.',
+  network_secrets_require_cloudflare: 'Network secrets require a Cloudflare snapshot builder.',
+  network_secret_configuration_invalid:
+    'Network secret configuration is invalid. Check the allowed domains before rebuilding.',
 };
 
 export function failureText(reason: string | null): string | null {

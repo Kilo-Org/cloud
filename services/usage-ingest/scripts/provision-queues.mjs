@@ -8,6 +8,9 @@ export const supportedEnvironments = ['staging', 'production'];
 // https://developers.cloudflare.com/queues/configuration/configure-queues/#queue-configuration
 export const DLQ_MESSAGE_RETENTION_SECONDS = 1_209_600;
 
+// Cloudflare's default source retention (four days), far beyond the 21-delivery retry window.
+export const SOURCE_MESSAGE_RETENTION_SECONDS = 345_600;
+
 export async function prepareQueues(
   environment,
   { token = process.env.CLOUDFLARE_API_TOKEN, request = fetch } = {}
@@ -21,30 +24,62 @@ export async function prepareQueues(
   const suffix = environment === 'staging' ? '-staging' : '';
   const globalSource = `usage-ingest-processing${suffix}`;
   const globalDlq = `usage-ingest-processing-dlq${suffix}`;
-  const queues = selected?.queues;
-  const source = queues?.producers?.find(p => p.binding === 'USAGE_INGEST_QUEUE')?.queue;
-  const dlq = queues?.producers?.find(p => p.binding === 'USAGE_INGEST_DLQ')?.queue;
-  const hedge = queues?.producers?.find(p => p.binding === 'USAGE_INGEST_HEDGE_QUEUE')?.queue;
-  const hedged = hedge !== undefined;
-  const eu = source === `${globalSource}-eu`;
+  const euSource = `${globalSource}-eu`;
+  const euDlq = `${globalDlq}-eu`;
+  // The dedicated tagged pair carries Enkrypt usage and Exa fallback usage; its names and
+  // bindings predate Exa joining it.
+  const enkryptSource = `usage-ingest-enkrypt${suffix}-eu`;
+  const enkryptDlq = `usage-ingest-enkrypt-dlq${suffix}-eu`;
   const worker = selected?.name;
+  const producers = selected?.queues?.producers;
+  const consumers = selected?.queues?.consumers;
+  const configError = () =>
+    new Error(`Expected matching ${environment} source/DLQ bindings and Worker name.`);
+  if (!Array.isArray(producers) || !Array.isArray(consumers)) throw configError();
+
+  // The declared topology selects which pairs are expected; exact membership then rejects
+  // missing, extra, duplicate, malformed or mismatched entries in either list.
+  const source = producers.find(p => p?.binding === 'USAGE_INGEST_QUEUE')?.queue;
+  const eu = source === euSource;
+  const hedged =
+    producers.some(p => p?.binding === 'USAGE_INGEST_HEDGE_QUEUE') ||
+    (eu && consumers.some(c => c?.queue === globalSource));
+  const dlq = eu ? euDlq : globalDlq;
+  const expectedProducers = [
+    { binding: 'USAGE_INGEST_QUEUE', queue: eu ? euSource : globalSource },
+    { binding: 'USAGE_INGEST_DLQ', queue: dlq },
+    ...(hedged ? [{ binding: 'USAGE_INGEST_HEDGE_QUEUE', queue: globalSource }] : []),
+    { binding: 'USAGE_INGEST_ENKRYPT_QUEUE', queue: enkryptSource },
+    { binding: 'USAGE_INGEST_ENKRYPT_DLQ', queue: enkryptDlq },
+  ];
+  // This revision's tagged ingress publishes to the dedicated EU pair whenever its cutover switch
+  // is on, and the pair's consumer must keep draining after the switch is turned off, so every
+  // supported topology, including a global routing rollback, keeps it. Earlier revisions deploy
+  // with their own copy of this helper.
+  const expectedConsumers = [
+    { queue: eu ? euSource : globalSource, dead_letter_queue: dlq },
+    ...(hedged ? [{ queue: globalSource, dead_letter_queue: globalDlq }] : []),
+    { queue: enkryptSource, dead_letter_queue: enkryptDlq },
+  ];
+  const sameMembers = (actual, expected, key) => {
+    const keys = actual.map(key);
+    return (
+      new Set(keys).size === keys.length &&
+      isDeepStrictEqual(keys.toSorted(), expected.map(key).toSorted())
+    );
+  };
   if (
-    source !== (eu ? `${globalSource}-eu` : globalSource) ||
-    dlq !== (eu ? `${globalDlq}-eu` : globalDlq) ||
+    // The stall hedge targets the global pair, so it requires the EU shared pair.
+    (hedged && !eu) ||
+    // JSON keys keep field types, so an array or number never matches an expected string.
+    !sameMembers(producers, expectedProducers, p => JSON.stringify([p?.binding, p?.queue])) ||
+    !sameMembers(consumers, expectedConsumers, c =>
+      JSON.stringify([c?.queue, c?.dead_letter_queue])
+    ) ||
     worker !== `usage-ingest${suffix}` ||
-    queues.producers.length !== (hedged ? 3 : 2) ||
-    queues.consumers?.length !== (hedged ? 2 : 1) ||
-    queues.consumers[0].queue !== source ||
-    queues.consumers[0].dead_letter_queue !== dlq ||
-    (hedged &&
-      (!eu ||
-        hedge !== globalSource ||
-        queues.consumers[1].queue !== globalSource ||
-        queues.consumers[1].dead_letter_queue !== globalDlq)) ||
     !/^[a-f0-9]{32}$/.test(config.account_id)
-  ) {
-    throw new Error(`Expected matching ${environment} source/DLQ bindings and Worker name.`);
-  }
+  )
+    throw configError();
   if (!token) throw new Error('CLOUDFLARE_API_TOKEN is required.');
   const api = async (path, body, method = body ? 'POST' : 'GET') => {
     let response, data;
@@ -119,6 +154,36 @@ export async function prepareQueues(
     existing.push(queue);
   }
   for (const name of hedgeNames) hedgeExisting.push(await find(name));
+  // The dedicated Enkrypt pair is only ever created or retained, never detached. Its DLQ must
+  // stay unconsumed so failed records remain visible, and its source must keep at least the
+  // default retention so records outlive the retry budget.
+  const enkryptNames = [enkryptDlq, enkryptSource];
+  const verifyEnkrypt = (queue, name) => {
+    verify(queue, name);
+    if (name === enkryptDlq && (!Array.isArray(queue.consumers) || queue.consumers.length))
+      throw new Error(`${name} has or may have a consumer; nothing detached, stop deployment.`);
+    if (name === enkryptDlq && !Number.isFinite(queue.settings?.message_retention_period))
+      throw new Error(`Cannot read ${name} message retention; stop deployment.`);
+    const retention = queue.settings?.message_retention_period;
+    if (
+      name === enkryptSource &&
+      (!Number.isFinite(retention) || retention < SOURCE_MESSAGE_RETENTION_SECONDS)
+    )
+      throw new Error(`Cannot confirm ${name} keeps four-day retention; stop deployment.`);
+    // Get Queue may omit this optional boolean; omission is not proof of active delivery.
+    if (
+      name === enkryptSource &&
+      Object.hasOwn(queue.settings, 'delivery_paused') &&
+      queue.settings.delivery_paused !== false
+    )
+      throw new Error(`Cannot confirm ${name} delivery is unpaused; stop deployment.`);
+  };
+  const enkryptExisting = [];
+  for (const name of enkryptNames) {
+    const queue = await find(name);
+    if (queue) verifyEnkrypt(queue, name);
+    enkryptExisting.push(queue);
+  }
   const verifyConsumer = async queue => {
     if (!queue) return;
     if (!Array.isArray(queue.consumers) || queue.consumers.length > 1)
@@ -150,6 +215,7 @@ export async function prepareQueues(
   // Validate the selected slot before changing the old attachment.
   await verifyConsumer(existing[1]);
   if (hedged) await verifyConsumer(hedgeExisting[1]);
+  await verifyConsumer(enkryptExisting[1]);
   const obsolete = hedged ? undefined : await find(eu ? globalSource : `${globalSource}-eu`);
   const consumer = await verifyConsumer(obsolete);
   // The API does not document whether PATCH keeps omitted settings, so resend them all.
@@ -200,6 +266,22 @@ export async function prepareQueues(
       if (name === globalSource) await verifyConsumer(queue);
     }
     if (name === globalDlq) await retainDlqMessages(queue, name);
+  }
+  for (const [index, name] of enkryptNames.entries()) {
+    let queue = enkryptExisting[index];
+    if (!queue) {
+      await api('/queues', {
+        queue_name: name,
+        jurisdiction: 'eu',
+        ...(name === enkryptDlq
+          ? { settings: { message_retention_period: DLQ_MESSAGE_RETENTION_SECONDS } }
+          : {}),
+      });
+      queue = await find(name);
+      verifyEnkrypt(queue, name);
+      if (name === enkryptSource) await verifyConsumer(queue);
+    }
+    if (name === enkryptDlq) await retainDlqMessages(queue, name);
   }
   // Traffic must already be paused/drained. This detaches, never deletes a queue.
   if (consumer) {

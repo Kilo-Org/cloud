@@ -185,7 +185,31 @@
     "privateRepositoryA11y": "{{name}}, repositorio privado",
     "legalDocumentEnglishOnly": "Este documento só está dispoñible en inglés.",
     "organizationTrialEndedBilling": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación e despois tentalo de novo.",
-    "viewOnGitHub": "Ver a PR en GitHub"
+    "organizationTrialEndedBillingAtKiloAi": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación en kilo.ai e despois tentalo de novo.",
+    "viewOnGitHub": "Ver a PR en GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punto de lista",
+        "nestedBulletPoint": "Punto de lista aniñado",
+        "orderedItem": "Elemento da lista {n}",
+        "nestedOrderedItem": "Elemento da lista aniñado {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita aniñada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemáticas: {latex}"
+      },
+      "rotor": {
+        "headings": "Cabeceiras",
+        "links": "Ligazóns",
+        "images": "Imaxes"
+      }
+    }
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -279,9 +303,13 @@
     "credits": "Créditos",
     "failedToLoadBalance": "Non se puido cargar o saldo. Toca para volver tentalo.",
     "balanceLoadFailed": "Non se puido cargar o saldo",
+    "balanceUnreachable": "Non se puido conectar co servidor. Téntao de novo.",
+    "balanceAccessDenied": "Non tes permiso para ver este saldo.",
+    "balanceUnavailable": "Non se puido cargar o saldo.",
     "hideBalance": "Agochar o saldo",
     "showBalance": "Amosar o saldo",
     "balanceHidden": "Saldo agochado",
+    "availableToSpendInOrganization": "Dispoñible para gastar nesta organización",
     "signOutTitle": "Pechar sesión?",
     "signOutMessage": "Terás que iniciar sesión de novo para acceder ao teu espazo de traballo.",
     "deleteAccountTitle": "Eliminar a conta?",
@@ -423,6 +451,17 @@
       "location": "Localización de Vertex",
       "clientEmail": "Correo electrónico da conta de servizo",
       "privateKey": "Clave privada da conta de servizo",
+      "privateKeyBlockRequired": "Pega o bloque de clave completo, desde a liña BEGIN ata a liña END.",
+      "privateKeyEncrypted": "Este bloque de clave está protexido cunha frase de contrasinal. Pega unha clave de conta de servizo que non teña frase de contrasinal.",
+      "names": {
+        "codestral": "Só Codestral antigo",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Iniciar sesión con ChatGPT)",
+        "xiaomi": "Xiaomi (pago por uso)",
+        "zai": "Z.ai (pago por uso)",
+        "bedrockByok": "Amazon Bedrock (directo)",
+        "vertexByok": "Google Vertex AI (directo)"
+      },
       "modelMappings": "Correspondencias de modelos",
       "modelMappingsDescription": "Envía un modelo da pasarela a un nome de despregamento personalizado.",
       "mappingTitle": "Correspondencia {{number}}",
@@ -502,14 +541,25 @@
       "nextStepFinal": "A decisión do recurso é definitiva. Non se pode presentar ningún recurso máis.",
       "viewReceipt": "Ver xustificante"
     },
+    "reportReceipts": {
+      "title": "Denuncias",
+      "rowSubtitle": "Denuncias que presentaches e os seus resultados",
+      "emptyTitle": "Aínda non hai denuncias",
+      "emptyDescription": "As denuncias que presentes desde un comentario ou unha resposta da IA aparecerán aquí.",
+      "couldNotLoad": "Non se puideron cargar as túas denuncias",
+      "capped": "Mostrando as túas denuncias máis recentes."
+    },
     "changelog": "Novidades",
     "changelogVersionPending": "As notas da versión {{version}} chegarán coa próxima actualización da aplicación.",
     "changelogGroupNew": "Novo",
     "changelogFixesIn": "Correccións e melloras en {{areas}}.",
     "changelogFixesPolish": "Correccións e melloras en toda a aplicación.",
     "changelogAreas": {
-      "signIn": "Inicio de sesión",
-      "profileOrganizations": "Perfil & organizacións"
+      "signIn": "inicio de sesión",
+      "profileOrganizations": "perfil & organizacións",
+      "chat": "conversa",
+      "notifications": "notificacións",
+      "integrations": "integracións"
     }
   },
   "preferences": {
@@ -1274,7 +1324,7 @@
       "couldNotGetLatest": "Non se puido obter a información máis recente.",
       "byline": "#{{number}} por {{author}}",
       "noFindings": "Non hai achados.",
-      "findingsUnavailable": "Os resultados non están dispoñibles porque esta revisión fallou.",
+      "findingsUnavailable": "Os resultados non están dispoñibles.",
       "findingsInProgress": "Esta revisión segue en curso. Os achados aparecerán aquí cando remate.",
       "findingsEndedWithoutResults": "Esta revisión rematou antes de producir ningún achado.",
       "serviceUnavailable": "Non se puido conectar co servizo de revisión de código. Tenta de novo a revisión cando o servizo estea dispoñible.",
@@ -1405,7 +1455,7 @@
       "managedOnWebRepositories": "Escolle os repositorios de {{organization}} na web desde un ordenador.",
       "description": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "descriptionReconnect": "Crea un novo token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
-      "descriptionOverview": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao na seguinte pantalla.",
+      "descriptionOverview": "Crea un token de acceso ao espazo de traballo e pégao na seguinte pantalla.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso ao espazo de traballo",
       "tokenRefused": "Bitbucket non aceptou este token do espazo de traballo. Comproba que ten os ámbitos indicados arriba e téntao de novo."
@@ -2516,7 +2566,7 @@
       "searchPlaceholder": "Buscar repositorios",
       "noMatches": "Sen coincidencias",
       "noRepositories": "Non hai repositorios dispoñibles",
-      "noRepositoriesDescription": "Non hai repositorios conectados á túa conta.",
+      "noRepositoriesDescription": "Conecta GitHub ou GitLab para cargar os repositorios.",
       "loading": "Cargando…",
       "accessibility": "Repositorio: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3406,7 +3456,7 @@
       "manageOnWeb": "Configuración da facturación na web",
       "changePlan": "Cambiar plan",
       "buySeats": "Mercar prazas",
-      "managedOnWeb": "O plan, as prazas e a recarga automática xestiónanse na web.",
+      "managedOnWeb": "O plan, as prazas e a recarga automática xestiónanse en kilo.ai.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Xestionar a recarga automática",
       "opensOnWeb": "Ábrese na web"
@@ -3588,6 +3638,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Introduce un identificador.",
       "identifierTaken": "Outro modo xa usa este identificador.",
+      "identifierTooLong": "Mantén o identificador en {{max}} caracteres ou menos.",
       "nameLabel": "Nome do modo",
       "nameRequired": "Introduce un nome de modo.",
       "notFound": "Este modo xa non existe.",
@@ -3678,7 +3729,7 @@
     "emailDeliveryFailed": "O envío de correo non está dispoñible temporalmente. Téntao de novo máis tarde.",
     "admissionRequired": "Non se pode verificar o teu dispositivo. Usa \"$t(login.moreSignInOptions)\" para iniciar sesión noutro dispositivo ou a través da web.",
     "default": "Produciuse un erro. Téntao de novo.",
-    "retryableAdmission": "Non puidemos verificar este dispositivo. Comproba a conexión e téntao de novo.",
+    "retryableAdmission": "Non se puido verificar este dispositivo. Téntao de novo.",
     "startSignInFailed": "Non se puido comezar o proceso de inicio de sesión. Téntao de novo.",
     "couldNotOpenBrowser": "Non se puido abrir o navegador. Téntao de novo.",
     "signInTimedOut": "Esgotouse o tempo para iniciar sesión. Téntao de novo.",
@@ -3750,6 +3801,34 @@
     "nextScheduled": "Próximas tarefas programadas",
     "answerNeeded": "Agardando resposta",
     "waitingToRetry": "Agardando para reintentar",
+    "countNoun": {
+      "needsInput_one": "Agardando resposta",
+      "needsInput_other": "Agardando resposta",
+      "running_one": "Traballando",
+      "running_other": "Traballando",
+      "scheduled_one": "Programada",
+      "scheduled_other": "Programadas",
+      "idle_one": "En espera",
+      "idle_other": "En espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Agardando resposta",
+      "needsInput_other": "{{displayCount}} Agardando resposta",
+      "running_one": "{{displayCount}} Traballando",
+      "running_other": "{{displayCount}} Traballando",
+      "scheduled_one": "{{displayCount}} Programada",
+      "scheduled_other": "{{displayCount}} Programadas",
+      "idle_one": "{{displayCount}} En espera",
+      "idle_other": "{{displayCount}} En espera"
+    },
+    "footer": {
+      "checked": "Comprobado {{time}}",
+      "lastKnown": "Último estado coñecido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima execución {{time}}",
+      "wasDue": "Estaba previsto {{time}}"
+    },
     "step": {
       "editing": "Edición",
       "reading": "Lectura",
@@ -3995,7 +4074,8 @@
         "space": "Non hai suficiente espazo libre para este modelo. Libera espazo e téntao de novo.",
         "network": "A descarga non rematou. Comproba a túa conexión e téntao de novo.",
         "invalidFile": "O ficheiro descargado non é un modelo que esta aplicación poida executar, así que se eliminou.",
-        "checksum": "O ficheiro descargado non coincide coa súa suma de verificación publicada, así que se eliminou. Tenta descargalo de novo."
+        "checksum": "O ficheiro descargado non coincide coa súa suma de verificación publicada, así que se eliminou. Tenta descargalo de novo.",
+        "writeFailed": "Este dispositivo non puido gardar o modelo. Tenta descargalo de novo."
       }
     },
     "catalog": {
@@ -4173,7 +4253,7 @@
     "personalDefaultDescription": "Carga automaticamente cando ningún repositorio ten un perfil fixado.",
     "organizationDefaultDescription": "Cargado automático para membros que non teñen ningún valor predeterminado persoal.",
     "setAsDefault": "Establecer como predeterminado",
-    "saveFailed": "Non se puido gardar o perfil",
+    "saveFailed": "Non se puido gardar o perfil. Téntao de novo.",
     "organizationRoleRequired": "Só os propietarios da organización e os administradores poden cambiar os perfís da organización.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Isto elimina permanentemente o perfil e a súa configuración. Isto non se pode desfacer.",
@@ -4322,6 +4402,7 @@
       "promptPlaceholder": "Vostede é un…",
       "tools": "Ferramentas",
       "wholeToolRule": "Este axente aplica unha regra a todas as ferramentas á vez: {{rule}}. Estes interruptores son de só lectura.",
+      "toolRule": "Regra gardada: {{rule}}",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primario — móstrase no selector",
       "visibilitySubagent": "Subaxente — só se pode chamar desde outros",
@@ -4431,19 +4512,34 @@
       "deductionFallback": "Dedución de créditos",
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
       "emptyTitle": "Sen historial de créditos",
+      "expiredGrant": "Caducado: {{description}}",
       "googlePlayReceipt": "Recibo de Google Play",
       "kind": {
         "adjustment": "Axuste",
         "balanceNeutral": "Sen efecto no saldo",
         "deduction": "Dedución",
         "grant": "Concesión de créditos",
+        "promotionalCredits": "Créditos promocionais",
+        "welcomeCredits": "Créditos de benvida",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Créditos concedidos polo administrador",
+        "contributorChampion": "Crédito de campión de colaboradores",
+        "feedback": "Crédito de comentarios",
+        "influencer": "Crédito de influenciador",
+        "ossMonthlyReset": "Restablecemento mensual do patrocinio de código aberto",
+        "ossSponsorship": "Crédito de patrocinio de código aberto",
+        "pullRequest": "Crédito de solicitude de cambios",
+        "usageIssue": "Crédito por problema de uso",
+        "vibeDay": "Crédito do día Vibe"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, do {{date}}",
       "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra.",
-      "retentionLimit": "Mostrando o historial de créditos máis recente."
+      "retentionLimit": "Mostrando o historial de créditos máis recente.",
+      "voidedGrant": "Anulado: {{description}}"
     },
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",
@@ -4692,6 +4788,8 @@
     "connectedTo": "Conectado a {{account}}",
     "disconnected": "{{provider}} desconectado",
     "disconnectFailed": "Non se puido desconectar {{provider}}",
+    "disconnectRetry": "Slack non puido confirmar a desconexión. Téntao de novo.",
+    "disconnectNeedsSupport": "Kilo non puido ler o acceso a Slack gardado para esta conexión. Contacta coa asistencia para rematar a desconexión.",
     "couldNotLoad": "Non se puideron cargar as integracións",
     "permissionDenied": "Non tes permiso para xestionar estas integracións.",
     "managedByOwner": "Pídelle a unha persoa propietaria da organización que cambie unha conexión que non poidas cambiar.",
@@ -4858,12 +4956,15 @@
     "inputDescription": "Analiza cada entrada con Enkrypt AI, incluídos os resultados das ferramentas. Cando Enkrypt non está dispoñible, as solicitudes envíanse sen analizar en lugar de rexeitarse.",
     "outputTitle": "Barreiras de seguridade da saída",
     "outputDescription": "Analiza as respostas con Enkrypt AI antes de que os membros as reciban. Desactivado a menos que o actives.",
+    "outputUnavailable": "Kilo non activou a análise da saída para esta organización, así que as respostas non se comproban e aquí non hai nada que configurar. Contacta con {{supportEmail}} para solicitalo.",
     "detectorsHint": "Bloquear rexeita unha solicitude sinalada. Só rexistrar limítase a rexistrala sen atrasar a solicitude.",
     "detectorsHintOutput": "Bloquear fai fallar unha resposta sinalada. Só rexistrar limítase a rexistrala sen atrasar a resposta.",
     "choiceLog": "Só rexistrar",
     "applyTo": "Aplicar a",
     "applyToAllMembers": "Todos os membros",
     "applyKiloDefault": "Aplicar o predeterminado de Kilo",
+    "applyKiloDefaultEnglishNote": "O texto da política predeterminada de Kilo está en inglés, porque Kilo Gateway aplícaa exactamente tal e como está escrita.",
+    "applyKiloDefaultReplaceMessage": "A política predeterminada de Kilo está escrita en inglés e substitúe o que estableciches en Vulneración da política. O texto que introduciches no campo de texto da política non se pode recuperar.",
     "invalidSavedTitle": "Non se poden ler os axustes gardados dos detectores de entrada",
     "invalidSavedBody": "As solicitudes bloquéanse ata que se garden de novo os detectores de entrada. Os detectores de abaixo parten do predeterminado de Kilo.",
     "invalidSavedOutputTitle": "Non se poden ler os axustes gardados dos detectores de saída",
@@ -4999,6 +5100,7 @@
     "providersNeedCatalog": "Os interruptores dos provedores permanecen en modo só lectura ata que se cargue o catálogo completo de modelos. Toca en Tentar de novo arriba para editalos.",
     "providersEmpty": "Ningún provedor coincide con esta busca.",
     "providersNone": "Non hai ningún provedor dispoñible para esta organización.",
+    "providersUnavailable": "Non se puido cargar a lista de provedores.",
     "allowAllShown": "Permitir todos os mostrados",
     "denyAllShown": "Denegar todos os mostrados",
     "gatewaysDescription": "Kilo encamiña as solicitudes dos modelos a través de Vercel AI Gateway ou OpenRouter. Unha pasarela desactivada fai fallar esas solicitudes.",
@@ -5017,6 +5119,20 @@
       "eu": "Unión Europea",
       "au": "Australia",
       "jp": "Xapón"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Buscar preferencias",
+    "noMatches": "Non hai preferencias coincidentes",
+    "emptyDescription": "Proba con outro nome de preferencia ou palabra clave.",
+    "resultsStatus": "Preferencias atopadas: {{resultCount}}",
+    "keywords": {
+      "signOut": "pechar sesión|saír|desconectar",
+      "appearance": "tema|esquema de cores",
+      "appUnlock": "biometría|recoñecemento facial|pegada dixital",
+      "language": "idioma|lingua|tradución",
+      "notifications": "avisos|alertas|notificacións",
+      "privacy": "analítica|seguimento"
     }
   }
 }

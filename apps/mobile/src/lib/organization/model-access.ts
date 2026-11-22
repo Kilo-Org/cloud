@@ -2,6 +2,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { type TFunction } from 'i18next';
+import * as z from 'zod';
 
 import { foldForSearch } from '@/i18n/fold-for-search';
 
@@ -30,6 +31,20 @@ export type ModelAccessDraft = {
   /** Models no member may use, whichever provider serves them. */
   modelDenyList: readonly string[];
 };
+
+const modelAccessDraftSchema = z.object({
+  providerAllowList: z.array(z.string()),
+  modelDenyList: z.array(z.string()),
+});
+
+/**
+ * Runtime shape guard for a stored model-access draft: two lists of model and
+ * provider ids. It checks the shape only — which providers a catalog holds, and
+ * whether a list leaves a route open, is the form's own question.
+ */
+export function isModelAccessFormDraft(value: unknown): value is ModelAccessDraft {
+  return modelAccessDraftSchema.safeParse(value).success;
+}
 
 /**
  * The gateway's own normalisation (`normalizeModelId` in web-shared): a variant
@@ -268,6 +283,8 @@ export type ModelAccessSave =
       providerAllowList: readonly string[] | undefined;
       modelDenyList: readonly string[];
     }
+  /** The provider list moved, but the catalog's provider data has not loaded. */
+  | { kind: 'provider-catalog-unavailable' }
   /** The organization would be left with no allowed provider, blocking every route. */
   | { kind: 'empty-provider-list' }
   /** The organization would be left with no model any member could route to. */
@@ -287,9 +304,12 @@ export type ModelAccessSave =
  *
  * The rows also need the whole gateway catalog: without it they are only the
  * organization's own policy-filtered models plus the saved slugs, so a write
- * would drop every provider that serves a denied model. A save made while the
- * catalog is unavailable therefore leaves the provider list alone whatever the
- * draft holds, exactly like an untouched Providers tab.
+ * would drop every provider that serves a denied model. A save that did not
+ * move the provider list therefore leaves the stored list alone, exactly like
+ * an untouched Providers tab. A draft that did move it cannot be saved at all
+ * while the catalog's provider data is missing: writing the rows would narrow
+ * the policy, and dropping the edit would report it as saved, so the save is
+ * refused until the catalog arrives.
  *
  * An empty provider list is refused unless the organization's saved list was
  * already empty: it stops every Kilo route, which no toggle on this form should
@@ -306,6 +326,11 @@ export function modelAccessSave(params: {
    */
   providerCatalogLoaded: boolean;
   /**
+   * Whether the draft's provider list is the admin's own choice, away from the
+   * baseline it started from, rather than the server's list as it arrived.
+   */
+  providerListEdited: boolean;
+  /**
    * Every model the form knows: the gateway catalog plus the organization's own
    * list. Empty while the catalog is unavailable, which leaves the model guard
    * inert instead of refusing a save it cannot judge.
@@ -314,6 +339,12 @@ export function modelAccessSave(params: {
 }): ModelAccessSave {
   const providersChanged =
     params.draft.providerAllowList.join('\n') !== params.baseline.providerAllowList.join('\n');
+  // An unloaded catalog cannot judge or reproduce the edit: the rows behind it
+  // are a policy-filtered subset, so writing them would narrow the policy and
+  // dropping the edit would report it as saved. Refuse instead.
+  if (!params.providerCatalogLoaded && providersChanged && params.providerListEdited) {
+    return { kind: 'provider-catalog-unavailable' };
+  }
   const providerAllowList =
     !params.providerCatalogLoaded || (params.savedAllowList === undefined && !providersChanged)
       ? undefined

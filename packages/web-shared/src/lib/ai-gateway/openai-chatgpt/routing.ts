@@ -3,6 +3,7 @@ import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
+import { markByokAvailable } from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -231,6 +232,26 @@ function logSharedConnectorGone(organizationId: string, connectorId: string): vo
 }
 
 /**
+ * The owner's stored connection when it may serve traffic, or null. The shared-services
+ * connector rule applies here so routing and the models-list tag cannot disagree; only a
+ * caller that reports the condition passes `onSharedConnectorGone`.
+ */
+async function readServableStoredConnection(
+  owner: OpenAiChatGptOwner,
+  onSharedConnectorGone?: (organizationId: string, connectorId: string) => void
+): Promise<OpenAiChatGptStoredConnection | null> {
+  const stored = await getOpenAiChatGptStoredConnection(owner);
+  if (!isUsableStoredConnection(stored)) return null;
+
+  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
+    onSharedConnectorGone?.(owner.organizationId, stored.createdBy);
+    return null;
+  }
+
+  return stored;
+}
+
+/**
  * The upstream model one specific owner's connection would serve the request
  * with, or null when that connection is not eligible.
  */
@@ -244,17 +265,11 @@ async function eligibleUpstreamModelForOwner(
   );
   if (!upstreamModel) return null;
 
-  if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
+  if (!(await isOpenAiModelServed(upstreamModel))) {
     return null;
   }
 
-  const stored = await getOpenAiChatGptStoredConnection(owner);
-  if (!isUsableStoredConnection(stored)) return null;
-
-  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
-    logSharedConnectorGone(owner.organizationId, stored.createdBy);
-    return null;
-  }
+  if (!(await readServableStoredConnection(owner, logSharedConnectorGone))) return null;
 
   return upstreamModel;
 }
@@ -271,21 +286,15 @@ export async function getOpenAiChatGptByokModelIds(
   owner: OpenAiChatGptOwner,
   candidateModelIds: readonly string[]
 ): Promise<Set<string> | null> {
-  const stored = await getOpenAiChatGptStoredConnection(owner);
-  if (!isUsableStoredConnection(stored)) return null;
+  if (!(await readServableStoredConnection(owner))) return null;
 
-  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
-    return null;
-  }
-
-  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
-  if (apiKey.trim().length === 0) return null;
+  if (getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV).trim().length === 0) return null;
 
   const tagged = await Promise.all(
     candidateModelIds.map(async modelId => {
       const upstreamModel = await resolveOpenAiChatGptUpstreamModel(modelId);
       if (!upstreamModel) return null;
-      return (await isOpenAiModelServed(apiKey, upstreamModel)) ? modelId : null;
+      return (await isOpenAiModelServed(upstreamModel)) ? modelId : null;
     })
   );
   return new Set(tagged.filter((id): id is string => id !== null));
@@ -293,11 +302,14 @@ export async function getOpenAiChatGptByokModelIds(
 
 /**
  * Returns `models` with the ChatGPT-served ones marked BYOK-available, so the
- * model picker and the extension show the BYOK badge like pasted BYOK keys. The
- * list is returned unchanged when the person has no usable connection.
+ * model picker and the extension show the BYOK badge like pasted BYOK keys. A
+ * marked model comes back with `hasUserByokAvailable: true` and `isFree: false`,
+ * including one that already carried the badge. The list is returned unchanged
+ * when the person has no usable connection. The caller runs it after
+ * `addUserByokAvailability`.
  */
 export async function tagOpenAiChatGptByokModels<
-  T extends { id: string; hasUserByokAvailable?: boolean },
+  T extends { id: string; hasUserByokAvailable?: boolean; isFree?: boolean },
 >(owner: OpenAiChatGptOwner, models: T[]): Promise<T[]> {
   const byokModelIds = await getOpenAiChatGptByokModelIds(
     owner,
@@ -305,9 +317,9 @@ export async function tagOpenAiChatGptByokModels<
   );
   if (!byokModelIds) return models;
   return models.map(model =>
-    model.hasUserByokAvailable !== true && !byokModelIds.has(model.id)
-      ? model
-      : { ...model, hasUserByokAvailable: true, isFree: false }
+    model.hasUserByokAvailable === true || byokModelIds.has(model.id)
+      ? markByokAvailable(model)
+      : model
   );
 }
 

@@ -185,7 +185,31 @@
     "organizationTrialEnded": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. సంస్థ యజమాని kilo.ai లో బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు.",
     "privateRepositoryA11y": "{{name}}, ప్రైవేట్ రిపోజిటరీ",
     "legalDocumentEnglishOnly": "ఈ పత్రం ఆంగ్లంలో మాత్రమే అందుబాటులో ఉంది.",
-    "organizationTrialEndedBilling": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. మీరు బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు."
+    "organizationTrialEndedBilling": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. మీరు బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు.",
+    "organizationTrialEndedBillingAtKiloAi": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. మీరు kilo.ai లో బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "బుల్లెట్ పాయింట్",
+        "nestedBulletPoint": "నెస్టెడ్ బుల్లెట్ పాయింట్",
+        "orderedItem": "జాబితా అంశం {n}",
+        "nestedOrderedItem": "నెస్టెడ్ జాబితా అంశం {n}"
+      },
+      "blockquote": {
+        "quote": "ఉల్లేఖనం",
+        "nestedQuote": "నెస్టెడ్ ఉల్లేఖనం"
+      },
+      "table": {
+        "row": "అడ్డు వరుస {n}: {content}"
+      },
+      "math": {
+        "equation": "గణితం: {latex}"
+      },
+      "rotor": {
+        "headings": "శీర్షికలు",
+        "links": "లింక్‌లు",
+        "images": "చిత్రాలు"
+      }
+    }
   },
   "language": {
     "restarting": "ఎంచుకున్న భాషను వర్తింపజేయడానికి పునఃప్రారంభిస్తోంది",
@@ -279,9 +303,13 @@
     "credits": "క్రెడిట్లు",
     "failedToLoadBalance": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి నొక్కండి.",
     "balanceLoadFailed": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము",
+    "balanceUnreachable": "సర్వర్‌ను చేరుకోలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
+    "balanceAccessDenied": "ఈ బ్యాలెన్స్ చూడటానికి మీకు అనుమతి లేదు.",
+    "balanceUnavailable": "బ్యాలెన్స్ లోడ్ కాలేదు.",
     "hideBalance": "బ్యాలెన్స్ దాచు",
     "showBalance": "బ్యాలెన్స్ చూపించు",
     "balanceHidden": "బ్యాలెన్స్ దాచబడింది",
+    "availableToSpendInOrganization": "ఈ సంస్థలో ఖర్చు చేయడానికి అందుబాటులో ఉంది",
     "signOutTitle": "సైన్ అవుట్ చేయాలా?",
     "signOutMessage": "మీ వర్క్‌స్పేస్‌ను ఉపయోగించడానికి మళ్లీ సైన్ ఇన్ చేయాలి.",
     "deleteAccountTitle": "ఖాతాను తొలగించాలా?",
@@ -423,6 +451,17 @@
       "location": "Vertex లొకేషన్",
       "clientEmail": "సర్వీస్ ఖాతా ఇమెయిల్",
       "privateKey": "సర్వీస్ ఖాతా ప్రైవేట్ కీ",
+      "privateKeyBlockRequired": "BEGIN లైన్ నుండి END లైన్ వరకు మొత్తం కీ బ్లాక్‌ను అతికించండి.",
+      "privateKeyEncrypted": "ఈ కీ బ్లాక్ పాస్‌ఫ్రేజ్‌తో రక్షించబడింది. పాస్‌ఫ్రేజ్ లేని సర్వీస్ ఖాతా కీని అతికించండి.",
+      "names": {
+        "codestral": "పాత Codestral మాత్రమే",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPTతో సైన్ ఇన్ చేయండి)",
+        "xiaomi": "Xiaomi (వాడినంత చెల్లింపు)",
+        "zai": "Z.ai (వాడినంత చెల్లింపు)",
+        "bedrockByok": "Amazon Bedrock (నేరుగా)",
+        "vertexByok": "Google Vertex AI (నేరుగా)"
+      },
       "modelMappings": "మోడల్ మ్యాపింగ్‌లు",
       "modelMappingsDescription": "గేట్‌వే మోడల్‌ను అనుకూల డిప్లాయ్‌మెంట్ పేరుకు పంపండి.",
       "mappingTitle": "మ్యాపింగ్ {{number}}",
@@ -502,6 +541,14 @@
       "nextStepFinal": "అప్పీల్ నిర్ణయం తుదిది. ఇకపై అప్పీల్ సమర్పించలేరు.",
       "viewReceipt": "రసీదును చూడండి"
     },
+    "reportReceipts": {
+      "title": "రిపోర్ట్‌లు",
+      "rowSubtitle": "మీరు సమర్పించిన రిపోర్ట్‌లు మరియు వాటి ఫలితాలు",
+      "emptyTitle": "ఇంకా రిపోర్ట్‌లు లేవు",
+      "emptyDescription": "మీరు వ్యాఖ్య లేదా AI ప్రతిస్పందన నుండి సమర్పించే రిపోర్ట్‌లు ఇక్కడ కనిపిస్తాయి.",
+      "couldNotLoad": "మీ రిపోర్ట్‌లను లోడ్ చేయలేకపోయాము",
+      "capped": "మీ ఇటీవలి రిపోర్ట్‌లను చూపుతోంది."
+    },
     "changelog": "కొత్త విశేషాలు",
     "changelogVersionPending": "{{version}} వెర్షన్ విశేషాలు తదుపరి యాప్ అప్‌డేట్‌తో వస్తాయి.",
     "changelogGroupNew": "కొత్తవి",
@@ -509,7 +556,10 @@
     "changelogFixesPolish": "యాప్ అంతటా పరిష్కారాలు మరియు మెరుగుదలలు.",
     "changelogAreas": {
       "signIn": "సైన్ ఇన్",
-      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు"
+      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు",
+      "chat": "చాట్",
+      "notifications": "నోటిఫికేషన్లు",
+      "integrations": "ఇంటిగ్రేషన్‌లు"
     }
   },
   "preferences": {
@@ -1274,7 +1324,7 @@
       "couldNotGetLatest": "తాజా వివరాలను పొందలేకపోయాము.",
       "byline": "#{{number}} — {{author}}",
       "noFindings": "సమస్యలు ఏవీ కనిపించలేదు.",
-      "findingsUnavailable": "ఈ సమీక్ష విఫలమైనందున ఫలితాలు అందుబాటులో లేవు.",
+      "findingsUnavailable": "ఫలితాలు అందుబాటులో లేవు.",
       "findingsInProgress": "ఈ సమీక్ష ఇంకా పురోగతిలో ఉంది. పూర్తయిన తర్వాత సమస్యలు ఇక్కడ కనిపిస్తాయి.",
       "findingsEndedWithoutResults": "ఈ సమీక్ష ఏ సమస్యలు కనుగొనకముందే ముగిసిపోయింది.",
       "serviceUnavailable": "కోడ్ సమీక్ష సేవకు కనెక్ట్ కాలేకపోయాము. సేవ అందుబాటులో ఉన్నప్పుడు సమీక్షను మళ్లీ ప్రయత్నించండి.",
@@ -1405,7 +1455,7 @@
       "managedOnWebRepositories": "కంప్యూటర్ నుండి వెబ్‌లో {{organization}} కోసం రిపాజిటరీలను ఎంచుకోండి.",
       "description": "{{organization}} కోసం వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, కింద అతికించండి.",
       "descriptionReconnect": "{{organization}} కోసం కొత్త వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, కింద అతికించండి.",
-      "descriptionOverview": "{{organization}} కోసం వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, తదుపరి స్క్రీన్‌లో అతికించండి.",
+      "descriptionOverview": "వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, తదుపరి స్క్రీన్‌లో అతికించండి.",
       "scopes": "ఖాతా: చదవడం · రిపోజిటరీలు: చదవడం/రాయడం · పుల్ రిక్వెస్ట్‌లు: చదవడం · వెబ్‌హుక్‌లు: చదవడం/రాయడం",
       "tokenPlaceholder": "వర్క్‌స్పేస్ యాక్సెస్ టోకెన్",
       "tokenRefused": "Bitbucket ఈ వర్క్స్‌స్పేస్ యాక్సెస్ టోకెన్‌ను అంగీకరించలేదు. దానికి పైన ఉన్న అనుమతులు ఉన్నాయో లేదో తనిఖీ చేసి, మళ్లీ ప్రయత్నించండి."
@@ -1682,7 +1732,7 @@
       "repoSummaryOpen_one": "{{displayCount}} పెండింగ్",
       "repoSummaryOpen_other": "{{displayCount}} పెండింగ్",
       "repoSummaryCritical": "{{displayCount}} అత్యంత తీవ్రమైనవి",
-      "repoSummaryCritical_one": "{{displayCount}} అత్యంత తీవ్రమైనవి",
+      "repoSummaryCritical_one": "{{displayCount}} అత్యంత తీవ్రమైనది",
       "repoSummaryCritical_other": "{{displayCount}} అత్యంత తీవ్రమైనవి",
       "repoSummaryHigh": "{{displayCount}} అధిక తీవ్రత",
       "repoSummaryHigh_one": "{{displayCount}} అధిక తీవ్రత",
@@ -1716,17 +1766,17 @@
       "deadlinePassedDetail": "{{critical}}, {{high}}",
       "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
       "breakdownCritical": "అత్యంత తీవ్రమైనవి {{displayCount}}",
-      "breakdownCritical_one": "అత్యంత తీవ్రమైనవి {{displayCount}}",
+      "breakdownCritical_one": "అత్యంత తీవ్రమైనది {{displayCount}}",
       "breakdownCritical_other": "అత్యంత తీవ్రమైనవి {{displayCount}}",
       "breakdownHigh": "అధిక తీవ్రత గలవి {{displayCount}}",
-      "breakdownHigh_one": "అధిక తీవ్రత గలవి {{displayCount}}",
+      "breakdownHigh_one": "అధిక తీవ్రత గలది {{displayCount}}",
       "breakdownHigh_other": "అధిక తీవ్రత గలవి {{displayCount}}",
       "breakdownMediumLow": "మధ్యస్థ, తక్కువ తీవ్రత గలవి {{displayCount}}",
-      "breakdownMediumLow_one": "మధ్యస్థ, తక్కువ తీవ్రత గలవి {{displayCount}}",
+      "breakdownMediumLow_one": "మధ్యస్థ, తక్కువ తీవ్రత గలది {{displayCount}}",
       "breakdownMediumLow_other": "మధ్యస్థ, తక్కువ తీవ్రత గలవి {{displayCount}}",
       "dueThisWeek": "ఈ వారం గడువు",
       "dueThisWeekDetail": "వీటిలో {{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
-      "dueThisWeekDetail_one": "వీటిలో {{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
+      "dueThisWeekDetail_one": "వీటిలో {{exploitable}} సమస్యలో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
       "dueThisWeekDetail_other": "వీటిలో {{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
       "noDeadline": "గడువు లేదు",
       "reviewSlaAssignment": "SLA కేటాయింపును సమీక్షించండి",
@@ -1777,13 +1827,13 @@
       "couldNotLoadSettings": "భద్రతా ఏజెంట్ సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము.",
       "couldNotLoadPermissions": "అనుమతులను లోడ్ చేయలేకపోయాము.",
       "on": "ఆన్",
-      "repositoriesCount_one": "{{displayCount}} రిపోజిటరీ ఎంచుకోబడింది",
+      "repositoriesCount_one": "{{displayCount}} రిపోజిటరీని ఎంచుకున్నారు",
       "repositoriesCount": "{{displayCount}} రిపోజిటరీలను ఎంచుకున్నారు",
       "repositoriesCount_other": "{{displayCount}} రిపోజిటరీలను ఎంచుకున్నారు",
       "analysisModeSubtitle": "{{mode}} విశ్లేషణ",
       "automationAllOff": "అన్నీ ఆఫ్",
-      "automationCount": "3లో {{displayCount}} ప్రారంభించబడ్డాయి",
-      "notificationsCount": "2లో {{displayCount}} ప్రారంభించబడ్డాయి",
+      "automationCount": "3లో {{displayCount}} ఆన్",
+      "notificationsCount": "2లో {{displayCount}} ఆన్",
       "disabledNoManage": "భద్రతా ఏజెంట్ నిలిపివేయబడింది. దీన్ని సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే ప్రారంభించగలరు.",
       "disabledNoRepo": "భద్రతా ఏజెంట్‌ను ప్రారంభించే ముందు కనీసం ఒక రిపోజిటరీని ఎంచుకోండి.",
       "disabledPrompt": "Dependabot హెచ్చరికలను సింక్ చేయడానికి, రిపోజిటరీలను ఎంచుకోవడానికి, స్వయంచాలక చర్యలను సెటప్ చేయడానికి భద్రతా ఏజెంట్‌ను ప్రారంభించండి."
@@ -2018,7 +2068,7 @@
       "overdue_other": "గడువు దాటి {{count}} రోజులు",
       "dueToday": "ఈరోజు గడువు",
       "dueTomorrow": "రేపు గడువు",
-      "dueInDays_one": "గడువుకు ఇంకా {{count}} రోజు",
+      "dueInDays_one": "{{count}} రోజులో గడువు",
       "dueInDays_other": "{{count}} రోజుల్లో గడువు",
       "overdue": "గడువు దాటి {{count}} రోజులు",
       "dueInDays": "{{count}} రోజుల్లో గడువు"
@@ -2083,7 +2133,9 @@
       "confirmTitle": "సమస్యలను తీసివేయాలా?",
       "confirmMessage": "{{repository}} కోసం నమోదైన ప్రతి సమస్య తొలగించబడుతుంది. దీన్ని వెనక్కి తీసుకోలేము.",
       "confirmAction": "సమస్యలను తొలగించండి",
-      "cleared": "సమస్యలు తీసివేయబడ్డాయి: {{count}}"
+      "cleared": "సమస్యలు తీసివేయబడ్డాయి: {{count}}",
+      "cleared_one": "సమస్య తీసివేయబడింది: {{count}}",
+      "cleared_other": "సమస్యలు తీసివేయబడ్డాయి: {{count}}"
     }
   },
   "agents": {
@@ -2512,7 +2564,7 @@
       "searchPlaceholder": "రిపోజిటరీల శోధన",
       "noMatches": "సరిపోలికలు లేవు",
       "noRepositories": "రిపోజిటరీలు అందుబాటులో లేవు",
-      "noRepositoriesDescription": "మీ ఖాతాకు ఏ రిపోజిటరీలూ కనెక్ట్ కాలేదు.",
+      "noRepositoriesDescription": "రిపోజిటరీలను లోడ్ చేయడానికి, GitHub లేదా GitLabను కనెక్ట్ చేయండి.",
       "loading": "లోడ్ అవుతోంది…",
       "accessibility": "రిపోజిటరీ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -3406,7 +3458,7 @@
       "manageOnWeb": "వెబ్‌లో బిల్లింగ్ సెట్టింగ్‌లు",
       "changePlan": "ప్లాన్ మార్చండి",
       "buySeats": "సీట్లు కొనండి",
-      "managedOnWeb": "ప్లాన్, సీట్లు మరియు ఆటో టాప్-అప్ వెబ్‌లో నిర్వహించబడతాయి.",
+      "managedOnWeb": "ప్లాన్, సీట్లు మరియు ఆటో టాప్-అప్ kilo.ai లో నిర్వహించబడతాయి.",
       "setupAutoTopUp": "ఆటో టాప్-అప్ సెటప్ చేయండి",
       "manageAutoTopUp": "ఆటో టాప్-అప్‌ను నిర్వహించండి",
       "opensOnWeb": "వెబ్‌లో తెరుచుకుంటుంది"
@@ -3588,6 +3640,7 @@
       "identifierLabel": "ఐడెంటిఫైయర్",
       "identifierRequired": "ఐడెంటిఫైయర్ నమోదు చేయండి.",
       "identifierTaken": "మరో మోడ్ ఈ ఐడెంటిఫైయర్‌ను ఇప్పటికే ఉపయోగిస్తోంది.",
+      "identifierTooLong": "ఐడెంటిఫైయర్‌ను {{max}} అక్షరాలు లేదా తక్కువగా ఉంచండి.",
       "nameLabel": "మోడ్ పేరు",
       "nameRequired": "మోడ్ పేరు నమోదు చేయండి.",
       "notFound": "ఈ మోడ్ ఇక ఉనికిలో లేదు.",
@@ -3678,7 +3731,7 @@
     "emailDeliveryFailed": "ప్రస్తుతం ఇమెయిల్ పంపలేము. కాసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
     "admissionRequired": "మీ పరికరాన్ని ధృవీకరించలేము. మరో పరికరంలో లేదా వెబ్‌లో సైన్ ఇన్ చేయడానికి '$t(login.moreSignInOptions)' ఉపయోగించండి.",
     "default": "ఏదో సమస్య వచ్చింది. మళ్లీ ప్రయత్నించండి.",
-    "retryableAdmission": "ఈ పరికరాన్ని ధృవీకరించలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+    "retryableAdmission": "ఈ పరికరాన్ని ధృవీకరించలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
     "startSignInFailed": "సైన్ ఇన్ ప్రక్రియను ప్రారంభించలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
     "couldNotOpenBrowser": "బ్రౌజర్‌ను తెరవలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
     "signInTimedOut": "సైన్ ఇన్ చేయడానికి కేటాయించిన సమయం ముగిసింది. మళ్లీ ప్రయత్నించండి.",
@@ -3750,6 +3803,34 @@
     "nextScheduled": "తదుపరి షెడ్యూల్",
     "answerNeeded": "మీ సమాధానం అవసరం",
     "waitingToRetry": "మళ్లీ ప్రయత్నించడానికి వేచి ఉంది",
+    "countNoun": {
+      "needsInput_one": "మీ స్పందన అవసరం",
+      "needsInput_other": "మీ స్పందన అవసరం",
+      "running_one": "పని జరుగుతోంది",
+      "running_other": "పని జరుగుతోంది",
+      "scheduled_one": "షెడ్యూల్ చేయబడింది",
+      "scheduled_other": "షెడ్యూల్ చేయబడింది",
+      "idle_one": "పని లేదు",
+      "idle_other": "పని లేదు"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} మీ స్పందన అవసరం",
+      "needsInput_other": "{{displayCount}} మీ స్పందన అవసరం",
+      "running_one": "{{displayCount}} పని జరుగుతోంది",
+      "running_other": "{{displayCount}} పని జరుగుతోంది",
+      "scheduled_one": "{{displayCount}} షెడ్యూల్ చేయబడింది",
+      "scheduled_other": "{{displayCount}} షెడ్యూల్ చేయబడింది",
+      "idle_one": "{{displayCount}} పని లేదు",
+      "idle_other": "{{displayCount}} పని లేదు"
+    },
+    "footer": {
+      "checked": "తనిఖీ చేయబడింది {{time}}",
+      "lastKnown": "చివరిగా తెలిసిన స్థితి · {{time}}"
+    },
+    "wake": {
+      "nextRun": "తదుపరి అమలు {{time}}",
+      "wasDue": "ఆశించబడింది {{time}}"
+    },
     "step": {
       "editing": "సవరణ",
       "reading": "చదవడం",
@@ -3995,7 +4076,8 @@
         "space": "ఈ మోడల్ కోసం సరిపడా ఖాళీ నిల్వ లేదు. స్థలాన్ని ఖాళీ చేసి మళ్లీ ప్రయత్నించండి.",
         "network": "డౌన్‌లోడ్ పూర్తి కాలేదు. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
         "invalidFile": "డౌన్‌లోడ్ చేసిన ఫైల్ ఈ యాప్ రన్ చేయగల మోడల్ కాదు, కాబట్టి అది తొలగించబడింది.",
-        "checksum": "డౌన్‌లోడ్ చేసిన ఫైల్ దాని ప్రచురించిన చెక్‌సమ్‌తో సరిపోలడం లేదు, కాబట్టి అది తొలగించబడింది. మళ్లీ డౌన్‌లోడ్ చేయడానికి ప్రయత్నించండి."
+        "checksum": "డౌన్‌లోడ్ చేసిన ఫైల్ దాని ప్రచురించిన చెక్‌సమ్‌తో సరిపోలడం లేదు, కాబట్టి అది తొలగించబడింది. మళ్లీ డౌన్‌లోడ్ చేయడానికి ప్రయత్నించండి.",
+        "writeFailed": "ఈ పరికరం మోడల్‌ను సేవ్ చేయలేకపోయింది. మళ్లీ డౌన్‌లోడ్ చేయడానికి ప్రయత్నించండి."
       }
     },
     "catalog": {
@@ -4173,7 +4255,7 @@
     "personalDefaultDescription": "ఏ రిపోజిటరీలో పిన్ చేయబడిన ప్రొఫైల్ లేనప్పుడు స్వయంచాలకంగా లోడ్ చేయబడుతుంది.",
     "organizationDefaultDescription": "వ్యక్తిగత డిఫాల్ట్ లేని సభ్యుల కోసం ఆటో-లోడ్ చేయబడింది.",
     "setAsDefault": "డిఫాల్ట్‌గా సెట్ చేయండి",
-    "saveFailed": "ప్రొఫైల్‌ను సేవ్ చేయడం సాధ్యపడలేదు",
+    "saveFailed": "ప్రొఫైల్‌ను సేవ్ చేయడం సాధ్యపడలేదు. మళ్లీ ప్రయత్నించండి.",
     "organizationRoleRequired": "సంస్థ యజమానులు మరియు నిర్వాహకులు మాత్రమే సంస్థ ప్రొఫైల్‌లను మార్చగలరు.",
     "deleteTitle": "ప్రొఫైల్‌ను తొలగించండి",
     "deleteMessage": "ఇది ప్రొఫైల్ మరియు దాని సెట్టింగ్‌లను శాశ్వతంగా తొలగిస్తుంది. ఇది రద్దు చేయబడదు.",
@@ -4322,6 +4404,7 @@
       "promptPlaceholder": "మీరు ఒక …",
       "tools": "ఉపకరణాలు",
       "wholeToolRule": "ఈ ఏజెంట్ ఒకేసారి ప్రతి ఉపకరణానికి ఒక నియమాన్ని వర్తిస్తుంది: {{rule}}. ఈ స్విచ్‌లు చదవడానికి మాత్రమే.",
+      "toolRule": "నిల్వ చేసిన నియమం: {{rule}}",
       "visibility": "దృశ్యమానత",
       "visibilityPrimary": "ప్రాథమిక — పికర్‌లో చూపబడింది",
       "visibilitySubagent": "సబ్జెక్ట్ — ఇతరుల నుండి మాత్రమే పిలవబడుతుంది",
@@ -4431,19 +4514,34 @@
       "deductionFallback": "క్రెడిట్ తగ్గింపు",
       "emptyDescription": "క్రెడిట్ కొనుగోళ్లు, రసీదులు మరియు వినియోగం ఇక్కడ కనిపిస్తాయి.",
       "emptyTitle": "క్రెడిట్ చరిత్ర లేదు",
+      "expiredGrant": "గడువు ముగిసింది: {{description}}",
       "googlePlayReceipt": "Google Play నుండి రసీదు",
       "kind": {
         "adjustment": "సర్దుబాటు",
         "balanceNeutral": "బ్యాలెన్స్‌పై ప్రభావం లేదు",
         "deduction": "తగ్గింపు",
         "grant": "క్రెడిట్ మంజూరు",
+        "promotionalCredits": "ప్రమోషనల్ క్రెడిట్",
+        "welcomeCredits": "స్వాగత క్రెడిట్",
         "purchase": "కొనుగోలు"
+      },
+      "program": {
+        "adminBulkGrant": "నిర్వాహకుడి క్రెడిట్ మంజూరు",
+        "contributorChampion": "కాంట్రిబ్యూటర్ ఛాంపియన్ క్రెడిట్",
+        "feedback": "అభిప్రాయ క్రెడిట్",
+        "influencer": "ఇన్‌ఫ్లుయెన్సర్ క్రెడిట్",
+        "ossMonthlyReset": "OSS ప్రాయోజకత్వ పునరుద్ధరణ",
+        "ossSponsorship": "OSS ప్రాయోజకత్వ క్రెడిట్",
+        "pullRequest": "పుల్ రిక్వెస్ట్ క్రెడిట్",
+        "usageIssue": "వినియోగ సమస్య క్రెడిట్",
+        "vibeDay": "Vibe Day క్రెడిట్"
       },
       "purchaseFallback": "క్రెడిట్ కొనుగోలు",
       "receipt": "రసీదు",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} కోసం రసీదును తెరవండి",
       "receiptUnavailable": "ఈ కొనుగోలుకు రసీదు అందుబాటులో లేదు.",
-      "retentionLimit": "ఇటీవలి క్రెడిట్ చరిత్ర చూపబడుతోంది."
+      "retentionLimit": "ఇటీవలి క్రెడిట్ చరిత్ర చూపబడుతోంది.",
+      "voidedGrant": "రద్దు చేయబడింది: {{description}}"
     },
     "title": "క్రెడిట్‌లు కొనండి",
     "description": "క్రెడిట్‌లు అనేవి Kilo యాప్‌లో AI కోడింగ్ సెషన్‌లను నడపడానికి మీ Kilo బ్యాలెన్స్‌కు జోడించే ఒక-సారి కొనుగోలు. స్టోర్ మీ ఖాతా నుండి ఛార్జ్ చేస్తుంది మరియు స్టోర్ చెల్లింపును నిర్ధారించిన తర్వాత క్రెడిట్‌లు జోడించబడతాయి.",
@@ -4692,6 +4790,8 @@
     "connectedTo": "{{account}}కి కనెక్ట్ అయింది",
     "disconnected": "{{provider}} డిస్‌కనెక్ట్ అయింది",
     "disconnectFailed": "{{provider}}ని డిస్‌కనెక్ట్ చేయడం సాధ్యపడలేదు",
+    "disconnectRetry": "Slack డిస్‌కనెక్ట్‌ను నిర్ధారించలేకపోయింది. మళ్లీ ప్రయత్నించండి.",
+    "disconnectNeedsSupport": "ఈ కనెక్షన్ కోసం సేవ్ చేసిన Slack యాక్సెస్‌ను Kilo చదవలేకపోయింది. డిస్‌కనెక్ట్ పూర్తి చేయడానికి సహాయ బృందాన్ని సంప్రదించండి.",
     "couldNotLoad": "ఇంటిగ్రేషన్‌లను లోడ్ చేయడం సాధ్యపడలేదు",
     "permissionDenied": "ఈ ఇంటిగ్రేషన్‌లను నిర్వహించడానికి మీకు అనుమతి లేదు.",
     "managedByOwner": "మీరు మార్చలేని కనెక్షన్‌ను మార్చడానికి సంస్థ యజమానిని అడగండి.",
@@ -4858,12 +4958,15 @@
     "inputDescription": "ప్రతి ఇన్పుట్ను Enkrypt AI తో స్కాన్ చేస్తుంది, టూల్ ఫలితాలతో సహా. Enkrypt అందుబాటులో లేనప్పుడు అభ్యర్థనలు తిరస్కరించడానికి బదులుగా స్కాన్ చేయకుండానే పంపబడతాయి.",
     "outputTitle": "అవుట్పుట్ గార్డ్రేల్స్",
     "outputDescription": "సభ్యులు స్వీకరించే ముందు Enkrypt AI తో ప్రతిస్పందనలను స్కాన్ చేస్తుంది. మీరు ఆన్ చేయనంత వరకు ఆఫ్లో ఉంటుంది.",
+    "outputUnavailable": "Kilo ఈ సంస్థ కోసం అవుట్‌పుట్ స్కానింగ్‌ను ప్రారంభించలేదు, కాబట్టి ప్రతిస్పందనలు తనిఖీ చేయబడవు మరియు ఇక్కడ సెట్ చేయడానికి ఏమీ లేదు. దీన్ని అభ్యర్థించడానికి {{supportEmail}}ని సంప్రదించండి.",
     "detectorsHint": "బ్లాక్ ఫ్లాగ్ చేయబడిన అభ్యర్థనను తిరస్కరిస్తుంది. లాగ్ మాత్రమే అభ్యర్థనను ఆలస్యం చేయకుండా దాన్ని నమోదు చేస్తుంది.",
     "detectorsHintOutput": "బ్లాక్ ఫ్లాగ్ చేయబడిన ప్రతిస్పందనను విఫలం చేస్తుంది. లాగ్ మాత్రమే ప్రతిస్పందనను ఆలస్యం చేయకుండా దాన్ని నమోదు చేస్తుంది.",
     "choiceLog": "లాగ్ మాత్రమే",
     "applyTo": "వర్తించు",
     "applyToAllMembers": "సభ్యులందరూ",
     "applyKiloDefault": "Kilo డిఫాల్ట్ను వర్తించు",
+    "applyKiloDefaultEnglishNote": "Kilo యొక్క డిఫాల్ట్ పాలసీ వచనం ఆంగ్లంలో ఉంది, ఎందుకంటే Kilo Gateway దాన్ని రాసిన విధంగానే సరిగ్గా వర్తిస్తుంది.",
+    "applyKiloDefaultReplaceMessage": "Kilo డిఫాల్ట్ పాలసీ ఆంగ్లంలో రాయబడింది మరియు పాలసీ ఉల్లంఘనలో మీరు సెట్ చేసినదాన్ని భర్తీ చేస్తుంది. పాలసీ వచనం ఫీల్డ్‌లో మీరు నమోదు చేసిన వచనాన్ని తిరిగి పొందలేము.",
     "invalidSavedTitle": "సేవ్ చేయబడిన ఇన్పుట్ డిటెక్టర్ సెట్టింగ్లు చదవబడలేవు",
     "invalidSavedBody": "ఇన్పుట్ డిటెక్టర్లు మళ్లీ సేవ్ అయ్యే వరకు అభ్యర్థనలు బ్లాక్ చేయబడతాయి. కింది డిటెక్టర్లు Kilo డిఫాల్ట్ నుండి ప్రారంభమవుతాయి.",
     "invalidSavedOutputTitle": "సేవ్ చేయబడిన అవుట్పుట్ డిటెక్టర్ సెట్టింగ్లు చదవబడలేవు",
@@ -4999,6 +5102,7 @@
     "providersNeedCatalog": "పూర్తి మోడల్ కేటలాగ్ లోడ్ అయ్యే వరకు ప్రొవైడర్ స్విచ్‌లు చదవడానికి మాత్రమే ఉంటాయి. వాటిని మార్చడానికి పైన ఉన్న మళ్లీ ప్రయత్నించండి నొక్కండి.",
     "providersEmpty": "ఈ శోధనకు ఏ ప్రొవైడర్లు సరిపోలలేదు.",
     "providersNone": "ఈ సంస్థ కోసం ఏ ప్రొవైడర్లు అందుబాటులో లేవు.",
+    "providersUnavailable": "ప్రొవైడర్ జాబితా లోడ్ కాలేదు.",
     "allowAllShown": "చూపిన అన్నింటినీ అనుమతించు",
     "denyAllShown": "చూపిన అన్నింటినీ నిరాకరించు",
     "gatewaysDescription": "Kilo మోడల్ అభ్యర్థనలను Vercel AI Gateway లేదా OpenRouter ద్వారా రూట్ చేస్తుంది. నిలిపివేయబడిన గేట్వే ఆ అభ్యర్థనలను విఫలం చేస్తుంది.",
@@ -5017,6 +5121,20 @@
       "eu": "యూరోపియన్ యూనియన్",
       "au": "ఆస్ట్రేలియా",
       "jp": "జపాన్"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ప్రాధాన్యతల కోసం శోధన",
+    "noMatches": "సరిపోలే ప్రాధాన్యతలు లేవు",
+    "emptyDescription": "వేరే ప్రాధాన్యత పేరు లేదా శోధన పదంతో ప్రయత్నించండి.",
+    "resultsStatus": "కనుగొన్న ప్రాధాన్యతలు: {{resultCount}}",
+    "keywords": {
+      "signOut": "సైన్ అవుట్|నిష్క్రమణ",
+      "appearance": "థీమ్|రంగులు|రూపం",
+      "appUnlock": "బయోమెట్రిక్స్|ముఖ గుర్తింపు|వేలిముద్ర",
+      "language": "భాష|అనువాదం",
+      "notifications": "హెచ్చరికలు|నోటిఫికేషన్లు",
+      "privacy": "గోప్యత|విశ్లేషణలు|ట్రాకింగ్"
     }
   }
 }

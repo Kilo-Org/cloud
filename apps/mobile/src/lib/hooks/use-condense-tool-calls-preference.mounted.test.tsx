@@ -24,9 +24,9 @@ type PreferenceHook = typeof useCondenseToolCallsPreference;
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
 /**
- * Mounting the hook is what starts the store's disk read: no other export of
- * the module starts it. The probe prints the value and the load flag, so a case
- * can wait for the read to land.
+ * Importing the module constructs the store, and construction starts its disk
+ * read. The probe prints the value and the load flag, so a case can wait for
+ * the read to land.
  */
 function Probe({ usePreference }: { usePreference: PreferenceHook }) {
   const { condenseToolCalls, hasLoaded } = usePreference();

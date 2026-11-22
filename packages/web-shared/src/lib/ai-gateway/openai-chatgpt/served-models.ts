@@ -6,7 +6,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import { FAILURE_BACKOFF_MS } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
+import {
+  OPENAI_CHATGPT_API_KEY_ENV,
+  OPENAI_CHATGPT_API_URL,
+  readOpenAiChatGptPartnerKey,
+} from './upstream';
 
 /**
  * Which models the partner project can actually serve.
@@ -126,7 +130,7 @@ async function fetchServedModelIds(): Promise<Set<string> | null> {
  * only request path.
  */
 export async function isOpenAiModelServed(modelId: string): Promise<boolean> {
-  if (getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV).trim().length === 0) return true;
+  if (readOpenAiChatGptPartnerKey() === null) return true;
 
   if (!cachedModelIds || Date.now() >= cacheExpiresAt) {
     // A recent failure already answered "unknown": fail open without another

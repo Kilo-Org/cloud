@@ -817,11 +817,12 @@ describe('checkOpenAiChatGptByok', () => {
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
   });
 
-  it('returns no provider without the deployment partner key, keeping the existing route', async () => {
+  it('returns no provider without the deployment partner key, without touching the stored connection', async () => {
     process.env.OPENAI_CHATGPT_API_KEY = '   ';
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(USER_OWNER);
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 
   it('builds no provider without the deployment partner key', () => {
@@ -1266,6 +1267,16 @@ describe('shared-services routing', () => {
     expect(result?.kind).toBe('provider');
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
     expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('returns no provider before consulting the shared connection without the deployment partner key', async () => {
+    process.env.OPENAI_CHATGPT_API_KEY = '';
+
+    await expect(
+      checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID, botId: 'reviewer' }))
+    ).resolves.toBeNull();
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 
   it('falls back to the caller own connection when the organization has no shared connection', async () => {

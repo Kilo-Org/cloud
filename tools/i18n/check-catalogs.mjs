@@ -890,9 +890,10 @@ const VISIBILITY_KEYS = [
  * which parameter the field sets; `profiles.mcp.jsonPlaceholder` is the JSON
  * sample the multiline field shows the reader, and a translated one stops
  * demonstrating the shape. This list is the only registry of keys that must read
- * English: `checkVerbatimLabels` requires it, and the identical-copy rules and
- * the serialized-JSON rule both derive their exemption from it through
- * `VERBATIM_KEY_SET`.
+ * English: `checkVerbatimLabels` requires it, and the identical-copy rules
+ * derive their exemption from it through `VERBATIM_KEY_SET`. The serialized-JSON
+ * rule exempts only `JSON_SAMPLE_KEY`, because a verbatim label still must not
+ * hold JSON text in English.
  */
 const VERBATIM_KEYS = ['profiles.agents.topP', 'profiles.mcp.jsonPlaceholder'];
 
@@ -2035,11 +2036,20 @@ function isSerializedJson(value) {
   return true;
 }
 
+/**
+ * The one key whose text is a JSON sample by design: the MCP form's multiline
+ * config placeholder shows the shape the stored value takes, so its braces and
+ * quoted key are the content, not a storage slip. It is registered in
+ * `VERBATIM_KEYS` too, because `checkVerbatimLabels` requires the English text.
+ * Every other key, verbatim or not, still fails a serialized value — including
+ * the English catalog, where `checkVerbatimLabels` cannot see a deviation.
+ */
+const JSON_SAMPLE_KEY = 'profiles.mcp.jsonPlaceholder';
+
 /** Reject a catalog value that a JSON encoder wrote instead of a label. */
 function checkSerializedJson(label, key, value) {
-  // A key required to read English cannot be a storage slip, because
-  // checkVerbatimLabels already reports any deviation.
-  if (VERBATIM_KEY_SET.has(key) || !isSerializedJson(value)) {
+  // Only the JSON sample is JSON text by design; every other label must be prose.
+  if (key === JSON_SAMPLE_KEY || !isSerializedJson(value)) {
     return [];
   }
   return [`${label}: "${key}" is serialized JSON; write the label text`];

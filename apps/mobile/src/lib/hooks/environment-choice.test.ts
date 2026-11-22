@@ -11,7 +11,6 @@ import {
 // map's own rules, so the store is a stub that never touches the disk.
 vi.mock('@/lib/hooks/secure-store-preference', () => ({
   createSecureStorePreference: () => ({
-    preload: vi.fn<() => void>(),
     get: vi.fn<() => Record<string, string>>(() => ({})),
     getRequested: vi.fn<() => Record<string, string>>(() => ({})),
     set: vi.fn<() => void>(),

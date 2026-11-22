@@ -52,6 +52,13 @@ async function answerControlPlane(
     case 'queue-full':
       // The same retryable capacity refusal a prompt reports.
       return throwAdmissionError(pendingQueueFullAdmissionFailure());
+    case 'invalid':
+      // The reply carries nothing to send. The interaction still waits, so this
+      // is a malformed request, not a dead interaction.
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'The answer carries no text; reply again',
+      });
     case 'retryable':
       // The interaction still waits; only the session moved on. `CONFLICT` is
       // not a terminal client code, and the cause marks the retry explicitly.

@@ -3208,6 +3208,37 @@ describe('hosted native routes', () => {
     expect(validatePromptBalance).not.toHaveBeenCalled();
   });
 
+  it('refuses a settled answer that carries no text without reading the payer balance', async () => {
+    const env = envStub();
+    const answer = vi.fn(async () => 'invalid' as const);
+    vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({ answer })) as never;
+    const validatePromptBalance = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [[]] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      authToken: 'caller-bearer',
+      deps: hostedDeps({ validatePromptBalance }),
+    });
+    // The wire body reaches the DO, which reports the empty reply. The
+    // interaction still waits, so this is a malformed reply rather than a dead
+    // interaction.
+    expect(answer).toHaveBeenCalledTimes(1);
+    expect(answer).toHaveBeenCalledWith({
+      sessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      reply: { action: 'answer', questionId: 'q_1', answers: [[]] },
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'KILO_ANSWER_INVALID',
+      message: 'The answer carries no text; reply again',
+    });
+    expect(validatePromptBalance).not.toHaveBeenCalled();
+  });
+
   it('answers a live turn without reading the balance', async () => {
     const env = envStub();
     vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({

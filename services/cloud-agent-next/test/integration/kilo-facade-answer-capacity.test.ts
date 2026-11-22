@@ -148,12 +148,12 @@ function clearFacadeRoots(): Promise<void> {
   });
 }
 
-function postAnswer(): Promise<Response> {
+function postAnswer(body: unknown = { answers: [['Blue']] }): Promise<Response> {
   const url = `http://worker.test/kilo-test/kilo/question/q_1/reply?userId=${USER_ID}&directory=${encodeURIComponent(publicDirectory)}`;
   return SELF.fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ answers: [['Blue']] }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -198,6 +198,39 @@ describe('facade answer capacity', { timeout: 30_000 }, () => {
       const snapshot = await stub.getSession();
       if (snapshot.type !== 'found') throw new Error('Session disappeared');
       expect(snapshot.messages.map(message => message.messageId)).toEqual(sent);
+    } finally {
+      await backend.release();
+    }
+  });
+
+  it('refuses a question reply that carries no text and keeps the question pending', async () => {
+    const { stub } = await registerColdSession();
+    await seedFacadeRoot();
+    const backend = await installBackendResponder();
+    try {
+      const promptId = createMessageId();
+      await stub.send(promptPayload(promptId, 'start'));
+      await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+
+      const response = await postAnswer({ answers: [[]] });
+      // Non-terminal: the interaction stays answerable, so this is a malformed
+      // reply rather than a dead interaction.
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: 'KILO_ANSWER_INVALID',
+        message: 'The answer carries no text; reply again',
+      });
+      // Nothing to preflight, so no payer or model read is issued.
+      const issued = await backend.requests();
+      expect(issued.filter(path => path.endsWith('/balance'))).toHaveLength(0);
+      expect(issued.filter(path => path.endsWith('/models/validate'))).toHaveLength(0);
+
+      await expect(stub.getPendingInteractions()).resolves.toMatchObject({
+        questions: [{ id: 'q_1' }],
+      });
+      const snapshot = await stub.getSession();
+      if (snapshot.type !== 'found') throw new Error('Session disappeared');
+      expect(snapshot.messages.map(message => message.messageId)).toEqual([promptId]);
     } finally {
       await backend.release();
     }

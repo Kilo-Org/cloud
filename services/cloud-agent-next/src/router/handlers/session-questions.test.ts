@@ -353,6 +353,25 @@ describe('answerQuestion', () => {
     }
   });
 
+  it('reports a settled answer that carries no text as a bad request', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    const harness = setup();
+    harness.stub.answer.mockResolvedValue('invalid');
+
+    await expect(
+      harness.caller.answerQuestion({
+        sessionId: SESSION_ID,
+        questionId: 'q_1',
+        answers: [[]],
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'The answer carries no text; reply again',
+    });
+    // Nothing is preflighted or admitted for a reply with no text.
+    expect(harness.stub.admitAnswerContinuation).not.toHaveBeenCalled();
+  });
+
   it('reports a session the caller cannot reach as its own forbidden refusal', async () => {
     fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
     requireCurrentSessionAccessMock.mockReset();

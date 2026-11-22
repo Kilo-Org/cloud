@@ -1538,6 +1538,11 @@ async function answerHostedNativeInteraction(params: {
     // The same retryable capacity refusal a prompt reports.
     return facadeError(429, 'KILO_PROMPT_QUEUE_FULL', pendingQueueFullAdmissionFailure().error);
   }
+  if (outcome.outcome === 'invalid') {
+    // The reply carries nothing to send. The interaction still waits, so a
+    // distinct 400 keeps a client from reading it as a dead interaction.
+    return facadeError(400, 'KILO_ANSWER_INVALID', 'The answer carries no text; reply again');
+  }
   if (outcome.outcome === 'retryable') {
     // The interaction still waits, but the session moved on, so the same reply
     // is admitted once it settles again. A distinct code keeps a client from

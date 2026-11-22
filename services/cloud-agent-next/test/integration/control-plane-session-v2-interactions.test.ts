@@ -1,8 +1,9 @@
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
+import { logger } from '../../src/logger.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import { createMessageId, MESSAGE_ID_PATTERN } from '../../src/session/message-id.js';
@@ -278,6 +279,13 @@ async function messageStatus(
 ): Promise<string | null> {
   const result = await stub.getMessageResult(messageId);
   return result.type === 'found' ? result.result.status : null;
+}
+
+/** Every primitive value of a logged field object, including nested values. */
+function primitiveValues(value: unknown): unknown[] {
+  if (value === null || typeof value !== 'object') return [value];
+  if (Array.isArray(value)) return value.flatMap(primitiveValues);
+  return Object.values(value as Record<string, unknown>).flatMap(primitiveValues);
 }
 
 /** A registered session with a recording sandbox peer and no prompt. */
@@ -695,6 +703,38 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     });
   });
 
+  it('reports a settled answer that carries no text as its own non-terminal refusal', async () => {
+    const { sessionId, stub } = await registerOnlySession();
+    await stub.send(promptPayload(messageId(), 'start'));
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+    const before = await stub.getSession();
+    if (before.type !== 'found') throw new Error('session disappeared');
+
+    // An empty selection has no text to send, so it queues nothing. The
+    // interaction keeps waiting instead of reading as gone.
+    await expect(
+      stub.answer({ sessionId, reply: { action: 'answer', questionId: 'q_1', answers: [[]] } })
+    ).resolves.toBe('invalid');
+    await expect(stub.getPendingInteractions()).resolves.toMatchObject({
+      questions: [{ id: 'q_1' }],
+    });
+    const after = await stub.getSession();
+    if (after.type !== 'found') throw new Error('session disappeared');
+    expect(after.messages).toEqual(before.messages);
+
+    // A real reply for the same interaction becomes the continuation.
+    const reply = { action: 'answer' as const, questionId: 'q_1', answers: [['Option A']] };
+    const continuation = await stub.answer({ sessionId, reply });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
+    await expect(
+      stub.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+    ).resolves.toBe('sent');
+    await expect(stub.getPendingInteractions()).resolves.toEqual({
+      questions: [],
+      permissions: [],
+    });
+  });
+
   it('refuses a settled answer for capacity before it reaches the payer preflight', async () => {
     // No sandbox route goes ready, so every prompt stays queued and fills the bound.
     const { sessionId, stub } = await registerOnlySession();
@@ -831,9 +871,57 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     await runInDurableObject(stub, () => {
       Object.assign(peer, { answer: async () => 'not_connected' });
     });
-    await expect(
-      stub.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
-    ).resolves.toBe('retry');
+    // Each failed forward leaves one warn that names the interaction and the
+    // cause, so a reply the route keeps refusing is visible. The reply text
+    // never reaches a logged field.
+    const captured = await runInDurableObject(stub, async instance => {
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await expect(
+          instance.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+        ).resolves.toBe('retry');
+        // A peer that throws is a different cause and stays retryable too.
+        Object.assign(peer, {
+          answer: async () => {
+            throw new Error('answer transport failed');
+          },
+        });
+        await expect(
+          instance.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+        ).resolves.toBe('retry');
+        return {
+          fields: withFields.mock.calls.map(call => call[0] as Record<string, unknown>),
+          warns: warn.mock.calls.length,
+        };
+      } finally {
+        withFields.mockRestore();
+        warn.mockRestore();
+      }
+    });
+    const forwards = captured.fields.filter(fields => fields.forwardReason !== undefined);
+    expect(forwards).toContainEqual(
+      expect.objectContaining({
+        sessionId,
+        interaction: 'questions:q_1',
+        forwardReason: 'refused',
+      })
+    );
+    expect(forwards).toContainEqual(
+      expect.objectContaining({
+        sessionId,
+        interaction: 'questions:q_1',
+        forwardReason: 'rpc_failed',
+        errorName: 'Error',
+      })
+    );
+    expect(captured.warns).toBeGreaterThanOrEqual(2);
+    // The reply text never reaches a logged value, at any depth.
+    const loggedValues = captured.fields
+      .flatMap(fields => primitiveValues(fields))
+      .filter((value): value is string => typeof value === 'string');
+    expect(loggedValues).not.toContain('yes');
+    expect(loggedValues.some(value => value.includes('yes'))).toBe(false);
     // The interaction is still pending, so the same reply stays admissible.
     await expect(stub.getPendingInteractions()).resolves.toMatchObject({
       questions: [{ id: 'q_1' }],

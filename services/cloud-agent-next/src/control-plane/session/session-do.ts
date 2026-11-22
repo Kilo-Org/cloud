@@ -2171,6 +2171,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // `admitAnswerContinuation`. Only a question/permission this session still
       // waits on may do so, so a retry, an unknown id or an already-answered one
       // cannot admit another turn.
+      //
+      // A reply with no text is its own result. It queues nothing, so capacity
+      // cannot be the cause, and the interaction still waits, so it is not the
+      // terminal refusal. The user can send a different reply instead.
+      if (answerPromptText(parsed.reply) === null) return 'invalid';
       const intent = answerMessageIntent(
         this.messages,
         parsed.reply,
@@ -2263,21 +2268,49 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * Hands a reply to the live turn that now owns it (spec §5). It only reports
    * whether the route took the reply; the caller decides whether a failure is
    * retryable, because the caller knows the interaction it named.
+   *
+   * A refusal is reported as retryable, so a reply that can never be delivered
+   * would otherwise show up only as repeated client retries. Each failure is
+   * logged once here, with the interaction it named and the cause; the reply
+   * text is never logged.
    */
   private async forwardToLiveTurn(
     reply: ControlPlaneAnswerReply
   ): Promise<'sent' | 'not_connected'> {
+    const target = pendingInteractionTarget(reply);
+    const logRefusal = (reason: 'no_peer' | 'rpc_failed' | 'refused', error?: unknown) => {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          interaction: `${target.collection}:${target.id}`,
+          forwardReason: reason,
+          ...(error === undefined
+            ? {}
+            : {
+                errorName: error instanceof Error ? error.name : typeof error,
+                error: errorMessage(error),
+              }),
+        })
+        .warn('Live answer forward was not taken');
+    };
     const peer = this.sandboxPeer();
-    if (peer === null) return 'not_connected';
+    if (peer === null) {
+      logRefusal('no_peer');
+      return 'not_connected';
+    }
     let result: ControlPlaneAnswerResult;
     try {
       result = await peer.answer({ sessionId: this.sessionId, reply });
-    } catch {
+    } catch (error) {
+      logRefusal('rpc_failed', error);
       return 'not_connected';
     }
     // The Sandbox DO only answers a live turn, so it cannot report capacity or
     // build a continuation.
-    if (result !== 'sent') return 'not_connected';
+    if (result !== 'sent') {
+      logRefusal('refused');
+      return 'not_connected';
+    }
     await this.resolvePendingInteraction(reply);
     return 'sent';
   }

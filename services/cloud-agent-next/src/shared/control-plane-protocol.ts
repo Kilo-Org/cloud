@@ -1137,13 +1137,16 @@ export const controlPlaneDispatchResultSchema = z.union([
  * The result of an answer. It adds `retry` to the dispatch result: the
  * interaction the reply names still waits, but the live sandbox route could not
  * take the reply, so the same reply is admissible once the route is available
- * again. Callers must keep the interaction and offer a retry. `abort` keeps
- * reporting `ControlPlaneDispatchResult`, because an abort has nothing to
- * retry.
+ * again. Callers must keep the interaction and offer a retry. `invalid` means
+ * the reply itself carries nothing to send (an empty question selection), so
+ * the interaction still waits and the same reply can be replaced by a real
+ * answer; it is not the terminal result. `abort` keeps reporting
+ * `ControlPlaneDispatchResult`, because an abort has nothing to retry.
  */
 export const controlPlaneAnswerResultSchema = z.union([
   controlPlaneDispatchResultSchema,
   z.literal('retry'),
+  z.literal('invalid'),
 ]);
 
 export const controlPlaneStatusResultSchema = z

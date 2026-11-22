@@ -50,6 +50,8 @@ export type AnswerAdmissionOutcome =
    * Clients must keep the interaction and offer a retry.
    */
   | { outcome: 'retryable' }
+  /** The reply carries no text, so the interaction still waits for a real one. */
+  | { outcome: 'invalid' }
   /** The caller holds no verified bearer, so the preflight cannot run. */
   | { outcome: 'unavailable' };
 
@@ -59,7 +61,8 @@ export type AnswerAdmissionOutcome =
  * reply the route could not take, while the interaction still waits, comes back
  * retryable rather than terminal. A settled turn admits its continuation only
  * after the balance and model preflight, so a refusal leaves the interaction
- * pending and the user can retry it.
+ * pending and the user can retry it. A reply that carries no text returns
+ * `invalid` before any preflight, because it would queue no turn.
  *
  * A preflight failure thrown by `preflightAndAdmitPromptMessage` propagates as
  * its `TRPCError`, so each caller projects it with the mapper it already uses
@@ -85,6 +88,7 @@ export async function answerWithAdmission(params: {
   );
   if (dispatch === 'sent') return { outcome: 'sent' };
   if (dispatch === 'retry') return { outcome: 'retryable' };
+  if (dispatch === 'invalid') return { outcome: 'invalid' };
   if (dispatch === 'not_connected') return { outcome: 'not_pending' };
   if (dispatch.result === 'queue-full') return { outcome: 'queue-full' };
   const authToken = params.authToken;

@@ -1,5 +1,5 @@
 import type {
-  OpenRouterModel,
+  OpenRouterCatalogModel,
   OpenRouterModelsResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
@@ -137,14 +137,14 @@ export async function getAvailableModelsForOrganization(
  */
 async function applyModelPolicyToCatalog(
   policy: EffectiveOrganizationModelPolicy,
-  candidates: readonly OpenRouterModel[],
+  candidates: readonly OpenRouterCatalogModel[],
   byokProviderIds: readonly UserByokProviderId[],
   directByokCatalogModelIds: ReadonlySet<string>
 ): Promise<{
-  filteredModels: OpenRouterModel[];
+  filteredModels: OpenRouterCatalogModel[];
   allowedProvidersByModel: Map<string, ReadonlySet<string>>;
 }> {
-  const filteredModels: OpenRouterModel[] = [];
+  const filteredModels: OpenRouterCatalogModel[] = [];
   const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
   if (policy.memberGrant.mode === 'unrestricted') {
     filteredModels.push(...candidates);

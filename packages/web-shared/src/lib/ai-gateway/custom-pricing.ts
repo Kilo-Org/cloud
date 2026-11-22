@@ -1,6 +1,6 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { CustomPricingConfig, CustomPricingTiers } from '@kilocode/db/schema-types';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   formatPricePerToken,
@@ -45,7 +45,7 @@ function calculateCost_mUsd(usage: Usage, pricingTiers: CustomPricingTiers): num
   );
 }
 
-function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricing) {
+function applyPricing(pricing: OpenRouterCatalogModel['pricing'], customPricing: Pricing) {
   return {
     ...pricing,
     prompt: formatPricePerToken(customPricing.prompt_per_million),
@@ -63,17 +63,17 @@ function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricin
 
 /** Model lists show the first tier, the price of a short request. */
 export function applyPricingTiers(
-  pricing: OpenRouterModel['pricing'],
+  pricing: OpenRouterCatalogModel['pricing'],
   pricingTiers: CustomPricingTiers
-): OpenRouterModel['pricing'] {
+): OpenRouterCatalogModel['pricing'] {
   return applyPricing(pricing, pricingTiers[0].pricing);
 }
 
 export function applyCustomPricingToPricing(
   config: CustomPricingConfig,
   modelId: string,
-  pricing: OpenRouterModel['pricing']
-): OpenRouterModel['pricing'] {
+  pricing: OpenRouterCatalogModel['pricing']
+): OpenRouterCatalogModel['pricing'] {
   const customPricing = getCustomPricing(config, modelId);
   return customPricing && !customPricing.fallbackOnly
     ? applyPricingTiers(pricing, customPricing.pricing)
@@ -82,8 +82,8 @@ export function applyCustomPricingToPricing(
 
 export function applyCustomPricingToModel(
   config: CustomPricingConfig,
-  model: OpenRouterModel
-): OpenRouterModel {
+  model: OpenRouterCatalogModel
+): OpenRouterCatalogModel {
   const customPricing = getCustomPricing(config, model.id);
   if (!customPricing || customPricing.fallbackOnly) return model;
 

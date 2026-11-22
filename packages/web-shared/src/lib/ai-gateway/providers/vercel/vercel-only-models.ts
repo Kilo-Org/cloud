@@ -13,9 +13,9 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { getVercelInferenceProvidersExcludingIgnored } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 
-function toVercelOnlyCatalogModel(model: VercelOnlyModel, name: string): OpenRouterModel {
+function toVercelOnlyCatalogModel(model: VercelOnlyModel, name: string): OpenRouterCatalogModel {
   const { id, storedModel, contextWindow, modalities, pricing } = model;
   // Without `opencode`, the catalog derives it with getGatewayOpenCodeSettings, which routing also
   // uses to resolve variants.
@@ -70,11 +70,11 @@ export async function getVercelOnlyCatalogModels({
   listedOpenRouterModels = openRouterModels,
   openRouterMetadata,
 }: {
-  openRouterModels: readonly OpenRouterModel[];
+  openRouterModels: readonly OpenRouterCatalogModel[];
   /** The models of `openRouterModels` the catalog lists; a Vercel-only model may not reuse their names. */
-  listedOpenRouterModels?: readonly OpenRouterModel[];
+  listedOpenRouterModels?: readonly OpenRouterCatalogModel[];
   openRouterMetadata: GatewayModelMap;
-}): Promise<OpenRouterModel[]> {
+}): Promise<OpenRouterCatalogModel[]> {
   const [routingConfig, vercelMetadata, overrides] = await Promise.all([
     getRuntimeGatewayRoutingConfig(),
     getVercelModelsMetadataFromDatabase(),

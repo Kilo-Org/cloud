@@ -206,9 +206,6 @@ function containsCacheControl(value: unknown): boolean {
   const pending: unknown[] = [value];
   let visited = 0;
   while (pending.length > 0) {
-    if (visited >= CACHE_CONTROL_NODE_BUDGET) {
-      return true;
-    }
     const current = pending.pop();
     visited += 1;
     let children: readonly unknown[];
@@ -225,6 +222,8 @@ function containsCacheControl(value: unknown): boolean {
     } else {
       continue;
     }
+    // Bounds the queued frontier and, through it, the total visited work. An over-budget payload
+    // returns `true` so the caller skips the transformation.
     if (visited + pending.length + children.length > CACHE_CONTROL_NODE_BUDGET) {
       return true;
     }
@@ -316,14 +315,6 @@ export function fixResponsesRequest(request: GatewayResponsesRequest) {
     }
     if (!outputMsg.status) {
       outputMsg.status = 'completed';
-    }
-  }
-}
-
-export function removeChatCompletionsToolNames(request: OpenRouterChatCompletionRequest) {
-  for (const message of request.messages) {
-    if (message.role === 'tool' && 'name' in message) {
-      delete message.name;
     }
   }
 }

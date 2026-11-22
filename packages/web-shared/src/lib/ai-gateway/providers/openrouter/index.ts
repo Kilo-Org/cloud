@@ -7,7 +7,7 @@ import {
   LOCAL_FAKE_LLM_API_KEY,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   OpenRouterModelsResponseSchema,
   type OpenRouterModelsResponse,
@@ -101,7 +101,7 @@ export {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 export type { EndpointPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
-export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
+export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterCatalogModel {
   const input_modalities = ['text'];
   if (m.supports_images) {
     input_modalities.push('image');
@@ -140,7 +140,7 @@ export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
   };
 }
 
-function buildAutoModels(): OpenRouterModel[] {
+function buildAutoModels(): OpenRouterCatalogModel[] {
   return AUTO_MODELS.map(buildAutoModelCatalogEntry);
 }
 
@@ -149,7 +149,7 @@ function buildAutoModels(): OpenRouterModel[] {
  * as `retires_on` so each client words it in its own language. The English note the web and the
  * extension show is `modelNameWithRetirement` in `./retirement`.
  */
-export function formatName(model: OpenRouterModel, preferredIndex: number) {
+export function formatName(model: OpenRouterCatalogModel, preferredIndex: number) {
   const name =
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
@@ -165,12 +165,12 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
  * undiscounted catalog price. In `worstCase` mode, long-context surcharges count too.
  */
 export function pickerModelPricing(
-  model: OpenRouterModel,
+  model: OpenRouterCatalogModel,
   endpointsMetadata: GatewayModelMap,
   preferredProviderOrderConfig: PreferredProviderOrderConfig,
   vercel: VercelPricingMetadata,
   mode: PricingMode
-): OpenRouterModel['pricing'] {
+): OpenRouterCatalogModel['pricing'] {
   const preferredProvider = resolvePreferredProviderOrder(
     preferredProviderOrderConfig,
     model.id
@@ -204,11 +204,11 @@ export function pickerModelPricing(
  * The catalog entry the picker adds for an id that the OpenRouter response
  * does not carry: one of Kilo's own Auto models.
  */
-export function pickerExtraModel(modelId: string): OpenRouterModel | undefined {
+export function pickerExtraModel(modelId: string): OpenRouterCatalogModel | undefined {
   return buildAutoModels().find(model => model.id === modelId);
 }
 
-async function enhancedModelList(models: OpenRouterModel[], countryCode: string | null) {
+async function enhancedModelList(models: OpenRouterCatalogModel[], countryCode: string | null) {
   const autoModels = buildAutoModels();
   const [
     endpointsMetadata,
@@ -268,7 +268,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     getTerminalBenchSummaries(),
   ]);
   const gatewayModels = listedModels
-    .map((model): OpenRouterModel => {
+    .map((model): OpenRouterCatalogModel => {
       const pricing = pickerModelPricing(
         model,
         endpointsMetadata,
@@ -332,10 +332,10 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);
-  const providerLookupId = (model: OpenRouterModel) => model.alias_target ?? model.id;
+  const providerLookupId = (model: OpenRouterCatalogModel) => model.alias_target ?? model.id;
   const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));
   const enhancedModels = await Promise.all(
-    catalogModels.map(async (model: OpenRouterModel) => {
+    catalogModels.map(async (model: OpenRouterCatalogModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
       const providerIds =
         publicCustomLlmProviders.get(model.id) ??

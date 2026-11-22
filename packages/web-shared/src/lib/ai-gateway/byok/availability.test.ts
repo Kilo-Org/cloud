@@ -3,7 +3,7 @@ import type {
   GatewayModelMap,
   GatewayModelWithEndpoints,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
@@ -38,7 +38,7 @@ import {
 const mockedGetVercelModelsMetadata = jest.mocked(getVercelModelsMetadataFromDatabase);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
 
-function makeModel(id: string): OpenRouterModel {
+function makeModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,

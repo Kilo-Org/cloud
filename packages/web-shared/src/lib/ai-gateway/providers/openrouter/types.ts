@@ -10,8 +10,9 @@ import type {
 import type Anthropic from '@anthropic-ai/sdk';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
-// Base types for OpenRouter API that don't depend on other lib files
-// This breaks circular dependencies with mistral.ts, minimax.ts, etc.
+// Imports here must be type-only, and this file never imports the provider modules that import it
+// (mistral.ts, minimax.ts), which is what keeps the cycle broken. `reasoning-details` and
+// `inference-provider-id` are examples of permitted imports: types only, never values.
 
 export type OpenRouterProviderConfig = {
   order?: string[];

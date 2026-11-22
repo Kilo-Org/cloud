@@ -345,13 +345,12 @@ export function RowFrame({
     };
     // A footer closes the row's own line below the whole row, and a row with no
     // text has nothing to put under the top line, so only a stack with text
-    // moves the press there. The press takes the bottom padding itself, so its
-    // node clears the 28 dp floor on a one-line title, but it cancels nothing:
-    // a press that reached to the frame's bottom edge lay under the next
-    // sibling's trailing control and took touches meant for it.
+    // moves the press there. The press then cancels the frame's bottom padding
+    // and pads itself back, exactly as the unstacked press does, so a stacked
+    // row is the same height whether its press covers the whole row or not.
     const stacksContentPress = stack && footer === undefined && hasText;
     const contentPressClass = stacksContentPress
-      ? 'w-full pb-3'
+      ? 'w-full -mb-3 pb-3'
       : cn(
           'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
           ROW_FRAME_CONTENT_PRESS_CLASS

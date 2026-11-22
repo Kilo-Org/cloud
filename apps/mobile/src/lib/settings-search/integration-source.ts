@@ -31,8 +31,7 @@ import { useTRPC } from '@/lib/trpc';
  */
 
 /** The personal integrations hub in the Profile tab. */
-const INTEGRATION_SETTINGS_PATH: Extract<Href, string> =
-  '/(app)/(tabs)/(3_profile)/integrations';
+const INTEGRATION_SETTINGS_PATH: Extract<Href, string> = '/(app)/(tabs)/(3_profile)/integrations';
 
 /** The hub's own name as the breadcrumb of every result below it. */
 const INTEGRATION_SETTINGS_CONTEXT = 'integrations.title';
@@ -81,10 +80,9 @@ function buildIntegrationSearchSource(
   return {
     context: [INTEGRATION_SETTINGS_CONTEXT],
     path: INTEGRATION_SETTINGS_PATH,
-    settings: visibleIntegrationProviders(
-      'personal',
-      installedIntegrationProviders(statuses)
-    ).map(provider => INTEGRATION_PROVIDER_SETTINGS[provider]),
+    settings: visibleIntegrationProviders('personal', installedIntegrationProviders(statuses)).map(
+      provider => INTEGRATION_PROVIDER_SETTINGS[provider]
+    ),
   };
 }
 

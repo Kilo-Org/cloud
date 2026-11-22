@@ -40,9 +40,7 @@ import { GENERAL_SETTINGS } from '@/lib/settings-search/preference-sources';
  * Each switch is wrapped in the search target its index definition names, so a
  * search result reveals that row without flipping it.
  */
-export function GeneralSettingsScreen({
-  settingsTarget,
-}: Readonly<{ settingsTarget?: string }>) {
+export function GeneralSettingsScreen({ settingsTarget }: Readonly<{ settingsTarget?: string }>) {
   const unlock = useAppUnlock();
   const { setEnabled: handleUnlockChange } = unlock;
   const {

@@ -1,5 +1,13 @@
 import { type ParseKeys, type TFunction } from 'i18next';
-import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type TextInput, View } from 'react-native';
 

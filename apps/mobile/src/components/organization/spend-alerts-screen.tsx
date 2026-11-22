@@ -927,7 +927,11 @@ function RuleCard({
                 {subtitle}
               </Text>
             </View>
-            <CardSwitch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
+            <CardSwitch
+              accessibilityLabel={title}
+              value={enabled}
+              onValueChange={onEnabledChange}
+            />
           </View>
 
           {children}

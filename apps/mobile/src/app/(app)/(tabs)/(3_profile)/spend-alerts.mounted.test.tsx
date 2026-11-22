@@ -93,7 +93,10 @@ describe('SpendAlertsRoute settings target', () => {
       settingsTarget: 'spendAlerts.master',
     });
 
-    expect(screenProps()).toEqual({ organizationId: 'org-b', settingsTarget: 'spendAlerts.master' });
+    expect(screenProps()).toEqual({
+      organizationId: 'org-b',
+      settingsTarget: 'spendAlerts.master',
+    });
   });
 
   it('opens with no target when the route has none', () => {

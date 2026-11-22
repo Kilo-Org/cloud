@@ -816,12 +816,16 @@ export function NotificationsScreen({ settingsTarget }: Readonly<SettingsTargetP
                   // assert a state nobody has read yet.
                   icon={masterLeading === 'neutral' ? undefined : MASTER_GATE_ICON[masterLeading]}
                   iconContent={
-                    masterLeading === 'neutral' ? <Skeleton className="h-4 w-4 rounded" /> : undefined
+                    masterLeading === 'neutral' ? (
+                      <Skeleton className="h-4 w-4 rounded" />
+                    ) : undefined
                   }
                   title={t(NOTIFICATION_DEVICE_SETTING.label)}
                   subtitle={masterSubtitle === undefined ? undefined : { text: masterSubtitle }}
                   subtitlePlaceholder={
-                    masterLeading === 'neutral' ? <Skeleton className="mt-0.5 h-4 w-52" /> : undefined
+                    masterLeading === 'neutral' ? (
+                      <Skeleton className="mt-0.5 h-4 w-52" />
+                    ) : undefined
                   }
                   trailing={{ kind: 'node', node: masterTrailing }}
                 />

@@ -176,13 +176,8 @@ vi.mock('@/components/settings-search/settings-target', () => ({
     settingsTarget?: string;
     children?: ReactNode;
   }): ReactNode => createElement('SettingsSearchScrollView', { settingsTarget }, children),
-  SettingsTarget: ({
-    item,
-    children,
-  }: {
-    item: { id: string };
-    children?: ReactNode;
-  }): ReactNode => createElement('SettingsTarget', { item }, children),
+  SettingsTarget: ({ item, children }: { item: { id: string }; children?: ReactNode }): ReactNode =>
+    createElement('SettingsTarget', { item }, children),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -1175,9 +1170,7 @@ describe('NotificationsScreen settings search', () => {
       // An enabled sibling proves the master gate settled and preferences loaded.
       await waitForEnabledSwitch(renderer, i18n.t('notifications.category.agentUpdatesTitle'));
 
-      const indexed = NOTIFICATION_SOURCES.flatMap(source =>
-        source.settings.map(item => item.id)
-      );
+      const indexed = NOTIFICATION_SOURCES.flatMap(source => source.settings.map(item => item.id));
       const rendered = new Set(targetIds(renderer.root));
       expect(indexed.filter(id => !rendered.has(id))).toEqual([]);
     } finally {

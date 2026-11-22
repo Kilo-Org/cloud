@@ -495,199 +495,199 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
           <SettingsSearchResults results={settingsSearch.results} onSelect={selectSetting} />
         ) : (
           <>
-        {/* Credits: the balance and its purchase action, plus the spend entry,
+            {/* Credits: the balance and its purchase action, plus the spend entry,
             because spend and remaining credits are the two halves of the same
             question. */}
-        <Section>
-          <CreditsCard orgs={orgs} enabled={isAuthenticated} />
-          <RowGroup leadingTile>
-            <SettingsTarget item={PROFILE_SETTINGS.usage}>
-              <ConfigureRow
-                icon={LineChart}
-                title={t(PROFILE_SETTINGS.usage.label)}
-                subtitle={t('usage.entrySubtitle')}
-                hue="sage"
-                onPress={() => {
-                  router.push('/(app)/usage' as Href);
-                }}
-              />
-            </SettingsTarget>
-          </RowGroup>
-        </Section>
-
-        <Section label={t('common.agents')}>
-          <RowGroup leadingTile>
-            <SettingsTarget item={PROFILE_SETTINGS.codeReviewer}>
-              <ConfigureRow
-                icon={GitPullRequest}
-                title={t(PROFILE_SETTINGS.codeReviewer.label)}
-                subtitle={t('profile.codeReviewerSubtitle')}
-                hue="honey"
-                disabled={!agentScope}
-                onPress={() => {
-                  if (agentScope) {
-                    router.push(getCodeReviewerProfilePath(agentScope));
-                  }
-                }}
-              />
-            </SettingsTarget>
-            <SettingsTarget item={PROFILE_SETTINGS.securityAgent}>
-              <ConfigureRow
-                icon={ShieldCheck}
-                title={t(PROFILE_SETTINGS.securityAgent.label)}
-                subtitle={t('profile.securityAgentSubtitle')}
-                hue="honey"
-                disabled={!agentScope}
-                onPress={() => {
-                  if (agentScope) {
-                    router.push(getSecurityAgentPath(agentScope));
-                  }
-                }}
-              />
-            </SettingsTarget>
-            <SettingsTarget item={PROFILE_SETTINGS.profiles}>
-              <ConfigureRow
-                icon={Users}
-                title={t(PROFILE_SETTINGS.profiles.label)}
-                subtitle={t('profiles.entrySubtitle')}
-                // Agents step: the row lists the agent profiles, and its two
-                // siblings in this section already carry `honey`. The neutral tile
-                // made one row of three read as disabled.
-                hue="honey"
-                onPress={() => {
-                  router.push(getProfilesPath());
-                }}
-              />
-            </SettingsTarget>
-            {/* Cloud Agent triggers are a native screen, for the scope in view:
-                the personal triggers, or the selected organization's. */}
-            <SettingsTarget item={PROFILE_SETTINGS.triggers}>
-              <ConfigureRow
-                icon={Workflow}
-                title={t(PROFILE_SETTINGS.triggers.label)}
-                subtitle={t('cloudAgent.triggers.subtitle')}
-                hue="honey"
-                onPress={() => {
-                  router.push(triggersListHref(organizationId ?? undefined));
-                }}
-              />
-            </SettingsTarget>
-          </RowGroup>
-        </Section>
-
-        {/* PR Review */}
-        <Section label={t('profile.reviews')}>
-          <RowGroup leadingTile>
-            <SettingsTarget item={PROFILE_SETTINGS.prReview}>
-              <ConfigureRow
-                icon={GitMerge}
-                title={t(PROFILE_SETTINGS.prReview.label)}
-                subtitle={t('common.prReviewSubtitle')}
-                hue="gold"
-                onPress={() => {
-                  router.push(getPrReviewEntryPath());
-                }}
-              />
-            </SettingsTarget>
-          </RowGroup>
-        </Section>
-
-        {/* Organization */}
-        {showOrganizationSection && (
-          <Section label={t('common.organization')}>
-            {organizationsError ? (
-              <QueryError
-                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
-                placement="top"
-                title={t('profile.couldNotLoadOrganization')}
-                message={t('profile.couldNotLoadOrganizationDescription')}
-                onRetry={() => void refetchOrganizations()}
-                isRetrying={organizationsFetching}
-              />
-            ) : (
+            <Section>
+              <CreditsCard orgs={orgs} enabled={isAuthenticated} />
               <RowGroup leadingTile>
-                {showOrganizationRow && organizationRow}
-                <SettingsTarget item={PROFILE_SETTINGS.createOrganization}>
+                <SettingsTarget item={PROFILE_SETTINGS.usage}>
                   <ConfigureRow
-                    icon={Plus}
-                    title={t(PROFILE_SETTINGS.createOrganization.label)}
-                    hue="lime"
+                    icon={LineChart}
+                    title={t(PROFILE_SETTINGS.usage.label)}
+                    subtitle={t('usage.entrySubtitle')}
+                    hue="sage"
                     onPress={() => {
-                      router.push(CREATE_ORGANIZATION_HREF);
+                      router.push('/(app)/usage' as Href);
                     }}
                   />
                 </SettingsTarget>
               </RowGroup>
-            )}
-          </Section>
-        )}
+            </Section>
 
-        {/* App */}
-        <Section label={t('profile.app')}>
-          <RowGroup leadingTile>
-            {showNativeRemote && (
-              <SettingsTarget item={PROFILE_SETTINGS.nativeRemote}>
-                <ConfigureRow
-                  icon={SlidersHorizontal}
-                  title={t(PROFILE_SETTINGS.nativeRemote.label)}
-                  hue="sage"
-                  onPress={() => {
-                    router.push('/(app)/native-remote' as Href);
-                  }}
-                />
-              </SettingsTarget>
+            <Section label={t('common.agents')}>
+              <RowGroup leadingTile>
+                <SettingsTarget item={PROFILE_SETTINGS.codeReviewer}>
+                  <ConfigureRow
+                    icon={GitPullRequest}
+                    title={t(PROFILE_SETTINGS.codeReviewer.label)}
+                    subtitle={t('profile.codeReviewerSubtitle')}
+                    hue="honey"
+                    disabled={!agentScope}
+                    onPress={() => {
+                      if (agentScope) {
+                        router.push(getCodeReviewerProfilePath(agentScope));
+                      }
+                    }}
+                  />
+                </SettingsTarget>
+                <SettingsTarget item={PROFILE_SETTINGS.securityAgent}>
+                  <ConfigureRow
+                    icon={ShieldCheck}
+                    title={t(PROFILE_SETTINGS.securityAgent.label)}
+                    subtitle={t('profile.securityAgentSubtitle')}
+                    hue="honey"
+                    disabled={!agentScope}
+                    onPress={() => {
+                      if (agentScope) {
+                        router.push(getSecurityAgentPath(agentScope));
+                      }
+                    }}
+                  />
+                </SettingsTarget>
+                <SettingsTarget item={PROFILE_SETTINGS.profiles}>
+                  <ConfigureRow
+                    icon={Users}
+                    title={t(PROFILE_SETTINGS.profiles.label)}
+                    subtitle={t('profiles.entrySubtitle')}
+                    // Agents step: the row lists the agent profiles, and its two
+                    // siblings in this section already carry `honey`. The neutral tile
+                    // made one row of three read as disabled.
+                    hue="honey"
+                    onPress={() => {
+                      router.push(getProfilesPath());
+                    }}
+                  />
+                </SettingsTarget>
+                {/* Cloud Agent triggers are a native screen, for the scope in view:
+                the personal triggers, or the selected organization's. */}
+                <SettingsTarget item={PROFILE_SETTINGS.triggers}>
+                  <ConfigureRow
+                    icon={Workflow}
+                    title={t(PROFILE_SETTINGS.triggers.label)}
+                    subtitle={t('cloudAgent.triggers.subtitle')}
+                    hue="honey"
+                    onPress={() => {
+                      router.push(triggersListHref(organizationId ?? undefined));
+                    }}
+                  />
+                </SettingsTarget>
+              </RowGroup>
+            </Section>
+
+            {/* PR Review */}
+            <Section label={t('profile.reviews')}>
+              <RowGroup leadingTile>
+                <SettingsTarget item={PROFILE_SETTINGS.prReview}>
+                  <ConfigureRow
+                    icon={GitMerge}
+                    title={t(PROFILE_SETTINGS.prReview.label)}
+                    subtitle={t('common.prReviewSubtitle')}
+                    hue="gold"
+                    onPress={() => {
+                      router.push(getPrReviewEntryPath());
+                    }}
+                  />
+                </SettingsTarget>
+              </RowGroup>
+            </Section>
+
+            {/* Organization */}
+            {showOrganizationSection && (
+              <Section label={t('common.organization')}>
+                {organizationsError ? (
+                  <QueryError
+                    variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
+                    placement="top"
+                    title={t('profile.couldNotLoadOrganization')}
+                    message={t('profile.couldNotLoadOrganizationDescription')}
+                    onRetry={() => void refetchOrganizations()}
+                    isRetrying={organizationsFetching}
+                  />
+                ) : (
+                  <RowGroup leadingTile>
+                    {showOrganizationRow && organizationRow}
+                    <SettingsTarget item={PROFILE_SETTINGS.createOrganization}>
+                      <ConfigureRow
+                        icon={Plus}
+                        title={t(PROFILE_SETTINGS.createOrganization.label)}
+                        hue="lime"
+                        onPress={() => {
+                          router.push(CREATE_ORGANIZATION_HREF);
+                        }}
+                      />
+                    </SettingsTarget>
+                  </RowGroup>
+                )}
+              </Section>
             )}
-            <SettingsTarget item={PROFILE_SETTINGS.preferences}>
-              <ConfigureRow
-                icon={SlidersHorizontal}
-                title={t(PROFILE_SETTINGS.preferences.label)}
-                subtitle={t('profile.preferencesSubtitle')}
-                hue="sage"
-                onPress={() => {
-                  router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
-                }}
-              />
-            </SettingsTarget>
-            <SettingsTarget item={PROFILE_SETTINGS.agentBriefing}>
-              <ConfigureRow
-                icon={BookOpenCheck}
-                title={t(PROFILE_SETTINGS.agentBriefing.label)}
-                subtitle={t('agentBriefing.historyHint')}
-                hue="sage"
-                onPress={() => {
-                  router.push('/(app)/agent-briefing' as Href);
-                }}
-              />
-            </SettingsTarget>
-            {/* Permanent replay entry: opens the tour at any time, including
+
+            {/* App */}
+            <Section label={t('profile.app')}>
+              <RowGroup leadingTile>
+                {showNativeRemote && (
+                  <SettingsTarget item={PROFILE_SETTINGS.nativeRemote}>
+                    <ConfigureRow
+                      icon={SlidersHorizontal}
+                      title={t(PROFILE_SETTINGS.nativeRemote.label)}
+                      hue="sage"
+                      onPress={() => {
+                        router.push('/(app)/native-remote' as Href);
+                      }}
+                    />
+                  </SettingsTarget>
+                )}
+                <SettingsTarget item={PROFILE_SETTINGS.preferences}>
+                  <ConfigureRow
+                    icon={SlidersHorizontal}
+                    title={t(PROFILE_SETTINGS.preferences.label)}
+                    subtitle={t('profile.preferencesSubtitle')}
+                    hue="sage"
+                    onPress={() => {
+                      router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+                    }}
+                  />
+                </SettingsTarget>
+                <SettingsTarget item={PROFILE_SETTINGS.agentBriefing}>
+                  <ConfigureRow
+                    icon={BookOpenCheck}
+                    title={t(PROFILE_SETTINGS.agentBriefing.label)}
+                    subtitle={t('agentBriefing.historyHint')}
+                    hue="sage"
+                    onPress={() => {
+                      router.push('/(app)/agent-briefing' as Href);
+                    }}
+                  />
+                </SettingsTarget>
+                {/* Permanent replay entry: opens the tour at any time, including
                 after the account finished or skipped it. Opening it is an
                 explicit user action, never a re-arm of the auto-open. */}
-            <SettingsTarget item={PROFILE_SETTINGS.tutorial}>
-              <ConfigureRow
-                icon={BookOpenCheck}
-                title={t(PROFILE_SETTINGS.tutorial.label)}
-                hue="sage"
-                onPress={() => {
-                  router.push('/(app)/tour' as Href);
-                }}
-              />
-            </SettingsTarget>
-            <SettingsTarget item={PROFILE_SETTINGS.changelog}>
-              <ConfigureRow
-                icon={Sparkles}
-                title={t(PROFILE_SETTINGS.changelog.label)}
-                hue="sage"
-                onPress={() => {
-                  router.push('/(app)/changelog' as Href);
-                }}
-              />
-            </SettingsTarget>
-          </RowGroup>
-        </Section>
+                <SettingsTarget item={PROFILE_SETTINGS.tutorial}>
+                  <ConfigureRow
+                    icon={BookOpenCheck}
+                    title={t(PROFILE_SETTINGS.tutorial.label)}
+                    hue="sage"
+                    onPress={() => {
+                      router.push('/(app)/tour' as Href);
+                    }}
+                  />
+                </SettingsTarget>
+                <SettingsTarget item={PROFILE_SETTINGS.changelog}>
+                  <ConfigureRow
+                    icon={Sparkles}
+                    title={t(PROFILE_SETTINGS.changelog.label)}
+                    hue="sage"
+                    onPress={() => {
+                      router.push('/(app)/changelog' as Href);
+                    }}
+                  />
+                </SettingsTarget>
+              </RowGroup>
+            </Section>
 
-        {/* Linked accounts — hide the whole section when there are no linked
+            {/* Linked accounts — hide the whole section when there are no linked
             providers (and we're not loading/erroring) so the header never dangles. */}
-        {/* No layout animation on this section: siblings above mount/resize
+            {/* No layout animation on this section: siblings above mount/resize
             asynchronously; LinearTransition would animate this container's
             position lag as a visible header overlap.
             The rows below carry no entering fade either: a Reanimated entering
@@ -696,159 +696,159 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
             bar (Android `profile-error`, 2026-09-22). The skeleton reserves the
             row's height, so painting a row directly cannot shift the sections
             below — only the skeleton's exit fade remains. */}
-        {linkedAccounts.kind === 'hidden' ? null : (
-          <Section label={t('profile.linkedAccounts')}>
-            {linkedAccounts.kind === 'skeleton' ? (
-              <Animated.View exiting={FadeOut.duration(150)}>
-                {/* The group's own row shape, so the swap to the loaded rows
+            {linkedAccounts.kind === 'hidden' ? null : (
+              <Section label={t('profile.linkedAccounts')}>
+                {linkedAccounts.kind === 'skeleton' ? (
+                  <Animated.View exiting={FadeOut.duration(150)}>
+                    {/* The group's own row shape, so the swap to the loaded rows
                     does not shift the sections below. */}
-                <RowGroup>
-                  <RowSkeleton tile subtitle />
-                </RowGroup>
-              </Animated.View>
-            ) : null}
+                    <RowGroup>
+                      <RowSkeleton tile subtitle />
+                    </RowGroup>
+                  </Animated.View>
+                ) : null}
 
-            {linkedAccounts.kind === 'error' ? (
-              <QueryError
-                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
-                placement="top"
-                title={t('profile.couldNotLoadAccounts')}
-                onRetry={() => void refetchProviders()}
-                isRetrying={providersFetching}
-              />
-            ) : null}
-
-            {listedProviders === null ? null : (
-              <RowGroup leadingTile>
-                {listedProviders.map(p => (
-                  <ConfigureRow
-                    key={`${p.provider}-${p.email}`}
-                    icon={KeyRound}
-                    title={providerLabel(p.provider)}
-                    subtitle={p.email}
-                    subtitleNumberOfLines={1}
-                    hue="moss"
+                {linkedAccounts.kind === 'error' ? (
+                  <QueryError
+                    variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
+                    placement="top"
+                    title={t('profile.couldNotLoadAccounts')}
+                    onRetry={() => void refetchProviders()}
+                    isRetrying={providersFetching}
                   />
-                ))}
-              </RowGroup>
+                ) : null}
+
+                {listedProviders === null ? null : (
+                  <RowGroup leadingTile>
+                    {listedProviders.map(p => (
+                      <ConfigureRow
+                        key={`${p.provider}-${p.email}`}
+                        icon={KeyRound}
+                        title={providerLabel(p.provider)}
+                        subtitle={p.email}
+                        subtitleNumberOfLines={1}
+                        hue="moss"
+                      />
+                    ))}
+                  </RowGroup>
+                )}
+
+                {linkedAccounts.kind === 'rowsStale' ? (
+                  <View className="flex-row items-center gap-3">
+                    <AccessibleStatus
+                      tone="warn"
+                      className="flex-1 text-xs"
+                      message={t('agents.sessionList.couldNotRefresh')}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => void refetchProviders()}
+                      loading={providersFetching}
+                    >
+                      {t('common.refresh')}
+                    </Button>
+                  </View>
+                ) : null}
+              </Section>
             )}
 
-            {linkedAccounts.kind === 'rowsStale' ? (
-              <View className="flex-row items-center gap-3">
-                <AccessibleStatus
-                  tone="warn"
-                  className="flex-1 text-xs"
-                  message={t('agents.sessionList.couldNotRefresh')}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => void refetchProviders()}
-                  loading={providersFetching}
-                >
-                  {t('common.refresh')}
-                </Button>
-              </View>
-            ) : null}
-          </Section>
-        )}
-
-        {/* Connected services — the integrations hub. Its own section rather
+            {/* Connected services — the integrations hub. Its own section rather
             than a row in App: the hub manages external accounts, and its row
             takes the next curated hue step in reading order. */}
-        <Section label={t('integrations.sectionTitle')}>
-          <RowGroup leadingTile>
-            <SettingsTarget item={PROFILE_SETTINGS.integrations}>
-              <ConfigureRow
-                icon={Plug}
-                title={t(PROFILE_SETTINGS.integrations.label)}
-                subtitle={t('integrations.entrySubtitle')}
-                hue="pine"
-                onPress={() => {
-                  router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
-                }}
-              />
-            </SettingsTarget>
-          </RowGroup>
-        </Section>
+            <Section label={t('integrations.sectionTitle')}>
+              <RowGroup leadingTile>
+                <SettingsTarget item={PROFILE_SETTINGS.integrations}>
+                  <ConfigureRow
+                    icon={Plug}
+                    title={t(PROFILE_SETTINGS.integrations.label)}
+                    subtitle={t('integrations.entrySubtitle')}
+                    hue="pine"
+                    onPress={() => {
+                      router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
+                    }}
+                  />
+                </SettingsTarget>
+              </RowGroup>
+            </Section>
 
-        <Section>
-          <RowGroup leadingTile>
-            <SettingsTarget item={PROFILE_SETTINGS.feedback}>
-              <ConfigureRow
-                variant="action"
-                icon={MessageSquare}
-                title={t(PROFILE_SETTINGS.feedback.label)}
-                hue="fern"
-                onPress={() => {
-                  void feedbackPrompt.requestPrompt(userId);
-                }}
-              />
-            </SettingsTarget>
-            <SettingsTarget item={PROFILE_SETTINGS.privacyChoices}>
-              <ConfigureRow
-                variant="action"
-                icon={Lock}
-                title={t(PROFILE_SETTINGS.privacyChoices.label)}
-                hue="fern"
-                onPress={showPrivacyChoices}
-              />
-            </SettingsTarget>
-            <SettingsTarget item={PROFILE_SETTINGS.signOut}>
-              <ConfigureRow
-                variant="action"
-                icon={DirectionalLogOut}
-                title={t(PROFILE_SETTINGS.signOut.label)}
-                hue="fern"
-                onPress={requestSignOut}
-              />
-            </SettingsTarget>
-            <SettingsTarget item={PROFILE_SETTINGS.deleteAccount}>
-              <ConfigureRow
-                variant="action"
-                icon={Trash2}
-                title={t(PROFILE_SETTINGS.deleteAccount.label)}
-                hue="fern"
-                destructive
-                disabled={deletePending}
-                onPress={confirmDeleteAccount}
-              />
-            </SettingsTarget>
-          </RowGroup>
+            <Section>
+              <RowGroup leadingTile>
+                <SettingsTarget item={PROFILE_SETTINGS.feedback}>
+                  <ConfigureRow
+                    variant="action"
+                    icon={MessageSquare}
+                    title={t(PROFILE_SETTINGS.feedback.label)}
+                    hue="fern"
+                    onPress={() => {
+                      void feedbackPrompt.requestPrompt(userId);
+                    }}
+                  />
+                </SettingsTarget>
+                <SettingsTarget item={PROFILE_SETTINGS.privacyChoices}>
+                  <ConfigureRow
+                    variant="action"
+                    icon={Lock}
+                    title={t(PROFILE_SETTINGS.privacyChoices.label)}
+                    hue="fern"
+                    onPress={showPrivacyChoices}
+                  />
+                </SettingsTarget>
+                <SettingsTarget item={PROFILE_SETTINGS.signOut}>
+                  <ConfigureRow
+                    variant="action"
+                    icon={DirectionalLogOut}
+                    title={t(PROFILE_SETTINGS.signOut.label)}
+                    hue="fern"
+                    onPress={requestSignOut}
+                  />
+                </SettingsTarget>
+                <SettingsTarget item={PROFILE_SETTINGS.deleteAccount}>
+                  <ConfigureRow
+                    variant="action"
+                    icon={Trash2}
+                    title={t(PROFILE_SETTINGS.deleteAccount.label)}
+                    hue="fern"
+                    destructive
+                    disabled={deletePending}
+                    onPress={confirmDeleteAccount}
+                  />
+                </SettingsTarget>
+              </RowGroup>
 
-          {(deletePhase === 'awaiting-code' || deletePhase === 'executing') && (
-            <Card className="gap-3">
-              <FormField
-                label={t('profile.confirmationCode')}
-                placeholder={t('profile.confirmationCodePlaceholder')}
-                keyboardType="number-pad"
-                // Android only: keep the IME docked to the number-pad instead
-                // of swapping to its full-screen extract editor, whose window
-                // parks over the whole screen and buries the destructive submit
-                // below it. The shared scroll view already reserves the docked
-                // IME height and the reveal scrolls the block to its end, so
-                // `TabScreenScrollView`'s occlusion reservation leaves the
-                // submit above the keyboard without a dimensions change here.
-                disableFullscreenUI
-                defaultValue={devCode ?? undefined}
-                onChangeText={setCode}
-                editable={deletePhase !== 'executing'}
-              />
-              <Button
-                variant="destructive"
-                loading={deletePhase === 'executing'}
-                disabled={deletePhase === 'executing' || !canSubmitCode}
-                onPress={submitCode}
-              >
-                <Text>{t('profile.confirmDeletion')}</Text>
-              </Button>
-            </Card>
-          )}
+              {(deletePhase === 'awaiting-code' || deletePhase === 'executing') && (
+                <Card className="gap-3">
+                  <FormField
+                    label={t('profile.confirmationCode')}
+                    placeholder={t('profile.confirmationCodePlaceholder')}
+                    keyboardType="number-pad"
+                    // Android only: keep the IME docked to the number-pad instead
+                    // of swapping to its full-screen extract editor, whose window
+                    // parks over the whole screen and buries the destructive submit
+                    // below it. The shared scroll view already reserves the docked
+                    // IME height and the reveal scrolls the block to its end, so
+                    // `TabScreenScrollView`'s occlusion reservation leaves the
+                    // submit above the keyboard without a dimensions change here.
+                    disableFullscreenUI
+                    defaultValue={devCode ?? undefined}
+                    onChangeText={setCode}
+                    editable={deletePhase !== 'executing'}
+                  />
+                  <Button
+                    variant="destructive"
+                    loading={deletePhase === 'executing'}
+                    disabled={deletePhase === 'executing' || !canSubmitCode}
+                    onPress={submitCode}
+                  >
+                    <Text>{t('profile.confirmDeletion')}</Text>
+                  </Button>
+                </Card>
+              )}
 
-          <Text variant="caption" className="text-center">
-            v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})
-          </Text>
-        </Section>
+              <Text variant="caption" className="text-center">
+                v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})
+              </Text>
+            </Section>
           </>
         )}
       </SettingsSearchScrollView>

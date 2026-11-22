@@ -65,8 +65,7 @@ function row(testID = 'row') {
 
 function overlays(root: ReactTestInstance) {
   return root.findAll(
-    node =>
-      Object.is(node.type, 'View') && String(node.props.className).includes('border-primary')
+    node => Object.is(node.type, 'View') && String(node.props.className).includes('border-primary')
   );
 }
 
@@ -77,9 +76,7 @@ afterEach(() => {
 
 describe('SettingsTarget', () => {
   it('returns the row untouched without an active target scope', () => {
-    const root = mount(
-      createElement(SettingsTarget, { item: system }, row('alone'))
-    );
+    const root = mount(createElement(SettingsTarget, { item: system }, row('alone')));
 
     expect(root.findByProps({ testID: 'alone' })).toBeTruthy();
     expect(root.findAll(node => Object.is(node.type, 'View'))).toEqual([]);

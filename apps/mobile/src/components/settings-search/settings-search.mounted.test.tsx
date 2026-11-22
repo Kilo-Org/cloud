@@ -4,11 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, TestRenderer, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 
 import { defineSetting, type SettingsSearchSource } from '@/lib/settings-search/definitions';
-import {
-  SettingsSearchField,
-  SettingsSearchResults,
-  useSettingsSearch,
-} from './settings-search';
+import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from './settings-search';
 
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
 const lookups = vi.hoisted(() => ({ keyword: {} as Record<string, number> }));

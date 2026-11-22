@@ -55,9 +55,7 @@ const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
  * methods, the caller's provider keys, their data export, the people they hid,
  * and the browser sessions they can revoke.
  */
-export function AccountSettingsScreen({
-  settingsTarget,
-}: Readonly<{ settingsTarget?: string }>) {
+export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTarget?: string }>) {
   const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();

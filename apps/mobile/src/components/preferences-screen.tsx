@@ -37,9 +37,7 @@ import { PREFERENCES_HUB_SETTINGS } from '@/lib/settings-search/preference-sourc
  * Every row is also wrapped in the search target the index names, so a search
  * result lands on the row instead of only opening this screen.
  */
-export function PreferencesScreen({
-  settingsTarget,
-}: Readonly<{ settingsTarget?: string }>) {
+export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?: string }>) {
   const router = useRouter();
   const { preference: themePreference } = useThemePreference();
   const { t } = useTranslation();

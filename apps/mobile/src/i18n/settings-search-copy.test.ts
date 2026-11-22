@@ -98,11 +98,7 @@ function foldForContainment(value: string): string {
 
 /** Drops the foldable diacritics, lowering first so Turkish İ folds to i. */
 function withoutDiacritics(label: string): string {
-  return label
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(FOLDABLE_DIACRITICS, '')
-    .normalize('NFC');
+  return label.toLowerCase().normalize('NFD').replace(FOLDABLE_DIACRITICS, '').normalize('NFC');
 }
 
 /**

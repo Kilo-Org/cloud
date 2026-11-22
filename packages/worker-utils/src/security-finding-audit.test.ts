@@ -270,6 +270,13 @@ describe('security finding audit contract', () => {
       'keys',
       'key_key',
       'Key',
+      'key2',
+      'keys_2',
+      'keys-3',
+      'Key1',
+      'keys3',
+      'KEY_2',
+      'keys123',
     ];
 
     for (const key of disallowedKeys) {
@@ -333,6 +340,10 @@ describe('security finding audit contract', () => {
       'pattern',
       'keystore',
       'compat',
+      'key2Id',
+      'key2Name',
+      'keys2Count',
+      'publicKey2',
     ];
 
     for (const key of allowedKeys) {

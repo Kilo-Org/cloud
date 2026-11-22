@@ -1101,10 +1101,19 @@ export const controlPlaneAdmitAnswerPayloadSchema = z
   })
   .strict();
 
+/**
+ * The result of admitting a preflighted settled answer. `sent` admitted the
+ * continuation, `not_connected` is terminal for this reply, and `queue-full`
+ * keeps it pending until capacity returns. `retry` means the interaction the
+ * reply names is still pending, so the same reply can be admitted after the
+ * session settles again; only the preflighted turn no longer matches the
+ * session's current state.
+ */
 export const controlPlaneContinuationAdmissionResultSchema = z.enum([
   'sent',
   'not_connected',
   'queue-full',
+  'retry',
 ]);
 
 export const controlPlaneDispatchResultSchema = z.union([

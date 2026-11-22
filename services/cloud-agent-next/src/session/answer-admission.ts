@@ -30,6 +30,8 @@ export type AnswerBalancePreflight = (params: {
   authToken: string;
   userId: string;
   cloudAgentSessionId: string;
+  /** The payer the caller already resolved; absent means the preflight reads it. */
+  organizationId?: string | null;
 }) => Promise<BalanceOnlyResult>;
 
 export type AnswerAdmissionDeps = {
@@ -44,6 +46,12 @@ export type AnswerAdmissionOutcome =
   | { outcome: 'queue-full' }
   /** The payer balance refused the new turn; the interaction stays pending. */
   | { outcome: 'balance'; status: 402 | 404 | 500 | 503; message: string }
+  /**
+   * The interaction still waits, but the preflighted turn no longer matches the
+   * session, so the same reply succeeds once the session settles again. Clients
+   * must keep the interaction and offer a retry.
+   */
+  | { outcome: 'retryable' }
   /** The caller holds no verified bearer, so the preflight cannot run. */
   | { outcome: 'unavailable' };
 
@@ -62,6 +70,11 @@ export async function answerWithAdmission(params: {
   userId: string;
   authToken?: string;
   cloudAgentSessionId: string;
+  /**
+   * The payer the caller resolved at its own session access gate. Omitted when
+   * the caller runs no gate, so the preflight reads the payer itself.
+   */
+  organizationId?: string | null;
   reply: ControlPlaneAnswerReply;
   deps?: AnswerAdmissionDeps;
 }): Promise<AnswerAdmissionOutcome> {
@@ -84,6 +97,7 @@ export async function answerWithAdmission(params: {
     authToken,
     userId: params.userId,
     cloudAgentSessionId: params.cloudAgentSessionId,
+    ...('organizationId' in params ? { organizationId: params.organizationId } : {}),
   });
   if (!balance.success) {
     return { outcome: 'balance', status: balance.status, message: balance.message };
@@ -117,5 +131,8 @@ export async function answerWithAdmission(params: {
   );
   if (admitted === 'sent') return { outcome: 'sent' };
   if (admitted === 'queue-full') return { outcome: 'queue-full' };
+  // The interaction still waits, but the preflighted turn no longer matches the
+  // session: the same reply can be admitted after the session settles again.
+  if (admitted === 'retry') return { outcome: 'retryable' };
   return { outcome: 'not_pending' };
 }

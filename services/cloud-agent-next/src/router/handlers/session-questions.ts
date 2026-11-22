@@ -27,7 +27,9 @@ async function answerControlPlane(
   userId: string,
   authToken: string | undefined,
   sessionId: SessionId,
-  reply: ControlPlaneAnswerReply
+  reply: ControlPlaneAnswerReply,
+  /** The payer the mutation's own access gate already resolved. */
+  organizationId: string | null
 ): Promise<{ success: boolean }> {
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
@@ -38,6 +40,7 @@ async function answerControlPlane(
     userId,
     ...(authToken === undefined ? {} : { authToken }),
     cloudAgentSessionId: sessionId,
+    organizationId,
     reply,
   });
   switch (outcome.outcome) {
@@ -48,6 +51,14 @@ async function answerControlPlane(
     case 'queue-full':
       // The same retryable capacity refusal a prompt reports.
       return throwAdmissionError(pendingQueueFullAdmissionFailure());
+    case 'retryable':
+      // The interaction still waits; only the session moved on. `CONFLICT` is
+      // not a terminal client code, and the cause marks the retry explicitly.
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'The session moved on; send the answer again',
+        cause: { error: 'ANSWER_RETRY_REQUIRED', retryable: true },
+      });
     case 'unavailable':
       throw new TRPCError({
         code: 'SERVICE_UNAVAILABLE',
@@ -87,16 +98,23 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            await requireCurrentSessionAccess({
+            const access = await requireCurrentSessionAccess({
               env,
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, ctx.authToken, sessionId, {
-              action: 'answer',
-              questionId: input.questionId,
-              answers: input.answers,
-            });
+            const result = await answerControlPlane(
+              env,
+              userId,
+              ctx.authToken,
+              sessionId,
+              {
+                action: 'answer',
+                questionId: input.questionId,
+                answers: input.answers,
+              },
+              access.organizationId
+            );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
               .info('Question answer forwarded to session');
@@ -127,15 +145,22 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            await requireCurrentSessionAccess({
+            const access = await requireCurrentSessionAccess({
               env,
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, ctx.authToken, sessionId, {
-              action: 'reject',
-              questionId: input.questionId,
-            });
+            const result = await answerControlPlane(
+              env,
+              userId,
+              ctx.authToken,
+              sessionId,
+              {
+                action: 'reject',
+                questionId: input.questionId,
+              },
+              access.organizationId
+            );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
               .info('Question rejection forwarded to session');
@@ -168,16 +193,23 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            await requireCurrentSessionAccess({
+            const access = await requireCurrentSessionAccess({
               env,
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, ctx.authToken, sessionId, {
-              action: 'permission',
-              permissionId: input.permissionId,
-              response: input.response,
-            });
+            const result = await answerControlPlane(
+              env,
+              userId,
+              ctx.authToken,
+              sessionId,
+              {
+                action: 'permission',
+                permissionId: input.permissionId,
+                response: input.response,
+              },
+              access.organizationId
+            );
             logger
               .withFields({ permissionId: input.permissionId, success: result.success })
               .info('Permission answer forwarded to session');

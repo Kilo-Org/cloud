@@ -198,7 +198,12 @@ import {
   type SessionMessage,
   type SessionMessageState,
 } from './messages.js';
-import { admittedPayload, answerMessageIntent, sameContinuationIntent } from './answers.js';
+import {
+  admittedPayload,
+  answerMessageIntent,
+  answerPromptText,
+  sameContinuationIntent,
+} from './answers.js';
 import { messageFailureText } from './failure-messages.js';
 import {
   createControlPlaneWorktreeChanges,
@@ -2200,6 +2205,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * through the wrapper, exactly like a live answer. A queue that filled after
    * the preflight refuses the continuation for capacity and keeps the
    * interaction pending.
+   *
+   * A refusal only proves the reply is dead when the session no longer waits on
+   * the interaction or the caller's own reply disagrees with the intent it sent;
+   * a session that merely moved on (newer last turn, or a live forward that
+   * nothing took) reports `retry`, because the same reply is still admissible
+   * once the session settles again.
    */
   async admitAnswerContinuation(
     payload: ControlPlaneAdmitAnswerPayload
@@ -2222,11 +2233,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         parsed.intent.messageId,
         this.metadata?.agent?.model
       );
-      if (rebuilt === null || !sameContinuationIntent(rebuilt, parsed.intent)) {
-        return 'not_connected';
+      if (rebuilt === null) return 'not_connected';
+      if (!sameContinuationIntent(rebuilt, parsed.intent)) {
+        // The session's last turn changed since `answer` built this intent (a
+        // prompt with a different model queued from another tab, a newer
+        // finalization). When the caller's reply still renders the text it
+        // preflighted, the caller is consistent and only the session moved on:
+        // the interaction is still pending, so the same reply can be admitted
+        // once the session settles again instead of reading as gone.
+        return answerPromptText(parsed.reply) === parsed.intent.turn.prompt
+          ? 'retry'
+          : 'not_connected';
       }
       if (this.messages.some(message => message.state === 'accepted')) {
-        return this.forwardToLiveTurn(parsed.reply);
+        const forwarded = await this.forwardToLiveTurn(parsed.reply);
+        if (forwarded !== 'not_connected') return forwarded;
+        // The live turn did not take the reply, but the interaction is still
+        // pending, so this refusal is retryable rather than terminal. A forward
+        // that resolved the interaction reports `sent` above.
+        return this.hasPendingInteraction(target.collection, target.id) ? 'retry' : 'not_connected';
       }
       // Same callback context `send` injects, so a subagent the continuation
       // spawns can route its completion back to this chat.

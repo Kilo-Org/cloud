@@ -81,13 +81,21 @@ function logPromptPayerScopeFailure(
  * The payer balance preflight shared by prompt, command and answer admission.
  * It resolves the payer from the session ownership record, so one session has
  * one payer on every surface.
+ *
+ * A caller that already ran the session access gate passes the payer it
+ * resolved as `organizationId`, which skips the read (and its retry) entirely.
+ * A supplied `null` is the personal payer, exactly like a read that finds none.
  */
 export async function defaultValidatePromptBalance(params: {
   env: Env;
   authToken: string;
   userId: string;
   cloudAgentSessionId: string;
+  organizationId?: string | null;
 }): Promise<BalanceOnlyResult> {
+  if ('organizationId' in params) {
+    return validateBalanceOnly(params.authToken, params.organizationId ?? undefined, params.env);
+  }
   let organizationId: string | null;
   try {
     organizationId = await readPromptPayerScope({

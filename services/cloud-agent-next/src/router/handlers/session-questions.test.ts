@@ -28,6 +28,11 @@ vi.mock('../../session/metadata.js', () => ({
   fetchSessionMetadata: fetchSessionMetadataMock,
 }));
 
+vi.mock('../../session/model-preflight.js', () => ({
+  preflightSessionRuntime: vi.fn(),
+  preflightExistingPromptModel: vi.fn(),
+}));
+
 const handlers = createSessionQuestionHandlers();
 const router = t.router({
   getPendingInteractions: handlers.getPendingInteractions,
@@ -41,6 +46,7 @@ function setup() {
   const stub = {
     getPendingInteractions: vi.fn().mockResolvedValue({ questions: [], permissions: [] }),
     answer: vi.fn().mockResolvedValue('sent'),
+    admitAnswerContinuation: vi.fn().mockResolvedValue('sent'),
   };
   const sandboxSessions = {
     idFromName: vi.fn((name: string) => name),
@@ -125,6 +131,10 @@ describe('getPendingInteractions', () => {
 describe('answerQuestion', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireCurrentSessionAccessMock.mockResolvedValue({
+      kiloSessionId: 'kilo_root',
+      organizationId: null,
+    });
   });
 
   it('resolves a fresh control-plane stub for each retry of the answer RPC', async () => {
@@ -193,6 +203,10 @@ describe('answerQuestion', () => {
       },
     } as unknown as TRPCContext;
     const caller = router.createCaller(context);
+    requireCurrentSessionAccessMock.mockResolvedValue({
+      kiloSessionId: 'kilo_root',
+      organizationId: 'org-funded',
+    });
     const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({ balance: 0, isDepleted: true })
     );
@@ -201,12 +215,91 @@ describe('answerQuestion', () => {
       await expect(
         caller.answerQuestion({ sessionId: SESSION_ID, questionId: 'q_1', answers: [['yes']] })
       ).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
-      // The balance read used the caller's own bearer.
+      // The balance read used the caller's own bearer and the payer the access
+      // gate already resolved, without reading that scope a second time.
+      expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [balanceInput, balanceInit] = fetchMock.mock.calls[0];
       const balanceUrl = balanceInput instanceof Request ? balanceInput.url : String(balanceInput);
       expect(balanceUrl).toContain('/balance');
-      expect(new Headers(balanceInit?.headers).get('Authorization')).toBe('Bearer test-auth-token');
+      const balanceHeaders = new Headers(balanceInit?.headers);
+      expect(balanceHeaders.get('Authorization')).toBe('Bearer test-auth-token');
+      expect(balanceHeaders.get('X-KiloCode-OrganizationId')).toBe('org-funded');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reads the payer scope once when a settled answer is admitted', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    const harness = setup();
+    harness.stub.answer.mockResolvedValue({
+      result: 'continuation',
+      intent: {
+        messageId: 'msg_answer_1',
+        turn: { type: 'prompt', prompt: 'yes' },
+        agent: { mode: 'code', model: 'test/model' },
+      },
+    });
+    requireCurrentSessionAccessMock.mockResolvedValue({
+      kiloSessionId: 'kilo_root',
+      organizationId: 'org-funded',
+    });
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ balance: 5, isDepleted: false })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(
+        harness.caller.answerQuestion({
+          sessionId: SESSION_ID,
+          questionId: 'q_1',
+          answers: [['yes']],
+        })
+      ).resolves.toEqual({ success: true });
+      // One access gate, one balance read on the payer it resolved.
+      expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [, balanceInit] = fetchMock.mock.calls[0];
+      expect(new Headers(balanceInit?.headers).get('X-KiloCode-OrganizationId')).toBe('org-funded');
+      expect(harness.stub.admitAnswerContinuation).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('uses the personal payer the access gate resolved without reading it again', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    const harness = setup();
+    harness.stub.answer.mockResolvedValue({
+      result: 'continuation',
+      intent: {
+        messageId: 'msg_answer_1',
+        turn: { type: 'prompt', prompt: 'yes' },
+        agent: { mode: 'code', model: 'test/model' },
+      },
+    });
+    requireCurrentSessionAccessMock.mockResolvedValue({
+      kiloSessionId: 'kilo_root',
+      organizationId: null,
+    });
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ balance: 0, isDepleted: true })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(
+        harness.caller.answerQuestion({
+          sessionId: SESSION_ID,
+          questionId: 'q_1',
+          answers: [['yes']],
+        })
+      ).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
+      expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [, balanceInit] = fetchMock.mock.calls[0];
+      // A supplied `null` is the personal payer: no organization header at all.
+      expect(new Headers(balanceInit?.headers).get('X-KiloCode-OrganizationId')).toBeNull();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -235,25 +328,13 @@ describe('answerQuestion', () => {
     }
   });
 
-  it('reports an unreachable payer scope as a missing session', async () => {
+  it('reports a session the caller cannot reach as its own forbidden refusal', async () => {
     fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
     requireCurrentSessionAccessMock.mockReset();
-    requireCurrentSessionAccessMock.mockResolvedValueOnce({
-      kiloSessionId: 'kilo_root',
-      organizationId: null,
-    });
     requireCurrentSessionAccessMock.mockRejectedValueOnce(
       new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
     );
     const harness = setup();
-    harness.stub.answer.mockResolvedValue({
-      result: 'continuation',
-      intent: {
-        messageId: 'msg_answer_1',
-        turn: { type: 'prompt', prompt: 'yes' },
-        agent: { mode: 'code', model: 'test/model' },
-      },
-    });
 
     await expect(
       harness.caller.answerQuestion({
@@ -262,31 +343,25 @@ describe('answerQuestion', () => {
         answers: [['yes']],
       })
     ).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-      message: 'Cloud Agent session was not found',
+      code: 'FORBIDDEN',
+      message: 'Session access denied',
     });
-    // The access gate, then the single payer read a denial ends at once.
-    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(2);
+    // The access gate is now the only payer read a settled answer makes.
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+    expect(harness.stub.answer).not.toHaveBeenCalled();
   });
 
-  it('reports a temporary payer scope read failure as retryable', async () => {
+  it('reports an unavailable session access gate as retryable', async () => {
     fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
     requireCurrentSessionAccessMock.mockReset();
-    requireCurrentSessionAccessMock.mockResolvedValueOnce({
-      kiloSessionId: 'kilo_root',
-      organizationId: null,
-    });
-    requireCurrentSessionAccessMock.mockRejectedValueOnce(new Error('payer read unavailable'));
-    requireCurrentSessionAccessMock.mockRejectedValueOnce(new Error('payer read unavailable'));
+    requireCurrentSessionAccessMock.mockRejectedValueOnce(
+      new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session access is temporarily unavailable',
+        cause: new Error('payer read unavailable'),
+      })
+    );
     const harness = setup();
-    harness.stub.answer.mockResolvedValue({
-      result: 'continuation',
-      intent: {
-        messageId: 'msg_answer_1',
-        turn: { type: 'prompt', prompt: 'yes' },
-        agent: { mode: 'code', model: 'test/model' },
-      },
-    });
 
     await expect(
       harness.caller.answerQuestion({
@@ -296,10 +371,11 @@ describe('answerQuestion', () => {
       })
     ).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
-      message: 'Session access is temporarily unavailable; retry the request',
+      message: 'Session access is temporarily unavailable',
     });
-    // The access gate, then the two payer read attempts.
-    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(3);
+    // The gate refuses before the answer, so no settled continuation is read.
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+    expect(harness.stub.answer).not.toHaveBeenCalled();
   });
 
   it('rejects a legacy session before reading metadata or resolving its DO', async () => {

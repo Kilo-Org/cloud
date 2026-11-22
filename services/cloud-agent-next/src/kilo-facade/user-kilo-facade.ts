@@ -1204,7 +1204,6 @@ export async function handleKiloFacadeRequest(params: {
       request,
       env,
       userId,
-      authToken,
       deps,
       url,
       route: collectionNativeRoute,
@@ -1392,12 +1391,11 @@ async function handleCollectionNativeRoute(params: {
   request: Request;
   env: Env;
   userId: string;
-  authToken?: string;
   deps?: KiloFacadeRequestDeps;
   url: URL;
-  route: NativeSessionRoute;
+  route: Exclude<NativeSessionRoute, { kind: 'answering' }>;
 }): Promise<Response> {
-  const { request, env, userId, deps, route } = params;
+  const { env, userId, deps, route } = params;
   const session = await resolveNativeRouteSession(params);
   if (session instanceof Response) return session;
 
@@ -1415,16 +1413,6 @@ async function handleCollectionNativeRoute(params: {
       }),
     });
     return nativeReadErrorResponse(outcome);
-  }
-  if (route.kind === 'answering') {
-    const body = await parseNativeAnswerBody(request, route);
-    if (!body.ok) return facadeError(body.status, body.code, body.message);
-    return answerHostedNativeInteraction({
-      env,
-      userId,
-      cloudAgentSessionId: session.cloudAgentSessionId,
-      reply: body.reply,
-    });
   }
   return facadeError(501, 'KILO_ROUTE_UNSUPPORTED', 'Kilo facade route is not supported');
 }
@@ -1551,6 +1539,18 @@ async function answerHostedNativeInteraction(params: {
   if (outcome.outcome === 'queue-full') {
     // The same retryable capacity refusal a prompt reports.
     return facadeError(429, 'KILO_PROMPT_QUEUE_FULL', pendingQueueFullAdmissionFailure().error);
+  }
+  if (outcome.outcome === 'retryable') {
+    // The interaction still waits, but the session moved on, so the same reply
+    // is admitted once it settles again. A distinct code keeps a client from
+    // reading a retry as a dead interaction.
+    const response = facadeError(
+      409,
+      'KILO_ANSWER_RETRY_REQUIRED',
+      'The session moved on; send the answer again'
+    );
+    response.headers.set('Retry-After', '1');
+    return response;
   }
   return facadeError(
     409,

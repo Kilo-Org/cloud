@@ -3148,6 +3148,39 @@ describe('hosted native routes', () => {
     expect(validatePromptBalance).toHaveBeenCalledTimes(1);
   });
 
+  it('reports a retryable refusal when the session moved on after the preflight', async () => {
+    const env = envStub();
+    const continuation = {
+      messageId: 'msg_answer_moved_on',
+      turn: { type: 'prompt' as const, prompt: 'Blue' },
+      agent: { mode: 'code', model: 'test/model' },
+    };
+    const admitAnswerContinuation = vi.fn(async () => 'retry' as const);
+    vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({
+      answer: vi.fn(async () => ({ result: 'continuation' as const, intent: continuation })),
+      admitAnswerContinuation,
+    })) as never;
+    const validatePromptBalance = vi.fn(async () => ({ success: true as const }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['Blue']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      authToken: 'caller-bearer',
+      deps: hostedDeps({ validatePromptBalance }),
+    });
+    // Retryable, so a client keeps the interaction instead of dropping it.
+    expect(response.status).toBe(409);
+    expect(response.headers.get('Retry-After')).toBe('1');
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_ANSWER_RETRY_REQUIRED',
+    });
+    expect(validatePromptBalance).toHaveBeenCalledTimes(1);
+    expect(admitAnswerContinuation).toHaveBeenCalledTimes(1);
+  });
+
   it('answers a live turn without reading the balance', async () => {
     const env = envStub();
     vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({

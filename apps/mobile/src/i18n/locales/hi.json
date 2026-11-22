@@ -4509,7 +4509,7 @@
       "activityUnavailable": "क्रेडिट गतिविधि लोड नहीं हो सकी।",
       "appStoreReceipt": "App Store की रसीद",
       "deductionFallback": "क्रेडिट कटौती",
-      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहां दिखेंगे।",
+      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहाँ दिखेंगे।",
       "emptyTitle": "कोई क्रेडिट इतिहास नहीं",
       "expiredGrant": "समय समाप्त: {{description}}",
       "googlePlayReceipt": "Google Play की रसीद",
@@ -4799,7 +4799,7 @@
     "connectFailed": "कनेक्शन पेज नहीं खोला जा सका"
   },
   "invoices": {
-    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
+    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहाँ दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
     "personalPeriod": "पिछले 12 महीने"
   },
   "cloudAgent": {

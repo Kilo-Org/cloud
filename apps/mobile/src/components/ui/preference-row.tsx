@@ -18,6 +18,12 @@ type PreferenceRowProps = Readonly<{
   /** The line under the title. Omit it for a one-line switch row. */
   subtitle?: string;
   /**
+   * The line cap for the subtitle. Omit it and the subtitle paints every line;
+   * a caller that shares this row's copy with another row passes its cap so
+   * both reserve the same height.
+   */
+  subtitleNumberOfLines?: number;
+  /**
    * A second muted line under the subtitle (a model's retirement date, say).
    * It renders only when a caller passes it and joins the switch's spoken
    * name through the shared list formatter, so the row keeps one name.
@@ -55,6 +61,7 @@ export function PreferenceRow({
   icon,
   title,
   subtitle,
+  subtitleNumberOfLines,
   note,
   value,
   disabled,
@@ -128,7 +135,7 @@ export function PreferenceRow({
   if (subtitle !== undefined) {
     subtitleNode =
       inactiveSubtitle === undefined ? (
-        <Text variant="muted" className="mt-0.5 text-xs">
+        <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={subtitleNumberOfLines}>
           {subtitle}
         </Text>
       ) : (
@@ -139,15 +146,23 @@ export function PreferenceRow({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            <Text variant="muted" className="w-full shrink-0 text-xs">
+            <Text
+              variant="muted"
+              className="w-full shrink-0 text-xs"
+              numberOfLines={subtitleNumberOfLines}
+            >
               {subtitle}
             </Text>
-            <Text variant="muted" className="-ms-[100%] w-full shrink-0 text-xs">
+            <Text
+              variant="muted"
+              className="-ms-[100%] w-full shrink-0 text-xs"
+              numberOfLines={subtitleNumberOfLines}
+            >
               {inactiveSubtitle}
             </Text>
           </View>
           <View className="absolute inset-x-0 top-0">
-            <Text variant="muted" className="text-xs">
+            <Text variant="muted" className="text-xs" numberOfLines={subtitleNumberOfLines}>
               {subtitle}
             </Text>
           </View>

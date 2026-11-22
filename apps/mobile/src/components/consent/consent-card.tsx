@@ -61,6 +61,15 @@ type ConsentCardProps = SettingsTargetProps & {
 export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
 
 /**
+ * Line cap shared by the optional disclosure's two rows.
+ *
+ * The pending placeholder and the settled row paint the same copy, so the row
+ * must reserve the same height in both: both branches pass this one cap. The
+ * optional disclosure needs the third line at the app's text column.
+ */
+const CONSENT_OPTIONAL_SUBTITLE_LINES = 3;
+
+/**
  * Whether the optional switch holds the same-size placeholder.
  *
  * The placeholder covers every render with a resolved account and no stored
@@ -123,6 +132,7 @@ export function ConsentCard({ mode = 'onboarding', settingsTarget }: ConsentCard
       icon={LineChart}
       title={t('consent.helpImprove')}
       subtitle={t('consent.helpImproveDescription')}
+      subtitleNumberOfLines={CONSENT_OPTIONAL_SUBTITLE_LINES}
       trailing={<Skeleton className="h-8 w-14 rounded-full" />}
     />
   ) : (
@@ -130,6 +140,7 @@ export function ConsentCard({ mode = 'onboarding', settingsTarget }: ConsentCard
       icon={LineChart}
       title={t('consent.helpImprove')}
       subtitle={t('consent.helpImproveDescription')}
+      subtitleNumberOfLines={CONSENT_OPTIONAL_SUBTITLE_LINES}
       value={optionalToggle}
       disabled={mode === 'review' && savingOptional}
       onValueChange={handleToggleOptional}

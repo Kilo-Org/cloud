@@ -89,8 +89,10 @@ const LAYOUT_ALLOWLIST = [
 const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
 
 /**
- * Every utility that can write a page inset, with the side it moves. One table
- * so the two inset rules below cannot drift on which sides exist; each rule
+ * Every utility that can write a page inset, with both facts a rule reads off
+ * it: the `side` it moves and the `property` it writes, a padding or a margin.
+ * One table so the two inset rules below cannot drift on which sides exist, and
+ * so no caller probes the utility name to work out what it insets; each rule
  * still states its own policy on top of it.
  *
  * The family is horizontal only: a page inset is the column a screen's content
@@ -99,18 +101,18 @@ const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
  * the `p-4` gutter; L12 leaves them out below, because it owns the side insets.
  */
 const INSET_UTILITIES = new Map([
-  ['p', 'all'],
-  ['px', 'x'],
-  ['ps', 's'],
-  ['pe', 'e'],
-  ['pl', 'l'],
-  ['pr', 'r'],
-  ['m', 'all'],
-  ['mx', 'x'],
-  ['ms', 's'],
-  ['me', 'e'],
-  ['ml', 'l'],
-  ['mr', 'r'],
+  ['p', { side: 'all', property: 'padding' }],
+  ['px', { side: 'x', property: 'padding' }],
+  ['ps', { side: 's', property: 'padding' }],
+  ['pe', { side: 'e', property: 'padding' }],
+  ['pl', { side: 'l', property: 'padding' }],
+  ['pr', { side: 'r', property: 'padding' }],
+  ['m', { side: 'all', property: 'margin' }],
+  ['mx', { side: 'x', property: 'margin' }],
+  ['ms', { side: 's', property: 'margin' }],
+  ['me', { side: 'e', property: 'margin' }],
+  ['ml', { side: 'l', property: 'margin' }],
+  ['mr', { side: 'r', property: 'margin' }],
 ]);
 
 /**
@@ -119,7 +121,7 @@ const INSET_UTILITIES = new Map([
  * all-side policy L2 states.
  */
 const L12_UTILITIES = [...INSET_UTILITIES]
-  .filter(([, side]) => side !== 'all')
+  .filter(([, entry]) => entry.side !== 'all')
   .map(([utility]) => utility);
 
 /**
@@ -819,9 +821,10 @@ function utilityOf(token) {
  * One class token read as a page inset, or null when it is not one.
  *
  * `property` is what the utility insets — a padding or a margin — and `side`
- * is the entry the token names in `INSET_UTILITIES`, so a rule states only the
- * policy it owns on top of the same parse. A negative token (`-mt-2`) parses
- * the same way: the sign only decides which direction the inset moves.
+ * is the side it moves; both come from the token's entry in `INSET_UTILITIES`,
+ * so a rule states only the policy it owns on top of the same parse. A negative
+ * token (`-mt-2`) parses the same way: the sign only decides which direction
+ * the inset moves.
  *
  * The two inset rules read this one parse with different policies:
  * - L12 judges a side inset at 5 or more, because the page gutter is 14pt.
@@ -836,17 +839,25 @@ function parseInset(token) {
     return null;
   }
   const [, utility, value] = match;
-  const side = INSET_UTILITIES.get(utility);
-  if (side === undefined) {
+  const entry = INSET_UTILITIES.get(utility);
+  if (entry === undefined) {
     return null;
   }
-  return { property: utility.startsWith('p') ? 'padding' : 'margin', utility, side, value };
+  return { ...entry, utility, value };
 }
 
 /** True when one class token writes a page inset other than the `px-4`/`p-4` gutter. */
 function wrongGutter(token) {
   const inset = parseInset(token);
   if (inset === null) {
+    return false;
+  }
+  // A margin of `auto` is centering geometry and a margin of `0` writes no
+  // inset at all, so neither moves the page column this rule judges; L12's
+  // 5-or-more threshold does not reach either value either, so no rule judges
+  // them. A padding is not exempt: `px-0` on a content container is exactly the
+  // gutterless column this rule exists for.
+  if (inset.property === 'margin' && (inset.value === 'auto' || inset.value === '0')) {
     return false;
   }
   return !((inset.utility === 'px' || inset.utility === 'p') && inset.value === '4');

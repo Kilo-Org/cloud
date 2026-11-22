@@ -1562,6 +1562,35 @@ test('flags a margin on a scroll content container as the page inset', () => {
   );
 });
 
+test('exempts auto and zero margins from the page-inset rule', () => {
+  // An auto margin is centering geometry and a zero margin writes no inset at
+  // all, so neither moves the page column L2 judges; L12's 5-or-more threshold
+  // does not reach either value either, so no rule judges them.
+  for (const classes of ['mx-auto', 'ms-auto', 'm-auto', 'mx-0', 'm-0']) {
+    for (const tag of ['DetailScreenScrollView', 'CenteredState']) {
+      const found = layoutProblems(
+        SCREEN_FILE,
+        screen(`<${tag} contentContainerClassName="${classes}" />`)
+      ).filter(problem => problem.includes('[L2]'));
+      assert.deepEqual(found, [], `${classes} on <${tag}>`);
+    }
+  }
+  // A padding is not exempt, and a margin that moves the column still is the
+  // page inset: `px-0` on a content container is exactly the gutterless column
+  // this rule exists for.
+  for (const classes of ['mx-6', 'm-6', 'px-0', 'p-2']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    ).filter(problem => problem.includes('[L2]'));
+    assert.equal(found.length, 1, classes);
+    assert.match(
+      found[0],
+      new RegExp(`\\[L2\\] "${classes} on <DetailScreenScrollView> contentContainerClassName"`)
+    );
+  }
+});
+
 test('keeps the header gutter rule padding-only', () => {
   // A header owns its own gutter, so a screen must not write padding on it.
   // A margin is not that: it moves the header's own box, and the all-side
@@ -2087,7 +2116,7 @@ test('a second run reads the theme through its own seam instead of the first run
     process.exitCode = previousExitCode;
   }
   // The first run read a theme with no failure and an admitted empty baseline.
-  assert.doesNotMatch(String(firstExitCode ?? ''), /1/);
+  assert.notEqual(firstExitCode, 1);
   // The second run reports its own failure: the memo did not carry the first
   // run's successful read into it.
   assert.equal(secondExitCode, 1);

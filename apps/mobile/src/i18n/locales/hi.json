@@ -3536,7 +3536,6 @@
         "namedPolicyDeleted": "{{kind}} नीति {{id}} हटाई गई",
         "namedPolicyLinked": "{{kind}} नीति {{next}} लिंक की गई",
         "webhookTriggerUpdated": "ट्रिगर {{trigger}}",
-        "organizationCreated": "{{name}} बनाया गया",
         "organizationRenamed": "संगठन का नाम {{previous}} से {{next}} बदला गया",
         "brand": {
           "github": "$t(common.github)",

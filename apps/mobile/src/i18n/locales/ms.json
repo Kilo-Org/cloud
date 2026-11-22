@@ -3447,7 +3447,7 @@
           "customInstructions": "$t(codeReviewer.instructions.title)",
           "groups": "$t(profiles.agents.tools)",
           "autoRoute": "penghalaan automatik",
-          "defaultModel": "Model lalai"
+          "defaultModel": "Model AI lalai"
         },
         "role": {
           "owner": "$t(organization.members.roles.owner)",
@@ -3499,7 +3499,7 @@
         "settingDefaultModelRemoved": "{{previous}}",
         "settingAutoRoute": "mod \"{{mode}}\": {{previous}} → {{next}}",
         "settingDefaultBehavior": {
-          "global": "lalai global",
+          "global": "Lalai global",
           "specific": "{{model}}",
           "auto": "$t(models.auto.organization)"
         },
@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Projek UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} kepada {{emails}}",
         "settingRecommendationsDigest": "ringkasan cadangan {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,12 +3529,12 @@
         "browserPolicyAllow": "hanya asal yang dibenarkan",
         "browserPolicyPlaywrightOnly": "penggunaan pelayar sahaja",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Model diubah: {{values}}",
+        "autoRouting": "Model AI diubah: {{values}}",
         "integrationConnected": "$t(common.github) Disambungkan",
         "integrationDisconnected": "Diputuskan sambungan",
         "integrationRefreshed": "Diperbaharui",
         "integrationCancelled": "Dibatalkan",
-        "integrationModelUpdated": "Model {{model}}",
+        "integrationModelUpdated": "Model AI {{model}}",
         "integrationKeyAdded": "Kunci ditambah untuk {{provider}}",
         "integrationKeyUpdated": "Kunci dikemas kini untuk {{provider}}",
         "integrationKeyDeleted": "Kunci dibuang untuk {{provider}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Dasar {{kind}} {{id}} dibuang",
         "namedPolicyLinked": "Dasar {{kind}} {{next}} dipautkan",
         "webhookTriggerUpdated": "Pencetus {{trigger}}",
-        "organizationCreated": "{{name}} dicipta",
         "organizationRenamed": "Organisasi dinamakan semula daripada {{previous}} kepada {{next}}",
         "brand": {
           "github": "$t(common.github)",

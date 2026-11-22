@@ -3447,7 +3447,7 @@
           "customInstructions": "$t(codeReviewer.instructions.title)",
           "groups": "$t(profiles.agents.tools)",
           "autoRoute": "Adeemsa ofumaa",
-          "defaultModel": "Moodeela durtii"
+          "defaultModel": "Modeelii durtii"
         },
         "role": {
           "owner": "$t(organization.members.roles.owner)",
@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Pirojektii UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} {{emails}}tti",
         "settingRecommendationsDigest": "Cuunfaa gorfannaa {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,12 +3529,12 @@
         "browserPolicyAllow": "Madda hayyamame qofa",
         "browserPolicyPlaywrightOnly": "Fayyadama biraawzarii qofa",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Model jijjiiraman: {{values}}",
+        "autoRouting": "Modeelii jijjiiraman: {{values}}",
         "integrationConnected": "$t(common.github) Walitti hidhame",
         "integrationDisconnected": "Addaan cite",
         "integrationRefreshed": "Haaromsame",
         "integrationCancelled": "Haqame",
-        "integrationModelUpdated": "Moodeela {{model}}",
+        "integrationModelUpdated": "Modeelii {{model}}",
         "integrationKeyAdded": "Furtuun {{provider}} dabalame",
         "integrationKeyUpdated": "Furtuun {{provider}} haaromsame",
         "integrationKeyDeleted": "Furtuun {{provider}} haqame",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Imaammatni {{kind}} {{id}} haqame",
         "namedPolicyLinked": "Imaammatni {{kind}} {{next}} walitti hidhame",
         "webhookTriggerUpdated": "Kakaasaa {{trigger}}",
-        "organizationCreated": "Dhaabbatni {{name}} uumame",
         "organizationRenamed": "Dhaabbatni maqaan isaa {{previous}} irraa {{next}}tti jijjiirame",
         "brand": {
           "github": "$t(common.github)",

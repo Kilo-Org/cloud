@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "திட்டம் UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} {{emails}} க்கு",
         "settingRecommendationsDigest": "பரிந்துரைச் சுருக்கம் {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} கொள்கை {{id}} அகற்றப்பட்டது",
         "namedPolicyLinked": "{{kind}} கொள்கை {{next}} உடன் இணைக்கப்பட்டது",
         "webhookTriggerUpdated": "தூண்டுதல் {{trigger}}",
-        "organizationCreated": "{{name}} உருவாக்கப்பட்டது",
         "organizationRenamed": "நிறுவனம் {{previous}} இலிருந்து {{next}} ஆக மறுபெயரிடப்பட்டது",
         "brand": {
           "github": "$t(common.github)",

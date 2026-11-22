@@ -3668,7 +3668,6 @@
         "namedPolicyDeleted": "Выдалена {{kind}} палітыка {{id}}",
         "namedPolicyLinked": "Звязана {{kind}} палітыка {{next}}",
         "webhookTriggerUpdated": "Трыгер {{trigger}}",
-        "organizationCreated": "Створана {{name}}",
         "organizationRenamed": "Арганізацыя перайменавана з {{previous}} на {{next}}",
         "brand": {
           "github": "$t(common.github)",

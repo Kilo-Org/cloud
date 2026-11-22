@@ -3606,7 +3606,6 @@
         "namedPolicyDeleted": "Uklonjena {{kind}} politika {{id}}",
         "namedPolicyLinked": "Povezana {{kind}} politika {{next}}",
         "webhookTriggerUpdated": "Okidač {{trigger}}",
-        "organizationCreated": "Stvorena {{name}}",
         "organizationRenamed": "Organizacija preimenovana iz {{previous}} u {{next}}",
         "brand": {
           "github": "$t(common.github)",

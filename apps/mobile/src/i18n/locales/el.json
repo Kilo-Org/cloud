@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Αφαιρέθηκε πολιτική {{kind}} {{id}}",
         "namedPolicyLinked": "Συνδέθηκε πολιτική {{kind}} {{next}}",
         "webhookTriggerUpdated": "Έναυσμα {{trigger}}",
-        "organizationCreated": "Δημιουργήθηκε {{name}}",
         "organizationRenamed": "Ο οργανισμός μετονομάστηκε από {{previous}} σε {{next}}",
         "brand": {
           "github": "$t(common.github)",

@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Projekti UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} për {{emails}}",
         "settingRecommendationsDigest": "Përmbledhja e rekomandimeve {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Politika {{kind}} {{id}} u hoq",
         "namedPolicyLinked": "Politika {{kind}} u lidh me {{next}}",
         "webhookTriggerUpdated": "Shkas {{trigger}}",
-        "organizationCreated": "Organizata {{name}} u krijua",
         "organizationRenamed": "Organizata u riemërtua nga {{previous}} në {{next}}",
         "brand": {
           "github": "$t(common.github)",

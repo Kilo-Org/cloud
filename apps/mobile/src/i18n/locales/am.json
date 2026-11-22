@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} ፖሊሲ {{id}} ተወግዷል",
         "namedPolicyLinked": "{{kind}} ፖሊሲ {{next}} ተገናኝቷል",
         "webhookTriggerUpdated": "ማስነሻ {{trigger}}",
-        "organizationCreated": "{{name}} ተፈጥሯል",
         "organizationRenamed": "ድርጅት ከ{{previous}} ወደ {{next}} ተቀይሯል",
         "brand": {
           "github": "$t(common.github)",

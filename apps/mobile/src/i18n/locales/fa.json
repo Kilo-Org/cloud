@@ -7,7 +7,7 @@
     "directory": "پوشهٔ کاری",
     "createSession": "ایجاد نشست نیتیو",
     "queueIfOffline": "قرار دادن پرامپت در صف اگر میزبان آفلاین است",
-    "prompt": "پرامپت یا \u2066/command\u2069",
+    "prompt": "پرامپت یا ⁦/command⁩",
     "localClear": "پاک کردن نمای محلی",
     "abort": "لغو نوبت",
     "failed": "عملیات دسترسی از راه دور نیتیو ناموفق بود",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "سیاست {{kind}} {{id}} حذف شد",
         "namedPolicyLinked": "سیاست {{kind}} به {{next}} پیوند شد",
         "webhookTriggerUpdated": "تریگر {{trigger}}",
-        "organizationCreated": "{{name}} ایجاد شد",
         "organizationRenamed": "سازمان از {{previous}} به {{next}} تغییر نام یافت",
         "brand": {
           "github": "$t(common.github)",

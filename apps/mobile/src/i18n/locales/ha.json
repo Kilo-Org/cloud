@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "An cire manufar {{kind}} {{id}}",
         "namedPolicyLinked": "An haɗa manufar {{kind}} {{next}}",
         "webhookTriggerUpdated": "Jawowar {{trigger}}",
-        "organizationCreated": "An ƙirƙiri {{name}}",
         "organizationRenamed": "An canza sunan ƙungiya daga {{previous}} zuwa {{next}}",
         "brand": {
           "github": "$t(common.github)",

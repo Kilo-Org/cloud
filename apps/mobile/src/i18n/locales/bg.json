@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Премахната {{kind}} политика {{id}}",
         "namedPolicyLinked": "Свързана {{kind}} политика {{next}}",
         "webhookTriggerUpdated": "Тригер {{trigger}}",
-        "organizationCreated": "Създадена {{name}}",
         "organizationRenamed": "Организацията е преименувана от {{previous}} на {{next}}",
         "brand": {
           "github": "$t(common.github)",

@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "പ്രോജക്റ്റ് UI {{state}}",
         "settingMinimumBalanceOn": "{{emails}} എന്നിവർക്ക് {{threshold}}",
         "settingRecommendationsDigest": "ശുപാർശ ഡൈജസ്റ്റ് {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} പോളിസി {{id}} നീക്കി",
         "namedPolicyLinked": "{{kind}} പോളിസി {{next}} ലിങ്ക് ചെയ്തു",
         "webhookTriggerUpdated": "ട്രിഗർ {{trigger}}",
-        "organizationCreated": "{{name}} സൃഷ്ടിച്ചു",
         "organizationRenamed": "ഓർഗനൈസേഷന്റെ പേര് {{previous}}-ൽ നിന്ന് {{next}}-ലേക്ക് മാറ്റി",
         "brand": {
           "github": "$t(common.github)",

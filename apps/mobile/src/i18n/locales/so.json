@@ -3447,7 +3447,7 @@
           "customInstructions": "$t(codeReviewer.instructions.title)",
           "groups": "$t(profiles.agents.tools)",
           "autoRoute": "Jihaynta otomaatiga ah",
-          "defaultModel": "Moodelka caadiga ah"
+          "defaultModel": "Moodeelka caadiga ah"
         },
         "role": {
           "owner": "$t(organization.members.roles.owner)",
@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Mashruuc UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} oo loo digayo {{emails}}",
         "settingRecommendationsDigest": "Soo-koobka talooyinka {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,12 +3529,12 @@
         "browserPolicyAllow": "Asalada la oggolaaday oo keliya",
         "browserPolicyPlaywrightOnly": "Isticmaalka biraawsarka oo keliya",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Modelada la beddelay: {{values}}",
+        "autoRouting": "Moodeellada la beddelay: {{values}}",
         "integrationConnected": "$t(common.github) Ku xiran",
         "integrationDisconnected": "La gooyay",
         "integrationRefreshed": "La cusboonaysiiyay",
         "integrationCancelled": "La joojiyay",
-        "integrationModelUpdated": "Moodel {{model}}",
+        "integrationModelUpdated": "Moodeel {{model}}",
         "integrationKeyAdded": "Fure loo daray {{provider}}",
         "integrationKeyUpdated": "Fure loo cusboonaysiiyay {{provider}}",
         "integrationKeyDeleted": "Fure loo saaray {{provider}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Siyaasad {{kind}} {{id}} la saaray",
         "namedPolicyLinked": "Siyaasad {{kind}} {{next}} la xidhay",
         "webhookTriggerUpdated": "Kiciye {{trigger}}",
-        "organizationCreated": "{{name}} la abuuray",
         "organizationRenamed": "Ururka magaciisa laga beddelay {{previous}} loona beddelay {{next}}",
         "brand": {
           "github": "$t(common.github)",

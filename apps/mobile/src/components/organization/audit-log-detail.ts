@@ -472,10 +472,6 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
     'token.user': () => undefined,
     'token.resource': () => undefined,
 
-    'organization.created': d => ({
-      key: 'organization.auditLog.detail.organizationCreated',
-      values: { name: isolated(d.name) },
-    }),
     'organization.renamed': d => ({
       key: 'organization.auditLog.detail.organizationRenamed',
       values: { previous: isolated(d.previous), next: isolated(d.next) },

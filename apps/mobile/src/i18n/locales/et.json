@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Eemaldatud {{kind}} poliitika {{id}}",
         "namedPolicyLinked": "Seotud {{kind}} poliitika {{next}}",
         "webhookTriggerUpdated": "Päästik {{trigger}}",
-        "organizationCreated": "Loodud {{name}}",
         "organizationRenamed": "Organisatsioon ümber nimetatud: {{previous}} → {{next}}",
         "brand": {
           "github": "$t(common.github)",

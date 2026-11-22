@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "ව්‍යාපෘතිය UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}}ට පහළ {{emails}} වෙත",
         "settingRecommendationsDigest": "නිර්දේශ සාරාංශය {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,7 +3529,7 @@
         "browserPolicyAllow": "අවසර ලත් මූලයන් පමණි",
         "browserPolicyPlaywrightOnly": "බ්‍රව්සර් භාවිතය පමණි",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Models වෙනස් විය: {{values}}",
+        "autoRouting": "ආකෘති වෙනස් විය: {{values}}",
         "integrationConnected": "$t(common.github) සම්බන්ධයි",
         "integrationDisconnected": "විසන්ධි වී ඇත",
         "integrationRefreshed": "නැවුම් කර ඇත",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{id}} නමැති {{kind}} ප්‍රතිපත්තිය ඉවත් කරන ලදී",
         "namedPolicyLinked": "{{kind}} ප්‍රතිපත්තිය {{next}} වෙත සම්බන්ධ කරන ලදී",
         "webhookTriggerUpdated": "ට්‍රිගර් {{trigger}}",
-        "organizationCreated": "{{name}} සාදන ලදී",
         "organizationRenamed": "සංවිධානය {{previous}} සිට {{next}} ලෙස නැවත නම් කරන ලදී",
         "brand": {
           "github": "$t(common.github)",

@@ -3639,8 +3639,8 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
-        "settingMinimumBalanceOn": "{{threshold}} → {{emails}}",
+        "settingProjectsUi": "Projektas UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} iki {{emails}}",
         "settingRecommendationsDigest": "Rekomendacijų suvestinė {{state}}",
         "settingBrowserControl": "{{policy}}",
         "settingName": "Pervadinta iš {{previous}} į {{next}}",
@@ -3668,7 +3668,6 @@
         "namedPolicyDeleted": "Pašalinta {{kind}} politika {{id}}",
         "namedPolicyLinked": "Susieta {{kind}} politika {{next}}",
         "webhookTriggerUpdated": "Paleidiklis {{trigger}}",
-        "organizationCreated": "Sukurta {{name}}",
         "organizationRenamed": "Organizacija pervadinta iš {{previous}} į {{next}}",
         "brand": {
           "github": "$t(common.github)",

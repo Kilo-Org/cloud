@@ -3507,7 +3507,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Dự án UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} đến {{emails}}",
         "settingRecommendationsDigest": "Tóm tắt đề xuất {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3521,7 +3521,7 @@
         "browserPolicyAllow": "Chỉ các origin được phép",
         "browserPolicyPlaywrightOnly": "Chỉ sử dụng trình duyệt",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Đã thay đổi Model: {{values}}",
+        "autoRouting": "Đã thay đổi Mô hình: {{values}}",
         "integrationConnected": "$t(common.github) Đã kết nối",
         "integrationDisconnected": "Đã ngắt kết nối",
         "integrationRefreshed": "Đã làm mới",
@@ -3536,7 +3536,6 @@
         "namedPolicyDeleted": "Đã xóa chính sách {{kind}} {{id}}",
         "namedPolicyLinked": "Đã liên kết chính sách {{kind}} với {{next}}",
         "webhookTriggerUpdated": "Kích hoạt {{trigger}}",
-        "organizationCreated": "Đã tạo tổ chức {{name}}",
         "organizationRenamed": "Đã đổi tên tổ chức từ {{previous}} thành {{next}}",
         "brand": {
           "github": "$t(common.github)",

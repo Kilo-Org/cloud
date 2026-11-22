@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "បានលុបគោលការណ៍ {{kind}} {{id}}",
         "namedPolicyLinked": "បានភ្ជាប់គោលការណ៍ {{kind}} {{next}}",
         "webhookTriggerUpdated": "កេព {{trigger}}",
-        "organizationCreated": "បានបង្កើត {{name}}",
         "organizationRenamed": "បានប្តូរឈ្មោះអង្គការពី {{previous}} ទៅ {{next}}",
         "brand": {
           "github": "$t(common.github)",

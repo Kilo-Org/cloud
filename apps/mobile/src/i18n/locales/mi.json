@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "{{state}} te Projects UI",
+        "settingProjectsUi": "{{state}} te Kaupapa UI",
         "settingMinimumBalanceOn": "{{threshold}} ki {{emails}}",
         "settingRecommendationsDigest": "{{state}} te whakarāpopototanga o ngā tūtohunga",
         "settingBrowserControl": "{{policy}}",
@@ -3529,7 +3529,7 @@
         "browserPolicyAllow": "Ngā takenga kua whakaaetia anake",
         "browserPolicyPlaywrightOnly": "Whakamahi pūtiro anake",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Ngā Model kua whakarerekētia: {{values}}",
+        "autoRouting": "Ngā Tauira kua whakarerekētia: {{values}}",
         "integrationConnected": "$t(common.github) Kua hono",
         "integrationDisconnected": "Kua momotu",
         "integrationRefreshed": "Kua whakahōutia",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "I tangohia te kaupapa here {{kind}} {{id}}",
         "namedPolicyLinked": "I honohia te kaupapa here {{kind}} ki {{next}}",
         "webhookTriggerUpdated": "Whakaoho {{trigger}}",
-        "organizationCreated": "I hangaia te rōpū {{name}}",
         "organizationRenamed": "I whakaingoatia anō te rōpū mai i {{previous}} ki {{next}}",
         "brand": {
           "github": "$t(common.github)",

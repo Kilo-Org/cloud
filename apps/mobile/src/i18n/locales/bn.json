@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} পলিসি {{id}} সরানো হয়েছে",
         "namedPolicyLinked": "{{kind}} পলিসি {{next}} এ সংযুক্ত করা হয়েছে",
         "webhookTriggerUpdated": "ট্রিগার {{trigger}}",
-        "organizationCreated": "{{name}} তৈরি করা হয়েছে",
         "organizationRenamed": "সংস্থার নাম {{previous}} থেকে {{next}} এ পরিবর্তন করা হয়েছে",
         "brand": {
           "github": "$t(common.github)",

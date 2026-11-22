@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Poistettu {{kind}}-käytäntö {{id}}",
         "namedPolicyLinked": "Linkitetty {{kind}}-käytäntö {{next}}",
         "webhookTriggerUpdated": "Laukaisin {{trigger}}",
-        "organizationCreated": "Luotu {{name}}",
         "organizationRenamed": "Organisaatio nimetty uudelleen: {{previous}} → {{next}}",
         "brand": {
           "github": "$t(common.github)",

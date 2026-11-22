@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Inalis ang {{kind}} na patakaran {{id}}",
         "namedPolicyLinked": "Ini-link ang {{kind}} na patakaran {{next}}",
         "webhookTriggerUpdated": "Trigger {{trigger}}",
-        "organizationCreated": "Nilikha ang {{name}}",
         "organizationRenamed": "Pinalitan ng pangalan ang organisasyon mula {{previous}} tungo sa {{next}}",
         "brand": {
           "github": "$t(common.github)",

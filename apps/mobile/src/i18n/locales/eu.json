@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} politika {{id}} kenduta",
         "namedPolicyLinked": "{{kind}} politika {{next}}(e)kin lotuta",
         "webhookTriggerUpdated": "Abiarazlea {{trigger}}",
-        "organizationCreated": "{{name}} sortuta",
         "organizationRenamed": "Erakundea {{previous}}(e)tik {{next}}(e)ra berrizendatuta",
         "brand": {
           "github": "$t(common.github)",

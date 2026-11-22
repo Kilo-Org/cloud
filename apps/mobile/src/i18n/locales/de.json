@@ -3536,7 +3536,6 @@
         "namedPolicyDeleted": "{{kind}}-Richtlinie {{id}} entfernt",
         "namedPolicyLinked": "{{kind}}-Richtlinie {{next}} verknüpft",
         "webhookTriggerUpdated": "Trigger {{trigger}}",
-        "organizationCreated": "{{name}} erstellt",
         "organizationRenamed": "Organisation umbenannt von {{previous}} in {{next}}",
         "brand": {
           "github": "$t(common.github)",

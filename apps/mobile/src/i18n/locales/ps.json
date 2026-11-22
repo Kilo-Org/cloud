@@ -7,7 +7,7 @@
     "directory": "کاري پوښۍ",
     "createSession": "نېټیو ناسته جوړه کړئ",
     "queueIfOffline": "که کوربه آفلاین وي، لارښوونه په کتار کې واچوئ",
-    "prompt": "لارښوونه یا \u2066/command\u2069",
+    "prompt": "لارښوونه یا ⁦/command⁩",
     "localClear": "ځايي لید پاک کړئ",
     "abort": "روان وار ودروئ",
     "failed": "د نېټیو لرې کنټرول کړنه ناکامه شوه",
@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "پروژه UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} {{emails}} ته",
         "settingRecommendationsDigest": "د وړاندیزونو لنډیز {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "د {{kind}} پالیسي {{id}} لرې شوه",
         "namedPolicyLinked": "د {{kind}} پالیسي {{next}} سره ونښلول شوه",
         "webhookTriggerUpdated": "ټریګر {{trigger}}",
-        "organizationCreated": "{{name}} جوړ شو",
         "organizationRenamed": "د سازمان نوم له {{previous}} څخه {{next}} ته بدل شو",
         "brand": {
           "github": "$t(common.github)",

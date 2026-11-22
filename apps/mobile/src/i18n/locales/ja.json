@@ -3536,7 +3536,6 @@
         "namedPolicyDeleted": "{{kind}}ポリシー{{id}}を削除しました",
         "namedPolicyLinked": "{{kind}}ポリシー{{next}}をリンクしました",
         "webhookTriggerUpdated": "トリガー {{trigger}}",
-        "organizationCreated": "{{name}}を作成しました",
         "organizationRenamed": "組織名を{{previous}}から{{next}}に変更しました",
         "brand": {
           "github": "$t(common.github)",

@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "परियोजना UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} का लागि {{emails}}",
         "settingRecommendationsDigest": "सिफारिस डाइजेस्ट {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} नीति {{id}} हटाइयो",
         "namedPolicyLinked": "{{kind}} नीति {{next}} मा लिङ्क गरियो",
         "webhookTriggerUpdated": "ट्रिगर {{trigger}}",
-        "organizationCreated": "{{name}} सिर्जना गरियो",
         "organizationRenamed": "संस्थाको नाम {{previous}} बाट {{next}} मा परिवर्तन गरियो",
         "brand": {
           "github": "$t(common.github)",

@@ -3515,8 +3515,8 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
-        "settingMinimumBalanceOn": "{{threshold}} — {{emails}}",
+        "settingProjectsUi": "Төсөл UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} {{emails}}-д",
         "settingRecommendationsDigest": "Зөвлөмжийн хураангуй {{state}}",
         "settingBrowserControl": "{{policy}}",
         "settingName": "{{previous}}-ээс {{next}} болж нэр өөрчлөгдсөн",
@@ -3529,7 +3529,7 @@
         "browserPolicyAllow": "Зөвхөн зөвшөөрөгдсөн эх сурвалж",
         "browserPolicyPlaywrightOnly": "Зөвхөн хөтөч ашиглалт",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Model-ууд өөрчлөгдсөн: {{values}}",
+        "autoRouting": "Загварууд өөрчлөгдсөн: {{values}}",
         "integrationConnected": "$t(common.github) Холбогдсон",
         "integrationDisconnected": "Салгагдсан",
         "integrationRefreshed": "Сэргээгдсэн",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} бодлого {{id}} хасагдсан",
         "namedPolicyLinked": "{{kind}} бодлого {{next}} холбогдсон",
         "webhookTriggerUpdated": "Триггер {{trigger}}",
-        "organizationCreated": "{{name}} үүсгэгдсэн",
         "organizationRenamed": "Байгууллагын нэр {{previous}}-ээс {{next}} болж өөрчлөгдсөн",
         "brand": {
           "github": "$t(common.github)",

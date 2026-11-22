@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Projekt UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} till {{emails}}",
         "settingRecommendationsDigest": "Sammanfattning av rekommendationer {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}}-policy {{id}} borttagen",
         "namedPolicyLinked": "{{kind}}-policy {{next}} länkad",
         "webhookTriggerUpdated": "Utlösare {{trigger}}",
-        "organizationCreated": "{{name}} skapad",
         "organizationRenamed": "Organisation omdöpt från {{previous}} till {{next}}",
         "brand": {
           "github": "$t(common.github)",

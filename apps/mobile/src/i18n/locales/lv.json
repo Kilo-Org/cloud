@@ -3577,7 +3577,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Projekts UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} uz {{emails}}",
         "settingRecommendationsDigest": "Ieteikumu kopsavilkums {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3606,7 +3606,6 @@
         "namedPolicyDeleted": "{{kind}} politika {{id}} noņemta",
         "namedPolicyLinked": "{{kind}} politika saistīta ar {{next}}",
         "webhookTriggerUpdated": "Trigeris {{trigger}}",
-        "organizationCreated": "{{name}} izveidota",
         "organizationRenamed": "Organizācija pārdēvēta no {{previous}} uz {{next}}",
         "brand": {
           "github": "$t(common.github)",

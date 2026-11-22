@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Ewepụrụ amụma {{kind}} {{id}}",
         "namedPolicyLinked": "Ejikọtara amụma {{kind}} {{next}}",
         "webhookTriggerUpdated": "Ihe na-akpalite {{trigger}}",
-        "organizationCreated": "Emepụtara {{name}}",
         "organizationRenamed": "A gbanwere aha ụlọ ọrụ site na {{previous}} gaa {{next}}",
         "brand": {
           "github": "$t(common.github)",

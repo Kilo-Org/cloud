@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Iphrojekthi UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} ku-{{emails}}",
         "settingRecommendationsDigest": "Isifinyezo sezincomo {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,7 +3529,7 @@
         "browserPolicyAllow": "Imisuka evunyelwe kuphela",
         "browserPolicyPlaywrightOnly": "Ukusetshenziswa kwesiphequluli kuphela",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Kushintshwe ama-Model: {{values}}",
+        "autoRouting": "Izimodeli zishintshiwe: {{values}}",
         "integrationConnected": "$t(common.github) Ixhunyiwe",
         "integrationDisconnected": "Kunqanyuliwe",
         "integrationRefreshed": "Kuvuselelwe",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Inqubomgomo ye-{{kind}} {{id}} isusiwe",
         "namedPolicyLinked": "Inqubomgomo ye-{{kind}} ixhunywe ku-{{next}}",
         "webhookTriggerUpdated": "Isibangeli {{trigger}}",
-        "organizationCreated": "Inhlangano {{name}} idaliwe",
         "organizationRenamed": "Inhlangano iqanjwe kabusha isuka ku-{{previous}} iya ku-{{next}}",
         "brand": {
           "github": "$t(common.github)",

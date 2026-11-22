@@ -3631,7 +3631,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Проєкт UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} до {{emails}}",
         "settingRecommendationsDigest": "Дайджест рекомендацій {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3660,7 +3660,6 @@
         "namedPolicyDeleted": "Політику {{kind}} {{id}} видалено",
         "namedPolicyLinked": "Політику {{kind}} {{next}} прив’язано",
         "webhookTriggerUpdated": "Тригер {{trigger}}",
-        "organizationCreated": "Організацію {{name}} створено",
         "organizationRenamed": "Організацію перейменовано з {{previous}} на {{next}}",
         "brand": {
           "github": "$t(common.github)",

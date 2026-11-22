@@ -3598,7 +3598,6 @@
         "namedPolicyDeleted": "Política {{kind}} {{id}} eliminada",
         "namedPolicyLinked": "Política {{kind}} {{next}} vinculada",
         "webhookTriggerUpdated": "Disparador {{trigger}}",
-        "organizationCreated": "Creada {{name}}",
         "organizationRenamed": "Organización renombrada de {{previous}} a {{next}}",
         "brand": {
           "github": "$t(common.github)",

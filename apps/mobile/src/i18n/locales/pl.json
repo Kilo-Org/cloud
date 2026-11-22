@@ -3563,7 +3563,7 @@
           "customInstructions": "$t(codeReviewer.instructions.title)",
           "groups": "$t(profiles.agents.tools)",
           "autoRoute": "Automatyczne kierowanie",
-          "defaultModel": "Domyślny model"
+          "defaultModel": "Domyślny model AI"
         },
         "role": {
           "owner": "$t(organization.members.roles.owner)",
@@ -3631,7 +3631,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Projekt UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} dla {{emails}}",
         "settingRecommendationsDigest": "Podsumowanie rekomendacji {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3645,12 +3645,12 @@
         "browserPolicyAllow": "Tylko dozwolone źródła",
         "browserPolicyPlaywrightOnly": "Tylko używanie przeglądarki",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Zmieniono modele: {{values}}",
+        "autoRouting": "Zmieniono modele AI: {{values}}",
         "integrationConnected": "$t(common.github) Połączono",
         "integrationDisconnected": "Odłączono",
         "integrationRefreshed": "Odświeżono",
         "integrationCancelled": "Anulowano",
-        "integrationModelUpdated": "Model {{model}}",
+        "integrationModelUpdated": "Model AI {{model}}",
         "integrationKeyAdded": "Dodano klucz dla {{provider}}",
         "integrationKeyUpdated": "Zaktualizowano klucz dla {{provider}}",
         "integrationKeyDeleted": "Usunięto klucz dla {{provider}}",
@@ -3660,7 +3660,6 @@
         "namedPolicyDeleted": "Usunięto zasady {{kind}} {{id}}",
         "namedPolicyLinked": "Powiązano zasady {{kind}} z {{next}}",
         "webhookTriggerUpdated": "Wyzwalacz {{trigger}}",
-        "organizationCreated": "Utworzono {{name}}",
         "organizationRenamed": "Zmieniono nazwę organizacji z {{previous}} na {{next}}",
         "brand": {
           "github": "$t(common.github)",

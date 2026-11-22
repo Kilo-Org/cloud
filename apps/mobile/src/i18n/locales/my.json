@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "ပရောဂျက် UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} အောက် {{emails}} သို့ အသိပေး",
         "settingRecommendationsDigest": "အကြံပြုချက်များ အနှစ်ချုပ် {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,7 +3529,7 @@
         "browserPolicyAllow": "ခွင့်ပြုထားသော မူလရင်းမြစ်များသာ",
         "browserPolicyPlaywrightOnly": "ဘရောက်ဇာ အသုံးပြုမှုသာ",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Model များ ပြောင်းလဲခဲ့သည်: {{values}}",
+        "autoRouting": "မော်ဒယ်များ ပြောင်းလဲခဲ့သည်: {{values}}",
         "integrationConnected": "$t(common.github) ချိတ်ဆက်ပြီး",
         "integrationDisconnected": "ချိတ်ဆက်မှု ပြတ်တောက်ထား",
         "integrationRefreshed": "ပြန်လည်ဆန်းသစ်ထား",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} မူဝါဒ {{id}} ဖယ်ရှားခဲ့သည်",
         "namedPolicyLinked": "{{kind}} မူဝါဒ {{next}} သို့ ချိတ်ဆက်ခဲ့သည်",
         "webhookTriggerUpdated": "ထရစ်ဂါ {{trigger}}",
-        "organizationCreated": "{{name}} ဖန်တီးခဲ့သည်",
         "organizationRenamed": "အဖွဲ့အစည်း {{previous}} မှ {{next}} သို့ အမည်ပြောင်းခဲ့သည်",
         "brand": {
           "github": "$t(common.github)",

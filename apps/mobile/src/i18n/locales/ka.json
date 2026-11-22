@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "წაიშალა {{kind}} პოლიტიკა {{id}}",
         "namedPolicyLinked": "დაუკავშირდა {{kind}} პოლიტიკა {{next}}",
         "webhookTriggerUpdated": "ტრიგერი {{trigger}}",
-        "organizationCreated": "შეიქმნა {{name}}",
         "organizationRenamed": "ორგანიზაცია გადაერქვა {{previous}}-დან {{next}}-ზე",
         "brand": {
           "github": "$t(common.github)",

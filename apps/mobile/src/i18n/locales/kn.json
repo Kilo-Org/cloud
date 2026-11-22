@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} ನೀತಿ {{id}} ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
         "namedPolicyLinked": "{{kind}} ನೀತಿ {{next}} ಲಿಂಕ್ ಮಾಡಲಾಗಿದೆ",
         "webhookTriggerUpdated": "ಟ್ರಿಗರ್ {{trigger}}",
-        "organizationCreated": "{{name}} ರಚಿಸಲಾಗಿದೆ",
         "organizationRenamed": "ಸಂಸ್ಥೆಯ ಹೆಸರು {{previous}} ರಿಂದ {{next}} ಆಗಿ ಬದಲಾಯಿಸಲಾಗಿದೆ",
         "brand": {
           "github": "$t(common.github)",

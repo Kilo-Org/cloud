@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Fjarlægð {{kind}}-stefna {{id}}",
         "namedPolicyLinked": "Tengd {{kind}}-stefna {{next}}",
         "webhookTriggerUpdated": "Kveikja {{trigger}}",
-        "organizationCreated": "Stofnað {{name}}",
         "organizationRenamed": "Félag endurnefnt úr {{previous}} í {{next}}",
         "brand": {
           "github": "$t(common.github)",

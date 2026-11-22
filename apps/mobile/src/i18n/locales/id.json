@@ -3536,7 +3536,6 @@
         "namedPolicyDeleted": "Kebijakan {{kind}} {{id}} dihapus",
         "namedPolicyLinked": "Kebijakan {{kind}} {{next}} ditautkan",
         "webhookTriggerUpdated": "Pemicu {{trigger}}",
-        "organizationCreated": "{{name}} dibuat",
         "organizationRenamed": "Organisasi diganti nama dari {{previous}} menjadi {{next}}",
         "brand": {
           "github": "$t(common.github)",

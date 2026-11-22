@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} szabályzat eltávolítva {{id}}",
         "namedPolicyLinked": "{{kind}} szabályzat hozzákapcsolva {{next}}",
         "webhookTriggerUpdated": "Eseményindító {{trigger}}",
-        "organizationCreated": "{{name}} létrehozva",
         "organizationRenamed": "Szervezet átnevezve {{previous}} → {{next}}",
         "brand": {
           "github": "$t(common.github)",

@@ -246,7 +246,9 @@ export const organizationsRouter = createTRPCRouter({
       actor_name: user.google_user_name,
       actor_email: user.google_user_email,
       actor_id: user.id,
-      details: { id: 'organization.created', name: org.name },
+      // No `details`: the row's event name already says the organization was
+      // created, and every row of this log belongs to this organization, so a
+      // detail line here would only restate it.
       message: `Organization ${org.name} created`,
     });
 

@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Mradi UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} kwa {{emails}}",
         "settingRecommendationsDigest": "Muhtasari wa mapendekezo {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,7 +3529,7 @@
         "browserPolicyAllow": "Vyanzo vinavyoruhusiwa pekee",
         "browserPolicyPlaywrightOnly": "Matumizi ya kivinjari pekee",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Model zimebadilishwa: {{values}}",
+        "autoRouting": "Modeli zimebadilishwa: {{values}}",
         "integrationConnected": "$t(common.github) Imeunganishwa",
         "integrationDisconnected": "Imetenganishwa",
         "integrationRefreshed": "Imesasishwa upya",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Sera ya {{kind}} {{id}} imeondolewa",
         "namedPolicyLinked": "Sera ya {{kind}} imeunganishwa na {{next}}",
         "webhookTriggerUpdated": "Kichocheo {{trigger}}",
-        "organizationCreated": "Shirika {{name}} limeundwa",
         "organizationRenamed": "Shirika limebadilishwa jina kutoka {{previous}} hadi {{next}}",
         "brand": {
           "github": "$t(common.github)",

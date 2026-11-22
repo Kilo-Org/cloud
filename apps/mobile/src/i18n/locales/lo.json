@@ -3447,7 +3447,7 @@
           "customInstructions": "$t(codeReviewer.instructions.title)",
           "groups": "$t(profiles.agents.tools)",
           "autoRoute": "ການກຳນົດເສັ້ນທາງອັດຕະໂນມັດ",
-          "defaultModel": "ໂມເດລເລີ່ມຕົ້ນ"
+          "defaultModel": "ໂມເດວເລີ່ມຕົ້ນ"
         },
         "role": {
           "owner": "$t(organization.members.roles.owner)",
@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "ໂຄງການ UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} ສຳລັບ {{emails}}",
         "settingRecommendationsDigest": "ສະຫຼຸບຄຳແນະນຳ {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,12 +3529,12 @@
         "browserPolicyAllow": "ສະເພາະຕົ້ນກຳເນີດທີ່ອະນຸຍາດ",
         "browserPolicyPlaywrightOnly": "ໃຊ້ບຣາວເຊີເທົ່ານັ້ນ",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Models ປ່ຽນແປງ: {{values}}",
+        "autoRouting": "ໂມເດວປ່ຽນແປງ: {{values}}",
         "integrationConnected": "$t(common.github) ເຊື່ອມຕໍ່ແລ້ວ",
         "integrationDisconnected": "ຕັດການເຊື່ອມຕໍ່ແລ້ວ",
         "integrationRefreshed": "ຣີເຟຣຊແລ້ວ",
         "integrationCancelled": "ຍົກເລີກແລ້ວ",
-        "integrationModelUpdated": "ໂມເດລ {{model}}",
+        "integrationModelUpdated": "ໂມເດວ {{model}}",
         "integrationKeyAdded": "ເພີ່ມກະແຈສຳລັບ {{provider}}",
         "integrationKeyUpdated": "ແກ້ໄຂກະແຈສຳລັບ {{provider}}",
         "integrationKeyDeleted": "ລຶບກະແຈສຳລັບ {{provider}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "ຖອນນະໂຍບາຍ {{kind}} {{id}}",
         "namedPolicyLinked": "ເຊື່ອມໂຍງນະໂຍບາຍ {{kind}} ກັບ {{next}}",
         "webhookTriggerUpdated": "ຕົວກະຕຸ້ນ {{trigger}}",
-        "organizationCreated": "ສ້າງ {{name}}",
         "organizationRenamed": "ປ່ຽນຊື່ອົງກອນຈາກ {{previous}} ເປັນ {{next}}",
         "brand": {
           "github": "$t(common.github)",

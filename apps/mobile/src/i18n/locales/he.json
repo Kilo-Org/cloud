@@ -7,7 +7,7 @@
     "directory": "תיקיית עבודה",
     "createSession": "יצירת סשן בפרוטוקול נייטיב",
     "queueIfOffline": "הוספת הפרומפט לתור אם המארח לא מחובר",
-    "prompt": "פרומפט או \u2066/command\u2069",
+    "prompt": "פרומפט או ⁦/command⁩",
     "localClear": "ניקוי התצוגה המקומית",
     "abort": "עצירת הסבב",
     "failed": "פעולת השליטה מרחוק בפרוטוקול נייטיב נכשלה",
@@ -3598,7 +3598,6 @@
         "namedPolicyDeleted": "הוסרה מדיניות {{kind}} {{id}}",
         "namedPolicyLinked": "קושרה מדיניות {{kind}} {{next}}",
         "webhookTriggerUpdated": "טריגר {{trigger}}",
-        "organizationCreated": "נוצר {{name}}",
         "organizationRenamed": "הארגון שונה שם מ{{previous}} ל{{next}}",
         "brand": {
           "github": "$t(common.github)",

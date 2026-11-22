@@ -3598,7 +3598,6 @@
         "namedPolicyDeleted": "Rimossa policy {{kind}} {{id}}",
         "namedPolicyLinked": "Collegata policy {{kind}} {{next}}",
         "webhookTriggerUpdated": "Trigger {{trigger}}",
-        "organizationCreated": "Creata {{name}}",
         "organizationRenamed": "Organizzazione rinominata da {{previous}} a {{next}}",
         "brand": {
           "github": "$t(common.github)",

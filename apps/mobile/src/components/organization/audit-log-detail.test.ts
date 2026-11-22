@@ -222,7 +222,6 @@ function detailSample(): Record<string, AuditDetail> {
     'webhookTrigger.updated': { id: 'webhookTrigger.updated', trigger: 't' },
     'token.user': { id: 'token.user' },
     'token.resource': { id: 'token.resource' },
-    'organization.created': { id: 'organization.created', name: 'Org' },
     'organization.renamed': { id: 'organization.renamed', previous: 'A', next: 'B' },
   };
 }

@@ -3515,8 +3515,8 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
-        "settingMinimumBalanceOn": "{{threshold}} → {{emails}}",
+        "settingProjectsUi": "ପ୍ରୋଜେକ୍ଟ UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} ରୁ {{emails}}",
         "settingRecommendationsDigest": "ସୁପାରିଶ ସାରାଂଶ {{state}}",
         "settingBrowserControl": "{{policy}}",
         "settingName": "{{previous}} ରୁ {{next}} କୁ ନାମ ପରିବର୍ତ୍ତନ କରାଗଲା",
@@ -3529,7 +3529,7 @@
         "browserPolicyAllow": "କେବଳ ଅନୁମତିପ୍ରାପ୍ତ ଅରିଜିନ୍",
         "browserPolicyPlaywrightOnly": "କେବଳ ବ୍ରାଉଜର ବ୍ୟବହାର",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Models ବଦଳାଗଲା: {{values}}",
+        "autoRouting": "ମଡେଲ୍ ବଦଳାଗଲା: {{values}}",
         "integrationConnected": "$t(common.github) ସଂଯୁକ୍ତ",
         "integrationDisconnected": "ବିଚ୍ଛିନ୍ନ",
         "integrationRefreshed": "ରିଫ୍ରେଶ୍ ହୋଇଛି",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} ପଲିସି {{id}} ଅପସାରଣ କରାଗଲା",
         "namedPolicyLinked": "{{kind}} ପଲିସି {{next}} ସହିତ ଲିଙ୍କ୍ କରାଗଲା",
         "webhookTriggerUpdated": "ଟ୍ରିଗର୍ {{trigger}}",
-        "organizationCreated": "{{name}} ସୃଷ୍ଟି ହେଲା",
         "organizationRenamed": "ସଂଗଠନର ନାମ {{previous}} ରୁ {{next}} କୁ ବଦଳାଗଲା",
         "brand": {
           "github": "$t(common.github)",

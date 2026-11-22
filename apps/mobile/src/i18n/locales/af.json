@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}}-beleid {{id}} verwyder",
         "namedPolicyLinked": "{{kind}}-beleid {{next}} gekoppel",
         "webhookTriggerUpdated": "Sneller {{trigger}}",
-        "organizationCreated": "{{name}} geskep",
         "organizationRenamed": "Organisasie hernoem van {{previous}} na {{next}}",
         "brand": {
           "github": "$t(common.github)",

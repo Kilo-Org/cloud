@@ -3730,7 +3730,6 @@
         "namedPolicyDeleted": "Polasaí {{kind}} bainte {{id}}",
         "namedPolicyLinked": "Polasaí {{kind}} nasctha {{next}}",
         "webhookTriggerUpdated": "Spreagthóir {{trigger}}",
-        "organizationCreated": "Cruthaíodh {{name}}",
         "organizationRenamed": "Eagraíocht athainmnithe ó {{previous}} go {{next}}",
         "brand": {
           "github": "$t(common.github)",

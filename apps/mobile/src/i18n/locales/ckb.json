@@ -7,7 +7,7 @@
     "directory": "بوخچەی کارکردن",
     "createSession": "دانیشتنێکی نەیتیڤ دروست بکە",
     "queueIfOffline": "ئەگەر هۆست ئۆفلاین بوو، پڕۆمپت بخەرە ڕیزەوە",
-    "prompt": "پڕۆمپت یان \u2066/command\u2069",
+    "prompt": "پڕۆمپت یان ⁦/command⁩",
     "localClear": "دیمەنی ناوخۆیی پاک بکەرەوە",
     "abort": "نۆرەکە بوەستێنە",
     "failed": "کرداری کۆنترۆڵی دوورەوەی نەیتیڤ سەرکەوتوو نەبوو",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "سیاسەتی {{kind}} {{id}} لابردرا",
         "namedPolicyLinked": "سیاسەتی {{kind}} بۆ {{next}} بەسترا",
         "webhookTriggerUpdated": "تریگەر {{trigger}}",
-        "organizationCreated": "{{name}} دروستکرا",
         "organizationRenamed": "ناوی ڕێکخراو لە {{previous}} بۆ {{next}} گۆڕدرا",
         "brand": {
           "github": "$t(common.github)",

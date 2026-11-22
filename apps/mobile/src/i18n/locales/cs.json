@@ -3668,7 +3668,6 @@
         "namedPolicyDeleted": "Odebrána zásada {{kind}} {{id}}",
         "namedPolicyLinked": "Propojena zásada {{kind}} {{next}}",
         "webhookTriggerUpdated": "Spouštěč {{trigger}}",
-        "organizationCreated": "Vytvořena {{name}}",
         "organizationRenamed": "Organizace přejmenována z {{previous}} na {{next}}",
         "brand": {
           "github": "$t(common.github)",

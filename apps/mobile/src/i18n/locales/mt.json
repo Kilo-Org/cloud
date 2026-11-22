@@ -3701,7 +3701,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Proġett UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} għal {{emails}}",
         "settingRecommendationsDigest": "Diġest tar-rakkomandazzjonijiet {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3730,7 +3730,6 @@
         "namedPolicyDeleted": "Politika {{kind}} {{id}} mneħħija",
         "namedPolicyLinked": "Politika {{kind}} marbuta ma' {{next}}",
         "webhookTriggerUpdated": "Skattatur {{trigger}}",
-        "organizationCreated": "Organizzazzjoni {{name}} maħluqa",
         "organizationRenamed": "Isem l-organizzazzjoni mibdul minn {{previous}} għal {{next}}",
         "brand": {
           "github": "$t(common.github)",

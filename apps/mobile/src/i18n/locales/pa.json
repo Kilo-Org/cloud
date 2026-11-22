@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "ਪ੍ਰੋਜੈਕਟ UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} 'ਤੇ {{emails}} ਨੂੰ",
         "settingRecommendationsDigest": "ਸਿਫ਼ਾਰਸ਼ਾਂ ਡਾਇਜੈਸਟ {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,7 +3529,7 @@
         "browserPolicyAllow": "ਸਿਰਫ਼ ਮਨਜ਼ੂਰ ਓਰੀਜਨ",
         "browserPolicyPlaywrightOnly": "ਸਿਰਫ਼ ਬ੍ਰਾਊਜ਼ਰ ਵਰਤੋਂ",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Models ਬਦਲੇ: {{values}}",
+        "autoRouting": "ਮਾਡਲ ਬਦਲੇ: {{values}}",
         "integrationConnected": "$t(common.github) ਜੁੜਿਆ ਹੋਇਆ",
         "integrationDisconnected": "ਡਿਸਕਨੈਕਟ ਹੋਇਆ",
         "integrationRefreshed": "ਰਿਫ੍ਰੈਸ਼ ਹੋਇਆ",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} ਪਾਲਿਸੀ {{id}} ਹਟਾਈ",
         "namedPolicyLinked": "{{kind}} ਪਾਲਿਸੀ {{next}} ਨਾਲ ਲਿੰਕ ਕੀਤੀ",
         "webhookTriggerUpdated": "ਟ੍ਰਿਗਰ {{trigger}}",
-        "organizationCreated": "{{name}} ਬਣਾਈ",
         "organizationRenamed": "ਸੰਸਥਾ ਦਾ ਨਾਮ {{previous}} ਤੋਂ {{next}} ਬਦਲਿਆ",
         "brand": {
           "github": "$t(common.github)",

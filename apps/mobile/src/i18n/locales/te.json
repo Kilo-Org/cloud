@@ -3517,8 +3517,8 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
-        "settingMinimumBalanceOn": "{{emails}}కు {{threshold}}",
+        "settingProjectsUi": "ప్రాజెక్ట్ UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} {{emails}}కు",
         "settingRecommendationsDigest": "సిఫార్సుల డైజెస్ట్ {{state}}",
         "settingBrowserControl": "{{policy}}",
         "settingName": "{{previous}} నుండి {{next}}కు పేరు మార్చబడింది",
@@ -3531,7 +3531,7 @@
         "browserPolicyAllow": "అనుమతించబడిన మూలాలు మాత్రమే",
         "browserPolicyPlaywrightOnly": "బ్రౌజర్ వినియోగం మాత్రమే",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Models మార్చబడ్డాయి: {{values}}",
+        "autoRouting": "మోడల్‌లు మార్చబడ్డాయి: {{values}}",
         "integrationConnected": "$t(common.github) కనెక్ట్ అయింది",
         "integrationDisconnected": "డిస్‌కనెక్ట్ చేయబడింది",
         "integrationRefreshed": "రిఫ్రెష్ చేయబడింది",
@@ -3546,7 +3546,6 @@
         "namedPolicyDeleted": "{{kind}} విధానం {{id}} తొలగించబడింది",
         "namedPolicyLinked": "{{kind}} విధానం {{next}}కు లింక్ చేయబడింది",
         "webhookTriggerUpdated": "ట్రిగ్గర్ {{trigger}}",
-        "organizationCreated": "{{name}} సృష్టించబడింది",
         "organizationRenamed": "సంస్థ పేరు {{previous}} నుండి {{next}}కు మార్చబడింది",
         "brand": {
           "github": "$t(common.github)",

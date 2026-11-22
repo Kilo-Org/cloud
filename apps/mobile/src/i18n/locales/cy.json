@@ -3792,7 +3792,6 @@
         "namedPolicyDeleted": "Dilëwyd polisi {{kind}} {{id}}",
         "namedPolicyLinked": "Cysylltwyd polisi {{kind}} {{next}}",
         "webhookTriggerUpdated": "Sbardun {{trigger}}",
-        "organizationCreated": "Crëwyd {{name}}",
         "organizationRenamed": "Ailenwyd sefydliad o {{previous}} i {{next}}",
         "brand": {
           "github": "$t(common.github)",

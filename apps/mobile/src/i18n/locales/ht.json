@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Retire politik {{kind}} {{id}}",
         "namedPolicyLinked": "Lye politik {{kind}} {{next}}",
         "webhookTriggerUpdated": "Deklanchè {{trigger}}",
-        "organizationCreated": "Kreye {{name}}",
         "organizationRenamed": "Òganizasyon chanje non de {{previous}} a {{next}}",
         "brand": {
           "github": "$t(common.github)",

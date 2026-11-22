@@ -3507,7 +3507,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "專案 UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} 至 {{emails}}",
         "settingRecommendationsDigest": "建議摘要{{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3521,7 +3521,7 @@
         "browserPolicyAllow": "僅限允許的來源",
         "browserPolicyPlaywrightOnly": "僅限瀏覽器使用",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Models 已變更：{{values}}",
+        "autoRouting": "模型已變更：{{values}}",
         "integrationConnected": "$t(common.github) 已連結",
         "integrationDisconnected": "已中斷連線",
         "integrationRefreshed": "已重新整理",
@@ -3536,7 +3536,6 @@
         "namedPolicyDeleted": "已移除 {{kind}} 原則 {{id}}",
         "namedPolicyLinked": "已連結 {{kind}} 原則 {{next}}",
         "webhookTriggerUpdated": "觸發程序 {{trigger}}",
-        "organizationCreated": "已建立 {{name}}",
         "organizationRenamed": "組織已從 {{previous}} 重新命名為 {{next}}",
         "brand": {
           "github": "$t(common.github)",

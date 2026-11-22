@@ -3507,7 +3507,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "项目 UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} 至 {{emails}}",
         "settingRecommendationsDigest": "推荐摘要 {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3536,7 +3536,6 @@
         "namedPolicyDeleted": "已移除 {{kind}} 策略 {{id}}",
         "namedPolicyLinked": "已将 {{kind}} 策略关联至 {{next}}",
         "webhookTriggerUpdated": "触发器 {{trigger}}",
-        "organizationCreated": "已创建 {{name}}",
         "organizationRenamed": "组织已从 {{previous}} 重命名为 {{next}}",
         "brand": {
           "github": "$t(common.github)",

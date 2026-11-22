@@ -3509,7 +3509,7 @@
           "customInstructions": "$t(codeReviewer.instructions.title)",
           "groups": "$t(profiles.agents.tools)",
           "autoRoute": "Rutare automată",
-          "defaultModel": "Model implicit"
+          "defaultModel": "Model AI implicit"
         },
         "role": {
           "owner": "$t(organization.members.roles.owner)",
@@ -3577,7 +3577,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Proiect UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} către {{emails}}",
         "settingRecommendationsDigest": "Rezumat de recomandări {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3591,12 +3591,12 @@
         "browserPolicyAllow": "Doar origini permise",
         "browserPolicyPlaywrightOnly": "Doar utilizarea browserului",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Modele modificate: {{values}}",
+        "autoRouting": "Modele AI modificate: {{values}}",
         "integrationConnected": "$t(common.github) Conectat",
         "integrationDisconnected": "Deconectat",
         "integrationRefreshed": "Reîmprospătat",
         "integrationCancelled": "Anulare",
-        "integrationModelUpdated": "Model {{model}}",
+        "integrationModelUpdated": "Model AI {{model}}",
         "integrationKeyAdded": "Cheie adăugată pentru {{provider}}",
         "integrationKeyUpdated": "Cheie actualizată pentru {{provider}}",
         "integrationKeyDeleted": "Cheie eliminată pentru {{provider}}",
@@ -3606,7 +3606,6 @@
         "namedPolicyDeleted": "Politică {{kind}} eliminată {{id}}",
         "namedPolicyLinked": "Politică {{kind}} asociată {{next}}",
         "webhookTriggerUpdated": "Declanșator {{trigger}}",
-        "organizationCreated": "Creată {{name}}",
         "organizationRenamed": "Organizație redenumită din {{previous}} în {{next}}",
         "brand": {
           "github": "$t(common.github)",

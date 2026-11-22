@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "โปรเจกต์ UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} ถึง {{emails}}",
         "settingRecommendationsDigest": "สรุปคำแนะนำ {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "ลบนโยบาย {{kind}} {{id}}",
         "namedPolicyLinked": "เชื่อมนโยบาย {{kind}} {{next}}",
         "webhookTriggerUpdated": "ทริกเกอร์ {{trigger}}",
-        "organizationCreated": "สร้าง {{name}}",
         "organizationRenamed": "เปลี่ยนชื่อองค์กรจาก {{previous}} เป็น {{next}}",
         "brand": {
           "github": "$t(common.github)",

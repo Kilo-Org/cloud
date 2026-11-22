@@ -301,7 +301,6 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
   z.strictObject({ id: z.literal('token.user') }),
   z.strictObject({ id: z.literal('token.resource') }),
 
-  z.strictObject({ id: z.literal('organization.created'), name: z.string() }),
   z.strictObject({ id: z.literal('organization.renamed'), previous: z.string(), next: z.string() }),
 ]);
 

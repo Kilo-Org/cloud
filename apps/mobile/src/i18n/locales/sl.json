@@ -3571,7 +3571,7 @@
           "customInstructions": "$t(codeReviewer.instructions.title)",
           "groups": "$t(profiles.agents.tools)",
           "autoRoute": "Samodejno usmerjanje",
-          "defaultModel": "Privzeti model"
+          "defaultModel": "Privzeti jezikovni model"
         },
         "role": {
           "owner": "$t(organization.members.roles.owner)",
@@ -3639,7 +3639,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI: {{state}}",
+        "settingProjectsUi": "Projekt UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} na {{emails}}",
         "settingRecommendationsDigest": "Povzetek priporočil: {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3653,12 +3653,12 @@
         "browserPolicyAllow": "Samo dovoljeni izvori",
         "browserPolicyPlaywrightOnly": "Samo uporaba brskalnika",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Spremenjeni modeli: {{values}}",
+        "autoRouting": "Spremenjeni jezikovni modeli: {{values}}",
         "integrationConnected": "$t(common.github) Povezano",
         "integrationDisconnected": "Odklopljeno",
         "integrationRefreshed": "Osveženo",
         "integrationCancelled": "Preklicano",
-        "integrationModelUpdated": "Model {{model}}",
+        "integrationModelUpdated": "Jezikovni model {{model}}",
         "integrationKeyAdded": "Ključ dodan za {{provider}}",
         "integrationKeyUpdated": "Ključ posodobljen za {{provider}}",
         "integrationKeyDeleted": "Ključ odstranjen za {{provider}}",
@@ -3668,7 +3668,6 @@
         "namedPolicyDeleted": "Odstranjen pravilnik {{kind}} {{id}}",
         "namedPolicyLinked": "Povezan pravilnik {{kind}} {{next}}",
         "webhookTriggerUpdated": "Sprožilec {{trigger}}",
-        "organizationCreated": "Ustvarjena {{name}}",
         "organizationRenamed": "Organizacija preimenovana iz {{previous}} v {{next}}",
         "brand": {
           "github": "$t(common.github)",

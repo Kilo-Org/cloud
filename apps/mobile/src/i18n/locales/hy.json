@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "Հեռացվեց {{kind}} քաղաքականություն {{id}}",
         "namedPolicyLinked": "Կապակցվեց {{kind}} քաղաքականություն {{next}}",
         "webhookTriggerUpdated": "Տրիգեր՝ {{trigger}}",
-        "organizationCreated": "Ստեղծվեց {{name}}",
         "organizationRenamed": "Կազմակերպությունը վերանվանվեց {{previous}}-ից {{next}}",
         "brand": {
           "github": "$t(common.github)",

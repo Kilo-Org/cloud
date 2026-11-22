@@ -3544,7 +3544,6 @@
         "namedPolicyDeleted": "{{kind}} siyasəti {{id}} silindi",
         "namedPolicyLinked": "{{kind}} siyasəti {{next}} ilə əlaqələndirildi",
         "webhookTriggerUpdated": "Tətikləyici {{trigger}}",
-        "organizationCreated": "{{name}} yaradıldı",
         "organizationRenamed": "Təşkilatın adı {{previous}}-dən {{next}}-ə dəyişdirildi",
         "brand": {
           "github": "$t(common.github)",

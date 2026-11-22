@@ -3447,7 +3447,7 @@
           "customInstructions": "$t(codeReviewer.instructions.title)",
           "groups": "$t(profiles.agents.tools)",
           "autoRoute": "Fandefasana ho azy",
-          "defaultModel": "modely mahazatra"
+          "defaultModel": "Modely mahazatra"
         },
         "role": {
           "owner": "$t(organization.members.roles.owner)",
@@ -3515,7 +3515,7 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
+        "settingProjectsUi": "Tetikasa UI {{state}}",
         "settingMinimumBalanceOn": "{{threshold}} ho an'ny {{emails}}",
         "settingRecommendationsDigest": "Famintinana ny tolo-kevitra {{state}}",
         "settingBrowserControl": "{{policy}}",
@@ -3529,23 +3529,22 @@
         "browserPolicyAllow": "Fiaviana avela ihany",
         "browserPolicyPlaywrightOnly": "Fampiasana mpitety tranonkala ihany",
         "disabled": "$t(common.disabled)",
-        "autoRouting": "Novaina ny Model: {{values}}",
+        "autoRouting": "Novaina ny Modely: {{values}}",
         "integrationConnected": "$t(common.github) Mifandray",
-        "integrationDisconnected": "tsy mifandray",
-        "integrationRefreshed": "nohavaozina",
+        "integrationDisconnected": "Tsy mifandray",
+        "integrationRefreshed": "Nohavaozina",
         "integrationCancelled": "Nofoanana",
-        "integrationModelUpdated": "modely {{model}}",
-        "integrationKeyAdded": "nampiana fanalahidy API ho an'i {{provider}}",
-        "integrationKeyUpdated": "nohavaozina ny fanalahidy API ho an'i {{provider}}",
-        "integrationKeyDeleted": "nesorina ny fanalahidy API ho an'i {{provider}}",
-        "integrationKeyToggled": "fanalahidy API ho an'i {{provider}}: {{state}}",
-        "namedPolicyCreated": "noforonina ny fitsipiky {{kind}} {{id}}",
-        "namedPolicyUpdated": "nohavaozina ny fitsipiky {{kind}} {{id}}",
-        "namedPolicyDeleted": "nesorina ny fitsipiky {{kind}} {{id}}",
-        "namedPolicyLinked": "nampifandraisina ny fitsipiky {{kind}} {{next}}",
-        "webhookTriggerUpdated": "fanosehana {{trigger}}",
-        "organizationCreated": "noforonina {{name}}",
-        "organizationRenamed": "novana anarana ny fikambanana avy amin'ny {{previous}} ho {{next}}",
+        "integrationModelUpdated": "Modely {{model}}",
+        "integrationKeyAdded": "Nampiana fanalahidy API ho an'i {{provider}}",
+        "integrationKeyUpdated": "Nohavaozina ny fanalahidy API ho an'i {{provider}}",
+        "integrationKeyDeleted": "Nesorina ny fanalahidy API ho an'i {{provider}}",
+        "integrationKeyToggled": "Fanalahidy API ho an'i {{provider}}: {{state}}",
+        "namedPolicyCreated": "Noforonina ny fitsipika {{kind}} {{id}}",
+        "namedPolicyUpdated": "Nohavaozina ny fitsipika {{kind}} {{id}}",
+        "namedPolicyDeleted": "Nesorina ny fitsipika {{kind}} {{id}}",
+        "namedPolicyLinked": "Nampifandraisina ny fitsipika {{kind}} {{next}}",
+        "webhookTriggerUpdated": "Fanosehana {{trigger}}",
+        "organizationRenamed": "Novana anarana ny fikambanana avy amin'ny {{previous}} ho {{next}}",
         "brand": {
           "github": "$t(common.github)",
           "gitlab": "$t(common.gitlab)",
@@ -3553,7 +3552,7 @@
           "discord": "$t(profile.providerDiscord)",
           "slack": "$t(agentChat.sessionFilter.platformSlack)",
           "linear": "$t(agentChat.sessionFilter.platformLinear)",
-          "byok": "ny fanalahidy API manokana"
+          "byok": "Ny fanalahidy API manokana"
         }
       }
     },

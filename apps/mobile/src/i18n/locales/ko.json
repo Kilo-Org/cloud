@@ -3507,8 +3507,8 @@
           "au": "$t(organizationModelAccess.region.au)",
           "jp": "$t(organizationModelAccess.region.jp)"
         },
-        "settingProjectsUi": "Projects UI {{state}}",
-        "settingMinimumBalanceOn": "{{threshold}} → {{emails}}",
+        "settingProjectsUi": "프로젝트 UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}}에서 {{emails}}(으)로",
         "settingRecommendationsDigest": "추천 다이제스트 {{state}}",
         "settingBrowserControl": "{{policy}}",
         "settingName": "{{previous}}에서 {{next}}(으)로 이름 변경됨",
@@ -3536,8 +3536,7 @@
         "namedPolicyDeleted": "{{kind}} 정책 {{id}} 제거됨",
         "namedPolicyLinked": "{{kind}} 정책 {{next}} 연결됨",
         "webhookTriggerUpdated": "트리거 {{trigger}}",
-        "organizationCreated": "{{name}} 생성됨",
-        "organizationRenamed": "조직 이름 변경됨: {{previous}} → {{next}}",
+        "organizationRenamed": "조직 이름 변경됨: {{previous}}에서 {{next}}(으)로",
         "brand": {
           "github": "$t(common.github)",
           "gitlab": "$t(common.gitlab)",

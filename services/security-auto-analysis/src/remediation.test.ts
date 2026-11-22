@@ -244,6 +244,34 @@ describe('security remediation launch contract', () => {
       'Create and check out branch security-remediation/handlebars-ghsa-765h-qjxv-5f44/b04cabeb31-1 from the current checkout'
     );
   });
+
+  it('names the file form of the commit and the pull request body', () => {
+    const prompt = buildRemediationPrompt({
+      finding: {
+        repo_full_name: 'Kilo-Org/security-agent-testbed',
+        package_name: 'handlebars',
+        package_ecosystem: 'npm',
+        severity: 'critical',
+        dependency_scope: 'runtime',
+        cve_id: null,
+        ghsa_id: 'GHSA-765h-qjxv-5f44',
+        title: 'Prototype Pollution in handlebars',
+        vulnerable_version_range: '<4.7.7',
+        patched_version: '4.7.7',
+        manifest_path: 'package-lock.json',
+        analysis: {
+          sandboxAnalysis: { isExploitable: 'unknown', suggestedAction: 'manual_review' },
+        },
+      } as never,
+      branchName: 'security-remediation/handlebars-ghsa-765h-qjxv-5f44/b04cabeb31-1',
+      findingUrl: 'https://app.kilo.ai/security-agent/findings?findingId=finding-1',
+    });
+
+    // The policy refuses a command that carries a quote character, so the prompt
+    // must name the file form of both commands it requires.
+    expect(prompt).toContain('git commit -F <file>');
+    expect(prompt).toContain('gh pr create --title <title> --body-file <file>');
+  });
 });
 
 describe('security lifecycle event mapping', () => {

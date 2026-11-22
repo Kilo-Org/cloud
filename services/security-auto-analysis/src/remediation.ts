@@ -523,6 +523,7 @@ Rules:
 - Create and check out branch ${params.branchName} from the current checkout before changing files, unless already on that branch.
 - Do not open no-change PR. If no changes are needed, return no_changes_needed.
 - Open draft PR when validation is incomplete or risk is nontrivial.
+- Write the commit message and the PR body to a file, then pass the file: git commit -F <file> and gh pr create --title <title> --body-file <file>. A command that carries a quote character is refused.
 - Include Kilo finding backlink in PR body: ${params.findingUrl}
 - Final assistant response must contain only normal summary plus machine-readable result block:
 

@@ -3342,6 +3342,7 @@ test('a stalled credential lookup times out and leaves the grant cache', async (
   // by the same deadline, and its failure evicts the entry so the next call mints again.
   let exchanges = 0;
   let release: (credential: string) => void = () => {};
+  let captured: AbortSignal | undefined;
   // ES2022/Hermes consumers do not provide Promise.withResolvers.
   const held = new Promise<string>(resolve => {
     release = resolve;
@@ -3359,7 +3360,10 @@ test('a stalled credential lookup times out and leaves the grant cache', async (
   });
   const client = new NativeSyncClient({
     baseUrl: 'https://sync.test',
-    getCredential: () => held,
+    getCredential: signal => {
+      captured = signal;
+      return held;
+    },
     fetch: fetcher,
     WebSocket: FakeSocket,
   });
@@ -3369,15 +3373,50 @@ test('a stalled credential lookup times out and leaves the grant cache', async (
   // No exchange is attempted while the credential is unread.
   expect(settled.code).toBe('pending');
   expect(exchanges).toBe(0);
+  expect(captured).toBeInstanceOf(AbortSignal);
+  expect(captured?.aborted).toBe(false);
   await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
   await flush();
   expect(settled.code).toBe('request_timeout');
+  // The deadline aborts the signal the source received, so its own request can stop too.
+  expect(captured?.aborted).toBe(true);
   await expect(call).rejects.toMatchObject({ code: 'request_timeout' });
   release('kilo-credential');
   // The dead entry left the cache, so this call mints once more instead of joining it.
   await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
   expect(exchanges).toBe(1);
   expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+test('a healthy credential lookup receives a signal that is never aborted', async () => {
+  // The signal is a deadline, not a cancellation of a working lookup, so a mint that finishes
+  // in time must hand the source a signal that stays live only until the timer is cleared.
+  let captured: AbortSignal | undefined;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: signal => {
+      captured = signal;
+      return Promise.resolve('kilo-credential');
+    },
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(captured).toBeInstanceOf(AbortSignal);
+  expect(captured?.aborted).toBe(false);
+  // The mint cleared its timer, so no later tick of the deadline can abort the passed signal.
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  expect(captured?.aborted).toBe(false);
 });
 
 test('two callers minting at once keep the newer grant when the older exchange fails', async () => {

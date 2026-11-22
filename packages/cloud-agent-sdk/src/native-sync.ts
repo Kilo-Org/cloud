@@ -148,7 +148,7 @@ export type NativeSocket = {
 export type NativeSocketConstructor = new (url: string, protocols: string[]) => NativeSocket;
 export type NativeSyncOptions = {
   baseUrl: string;
-  getCredential: () => Promise<string>;
+  getCredential: (signal?: AbortSignal) => Promise<string>;
   fetch?: typeof fetch;
   WebSocket?: NativeSocketConstructor;
 };
@@ -517,7 +517,9 @@ export class NativeSyncClient {
   /**
    * Both consumers fetch the credential over the network, so a lookup that black-holes would
    * leave the cached mint pending forever: it could never settle, its catch could never evict
-   * it, and every later caller would join the dead entry. Bound it like the exchange itself.
+   * it, and every later caller would join the dead entry. Bound it like the exchange itself,
+   * and hand the deadline's signal to the source so it can cancel its own request instead of
+   * leaving it in flight, because each reconnect can otherwise leave another one behind.
    */
   private async credential(): Promise<string> {
     const controller = new AbortController();
@@ -526,7 +528,7 @@ export class NativeSyncClient {
       return await raceAbort(
         controller.signal,
         () => new NativeSyncError('request_timeout'),
-        () => this.options.getCredential()
+        () => this.options.getCredential(controller.signal)
       );
     } finally {
       clearTimeout(timer);

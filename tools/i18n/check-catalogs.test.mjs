@@ -488,9 +488,17 @@ test('folds a Devanagari danda as sentence-final punctuation', () => {
   // so the shared-wording rule must read them as one wording.
   const found = run({
     language: 'hi',
-    english: { label: 'Choose a model', error: 'Choose a model.' },
-    translated: { label: 'मॉडल चुनें', error: 'मॉडल चुनें।' },
-    source: "t('label'); t('error');",
+    english: {
+      common: { sentenceJoiner: '. ' },
+      label: 'Choose a model',
+      error: 'Choose a model.',
+    },
+    translated: {
+      common: { sentenceJoiner: '। ' },
+      label: 'मॉडल चुनें',
+      error: 'मॉडल चुनें।',
+    },
+    source: "t('common.sentenceJoiner'); t('label'); t('error');",
   });
   assert.deepEqual(found, []);
 });
@@ -532,6 +540,27 @@ test('rejects a borrowed Devanagari danda in Marathi, which closes sentences wit
   assert.equal(found.length, 1, found.join('\n'));
   assert.match(found[0], /mobile\/mr/);
   assert.match(found[0], /«।»/);
+});
+
+test('rejects a borrowed Devanagari danda in a catalog that writes no sentence mark', () => {
+  // The push catalog carries no `common.sentenceJoiner`, so it states no
+  // sentence mark at all and a danda there belongs to no script of its own.
+  const found = run({
+    language: 'hi',
+    pushEnglish: {
+      generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
+    },
+    pushTranslated: {
+      generic: { title: 'Kilo', body: { chatMessage: 'आपके पास एक नया संदेश है।' } },
+    },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "translatePush(locale, 'generic.body.chatMessage', undefined, 'You have a new message');",
+    ].join('\n'),
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /«।»/);
+  assert.match(found[0], /no sentence mark/);
 });
 
 for (const [language, title, badge] of [
@@ -3236,14 +3265,15 @@ const CHANGELOG_AREAS_SOURCE = [
 test('accepts a changelog area label that joins its nouns without the list conjunction', () => {
   const found = run({
     language: 'hi',
-    english: CHANGELOG_AREAS,
+    english: { common: { sentenceJoiner: '. ' }, ...CHANGELOG_AREAS },
     translated: {
+      common: { sentenceJoiner: '। ' },
       profile: {
         changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
         changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल व संगठन' },
       },
     },
-    source: CHANGELOG_AREAS_SOURCE,
+    source: `${CHANGELOG_AREAS_SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.deepEqual(found, []);
 });
@@ -3251,14 +3281,15 @@ test('accepts a changelog area label that joins its nouns without the list conju
 test('rejects a changelog area label that carries the catalog list conjunction', () => {
   const found = run({
     language: 'hi',
-    english: CHANGELOG_AREAS,
+    english: { common: { sentenceJoiner: '. ' }, ...CHANGELOG_AREAS },
     translated: {
+      common: { sentenceJoiner: '। ' },
       profile: {
         changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
         changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल और संगठन' },
       },
     },
-    source: CHANGELOG_AREAS_SOURCE,
+    source: `${CHANGELOG_AREAS_SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(

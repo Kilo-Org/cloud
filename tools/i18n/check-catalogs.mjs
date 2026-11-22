@@ -1101,13 +1101,14 @@ function checkArmenianSentenceTerminator(tag, values, label) {
  * write it. A catalog states its own sentence mark in `common.sentenceJoiner`,
  * so a catalog that joins its sentences with another mark must not borrow it:
  * a batch imported from a danda source leaves one screen with two sentence
- * terminators, and the mark belongs to another script.
+ * terminators, and the mark belongs to another script. The notifications push
+ * catalog carries no joiner at all and writes no sentence mark, so a danda
+ * there is reported too.
  */
 function checkBorrowedDanda(values, label) {
   const problems = [];
   const joiner = values.get('common.sentenceJoiner');
-  // Key parity guarantees the joiner; a catalog parsed without one stays silent.
-  if (typeof joiner !== 'string' || joiner.startsWith('\u0964')) {
+  if (typeof joiner === 'string' && joiner.startsWith('\u0964')) {
     return problems;
   }
   for (const [key, value] of values) {
@@ -1115,7 +1116,9 @@ function checkBorrowedDanda(values, label) {
       continue;
     }
     problems.push(
-      `${label}: "${key}" writes the Devanagari danda «।» while this catalog joins its sentences with "${joiner}"`
+      typeof joiner === 'string'
+        ? `${label}: "${key}" writes the Devanagari danda «।» while this catalog joins its sentences with "${joiner}"`
+        : `${label}: "${key}" writes the Devanagari danda «।», and this catalog writes no sentence mark of its own`
     );
   }
   return problems;

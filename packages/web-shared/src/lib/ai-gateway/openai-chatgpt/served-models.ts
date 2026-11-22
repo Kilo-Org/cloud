@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
+  fetchMetadata,
   readStoredMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
@@ -83,35 +84,31 @@ function parseServedModelIds(body: unknown): Set<string> {
   return ids;
 }
 
+/**
+ * The metadata-cache cron refreshes this source, and `isOpenAiModelServed`
+ * reads its stored row and refetches it on the request path. That second reader
+ * is why `timeoutMs` stays at `REQUEST_TIMEOUT_MS`: a request waits on it.
+ */
 export const openAiServedModelsMetadataSource: MetadataSource<Set<string>> = {
   url: MODELS_URL,
   headers: () => ({ authorization: `Bearer ${getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV)}` }),
   parse: parseServedModelIds,
+  timeoutMs: REQUEST_TIMEOUT_MS,
 };
 
-async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
+async function fetchServedModelIds(): Promise<Set<string> | null> {
   const stored = await readStoredMetadata(openAiServedModelsMetadataSource, readDb);
   if (stored) return stored;
 
   try {
-    const response = await fetch(MODELS_URL, {
-      // Bypass Next's data cache: it would otherwise keep answering with the body
-      // it already stored for `CACHE_TTL_SECONDS`, so the short failure window
-      // could only repeat an unusable answer instead of asking the project again.
-      cache: 'no-store',
-      headers: { authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
-
-    return readServedModelIds(await response.json());
+    return (await fetchMetadata(openAiServedModelsMetadataSource)).data;
   } catch {
     return null;
   }
 }
 
 /**
- * True when the project behind `apiKey` can serve `modelId`.
+ * True when the partner project can serve `modelId`.
  *
  * A missing key, a failed request, a 200 without a usable list, or an unreadable
  * body returns true: a transient problem must not hide the route, and the
@@ -119,17 +116,18 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
  * `FAILURE_BACKOFF_MS` so a burst of eligible requests does not each pay the lookup
  * and its timeout, so a bad answer costs the short window and never the hour a
  * good list is reused for. Each lookup reads the list the metadata cache refresh
- * stored, and asks the project directly only when no usable row exists.
+ * stored, and refetches the same descriptor through `fetchMetadata` only when no
+ * usable row exists; the metadata cache is the only request path.
  */
-export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
-  if (apiKey.trim().length === 0) return true;
+export async function isOpenAiModelServed(modelId: string): Promise<boolean> {
+  if (getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV).trim().length === 0) return true;
 
   if (!cachedModelIds || Date.now() >= cacheExpiresAt) {
     // A recent failure already answered "unknown": fail open without another
     // request until its short TTL passes.
     if (Date.now() < failureExpiresAt) return true;
 
-    inFlight ??= fetchServedModelIds(apiKey)
+    inFlight ??= fetchServedModelIds()
       .then(ids => {
         if (ids) {
           cachedModelIds = ids;

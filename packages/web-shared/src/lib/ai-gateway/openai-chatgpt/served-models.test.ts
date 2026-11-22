@@ -18,7 +18,11 @@ function modelsResponse(ids: string[]): Response {
 }
 
 describe('isOpenAiModelServed', () => {
+  let originalApiKey: string | undefined;
+
   beforeEach(async () => {
+    originalApiKey = process.env.OPENAI_CHATGPT_API_KEY;
+    process.env.OPENAI_CHATGPT_API_KEY = 'partner-key';
     await db.delete(ai_gateway_metadata_cache).where(sql`true`);
     resetServedModelIdsCache();
     fetchMock.mockReset();
@@ -26,6 +30,8 @@ describe('isOpenAiModelServed', () => {
   });
 
   afterEach(() => {
+    if (originalApiKey === undefined) delete process.env.OPENAI_CHATGPT_API_KEY;
+    else process.env.OPENAI_CHATGPT_API_KEY = originalApiKey;
     resetServedModelIdsCache();
     jest.restoreAllMocks();
   });
@@ -33,12 +39,12 @@ describe('isOpenAiModelServed', () => {
   it('asks the delegated upstream for its model list', async () => {
     fetchMock.mockResolvedValue(modelsResponse(['gpt-5-nano']));
 
-    await isOpenAiModelServed('partner-key', 'gpt-5-nano');
+    await isOpenAiModelServed('gpt-5-nano');
 
     expect(fetchMock).toHaveBeenCalledWith(
       `${OPENAI_CHATGPT_API_URL}/models`,
       expect.objectContaining({
-        headers: { authorization: 'Bearer partner-key' },
+        headers: expect.objectContaining({ authorization: 'Bearer partner-key' }),
       })
     );
   });
@@ -49,8 +55,8 @@ describe('isOpenAiModelServed', () => {
       data: { object: 'list', data: [{ id: 'gpt-5.6-luna' }] },
     });
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(false);
+    await expect(isOpenAiModelServed('gpt-5.6-luna')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -61,7 +67,7 @@ describe('isOpenAiModelServed', () => {
       updated_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna')).resolves.toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -72,22 +78,22 @@ describe('isOpenAiModelServed', () => {
     });
     fetchMock.mockResolvedValue(modelsResponse(['gpt-5-nano']));
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5-nano')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5-nano')).resolves.toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a model the project does not serve', async () => {
     fetchMock.mockResolvedValue(modelsResponse(['gpt-5.6-luna', 'gpt-5-nano']));
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(false);
+    await expect(isOpenAiModelServed('gpt-5.6-luna')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(false);
   });
 
   it('fetches the list once and reuses it', async () => {
     fetchMock.mockResolvedValue(modelsResponse(['gpt-5-nano']));
 
-    await isOpenAiModelServed('partner-key', 'gpt-5-nano');
-    await isOpenAiModelServed('partner-key', 'gpt-5-nano');
+    await isOpenAiModelServed('gpt-5-nano');
+    await isOpenAiModelServed('gpt-5-nano');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     // The lookup is not stored by the framework: a stored copy would keep
@@ -102,13 +108,13 @@ describe('isOpenAiModelServed', () => {
   it('keeps the route when the list cannot be read', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(true);
   });
 
   it('keeps the route when the request throws', async () => {
     fetchMock.mockRejectedValue(new Error('network down'));
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(true);
   });
 
   it.each([
@@ -123,10 +129,10 @@ describe('isOpenAiModelServed', () => {
       })
     );
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(true);
     // The unusable answer is remembered for the short failure window, not cached
     // as an empty catalog for the hour a real list is reused for.
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -136,13 +142,13 @@ describe('isOpenAiModelServed', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ object: 'list' }), { status: 200 }))
       .mockResolvedValueOnce(modelsResponse(['gpt-5.6-luna']));
 
-    await isOpenAiModelServed('partner-key', 'gpt-5.6-luna');
+    await isOpenAiModelServed('gpt-5.6-luna');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     now.mockReturnValue(1_000_000 + 30_000);
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna')).resolves.toBe(true);
     // The recovered list is authoritative again and rejects the unserved slug.
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(false);
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -153,15 +159,15 @@ describe('isOpenAiModelServed', () => {
       })
     );
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(false);
+    await expect(isOpenAiModelServed('gpt-5.6-luna')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(false);
   });
 
   it('remembers a failed lookup instead of retrying it per request', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('gpt-5.6-luna')).resolves.toBe(true);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -170,17 +176,23 @@ describe('isOpenAiModelServed', () => {
     const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
 
-    await isOpenAiModelServed('partner-key', 'gpt-5.6-luna');
+    await isOpenAiModelServed('gpt-5.6-luna');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     now.mockReturnValue(1_000_000 + 30_000);
-    await isOpenAiModelServed('partner-key', 'gpt-5.6-luna');
+    await isOpenAiModelServed('gpt-5.6-luna');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the route without a key, and does not call OpenAI', async () => {
-    await expect(isOpenAiModelServed('   ', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+    process.env.OPENAI_CHATGPT_API_KEY = '   ';
+
+    await expect(isOpenAiModelServed('gpt-5.6-luna-pro')).resolves.toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('bounds the descriptor a request waits on', () => {
+    expect(openAiServedModelsMetadataSource.timeoutMs).toBe(2000);
   });
 });

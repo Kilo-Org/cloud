@@ -167,17 +167,26 @@ async function main(): Promise<void> {
     return;
   }
 
+  // The decision above refuses a row without a server, so this value is set here.
+  if (!serverId) {
+    throw new Error('This command removes a row that records a Discord server');
+  }
+
   const deleted = await db
     .delete(platform_integrations)
     .where(
       and(
         eq(platform_integrations.id, integrationId),
         eq(platform_integrations.platform, PLATFORM.DISCORD),
-        // A re-authorization updates the row in place, so the delete carries the status it
-        // printed and matches nothing when the row changed since that read.
-        integration.integration_status === null
-          ? isNull(platform_integrations.integration_status)
-          : eq(platform_integrations.integration_status, integration.integration_status)
+        // The delete names the server the command printed, so it removes the row that was
+        // read and only while that row still records this server.
+        or(
+          eq(platform_integrations.platform_installation_id, serverId),
+          and(
+            eq(platform_integrations.platform_account_id, serverId),
+            isNull(platform_integrations.platform_installation_id)
+          )
+        )
       )
     )
     .returning({ id: platform_integrations.id });

@@ -1,15 +1,14 @@
-import { requireCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { ModelStatsBenchmarksSchema } from '@kilocode/db/schema';
+import {
+  getModelStatsSnapshot,
+  type ModelStatsCacheEntry,
+  type ModelStatsLoadClient,
+} from './model-stats-cache';
 import { lookupModelWithKiloGatewayFallback } from './model-id-lookup';
 
 const TerminalBenchSchema = ModelStatsBenchmarksSchema.unwrap()
   .pick({ kiloBench: true })
   .optional();
-
-const TTL_MS = 5 * 60 * 1000;
 
 export type TerminalBenchSummary = {
   overallScore: number;
@@ -18,22 +17,21 @@ export type TerminalBenchSummary = {
 
 export type TerminalBenchSummaries = ReadonlyMap<string, TerminalBenchSummary>;
 
-type Row = {
-  openrouterId: string;
-  isActive: boolean | null;
-  benchmarks: unknown;
-};
-
-/** `customLlmIds` holds lowercased custom LLM ids, whose results are never published. */
+/**
+ * The terminal-bench view is derived from the model-stats snapshot, so one cached read and
+ * `invalidateModelStatsCache` govern it together with the enkrypt publication.
+ * `customLlmIds` holds lowercased custom LLM ids, whose results are never published.
+ */
 export function summarizeTerminalBench(
-  rows: readonly Row[],
+  entries: readonly ModelStatsCacheEntry[],
   customLlmIds: ReadonlySet<string>
 ): TerminalBenchSummaries {
   const summaries = new Map<string, TerminalBenchSummary>();
 
-  for (const row of rows) {
-    if (!row.isActive || customLlmIds.has(row.openrouterId.toLowerCase())) continue;
-    const result = TerminalBenchSchema.safeParse(row.benchmarks);
+  for (const entry of entries) {
+    const stat = entry.stat;
+    if (stat.isActive !== true || customLlmIds.has(stat.openrouterId.toLowerCase())) continue;
+    const result = TerminalBenchSchema.safeParse(stat.benchmarks);
     if (!result.success) continue;
     const bench = result.data?.kiloBench?.evals['terminal-bench'];
     if (
@@ -44,7 +42,7 @@ export function summarizeTerminalBench(
     ) {
       continue;
     }
-    summaries.set(row.openrouterId, {
+    summaries.set(stat.openrouterId, {
       overallScore: bench.overallScore,
       avgAttemptCostUsd: bench.avgAttemptCostUsd,
     });
@@ -60,25 +58,9 @@ export function terminalBenchFor(
   return lookupModelWithKiloGatewayFallback(id, candidate => summaries.get(candidate));
 }
 
-async function loadTerminalBench(): Promise<TerminalBenchSummaries> {
-  const [rows, customLlmsById] = await Promise.all([loadActiveRows(), requireCustomLlmsById()]);
-  return summarizeTerminalBench(rows, new Set(customLlmsById.keys()));
+export async function getTerminalBenchSummaries({
+  fromDb,
+}: { fromDb?: ModelStatsLoadClient } = {}): Promise<TerminalBenchSummaries> {
+  const snapshot = await getModelStatsSnapshot({ fromDb }).catch(() => null);
+  return snapshot ? summarizeTerminalBench(snapshot.entries, snapshot.customLlmIds) : new Map();
 }
-
-async function loadActiveRows(): Promise<Row[]> {
-  return await readDb
-    .select({
-      openrouterId: modelStats.openrouterId,
-      isActive: modelStats.isActive,
-      benchmarks: modelStats.benchmarks,
-    })
-    .from(modelStats)
-    .where(eq(modelStats.isActive, true));
-}
-
-export const getTerminalBenchSummaries = createCachedFetch(
-  loadTerminalBench,
-  TTL_MS,
-  new Map<string, TerminalBenchSummary>(),
-  { name: 'terminalBenchSummaries' }
-);

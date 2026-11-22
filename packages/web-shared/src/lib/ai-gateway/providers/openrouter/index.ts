@@ -208,7 +208,11 @@ export function pickerExtraModel(modelId: string): OpenRouterModel | undefined {
   return buildAutoModels().find(model => model.id === modelId);
 }
 
-async function enhancedModelList(models: OpenRouterModel[], countryCode: string | null) {
+async function enhancedModelList(
+  models: OpenRouterModel[],
+  countryCode: string | null,
+  fromDb?: ModelStatsLoadClient
+) {
   const autoModels = buildAutoModels();
   const [
     endpointsMetadata,
@@ -265,7 +269,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
       listedOpenRouterModels: listedModels,
       openRouterMetadata: endpointsMetadata,
     }),
-    getTerminalBenchSummaries(),
+    getTerminalBenchSummaries({ fromDb }),
   ]);
   const gatewayModels = listedModels
     .map((model): OpenRouterModel => {
@@ -561,7 +565,7 @@ export async function getEnhancedOpenRouterModels({
 }): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels();
 
-  const models = await enhancedModelList(rawResponse.data, countryCode);
+  const models = await enhancedModelList(rawResponse.data, countryCode, fromDb);
   const snapshot = await getEnkryptBenchmarks({ fromDb });
   return { data: publishEnkryptModels(models, snapshot) };
 }

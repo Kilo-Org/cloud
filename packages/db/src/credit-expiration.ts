@@ -29,6 +29,8 @@ const expiringTransactionColumns = {
   is_free: creditTransactionsTable.is_free,
 } as const;
 
+type ExpiringTransactionColumn = keyof typeof expiringTransactionColumns;
+
 /** Lot columns a caller may omit; the computation reads an absent one as unset. */
 const optionalExpiringTransactionColumns = [
   'consumed_microdollars',
@@ -36,9 +38,8 @@ const optionalExpiringTransactionColumns = [
   'paid_credit_policy',
   'credit_source',
   'source_transaction_id',
-] as const;
+] as const satisfies readonly ExpiringTransactionColumn[];
 
-type ExpiringTransactionColumn = keyof typeof expiringTransactionColumns;
 type OptionalExpiringTransactionColumn = (typeof optionalExpiringTransactionColumns)[number];
 
 export type ExpiringTransaction = Pick<

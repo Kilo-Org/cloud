@@ -25,8 +25,8 @@ import { z } from 'zod';
 import * as Notifications from 'expo-notifications';
 
 import {
-  ANSWER_DRAFT_MAX_LENGTH,
   androidChannelIdForPushData,
+  ANSWER_DRAFT_MAX_LENGTH,
   genericPushContentForPushData,
   NEEDS_INPUT_ACTION_IDS,
   type NeedsInputActionId,
@@ -544,15 +544,22 @@ function resumeAnswerDraft(
   args: { outcome: NeedsInputActionOutcome; action: NeedsInputAction; text: string | undefined }
 ): NeedsInputRaiseData {
   const { outcome, action, text } = args;
-  if (outcome !== 'retryable' || action !== 'reply' || text === undefined) {
-    return data;
+  // The acted-on payload may already carry an earlier attempt's draft, because
+  // a retryable result is the notification the next tap reads. Only the failure
+  // of a reply that had text may carry one, so every other result drops the
+  // field instead of inheriting a stale answer.
+  const carried =
+    outcome === 'retryable' &&
+    action === 'reply' &&
+    text !== undefined &&
+    hasVisibleComposerText(text)
+      ? text.slice(0, ANSWER_DRAFT_MAX_LENGTH)
+      : undefined;
+  if (carried === undefined) {
+    const { answerDraft: _previousDraft, ...rest } = data;
+    return rest;
   }
-  if (!hasVisibleComposerText(text)) {
-    return data;
-  }
-  // The schema owns the bound: this slice keeps the posted payload valid, and
-  // the reader never sees a value the shared contract would refuse.
-  return { ...data, answerDraft: text.slice(0, ANSWER_DRAFT_MAX_LENGTH) };
+  return { ...data, answerDraft: carried };
 }
 
 async function runAnswerAction(args: {

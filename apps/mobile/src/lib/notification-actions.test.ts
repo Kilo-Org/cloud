@@ -416,6 +416,30 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     expect(request.content.data).toEqual(raiseData());
   });
 
+  // The failure result is the notification the next tap reads, so its payload
+  // carries the answer. A later result for the same raise must not inherit it:
+  // a sent answer, or a raise proven gone, would otherwise carry text nobody
+  // asked for into a card that has nothing to answer.
+  it("drops an earlier attempt's draft from a result that is not a failure", async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('unavailable');
+
+    const response = raiseResponse({
+      actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+      userText: 'ship it',
+    });
+    response.notification.request.content.data = raiseData({ answerDraft: 'an older answer' });
+
+    await handleNeedsInputNotificationResponse(response, {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { data: RaiseData } },
+    ];
+    expect(request.content.data).toEqual(raiseData());
+    expect('answerDraft' in request.content.data).toBe(false);
+  });
+
   it('posts no reply draft once the answer was sent', async () => {
     mocks.runNeedsInputInteraction.mockResolvedValue('ok');
 

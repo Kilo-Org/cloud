@@ -103,8 +103,10 @@ const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
  *
  * The family is horizontal only: a page inset is the column a screen's content
  * sits in, so `mt-6` or `py-6` moves an element's own box and is not one. The
- * all-side `p`/`m` entries are here because L2 judges them when they are not
- * the `p-4` gutter; L12 leaves them out below, because it owns the side insets.
+ * all-side `p`/`m` entries are here for the same reason as every other side:
+ * both inset rules read this one table and each applies its own policy on top
+ * of it — L2 the gutter on a surface that owns one, L12 anything wider than
+ * the gutter.
  */
 const INSET_UTILITIES = new Map([
   ['p', { side: 'all', property: 'padding' }],
@@ -122,24 +124,17 @@ const INSET_UTILITIES = new Map([
 ]);
 
 /**
- * L12's own share of the table: the side-specific insets. The all-side `p`/`m`
- * entries are left out because L12 judges a side, and it does not own the
- * all-side policy L2 states.
+ * The one page gutter, in spacing steps: `px-4`/`p-4` is the 14pt inset the
+ * contract fixes, and both inset rules compare against this number instead of
+ * spelling the step in a pattern of their own — a rule that admits a new shape
+ * of inset (an all-side one, a half step) then states the threshold once.
  */
-const L12_UTILITIES = [...INSET_UTILITIES]
-  .filter(([, entry]) => entry.side !== 'all')
-  .map(([utility]) => utility);
+const PAGE_GUTTER_STEPS = 4;
 
-/**
- * L12's pattern, built from the table above rather than spelled again, so a
- * side added there is judged by both rules at once. A side inset at 5 or more
- * is wider than the 14pt page gutter; the lookbehind and lookahead keep it off
- * a longer utility name and off a fractional or arbitrary value.
- */
-const L12_PATTERN = new RegExp(
-  `(?<![\\w-])-?(?:${L12_UTILITIES.join('|')})-(?:[5-9]|\\d{2,})(?![\\w.\\-/])`,
-  'g'
-);
+/** A spacing value the scale writes as a number of steps, or null for `auto`, `px`, `[22px]` and the like. */
+function stepOf(value) {
+  return /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : null;
+}
 
 /**
  * The layout contract's rules. Each entry states one rule once: `id` (the id a
@@ -239,16 +234,14 @@ export const LAYOUT_RULES = [
   },
   {
     id: 'L12',
-    patterns: [
-      // A horizontal padding or margin wider than the page gutter. The page
-      // inset is one number; a call site that writes a wider one puts its
-      // content on a column the rest of the app does not share — the 21pt
-      // sheet-header label and 28pt empty-state paragraph the design gate read
-      // as double insets both started as a class wider than the gutter. The
-      // sides come from `INSET_UTILITIES`, so a side added to that table is
-      // judged here without this pattern being edited.
-      L12_PATTERN,
-    ],
+    // A horizontal padding or margin wider than the page gutter. The page
+    // inset is one number; a call site that writes a wider one puts its
+    // content on a column the rest of the app does not share — the 21pt
+    // sheet-header label and 28pt empty-state paragraph the design gate read
+    // as double insets both started as a class wider than the gutter. The
+    // detector reads `INSET_UTILITIES` through `parseInset`, so a side added
+    // to that table is judged here without this rule being edited.
+    detectSurface: detectPageInsets,
     advice:
       'a page inset is the 14pt gutter: use SCREEN_GUTTER_CLASS, or the primitive that owns its own inset (SheetHeader, ScreenHeader, the state and row primitives)',
   },
@@ -915,7 +908,7 @@ const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
  * leading `!` removed. A variant (`md:`, `landscape:`, `ios:`) selects when the
  * utility applies and `!` only raises its specificity, so neither changes what
  * the utility does: every rule below reads the same inset a bare token writes —
- * the same way L12's lookbehind sees a variant-prefixed `px-6`.
+ * the same way L12's detector sees a variant-prefixed `px-6`.
  * `checkScrollPadding` reads `anyPadding` for the same reason L2's header
  * policy does: a prefixed `ios:px-4` insets the surface exactly as a bare
  * `px-4` does.
@@ -935,7 +928,9 @@ function utilityOf(token) {
  * the inset moves.
  *
  * The two inset rules read this one parse with different policies:
- * - L12 judges a side inset at 5 or more, because the page gutter is 14pt.
+ * - L12 judges any page inset wider than the gutter, whatever its side or
+ *   step: `px-6`, `p-6`, `m-10` and `px-4.5` are one decision against
+ *   `PAGE_GUTTER_STEPS`.
  * - L2 judges the page inset on a scroll content container, a `CenteredState`
  *   content container and a header's own `className`: the first two must be
  *   exactly `px-4`/`p-4`, except a margin of `auto` (centring) or `0` (no
@@ -961,14 +956,17 @@ function wrongGutter(token) {
     return false;
   }
   // A margin of `auto` is centering geometry and a margin of `0` writes no
-  // inset at all, so neither moves the page column this rule judges; L12's
-  // 5-or-more threshold does not reach either value either, so no rule judges
-  // them. A padding is not exempt: `px-0` on a content container is exactly the
-  // gutterless column this rule exists for.
+  // inset at all, so neither moves the page column this rule judges; neither is
+  // a number of steps on the scale, so L12 skips both as well and no rule
+  // judges them. A padding is not exempt: `px-0` on a content container is
+  // exactly the gutterless column this rule exists for.
   if (inset.property === 'margin' && (inset.value === 'auto' || inset.value === '0')) {
     return false;
   }
-  return !((inset.utility === 'px' || inset.utility === 'p') && inset.value === '4');
+  return !(
+    (inset.utility === 'px' || inset.utility === 'p') &&
+    inset.value === `${PAGE_GUTTER_STEPS}`
+  );
 }
 
 /** True when a class token writes a padding at all: the header's own gutter policy. */
@@ -1019,6 +1017,36 @@ function detectScrollGutters({ program, chunks, text, lineOf }) {
       });
     }
   });
+  return problems;
+}
+
+/**
+ * L12: any page inset wider than the one gutter, whatever shape writes it. The
+ * parse is the shared `parseInset`, so the all-side `p`/`m` forms and the side
+ * forms the same table lists are judged by one rule, and the value is compared
+ * as a number so `p-6`, `m-10`, `px-4.5` and `px-12.5` share one decision
+ * instead of a digit class that admits only whole side steps. A vertical
+ * utility (`mt-6`, `py-6`) is not in the table, so it stays out of the family.
+ * A value the scale does not write as steps (`auto`, `[22px]`, `full`, `px`)
+ * is left to the rule that owns it: L1 bans the arbitrary value, and an auto
+ * margin is centring geometry.
+ */
+function detectPageInsets({ group, lineOf }) {
+  const problems = [];
+  for (const chunk of group.chunks) {
+    for (const match of chunk.value.matchAll(/\S+/g)) {
+      const token = match[0];
+      const inset = parseInset(token);
+      if (inset === null) {
+        continue;
+      }
+      const step = stepOf(inset.value);
+      if (step === null || step <= PAGE_GUTTER_STEPS) {
+        continue;
+      }
+      problems.push({ line: lineOf(chunk.offsetOf(match.index)), offending: utilityOf(token) });
+    }
+  }
   return problems;
 }
 

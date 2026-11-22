@@ -1322,8 +1322,9 @@ reauthorizes them. Unresolved live attachments remain visibly incomplete; they d
 not crash the transcript or silently expose local paths as fetchable display URLs.
 A reference no authorization can bind — an absolute `http(s)` reference, or one the
 snapshot reported as unmapped — withholds only its own file part. The containing
-message still displays, and every reader reports it as incomplete rather than
-presenting the transcript as complete.
+message still displays. The snapshot projection and the live reader report such a
+message in `incompleteMessageIDs`, so their surfaces show an incomplete transcript,
+while the paged history reader keeps only its existing omitted-item count.
 
 Snapshot fetching, relay cursors, replay and recovery remain native-owned.
 `session.moved` requires an authoritative canonical snapshot because its event does

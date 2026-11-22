@@ -3567,6 +3567,18 @@ export const createBrowserRuntime = ({
         const runIsTranslation = reusedTab !== undefined || openedForStep !== undefined;
         const runToolName = runIsTranslation ? 'browser_navigate' : toolName;
         const runArguments = runIsTranslation ? { url: stepUrl ?? '' } : toolArguments;
+        /**
+         * The origin this call's navigation was approved for, or `undefined` when the call sent none: a
+         * `browser_navigate` call, or a `browser_tabs new` the runtime ran as one on the tab it opened or reused. The
+         * gate answers the destination's origin for both spellings, so a redirect away from it is judged against the
+         * origin the call really asked to open, never against the tab it happened to start on.
+         */
+        const navigatedOrigin =
+          preflight === undefined || !preflight.ok
+            ? undefined
+            : runIsTranslation || preflight.class === 'navigate'
+              ? preflight.origin
+              : undefined;
 
         if (downloadCapable) {
           takeOverDownloads(tabId);
@@ -4265,6 +4277,25 @@ export const createBrowserRuntime = ({
             return { kind: 'result', result: settled };
           }
 
+          // The navigation this call sent is the one the check is about, whichever tool carried it: a redirect that
+          // Left the tab on an origin this call may not open or read is reported before the tab is answered as opened.
+          if (agentContext !== undefined && navigatedOrigin !== undefined) {
+            const changed = await postAgentNavigate(
+              runSession,
+              navigatedOrigin,
+              agentContext.authorized
+            );
+
+            if (changed !== undefined) {
+              return {
+                from: changed.from,
+                kind: 'origin_changed',
+                result: settled,
+                to: changed.to,
+              };
+            }
+          }
+
           const info = await tabInfo(runTabId);
           const opened = {
             selected: true,
@@ -4345,12 +4376,12 @@ export const createBrowserRuntime = ({
         // An opaque or older origin there is the file's answer, not the redirect this check looks for.
         if (
           agentContext !== undefined &&
-          preflight?.class === 'navigate' &&
+          navigatedOrigin !== undefined &&
           successText === undefined
         ) {
           const changed = await postAgentNavigate(
             runSession,
-            preflight.origin,
+            navigatedOrigin,
             agentContext.authorized
           );
 

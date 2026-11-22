@@ -3724,6 +3724,8 @@ describe('agent browser calls', () => {
       readonly leases?: TabLeaseRegistry;
       /** A navigate that loads a page instead of becoming the download the guard stops. */
       readonly plain?: boolean;
+      /** Extra grants for a case about an origin the step may already open or read. */
+      readonly extraGrants?: readonly BrowserGrant[];
       /** The Downloads permission is gone by the time the guard is armed: revoked after the pre-open check. */
       readonly revokeAfterOpen?: boolean;
       /** The opened tab reports an empty url, as Chrome does without the `tabs` permission. */
@@ -3923,7 +3925,12 @@ describe('agent browser calls', () => {
     const run = (caller: BrowserCaller, sensitive: readonly string[] = [], tabId = TAB_ID) =>
       harness.runtime.runTool({
         agent: {
-          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          authorized: [
+            readGrant,
+            actGrant,
+            { class: 'navigate', origin: MAIN_ORIGIN },
+            ...(options.extraGrants ?? []),
+          ],
           sensitive: [...sensitive],
         },
         arguments: { action: 'new', url },
@@ -4542,6 +4549,57 @@ describe('agent browser calls', () => {
     }
 
     expect(outcome.withheldFrames).toStrictEqual([FRAME_ORIGIN]);
+  });
+
+  it('answers the opened tab for a tabs-new that settles on its approved destination', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+    const outcome = await fixture.run(agent());
+
+    // The tab the step opened is the answer, at the url the step navigated to.
+    expect(expectResult(outcome).result.value).toStrictEqual({
+      selected: true,
+      tabId: fixture.newTab,
+      title: '',
+      url: `${MAIN_ORIGIN}/report.txt`,
+    });
+  });
+
+  it('reports origin_changed for a tabs-new that redirects to another origin', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+
+    // The approved destination answered with a redirect: the tab commits on another origin than the one the step was approved for.
+    fixture.cdp.setFrameUrl('https://accounts.example.org/login');
+
+    const outcome = await fixture.run(agent());
+
+    expect(outcome).toMatchObject({
+      from: MAIN_ORIGIN,
+      kind: 'origin_changed',
+      to: 'https://accounts.example.org',
+    });
+    // The step's own answer is the refusal, not a claim that the tab opened where it was asked to.
+    expect(originChangedResultOf(outcome)).toMatchObject({ ok: true });
+  });
+
+  it('completes a tabs-new redirect that lands on an origin the step may already read', async () => {
+    const fixture = await tabsNewFixture({
+      extraGrants: [{ class: 'read', origin: 'https://accounts.example.org' }],
+      plain: true,
+    });
+
+    fixture.cdp.setFrameUrl('https://accounts.example.org/login');
+
+    const outcome = await fixture.run(agent());
+
+    // `postAgentNavigate` is the only judge: a landing origin the session may read is the redirect's answer, and the
+    // Tab the step opened is what the caller gets back.
+    expect(outcome.kind).toBe('result');
+    expect(expectResult(outcome).result.value).toStrictEqual({
+      selected: true,
+      tabId: fixture.newTab,
+      title: '',
+      url: `${MAIN_ORIGIN}/report.txt`,
+    });
   });
 
   it('names the tab a guarded tabs-new opened when the navigation leaves a dialog open on it', async () => {

@@ -157,17 +157,19 @@ export const AutoRoutingDecisionSchema = z
   .superRefine((decision, ctx) => {
     refineVariantExclusivity(decision, ctx, 'Decision');
     refineEntryModelMatch(decision, ctx);
-    if (
-      decision.fallback !== true &&
-      (decision.taskType === null ||
-        decision.subtaskType === null ||
-        decision.tableVersion === null)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['taskType'],
-        message: 'Only a fallback decision may omit taskType, subtaskType, and tableVersion',
-      });
+    // The three fields are independently nullable, so each omission is
+    // reported at its own path. One issue fixed to a single path would name a
+    // field that is present in the decision it rejects.
+    if (decision.fallback !== true) {
+      for (const field of ['taskType', 'subtaskType', 'tableVersion'] as const) {
+        if (decision[field] === null) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [field],
+            message: 'Only a fallback decision may omit taskType, subtaskType, and tableVersion',
+          });
+        }
+      }
     }
   });
 

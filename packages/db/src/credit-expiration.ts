@@ -133,11 +133,27 @@ export function computeCreditLotAllocations<T extends ExpiringTransaction>(
   });
 }
 
+/**
+ * The actor id stored in `credit_transactions.kilo_user_id` on the expiration rows of an
+ * organization. The column is non-null and an organization has no user id, so an organization
+ * expiration records this placeholder instead. Callers must use it for an organization, and must
+ * never pass an organization or member id.
+ */
+export const ORGANIZATION_CREDIT_ACTOR = 'system';
+
+/**
+ * Computes the expiration rows for one owner's credit lots.
+ *
+ * `kiloUserId` is written to `credit_transactions.kilo_user_id` on every new `credits_expired`
+ * row. For a user owner, pass the user id. For an organization owner, pass
+ * `ORGANIZATION_CREDIT_ACTOR`; an organization or member id would change what the stored rows
+ * record.
+ */
 export function computeExpiration(
   transactions: ExpiringTransaction[],
   entity: EntityForExpiration,
   now: Date,
-  kilo_user_id: string
+  kiloUserId: string
 ): ExpirationResult {
   const newBaselines = new Map<CreditTransaction['id'], number>();
   const newTransactions: (typeof credit_transactions.$inferInsert)[] = [];
@@ -153,7 +169,7 @@ export function computeExpiration(
     // expiredIds feeds earliestUnexpiredExpiry. Dropping the zero row would let the
     // next reconcile re-expire the same lot.
     newTransactions.push({
-      kilo_user_id,
+      kilo_user_id: kiloUserId,
       amount_microdollars: expired === 0 ? 0 : -expired,
       credit_category: 'credits_expired',
       original_transaction_id: transaction.id,
@@ -243,7 +259,7 @@ export async function reconcileCreditExpirationsInTransaction(
     transactions,
     entity,
     now,
-    owner.type === 'user' ? owner.id : 'system'
+    owner.type === 'user' ? owner.id : ORGANIZATION_CREDIT_ACTOR
   );
   const expiredIds = new Set(
     result.newTransactions.map(transaction => transaction.original_transaction_id)

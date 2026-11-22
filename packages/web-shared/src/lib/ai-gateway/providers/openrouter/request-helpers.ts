@@ -55,13 +55,28 @@ function findEnvironmentDetailsCacheTargetIndex(
   return environmentDetailsIndex > 0 ? environmentDetailsIndex - 1 : undefined;
 }
 
+/**
+ * The content index a cache breakpoint should land on for a message in `role`:
+ * the block just before the user's `<environment_details>` text. Undefined when
+ * the role has no such target.
+ */
+function environmentDetailsCacheTargetIndex(
+  content: ReadonlyArray<{ type: string; text?: string }>,
+  role: string
+): number | undefined {
+  return role === 'user' ? findEnvironmentDetailsCacheTargetIndex(content) : undefined;
+}
+
 function findCacheTargetBlock<T extends { type: string; text?: string }>(
   content: ReadonlyArray<T>,
   role: string
 ) {
-  const cacheTargetIndex =
-    role === 'user' ? findEnvironmentDetailsCacheTargetIndex(content) : undefined;
-  return cacheTargetIndex === undefined ? content.at(-1) : content[cacheTargetIndex];
+  const cacheTargetIndex = environmentDetailsCacheTargetIndex(content, role);
+  if (cacheTargetIndex !== undefined) {
+    return content[cacheTargetIndex];
+  }
+  const lastBlock = content.at(-1);
+  return lastBlock;
 }
 
 function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionMessageParam) {
@@ -148,17 +163,19 @@ function setCacheControlOnMessagesMessage(
     ];
   } else {
     const content: Anthropic.ContentBlockParam[] = message.content;
-    const environmentDetailsCacheTargetIndex =
-      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(content) : undefined;
+    const environmentDetailsTargetIndex = environmentDetailsCacheTargetIndex(content, message.role);
     const environmentDetailsCacheTarget =
-      environmentDetailsCacheTargetIndex === undefined
+      environmentDetailsTargetIndex === undefined
         ? undefined
-        : content[environmentDetailsCacheTargetIndex];
+        : content[environmentDetailsTargetIndex];
+    // The environment-details block is preferred, but a `thinking` or `redacted_thinking`
+    // block cannot hold it: a Messages breakpoint must not land on reasoning output.
+    const lastCacheableBlock = content.findLast(isCacheableMessagesContentBlock);
     const cacheTarget =
       environmentDetailsCacheTarget &&
       isCacheableMessagesContentBlock(environmentDetailsCacheTarget)
         ? environmentDetailsCacheTarget
-        : content.findLast(isCacheableMessagesContentBlock);
+        : lastCacheableBlock;
     if (cacheTarget) {
       cacheTarget.cache_control = cacheControl;
     }

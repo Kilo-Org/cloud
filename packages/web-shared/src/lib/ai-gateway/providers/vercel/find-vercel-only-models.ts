@@ -39,8 +39,8 @@ function getModelPrefix(modelId: string): string | undefined {
 /** OpenRouter names start with the vendor, as in `Qwen: Qwen3 Max`. */
 function getVendorNamesByModelPrefix(
   openRouterModels: Iterable<{ id: string; name: string }>
-): ReadonlyMap<string | undefined, string> {
-  const vendorNames = new Map<string | undefined, string>();
+): ReadonlyMap<string, string> {
+  const vendorNames = new Map<string, string>();
   for (const { id, name } of openRouterModels) {
     const prefix = getModelPrefix(id);
     const separatorIndex = name.indexOf(': ');
@@ -53,9 +53,10 @@ function getVendorNamesByModelPrefix(
 
 function getVercelOnlyModelName(
   { id, storedModel }: { id: string; storedModel: GatewayModelWithEndpoints },
-  vendorNames: ReadonlyMap<string | undefined, string>
+  vendorNames: ReadonlyMap<string, string>
 ): string {
-  const vendorName = vendorNames.get(getModelPrefix(id));
+  const prefix = getModelPrefix(id);
+  const vendorName = prefix === undefined ? undefined : vendorNames.get(prefix);
   return vendorName ? `${vendorName}: ${storedModel.name}` : storedModel.name;
 }
 

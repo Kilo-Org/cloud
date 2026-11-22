@@ -976,6 +976,58 @@ describe('auto top-up card errors with empty decline codes', () => {
       expect(events[0].event_type).toBe('charge.attempted');
     }
   );
+
+  test.each(['toString', 'constructor', 'hasOwnProperty'] as const)(
+    'a decline code that names an inherited property ("%s") disables with the unknown_error fallback',
+    async inheritedName => {
+      const user = await insertTestUser({
+        google_user_email: `at-inherited-${crypto.randomUUID()}@example.com`,
+        auto_top_up_enabled: true,
+        stripe_customer_id: `cus_inherited_${crypto.randomUUID()}`,
+        total_microdollars_acquired: 0,
+        microdollars_used: toMicrodollars(10),
+      });
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: user.id,
+        created_by_user_id: user.id,
+        stripe_payment_method_id: 'pm_inherited_test',
+        amount_cents: 2000,
+        disabled_reason: null,
+      });
+
+      const invoiceId = `inv_inherited_${crypto.randomUUID()}`;
+      (client.invoices.create as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        created: 1_700_000_000,
+      });
+      (client.invoices.update as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        created: 1_700_000_000,
+      });
+      (client.invoiceItems.create as jest.Mock).mockResolvedValue({
+        id: `ii_inherited_${crypto.randomUUID()}`,
+      });
+      (client.invoices.pay as jest.Mock).mockRejectedValue(
+        new Stripe.errors.StripeCardError({
+          type: 'card_error',
+          message: 'This card was declined.',
+          decline_code: inheritedName,
+          code: inheritedName,
+        })
+      );
+
+      await maybePerformAutoTopUp(toUserForBalance(user));
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_user_id, user.id),
+      });
+      expect(config?.disabled_reason).toBe(inheritedName);
+
+      const sendMock = sendAutoTopUpFailedEmail as jest.Mock;
+      expect(sendMock).toHaveBeenCalledTimes(1);
+      expect(sendMock.mock.calls[0][1]).toMatchObject({ reason: '' });
+    }
+  );
 });
 
 describe('auto top-up failed email recipients for organizations', () => {

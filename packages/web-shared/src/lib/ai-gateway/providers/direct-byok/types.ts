@@ -167,7 +167,7 @@ export function apiKeyUpstream(upstream: {
 }
 
 /** The favicon a provider's own site serves, which the provider list shows next to its name. */
-export function faviconIcon(siteUrl: string): DirectByokProviderListing['icon'] {
+function faviconIcon(siteUrl: string): DirectByokProviderListing['icon'] {
   return {
     url: `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${siteUrl}&size=256`,
   };

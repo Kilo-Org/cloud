@@ -146,7 +146,23 @@ describe('assertUserAdministersInstallation', () => {
     expect((thrown as Error).message).toBe(
       'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
     );
-    expect(mockListInstallationsForAuthenticatedUser).toHaveBeenCalledTimes(100);
+    expect(mockListInstallationsForAuthenticatedUser).toHaveBeenCalledTimes(101);
+  });
+
+  test('completes a listing at the page bound', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({ id: 10000 + i }));
+    for (let index = 0; index < 100; index++) {
+      mockPage(fullPage, 10_000);
+    }
+    mockPage([], 10_000);
+
+    const result = await assertUserAdministersInstallation({
+      accessToken: 'test-token',
+      installationId: INSTALLATION_ID,
+    });
+
+    expect(result).toBe(false);
+    expect(mockListInstallationsForAuthenticatedUser).toHaveBeenCalledTimes(101);
   });
 
   test('enforces MAX_GITHUB_LISTING_BYTES', async () => {

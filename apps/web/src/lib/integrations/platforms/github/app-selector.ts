@@ -126,10 +126,11 @@ export async function assertUserAdministersInstallation(params: {
       }
 
       itemCount += data.installations.length;
+      if (data.installations.length === 0) break;
       const isLastPage = data.installations.length < perPage;
-      if (!isLastPage) page++;
       checkGitHubPaginationBounds(page, itemCount, context);
       if (isLastPage) break;
+      page++;
     }
 
     return false;

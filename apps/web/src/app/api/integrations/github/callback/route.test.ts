@@ -44,6 +44,7 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
+import { GitHubListingBudgetExceededError } from '@/lib/integrations/platforms/github/listing-budget';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
@@ -1642,6 +1643,49 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockedCreateAppAuth).not.toHaveBeenCalled();
+  });
+
+  test('reports the administration listing outcome at the page bound', async () => {
+    mockedAssertUserAdministersInstallation.mockRejectedValue(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
+      )
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_listing_too_large`);
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
+  });
+
+  test('reports the authorization listing outcome at the page bound', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedVerifyGitHubInstallationAuthorization.mockRejectedValue(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
+      )
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_listing_too_large`);
+    expect(mockedVerifyGitHubInstallationAuthorization).toHaveBeenCalled();
+    expect(mockedConnectVerifiedGitHubInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
   });
 
   test('redirects with installation_already_claimed when upsert detects cross-owner claim', async () => {

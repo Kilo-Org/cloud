@@ -64,10 +64,11 @@ export async function fetchGitHubInstallationRequests(
         }))
       );
 
+      if (data.length === 0) break;
       const isLastPage = data.length < perPage;
-      if (!isLastPage) page++;
       checkGitHubPaginationBounds(page, requests.length, context);
       if (isLastPage) break;
+      page++;
     }
 
     return requests;
@@ -273,10 +274,11 @@ async function listInstallationRepositories(octokit: Octokit): Promise<GitHubRep
           }))
       );
 
+      if (data.repositories.length === 0) break;
       const isLastPage = data.repositories.length < perPage;
-      if (!isLastPage) page++;
       checkGitHubPaginationBounds(page, repositories.length, context);
       if (isLastPage) break;
+      page++;
     }
 
     return repositories;
@@ -358,10 +360,11 @@ export async function fetchGitHubBranches(
         }))
       );
 
+      if (data.length === 0) break;
       const isLastPage = data.length < perPage;
-      if (!isLastPage) page++;
       checkGitHubPaginationBounds(page, branches.length, context);
       if (isLastPage) break;
+      page++;
     }
   } finally {
     budget.dispose();

@@ -773,7 +773,30 @@ describe('fetchGitHubRepositories', () => {
     expect((thrown as Error).message).toBe(
       'GitHub pagination limit exceeded: repository listing returned more than 100 pages'
     );
-    expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(100);
+    expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(101);
+  });
+
+  it('completes a listing at the page bound', async () => {
+    for (let index = 0; index < 100; index++) {
+      mockListReposAccessibleToInstallation.mockResolvedValueOnce({
+        data: {
+          total_count: 10_000,
+          repositories: Array.from({ length: 100 }, (_value, row) =>
+            repositoryRow(index * 100 + row)
+          ),
+        },
+      });
+    }
+    mockListReposAccessibleToInstallation.mockResolvedValueOnce({
+      data: { total_count: 10_000, repositories: [] },
+    });
+
+    const repositories = await fetchGitHubRepositories('5001');
+
+    expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(101);
+    expect(repositories).toHaveLength(10_000);
+    expect(repositories[0].id).toBe(0);
+    expect(repositories[9_999].id).toBe(9_999);
   });
 
   it('rejects a listing that returns more items than the item cap', async () => {
@@ -948,7 +971,21 @@ describe('fetchGitHubBranches', () => {
     expect((thrown as Error).message).toBe(
       'GitHub pagination limit exceeded: branch listing returned more than 100 pages'
     );
-    expect(mockReposListBranches).toHaveBeenCalledTimes(100);
+    expect(mockReposListBranches).toHaveBeenCalledTimes(101);
+  });
+
+  it('completes a listing at the page bound', async () => {
+    for (let index = 0; index < 100; index++) {
+      mockReposListBranches.mockResolvedValueOnce({ data: branchNames(100, index * 100) });
+    }
+    mockReposListBranches.mockResolvedValueOnce({ data: [] });
+
+    const branches = await fetchGitHubBranches('5001', 'kilo/repo');
+
+    expect(mockReposListBranches).toHaveBeenCalledTimes(101);
+    expect(branches).toHaveLength(10_000);
+    expect(branches[0]).toEqual({ name: 'branch-0', isDefault: false });
+    expect(branches[9_999]).toEqual({ name: 'branch-9999', isDefault: false });
   });
 
   it('rejects a listing that returns more items than the item cap', async () => {
@@ -1114,7 +1151,23 @@ describe('fetchGitHubInstallationRequests', () => {
     expect((thrown as Error).message).toBe(
       'GitHub pagination limit exceeded: installation request listing returned more than 100 pages'
     );
-    expect(mockListInstallationRequests).toHaveBeenCalledTimes(100);
+    expect(mockListInstallationRequests).toHaveBeenCalledTimes(101);
+  });
+
+  it('completes a listing at the page bound', async () => {
+    for (let index = 0; index < 100; index++) {
+      mockListInstallationRequests.mockResolvedValueOnce({
+        data: Array.from({ length: 100 }, (_value, row) => requestRow(index * 100 + row)),
+      });
+    }
+    mockListInstallationRequests.mockResolvedValueOnce({ data: [] });
+
+    const requests = await fetchGitHubInstallationRequests();
+
+    expect(mockListInstallationRequests).toHaveBeenCalledTimes(101);
+    expect(requests).toHaveLength(10_000);
+    expect(requests[0].id).toBe('0');
+    expect(requests[9_999].id).toBe('9999');
   });
 
   it('reports the typed deadline error when the read runs out of time', async () => {

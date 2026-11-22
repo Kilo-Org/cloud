@@ -252,7 +252,31 @@ describe('discoverAuthorizedGitHubInstallations', () => {
     expect((thrown as Error).message).toBe(
       'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages'
     );
-    expect(listInstallations).toHaveBeenCalledTimes(100);
+    expect(listInstallations).toHaveBeenCalledTimes(101);
+  });
+
+  test('completes a listing at the page bound', async () => {
+    const fullPage = (pageIndex: number) =>
+      Array.from({ length: 100 }, (_, index) => ({
+        id: pageIndex * 100 + index,
+        app_id: 7,
+        account: { id: 12, login: 'owner', type: 'User' },
+      }));
+    for (let pageIndex = 0; pageIndex < 100; pageIndex++) {
+      listInstallations.mockResolvedValueOnce(installationPage(fullPage(pageIndex)));
+    }
+    listInstallations.mockResolvedValueOnce(installationPage([]));
+
+    const result = await discoverAuthorizedGitHubInstallations({
+      accessToken: 'token',
+      githubAppType: 'standard',
+      expectedAppId: '7',
+    });
+
+    expect(listInstallations).toHaveBeenCalledTimes(101);
+    expect(result.candidates).toHaveLength(10_000);
+    expect(result.candidates[0].installationId).toBe('0');
+    expect(result.candidates[9_999].installationId).toBe('9999');
   });
 
   test('stops at the time limit', async () => {

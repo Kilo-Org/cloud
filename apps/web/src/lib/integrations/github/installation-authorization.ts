@@ -77,10 +77,11 @@ async function allPages<T>(
       const current = await withListingDeadline(budget, () => fetchPage(page, budget.signal));
       budget.retain(Buffer.byteLength(JSON.stringify(current)));
       values.push(...current);
+      if (current.length === 0) return values;
       const isLastPage = current.length < 100;
-      if (!isLastPage) page += 1;
       checkGitHubPaginationBounds(page, values.length, context);
       if (isLastPage) return values;
+      page += 1;
     }
   } finally {
     budget.dispose();

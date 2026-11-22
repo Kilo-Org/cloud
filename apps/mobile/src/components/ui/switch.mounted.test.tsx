@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
+import { resolveAlphaColor } from '@/lib/theme-color';
 import { Switch } from './switch';
 
 const native = vi.hoisted(() => ({ os: 'ios', scheme: 'light' as 'light' | 'dark' }));
@@ -261,15 +262,25 @@ describe('Switch', () => {
     ] as const) {
       native.scheme = scheme;
       const disabledOn = nativeProps(renderSwitch({ disabled: true, value: true }).root);
-      const enabledOff = nativeProps(renderSwitch({ value: false }).root);
-      expect(disabledOn.thumbColor, `disabled on grip (${scheme})`).toBe(colors.ink2);
-      expect(disabledOn.thumbColor).not.toBe(enabledOff.thumbColor);
-      // `PreferenceRow`'s light enabled off row: `mutedForeground` (the
-      // `primaryDisabled` token) under a white thumb.
-      expect(`${disabledOn.trackColor?.true}/${disabledOn.thumbColor}`).not.toBe(
-        `${colors.mutedForeground}/${colors.primaryForeground}`
+      // The painted pair of a `value: true` control, so both halves come from
+      // the track it really draws.
+      const paintedTrack = disabledOn.trackColor?.true;
+      expect(paintedTrack, `painted on track (${scheme})`).toBe(
+        resolveAlphaColor(
+          scheme === 'dark' ? colors.selection : colors.primary,
+          scheme === 'dark' ? 0.5 : 0.8
+        )
       );
-      expect(disabledOn.trackColor?.true).not.toBe(colors.mutedForeground);
+      expect(disabledOn.thumbColor, `disabled on grip (${scheme})`).toBe(colors.ink2);
+      // The live off pair of this scheme: the shared off track under its grip
+      // in dark, and `PreferenceRow`'s light override (`mutedForeground`, the
+      // `primaryDisabled` token) under a white thumb in light. Both tracks are
+      // `mutedForeground`; the grips differ, so compare each half.
+      const liveOffGrip = scheme === 'dark' ? colors.foreground : colors.primaryForeground;
+      expect(paintedTrack, `on track vs live off track (${scheme})`).not.toBe(
+        colors.mutedForeground
+      );
+      expect(disabledOn.thumbColor, `on grip vs live off grip (${scheme})`).not.toBe(liveOffGrip);
     }
   });
 

@@ -427,14 +427,6 @@ describe('disabled switch pair contrast (non-text)', () => {
     return {
       themeName,
       colors,
-      enabledOn: {
-        track: enabledOnTrack,
-        grip: themeName === 'dark' ? colors.selectionForeground : colors.primaryForeground,
-      },
-      enabledOff: {
-        track: enabledOffTrack,
-        grip: themeName === 'dark' ? colors.foreground : colors.primaryForeground,
-      },
       on: {
         track: compositeToken(
           resolveAlphaColor(enabledOnTrack, DISABLED_ON_TRACK_ALPHA[themeName]),
@@ -495,20 +487,37 @@ describe('disabled switch pair contrast (non-text)', () => {
   });
 
   // A disabled row has to read as unavailable beside a live one, so no disabled
-  // half may reuse an enabled half. `PreferenceRow`'s light enabled off row is
-  // the pair to beat there: `mutedForeground` (the `primaryDisabled` token)
-  // under a `primaryForeground` thumb.
-  it('every theme: a disabled pair is not either enabled pair', () => {
-    for (const { themeName, colors, enabledOn, enabledOff, on, off } of pairs) {
-      expect(`${on.track}/${on.grip}`, `disabled on vs enabled on (${themeName})`).not.toBe(
-        `${enabledOn.track}/${enabledOn.grip}`
-      );
-      expect(`${off.track}/${off.grip}`, `disabled off vs enabled off (${themeName})`).not.toBe(
-        `${enabledOff.track}/${enabledOff.grip}`
-      );
-      expect(`${on.track}/${on.grip}`, `disabled on vs live light off row (${themeName})`).not.toBe(
-        `${colors.mutedForeground}/${colors.primaryForeground}`
-      );
+  // pair may equal an enabled pair of either position. `PreferenceRow`'s light
+  // enabled off row is the pair to beat there: it overrides the shared off pair
+  // with `mutedForeground` (the `primaryDisabled` token) under a
+  // `primaryForeground` thumb, so the light off row is measured with that
+  // override and not with the shared pair.
+  it('every theme: no disabled pair equals an enabled pair of either position', () => {
+    for (const { themeName, colors, on, off } of pairs) {
+      const liveOn = {
+        track: themeName === 'dark' ? colors.selection : colors.primary,
+        grip: themeName === 'dark' ? colors.selectionForeground : colors.primaryForeground,
+      };
+      // Both schemes' live off row ends on `mutedForeground`: the shared pair
+      // in dark, and `PreferenceRow`'s light override, which equals it.
+      const liveOff = {
+        track: colors.mutedForeground,
+        grip: themeName === 'dark' ? colors.foreground : colors.primaryForeground,
+      };
+      for (const [name, disabled] of [
+        ['on', on],
+        ['off', off],
+      ] as const) {
+        for (const [liveName, live] of [
+          ['live on', liveOn],
+          ['live off', liveOff],
+        ] as const) {
+          expect(
+            `${disabled.track}/${disabled.grip}`,
+            `disabled ${name} vs ${liveName} (${themeName})`
+          ).not.toBe(`${live.track}/${live.grip}`);
+        }
+      }
     }
   });
 });

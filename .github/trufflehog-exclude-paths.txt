@@ -59,6 +59,8 @@ services/cloud-agent-next/src/shared/sentry\.test\.ts
 
 # Database reset target fixtures. reset-target.test.ts builds connection strings to
 # assert which pairs name one database. An earlier commit on the branch used a
-# literal placeholder URI, and that commit stays in branch history. Exclude the
-# fixture path so the historical commit does not fail the scan.
+# literal placeholder URI, and that commit stays in branch history; the same file
+# carried a different name then, so both paths are listed. Exclude the fixture
+# paths so the historical commit does not fail the scan.
+apps/web/src/db/require-reset-target\.test\.ts
 apps/web/src/db/reset-target\.test\.ts

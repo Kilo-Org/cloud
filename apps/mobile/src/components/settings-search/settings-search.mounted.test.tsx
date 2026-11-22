@@ -239,10 +239,12 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
 
     typeQuery(root, 'appearance');
     const appearanceRows = rows(root);
-    expect(appearanceRows).toHaveLength(4);
-    expect(
-      appearanceRows.map(row => row.props.accessibilityLabel).sort((a, b) => a.localeCompare(b))
-    ).toEqual(['Appearance', 'Dark', 'Light', 'System']);
+    expect(appearanceRows.map(row => row.props.accessibilityLabel)).toEqual([
+      'Appearance',
+      'System',
+      'Light',
+      'Dark',
+    ]);
     const optionRows = appearanceRows.filter(
       appearanceRow => appearanceRow.props.accessibilityLabel !== 'Appearance'
     );

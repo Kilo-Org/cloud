@@ -126,6 +126,16 @@ function foldedMark(part: string): boolean {
   );
 }
 
+function stripOptionalMarks(value: string): string {
+  let kept = '';
+  for (const part of value.normalize('NFD')) {
+    if (!foldedMark(part)) {
+      kept += part;
+    }
+  }
+  return kept;
+}
+
 /**
  * Fold one grapheme cluster. Canonically equivalent input composes first, so
  * `I` + U+0307 is the same as `İ` before Turkic lowercasing. The optional
@@ -155,7 +165,7 @@ function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string 
     for (const char of cluster.normalize('NFC')) {
       for (const lowered of lowercaseForLocale(char, rules.language)) {
         const letters = rules.serbianCyrillic ? transliterateSerbian(lowered) : lowered;
-        const kept = [...letters.normalize('NFD')].filter(part => !foldedMark(part)).join('');
+        const kept = stripOptionalMarks(letters);
         for (const letter of kept.normalize('NFC')) {
           if (letter === 'ß') {
             append('ss', start, end);

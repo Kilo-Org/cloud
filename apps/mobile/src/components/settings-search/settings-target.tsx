@@ -180,7 +180,7 @@ export function SettingsSearchTargetScope({
         return;
       }
       const armed = armedRef.current;
-      if (armed?.target === target && armed?.node === node) {
+      if (armed?.target === target && armed.node === node) {
         return;
       }
       armedRef.current = { target, node };

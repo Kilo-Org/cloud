@@ -1502,7 +1502,9 @@
       "githubError": "نەتوانرا ڕێکخستنی GitHub بکرێتەوە. تکایە دووبارە هەوڵ بدە.",
       "gitlabAccount": "هەژماری GitLab",
       "gitlabError": "نەتوانرا ڕێکخستنی GitLab بکرێتەوە. تکایە دووبارە هەوڵ بدە.",
-      "description": "بۆ پێداچوونەوەی خۆکاری داواکارییەکانی تێکەڵکردن، {{label}}ی Kilo ببەستە."
+      "description": "بۆ پێداچوونەوەی خۆکاری داواکارییەکانی تێکەڵکردن، {{label}}ی Kilo ببەستە.",
+      "notConnectedTitle": "{{platform}} نەبەستراوە",
+      "githubAdminOnlyDescription": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەران دەتوانن بیبەستن."
     },
     "overview": {
       "allAreas": "هەموو بوارەکان",

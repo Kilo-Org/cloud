@@ -1502,7 +1502,9 @@
       "githubError": "Dejinta GitHub lama furi karin. Fadlan mar kale isku day.",
       "gitlabAccount": "akoonka GitLab",
       "gitlabError": "Dejinta GitLab lama furi karin. Fadlan mar kale isku day.",
-      "description": "Ku xidh Kilo {{label}} si codsiyada isku darka dib loogu eego si otomaatig ah."
+      "description": "Ku xidh Kilo {{label}} si codsiyada isku darka dib loogu eego si otomaatig ah.",
+      "notConnectedTitle": "{{platform}} kuma xidhna",
+      "githubAdminOnlyDescription": "Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa ku xidhi kara."
     },
     "overview": {
       "allAreas": "Dhammaan meelaha",

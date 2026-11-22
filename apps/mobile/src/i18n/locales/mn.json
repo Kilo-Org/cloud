@@ -1502,7 +1502,9 @@
       "githubError": "GitHub тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
       "gitlabAccount": "GitLab бүртгэл",
       "gitlabError": "GitLab тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
-      "description": "Нэгтгэх хүсэлтийг автоматаар шалгахын тулд Kilo {{label}} холбоно уу."
+      "description": "Нэгтгэх хүсэлтийг автоматаар шалгахын тулд Kilo {{label}} холбоно уу.",
+      "notConnectedTitle": "{{platform}} холбогдоогүй байна",
+      "githubAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч болон админ үүнийг холбох эрхтэй."
     },
     "overview": {
       "allAreas": "Бүх чиглэл",

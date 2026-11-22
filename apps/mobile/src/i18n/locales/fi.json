@@ -1502,7 +1502,9 @@
       "githubError": "GitHubin käyttöönottoa ei voitu avata. Yritä uudelleen.",
       "gitlabAccount": "GitLab-tili",
       "gitlabError": "GitLabin käyttöönottoa ei voitu avata. Yritä uudelleen.",
-      "description": "Yhdistä {{label}} Kiloon, niin muutospyynnöt katselmoidaan automaattisesti."
+      "description": "Yhdistä {{label}} Kiloon, niin muutospyynnöt katselmoidaan automaattisesti.",
+      "notConnectedTitle": "{{platform}}ia ei ole yhdistetty",
+      "githubAdminOnlyDescription": "Vain organisaation omistajat ja ylläpitäjät voivat yhdistää sen."
     },
     "overview": {
       "allAreas": "Kaikki osa-alueet",

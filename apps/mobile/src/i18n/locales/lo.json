@@ -1502,7 +1502,9 @@
       "githubError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitHub ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
       "gitlabAccount": "ບັນຊີ GitLab",
       "gitlabError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitLab ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
-      "description": "ເຊື່ອມຕໍ່ {{label}} ຂອງ Kilo ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດອັດຕະໂນມັດ."
+      "description": "ເຊື່ອມຕໍ່ {{label}} ຂອງ Kilo ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດອັດຕະໂນມັດ.",
+      "notConnectedTitle": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ {{platform}}",
+      "githubAdminOnlyDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ດູແລລະບົບທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
     },
     "overview": {
       "allAreas": "ທຸກດ້ານ",

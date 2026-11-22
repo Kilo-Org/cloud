@@ -821,6 +821,8 @@
     },
     "providerConnect": {
       "description": "Настройте подключение Kilo — {{label}} — для автоматической проверки пул-реквестов.",
+      "notConnectedTitle": "{{platform}} не подключён",
+      "githubAdminOnlyDescription": "Подключить его могут только владельцы и администраторы организации.",
       "githubApp": "приложение GitHub",
       "githubError": "Не удалось открыть настройку GitHub. Попробуйте снова.",
       "gitlabAccount": "аккаунт GitLab",

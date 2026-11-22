@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "連結 Kilo {{label}}，即可自動審查 PR。",
+      "notConnectedTitle": "尚未連結 {{platform}}",
+      "githubAdminOnlyDescription": "只有組織擁有者和管理員可以設定連結。",
       "githubApp": "GitHub App",
       "githubError": "無法開啟 GitHub 設定。請再試一次。",
       "gitlabAccount": "GitLab 帳戶",

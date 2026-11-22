@@ -1502,7 +1502,9 @@
       "githubError": "የGitHub ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "gitlabAccount": "የGitLab መለያ",
       "gitlabError": "የGitLab ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "description": "የኮድ ውህደት ጥያቄዎችን በራስ-ሰር ለመገምገም የKilo {{label}}ን ያገናኙ።"
+      "description": "የኮድ ውህደት ጥያቄዎችን በራስ-ሰር ለመገምገም የKilo {{label}}ን ያገናኙ።",
+      "notConnectedTitle": "{{platform}} አልተገናኘም",
+      "githubAdminOnlyDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።"
     },
     "overview": {
       "allAreas": "ሁሉም ዘርፎች",

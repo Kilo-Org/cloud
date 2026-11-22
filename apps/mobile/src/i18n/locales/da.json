@@ -1502,7 +1502,9 @@
       "githubError": "Opsætningen af GitHub kunne ikke åbnes. Prøv igen.",
       "gitlabAccount": "GitLab-konto",
       "gitlabError": "Opsætningen af GitLab kunne ikke åbnes. Prøv igen.",
-      "description": "Tilslut Kilos {{label}} for automatisk at gennemgå pull requests."
+      "description": "Tilslut Kilos {{label}} for automatisk at gennemgå pull requests.",
+      "notConnectedTitle": "{{platform}} er ikke tilsluttet",
+      "githubAdminOnlyDescription": "Kun organisationsejere og administratorer kan oprette forbindelsen."
     },
     "overview": {
       "allAreas": "Alle områder",

@@ -1558,7 +1558,9 @@
       "githubError": "Não foi possível abrir a configuração do GitHub. Tenta novamente.",
       "gitlabAccount": "conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tenta novamente.",
-      "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente."
+      "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente.",
+      "notConnectedTitle": "O {{platform}} não está ligado",
+      "githubAdminOnlyDescription": "Apenas os proprietários da organização e os administradores o podem ligar."
     },
     "overview": {
       "allAreas": "Todas as áreas",

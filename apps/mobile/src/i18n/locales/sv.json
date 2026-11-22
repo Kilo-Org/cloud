@@ -1502,7 +1502,9 @@
       "githubError": "Kunde inte öppna konfigurationen för GitHub. Försök igen.",
       "gitlabAccount": "GitLab-konto",
       "gitlabError": "Kunde inte öppna konfigurationen för GitLab. Försök igen.",
-      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt."
+      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt.",
+      "notConnectedTitle": "{{platform}} är inte anslutet",
+      "githubAdminOnlyDescription": "Endast organisationsägare och administratörer kan skapa anslutningen."
     },
     "overview": {
       "allAreas": "Alla områden",

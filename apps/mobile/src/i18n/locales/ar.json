@@ -825,6 +825,8 @@
     },
     "providerConnect": {
       "description": "اربط {{label}} الخاص بـ Kilo لمراجعة طلبات السحب تلقائيًا.",
+      "notConnectedTitle": "{{platform}} غير متصل",
+      "githubAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين فقط ربطه.",
       "githubApp": "تطبيق GitHub",
       "githubError": "تعذّر فتح صفحة إعداد GitHub. حاول مرة أخرى.",
       "gitlabAccount": "حساب GitLab",

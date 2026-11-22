@@ -1502,7 +1502,9 @@
       "githubError": "GitHub ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "gitlabAccount": "GitLab ਖਾਤਾ",
       "gitlabError": "GitLab ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।"
+      "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।",
+      "notConnectedTitle": "{{platform}} ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
+      "githubAdminOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।"
     },
     "overview": {
       "allAreas": "ਸਾਰੇ ਖੇਤਰ",

@@ -1530,7 +1530,9 @@
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
       "gitlabAccount": "el compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració."
+      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració.",
+      "notConnectedTitle": "{{platform}} no està connectat",
+      "githubAdminOnlyDescription": "Només els propietaris i els administradors de l'organització poden connectar-lo."
     },
     "overview": {
       "allAreas": "Totes les àrees",

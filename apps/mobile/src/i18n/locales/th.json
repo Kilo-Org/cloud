@@ -1502,7 +1502,9 @@
       "githubError": "ไม่สามารถเปิดหน้าตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง",
       "gitlabAccount": "บัญชี GitLab",
       "gitlabError": "ไม่สามารถเปิดหน้าตั้งค่า GitLab ได้ กรุณาลองอีกครั้ง",
-      "description": "เชื่อมต่อ{{label}}กับ Kilo เพื่อตรวจสอบ PR โดยอัตโนมัติ"
+      "description": "เชื่อมต่อ{{label}}กับ Kilo เพื่อตรวจสอบ PR โดยอัตโนมัติ",
+      "notConnectedTitle": "{{platform}} ยังไม่เชื่อมต่อ",
+      "githubAdminOnlyDescription": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่สามารถเชื่อมต่อได้"
     },
     "overview": {
       "allAreas": "ทุกด้าน",

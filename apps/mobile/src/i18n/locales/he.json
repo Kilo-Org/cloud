@@ -819,6 +819,8 @@
     },
     "providerConnect": {
       "description": "חבר את {{label}} של Kilo כדי לסקור בקשות משיכה אוטומטית.",
+      "notConnectedTitle": "{{platform}} לא מחובר",
+      "githubAdminOnlyDescription": "רק בעלי הארגון ומנהלים יכולים לחבר אותו.",
       "githubApp": "אפליקציית GitHub",
       "githubError": "לא ניתן לפתוח את הגדרות GitHub. נסה שוב.",
       "gitlabAccount": "חשבון GitLab",

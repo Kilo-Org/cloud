@@ -1502,7 +1502,9 @@
       "githubError": "An kasa buɗe saitin GitHub. Sake gwadawa.",
       "gitlabAccount": "asusun GitLab",
       "gitlabError": "An kasa buɗe saitin GitLab. Sake gwadawa.",
-      "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik."
+      "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik.",
+      "notConnectedTitle": "Ba a haɗa {{platform}} ba",
+      "githubAdminOnlyDescription": "Masu ƙungiya da masu gudanarwa kawai za su iya haɗa shi."
     },
     "overview": {
       "allAreas": "Duk fannoni",

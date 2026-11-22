@@ -1502,7 +1502,9 @@
       "githubError": "Ezin izan da GitHub-en konfigurazioa ireki. Saiatu berriro.",
       "gitlabAccount": "GitLab-eko kontua",
       "gitlabError": "Ezin izan da GitLab-en konfigurazioa ireki. Saiatu berriro.",
-      "description": "Konektatu Kiloren {{label}} bateratze-eskaerak automatikoki berrikusteko."
+      "description": "Konektatu Kiloren {{label}} bateratze-eskaerak automatikoki berrikusteko.",
+      "notConnectedTitle": "{{platform}} ez dago konektatuta",
+      "githubAdminOnlyDescription": "Erakundeko jabeek eta administratzaileek soilik konekta dezakete."
     },
     "overview": {
       "allAreas": "Eremu guztiak",

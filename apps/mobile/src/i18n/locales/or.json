@@ -1502,7 +1502,9 @@
       "githubError": "GitHub ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "gitlabAccount": "GitLab ଆକାଉଣ୍ଟ",
       "gitlabError": "GitLab ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "description": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକର ସ୍ୱୟଂଚାଳିତ ସମୀକ୍ଷା ପାଇଁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।"
+      "description": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକର ସ୍ୱୟଂଚାଳିତ ସମୀକ୍ଷା ପାଇଁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।",
+      "notConnectedTitle": "{{platform}} ସଂଯୋଗ ହୋଇନାହିଁ",
+      "githubAdminOnlyDescription": "କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ପ୍ରଶାସକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।"
     },
     "overview": {
       "allAreas": "ସମସ୍ତ କ୍ଷେତ୍ର",

@@ -1502,7 +1502,9 @@
       "githubError": "GitHub સેટઅપ ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
       "gitlabAccount": "GitLab એકાઉન્ટ",
       "gitlabError": "GitLab સેટઅપ ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
-      "description": "પુલ રિક્વેસ્ટની આપમેળે સમીક્ષા કરવા Kilo {{label}} જોડો."
+      "description": "પુલ રિક્વેસ્ટની આપમેળે સમીક્ષા કરવા Kilo {{label}} જોડો.",
+      "notConnectedTitle": "{{platform}} જોડાયેલું નથી",
+      "githubAdminOnlyDescription": "માત્ર સંસ્થાના માલિકો અને એડમિનો જ તેને જોડી શકે છે."
     },
     "overview": {
       "allAreas": "બધા ક્ષેત્રો",

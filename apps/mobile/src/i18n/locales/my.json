@@ -1502,7 +1502,9 @@
       "githubError": "GitHub ပြင်ဆင်မှု ဖွင့်၍ မရပါ။ ထပ်ကြိုးစားပါ။",
       "gitlabAccount": "GitLab အကောင့်",
       "gitlabError": "GitLab ပြင်ဆင်မှု ဖွင့်၍ မရပါ။ ထပ်ကြိုးစားပါ။",
-      "description": "PR များကို အလိုအလျောက် စစ်ဆေးရန် Kilo {{label}} ကို ချိတ်ဆက်ပါ။"
+      "description": "PR များကို အလိုအလျောက် စစ်ဆေးရန် Kilo {{label}} ကို ချိတ်ဆက်ပါ။",
+      "notConnectedTitle": "{{platform}} ကို ချိတ်ဆက်မထားပါ",
+      "githubAdminOnlyDescription": "အဖွဲ့အစည်း ပိုင်ရှင်များနှင့် စီမံခန့်ခွဲသူများသာ ချိတ်ဆက်နိုင်သည်။"
     },
     "overview": {
       "allAreas": "နယ်ပယ်အားလုံး",

@@ -1502,7 +1502,9 @@
       "githubError": "Nuk u hap konfigurimi i GitHub. Provo përsëri.",
       "gitlabAccount": "llogaria GitLab",
       "gitlabError": "Nuk u hap konfigurimi i GitLab. Provo përsëri.",
-      "description": "Lidh Kilo me {{label}} për të shqyrtuar automatikisht PR."
+      "description": "Lidh Kilo me {{label}} për të shqyrtuar automatikisht PR.",
+      "notConnectedTitle": "{{platform}} nuk është i lidhur",
+      "githubAdminOnlyDescription": "Vetëm pronarët e organizatës dhe administratorët mund ta lidhin."
     },
     "overview": {
       "allAreas": "Të gjitha fushat",

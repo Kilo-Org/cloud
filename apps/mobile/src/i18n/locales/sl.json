@@ -1558,7 +1558,9 @@
       "githubError": "Nastavitve povezave s platformo GitHub ni bilo mogoče odpreti. Poskusi znova.",
       "gitlabAccount": "račun GitLab",
       "gitlabError": "Nastavitve povezave s platformo GitLab ni bilo mogoče odpreti. Poskusi znova.",
-      "description": "Za samodejne preglede zahtev za združitev vzpostavi povezavo s Kilo prek možnosti {{label}}."
+      "description": "Za samodejne preglede zahtev za združitev vzpostavi povezavo s Kilo prek možnosti {{label}}.",
+      "notConnectedTitle": "{{platform}} ni povezan",
+      "githubAdminOnlyDescription": "Vzpostavijo jo lahko samo lastniki organizacije in skrbniki."
     },
     "overview": {
       "allAreas": "Vsa področja",

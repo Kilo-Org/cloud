@@ -821,6 +821,8 @@
     },
     "providerConnect": {
       "description": "Skonfiguruj połączenie z Kilo ({{label}}), aby automatycznie przeglądać PR.",
+      "notConnectedTitle": "Brak połączenia z {{platform}}",
+      "githubAdminOnlyDescription": "Tylko właściciele organizacji i administratorzy mogą je skonfigurować.",
       "githubApp": "aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
       "gitlabAccount": "konto GitLab",

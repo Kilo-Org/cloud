@@ -1502,7 +1502,9 @@
       "githubError": "د GitHub د تنظیم پاڼه پرانیستل نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
       "gitlabAccount": "د GitLab حساب",
       "gitlabError": "د GitLab د تنظیم پاڼه پرانیستل نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
-      "description": "د PR د اتوماتیکې بیاکتنې لپاره د Kilo {{label}} ونښلوئ."
+      "description": "د PR د اتوماتیکې بیاکتنې لپاره د Kilo {{label}} ونښلوئ.",
+      "notConnectedTitle": "{{platform}} نښلول شوی نه دی",
+      "githubAdminOnlyDescription": "یوازې د سازمان مالکان او مدیران کولی شي دا ونښلوي."
     },
     "overview": {
       "allAreas": "ټولې ساحې",

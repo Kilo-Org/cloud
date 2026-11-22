@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "连接 Kilo {{label}} 以自动审查拉取请求。",
+      "notConnectedTitle": "尚未连接 {{platform}}",
+      "githubAdminOnlyDescription": "只有组织所有者和管理员可以完成连接。",
       "githubApp": "GitHub 应用",
       "githubError": "无法打开 GitHub 配置页面。请重试。",
       "gitlabAccount": "GitLab 账户",

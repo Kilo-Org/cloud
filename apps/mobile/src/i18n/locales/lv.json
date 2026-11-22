@@ -1530,7 +1530,9 @@
       "githubError": "Neizdevās atvērt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz.",
       "gitlabAccount": "GitLab konts",
       "gitlabError": "Neizdevās atvērt GitLab iestatīšanu. Lūdzu, mēģini vēlreiz.",
-      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus."
+      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus.",
+      "notConnectedTitle": "{{platform}} nav pievienots",
+      "githubAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki un administratori."
     },
     "overview": {
       "allAreas": "Visas jomas",

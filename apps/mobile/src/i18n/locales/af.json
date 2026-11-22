@@ -1502,7 +1502,9 @@
       "githubError": "Die GitHub-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
       "gitlabAccount": "GitLab-rekening",
       "gitlabError": "Die GitLab-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
-      "description": "Koppel die Kilo {{label}} om trekversoeke outomaties te hersien."
+      "description": "Koppel die Kilo {{label}} om trekversoeke outomaties te hersien.",
+      "notConnectedTitle": "{{platform}} is nie gekoppel nie",
+      "githubAdminOnlyDescription": "Slegs organisasie-eienaars en administrateurs kan dit koppel."
     },
     "overview": {
       "allAreas": "Alle fokusareas",

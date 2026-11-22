@@ -1558,7 +1558,9 @@
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
       "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky."
+      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky.",
+      "notConnectedTitle": "{{platform}} nie je pripojený",
+      "githubAdminOnlyDescription": "Pripojiť ju môžu iba vlastníci organizácie a správcovia."
     },
     "overview": {
       "allAreas": "Všetky oblasti",

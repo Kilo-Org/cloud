@@ -1502,7 +1502,9 @@
       "githubError": "Չհաջողվեց բացել GitHub-ի կարգավորումը։ Կրկին փորձիր։",
       "gitlabAccount": "GitLab հաշիվ",
       "gitlabError": "Չհաջողվեց բացել GitLab-ի կարգավորումը։ Կրկին փորձիր։",
-      "description": "Միացրու Kilo-ի {{label}}-ը՝ pull request-ներն ավտոմատ ստուգելու համար։"
+      "description": "Միացրու Kilo-ի {{label}}-ը՝ pull request-ներն ավտոմատ ստուգելու համար։",
+      "notConnectedTitle": "{{platform}}-ը միացված չէ",
+      "githubAdminOnlyDescription": "Միայն կազմակերպության սեփականատերերը և ադմինիստրատորները կարող են այն միացնել։"
     },
     "overview": {
       "allAreas": "Բոլոր ոլորտները",

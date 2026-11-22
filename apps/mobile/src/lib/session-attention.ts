@@ -728,10 +728,18 @@ export type NeedsInputVisibility = 'show' | 'hold' | 'hide';
  * - `loading` — the ack store has not settled, so it answers "not acked" for
  *   every raise including one the person already dismissed: hold the
  *   affordance rather than draw a badge that would disappear a moment later.
- * - `failed` — settled and empty. Fail open: derive the badge from the server
- *   status alone. A missing ack can add a badge the person dismissed, but it
- *   can never suppress a genuine raise, and losing a raise is the worse error.
+ * - `failed` — the restored acks are unknowable, because the read failed and
+ *   never retries. An ack this run recorded is a different matter: the entry
+ *   map is authoritative for everything the process has learned, so a raise
+ *   the person answered after the failed read stays hidden. With no ack, the
+ *   badge derives from the server status alone — fail open, because a missing
+ *   ack may add a badge the person dismissed but can never suppress a genuine
+ *   raise.
  * - `ready` — hide only the raise the store knows was answered.
+ *
+ * `failed` therefore answers exactly as `ready` does; the phase stays distinct
+ * because consumers must know the read settled (so they stop holding) and
+ * because the failure itself is worth reporting.
  */
 export function needsInputVisibility({
   status,
@@ -747,9 +755,6 @@ export function needsInputVisibility({
   }
   if (!sessionNeedsInput(status)) {
     return 'hide';
-  }
-  if (hydration === 'failed') {
-    return 'show';
   }
   return isAcked ? 'hide' : 'show';
 }

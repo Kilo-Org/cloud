@@ -1,4 +1,5 @@
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
+import { whenSessionAttentionHydrationSettled } from '@/lib/session-attention';
 import { trpcClient } from '@/lib/trpc';
 
 import { whenAskBindingSettled } from './ask-binding';
@@ -6,6 +7,18 @@ import { resolveAnsweredRaises } from './attention-rows';
 import { createGlanceablePublisher } from './create-publisher';
 import { type GlanceablePublisherContext } from './publisher';
 import { getGlanceableSinks } from './sink-registry';
+
+/**
+ * How long this run waits for the session-attention ack store to hydrate before
+ * deriving. The store answers "not acked" for every raise while it loads, so a
+ * derive that beats it would republish a raise the person already answered. A
+ * fresh background process opens the encrypted KV on this run, so the wait is a
+ * cold KV open, not a network read: a couple of seconds covers it while keeping
+ * the periodic refresh well inside its OS budget, and a store that never
+ * settles still derives — an unhydrated read is the same answer every surface
+ * had before this wait existed.
+ */
+const ACK_HYDRATION_SETTLE_MS = 2000;
 
 /**
  * Read the tray once and publish it to every registered sink, for the periodic
@@ -17,8 +30,11 @@ import { getGlanceableSinks } from './sink-registry';
  * native surfaces this process did not start. It is built before the fetch:
  * it captures the terminal-blank epoch at construction, so a sign-out that
  * lands during the read wins the surface. The counts are the ack-resolved
- * ones, like every other republish path. A failed fetch rejects before any
- * write: the last published snapshot stays, and nothing is invented.
+ * ones, like every other republish path, and the derivation waits (bounded) for
+ * the session-attention store to hydrate: this process did not answer a raise,
+ * so before hydrating the store reads every raise as unanswered. A failed fetch
+ * rejects before any write: the last published snapshot stays, and nothing is
+ * invented.
  *
  * The task's process can end as soon as this resolves, so it waits for the
  * native start or terminal submission. A native failure rejects, which the
@@ -28,9 +44,12 @@ export async function publishTrayOnce(ctx: GlanceablePublisherContext): Promise<
   // One publisher per run: the binding wait below redraws it, and a
   // subscription would outlive the process in the module-level listener set.
   const publisher = createGlanceablePublisher({ context: ctx, redrawOnAskBound: false });
-  const { sessions } = await trpcClient.activeSessions.list.query(
-    buildActiveSessionsTrayInput(ctx.organizationId)
-  );
+  // The settle wait runs beside the read, so the ack store's KV open costs this
+  // run nothing when it is the slower of the two.
+  const [{ sessions }] = await Promise.all([
+    trpcClient.activeSessions.list.query(buildActiveSessionsTrayInput(ctx.organizationId)),
+    whenSessionAttentionHydrationSettled(ACK_HYDRATION_SETTLE_MS),
+  ]);
   publisher.handleSessions(resolveAnsweredRaises(sessions), ctx);
   // The surface reads the ask's request binding when it draws, and the select
   // above starts that read: wait for it and draw again, so the card this run

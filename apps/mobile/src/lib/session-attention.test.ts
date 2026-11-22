@@ -779,14 +779,40 @@ describe('hydration gating', () => {
 
     const hydration = getHydrationSnapshot();
     expect(hydration).toBe('failed');
-    // Settled and empty: the badge derives from the server status alone, for an
-    // ack it may have lost as much as for one it never held.
-    for (const isAcked of [false, true]) {
-      expect(needsInputVisibility({ status: 'question', hydration, isAcked })).toBe('show');
-      expect(needsInputVisibility({ status: 'permission', hydration, isAcked })).toBe('show');
-      expect(needsInputVisibility({ status: 'busy', hydration, isAcked })).toBe('hide');
-      expect(needsInputVisibility({ status: null, hydration, isAcked })).toBe('hide');
+    // No ack: the badge derives from the server status alone, for an ack the
+    // failed read lost as much as for one it never held.
+    for (const status of ['question', 'permission'] as const) {
+      expect(needsInputVisibility({ status, hydration, isAcked: false })).toBe('show');
     }
+    for (const status of ['busy', null] as const) {
+      expect(needsInputVisibility({ status, hydration, isAcked: false })).toBe('hide');
+    }
+    // An ack this run recorded still hides its raise: the entry map is
+    // authoritative for what the process has learned, and the phase never
+    // leaves `failed`, so ignoring it would keep the badge for the whole launch.
+    expect(needsInputVisibility({ status: 'question', hydration, isAcked: true })).toBe('hide');
+    expect(needsInputVisibility({ status: 'permission', hydration, isAcked: true })).toBe('hide');
+  });
+
+  it('hides a raise acked after a failed hydration, for the rest of the launch', async () => {
+    kvMock.getItem.mockRejectedValueOnce(new Error('corrupt'));
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('failed');
+
+    ackSessionAttention('s1', 'question', 'R1');
+
+    // The phase is settled and never retried, so the in-memory ack is the only
+    // answer available; it must suppress the raise exactly as it does at ready.
+    expect(getHydrationSnapshot()).toBe('failed');
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
+    expect(
+      needsInputVisibility({
+        status: 'question',
+        hydration: getHydrationSnapshot(),
+        isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
+      })
+    ).toBe('hide');
   });
 
   it.each([
@@ -801,7 +827,10 @@ describe('hydration gating', () => {
 
     const hydration = getHydrationSnapshot();
     expect(hydration).toBe('failed');
-    expect(needsInputVisibility({ status: 'question', hydration, isAcked: true })).toBe('show');
+    expect(needsInputVisibility({ status: 'question', hydration, isAcked: false })).toBe('show');
+    // A raise acked this run stays hidden even though the restored blob was
+    // unreadable: the in-memory entry is the only ack answer this launch has.
+    expect(needsInputVisibility({ status: 'question', hydration, isAcked: true })).toBe('hide');
     expect(needsInputVisibility({ status: 'busy', hydration, isAcked: false })).toBe('hide');
   });
 

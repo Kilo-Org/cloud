@@ -30,6 +30,8 @@ const MODEL_PROVIDER_ROUTES: Record<string, string[]> = {
   'allowed/model': ['openai'],
   'blocked-provider/model': ['anthropic'],
   'unknown-routes/model': [],
+  // A router has no provider of its own: only the snapshot-only virtual provider lists it.
+  'router/auto': ['virtual'],
 };
 
 const providerLookup = async (modelId: string) => new Set(MODEL_PROVIDER_ROUTES[modelId] ?? []);
@@ -122,6 +124,8 @@ describe('legacy organization restrictions with no groups or policies', () => {
       'allowed/model': true,
       'blocked-provider/model': false,
       'unknown-routes/model': false,
+      // `virtual` permits no real provider here, so the router has nowhere to route.
+      'router/auto': false,
     });
 
     // Reading policy must not materialize a settings row or invent a revision.
@@ -165,6 +169,7 @@ describe('legacy organization restrictions with no groups or policies', () => {
       'allowed/model': true,
       'blocked-provider/model': true,
       'unknown-routes/model': false,
+      'router/auto': true,
     });
   });
 
@@ -182,6 +187,53 @@ describe('legacy organization restrictions with no groups or policies', () => {
       'allowed/model': true,
       'blocked-provider/model': true,
       'unknown-routes/model': true,
+      'router/auto': true,
     });
+  });
+
+  it('admits a virtual router for both engines when the allow list pairs it with a real provider', async () => {
+    const { owner, organization } = await seedLegacyOrganization(
+      'Legacy Enterprise Virtual Router',
+      {
+        provider_allow_list: ['virtual', 'openai'],
+      }
+    );
+
+    const { policy, legacy } = await expectParityWithLegacyPredicate(organization, owner.id);
+    const routerDecision = await getEffectiveModelDecision(policy, 'router/auto', providerLookup);
+
+    expect(legacy['router/auto']).toBe(true);
+    expect(routerDecision.allowed).toBe(true);
+    expect([...(routerDecision.eligibleProviderRoutes ?? [])].sort()).toEqual([
+      'openai',
+      'virtual',
+    ]);
+  });
+
+  it('denies a virtual router for both engines when the allow list has no real provider', async () => {
+    const { owner, organization } = await seedLegacyOrganization('Legacy Enterprise Router Only', {
+      provider_allow_list: ['virtual'],
+    });
+
+    const { policy, legacy } = await expectParityWithLegacyPredicate(organization, owner.id);
+    const routerDecision = await getEffectiveModelDecision(policy, 'router/auto', providerLookup);
+
+    // Allowing `virtual` alone gives the router nowhere to route, so neither
+    // engine may admit it.
+    expect(legacy['router/auto']).toBe(false);
+    expect(routerDecision).toEqual({ allowed: false, denialSource: 'organization_provider' });
+  });
+
+  it('denies a virtual router for both engines when the allow list omits it', async () => {
+    const { owner, organization } = await seedLegacyOrganization(
+      'Legacy Enterprise Without Virtual',
+      { provider_allow_list: ['openai'] }
+    );
+
+    const { policy, legacy } = await expectParityWithLegacyPredicate(organization, owner.id);
+    const routerDecision = await getEffectiveModelDecision(policy, 'router/auto', providerLookup);
+
+    expect(legacy['router/auto']).toBe(false);
+    expect(routerDecision.allowed).toBe(false);
   });
 });

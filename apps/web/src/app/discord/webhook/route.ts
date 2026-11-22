@@ -176,7 +176,21 @@ async function processGatewayMessage(event: ForwardedGatewayEvent) {
     // The processing reaction was added before the model call, so it is removed
     // here too: this return ends the work for the message, and the hourglass
     // would otherwise stay on it with nothing left to replace it.
-    await removeDiscordReaction(channelId, messageId, PROCESSING_EMOJI);
+    let removal = await removeDiscordReaction(channelId, messageId, PROCESSING_EMOJI);
+    // A 429, a 5xx, or a transport error leaves the reaction in place, so the
+    // removal gets the same single retry as the reply path below.
+    if (!removal.ok) {
+      removal = await removeDiscordReaction(channelId, messageId, PROCESSING_EMOJI);
+    }
+    if (!removal.ok) {
+      // No reply follows, so the operator report is the only record of the
+      // hourglass that stayed on the message.
+      console.error('[DiscordBot:Webhook] Failed to remove processing reaction', {
+        guildId,
+        messageId,
+        error: removal.error,
+      });
+    }
     return;
   }
 

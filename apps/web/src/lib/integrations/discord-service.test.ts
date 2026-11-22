@@ -977,7 +977,8 @@ describe('discord-service guild membership probe', () => {
 describe('discord-service guild row discard', () => {
   const guildId = '123456789012345678';
   const otherOwner = { type: 'user', id: 'user-2' } satisfies Owner;
-  const ids = ['integration-1'];
+  const updatedAt = '2026-11-22T10:00:00.000Z';
+  const row = { id: 'integration-1', updatedAt };
   const lockState = { depth: 0 };
   const mockDiscardReturning = jest.fn();
 
@@ -1008,10 +1009,10 @@ describe('discord-service guild row discard', () => {
     });
   });
 
-  it('names the owner, the server, and the observed ids in the delete', async () => {
+  it('names the owner, the server, the row, and its write in the delete', async () => {
     mockDiscardReturning.mockResolvedValue([{ id: 'integration-1' }]);
 
-    await expect(discardDiscordGuildRows(owner, guildId, ids)).resolves.toBe(1);
+    await expect(discardDiscordGuildRows(owner, guildId, row)).resolves.toBe(1);
 
     const predicate = mockDeleteWhere.mock.calls[0]?.[0];
     const rendered = new PgDialect().sqlToQuery(predicate as SQL);
@@ -1020,13 +1021,15 @@ describe('discord-service guild row discard', () => {
     expect(rendered.params).toContain(owner.id);
     expect(rendered.params).not.toContain(otherOwner.id);
     expect(rendered.params).toContain('integration-1');
+    expect(rendered.params).toContain(updatedAt);
     expect(rendered.sql).toContain('"platform_installation_id"');
     expect(rendered.sql).toContain('"platform_account_id"');
     expect(rendered.sql).toContain('"owned_by_user_id"');
     expect(rendered.sql).toContain('"owned_by_organization_id"');
-    // Only the rows the caller observed, so a connect that commits during the
-    // probe keeps its row.
-    expect(rendered.sql).toContain('"id" in');
+    // Only the write the caller observed, so a connect that commits during the
+    // probe keeps the row it wrote, even when a re-authorization keeps the id.
+    expect(rendered.sql).toContain('"id" =');
+    expect(rendered.sql).toContain('"updated_at" =');
   });
 
   it('takes the connect owner and server locks before the delete', async () => {
@@ -1036,7 +1039,7 @@ describe('discord-service guild row discard', () => {
     });
     mockDiscardReturning.mockResolvedValue([{ id: 'integration-1' }]);
 
-    await discardDiscordGuildRows(owner, guildId, ids);
+    await discardDiscordGuildRows(owner, guildId, row);
 
     const statements = mockTxExecute.mock.calls.map(([statement]) => statementText(statement));
     const ownerLock = `integration-installation-owner:discord:user:${owner.id}`;
@@ -1045,22 +1048,20 @@ describe('discord-service guild row discard', () => {
     expect(deleteDepths).toEqual([1]);
   });
 
-  it('reports how many rows it removed', async () => {
-    mockDiscardReturning.mockResolvedValue([{ id: 'integration-1' }, { id: 'legacy-row' }]);
+  it('reports the row it removed', async () => {
+    mockDiscardReturning.mockResolvedValue([{ id: 'integration-1' }]);
 
-    await expect(
-      discardDiscordGuildRows(owner, guildId, ['integration-1', 'legacy-row'])
-    ).resolves.toBe(2);
+    await expect(discardDiscordGuildRows(owner, guildId, row)).resolves.toBe(1);
   });
 
   it('reports no removal when the owner records no such row', async () => {
     mockDiscardReturning.mockResolvedValue([]);
 
-    await expect(discardDiscordGuildRows(owner, guildId, ids)).resolves.toBe(0);
+    await expect(discardDiscordGuildRows(owner, guildId, row)).resolves.toBe(0);
   });
 
-  it('deletes nothing and takes no lock when it observed no row', async () => {
-    await expect(discardDiscordGuildRows(owner, guildId, [])).resolves.toBe(0);
+  it('deletes nothing and takes no lock when the row names no id', async () => {
+    await expect(discardDiscordGuildRows(owner, guildId, { id: '', updatedAt })).resolves.toBe(0);
 
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockDeleteWhere).not.toHaveBeenCalled();

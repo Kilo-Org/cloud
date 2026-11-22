@@ -269,10 +269,23 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
 
       if (presence.status === 'absent') {
         // The row the write returned is the one this connect may discard, so the
-        // discard names it and not every row of the same owner and server.
-        const discarded = await discardDiscordGuildRows(owner, recordedGuildId, [
-          installation.integration.id,
-        ]);
+        // discard names that write and not every row of the same owner and server.
+        let discarded: number | undefined;
+        try {
+          discarded = await discardDiscordGuildRows(owner, recordedGuildId, {
+            id: installation.integration.id,
+            updatedAt: installation.integration.updated_at,
+          });
+        } catch (error) {
+          // The connection write has committed and the one-shot OAuth attempt is
+          // consumed, so a discard that cannot settle is reported rather than
+          // turned into a failed connect. The redirect below is the same either
+          // way; only the operator report differs.
+          captureException(error, {
+            tags: { source: 'discord_oauth', op: 'connect_membership_discard' },
+            extra: { guildId: recordedGuildId, rowId: installation.integration.id },
+          });
+        }
         captureException(new Error('Discord connect recorded a server without the bot'), {
           tags: { source: 'discord_oauth', op: 'connect_membership_check' },
           extra: { guildId: recordedGuildId, outcome: presence.status, discarded },

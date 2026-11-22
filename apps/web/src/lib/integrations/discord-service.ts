@@ -3,7 +3,7 @@ import { captureException } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, inArray, isNull, or, sql } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -648,17 +648,31 @@ export async function probeBotInGuild(
 }
 
 /**
- * Delete the rows `ids` name for this owner and server, and report how many were
- * removed.
+ * The row a connect wrote, as the write returned it. `updatedAt` is part of the
+ * identity because a re-authorization updates the row in place, so the id alone
+ * does not say which write the row carries.
+ */
+export type DiscordDiscardTarget = {
+  readonly id: string;
+  readonly updatedAt: string;
+};
+
+/**
+ * Delete the row `row` names for this owner and server, and report how many rows
+ * were removed.
  *
  * The connect path calls this once it has proven the bot is not in the server
- * those rows record: such a row describes a connection that cannot act, so it is
- * discarded. `ids` are the rows the caller observed, because the probe that
- * settled the question runs after the connect lock was released, and a connect
- * by the same owner to the same server can commit while it runs. The delete
- * therefore takes the connect's owner and server locks, and names those ids, so
- * every condition is re-checked under the lock and a row that committed in
- * between is left alone.
+ * that row records: such a row describes a connection that cannot act, so it is
+ * discarded. `row` is the row the write returned, because the probe that settled
+ * the question runs after the connect lock was released, and a connect by the
+ * same owner to the same server can commit while it runs. A re-authorization
+ * updates the row in place and keeps its id, so the id alone does not name the
+ * write: the id with the `updated_at` that write returned does, and a later
+ * write bumps that column.
+ *
+ * The delete therefore takes the connect's owner and server locks, and names
+ * that id with that timestamp, so every condition is re-checked under the lock
+ * and a row a connect wrote in between is left alone.
  *
  * The remaining conditions are the disconnect's, so a legacy row that carries
  * the server id only in `platform_account_id` goes with the canonical one, and
@@ -669,9 +683,11 @@ export async function probeBotInGuild(
 export async function discardDiscordGuildRows(
   owner: Owner,
   guildId: string,
-  ids: string[]
+  row: DiscordDiscardTarget
 ): Promise<number> {
-  if (ids.length === 0) {
+  // A row without an id names no row, so there is nothing to delete and no lock
+  // to take.
+  if (!row.id) {
     return 0;
   }
 
@@ -687,7 +703,8 @@ export async function discardDiscordGuildRows(
             eq(platform_integrations.platform, PLATFORM.DISCORD),
             recordsDiscordGuildCondition(guildId),
             ...getOwnershipConditions(owner),
-            inArray(platform_integrations.id, ids)
+            eq(platform_integrations.id, row.id),
+            eq(platform_integrations.updated_at, row.updatedAt)
           )
         )
         .returning({ id: platform_integrations.id });

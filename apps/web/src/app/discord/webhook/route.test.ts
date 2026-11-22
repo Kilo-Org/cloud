@@ -233,6 +233,49 @@ describe('Discord forwarded message admission', () => {
     expect(removeDiscordReaction).toHaveBeenCalledWith(CHANNEL_ID, MESSAGE_ID, '\u23f3');
   });
 
+  it('retries the hourglass removal once when the bot reports an inactive installation', async () => {
+    jest.mocked(processDiscordBotMessage).mockResolvedValueOnce({
+      response: '',
+      modelUsed: '',
+      toolCallsMade: [],
+      error: 'installation_not_active',
+      installation: discordInstallation(),
+    });
+    jest
+      .mocked(removeDiscordReaction)
+      .mockResolvedValueOnce({ ok: false, error: 'rate limited' })
+      .mockResolvedValueOnce({ ok: true });
+
+    expect((await deliver(makeEvent())).status).toBe(200);
+    await finishBackgroundWork();
+
+    expect(removeDiscordReaction).toHaveBeenCalledTimes(2);
+    expect(removeDiscordReaction).toHaveBeenCalledWith(CHANNEL_ID, MESSAGE_ID, '\u23f3');
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('reports the hourglass that stayed when the retry also fails', async () => {
+    jest.mocked(processDiscordBotMessage).mockResolvedValueOnce({
+      response: '',
+      modelUsed: '',
+      toolCallsMade: [],
+      error: 'installation_not_active',
+      installation: discordInstallation(),
+    });
+    jest.mocked(removeDiscordReaction).mockResolvedValue({ ok: false, error: 'rate limited' });
+
+    expect((await deliver(makeEvent())).status).toBe(200);
+    await finishBackgroundWork();
+
+    expect(removeDiscordReaction).toHaveBeenCalledTimes(2);
+    // Nothing replaces the hourglass, so the failed removal is the operator's
+    // only record of it.
+    expect(console.error).toHaveBeenCalledWith(
+      '[DiscordBot:Webhook] Failed to remove processing reaction',
+      { guildId: GUILD_ID, messageId: MESSAGE_ID, error: 'rate limited' }
+    );
+  });
+
   it('processes concurrent deliveries of one message only once', async () => {
     const responses = await Promise.all(Array.from({ length: 8 }, () => deliver(makeEvent())));
     expect(responses.map(response => response.status)).toEqual(Array(8).fill(200));

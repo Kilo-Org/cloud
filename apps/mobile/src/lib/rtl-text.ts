@@ -542,7 +542,8 @@ function withoutRuns(line: string, runs: readonly (readonly [number, number])[])
  * a time and drops the mark runs in front of it. Once a token is not
  * recognised, the rest is the block's text, whose marks order the runs they
  * were written for and stay: markup this walk does not know (an HTML tag, say)
- * ends it there for the same reason.
+ * ends it there for the same reason. A reference link's label is the one shape
+ * whose mark survives (`pastLinkOpener`).
  */
 function stripLineMarks(line: string, at: number, listItem: boolean): string {
   const runs: [number, number][] = [];

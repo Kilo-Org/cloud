@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { z } from 'zod';
 import { LOCAL_AGENT_ERROR_CODES } from '../../src/shared/local-agents/jsonrpc';
+import { DISPOSE_BROWSER_CALLER_MESSAGE } from '../../src/shared/tab-debugger';
 import { ONCE_DOWNLOAD_PATH, startDownloadFixture } from './download-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 import { startFakeHub } from './local-agents-hub-fixture';
@@ -31,19 +32,14 @@ import {
  *    approval in the hold.
  * 4. The record and the real downloads folder then say what the session left behind.
  *
- * `HOLD_CLOSED_SESSION_EXPECT` names the build this run asserts facts for.
- *
  * The attachment's route answers one request and redirects every later one, so step 3 keeps
- * no file: the folder stays empty in both builds, which is asserted rather than assumed.
+ * no file: the folder stays empty, which is asserted rather than assumed.
  * That the repeat really ran is a fact of the same record: its step names the repeat's own
  * navigation, and its `need` is the approval that navigation armed.
+ *
+ * The same spec fails against the merge-base build, where the record still holds the closed
+ * session: that comparison is a manual checkout of the merge base, a rebuild, and a rerun.
  */
-
-/** The build whose assertions this run makes: the reviewed change, or the merge base. */
-const EXPECTED_BUILD = process.env['HOLD_CLOSED_SESSION_EXPECT'] ?? 'head';
-
-/** The panel message that disposes one browser caller, as `@/src/shared/tab-debugger` declares it. */
-const DISPOSE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.disposeBrowserCaller';
 
 /** The grant set this spec's calls carry: the fixture page's own origin. */
 const grant = (origin: string) => [
@@ -264,22 +260,11 @@ test('a session whose browser caller was disposed keeps no tab or approval of it
     expect(repeat.kind === 'result' ? repeat.text : '').toContain(`${origin}/page`);
     expect(fixture.onceHits()).toBe(2);
 
-    if (EXPECTED_BUILD === 'base') {
-      // The writes of step 3 register a tab and an approval for the session, so the record names
-      // It again with that tab and that approval, and its step is the repeat's own navigation
-      // Rather than the guarded call before the close.
-      const entry = holdRecordOf(record)[session.sessionHandle];
+    // The close is what the record ends with: it holds no entry for the disposed session.
+    expect(holdRecordOf(record)[session.sessionHandle]).toBeUndefined();
+    expect(Object.keys(holdRecordOf(record))).toStrictEqual([]);
 
-      expect(entry).toBeDefined();
-      expect(entry?.need?.kind).toBe('armed');
-      expect(entry?.tabs.map(tab => tab.tabId)).toStrictEqual([session.tabId]);
-    } else {
-      // The close is what the record ends with: it holds no entry for the disposed session.
-      expect(holdRecordOf(record)[session.sessionHandle]).toBeUndefined();
-      expect(Object.keys(holdRecordOf(record))).toStrictEqual([]);
-    }
-
-    // The repeat's own request is answered with a page, so no file was written either way.
+    // The repeat's own request is answered with a page, so no file was written at all.
     await expectNothingSaved(downloadsPath);
   } finally {
     await launch.close();

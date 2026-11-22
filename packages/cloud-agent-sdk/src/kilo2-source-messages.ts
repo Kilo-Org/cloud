@@ -278,24 +278,16 @@ export function readKilo2Messages(
                     ? file.uri
                     : undefined;
             if (uri === undefined) return [];
-            // Empty bytes are the one absent case: they emit no part rather than a
-            // zero-byte one. A permanent reference is withheld the same way, while a
-            // recoverable one keeps the throwing contract (call sites gate it first).
-            if (file.data === '') {
-              if (!isInlineDataUri(uri)) return [];
-              return [
-                {
-                  ...base,
-                  id,
-                  messageID: message.id,
-                  type: 'file' as const,
-                  mime: file.mime,
-                  url: uri,
-                  ...(file.name === undefined ? {} : { filename: file.name }),
-                },
-              ];
-            }
-            const url = fileURL({ id, uri, mime: file.mime, fileIndex: index });
+            // Empty bytes are absent bytes: a `data:` url of nothing would be a zero-byte
+            // file, so such a file renders only from an inline source uri or its authorized
+            // mapping, and otherwise emits no part. A file with real bytes falls through to
+            // the reference rules below.
+            const url =
+              file.data === ''
+                ? isInlineDataUri(uri)
+                  ? uri
+                  : options.assetURLs?.[kilo2AssetKey(id, uri, file.mime)]
+                : fileURL({ id, uri, mime: file.mime, fileIndex: index });
             if (url === undefined) return [];
             return [
               {

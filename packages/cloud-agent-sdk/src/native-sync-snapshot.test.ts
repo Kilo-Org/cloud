@@ -3,6 +3,7 @@ import { NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import {
   readKilo2Messages,
   hasUnresolvedKilo2Assets,
+  kilo2MessageFileId,
   kilo2ToolFileId,
   kilo2AssetKey,
 } from './kilo2-source-messages';
@@ -1269,6 +1270,18 @@ describe('native user file display fallbacks', () => {
     expect(hasUnresolvedKilo2Assets(message)).toBe(true);
     expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
       { id: kilo2PartId(message.id, 0), type: 'text' },
+    ]);
+    // Once that reference is authorized, its bytes are the display: the empty `data:` never
+    // becomes a zero-byte file, and the authorized mapping still renders a part.
+    const id = kilo2MessageFileId(message.id, 0);
+    const url = 'data:image/png;base64,AQID';
+    expect(
+      readKilo2Messages(session, [message], {
+        assetURLs: { [kilo2AssetKey(id, `media:${'a'.repeat(64)}`, 'image/png')]: url },
+      })[0]?.parts
+    ).toMatchObject([
+      { id: kilo2PartId(message.id, 0), type: 'text' },
+      { id, type: 'file', url },
     ]);
   });
 });

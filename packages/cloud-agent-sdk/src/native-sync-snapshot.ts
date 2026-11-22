@@ -347,7 +347,8 @@ async function resolveSnapshotAssets(
       if (
         !mapping ||
         mapping.reference !== file.uri ||
-        mapping.mime !== file.mime ||
+        // An absent mapping MIME makes no claim about the type; a stated one must agree.
+        (mapping.mime !== undefined && mapping.mime !== file.mime) ||
         (file.uri.startsWith('media:') && file.uri !== `media:${mapping.blob.hash}`)
       ) {
         unavailable.add(kilo2AssetKey(file.id, file.uri, file.mime));

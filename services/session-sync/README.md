@@ -157,8 +157,9 @@ deadlines/cancellation/revision recovery, and deduplicate bytes by blob hash.
 No native local path, raw media URI or credential-bearing service URL is exposed
 as an attachment URL. The sidecar `assetURLs` contains actual downloaded bytes as
 data URLs keyed by `kilo2AssetKey(displayFileID, originalURI, mime)`; canonical native
-messages and asset entities remain unchanged. Missing/mismatched mappings fail
-explicitly rather than silently dropping a file or making an unauthenticated fetch.
+messages and asset entities remain unchanged. A missing or mismatched mapping never
+authorizes a download and never triggers an unauthenticated fetch: the reference is
+reported as unavailable and only its own file part is withheld.
 
 The shared projector exposes every completed/errored native tool image/document
 as an ordinary message FilePart, so specialized tool cards cannot hide files and

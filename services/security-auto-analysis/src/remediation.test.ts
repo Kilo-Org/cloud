@@ -244,6 +244,50 @@ describe('security remediation launch contract', () => {
       'Create and check out branch security-remediation/handlebars-ghsa-765h-qjxv-5f44/b04cabeb31-1 from the current checkout'
     );
   });
+
+  it('names the file form of the commit and the pull request body', () => {
+    const prompt = buildRemediationPrompt({
+      finding: {
+        repo_full_name: 'Kilo-Org/security-agent-testbed',
+        package_name: 'handlebars',
+        package_ecosystem: 'npm',
+        severity: 'critical',
+        dependency_scope: 'runtime',
+        cve_id: null,
+        ghsa_id: 'GHSA-765h-qjxv-5f44',
+        title: 'Prototype Pollution in handlebars',
+        vulnerable_version_range: '<4.7.7',
+        patched_version: '4.7.7',
+        manifest_path: 'package-lock.json',
+        analysis: {
+          sandboxAnalysis: { isExploitable: 'unknown', suggestedAction: 'manual_review' },
+        },
+      } as never,
+      branchName: 'security-remediation/handlebars-ghsa-765h-qjxv-5f44/b04cabeb31-1',
+      findingUrl: 'https://app.kilo.ai/security-agent/findings?findingId=finding-1',
+    });
+
+    // The policy refuses a command that carries a quote character, so the prompt
+    // must name the file form of both commands it requires.
+    expect(prompt).toContain('git commit -F /tmp/commit-message.txt');
+    // The message file lives outside the checkout, and staging stays explicit.
+    expect(prompt).toContain('outside the checkout');
+    expect(prompt).toContain('do not use git add -A');
+    // The backlink travels in the commit message, because the pull request body
+    // comes from that commit.
+    expect(prompt).toContain('Put the summary and the Kilo finding backlink');
+    // The push names the branch with no option, and the create command names the
+    // pushed branch so it needs no upstream.
+    expect(prompt).toContain(
+      'git push origin security-remediation/handlebars-ghsa-765h-qjxv-5f44/b04cabeb31-1'
+    );
+    expect(prompt).toContain(
+      '--head security-remediation/handlebars-ghsa-765h-qjxv-5f44/b04cabeb31-1'
+    );
+    // The create command is named, and the draft choice stays conditional.
+    expect(prompt).toContain('gh pr create --fill --head');
+    expect(prompt).toContain('Add --draft only when validation is incomplete');
+  });
 });
 
 describe('security lifecycle event mapping', () => {

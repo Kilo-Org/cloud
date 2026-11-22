@@ -8,7 +8,7 @@ import {
 import { fetchNativeSnapshot, type NativeSnapshot } from './native-sync-snapshot';
 import type * as NativeSnapshotModule from './native-sync-snapshot';
 import { kilo2AssetKey, kilo2MessageFileId } from './kilo2-source-messages';
-import { NATIVE_SYNC_TICKET_MINT_DEADLINE_MS } from './limits';
+import { NATIVE_SYNC_REQUEST_DEADLINE_MS, NATIVE_SYNC_TICKET_MINT_DEADLINE_MS } from './limits';
 import { readNativeConversation } from './native-conversation-source';
 import { z } from 'zod';
 
@@ -81,8 +81,22 @@ const hello = (runnerConnected = true) => ({
   reauthAt: new Date(Date.now() + 60_000).toISOString(),
   expiresAt: new Date(Date.now() + 90_000).toISOString(),
 });
+/** Drains enough microtask hops to reach the socket: the mint crosses the bounded credential lookup. */
 async function flush() {
-  for (let index = 0; index < 25; index++) await Promise.resolve();
+  for (let index = 0; index < 60; index++) await Promise.resolve();
+}
+/** Records how a promise settles without leaving its rejection unhandled. */
+function trackOutcome(operation: Promise<unknown>) {
+  const state = { code: 'pending' };
+  void operation.then(
+    () => {
+      state.code = 'resolved';
+    },
+    (error: { code?: string }) => {
+      state.code = error.code ?? 'failed';
+    }
+  );
+  return state;
 }
 function fixture(respond?: (path: string) => Promise<Response> | undefined) {
   const calls: {
@@ -2753,16 +2767,25 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
   const ordinary = fetcher.getMockImplementation();
   if (!ordinary) throw new Error('Missing fetch fixture');
   const authorizations: (string | null)[] = [];
-  let assetCalls = 0;
+  const signals: (AbortSignal | null | undefined)[] = [];
   const controller = new AbortController();
+  let assetCalls = 0;
+  let holdAsset = false;
+  let heldAsset: (response: Response) => void = () => {};
   fetcher.mockImplementation(async (input, init) => {
     if (!new URL(String(input)).pathname.endsWith('/blobs/owned')) return ordinary(input, init);
     authorizations.push(new Headers(init?.headers).get('Authorization'));
-    expect(init?.signal).toBe(controller.signal);
+    signals.push(init?.signal);
+    // The exchange owns the signal it hands the fetcher; caller cancellation reaches it through
+    // a listener, so the caller's own signal is not the one on the wire.
+    expect(init?.signal?.aborted).toBe(false);
     assetCalls++;
-    return assetCalls === 1
-      ? Response.json({ error: { code: 'expired' } }, { status: 401 })
-      : new Response(new Uint8Array([1, 2, 3]).buffer);
+    if (assetCalls === 1) return Response.json({ error: { code: 'expired' } }, { status: 401 });
+    if (holdAsset)
+      return new Promise<Response>(resolve => {
+        heldAsset = resolve;
+      });
+    return new Response(new Uint8Array([1, 2, 3]).buffer);
   });
   const expected: NativeSnapshot = {
     position: 1,
@@ -2790,11 +2813,29 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
     await readAsset('/v1/sessions/ses_a/blobs/owned', 3, { signal });
     return expected;
   });
+  holdAsset = true;
+  const stalled = client.getSnapshot('ses_a', 'organization-owned', controller.signal);
+  let settled = 'pending';
+  void stalled.then(
+    () => {
+      settled = 'resolved';
+    },
+    (error: { code?: string }) => {
+      settled = error.code ?? 'failed';
+    }
+  );
+  await flush();
+  expect(assetCalls).toBe(3);
+  const wire = signals[signals.length - 1];
+  expect(wire?.aborted).toBe(false);
   controller.abort();
-  await expect(
-    client.getSnapshot('ses_a', 'organization-owned', controller.signal)
-  ).rejects.toMatchObject({ code: 'request_canceled' });
-  expect(assetCalls).toBe(2);
+  await flush();
+  expect(settled).toBe('request_canceled');
+  expect(wire?.aborted).toBe(true);
+  await expect(stalled).rejects.toMatchObject({ code: 'request_canceled' });
+  heldAsset(new Response(new Uint8Array([1, 2, 3]).buffer));
+  await flush();
+  expect(assetCalls).toBe(3);
 });
 
 /** One stored attachment page; `advertisedBytes` is what the mapping authorizes. */
@@ -3240,4 +3281,464 @@ test('a later missing terminal tool frame keeps its own frontier while an earlie
   expect(state?.pendingSnapshotMessageIDs).toEqual([]);
   expect(state?.error).toBeUndefined();
   connection.close();
+});
+
+test('a response whose body never arrives times out like a stalled connect', async () => {
+  // Both halves stall after the headers: the success path reads JSON, and the failing status
+  // path reads an error body before it can report the status.
+  const neverEnding = () => new ReadableStream({ start() {} });
+  let stallBody = true;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange')
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (!stallBody) return Response.json({ items: [], cursor: null });
+    if (path === '/v1/sessions') return new Response(neverEnding());
+    return new Response(neverEnding(), { status: 503 });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  const first = trackOutcome(client.listSessions());
+  await flush();
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(first.code).toBe('request_timeout');
+  // A different path reaches the failing status, whose error body stalls the same way.
+  const failing = trackOutcome(client.request('/v1/sessions/ses_a/commands'));
+  await flush();
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(failing.code).toBe('request_timeout');
+  stallBody = false;
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+});
+
+test('a response that arrives after the deadline releases its body', async () => {
+  // A fetcher that ignores the abort signal still answers. The late body must be canceled then,
+  // not left open until the collector reclaims the stream.
+  const cancel = jest.fn(async () => {});
+  let release: (response: Response) => void = () => {};
+  const held = new Promise<Response>(resolve => {
+    release = resolve;
+  });
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange')
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    return held;
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  const call = client.listSessions();
+  const settled = trackOutcome(call);
+  await flush();
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(settled.code).toBe('request_timeout');
+  expect(cancel).not.toHaveBeenCalled();
+  release(new Response(new ReadableStream({ cancel })));
+  await flush();
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
+
+test('a stalled grant exchange times out, aborts its request, and is replaced on the next call', async () => {
+  let exchanges = 0;
+  let stallExchange = true;
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const fetcher = jest.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      exchanges++;
+      signals.push(init?.signal);
+      if (stallExchange) return new Promise<Response>(() => {});
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  const call = client.listSessions();
+  const settled = trackOutcome(call);
+  await flush();
+  const wire = signals[0];
+  expect(wire?.aborted).toBe(false);
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(settled.code).toBe('request_timeout');
+  // The deadline reaches the request itself, not just the promise waiting on it.
+  expect(wire?.aborted).toBe(true);
+  await expect(call).rejects.toMatchObject({ code: 'request_timeout' });
+  // A cached rejected promise would answer the second call without a new exchange.
+  stallExchange = false;
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(exchanges).toBe(2);
+});
+
+test('a stalled credential lookup times out and leaves the grant cache', async () => {
+  // The credential is fetched before the exchange, so a lookup that never settles would leave
+  // the cached mint pending forever and every later caller would join it. The lookup is bounded
+  // by the same deadline, and its failure evicts the entry so the next call mints again.
+  let exchanges = 0;
+  let release: (credential: string) => void = () => {};
+  let captured: AbortSignal | undefined;
+  // ES2022/Hermes consumers do not provide Promise.withResolvers.
+  const held = new Promise<string>(resolve => {
+    release = resolve;
+  });
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      exchanges++;
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: signal => {
+      captured = signal;
+      return held;
+    },
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  const call = client.listSessions();
+  const settled = trackOutcome(call);
+  await flush();
+  // No exchange is attempted while the credential is unread.
+  expect(settled.code).toBe('pending');
+  expect(exchanges).toBe(0);
+  expect(captured).toBeInstanceOf(AbortSignal);
+  expect(captured?.aborted).toBe(false);
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(settled.code).toBe('request_timeout');
+  // The deadline aborts the signal the source received, so its own request can stop too.
+  expect(captured?.aborted).toBe(true);
+  await expect(call).rejects.toMatchObject({ code: 'request_timeout' });
+  release('kilo-credential');
+  // The dead entry left the cache, so this call mints once more instead of joining it.
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(exchanges).toBe(1);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+test('a healthy credential lookup receives a signal that is never aborted', async () => {
+  // The signal is a deadline, not a cancellation of a working lookup, so a mint that finishes
+  // in time must hand the source a signal that stays live only until the timer is cleared.
+  let captured: AbortSignal | undefined;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: signal => {
+      captured = signal;
+      return Promise.resolve('kilo-credential');
+    },
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(captured).toBeInstanceOf(AbortSignal);
+  expect(captured?.aborted).toBe(false);
+  // The mint cleared its timer, so no later tick of the deadline can abort the passed signal.
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  expect(captured?.aborted).toBe(false);
+});
+
+test('two callers minting at once keep the newer grant when the older exchange fails', async () => {
+  // Both callers see the same expired entry and start their own exchange. The older one fails
+  // after the newer one was cached; the shared entry must stay, and later calls reuse it.
+  let exchanges = 0;
+  // Fresh enough for the first call, stale once the clock advances past the reuse margin.
+  const expiresAt = new Date(Date.now() + 31_000).toISOString();
+  // ES2022/Hermes consumers do not provide Promise.withResolvers.
+  let rejectOlder: (error: Error) => void = () => {};
+  let resolveNewer: (response: Response) => void = () => {};
+  const older = new Promise<Response>((_resolve, reject) => {
+    rejectOlder = reject;
+  });
+  const newer = new Promise<Response>(resolve => {
+    resolveNewer = resolve;
+  });
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      exchanges++;
+      if (exchanges === 2) return older;
+      if (exchanges === 3) return newer;
+      return Response.json({ token: `grant-${exchanges}`, expiresAt });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(exchanges).toBe(1);
+  await jest.advanceTimersByTimeAsync(2000);
+  const first = trackOutcome(client.listSessions());
+  const second = trackOutcome(client.listSessions());
+  await flush();
+  expect(exchanges).toBe(3);
+  // The newer exchange wins the cache; the older one then fails.
+  resolveNewer(
+    Response.json({
+      token: 'grant-newer',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    })
+  );
+  await flush();
+  rejectOlder(new Error('offline'));
+  await flush();
+  // The caller whose own exchange failed reports that failure.
+  expect(first.code).toBe('failed');
+  expect(second.code).toBe('resolved');
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  // The newer entry survived, so the shared cache answers without a fourth exchange.
+  expect(exchanges).toBe(3);
+});
+
+test('two concurrent 401s renew the grant once', async () => {
+  // Both callers hold the same cached grant and both receive a 401. One caller's catch must not
+  // delete the renewal the other already installed, or both callers exchange again.
+  let exchanges = 0;
+  let rejections = 0;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      exchanges++;
+      return Response.json({
+        token: `grant-${exchanges}`,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    }
+    // The two requests made with the cached grant fail; the retries use the renewal.
+    if (rejections > 0) {
+      rejections--;
+      return Response.json({ error: { code: 'unauthorized' } }, { status: 401 });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(exchanges).toBe(1);
+  // Both concurrent requests are answered by the cached grant and both get a 401.
+  rejections = 2;
+  const first = trackOutcome(client.listSessions());
+  const second = trackOutcome(client.listSessions());
+  await flush();
+  expect(exchanges).toBe(2);
+  await flush();
+  expect(first.code).toBe('resolved');
+  expect(second.code).toBe('resolved');
+  // A second renewal round after both calls settled would raise this beyond two.
+  expect(exchanges).toBe(2);
+});
+
+test('a stalled ticket mint reaches the connect backoff', async () => {
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  let stallTicket = true;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith('/exchange'))
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (path.endsWith('live-ticket')) {
+      if (stallTicket) return new Promise<Response>(() => {});
+      return Response.json({
+        ticket: 'private-ticket',
+        expiresAt: new Date(Date.now() + 90_000).toISOString(),
+      });
+    }
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  try {
+    await flush();
+    expect(state?.connection).toBe('connecting');
+    await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+    await flush();
+    expect(state?.connection).toBe('disconnected');
+    stallTicket = false;
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(FakeSocket.sockets).toHaveLength(1);
+    connectedSocket().frame('hello', hello());
+    await flush();
+    expect(state?.connection).toBe('connected');
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
+test('a slow but successful mint chain fails at one total deadline instead of three hops', async () => {
+  // The mint is a credential lookup, a grant exchange and a ticket POST, each with its own
+  // request deadline. Hops that all succeed would therefore each stay under their own bound and
+  // still hold `connecting` for 20 s here. This pins the total bound: the chain fails at one
+  // deadline, cancels the hop in flight, and the first failure reaches the existing backoff.
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  // Every `setTimeout` below runs on the fake clock `beforeEach` installs, so the hops cost no
+  // wall time, and ES2022/Hermes consumers do not provide Promise.withResolvers.
+  let slow = true;
+  const delayed = (ms: number, answer: () => Response) =>
+    new Promise<Response>(resolve => setTimeout(() => resolve(answer()), ms));
+  const ticketPostSignals: (AbortSignal | null | undefined)[] = [];
+  const fetcher = jest.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith('/exchange'))
+      return slow
+        ? delayed(5_000, () =>
+            Response.json({
+              token: 'grant',
+              expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            })
+          )
+        : Response.json({
+            token: 'grant',
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          });
+    if (path.endsWith('live-ticket')) {
+      ticketPostSignals.push(init?.signal);
+      const answer = () =>
+        Response.json({
+          ticket: 'private-ticket',
+          expiresAt: new Date(Date.now() + 90_000).toISOString(),
+        });
+      // Starts at 10 s and would succeed at 20 s, past the 15 s total bound.
+      return slow ? delayed(10_000, answer) : answer();
+    }
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: () =>
+      slow
+        ? new Promise<string>(resolve => setTimeout(() => resolve('kilo-credential'), 5_000))
+        : Promise.resolve('kilo-credential'),
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  try {
+    await flush();
+    expect(state?.connection).toBe('connecting');
+    await jest.advanceTimersByTimeAsync(14_000);
+    await flush();
+    expect(state?.connection).toBe('connecting');
+    expect(ticketPostSignals).toHaveLength(1);
+    expect(ticketPostSignals[0]?.aborted).toBe(false);
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(state?.connection).toBe('disconnected');
+    expect(state?.error).toBe('request_timeout');
+    // The hop in flight is cancelled at the bound instead of running to its own success.
+    expect(ticketPostSignals[0]?.aborted).toBe(true);
+    slow = false;
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(ticketPostSignals).toHaveLength(2);
+    expect(FakeSocket.sockets).toHaveLength(1);
+    connectedSocket().frame('hello', hello());
+    await flush();
+    expect(state?.connection).toBe('connected');
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
+test('a caller abort during a stalled exchange stays request_canceled', async () => {
+  const controller = new AbortController();
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const fetcher = jest.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange')
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    signals.push(init?.signal);
+    if (path === '/v1/sessions/ses_a') return new Promise<Response>(() => {});
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  snapshot.mockImplementationOnce(async (request, sessionID) => {
+    await request(`/v1/sessions/${sessionID}`, { signal: controller.signal });
+    return { position: 0, revision: 1, session: sessionMetadata, entities: [], messages: [] };
+  });
+  const pending = client.getSnapshot('ses_a', undefined, controller.signal);
+  const settled = trackOutcome(pending);
+  await flush();
+  const wire = signals.at(-1);
+  expect(wire?.aborted).toBe(false);
+  controller.abort();
+  await flush();
+  expect(settled.code).toBe('request_canceled');
+  // The caller's cancellation reaches the request, and the later deadline does not rewrite it.
+  expect(wire?.aborted).toBe(true);
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(settled.code).toBe('request_canceled');
+  await expect(pending).rejects.toMatchObject({ code: 'request_canceled' });
 });

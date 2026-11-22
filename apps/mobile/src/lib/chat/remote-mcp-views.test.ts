@@ -238,11 +238,20 @@ describe('the document a view is drawn from', () => {
     expect(await readRemoteMcpView(view)).toEqual({ kind: 'unavailable' });
   });
 
-  it('is unavailable when the document is larger than the cap', async () => {
-    answering('x'.repeat(MAX_VIEW_BYTES + 1), undefined);
+  it('is unavailable when the read throws', async () => {
+    answers.resource = () => {
+      throw new Error('the client threw instead of failing');
+    };
     const view = await discoveredWithChart();
 
     expect(await readRemoteMcpView(view)).toEqual({ kind: 'unavailable' });
+  });
+
+  it('is too large when the document is over the cap', async () => {
+    answering('x'.repeat(MAX_VIEW_BYTES + 1), undefined);
+    const view = await discoveredWithChart();
+
+    expect(await readRemoteMcpView(view)).toEqual({ kind: 'tooLarge' });
   });
 
   it('is drawn when the document is exactly at the cap', async () => {

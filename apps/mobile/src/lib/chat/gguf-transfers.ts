@@ -218,12 +218,16 @@ export function transfersOf(source: GgufDownloadSource, fileId: string): readonl
 /**
  * Every file with a published hash must hash to it before llama.cpp reads the
  * model, so a wrong file is never loaded. One file at a time bounds memory and CPU.
+ *
+ * A hash the device refused is `unreadable`, not `checksum`: no digest was
+ * computed, so nothing about the bytes was decided, and the caller can read them
+ * again. Only a digest that came back and differs is the verdict itself.
  */
 export async function readVerified(
   storage: GgufStorage,
   inspect: GgufInspect,
   transfers: readonly GgufTransfer[]
-): Promise<Settled<GgufInspection> | 'checksum'> {
+): Promise<Settled<GgufInspection> | 'checksum' | 'unreadable'> {
   const [model, projector] = transfers;
   if (model === undefined) {
     return { ok: false };
@@ -232,7 +236,10 @@ export async function readVerified(
     if (transfer.sha256 !== undefined) {
       // eslint-disable-next-line no-await-in-loop -- files hash one after another on purpose
       const hash = await settled(storage.sha256(transfer.part));
-      if (!hash.ok || hash.value !== transfer.sha256) {
+      if (!hash.ok) {
+        return 'unreadable';
+      }
+      if (hash.value !== transfer.sha256) {
         return 'checksum';
       }
     }

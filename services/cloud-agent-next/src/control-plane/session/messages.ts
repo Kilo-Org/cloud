@@ -2,6 +2,7 @@ import type { ControlPlanePromptPayload } from '../../shared/control-plane-proto
 import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { MessageSettlement } from './message-settlement.js';
 
 /**
  * Spec §5 message state: `queued → accepted → completed | failed | cancelled`.
@@ -30,6 +31,11 @@ export const TERMINAL_MESSAGE_STATES = ['completed', 'failed', 'cancelled'] as c
  */
 export const QUEUED_MESSAGE_LIMIT = 10;
 
+/** Whether a new message would exceed the queued bound. */
+export function queuedBoundReached(messages: readonly SessionMessage[]): boolean {
+  return messages.filter(message => message.state === 'queued').length >= QUEUED_MESSAGE_LIMIT;
+}
+
 /** One message row: identity, immutable intent, one state, timestamps, reason. */
 export type SessionMessage = {
   messageId: string;
@@ -41,6 +47,7 @@ export type SessionMessage = {
   reason: string | null;
   billingFailure?: CustomerBillingFailure;
   container?: CloudAgentRunContainer;
+  settlement?: MessageSettlement;
 };
 
 /** The messages a reducer changed, so the caller can emit their events. */
@@ -84,7 +91,7 @@ export function queueMessage(
   if (messages.some(message => message.messageId === intent.messageId)) {
     return { messages: [...messages], changed: [] };
   }
-  if (messages.filter(message => message.state === 'queued').length >= QUEUED_MESSAGE_LIMIT) {
+  if (queuedBoundReached(messages)) {
     return { messages: [...messages], changed: [], rejected: 'queue-full' };
   }
   const message: SessionMessage = {

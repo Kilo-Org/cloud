@@ -29,8 +29,12 @@ const agentsSchema = z.object({ agents: z.array(z.object({ id: z.string(), name:
 const createdSchema = z.object({ sessionID: z.string() });
 type NativeSelection = { id: string; organizationID?: string };
 
-async function getCredential() {
-  const response = await fetch('/api/native-remote/token', { method: 'POST', cache: 'no-store' });
+async function getCredential(signal?: AbortSignal) {
+  const response = await fetch('/api/native-remote/token', {
+    method: 'POST',
+    cache: 'no-store',
+    signal,
+  });
   if (!response.ok) throw new Error('Sign in to connect to native sessions.');
   return tokenSchema.parse(await response.json()).token;
 }

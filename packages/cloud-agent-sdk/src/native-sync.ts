@@ -21,6 +21,7 @@ import {
 import { NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import {
   NATIVE_SNAPSHOT_BLOB_CACHE_BYTES,
+  NATIVE_SYNC_REQUEST_DEADLINE_MS,
   NATIVE_SYNC_RETAINED_WORK_BYTES,
   NATIVE_SYNC_RETAINED_WORK_FRAMES,
   NATIVE_SYNC_TICKET_MINT_DEADLINE_MS,
@@ -152,7 +153,7 @@ export type NativeSocket = {
 export type NativeSocketConstructor = new (url: string, protocols: string[]) => NativeSocket;
 export type NativeSyncOptions = {
   baseUrl: string;
-  getCredential: () => Promise<string>;
+  getCredential: (signal?: AbortSignal) => Promise<string>;
   fetch?: typeof fetch;
   WebSocket?: NativeSocketConstructor;
 };
@@ -183,6 +184,84 @@ const isPermanent = (error: unknown) =>
   (error instanceof Error &&
     'code' in error &&
     (error.code === 'session_deleted' || error.code === 'snapshot_unavailable'));
+
+/**
+ * Settles with `operation` unless the signal aborts first, then rejects with `failure()`.
+ * The fetcher may ignore the abort signal, so the deadline must win the race; the operation
+ * keeps a rejection handler so a late failure is never unhandled. A value that arrives after
+ * the abort is handed to `discard`, so a late response can release its body.
+ */
+function raceAbort<T>(
+  signal: AbortSignal,
+  failure: () => Error,
+  operation: () => Promise<T>,
+  discard?: (value: T) => void
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(failure());
+      return;
+    }
+    const abort = () => reject(failure());
+    signal.addEventListener('abort', abort, { once: true });
+    void operation().then(
+      value => {
+        signal.removeEventListener('abort', abort);
+        if (signal.aborted) {
+          discard?.(value);
+          reject(failure());
+        } else resolve(value);
+      },
+      error => {
+        signal.removeEventListener('abort', abort);
+        reject(error);
+      }
+    );
+  });
+}
+
+/** Read one authorized asset body, bounded to the advertised blob size and never left locked. */
+async function readAssetBytes(response: Response, advertisedBytes: number): Promise<ArrayBuffer> {
+  const reader = response.body?.getReader();
+  try {
+    const length = response.headers.get('Content-Length');
+    if (length !== null) {
+      if (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))) {
+        throw new NativeSyncError('invalid_content_length');
+      }
+      if (Number(length) > advertisedBytes) {
+        throw new NativeSyncError('blob_hash_mismatch');
+      }
+    }
+    if (!reader) {
+      if (advertisedBytes === 0) return new ArrayBuffer(0);
+      throw new NativeSyncError('blob_hash_mismatch');
+    }
+    const bytes = new Uint8Array(advertisedBytes);
+    let offset = 0;
+    while (true) {
+      const result = await reader.read();
+      if (result.done) {
+        if (offset !== advertisedBytes) throw new NativeSyncError('blob_hash_mismatch');
+        return bytes.buffer;
+      }
+      if (result.value.byteLength > advertisedBytes - offset) {
+        throw new NativeSyncError('blob_hash_mismatch');
+      }
+      bytes.set(result.value, offset);
+      offset += result.value.byteLength;
+    }
+  } catch (error) {
+    try {
+      await reader?.cancel();
+    } catch {
+      // The bounded read fails closed even if the stream cannot be canceled.
+    }
+    throw error;
+  } finally {
+    reader?.releaseLock();
+  }
+}
 
 // Count UTF-16 storage conservatively for raw frames and retained parsed replay.
 const liveFrameBytes = 512 * 1024;
@@ -406,6 +485,12 @@ function transcriptHasGap(facts: NativeTranscriptFacts): boolean {
 const projectedFrameGap =
   'Native live sync skipped an event it could not read and is restoring the transcript from a canonical snapshot.';
 
+/** A grant and the cached entry that answered it, so a caller can evict only what it used. */
+type NativeGrantEntry = {
+  entry: Promise<z.infer<typeof grantSchema>>;
+  grant: z.infer<typeof grantSchema>;
+};
+
 /** Native v2 only. The legacy session-ingest/cloud-agent transport is deliberately unchanged. */
 export class NativeSyncClient {
   private readonly fetcher: typeof fetch;
@@ -416,83 +501,168 @@ export class NativeSyncClient {
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.socketConstructor = options.WebSocket ?? globalThis.WebSocket;
   }
-  private async grant(organizationID?: string) {
+  private async grant(organizationID?: string): Promise<NativeGrantEntry> {
     const key = organizationID ?? '';
     const existing = this.grants.get(key);
     if (existing) {
       const grant = await existing;
-      if (Date.parse(grant.expiresAt) > Date.now() + 30_000) return grant;
+      if (Date.parse(grant.expiresAt) > Date.now() + 30_000) return { entry: existing, grant };
     }
     const pending = (async () => {
-      const credential = await this.options.getCredential();
+      const credential = await this.credential();
       return grantSchema.parse(
-        await (
-          await this.response('/v1/auth/exchange', {
+        await this.exchange(
+          '/v1/auth/exchange',
+          {
             method: 'POST',
             headers: { Authorization: `Bearer ${credential}` },
             body: JSON.stringify({ version: 1, ...(organizationID ? { organizationID } : {}) }),
-          })
-        ).json()
+          },
+          response => response.json()
+        )
       );
     })();
     this.grants.set(key, pending);
     try {
-      return await pending;
+      return { entry: pending, grant: await pending };
     } catch (error) {
-      this.grants.delete(key);
+      // Two callers can mint at once: both await the same expired entry, then each replaces it.
+      // Delete only this exchange, so a newer cached grant survives its predecessor's failure.
+      if (this.grants.get(key) === pending) this.grants.delete(key);
       throw error;
     }
   }
-  private async response(path: string, init?: RequestInit): Promise<Response> {
-    const response = await this.fetcher(new URL(path, this.options.baseUrl).href, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
-    });
-    if (!response.ok) {
-      const body = record(await response.json().catch(() => null));
-      const error = record(body['error']);
-      const retry = response.headers.get('Retry-After');
-      const retryAfterMs = retry
-        ? /^\d+$/.test(retry)
-          ? Number(retry) * 1000
-          : Math.max(0, Date.parse(retry) - Date.now())
-        : 0;
-      throw new NativeSyncError(
-        typeof error['code'] === 'string' ? error['code'] : `HTTP ${response.status}`,
-        response.status,
-        retryAfterMs
+  /**
+   * Both consumers fetch the credential over the network, so a lookup that black-holes would
+   * leave the cached mint pending forever: it could never settle, its catch could never evict
+   * it, and every later caller would join the dead entry. Bound it like the exchange itself,
+   * and hand the deadline's signal to the source so it can cancel its own request instead of
+   * leaving it in flight, because each reconnect can otherwise leave another one behind.
+   */
+  private async credential(): Promise<string> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), NATIVE_SYNC_REQUEST_DEADLINE_MS);
+    try {
+      return await raceAbort(
+        controller.signal,
+        () => new NativeSyncError('request_timeout'),
+        () => this.options.getCredential(controller.signal)
       );
+    } finally {
+      clearTimeout(timer);
     }
-    return response;
   }
-  private async authorizedResponse(
+  private async exchange<T>(
     path: string,
-    init?: RequestInit,
-    organizationID?: string
-  ): Promise<Response> {
-    const grant = await this.grant(organizationID);
+    init: RequestInit | undefined,
+    read: (response: Response) => Promise<T>
+  ): Promise<T> {
+    const controller = new AbortController();
+    let failure = new NativeSyncError('request_canceled');
+    const timer = setTimeout(() => {
+      failure = new NativeSyncError('request_timeout');
+      controller.abort();
+    }, NATIVE_SYNC_REQUEST_DEADLINE_MS);
+    const cancel = () => {
+      failure = new NativeSyncError('request_canceled');
+      controller.abort();
+    };
+    init?.signal?.addEventListener('abort', cancel, { once: true });
+    if (init?.signal?.aborted) cancel();
+    try {
+      const response = await raceAbort(
+        controller.signal,
+        () => failure,
+        () =>
+          this.fetcher(new URL(path, this.options.baseUrl).href, {
+            ...init,
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json', ...init?.headers },
+          }),
+        // A fetcher that ignores the abort signal can still answer, so release its body now
+        // rather than at collection.
+        late => void late.body?.cancel().catch(() => undefined)
+      );
+      if (!response.ok) {
+        const body = record(
+          await raceAbort(
+            controller.signal,
+            () => failure,
+            () => response.json().catch(() => null)
+          )
+        );
+        const error = record(body['error']);
+        const retry = response.headers.get('Retry-After');
+        const retryAfterMs = retry
+          ? /^\d+$/.test(retry)
+            ? Number(retry) * 1000
+            : Math.max(0, Date.parse(retry) - Date.now())
+          : 0;
+        throw new NativeSyncError(
+          typeof error['code'] === 'string' ? error['code'] : `HTTP ${response.status}`,
+          response.status,
+          retryAfterMs
+        );
+      }
+      return await raceAbort(
+        controller.signal,
+        () => failure,
+        () => read(response)
+      );
+    } finally {
+      clearTimeout(timer);
+      init?.signal?.removeEventListener('abort', cancel);
+    }
+  }
+  /**
+   * The grant is shared across callers, so one caller's cancellation must not abort it; it
+   * stops waiting instead, and the exchange stays bounded by its own deadline.
+   */
+  private async grantFor(
+    organizationID: string | undefined,
+    signal: AbortSignal | null | undefined
+  ): Promise<NativeGrantEntry> {
+    if (!signal) return await this.grant(organizationID);
+    return await raceAbort(
+      signal,
+      () => new NativeSyncError('request_canceled'),
+      () => this.grant(organizationID)
+    );
+  }
+  private async authorized<T>(
+    path: string,
+    init: RequestInit | undefined,
+    organizationID: string | undefined,
+    read: (response: Response) => Promise<T>
+  ): Promise<T> {
+    const used = await this.grantFor(organizationID, init?.signal);
     if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
     try {
-      return await this.response(path, {
-        ...init,
-        headers: { ...init?.headers, Authorization: `Bearer ${grant.token}` },
-      });
+      return await this.exchange(
+        path,
+        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${used.grant.token}` } },
+        read
+      );
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       if (!(error instanceof NativeSyncError) || error['status'] !== 401) throw error;
-      this.grants.delete(organizationID ?? '');
-      const renewed = await this.grant(organizationID);
+      // A concurrent 401 may already have replaced the entry with an in-flight renewal, and
+      // deleting that would make both callers exchange again.
+      if (this.grants.get(organizationID ?? '') === used.entry)
+        this.grants.delete(organizationID ?? '');
+      const renewed = await this.grantFor(organizationID, init?.signal);
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
-      return await this.response(path, {
-        ...init,
-        headers: { ...init?.headers, Authorization: `Bearer ${renewed.token}` },
-      });
+      return await this.exchange(
+        path,
+        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${renewed.grant.token}` } },
+        read
+      );
     }
   }
   async request<T>(path: string, init?: RequestInit, organizationID?: string): Promise<T> {
     // Snapshot parsing lives at its canonical boundary; other callers validate below.
     try {
-      return (await (await this.authorizedResponse(path, init, organizationID)).json()) as T;
+      return (await this.authorized(path, init, organizationID, response => response.json())) as T;
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       throw error;
@@ -505,46 +675,9 @@ export class NativeSyncClient {
     organizationID?: string
   ): Promise<ArrayBuffer> {
     try {
-      const response = await this.authorizedResponse(path, init, organizationID);
-      const reader = response.body?.getReader();
-      try {
-        const length = response.headers.get('Content-Length');
-        if (length !== null) {
-          if (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))) {
-            throw new NativeSyncError('invalid_content_length');
-          }
-          if (Number(length) > advertisedBytes) {
-            throw new NativeSyncError('blob_hash_mismatch');
-          }
-        }
-        if (!reader) {
-          if (advertisedBytes === 0) return new ArrayBuffer(0);
-          throw new NativeSyncError('blob_hash_mismatch');
-        }
-        const bytes = new Uint8Array(advertisedBytes);
-        let offset = 0;
-        while (true) {
-          const result = await reader.read();
-          if (result.done) {
-            if (offset !== advertisedBytes) throw new NativeSyncError('blob_hash_mismatch');
-            return bytes.buffer;
-          }
-          if (result.value.byteLength > advertisedBytes - offset) {
-            throw new NativeSyncError('blob_hash_mismatch');
-          }
-          bytes.set(result.value, offset);
-          offset += result.value.byteLength;
-        }
-      } catch (error) {
-        try {
-          await reader?.cancel();
-        } catch {
-          // The bounded read fails closed even if the stream cannot be canceled.
-        }
-        throw error;
-      } finally {
-        reader?.releaseLock();
-      }
+      return await this.authorized(path, init, organizationID, response =>
+        readAssetBytes(response, advertisedBytes)
+      );
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       throw error;
@@ -583,18 +716,41 @@ export class NativeSyncClient {
       socket.send(JSON.stringify(value));
       return true;
     };
-    const mint = async ({ signal }: { signal?: AbortSignal } = {}) =>
-      ticketSchema.parse(
-        await this.request(
-          ticketPath,
-          {
-            method: 'POST',
-            body: JSON.stringify({ role: 'controller' }),
-            ...(signal ? { signal } : {}),
-          },
-          organizationID
-        )
-      );
+    /**
+     * One ticket mint: the credential lookup, the grant exchange and the ticket POST, bounded
+     * end to end. Each hop carries its own deadline, yet three slow hops would still hold a
+     * connect for their sum, so the whole chain races one mint deadline. The deadline's signal
+     * is the one the ticket POST carries, so that request is cancelled when the bound fires.
+     * The credential lookup and the grant exchange are shared with every other caller of this
+     * client, so they keep their own deadlines and are not cancelled with this mint.
+     */
+    const mint = ({ signal }: { signal?: AbortSignal } = {}) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), NATIVE_SYNC_TICKET_MINT_DEADLINE_MS);
+      // ES2022/Hermes consumers do not provide AbortSignal.any: each source aborts the mint.
+      const cancel = () => controller.abort();
+      signal?.addEventListener('abort', cancel, { once: true });
+      if (signal?.aborted) cancel();
+      return raceAbort(
+        controller.signal,
+        () => new NativeSyncError('request_timeout'),
+        async () =>
+          ticketSchema.parse(
+            await this.request(
+              ticketPath,
+              {
+                method: 'POST',
+                body: JSON.stringify({ role: 'controller' }),
+                signal: controller.signal,
+              },
+              organizationID
+            )
+          )
+      ).finally(() => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
+      });
+    };
     const scheduleRenewal = (body: Record<string, unknown>) => {
       clearTimeout(renewalTimer);
       const deadline =
@@ -652,6 +808,10 @@ export class NativeSyncClient {
       let retainedBytes = 0;
       let retainedCount = 0;
       let draining = false;
+      // The connect mint needs its own controller: aborting the epoch controller makes
+      // `epoch.current()` false, so the failed mint's `epoch.fail` would stop calling `reconnect`
+      // and the client would sit in `connecting` for ever with no backoff.
+      const connectMint = new AbortController();
       // One `reauth_required` mint per connection; later frames join it instead of starting
       // another POST or holding the queue.
       let reauthMint: AbortController | undefined;
@@ -681,12 +841,13 @@ export class NativeSyncClient {
         for (const item of queue) epoch.release(item.bytes);
         queue.length = 0;
         reauthMint?.abort();
+        connectMint.abort();
         controller.abort();
       };
       greeted = false;
       onConnection('connecting');
       try {
-        const ticket = await mint({ signal: controller.signal });
+        const ticket = await mint({ signal: connectMint.signal });
         if (!epoch.current()) return;
         const url = new URL(path, this.options.baseUrl);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -694,46 +855,22 @@ export class NativeSyncClient {
         socket = next;
         const sendCurrent = (value: unknown) => epoch.current() && send(value);
         // Starts the one ticket mint this connection may have in flight and returns at once, so
-        // later queued frames keep draining. The mint races its own deadline because the fetcher
-        // may ignore the abort signal; `retire` cancels it together with the epoch.
+        // later queued frames keep draining. The mint owns its deadline because the fetcher may
+        // ignore the abort signal; `retire` cancels it together with the epoch.
         const requestReauth = () => {
           if (reauthMint) return;
-          const mintController = new AbortController();
-          reauthMint = mintController;
-          const failure = new NativeSyncError('live_ticket_timeout');
-          // ES2022/Hermes consumers do not provide Promise.withResolvers.
-          const ticket = new Promise<z.infer<typeof ticketSchema>>((resolve, reject) => {
-            const deadline = setTimeout(
-              () => mintController.abort(),
-              NATIVE_SYNC_TICKET_MINT_DEADLINE_MS
-            );
-            const abort = () => {
-              clearTimeout(deadline);
-              reject(failure);
-            };
-            mintController.signal.addEventListener('abort', abort, { once: true });
-            void mint({ signal: mintController.signal }).then(
-              value => {
-                clearTimeout(deadline);
-                mintController.signal.removeEventListener('abort', abort);
-                if (mintController.signal.aborted) reject(failure);
-                else resolve(value);
-              },
-              error => {
-                clearTimeout(deadline);
-                mintController.signal.removeEventListener('abort', abort);
-                reject(error);
+          const controller = new AbortController();
+          reauthMint = controller;
+          void mint({ signal: controller.signal })
+            .then(
+              value => sendCurrent({ type: 'reauth', ticket: value.ticket }),
+              (error: unknown) => {
+                if (epoch.current()) reconnect(error);
               }
-            );
-          }).finally(() => {
-            if (reauthMint === mintController) reauthMint = undefined;
-          });
-          void ticket.then(
-            value => sendCurrent({ type: 'reauth', ticket: value.ticket }),
-            (error: unknown) => {
-              if (epoch.current()) reconnect(error);
-            }
-          );
+            )
+            .finally(() => {
+              if (reauthMint === controller) reauthMint = undefined;
+            });
         };
         const drain = async () => {
           if (draining) return;

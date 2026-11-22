@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Leita að kóðasöfnum",
       "noMatches": "Engar samsvaranir",
       "noRepositories": "Engin kóðasöfn tiltæk",
-      "noRepositoriesDescription": "Engin kóðasöfn eru tengd við reikninginn þinn.",
+      "noRepositoriesDescription": "Tengdu GitHub eða GitLab til að hlaða kóðasöfnum.",
       "loading": "Hleður…",
       "accessibility": "Kóðasafn: {{label}}",
       "platformBitbucket": "Bitbucket"

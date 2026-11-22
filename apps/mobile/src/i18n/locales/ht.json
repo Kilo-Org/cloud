@@ -2565,7 +2565,7 @@
       "searchPlaceholder": "Chèche depo",
       "noMatches": "Pa gen rezilta",
       "noRepositories": "Pa gen depo disponib",
-      "noRepositoriesDescription": "Pa gen depo ki konekte ak kont ou a.",
+      "noRepositoriesDescription": "Konekte GitHub oswa GitLab pou chaje depo yo.",
       "loading": "Ap chaje…",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"

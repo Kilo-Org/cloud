@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Търсене на хранилища",
       "noMatches": "Няма съвпадения",
       "noRepositories": "Няма налични хранилища",
-      "noRepositoriesDescription": "Няма хранилища, свързани с твоя акаунт.",
+      "noRepositoriesDescription": "За да заредиш хранилища, свържи GitHub или GitLab.",
       "loading": "Зареждане…",
       "accessibility": "Хранилище: {{label}}",
       "platformBitbucket": "Bitbucket"

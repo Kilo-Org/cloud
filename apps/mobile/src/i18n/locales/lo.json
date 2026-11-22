@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "ຄົ້ນຫາຄັງໂຄ້ດ",
       "noMatches": "ບໍ່ພົບລາຍການທີ່ກົງກັນ",
       "noRepositories": "ບໍ່ມີຄັງໂຄດທີ່ໃຊ້ໄດ້",
-      "noRepositoriesDescription": "ຍັງບໍ່ມີຄັງໂຄດເຊື່ອມຕໍ່ກັບບັນຊີຂອງເຈົ້າ.",
+      "noRepositoriesDescription": "ເພື່ອໂຫຼດຄັງໂຄດ ໃຫ້ເຊື່ອມຕໍ່ GitHub ຫຼື GitLab.",
       "loading": "ກຳລັງໂຫຼດ…",
       "accessibility": "ຄັງໂຄດ: {{label}}",
       "platformBitbucket": "Bitbucket"

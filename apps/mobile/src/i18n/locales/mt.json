@@ -2717,7 +2717,7 @@
       "searchPlaceholder": "Tfittxija tar-repożitorji",
       "noMatches": "L-ebda riżultat",
       "noRepositories": "L-ebda repożitorju disponibbli",
-      "noRepositoriesDescription": "M'hemm l-ebda repożitorju mqabbad mal-kont tiegħek.",
+      "noRepositoriesDescription": "Biex ittella' r-repożitorji, qabbad kont GitHub jew GitLab.",
       "loading": "Qed jgħabbi…",
       "accessibility": "Repożitorju: {{label}}",
       "platformBitbucket": "Bitbucket"

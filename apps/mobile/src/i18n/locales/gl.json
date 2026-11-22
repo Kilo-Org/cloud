@@ -2565,7 +2565,7 @@
       "searchPlaceholder": "Buscar repositorios",
       "noMatches": "Sen coincidencias",
       "noRepositories": "Non hai repositorios dispoñibles",
-      "noRepositoriesDescription": "Non hai repositorios conectados á túa conta.",
+      "noRepositoriesDescription": "Conecta GitHub ou GitLab para cargar os repositorios.",
       "loading": "Cargando…",
       "accessibility": "Repositorio: {{label}}",
       "platformBitbucket": "Bitbucket"

@@ -202,6 +202,7 @@ describe('prompt payer scope', () => {
     });
 
     expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('1');
     await expect(response.json()).resolves.toMatchObject({
       error: 'KILO_BALANCE_VALIDATION_FAILED',
     });
@@ -288,6 +289,7 @@ describe('prompt payer scope', () => {
     });
 
     expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('1');
     await expect(response.json()).resolves.toMatchObject({
       error: 'KILO_BALANCE_VALIDATION_FAILED',
     });

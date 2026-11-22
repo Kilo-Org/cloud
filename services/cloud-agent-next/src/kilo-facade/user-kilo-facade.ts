@@ -244,9 +244,10 @@ function missingRootKiloSessionResponse(): Response {
 function promptBalanceFailureResponse(
   balance: Extract<BalanceOnlyResult, { success: false }>
 ): Response {
-  return balance.status === 404
-    ? missingRootKiloSessionResponse()
-    : facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+  if (balance.status === 404) return missingRootKiloSessionResponse();
+  const response = facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+  if (balance.status === 503) response.headers.set('Retry-After', '1');
+  return response;
 }
 
 function pendingSessionSnapshotResponse(): Response {

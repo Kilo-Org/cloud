@@ -6,7 +6,7 @@ import { PartDetailTransitionFixture } from '@/components/agents/part-detail-tra
 const fixtureParams = z.object({
   open: z.enum(['file', 'missing']).optional(),
   state: z.enum(['completed', 'running']).optional(),
-  media: z.enum(['loaded', 'loading', 'failed', 'superseded']).optional(),
+  media: z.enum(['loaded', 'failed', 'superseded']).optional(),
 });
 const fixturePartIds = { file: 'part-detail-transition-file', missing: 'missing-part' };
 

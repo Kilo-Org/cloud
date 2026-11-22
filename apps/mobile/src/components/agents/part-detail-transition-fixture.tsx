@@ -13,11 +13,7 @@ import { MessageBubble } from './message-bubble';
 import { useOpenPartDetail } from './open-part-detail-context';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { SessionMessageList } from './session-message-list';
-import {
-  __holdToolCardImagePendingForDev,
-  cacheToolAttachment,
-  clearToolCardImageCache,
-} from './tool-card-image-cache';
+import { cacheToolAttachment, clearToolCardImageCache } from './tool-card-image-cache';
 
 const SESSION = 'part-detail-transition-fixture';
 const PART = 'part-detail-transition-file';
@@ -180,24 +176,15 @@ const ignoreExit = () => Promise.resolve();
 /**
  * Put the tool card image cache behind `MEDIA_PART` into one settled state.
  *
- * `loaded` writes a real PNG and records its URI. `loading` holds the part in
- * the in-flight state, so the card paints its busy placeholder: the real write
- * completes inside one frame, which no device capture can reach. `failed` leaves
- * a regular file where the cache directory belongs, so the directory create
- * throws and the part id stays latched. `superseded` resets the cache while the
- * base64 write is still in flight, so that attempt publishes nothing (no URI, no
+ * `loaded` writes a real PNG and records its URI. `failed` leaves a regular
+ * file where the cache directory belongs, so the directory create throws and
+ * the part id stays latched. `superseded` resets the cache while the base64
+ * write is still in flight, so that attempt publishes nothing (no URI, no
  * pending mark, no latch) into the next generation.
- *
- * `loading` is a device-only state: the design gate refuses a screen that still
- * paints a `Skeleton` as unsettled, so no gate cell can hold it.
  */
-function seedMediaState(media: 'loaded' | 'loading' | 'failed' | 'superseded'): void {
+function seedMediaState(media: 'loaded' | 'failed' | 'superseded'): void {
   // A fresh generation: one target can run twice in one app process.
   clearToolCardImageCache();
-  if (media === 'loading') {
-    __holdToolCardImagePendingForDev(MEDIA_PART);
-    return;
-  }
   let blocker: File | undefined = undefined;
   if (media === 'failed') {
     // An earlier pass in this process may have left the cache directory here (a
@@ -246,15 +233,12 @@ function OpenInitialPart({ partId }: Readonly<{ partId: string | undefined }>) {
  * and the row have only the input path to name the file with.
  *
  * `media` swaps the transcript for a completed image send and opens the sheet on
- * it, so the tool card's image surfaces are reachable without a live session:
- * `loaded` paints the cached PNG, `loading` keeps the write in flight so the
- * card paints its busy placeholder, and `failed` shows the unavailable row. The
- * two terminal states `failed` and `superseded` render that same row; they
- * differ only in cache state, and only a device can produce either one, because
- * a failed write latches the part id while a write superseded by a cache reset
- * publishes nothing at all — no URI, no pending mark, no latch. `loading` is
- * device-only too: a screen that still paints a `Skeleton` is unsettled, so the
- * design gate cannot hold it in a cell.
+ * it, so the tool card's three settled image surfaces are reachable without a
+ * live session: `loaded` paints the cached PNG, `failed` shows the unavailable
+ * row. Both `failed` and `superseded` render that same row; they differ only in
+ * cache state, and only a device can produce either one, because a failed write
+ * latches the part id while a write superseded by a cache reset publishes
+ * nothing at all — no URI, no pending mark, no latch.
  */
 export function PartDetailTransitionFixture({
   initialPartId,
@@ -263,7 +247,7 @@ export function PartDetailTransitionFixture({
 }: Readonly<{
   initialPartId?: string;
   state?: 'completed' | 'running';
-  media?: 'loaded' | 'loading' | 'failed' | 'superseded';
+  media?: 'loaded' | 'failed' | 'superseded';
 }> = {}) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();

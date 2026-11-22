@@ -18,8 +18,8 @@ export const GoogleServiceAccountKeyFileSchema = GoogleServiceAccountSigningKeyS
 });
 
 /**
- * Direct Vertex AI BYOK accepts the Vercel-shaped credentials above, or a
- * service account key file with an optional `location` (default `global`).
+ * Direct Vertex AI BYOK accepts the Vercel-shaped `VertexCredentialsSchema`, or
+ * a service account key file with an optional `location` (default `global`).
  */
 export const DirectVertexCredentialsSchema = z.union([
   VertexCredentialsSchema,

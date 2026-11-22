@@ -89,6 +89,9 @@ vi.mock('@/components/ui/row-group', () => ({
   rowGroupPosition: () => 'only',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The no-match state nests a surface so it can drop the reserve the screen's
+// surface carries; the host string keeps that prop readable in the tree.
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 
 const DRAFT = { providerAllowList: [], modelDenyList: [] };
 
@@ -331,16 +334,17 @@ describe('Model access lists keyboard frame', () => {
     expect(frameMargins(live)).not.toContain(frame.tabBarHeight);
   });
 
-  it('keeps only the trailing gap on the list content', async () => {
+  it('keeps the trailing gap on the list content and grows it to the viewport', async () => {
     const root = await mountBothLists();
 
     expect(listContentStyles(root)).toEqual([
-      { paddingBottom: TAB_SCREEN_TRAILING_GAP },
-      { paddingBottom: TAB_SCREEN_TRAILING_GAP },
+      { flexGrow: 1, paddingBottom: TAB_SCREEN_TRAILING_GAP },
+      { flexGrow: 1, paddingBottom: TAB_SCREEN_TRAILING_GAP },
     ]);
     // The band lives on the frame alone; leaving it on the content as well
     // would double the reserve.
     expect(listContentStyles(root)).not.toContainEqual({
+      flexGrow: 1,
       paddingBottom: frame.tabBarHeight + TAB_SCREEN_TRAILING_GAP,
     });
   });

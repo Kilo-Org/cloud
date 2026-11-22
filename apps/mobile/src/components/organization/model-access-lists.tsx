@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { StateSurface } from '@/components/centered-state-surface';
 import { Button } from '@/components/ui/button';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { SearchX } from '@/components/ui/icons';
@@ -26,8 +27,12 @@ import {
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
 // The frame reserves the tab-bar band, or the IME band while the keyboard is
-// up, so the content keeps only the room below its last row.
+// up, so the content keeps only the room below its last row. The container also
+// grows to the viewport: the empty state is a centred one, and it must take the
+// band the list still shows instead of its own height below the header, or a
+// search that matches nothing would open on a clipped state.
 const listContentStyle = {
+  flexGrow: 1,
   paddingBottom: TAB_SCREEN_TRAILING_GAP,
 } satisfies ViewStyle;
 
@@ -72,8 +77,17 @@ function ListHeader({
 }
 
 function NoMatch({ label }: Readonly<{ label: string }>) {
-  // The list's content container carries the page gutter, so the state adds none.
-  return <EmptyState icon={SearchX} title={label} inset="none" className="bg-background py-8" />;
+  // The list's own frame already reserves the bottom chrome (the tab bar, or the
+  // IME while the keyboard is up), so the state nests a surface with no reserve
+  // of its own: its band is the box the content container hands it. Without
+  // this the centred state would subtract the tab-bar band a second time and
+  // pin itself above a band it cannot fit.
+  return (
+    <StateSurface className="flex-1" bottomInset={0}>
+      {/* The content container carries the page gutter, so the state adds none. */}
+      <EmptyState icon={SearchX} title={label} inset="none" />
+    </StateSurface>
+  );
 }
 
 /**

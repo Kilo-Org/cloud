@@ -674,8 +674,17 @@ export function findCountlessFamilies(scan, english) {
  * exemption behind. `checkDynamicCountedKeySources` reports the same pairing for
  * the dynamic lists. It projects a scan the caller made once with
  * `auditCountedCalls`.
+ *
+ * A scan that could not read or parse every file cannot say which keys exist —
+ * a refused file's messages are invisible — so it proves no entry stale and
+ * names none. Its own problem lines already say why. This is the same reason
+ * `checkDynamicCountedKeySources` drops its per-key lines for a module it could
+ * not read.
  */
 export function findOrphanedNoAgreementEntries(scan) {
+  if (scan.problems.length > 0) {
+    return [];
+  }
   const keys = new Set(auditKeys(scan));
   return [...NO_AGREEMENT.keys()].filter(key => !keys.has(key)).sort();
 }

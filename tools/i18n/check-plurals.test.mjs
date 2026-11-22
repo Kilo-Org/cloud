@@ -443,6 +443,19 @@ test('reports one orphan naming the entry whose counted call is gone', () => {
   assert.deepEqual(findOrphanedNoAgreementEntries(scan), [missing]);
 });
 
+test('names no orphan from a scan that could not read or parse every file', () => {
+  // A refused file's counted calls are invisible, so an entry whose call lives
+  // in it would read as stale. The scan's own problem line says why the tree is
+  // incomplete, and naming the entry would send a reviewer to delete a review it
+  // still needs; the sibling declaration check drops its per-key lines for the
+  // same reason.
+  const scan = {
+    calls: [],
+    problems: ['apps/mobile/src/example.ts:1: cannot parse: Unexpected token'],
+  };
+  assert.deepEqual(findOrphanedNoAgreementEntries(scan), []);
+});
+
 test('reports an orphaned NO_AGREEMENT entry through the command', () => {
   const missing = 'profiles.counts.mcp';
   const root = cliFixture(standardFiles({ omitNoAgreementCall: missing }));

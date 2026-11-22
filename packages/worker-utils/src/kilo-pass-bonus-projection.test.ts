@@ -13,26 +13,27 @@ describe('kilo pass ended status', () => {
     expect(isKiloPassSubscriptionEndedStatus('active')).toBe(false);
     expect(isKiloPassSubscriptionEndedStatus('past_due')).toBe(false);
     expect(isKiloPassSubscriptionEndedStatus('paused')).toBe(false);
-    // A status a newer provider version may return is not ended.
     expect(isKiloPassSubscriptionEndedStatus('unknown-status')).toBe(false);
   });
 
-  it('narrows its argument to the ended statuses', () => {
-    const status: StripeSubscriptionStatus = 'unpaid';
+  it('keeps a narrow signature so the ended set stays checked', () => {
+    const statuses: StripeSubscriptionStatus[] = ['canceled', 'unpaid', 'incomplete_expired'];
 
-    // Keeps the predicate a type guard. A plain `boolean` return leaves `status`
-    // as the open provider union, which is not assignable to the ended set.
-    const ended: KiloPassEndedSubscriptionStatus | null = isKiloPassSubscriptionEndedStatus(status)
-      ? status
-      : null;
+    // A type guard narrows the argument to the ended union here. Widening the
+    // return to `boolean` leaves the open provider union instead, which is not
+    // assignable to `KiloPassEndedSubscriptionStatus`, so this line fails the
+    // package typecheck rather than passing silently at runtime.
+    const ended = statuses.map(status =>
+      isKiloPassSubscriptionEndedStatus(status) ? status : null
+    ) satisfies (KiloPassEndedSubscriptionStatus | null)[];
 
-    expect(ended).toBe('unpaid');
-  });
+    expect(ended).toEqual(['canceled', 'unpaid', 'incomplete_expired']);
 
-  it('rejects a status outside the ended set at compile time', () => {
+    // The ended union is closed, so a live status cannot be assigned to it.
+    // Removing either guard above makes this directive unused (TS2578) or the
+    // assignment legal, and the package typecheck reports it.
     // @ts-expect-error 'active' is not an ended status.
     const notEnded: KiloPassEndedSubscriptionStatus = 'active';
-
-    expect(notEnded).toBe('active');
+    expect(isKiloPassSubscriptionEndedStatus(notEnded)).toBe(false);
   });
 });

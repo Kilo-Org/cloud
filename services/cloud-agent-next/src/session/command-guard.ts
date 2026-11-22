@@ -814,9 +814,6 @@ export function getCommandGuardPermissions(
           '.g*t/*': 'deny',
           '*gitconfig*': 'deny',
           '*/.git/config*': 'deny',
-          // The user-level file is refused by its own name, so the repository
-          // directory stays the only `.git` path this map singles out.
-          '*gitconfig*': 'deny',
           // The user-level file also lives under the XDG config directory, which
           // is named with its dot so an ordinary `git/` source directory stays
           // editable.

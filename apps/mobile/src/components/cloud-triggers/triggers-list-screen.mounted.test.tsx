@@ -14,6 +14,7 @@ import { createElement, type ElementType } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -178,6 +179,12 @@ describe('TriggersListScreen rows', () => {
     expect(copyControl.props.accessibilityRole).toBe('button');
     expect(copyControl.props.accessibilityLabel).toContain(i18n.t('common.copyLink'));
     expect(copyControl.props.hitSlop).toBeUndefined();
+    // The platform target floor is on the control's own class, so dropping the
+    // glyph's box or shrinking the line cannot take the target under 44 pt
+    // without this failing.
+    expect(String(copyControl.props.className).split(' ')).toEqual(
+      expect.arrayContaining(TOUCH_TARGET_CLASS.split(' '))
+    );
     // The glyph is decoration inside the line, not a nested pressable of its own.
     expect(
       copyControl.findAll(node => !Object.is(node, copyControl) && Object.is(node.type, PRESSABLE))

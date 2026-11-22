@@ -16,6 +16,13 @@
  * target grows with the address and nothing out of flow moves the label away
  * from its value or the card away from the section it ends. A shared session
  * link is the same shape (`session-share-active-link.tsx`).
+ *
+ * The floor only has work to do on a one-line address, where the label and the
+ * value are 37.6 dp together: `justify-center` splits that slack above and
+ * below the pair, so the label keeps its distance from its value and neither
+ * surrounding gap moves by more than half the slack. A wrapped address is over
+ * the floor on its own, so the field's geometry there is the base screen's,
+ * dp for dp.
  */
 
 import { useTranslation } from 'react-i18next';
@@ -41,7 +48,7 @@ export function TriggerUrlCard({ url }: Readonly<{ url: string }>) {
       onPress={() => {
         void copyWebhookUrl(url);
       }}
-      className={cn('gap-1.5 active:opacity-70', TOUCH_TARGET_CLASS)}
+      className={cn('justify-center gap-1.5 active:opacity-70', TOUCH_TARGET_CLASS)}
     >
       <FormFieldLabel label={t('cloudAgent.triggers.webhookUrl')} />
       <View className="flex-row">

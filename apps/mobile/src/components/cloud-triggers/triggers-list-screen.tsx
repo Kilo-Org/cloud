@@ -25,7 +25,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { i18n } from '@/i18n';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
@@ -108,9 +108,10 @@ function TriggerRow({
         // React Native confines a touch to every ancestor view's bounds, so a
         // control on this one-text-line row can never deliver a taller target
         // and one that declares `hitSlop` loses it at the line's edge. The line
-        // is 44 dp tall on its own node — the icon box's 34 dp contribution to
-        // this row plus its bottom pad — so the target is real and the glyph
-        // keeps the place it has always had, with the URL closer to its own
+        // carries the platform target on its own node — the shared
+        // `TOUCH_TARGET_CLASS` floor, which the icon box's 34 dp contribution
+        // plus `pb-3` already meets — so the target is real, the glyph keeps
+        // the place it has always had, and the URL stays closer to its own
         // trigger row than to the next one.
         <Pressable
           accessibilityRole="button"
@@ -118,7 +119,10 @@ function TriggerRow({
           onPress={() => {
             void copyWebhookUrl(trigger.inboundUrl);
           }}
-          className="flex-row items-center gap-2 px-4 pb-3 active:opacity-70"
+          className={cn(
+            'flex-row items-center gap-2 px-4 pb-3 active:opacity-70',
+            TOUCH_TARGET_CLASS
+          )}
         >
           <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
             {trigger.inboundUrl}

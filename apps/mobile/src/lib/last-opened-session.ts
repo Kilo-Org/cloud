@@ -180,8 +180,12 @@ async function restore(nextAttempt: 'budget' | 'single'): Promise<void> {
         ? await readStoredValueWithRetry(LAST_OPENED_SESSION_KEY)
         : await readStoredValue(LAST_OPENED_SESSION_KEY);
     // A write or a clear that landed while this read was in flight owns the
-    // state, and its answer is newer than these bytes.
+    // state, and its answer is newer than these bytes. The state settles here
+    // rather than staying `pending`, because no later reader needs a read: the
+    // in-memory record is authoritative.
     if (epoch !== startEpoch) {
+      disarmUnlockRetry();
+      hydration = { status: 'answered' };
       return;
     }
     // The read answered: a record, or nothing stored. Either way this is the
@@ -199,8 +203,12 @@ async function restore(nextAttempt: 'budget' | 'single'): Promise<void> {
   } catch (error) {
     // A write or a clear that landed during the read owns the state, so a
     // refusal it did not cause must not reopen the hydration and let a later
-    // reader restore what the caller just established is gone.
+    // reader restore what the caller just established is gone. Settle it for
+    // the same reason as the success path: the in-memory record is
+    // authoritative and no later reader needs a read.
     if (epoch !== startEpoch) {
+      disarmUnlockRetry();
+      hydration = { status: 'answered' };
       return;
     }
     // The read never answered, so this run must not serve its absence for the

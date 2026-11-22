@@ -12,12 +12,15 @@ export const store = new Map<string, string>();
 
 type StoreSurface = {
   getItemAsync: {
+    mockReset: () => void;
     mockImplementation: (implementation: (key: string) => Promise<string | null>) => void;
   };
   setItemAsync: {
+    mockReset: () => void;
     mockImplementation: (implementation: (key: string, value: string) => Promise<void>) => void;
   };
   deleteItemAsync: {
+    mockReset: () => void;
     mockImplementation: (implementation: (key: string) => Promise<void>) => void;
   };
 };
@@ -29,6 +32,11 @@ type StoreSurface = {
  */
 export function installHealthyStore(mocks: StoreSurface): void {
   store.clear();
+  // Reset first so one test's call history and queued one-time implementations
+  // never reach the next.
+  for (const mock of [mocks.getItemAsync, mocks.setItemAsync, mocks.deleteItemAsync]) {
+    mock.mockReset();
+  }
   mocks.getItemAsync.mockImplementation(async (key: string) => {
     await Promise.resolve();
     return store.get(key) ?? null;

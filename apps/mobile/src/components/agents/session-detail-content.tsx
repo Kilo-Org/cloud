@@ -616,7 +616,10 @@ export function SessionDetailContent({
   // is that message, so it is withdrawn rather than offered for a second send.
   // An absent record reads as complete, so an ordinary session never takes this
   // path.
-  const [pendingSendGuardIncomplete, setPendingSendGuardIncomplete] = useState(false);
+  const [pendingSendGuard, setPendingSendGuard] = useState<{
+    sessionId: string;
+    incomplete: boolean;
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
 
@@ -628,7 +631,9 @@ export function SessionDetailContent({
       if (cancelled) {
         return;
       }
-      setPendingSendGuardIncomplete(!record.complete);
+      // The answer is kept with the session it was read for: a session switch
+      // must not apply one session's verdict to another's draft.
+      setPendingSendGuard({ sessionId, incomplete: !record.complete });
     };
     void readGuard();
 
@@ -636,6 +641,10 @@ export function SessionDetailContent({
       cancelled = true;
     };
   }, [userId, sessionId, isIdentityLoading]);
+  const pendingSendGuardIncomplete =
+    pendingSendGuard !== null && pendingSendGuard.sessionId === sessionId
+      ? pendingSendGuard.incomplete
+      : false;
 
   // Composer remount identity. An account CHANGE must remount the composer, so
   // one account's typed text never surfaces under another. Identity RESOLVING

@@ -9037,6 +9037,30 @@ describe('createSessionManager', () => {
       expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-original')).toBe(false);
     });
 
+    it('drops a failure the replay applied before the unverifiable read landed', async () => {
+      // The DO's stored-event replay normally applies the footer before the
+      // durable read resolves, so hiding later failures is not enough: an
+      // unverifiable record must also drop what the replay already applied.
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map([['m-resolved', { status: 'failed', error: 'x', reason: 'execution' }]])
+      );
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+
+      read.resolve({ items: [], complete: false });
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-resolved');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
     it('projects the seeded durable ids on the resolvedDeliveryFailures atom', async () => {
       // A relaunch: the row a retry superseded is server history and comes back
       // with the snapshot, so the transcript filter needs the durable record.

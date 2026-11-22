@@ -3277,6 +3277,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS,
             activeSessionId
           );
+          discardAppliedDeliveryFailures();
         }
         const ids = record.items;
         for (const id of ids) {
@@ -3311,8 +3312,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS,
           activeSessionId
         );
+        discardAppliedDeliveryFailures();
       });
     return resolvedFailures;
+  }
+
+  /**
+   * A record the reader cannot vouch for may name a failure the user already
+   * resolved. The DO's stored-event replay usually applies those footers before
+   * the durable read lands, so hiding later failures is not enough: the ones
+   * already applied for this session are dropped here. The whole failure goes,
+   * like the id branch below, so the terminal error the replay set cannot
+   * outlive it.
+   */
+  function discardAppliedDeliveryFailures(): void {
+    const state = currentSession?.state;
+    if (state === undefined) return;
+    for (const [messageId, delivery] of state.getPendingMessages()) {
+      if (delivery.status !== 'failed') continue;
+      if (state.clearFailedMessage(messageId)) {
+        store.set(errorAtom, null);
+        store.set(failedHistoryKindAtom, null);
+      }
+    }
   }
 
   function seedPendingSendConfirmations(

@@ -6,6 +6,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import {
   BITBUCKET_TOKEN_MAX_LENGTH,
   bitbucketConnectionFailure,
@@ -130,6 +131,7 @@ export function BitbucketConnectForm({
       <Button
         variant="outline"
         size="sm"
+        className={textActionTargetClass()}
         onPress={() => {
           void openExternalUrl(CREATE_WORKSPACE_TOKEN_URL, {
             label: t('common.openInBrowser'),

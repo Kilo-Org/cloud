@@ -77,6 +77,10 @@ vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({ data: [] }),
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
+// The pull's hook now announces under reduced motion through this adapter, whose
+// real module reaches `react-native`'s `AccessibilityInfo`; this suite stubs
+// only the hosts it renders.
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentBriefing: {

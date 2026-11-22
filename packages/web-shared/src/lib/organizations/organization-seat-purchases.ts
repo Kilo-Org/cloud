@@ -24,11 +24,15 @@ export async function getMostRecentSeatPurchase(
   return purchase || null;
 }
 
-/** Returns the most recently ended seat purchase by period end. Used for resubscribe flow. */
+/**
+ * Returns the most recently ended seat purchase by period end. Used for resubscribe flow.
+ * Like its sibling, it reads through the client the caller passes.
+ */
 export async function getMostRecentEndedSeatPurchase(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  fromDb: typeof db = db
 ): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
+  const [purchase] = await fromDb
     .select()
     .from(organization_seats_purchases)
     .where(

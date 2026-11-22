@@ -1733,6 +1733,26 @@ test('rejects a push locale registry entry bound to another catalog', () => {
   );
 });
 
+test('reports an unparseable push locale registry as its parse error only', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en, 'ru': ru`,
+      ].join('\n'),
+    },
+  });
+  // The tree a refused parse yields is empty, so the registry walk would find no
+  // `pushCatalogs` and report a missing registry on top of the parse error that
+  // already names the cause. The rest of the audit still reports its own lines.
+  const text = found.join('\n');
+  assert.match(text, /packages\/notifications\/src\/i18n\.ts:3: cannot parse: /);
+  assert.doesNotMatch(text, /no push locale registry named/);
+  assert.match(text, /mobile\/ru: missing key "agents\.title"/);
+});
+
 test('rejects a push locale registry with no initializer', () => {
   const found = run({
     extraFiles: {
@@ -2096,6 +2116,90 @@ test('still rejects that push value in a language the exceptions do not list', (
     found.join('\n'),
     /notifications\/ru: "internal\.securityFindingNew\.body" is English; translate it/
   );
+});
+
+// The push title and the app's finding rows show one severity level, so both
+// catalogs must spell it the same way. These fixtures carry just the four pairs
+// the parity rule compares, with the English words equal on both sides.
+const SEVERITY_PARITY_MOBILE_ENGLISH = {
+  common: { critical: 'Critical' },
+  securityAgent: { sla: { high: 'High', medium: 'Medium', low: 'Low' } },
+};
+const SEVERITY_PARITY_SOURCE = [
+  "t('common.critical');",
+  "t('securityAgent.sla.high');",
+  "t('securityAgent.sla.medium');",
+  "t('securityAgent.sla.low');",
+].join('\n');
+const SEVERITY_PARITY_PUSH_ENGLISH = {
+  internal: {
+    securityFindingSeverity: {
+      critical: 'Critical',
+      high: 'High',
+      medium: 'Medium',
+      low: 'Low',
+    },
+  },
+};
+// The severity keys are string literals in the real producer, so the fixture
+// names them the same way and the usage check finds every one.
+const SEVERITY_PARITY_PUSH_SOURCE = [
+  'const SEVERITY_KEYS = [',
+  "  'internal.securityFindingSeverity.critical',",
+  "  'internal.securityFindingSeverity.high',",
+  "  'internal.securityFindingSeverity.medium',",
+  "  'internal.securityFindingSeverity.low',",
+  '];',
+].join('\n');
+
+test('accepts a severity the push catalog and the mobile catalog spell the same way', () => {
+  const found = run({
+    english: SEVERITY_PARITY_MOBILE_ENGLISH,
+    translated: {
+      common: { critical: 'Критично' },
+      securityAgent: { sla: { high: 'Высоко', medium: 'Средне', low: 'Низко' } },
+    },
+    source: SEVERITY_PARITY_SOURCE,
+    pushEnglish: SEVERITY_PARITY_PUSH_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingSeverity: {
+          critical: 'Критично',
+          high: 'Высоко',
+          medium: 'Средне',
+          low: 'Низко',
+        },
+      },
+    },
+    pushSource: SEVERITY_PARITY_PUSH_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a severity the push catalog and the mobile catalog spell two ways', () => {
+  const found = run({
+    english: SEVERITY_PARITY_MOBILE_ENGLISH,
+    translated: {
+      common: { critical: 'Критично' },
+      securityAgent: { sla: { high: 'Высоко', medium: 'Средне', low: 'Низко' } },
+    },
+    source: SEVERITY_PARITY_SOURCE,
+    pushEnglish: SEVERITY_PARITY_PUSH_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingSeverity: {
+          critical: 'Критично',
+          high: 'Высокий',
+          medium: 'Средне',
+          low: 'Низко',
+        },
+      },
+    },
+    pushSource: SEVERITY_PARITY_PUSH_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'notifications/ru: "internal.securityFindingSeverity.high" reads "Высокий" but mobile "securityAgent.sla.high" reads "Высоко"',
+  ]);
 });
 
 // Two non-English catalogs let a case leave one of them in English while the

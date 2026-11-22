@@ -7,16 +7,14 @@ import {
 import { getVercelModelIdOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   findVercelOnlyModels,
-  getVendorNamesByModelPrefix,
-  getVercelOnlyModelName,
   type VercelOnlyModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { getVercelInferenceProvidersExcludingIgnored } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 
-function toVercelOnlyCatalogModel(model: VercelOnlyModel, name: string): OpenRouterModel {
-  const { id, storedModel, contextWindow, modalities, pricing } = model;
+function toVercelOnlyCatalogModel(model: VercelOnlyModel): OpenRouterModel {
+  const { id, name, storedModel, contextWindow, modalities, pricing } = model;
   // Without `opencode`, the catalog derives it with getGatewayOpenCodeSettings, which routing also
   // uses to resolve variants.
   return {
@@ -81,7 +79,6 @@ export async function getVercelOnlyCatalogModels({
     getVercelModelIdOverrides(),
   ]);
 
-  const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
   return findVercelOnlyModels({
     openRouterModelIds: [
       ...openRouterModels.map(model => model.id),
@@ -93,6 +90,6 @@ export async function getVercelOnlyCatalogModels({
     overrides,
   })
     .filter(model => !routingConfig.vercelOptOutModels.has(model.id) && hasRoutableProvider(model))
-    .map(model => toVercelOnlyCatalogModel(model, getVercelOnlyModelName(model, vendorNames)))
+    .map(model => toVercelOnlyCatalogModel(model))
     .sort((a, b) => b.created - a.created);
 }

@@ -28,6 +28,9 @@ export function RefreshControl({ refreshing, ...props }: Readonly<RefreshControl
       {...props}
       colors={props.colors ?? [indicatorColor]}
       tintColor={props.tintColor ?? indicatorColor}
+      // Under reduced motion the platform indicator is inert by policy, so the
+      // pull's start and finish are carried by the screen's static
+      // `RefreshProgress` band and by `useManualRefresh`'s announcements.
       refreshing={reducedMotion ? false : refreshing}
     />
   );

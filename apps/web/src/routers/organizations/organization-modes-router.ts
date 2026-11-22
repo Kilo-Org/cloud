@@ -30,7 +30,7 @@ import {
   mutateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -121,7 +121,7 @@ async function applyOrganizationAutoRouteChange(
     delete routes[modeSlug];
   } else {
     const validation = await validateOrganizationAutoTarget(organization, routeModel, {
-      dbClient: tx,
+      read: tx ? { tx } : { fromDb: readDb },
     });
 
     if (validation.kind === 'error') {

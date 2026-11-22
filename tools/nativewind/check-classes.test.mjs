@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { LAYOUT_RULES, checkParsedFile } from './check-classes.mjs';
+import { LAYOUT_RULES, checkParsedFile, layoutFindingText } from './check-classes.mjs';
 import { parseSourceEntry } from '../lib/source-files.mjs';
 
 // The rule cases read the repository's own files: the checker resolves the app's
@@ -34,9 +34,16 @@ const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'fs-entries.mjs', 'source
  * repository's app tree because the Intl rule decides by it whether the
  * formatter rule applies; the shared parse entry reads nothing from that path
  * but the text it is given.
+ *
+ * The layout rules now return records the report formats where it prints them,
+ * so this flattens them the same way: every assertion below reads the printable
+ * lines, in the order the report prints them.
  */
 function check(relative, text) {
-  return checkParsedFile(parseSourceEntry(MOBILE_ROOT, REPO, join(REPO, relative), text));
+  const { problems, layout } = checkParsedFile(
+    parseSourceEntry(MOBILE_ROOT, REPO, join(REPO, relative), text)
+  );
+  return [...problems, ...layout.map(layoutFindingText)];
 }
 
 /** The diagnostics of several files, in the order they are listed. */
@@ -441,6 +448,15 @@ test('flags a runtime Text import under any name and allows the type-only forms'
   assert.doesNotMatch(text, /type-import/);
 });
 
+test('exempts the shared Text module by its own path, not by a suffix', () => {
+  const source = "import { Text } from 'react-native';\n";
+  assert.deepEqual(check('apps/mobile/src/components/ui/text.tsx', source), []);
+  assert.match(
+    check('packages/app-shared/src/components/ui/text.tsx', source).join('\n'),
+    /imports Text from 'react-native'/
+  );
+});
+
 test('runs the whole audit over a clean tree through the CLI and ignores test scaffolding', context => {
   // The scaffolding filter lives in the audit's file walk, not in
   // checkParsedFile, so this case runs the entry point that walks the tree.
@@ -734,16 +750,21 @@ test('checkParsedFile reports one file and keeps no state between calls', contex
   writeFileSync(
     join(root, 'probe.mjs'),
     [
-      "import { checkParsedFile } from './tools/nativewind/check-classes.mjs';",
+      "import { checkParsedFile, layoutFindingText } from './tools/nativewind/check-classes.mjs';",
       "import { parseSourceEntry } from './tools/lib/source-files.mjs';",
       `const source = ${JSON.stringify(source)};`,
       `const absolute = ${JSON.stringify(absolute)};`,
       `const dir = ${JSON.stringify(dir)};`,
       `const root = ${JSON.stringify(root)};`,
       'const entry = parseSourceEntry(dir, root, absolute, source);',
-      'const first = checkParsedFile(entry);',
-      'const firstAgain = checkParsedFile(entry);',
-      'const clean = checkParsedFile(parseSourceEntry(dir, root, absolute, "export const a = 1;"));',
+      // The printable lines of one call, built the way the report builds them.
+      'const lines = entry => {',
+      '  const { problems, layout } = checkParsedFile(entry);',
+      '  return [...problems, ...layout.map(layoutFindingText)];',
+      '};',
+      'const first = lines(entry);',
+      'const firstAgain = lines(entry);',
+      'const clean = lines(parseSourceEntry(dir, root, absolute, "export const a = 1;"));',
       'console.log(JSON.stringify({ first, firstAgain, clean }));',
     ].join('\n')
   );
@@ -1753,6 +1774,9 @@ test('--write-layout-baseline refuses when a walked file cannot be read', async 
   console.error = message => {
     errors.push(String(message));
   };
+  // The injected writer is what a refused run must not reach: touching the
+  // baseline file itself would prove nothing about which writer ran.
+  let written = 0;
   let exitCode;
   try {
     run({
@@ -1762,7 +1786,9 @@ test('--write-layout-baseline refuses when a walked file cannot be read', async 
         }
         return readFileSync(file, ...rest);
       },
-      writeBaseline: true,
+      writeBaseline: () => {
+        written += 1;
+      },
     });
     exitCode = process.exitCode;
   } finally {
@@ -1770,6 +1796,7 @@ test('--write-layout-baseline refuses when a walked file cannot be read', async 
     process.exitCode = previousExitCode;
   }
   assert.equal(exitCode, 1, errors.join('\n'));
+  assert.equal(written, 0);
   const report = errors.join('\n');
   assert.match(report, /apps\/mobile\/src\/screen\.tsx: cannot read: EACCES: permission denied/);
   assert.match(report, /check-classes: 1 problem\(s\)/);
@@ -1795,6 +1822,48 @@ test('--write-layout-baseline refuses when a fixture source does not parse', con
   assert.match(result.stderr, /check-classes: [1-9]\d* problem\(s\)/);
   assert.doesNotMatch(result.stdout, /wrote/);
   // The refused file may hold any number of violations, so no count is safe.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('run writes and reads the baseline through its injected seams', async context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />'),
+  });
+  const { run } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const written = [];
+  let reads = 0;
+  // The admitted run ends on its summary line, and a passing case owns that
+  // output instead of letting it land in the suite's.
+  const originalLog = console.log;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.log = () => {};
+  let exitCode;
+  try {
+    run({ writeBaseline: findings => written.push(findings) });
+    run({
+      readBaseline: () => {
+        reads += 1;
+        return { 'apps/mobile/src/screen.tsx': { L1: 1 } };
+      },
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.log = originalLog;
+    process.exitCode = previousExitCode;
+  }
+  // The injected writer received this run's findings instead of the file.
+  assert.equal(written.length, 1);
+  assert.equal(written[0].get('apps/mobile/src/screen.tsx').get('L1').length, 1);
+  // The injected reader supplied the admitted baseline, so the run passed.
+  assert.equal(reads, 1);
+  assert.doesNotMatch(String(exitCode ?? ''), /1/);
+  // Neither seam touched the tracked baseline: the fixture has no such file.
   assert.throws(
     () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
     /ENOENT/

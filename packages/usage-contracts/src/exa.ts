@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { taggedQueueMessageSchema } from './queue-envelope';
+
 export const EXA_USAGE_WRITE_PATH = '/api/internal/exa-usage/record';
 
 export const EXA_ALLOWED_PATHS = [
@@ -80,14 +82,10 @@ export const ExaUsageWriteResponseSchema = z.strictObject({
 
 export type ExaUsageWriteResponse = z.infer<typeof ExaUsageWriteResponseSchema>;
 
-/**
- * Body of an Exa usage message on the shared usage queue. The kind tag is what separates it from
- * an LLM usage message, which is always sent untagged.
- */
-export const ExaUsageQueueMessageSchema = z.strictObject({
-  kind: z.literal('exa_usage'),
-  v: z.literal(1),
-  record: ExaUsageRecordSchema,
-});
+/** Envelope carrying an `ExaUsageRecordSchema` record on the shared usage queue. */
+export const ExaUsageQueueMessageSchema = taggedQueueMessageSchema(
+  'exa_usage',
+  ExaUsageRecordSchema
+);
 
 export type ExaUsageQueueMessage = z.infer<typeof ExaUsageQueueMessageSchema>;

@@ -1,7 +1,11 @@
 import * as z from 'zod';
 
-export const ReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high']);
-export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
+// The routing effort bands. The catalog variant vocabulary adds its own controls on top of
+// these; it takes the bands from here rather than restating them.
+export const REASONING_EFFORT_BANDS = ['minimal', 'low', 'medium', 'high'] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORT_BANDS)[number];
+
+export const ReasoningEffortSchema = z.enum(REASONING_EFFORT_BANDS);
 
 // The canonical catalog variant key every reasoning-identity field shares: a trimmed,
 // non-empty string or null. Leaf-module rule so the field schemas that carry it (package root,

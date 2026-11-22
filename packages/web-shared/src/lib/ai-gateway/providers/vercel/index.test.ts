@@ -890,6 +890,28 @@ describe('applyVercelSettings BYOK pinning', () => {
     },
   });
 
+  it('rejects an empty userByok before touching the request', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        // Vercel serves this model under `alibaba/qwen3-max`, so a mutated request is detectable.
+        model: 'qwen/qwen3-max',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ignore: [] },
+      },
+    };
+    const before = structuredClone(request);
+
+    await expect(applyVercelSettings('qwen/qwen3-max', request, [], null)).rejects.toThrow(
+      new Error('Invalid state: userByok should be null or not empty')
+    );
+
+    expect(request).toEqual(before);
+    expect(request.body.model).toBe('qwen/qwen3-max');
+    expect(request.body.provider).toEqual({ ignore: [] });
+    expect(request.body).not.toHaveProperty('providerOptions');
+  });
+
   it.each([
     { sort: 'throughput', expected: 'tps' },
     { sort: 'future-sort', expected: undefined },

@@ -1,7 +1,7 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { dropToolStrictProperties } from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
-import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import {
   ReasoningDetailType,

@@ -1,5 +1,6 @@
 import {
   genericPushTitle,
+  localizedPushParams,
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
   pushBodyCatalogKey,
@@ -51,7 +52,12 @@ function translatedPart(
     return stored;
   }
   const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : pushTitleCatalogKey(row.i18nKey);
-  return translatePush(locale, key, row.i18nParams ?? undefined, stored);
+  return translatePush(
+    locale,
+    key,
+    localizedPushParams(locale, row.i18nKey, row.i18nParams ?? undefined),
+    stored
+  );
 }
 
 /**

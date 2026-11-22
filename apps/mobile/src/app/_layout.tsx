@@ -1012,15 +1012,18 @@ function RootLayoutNav({
   // session behind it, so no read can answer for it: the exit is then the only
   // way out, it clears the explanation and reveals whatever the tree has
   // settled on (login when signed out), and it is labelled Continue rather
-  // than Sign out — there is nothing left to sign out of. Contact support sits
-  // beside it as the next step the copy names; it opens a mail to the support
-  // address and leaves the explanation up. A new sign-in clears it too, since
-  // that is the one event that proves the block no longer applies.
+  // than Sign out — there is nothing left to sign out of. A new sign-in clears
+  // it too, since that is the one event that proves the block no longer
+  // applies.
   //
-  // The raised value is the refusal reason, and it picks the actions: an
-  // account block offers Retry, while a domain refusal offers none (a re-read
-  // answers the same thing) and leads with Contact support. The overlay only
-  // renders with a non-null reason, so the surface always receives one.
+  // The raised value is the refusal reason, and it picks the actions. Contact
+  // support is the filled primary in every state: it is the only step that can
+  // change a block, and the copy says a fresh sign-in cannot. It opens a mail
+  // to the support address and leaves the explanation up. An account block
+  // keeps Retry as the outlined secondary under it; a domain refusal offers
+  // none (a re-read answers the same thing), so the exit takes that slot. The
+  // overlay only renders with a non-null reason, so the surface always
+  // receives one.
   const blockedAccountReason =
     blockedAccountExplanation !== null && bootstrapErrorOwnsScreen
       ? blockedAccountExplanation

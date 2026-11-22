@@ -2079,10 +2079,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             return;
           }
           if (page.kind !== 'success') {
-            // A retryable read keeps the generic retry copy the app already
-            // renders a Retry for; the terminal kinds name the history
-            // failure they are, so no surface offers a CTA a retry cannot
-            // recover.
+            // A retryable read keeps the generic retry copy the apps already
+            // classify as transient. The terminal kinds store the history copy
+            // instead of a connection error, so a surface that classifies the
+            // message (the mobile child sheet) neither offers nor claims a
+            // retry; a surface that always draws a retry still shows honest
+            // copy for a page a retry re-reads unchanged.
             storeChildHydrationFailure(
               storage,
               childSessionId,

@@ -2975,6 +2975,8 @@
     "why": "الغرض",
     "who": "الجهة المستلمة",
     "installAttributionPromptMessage": "يستخدم Kilo إذن التتبع من Apple فقط لمعرفة القناة التي أتيت منها. ولا يستخدم تعليماتك أو محادثاتك لهذا الغرض أبدًا.",
+    "installAttributionRequestFailedTitle": "تعذّر عرض مطالبة التتبع",
+    "installAttributionRequestFailedMessage": "تعذّر على Kilo عرض مطالبة النظام، لذا يبقى تحديد مصدر التثبيت معطّلًا.",
     "installAttributionPromptTitle": "السماح بتحديد مصدر التثبيت؟"
   },
   "prReview": {

@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Idivayisi yakho, i-Kilo Gateway enemodeli yokuguqula umbhalo oyikhethile, noma i-Apple noma i-Google ukuze kuqashelwe ku-inthanethi.",
     "installAttributionPromptTitle": "Uyafuna ukuvumela ukuhlonzwa komthombo wokufakwa?",
     "installAttributionPromptMessage": "I-Kilo isebenzisa imvume yokulandelela ka-Apple ukuze ithole kuphela ukuthi iyiphi indlela ekulethile lapha. Izicelo zakho nezingxoxo azisetshenziswa nhlobo.",
+    "installAttributionRequestFailedTitle": "Akukwazekanga ukubonisa isicelo sokulandelela",
+    "installAttributionRequestFailedMessage": "I-Kilo ayikwazanga ukubonisa isicelo sesistimu, ngakho ukuhlonza umthombo wokufakwa kuhlala kucishiwe.",
     "what": "Ini",
     "why": "Kungani",
     "who": "Ubani"

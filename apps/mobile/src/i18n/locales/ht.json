@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Aparèy ou, Kilo Gateway ak modèl transkripsyon ou chwazi a, oswa Apple oswa Google pou rekonesans sou entènèt.",
     "installAttributionPromptTitle": "Pèmèt idantifikasyon sous enstalasyon an?",
     "installAttributionPromptMessage": "Kilo itilize pèmisyon swivi Apple la sèlman pou konnen ki sous ki mennen ou isit la. Li pa janm itilize enstriksyon oswa konvèsasyon ou yo pou sa.",
+    "installAttributionRequestFailedTitle": "Nou pa t ka montre demann swivi a",
+    "installAttributionRequestFailedMessage": "Kilo pa t ka montre demann sistèm nan, kidonk idantifikasyon sous enstalasyon an rete dezaktive.",
     "what": "Kisa",
     "why": "Poukisa",
     "who": "Ki moun"

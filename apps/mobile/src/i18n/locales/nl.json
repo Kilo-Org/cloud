@@ -2827,6 +2827,8 @@
     "why": "Waarom",
     "who": "Wie",
     "installAttributionPromptMessage": "Kilo gebruikt de trackingtoestemming van Apple alleen om te bepalen via welk kanaal je de app hebt gevonden. Je prompts en gesprekken worden hiervoor nooit gebruikt.",
+    "installAttributionRequestFailedTitle": "Trackingprompt kon niet worden getoond",
+    "installAttributionRequestFailedMessage": "Kilo kon de systeemprompt niet tonen, dus installatiebron bijhouden blijft uit.",
     "installAttributionPromptTitle": "Bijhouden van de installatiebron toestaan?"
   },
   "prReview": {

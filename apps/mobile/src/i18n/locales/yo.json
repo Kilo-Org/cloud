@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Ẹ̀rọ rẹ, Kilo Gateway pẹ̀lú àwòṣe ìyípadà ọ̀rọ̀ tí o yàn, tàbí Apple tàbí Google fún ìdámọ̀ lórí ayélujára.",
     "installAttributionPromptTitle": "Yọ̀ǹda ìdánimọ̀ orísun fífi ohun èlò sórí ẹ̀rọ?",
     "installAttributionPromptMessage": "Kilo lo ìyọ̀ǹda ìtọpinpin Apple láti mọ ọ̀nà tí o gbà dé síbí nìkan. A kì í lo àwọn ọ̀rọ̀ ìtọ́ni àti ìjíròrò rẹ rárá.",
+    "installAttributionRequestFailedTitle": "A kò lè fi ìtọ́ni ìtọpinpin hàn",
+    "installAttributionRequestFailedMessage": "Kilo kò lè fi ìtọ́ni ètò ẹ̀rọ hàn, nítorí náà ìdánimọ̀ orísun fífi ohun èlò sórí ẹ̀rọ wà ní pípa.",
     "what": "Kí ni",
     "why": "Kí ló dé",
     "who": "Ta ni"

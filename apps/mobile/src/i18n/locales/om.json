@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Meeshaa keessan, Kilo Gateway moodeela hiikkaa isin filattaniin, yookaan Apple yookaan Google adda baasuu online.",
     "installAttributionPromptTitle": "Maddi fe'iinsaa akka beekamu hayyamtaa?",
     "installAttributionPromptMessage": "Kilo karaa asitti si fide beekuuf qofa hayyama hordoffii Apple fayyadama. Gaaffiiwwanii fi mariiwwan kee gonkumaa kanaaf hin fayyadamu.",
+    "installAttributionRequestFailedTitle": "Gaaffii hordoffii agarsiisuun hin danda'amne",
+    "installAttributionRequestFailedMessage": "Kilo gaaffii sirnaa agarsiisuu hin dandeenye, kanaaf maddi fe'iinsaa beekamuun cufaa ta'ee hafa.",
     "what": "Maal",
     "why": "Maaliif",
     "who": "Eenyu"

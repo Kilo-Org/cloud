@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "तपाईंको यन्त्र, तपाईंले छान्नुभएको ट्रान्सक्रिप्शन मोडेलसहित Kilo Gateway, वा अनलाइन पहिचानका लागि Apple वा Google।",
     "installAttributionPromptTitle": "स्थापनाको स्रोत पहिचान गर्न अनुमति दिने?",
     "installAttributionPromptMessage": "तपाईं कुन माध्यमबाट यहाँ आउनुभयो भन्ने थाहा पाउन मात्र Kilo ले Apple को ट्र्याकिङ अनुमति प्रयोग गर्छ। यसका लागि तपाईंका प्रम्प्टहरू र कुराकानीहरू कहिल्यै प्रयोग हुँदैनन्।",
+    "installAttributionRequestFailedTitle": "ट्र्याकिङ प्रम्प्ट देखाउन सकिएन",
+    "installAttributionRequestFailedMessage": "Kilo ले प्रणालीको प्रम्प्ट देखाउन सकेन, त्यसैले स्थापनाको स्रोत पहिचान बन्द रहन्छ।",
     "what": "के",
     "why": "किन",
     "who": "कसलाई"

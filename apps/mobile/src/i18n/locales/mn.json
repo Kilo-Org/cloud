@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Таны төхөөрөмж, таны сонгосон транскрипцийн модельтай Kilo Gateway, эсвэл онлайн танихын тулд Apple эсвэл Google.",
     "installAttributionPromptTitle": "Суулгасан эх үүсвэрийг тодорхойлохыг зөвшөөрөх үү?",
     "installAttributionPromptMessage": "Kilo нь Apple-ийн мөрдөх зөвшөөрлийг зөвхөн таныг аль сувгаар ирснийг мэдэхэд ашигладаг. Таны заавар болон харилцан яриаг үүнд хэзээ ч ашиглахгүй.",
+    "installAttributionRequestFailedTitle": "Мөрдөх зөвшөөрлийн хүсэлтийг харуулж чадсангүй",
+    "installAttributionRequestFailedMessage": "Kilo системийн хүсэлтийг харуулж чадсангүй тул суулгасан эх үүсвэрийг тодорхойлох идэвхгүй хэвээр үлдэнэ.",
     "what": "Юу",
     "why": "Яагаад",
     "who": "Хэн"

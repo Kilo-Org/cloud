@@ -2789,6 +2789,8 @@
     "revokeConsent": "Retirer le consentement",
     "revokeConsentTitle": "Retirer le consentement au partage des données ?",
     "installAttributionPromptMessage": "Kilo utilise l'autorisation de suivi d'Apple uniquement pour savoir comment vous avez découvert l'application. Vos consignes et conversations ne sont jamais utilisées.",
+    "installAttributionRequestFailedTitle": "Impossible d'afficher l'invite de suivi",
+    "installAttributionRequestFailedMessage": "Kilo n'a pas pu afficher l'invite système, donc le suivi de l'origine de l'installation reste désactivé.",
     "installAttributionPromptTitle": "Autoriser le suivi de l'origine de l'installation ?"
   },
   "agents": {

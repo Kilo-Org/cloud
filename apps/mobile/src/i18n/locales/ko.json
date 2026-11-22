@@ -2827,6 +2827,8 @@
     "why": "공유 목적",
     "who": "공유 대상",
     "installAttributionPromptMessage": "Kilo는 앱을 설치한 경로를 파악하는 데만 Apple의 추적 권한을 사용합니다. 프롬프트와 대화는 절대 사용하지 않습니다.",
+    "installAttributionRequestFailedTitle": "추적 프롬프트를 표시하지 못했습니다",
+    "installAttributionRequestFailedMessage": "Kilo가 시스템 프롬프트를 표시하지 못해 설치 경로 분석이 꺼진 채로 유지됩니다.",
     "installAttributionPromptTitle": "설치 경로 분석을 허용할까요?"
   },
   "prReview": {

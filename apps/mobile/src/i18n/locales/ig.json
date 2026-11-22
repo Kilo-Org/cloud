@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Ngwaọrụ gị, Kilo Gateway na ụdị ntụgharị okwu ị họọrọ, ma ọ bụ Apple ma ọ bụ Google maka mmata n'ịntanetị.",
     "installAttributionPromptTitle": "Kwe ka a mata ebe ị si nweta ngwa?",
     "installAttributionPromptMessage": "Kilo na-eji ikike nsuso Apple naanị iji mata ụzọ wetara gị ebe a. A naghị eji ihe ị na-ede ma ọ bụ mkparịta ụka gị eme nke a.",
+    "installAttributionRequestFailedTitle": "Enweghị ike igosi arịrịọ nsuso",
+    "installAttributionRequestFailedMessage": "Kilo enweghị ike igosi arịrịọ sistemụ, ya mere ịmata ebe e si nweta ngwa ka na-agbanyụ.",
     "what": "Gịnị",
     "why": "Gịnị kpatara",
     "who": "Ònye"

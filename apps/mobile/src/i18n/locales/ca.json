@@ -3450,6 +3450,8 @@
     "voiceTranscriptionWho": "El teu dispositiu, Kilo Gateway amb el model de transcripció que triïs, o Apple o Google per al reconeixement en línia.",
     "installAttributionPromptTitle": "Vols permetre l'atribució de la instal·lació?",
     "installAttributionPromptMessage": "Kilo només utilitza el permís de seguiment d'Apple per saber per quin canal has arribat aquí. Mai no s'utilitzen els teus missatges ni les teves converses.",
+    "installAttributionRequestFailedTitle": "No s'ha pogut mostrar la sol·licitud de seguiment",
+    "installAttributionRequestFailedMessage": "Kilo no ha pogut mostrar la sol·licitud del sistema, així que l'atribució de la instal·lació queda desactivada.",
     "what": "Què",
     "why": "Per què",
     "who": "Qui"

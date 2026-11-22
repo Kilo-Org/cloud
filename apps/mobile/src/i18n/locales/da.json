@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Din enhed, Kilo Gateway med den transskriptionsmodel, du har valgt, eller Apple eller Google til genkendelse online.",
     "installAttributionPromptTitle": "Tillad sporing af installationskilde?",
     "installAttributionPromptMessage": "Kilo bruger kun Apples sporingstilladelse til at se, hvilken kanal du fandt os gennem. Dine forespørgsler og samtaler bruges aldrig til dette.",
+    "installAttributionRequestFailedTitle": "Sporingsprompten kunne ikke vises",
+    "installAttributionRequestFailedMessage": "Kilo kunne ikke vise systemprompten, så sporing af installationskilde forbliver slået fra.",
     "what": "Hvad",
     "why": "Hvorfor",
     "who": "Hvem"

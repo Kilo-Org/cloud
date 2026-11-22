@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Сіздің құрылғыңыз, өзіңіз таңдаған транскрипция моделімен Kilo Gateway немесе онлайн тану үшін Apple немесе Google.",
     "installAttributionPromptTitle": "Орнату көзін анықтауға рұқсат бересіз бе?",
     "installAttributionPromptMessage": "Kilo Apple бақылау рұқсатын тек қай арна арқылы келгеніңізді білу үшін қолданады. Сұрауларыңыз бен сөйлесулеріңіз бұл мақсатта ешқашан қолданылмайды.",
+    "installAttributionRequestFailedTitle": "Бақылау сұрауын көрсету мүмкін болмады",
+    "installAttributionRequestFailedMessage": "Kilo жүйелік сұрауды көрсете алмады, сондықтан орнату көзін анықтау өшірулі күйінде қалады.",
     "what": "Қандай деректер",
     "why": "Не үшін",
     "who": "Кімге"

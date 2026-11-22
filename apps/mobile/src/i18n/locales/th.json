@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "อุปกรณ์ของคุณ, Kilo Gateway พร้อมโมเดลถอดเสียงที่คุณเลือก หรือ Apple หรือ Google สำหรับการรู้จำออนไลน์",
     "installAttributionPromptTitle": "อนุญาตการระบุแหล่งที่มาของการติดตั้งหรือไม่?",
     "installAttributionPromptMessage": "Kilo ใช้สิทธิ์การติดตามของ Apple เพื่อทราบว่าคุณมาจากช่องทางใดเท่านั้น เราจะไม่นำพรอมต์และการสนทนาของคุณมาใช้เพื่อการนี้",
+    "installAttributionRequestFailedTitle": "ไม่สามารถแสดงพรอมต์การติดตามได้",
+    "installAttributionRequestFailedMessage": "Kilo ไม่สามารถแสดงพรอมต์ของระบบได้ การระบุแหล่งที่มาของการติดตั้งจึงยังคงปิดอยู่",
     "what": "ข้อมูลที่แชร์",
     "why": "เหตุผลที่แชร์",
     "who": "ผู้รับข้อมูล"

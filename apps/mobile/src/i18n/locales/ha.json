@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Na'urar ka, Kilo Gateway tare da samfurin rubutun da ka zaɓa, ko Apple ko Google don ganewa ta kan layi.",
     "installAttributionPromptTitle": "A ba da izinin gano inda aka samo manhaja?",
     "installAttributionPromptMessage": "Kilo yana amfani da izinin bin diddigi na Apple kawai don sanin hanyar da ta kawo ka nan. Ba a taɓa amfani da umarnin aikinka ko tattaunawarka ba.",
+    "installAttributionRequestFailedTitle": "An kasa nuna buƙatar bin diddigi",
+    "installAttributionRequestFailedMessage": "Kilo ya kasa nuna buƙatar izini ta tsarin, don haka gano inda aka samo manhaja ya kasance a kashe.",
     "what": "Me",
     "why": "Me yasa",
     "who": "Wane"

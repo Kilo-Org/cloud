@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Ny fitaovanao, Kilo Gateway miaraka amin'ny maodely fanovana feo ho soratra nofidinao, na Apple na Google ho an'ny fanekena an-tsehatra.",
     "installAttributionPromptTitle": "Havela ve ny famantarana ny loharanon'ny fametrahana?",
     "installAttributionPromptMessage": "Ny hamantarana ny fantsona nahatongavanao teto ihany no ampiasan'ny Kilo ny alalana fanarahana omen'ny Apple. Tsy ampiasaina mihitsy ny toromarikanao sy ny resakao.",
+    "installAttributionRequestFailedTitle": "Tsy voaseho ny fangatahana fanarahana",
+    "installAttributionRequestFailedMessage": "Tsy afaka nasehon'ny Kilo ny fangatahana avy amin'ny rafitra, ka mijanona tsy mandeha ny famantarana ny loharanon'ny fametrahana.",
     "what": "Inona",
     "why": "Nahoana",
     "who": "Iza"

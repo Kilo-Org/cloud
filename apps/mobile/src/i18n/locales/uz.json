@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Qurilmangiz, siz tanlagan transkripsiya modeli bilan Kilo Gateway yoki onlayn tanib olish uchun Apple yoki Google.",
     "installAttributionPromptTitle": "O'rnatish manbasini aniqlashga ruxsat berilsinmi?",
     "installAttributionPromptMessage": "Kilo Apple tizimidagi kuzatish ruxsatidan faqat ilovani qaysi manba orqali topganingizni bilish uchun foydalanadi. Bunda so'rovlaringiz va suhbatlaringiz hech qachon ishlatilmaydi.",
+    "installAttributionRequestFailedTitle": "Kuzatish so'rovini ko'rsatib bo'lmadi",
+    "installAttributionRequestFailedMessage": "Kilo tizim so'rovini ko'rsata olmadi, shu sababli o'rnatish manbasini aniqlash o'chiq qoladi.",
     "what": "Qaysi ma'lumotlar",
     "why": "Nima uchun",
     "who": "Kimga"

@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Pajisja jote, Kilo Gateway me modelin e transkriptimit që zgjidhni, ose Apple ose Google për njohje në internet.",
     "installAttributionPromptTitle": "Të lejohet identifikimi i burimit të instalimit?",
     "installAttributionPromptMessage": "Kilo përdor lejen e gjurmimit të Apple vetëm për të mësuar se cili kanal të solli këtu. Kërkesat dhe bisedat e tua nuk përdoren kurrë.",
+    "installAttributionRequestFailedTitle": "Nuk u shfaq dot kërkesa e gjurmimit",
+    "installAttributionRequestFailedMessage": "Kilo nuk mundi të shfaqë kërkesën e sistemit, prandaj identifikimi i burimit të instalimit mbetet i fikur.",
     "what": "Çfarë",
     "why": "Pse",
     "who": "Kush"

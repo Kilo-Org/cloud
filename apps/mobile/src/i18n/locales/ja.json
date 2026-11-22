@@ -2827,6 +2827,8 @@
     "why": "利用目的",
     "who": "共有先",
     "installAttributionPromptMessage": "Kiloは、アプリのインストール元を把握するためにのみ、Appleのトラッキング権限を使用します。この目的でプロンプトや会話を使用することはありません。",
+    "installAttributionRequestFailedTitle": "トラッキングの確認を表示できませんでした",
+    "installAttributionRequestFailedMessage": "Kiloはシステムの確認画面を表示できなかったため、インストール元の特定はオフのままです。",
     "installAttributionPromptTitle": "インストール元の特定を許可しますか？"
   },
   "prReview": {

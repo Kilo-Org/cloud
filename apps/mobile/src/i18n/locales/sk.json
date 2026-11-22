@@ -3513,6 +3513,8 @@
     "voiceTranscriptionWho": "Tvoje zariadenie, Kilo Gateway s tebou zvoleným modelom prepisu alebo Apple či Google na rozpoznávanie online.",
     "installAttributionPromptTitle": "Povoliť zisťovanie zdroja inštalácie?",
     "installAttributionPromptMessage": "Kilo používa povolenie na sledovanie od spoločnosti Apple len na zistenie, odkiaľ si sa o aplikácii dozvedel. Tvoje zadania ani konverzácie na to nikdy nepoužívame.",
+    "installAttributionRequestFailedTitle": "Nepodarilo sa zobraziť výzvu na sledovanie",
+    "installAttributionRequestFailedMessage": "Kilo nemohlo zobraziť systémovú výzvu, preto zisťovanie zdroja inštalácie zostáva vypnuté.",
     "what": "Čo",
     "why": "Prečo",
     "who": "Kto"

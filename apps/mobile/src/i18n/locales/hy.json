@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Ձեր սարքը, ձեր ընտրած տեքստի փոխակերպման մոդելով Kilo Gateway-ը, կամ Apple-ը կամ Google-ը՝ առցանց ճանաչման համար։",
     "installAttributionPromptTitle": "Թույլատրե՞լ որոշել տեղադրման աղբյուրը",
     "installAttributionPromptMessage": "Kilo-ն Apple-ի հետագծման թույլտվությունն օգտագործում է միայն պարզելու համար, թե որ աղբյուրից եք եկել։ Ձեր հուշումներն ու զրույցները երբեք չեն օգտագործվում։",
+    "installAttributionRequestFailedTitle": "Չհաջողվեց ցուցադրել հետագծման թույլտվության հարցումը",
+    "installAttributionRequestFailedMessage": "Kilo-ն չկարողացավ ցուցադրել համակարգի հարցումը, ուստի տեղադրման աղբյուրի որոշումը մնում է անջատված։",
     "what": "Ի՞նչ",
     "why": "Ինչո՞ւ",
     "who": "Ո՞վ"

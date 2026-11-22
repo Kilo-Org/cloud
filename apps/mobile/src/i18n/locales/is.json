@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Tækið þitt, Kilo Gateway með umritunarlíkaninu sem þú velur, eða Apple eða Google fyrir auðkenningu á netinu.",
     "installAttributionPromptTitle": "Leyfa rakningu á uppruna uppsetningar?",
     "installAttributionPromptMessage": "Kilo notar rakningarheimild Apple aðeins til að sjá hvernig þú fannst forritið. Skilaboðin þín og samtöl eru aldrei notuð í þeim tilgangi.",
+    "installAttributionRequestFailedTitle": "Ekki tókst að sýna rakningarbeiðnina",
+    "installAttributionRequestFailedMessage": "Kilo gat ekki sýnt kerfisbeiðnina, svo rakning á uppruna uppsetningar helst óvirk.",
     "what": "Hvað",
     "why": "Hvers vegna",
     "who": "Hver"

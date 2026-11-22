@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Din enhet, Kilo Gateway med den transkriberingsmodell du väljer, eller Apple eller Google för identifiering online.",
     "installAttributionPromptTitle": "Tillåt spårning av installationskälla?",
     "installAttributionPromptMessage": "Kilo använder Apples spårningsbehörighet bara för att ta reda på vilken kanal du hittade appen genom. Dina prompter och konversationer används aldrig.",
+    "installAttributionRequestFailedTitle": "Det gick inte att visa förfrågan om spårning",
+    "installAttributionRequestFailedMessage": "Kilo kunde inte visa systemförfrågan, så spårningen av installationskälla förblir avstängd.",
     "what": "Vad",
     "why": "Varför",
     "who": "Vem"

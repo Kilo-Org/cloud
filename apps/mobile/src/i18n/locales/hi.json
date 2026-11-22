@@ -2827,6 +2827,8 @@
     "why": "क्यों",
     "who": "किसके साथ",
     "installAttributionPromptMessage": "Kilo, Apple की ट्रैकिंग अनुमति का उपयोग केवल यह जानने के लिए करता है कि आप किस माध्यम से यहाँ आए। आपके प्रॉम्प्ट और बातचीत का कभी उपयोग नहीं होता।",
+    "installAttributionRequestFailedTitle": "ट्रैकिंग प्रॉम्प्ट नहीं दिखाया जा सका",
+    "installAttributionRequestFailedMessage": "Kilo सिस्टम प्रॉम्प्ट नहीं दिखा सका, इसलिए इंस्टॉल के स्रोत की पहचान बंद रहती है।",
     "installAttributionPromptTitle": "इंस्टॉल के स्रोत की पहचान करने की अनुमति दें?"
   },
   "prReview": {

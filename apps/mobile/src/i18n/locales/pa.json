@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "ਤੁਹਾਡੀ ਡਿਵਾਈਸ, ਤੁਹਾਡੇ ਚੁਣੇ ਹੋਏ ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਮਾਡਲ ਨਾਲ Kilo Gateway, ਜਾਂ ਆਨਲਾਈਨ ਪਛਾਣ ਲਈ Apple ਜਾਂ Google।",
     "installAttributionPromptTitle": "ਕੀ ਇੰਸਟਾਲ ਕਰਨ ਦੇ ਸਰੋਤ ਦੀ ਪਛਾਣ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦੇਣੀ ਹੈ?",
     "installAttributionPromptMessage": "Kilo ਸਿਰਫ਼ ਇਹ ਜਾਣਨ ਲਈ Apple ਦੀ ਟ੍ਰੈਕਿੰਗ ਇਜਾਜ਼ਤ ਵਰਤਦਾ ਹੈ ਕਿ ਤੁਸੀਂ ਕਿਸ ਸਰੋਤ ਰਾਹੀਂ ਇੱਥੇ ਆਏ ਹੋ। ਇਸ ਲਈ ਤੁਹਾਡੇ ਪ੍ਰੌਂਪਟ ਅਤੇ ਗੱਲਬਾਤਾਂ ਕਦੇ ਨਹੀਂ ਵਰਤੇ ਜਾਂਦੇ।",
+    "installAttributionRequestFailedTitle": "ਟ੍ਰੈਕਿੰਗ ਪ੍ਰੌਂਪਟ ਦਿਖਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
+    "installAttributionRequestFailedMessage": "Kilo ਸਿਸਟਮ ਪ੍ਰੌਂਪਟ ਦਿਖਾਉਣ ਨਹੀਂ ਸਕਿਆ, ਇਸ ਲਈ ਇੰਸਟਾਲ ਕਰਨ ਦੇ ਸਰੋਤ ਦੀ ਪਛਾਣ ਬੰਦ ਰਹਿੰਦੀ ਹੈ।",
     "what": "ਕੀ",
     "why": "ਕਿਉਂ",
     "who": "ਕੌਣ"

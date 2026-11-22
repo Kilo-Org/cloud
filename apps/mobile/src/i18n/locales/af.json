@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Jou toestel, die Kilo Gateway met jou gekose transkripsiemodel, of Apple of Google vir aanlyn herkenning.",
     "installAttributionPromptTitle": "Installasietoeskrywing toelaat?",
     "installAttributionPromptMessage": "Kilo gebruik Apple se nasporingstoestemming net om vas te stel watter kanaal jou hierheen gebring het. Jou opdragte en gesprekke word nooit gebruik nie.",
+    "installAttributionRequestFailedTitle": "Kon nie die nasporingsversoek wys nie",
+    "installAttributionRequestFailedMessage": "Kilo kon nie die stelselversoek wys nie, daarom bly installasietoeskrywing uit.",
     "what": "Wat",
     "why": "Hoekom",
     "who": "Wie"

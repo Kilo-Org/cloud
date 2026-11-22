@@ -2827,6 +2827,8 @@
     "why": "用途",
     "who": "對象",
     "installAttributionPromptMessage": "Kilo 僅使用 Apple 的追蹤權限，了解你透過哪個管道安裝應用程式。絕不會使用你的提示詞或對話。",
+    "installAttributionRequestFailedTitle": "無法顯示追蹤提示",
+    "installAttributionRequestFailedMessage": "Kilo 無法顯示系統提示，因此安裝來源追蹤保持關閉。",
     "installAttributionPromptTitle": "允許追蹤安裝來源？"
   },
   "prReview": {

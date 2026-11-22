@@ -2864,6 +2864,8 @@
     "why": "לאיזו מטרה",
     "who": "למי נשלח",
     "installAttributionPromptMessage": "Kilo משתמש בהרשאת המעקב של Apple רק כדי לדעת מאיזה ערוץ הגעת. לעולם לא נעשה שימוש בהנחיות ובשיחות שלך למטרה הזו.",
+    "installAttributionRequestFailedTitle": "לא ניתן היה להציג את בקשת המעקב",
+    "installAttributionRequestFailedMessage": "Kilo לא הצליח להציג את הודעת המערכת, ולכן זיהוי מקור ההתקנה נשאר כבוי.",
     "installAttributionPromptTitle": "לאפשר זיהוי של מקור ההתקנה?"
   },
   "prReview": {

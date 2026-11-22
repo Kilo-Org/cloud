@@ -3513,6 +3513,8 @@
     "voiceTranscriptionWho": "Ваша прылада, Kilo Gateway з абранай вамі мадэллю распазнавання або Apple ці Google для анлайн-распазнавання.",
     "installAttributionPromptTitle": "Дазволіць вызначаць крыніцу ўсталявання?",
     "installAttributionPromptMessage": "Kilo выкарыстоўвае дазвол Apple на адсочванне толькі для вызначэння канала, праз які вы прыйшлі. Вашы запыты і размовы для гэтага ніколі не выкарыстоўваюцца.",
+    "installAttributionRequestFailedTitle": "Не ўдалося паказаць запыт аб адсочванні",
+    "installAttributionRequestFailedMessage": "Kilo не змог паказаць сістэмны запыт, таму вызначэнне крыніцы ўсталявання застаецца выключаным.",
     "what": "Якія даныя",
     "why": "Навошта",
     "who": "Каму"

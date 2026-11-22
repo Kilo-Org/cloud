@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Tō pūrere, te Kilo Gateway me tō kōwhiringa tauira tuhi ā-reo, te Apple, te Google rānei mō te āhukahuka tuihono.",
     "installAttributionPromptTitle": "Whakaaetia te tautohu i te pūtake tāuta?",
     "installAttributionPromptMessage": "Ka whakamahia e Kilo te whakaaetanga aroturuki a Apple hei kimi anake i te ara i tae mai ai koe ki konei. E kore rawa ō tohutohu me ō kōrerorero e whakamahia.",
+    "installAttributionRequestFailedTitle": "Kāore i taea te whakaatu i te pātai aroturuki",
+    "installAttributionRequestFailedMessage": "Kāore i taea e Kilo te whakaatu i te pātai a te pūnaha, nō reira ka noho weto tonu te tautohu i te pūtake tāuta.",
     "what": "He aha",
     "why": "He aha ai",
     "who": "Ko wai"

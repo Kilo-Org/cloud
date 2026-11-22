@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Kifaa chako, Kilo Gateway na modeli ya unukuzi uliyochagua, au Apple au Google kwa utambuzi mtandaoni.",
     "installAttributionPromptTitle": "Ungependa kuruhusu utambuzi wa chanzo cha usakinishaji?",
     "installAttributionPromptMessage": "Kilo hutumia ruhusa ya ufuatiliaji ya Apple kujua tu njia iliyokuleta hapa. Maagizo na mazungumzo yako hayatumiwi kamwe kwa hili.",
+    "installAttributionRequestFailedTitle": "Imeshindwa kuonyesha ombi la ufuatiliaji",
+    "installAttributionRequestFailedMessage": "Kilo haikuweza kuonyesha ombi la mfumo, kwa hivyo utambuzi wa chanzo cha usakinishaji unabaki umezimwa.",
     "what": "Nini",
     "why": "Kwa nini",
     "who": "Nani"

@@ -3450,6 +3450,8 @@
     "voiceTranscriptionWho": "Dispozitivul tău, Kilo Gateway cu modelul de transcriere ales, sau Apple ori Google pentru recunoaștere online.",
     "installAttributionPromptTitle": "Permiți identificarea sursei instalării?",
     "installAttributionPromptMessage": "Kilo folosește permisiunea de urmărire de la Apple doar pentru a afla prin ce canal ai ajuns aici. Instrucțiunile și conversațiile tale nu sunt niciodată folosite în acest scop.",
+    "installAttributionRequestFailedTitle": "Nu s-a putut afișa promptul de urmărire",
+    "installAttributionRequestFailedMessage": "Kilo nu a putut afișa promptul de sistem, așa că identificarea sursei instalării rămâne dezactivată.",
     "what": "Ce",
     "why": "De ce",
     "who": "Cine"

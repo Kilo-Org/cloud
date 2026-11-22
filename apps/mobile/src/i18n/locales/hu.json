@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Az eszközöd, a Kilo Gateway a választott átírási modelleddel, vagy az Apple vagy a Google az online felismeréshez.",
     "installAttributionPromptTitle": "Engedélyezed a telepítés forrásának azonosítását?",
     "installAttributionPromptMessage": "A Kilo az Apple követési engedélyét kizárólag arra használja, hogy megtudja, milyen csatornán jutottál el hozzánk. Az utasításaidat és beszélgetéseidet soha nem használjuk.",
+    "installAttributionRequestFailedTitle": "Nem sikerült megjeleníteni a követési engedélykérést",
+    "installAttributionRequestFailedMessage": "A Kilo nem tudta megjeleníteni a rendszer engedélykérését, ezért a telepítés forrásának azonosítása kikapcsolva marad.",
     "what": "Mit",
     "why": "Miért",
     "who": "Kivel"

@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "ئامێرەکەت، Kilo Gateway لەگەڵ مۆدێلی گۆڕینەوەی دەق کە هەڵتبژاردووە، یان Apple یان Google بۆ ناسینەوەی سەرهێڵ.",
     "installAttributionPromptTitle": "ڕێگەدان بە دیاریکردنی سەرچاوەی دامەزراندن؟",
     "installAttributionPromptMessage": "Kilo تەنها مۆڵەتی بەدواداچوونی Apple بەکار دەهێنێت بۆ زانینی ئەوەی لە چ ڕێگەیەکەوە هاتوویتە ئێرە. داواکاری و گفتوگۆکانت هەرگیز بۆ ئەمە بەکار ناهێنرێن.",
+    "installAttributionRequestFailedTitle": "نەتوانرا داواکاری بەدواداچوونەکە پیشان بدرێت",
+    "installAttributionRequestFailedMessage": "Kilo نەیتوانی داواکاری سیستەم پیشان بدات، بۆیە دیاریکردنی سەرچاوەی دامەزراندن ناچالاک دەمێنێتەوە.",
     "what": "چی",
     "why": "بۆچی",
     "who": "کێ"

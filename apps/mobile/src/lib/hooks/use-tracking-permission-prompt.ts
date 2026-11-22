@@ -70,6 +70,46 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
           return;
         }
 
+        // One request path for Continue and Retry. A native alert dismisses
+        // synchronously on a button press, so one alert cannot start two
+        // requests and a retry is user-driven: no extra admission guard.
+        const requestPermission = async (): Promise<void> => {
+          if (cancelled) {
+            return;
+          }
+
+          try {
+            await requestTrackingPermissionsAsync();
+          } catch (error) {
+            Sentry.captureException(error, {
+              tags: {
+                'error.subsystem': 'tracking_permission',
+                'error.operation': 'request_permission',
+              },
+            });
+            // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition -- the effect cleanup sets `cancelled` after this request settles
+            if (cancelled) {
+              return;
+            }
+            // The system prompt owns the outcome, so a failure only offers a
+            // retry: nothing here records the dismissal.
+            Alert.alert(
+              i18n.t('consent.installAttributionRequestFailedTitle'),
+              i18n.t('consent.installAttributionRequestFailedMessage'),
+              [
+                { text: i18n.t('common.cancel'), style: 'cancel' },
+                {
+                  text: i18n.t('common.retry'),
+                  onPress: () => {
+                    void requestPermission();
+                  },
+                },
+              ],
+              { cancelable: true }
+            );
+          }
+        };
+
         Alert.alert(
           i18n.t('consent.installAttributionPromptTitle'),
           i18n.t('consent.installAttributionPromptMessage'),
@@ -84,18 +124,7 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
             {
               text: i18n.t('common.continue'),
               onPress: () => {
-                void (async () => {
-                  try {
-                    await requestTrackingPermissionsAsync();
-                  } catch (error) {
-                    Sentry.captureException(error, {
-                      tags: {
-                        'error.subsystem': 'tracking_permission',
-                        'error.operation': 'request_permission',
-                      },
-                    });
-                  }
-                })();
+                void requestPermission();
               },
             },
           ],

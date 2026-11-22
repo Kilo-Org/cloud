@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "ឧបករណ៍របស់អ្នក Kilo Gateway ជាមួយម៉ូដែលបម្លែងសំឡេងជាអត្ថបទដែលអ្នកបានជ្រើស ឬ Apple ឬ Google សម្រាប់ការស្គាល់តាមអ៊ីនធឺណិត។",
     "installAttributionPromptTitle": "អនុញ្ញាតឱ្យស្គាល់ប្រភពដំឡើង?",
     "installAttributionPromptMessage": "Kilo ប្រើសិទ្ធិតាមដានរបស់ Apple តែដើម្បីដឹងថាអ្នកមកពីប្រភពណាប៉ុណ្ណោះ។ យើងមិនដែលប្រើសេចក្តីណែនាំ និងការសន្ទនារបស់អ្នកទេ។",
+    "installAttributionRequestFailedTitle": "មិនអាចបង្ហាញការស្នើសុំតាមដានបានទេ",
+    "installAttributionRequestFailedMessage": "Kilo មិនអាចបង្ហាញការស្នើសុំរបស់ប្រព័ន្ធបានទេ ដូច្នេះការស្គាល់ប្រភពដំឡើងនៅតែបិទ។",
     "what": "ទិន្នន័យអ្វីខ្លះ",
     "why": "គោលបំណង",
     "who": "អ្នកទទួល"

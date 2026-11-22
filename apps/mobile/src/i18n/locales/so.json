@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "Qalabkaaga, Kilo Gateway oo leh moodeelka qoraal-u-beddelka ee aad dooratay, ama Apple ama Google aqoonsiga online.",
     "installAttributionPromptTitle": "Ma oggolaanaysaa in la ogaado halka rakibaaddu ka timid?",
     "installAttributionPromptMessage": "Kilo wuxuu oggolaanshaha raadraaca Apple u isticmaalaa oo keliya inuu ogaado kanaalka ku keenay halkan. Tilmaamahaaga iyo wadahadalladaada marnaba lama isticmaalo.",
+    "installAttributionRequestFailedTitle": "Lama tusi karin codsiga raadraaca",
+    "installAttributionRequestFailedMessage": "Kilo ma tusi karin degdegga nidaamka, sidaas darteed raadinta halka rakibaaddu ka timid way dansan tahay.",
     "what": "Maxaa",
     "why": "Sababta",
     "who": "Yaa"

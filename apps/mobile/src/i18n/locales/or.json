@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "ଆପଣଙ୍କ ଡିଭାଇସ, ଆପଣ ବାଛିଥିବା ଟ୍ରାନ୍ସକ୍ରିପ୍ସନ ମଡେଲ ସହିତ Kilo Gateway, କିମ୍ବା ଅନଲାଇନ୍ ଚିହ୍ନଟ ପାଇଁ Apple କିମ୍ବା Google।",
     "installAttributionPromptTitle": "ଇନଷ୍ଟଲ୍‌ର ଉତ୍ସ ଚିହ୍ନଟ କରିବାକୁ ଅନୁମତି ଦେବେ?",
     "installAttributionPromptMessage": "କେଉଁ ମାଧ୍ୟମରୁ ଆପଣ ଏଠାକୁ ଆସିଛନ୍ତି, କେବଳ ତାହା ଜାଣିବାକୁ Kilo, Apple ର ଟ୍ରାକିଂ ଅନୁମତି ବ୍ୟବହାର କରେ। ଏଥିପାଇଁ ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ଓ ବାର୍ତ୍ତାଳାପ କେବେ ବି ବ୍ୟବହାର ହୁଏ ନାହିଁ।",
+    "installAttributionRequestFailedTitle": "ଟ୍ରାକିଂ ପ୍ରମ୍ପ୍ଟ ଦେଖାଯାଇପାରିଲା ନାହିଁ",
+    "installAttributionRequestFailedMessage": "Kilo ସିଷ୍ଟମ୍ ପ୍ରମ୍ପ୍ଟ ଦେଖାଇପାରିଲା ନାହିଁ, ତେଣୁ ଇନଷ୍ଟଲ୍‌ର ଉତ୍ସ ଚିହ୍ନଟ ବନ୍ଦ ରହିଛି।",
     "what": "କ'ଣ",
     "why": "କାହିଁକି",
     "who": "କିଏ"

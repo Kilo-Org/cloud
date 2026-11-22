@@ -2901,6 +2901,8 @@
     "why": "Finalidade",
     "who": "Destinatários",
     "installAttributionPromptMessage": "O Kilo usa a permissão de rastreamento da Apple apenas para saber qual canal trouxe você até aqui. Seus prompts e conversas nunca são usados.",
+    "installAttributionRequestFailedTitle": "Não foi possível mostrar o prompt de rastreamento",
+    "installAttributionRequestFailedMessage": "O Kilo não conseguiu mostrar o prompt do sistema, então a atribuição de instalação continua desativada.",
     "installAttributionPromptTitle": "Permitir atribuição de instalação?"
   },
   "prReview": {

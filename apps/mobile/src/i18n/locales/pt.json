@@ -3513,6 +3513,8 @@
     "voiceTranscriptionWho": "O teu dispositivo, Kilo Gateway com o modelo de transcrição que escolheres, ou a Apple ou a Google para reconhecimento online.",
     "installAttributionPromptTitle": "Permitir identificar a origem da instalação?",
     "installAttributionPromptMessage": "O Kilo usa a permissão de seguimento da Apple apenas para identificar o canal através do qual conheceu a aplicação. Os seus pedidos e conversas nunca são usados para este fim.",
+    "installAttributionRequestFailedTitle": "Não foi possível mostrar o prompt de seguimento",
+    "installAttributionRequestFailedMessage": "O Kilo não conseguiu mostrar a instrução do sistema, por isso a origem da instalação continua desativada.",
     "what": "O quê",
     "why": "Porquê",
     "who": "Quem"

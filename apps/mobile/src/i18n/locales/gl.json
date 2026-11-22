@@ -3387,6 +3387,8 @@
     "voiceTranscriptionWho": "O teu dispositivo, Kilo Gateway co modelo de transcrición que escollas, ou Apple ou Google para o recoñecemento en liña.",
     "installAttributionPromptTitle": "Permitir a atribución da instalación?",
     "installAttributionPromptMessage": "Kilo usa o permiso de seguimento de Apple só para saber por que canle chegaches á aplicación. As túas instrucións e conversas nunca se usan para isto.",
+    "installAttributionRequestFailedTitle": "Non se puido amosar o aviso de seguimento",
+    "installAttributionRequestFailedMessage": "Kilo non puido amosar o aviso do sistema, polo que a atribución da instalación segue desactivada.",
     "what": "Que se comparte",
     "why": "Para que",
     "who": "Con quen"

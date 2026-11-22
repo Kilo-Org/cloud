@@ -209,10 +209,7 @@ const IDLE_CHILD_SESSION_HYDRATION_STATE = {
  *   had history: rows existed and were dropped (`omittedItemCount > 0`), or
  *   the run admitted an initial turn that the page matched no rows for.
  */
-type TranscriptHistoryState =
-  | { kind: 'pending' }
-  | { kind: 'settled' }
-  | { kind: 'unreadable' };
+type TranscriptHistoryState = { kind: 'pending' } | { kind: 'settled' } | { kind: 'unreadable' };
 
 const EMPTY_REMOTE_MODEL_STATE = {
   ownerConnectionId: null,

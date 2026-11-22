@@ -11606,9 +11606,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       const mgr = createSessionManager(config);
 
       await mgr.switchSession(kiloId('ses-1'));
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'pending' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'pending',
+      });
 
       pageRead.resolve(
         makePage({
@@ -11617,9 +11617,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
         })
       );
       await settlePage();
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'settled' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'settled',
+      });
     });
 
     it('stays pending until the metadata can judge a zero-row page, then is unreadable', async () => {
@@ -11651,9 +11651,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await settlePage();
 
       // The page produced no row and nothing was omitted: not judgeable yet.
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'pending' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'pending',
+      });
 
       metadataRead.resolve({
         sessionId: workspaceSessionId,
@@ -11662,9 +11662,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       });
       await opening;
 
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'unreadable' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'unreadable',
+      });
     });
 
     it('settles as empty only once the metadata says no turn was admitted', async () => {
@@ -11694,9 +11694,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       const opening = mgr.switchSession(kiloId('ses-1'));
       await settlePage();
 
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'pending' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'pending',
+      });
 
       metadataRead.resolve({
         sessionId: workspaceSessionId,
@@ -11704,9 +11704,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       });
       await opening;
 
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'settled' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'settled',
+      });
     });
 
     it('settles as empty for a session with no admitted turn', async () => {
@@ -11724,9 +11724,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await mgr.switchSession(kiloId('ses-1'));
       await settlePage();
 
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'settled' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'settled',
+      });
     });
 
     it('is unreadable when the page omitted every row it carried', async () => {
@@ -11744,9 +11744,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await mgr.switchSession(kiloId('ses-1'));
       await settlePage();
 
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'unreadable' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'unreadable',
+      });
     });
 
     it('is unreadable when an admitted turn matched no rows', async () => {
@@ -11761,9 +11761,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await mgr.switchSession(kiloId('ses-1'));
       await settlePage();
 
-      expect(
-        atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)
-      ).toEqual({ kind: 'unreadable' });
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'unreadable',
+      });
     });
 
     it('settles on stored rows regardless of omissions', async () => {
@@ -11780,9 +11780,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await mgr.switchSession(kiloId('ses-1'));
       await settlePage();
 
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'settled' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'settled',
+      });
     });
 
     it('is unchanged by an older page', async () => {
@@ -11811,16 +11811,16 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       await settlePage();
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'unreadable' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'unreadable',
+      });
 
       await mgr.loadOlderMessages();
 
       // Older pages never decide the first page's outcome, even with rows.
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'unreadable' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'unreadable',
+      });
     });
 
     it('settles on /clear: a deliberately cleared view is empty, not unreadable', async () => {
@@ -11840,15 +11840,15 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       await settlePage();
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'unreadable' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'unreadable',
+      });
 
       mgr.clearTranscript();
 
-      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual(
-        { kind: 'settled' }
-      );
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'settled',
+      });
     });
   });
 

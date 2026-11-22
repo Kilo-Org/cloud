@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSegments } from 'expo-router';
 import { PlugZap, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +12,7 @@ import { PrReviewGateActionGroup } from '@/components/pr-review/pr-review-gate-a
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { PrReviewGateLoading } from '@/components/pr-review/pr-review-gate-loading';
+import { PrReviewGateSurface } from '@/components/pr-review/pr-review-gate-surface';
 import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
@@ -99,6 +101,9 @@ function GitHubConnectGate({
 }: Readonly<{ children: ReactNode; prRef?: ProviderPrRef }>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // The current route segments: an arm must not tear down a presented sheet
+  // (see `PrReviewGateSurface`).
+  const segments = useSegments();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
@@ -173,68 +178,79 @@ function GitHubConnectGate({
     organizationSelectionLoaded: true,
   });
 
-  if (view === 'error') {
-    return (
-      <View className="flex-1 bg-background">
-        <PrReviewGateHeader />
-        <QueryError
-          variant="server"
-          title={t('prReview.connect.checkFailedTitle')}
-          message={t('prReview.connect.checkFailedMessage')}
-          onRetry={() => {
-            void authorization.refetch();
-          }}
-          isRetrying={authorization.isFetching}
-        />
-      </View>
-    );
-  }
+  // The arms render into the keeper below instead of replacing the review
+  // subtree: a status change that arrives while a comment sheet is presented
+  // must not unmount the Stack that owns it.
+  function renderArm(): ReactNode {
+    if (view === 'error') {
+      return (
+        <View className="flex-1 bg-background">
+          <PrReviewGateHeader />
+          <QueryError
+            variant="server"
+            title={t('prReview.connect.checkFailedTitle')}
+            message={t('prReview.connect.checkFailedMessage')}
+            onRetry={() => {
+              void authorization.refetch();
+            }}
+            isRetrying={authorization.isFetching}
+          />
+        </View>
+      );
+    }
 
-  if (view === 'loading') {
-    return <PrReviewGateLoading />;
-  }
+    if (view === 'loading') {
+      return <PrReviewGateLoading />;
+    }
 
-  if (view === 'connect' || view === 'reconnect') {
-    const revoked = view === 'reconnect';
-    return (
-      <View className="flex-1 bg-background">
-        <PrReviewGateHeader />
-        <EmptyState
-          icon={revoked ? ShieldAlert : PlugZap}
-          iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
-          iconColor={iconColor}
-          title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
-          description={
-            <>
-              <PrReviewGateItemLine prRef={prRef} />
-              <Text variant="muted" className="text-center">
-                {/* The benefit line, not a second "Connect your GitHub account":
+    if (view === 'connect' || view === 'reconnect') {
+      const revoked = view === 'reconnect';
+      return (
+        <View className="flex-1 bg-background">
+          <PrReviewGateHeader />
+          <EmptyState
+            icon={revoked ? ShieldAlert : PlugZap}
+            iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
+            iconColor={iconColor}
+            title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
+            description={
+              <>
+                <PrReviewGateItemLine prRef={prRef} />
+                <Text variant="muted" className="text-center">
+                  {/* The benefit line, not a second "Connect your GitHub account":
                     the title and the CTA already name the action, and the item
                     and scope lines above give the context. The reconnect arm's
                     key states the cause only, for the same reason. */}
-                {revoked
-                  ? t('prReview.connect.reconnectDescription')
-                  : t('common.prReviewSubtitle')}
-              </Text>
-            </>
-          }
-          action={
-            <PrReviewGateActionGroup>
-              <StateAction
-                label={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
-                icon={GitHubIcon}
-                loading={connecting}
-                disabled={connecting}
-                onPress={() => {
-                  void handleConnect();
-                }}
-              />
-            </PrReviewGateActionGroup>
-          }
-        />
-      </View>
-    );
+                  {revoked
+                    ? t('prReview.connect.reconnectDescription')
+                    : t('common.prReviewSubtitle')}
+                </Text>
+              </>
+            }
+            action={
+              <PrReviewGateActionGroup>
+                <StateAction
+                  label={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
+                  icon={GitHubIcon}
+                  loading={connecting}
+                  disabled={connecting}
+                  onPress={() => {
+                    void handleConnect();
+                  }}
+                />
+              </PrReviewGateActionGroup>
+            }
+          />
+        </View>
+      );
+    }
+
+    return null;
   }
 
-  return <>{children}</>;
+  return (
+    <PrReviewGateSurface arm={renderArm()} segments={segments}>
+      {children}
+    </PrReviewGateSurface>
+  );
 }

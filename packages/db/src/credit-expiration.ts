@@ -49,9 +49,7 @@ export type ExpiringTransaction = Pick<
 
 export type DrizzleTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 export type EntityForExpiration = { id: string; microdollars_used: number };
-export type OrganizationForExpiration = {
-  id: string;
-  microdollars_used: number;
+export type OrganizationForExpiration = EntityForExpiration & {
   next_credit_expiration_at: string | null;
   total_microdollars_acquired: number;
 };

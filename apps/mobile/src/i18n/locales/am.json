@@ -555,7 +555,10 @@
     "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
     "changelogAreas": {
       "signIn": "መግቢያ",
-      "profileOrganizations": "መገለጫና ድርጅቶች"
+      "profileOrganizations": "መገለጫና ድርጅቶች",
+      "chat": "ውይይት",
+      "notifications": "ማሳወቂያዎች",
+      "integrations": "ውህደቶች"
     }
   },
   "preferences": {

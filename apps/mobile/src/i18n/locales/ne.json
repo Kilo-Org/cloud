@@ -555,7 +555,10 @@
     "changelogFixesPolish": "सम्पूर्ण एपमा समाधान र सुधारहरू।",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल तथा संस्थाहरू"
+      "profileOrganizations": "प्रोफाइल तथा संस्थाहरू",
+      "chat": "कुराकानी",
+      "notifications": "सूचनाहरू",
+      "integrations": "एकीकरणहरू"
     }
   },
   "preferences": {

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Marekebisho na maboresho katika {{areas}}.",
     "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
     "changelogAreas": {
-      "signIn": "Kuingia",
-      "profileOrganizations": "Wasifu & mashirika"
+      "signIn": "kuingia",
+      "profileOrganizations": "wasifu & mashirika",
+      "chat": "mazungumzo",
+      "notifications": "arifa",
+      "integrations": "miunganisho"
     }
   },
   "preferences": {

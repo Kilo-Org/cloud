@@ -555,8 +555,11 @@
     "changelogFixesIn": "Remedieri și îmbunătățiri în {{areas}}.",
     "changelogFixesPolish": "Remedieri și îmbunătățiri în întreaga aplicație.",
     "changelogAreas": {
-      "signIn": "Autentificare",
-      "profileOrganizations": "Profil & organizații"
+      "signIn": "autentificare",
+      "profileOrganizations": "profil & organizații",
+      "chat": "conversații",
+      "notifications": "notificări",
+      "integrations": "integrări"
     }
   },
   "preferences": {

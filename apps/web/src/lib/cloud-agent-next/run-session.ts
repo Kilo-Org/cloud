@@ -7,6 +7,7 @@ import type { CloudAgentEvent, StreamError } from './event-types';
 import type { CloudAgentNextClient } from './cloud-agent-client';
 import { InsufficientCreditsError } from './cloud-agent-client';
 import type { PrepareSessionInput } from './cloud-agent-client';
+import { createBoundedStatusLog } from './bounded-status-log';
 
 /**
  * Server-side helper for running a cloud-agent-next session to completion.
@@ -20,6 +21,11 @@ const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL');
 
 const DEFAULT_STREAM_TIMEOUT_MS = 15 * 60 * 1000;
 const COMPLETE_GRACE_MS = 1000; // Wait 1s after 'complete' for final events
+// The chat surface posts at most 2000 characters of a reply, so the detail
+// lines are sized to whatever that leaves after the header, the error text and
+// the omitted-line note.
+const CHAT_REPLY_MAX_LENGTH = 2000;
+const OMITTED_NOTE_RESERVE = 40;
 
 /**
  * Resolve a (possibly relative) stream URL returned by initiateFromPreparedSession
@@ -78,6 +84,23 @@ export function extractTextFromMessage(message: ProcessedMessage): string {
 export const INSUFFICIENT_CREDITS_RESPONSE =
   'Cannot start a Cloud Agent session: this account or organization has insufficient credits. ' +
   'Add credits in Kilo Code settings and try again.';
+/**
+ * Keep the newest lines whose joined length fits the budget, oldest first, so a
+ * reader who sees only the start of the reply still sees the latest state.
+ */
+function newestLines(lines: readonly string[], budget: number): readonly string[] {
+  const kept: string[] = [];
+  let used = 0;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (line === undefined) break;
+    if (used + line.length + 1 > budget) break;
+    kept.unshift(line);
+    used += line.length + 1;
+  }
+  return kept;
+}
+
 /** Input for runSessionToCompletion */
 export type RunSessionInput = {
   /** An already-constructed CloudAgentNextClient (caller owns auth / balance-check config). */
@@ -125,7 +148,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   } = input;
   const streamTimeoutMs = input.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS;
 
-  const statusMessages: string[] = [];
+  const log = createBoundedStatusLog();
   let completionResult: string | undefined;
   let sessionId: string | undefined;
   let kiloSessionId: string | undefined;
@@ -143,7 +166,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       return {
         response: INSUFFICIENT_CREDITS_RESPONSE,
         hasError: true,
-        statusMessages,
+        statusMessages: [...log.entries()],
       };
     }
     const msg = error instanceof Error ? error.message : String(error);
@@ -152,14 +175,14 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       response: `Error preparing Cloud Agent: ${msg}`,
       sessionId,
       hasError: true,
-      statusMessages,
+      statusMessages: [...log.entries()],
     };
   }
 
   if (!sessionId || !kiloSessionId) {
     const msg = 'Session preparation did not return session IDs.';
     console.error(`${logPrefix} ${msg}`);
-    return { response: msg, sessionId, hasError: true, statusMessages };
+    return { response: msg, sessionId, hasError: true, statusMessages: [...log.entries()] };
   }
 
   let streamUrl: string;
@@ -180,7 +203,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
         response: INSUFFICIENT_CREDITS_RESPONSE,
         sessionId,
         hasError: true,
-        statusMessages,
+        statusMessages: [...log.entries()],
       };
     }
     const msg = error instanceof Error ? error.message : String(error);
@@ -189,7 +212,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       response: `Error initiating Cloud Agent: ${msg}`,
       sessionId,
       hasError: true,
-      statusMessages,
+      statusMessages: [...log.entries()],
     };
   }
 
@@ -209,7 +232,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       response: `Error resolving stream URL: ${msg}`,
       sessionId,
       hasError: true,
-      statusMessages,
+      statusMessages: [...log.entries()],
     };
   }
 
@@ -281,7 +304,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       switch (event.streamEventType) {
         case 'complete': {
           const data = event.data as { exitCode?: number; metadata?: { executionTimeMs?: number } };
-          statusMessages.push(
+          log.push(
             `Session completed${data?.metadata?.executionTimeMs !== undefined ? ` in ${data.metadata.executionTimeMs}ms` : ''} with exit code ${data?.exitCode ?? 'unknown'}`
           );
           scheduleCompleteGrace();
@@ -290,7 +313,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
         case 'error': {
           const data = event.data as { error?: string };
           const text = data?.error ?? 'Cloud Agent error';
-          statusMessages.push(`Error: ${text}`);
+          log.push(`Error: ${text}`);
           hasError = true;
           errorMessage = text;
           resolveOnce();
@@ -299,7 +322,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
         case 'interrupted': {
           const data = event.data as { reason?: string };
           const reason = data?.reason ?? 'Session interrupted';
-          statusMessages.push(`Session interrupted: ${reason}`);
+          log.push(`Session interrupted: ${reason}`);
           hasError = true;
           errorMessage = reason;
           resolveOnce();
@@ -308,7 +331,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
         case 'cloud.message.failed': {
           const data = event.data as { error?: string };
           const text = data?.error ?? 'Queued message delivery failed';
-          statusMessages.push(`Message failed before execution: ${text}`);
+          log.push(`Message failed before execution: ${text}`);
           hasError = true;
           errorMessage = text;
           resolveOnce();
@@ -317,14 +340,14 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
         case 'output': {
           const data = event.data as { source?: string; content?: string };
           if (data?.source === 'stderr') {
-            statusMessages.push(`[stderr] ${data.content ?? ''}`.trim());
+            log.push(`[stderr] ${data.content ?? ''}`.trim());
             hasError = true;
           }
           break;
         }
         case 'status': {
           const data = event.data as { message?: string };
-          if (data?.message) statusMessages.push(data.message);
+          if (data?.message) log.push(data.message);
           break;
         }
       }
@@ -363,16 +386,35 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   wsManager.disconnect();
 
   console.log(
-    `${logPrefix} Stream completed. statusMessages=${statusMessages.length}, hasResult=${!!completionResult}`
+    `${logPrefix} Stream completed. statusMessages=${log.entries().length}, dropped=${log.droppedCount()}, hasResult=${!!completionResult}`
   );
 
+  const droppedCount = log.droppedCount();
+  // The Discord caller keeps only the first ~2000 characters of this reply.
+  // Two kinds of line never reach it: the ones the log let go, and the retained
+  // ones too old to fit what the reply shows. One note counts both.
+  const missingNote = (shown: number) => {
+    const missing = droppedCount + log.entries().length - shown;
+    return missing > 0 ? `(+${missing} earlier lines omitted)` : undefined;
+  };
+
   if (hasError) {
-    const details = [errorMessage, ...statusMessages].filter(Boolean).join('\n');
+    // The chat surface posts only the first part of this reply, so the detail
+    // lines take whatever the header, the error text and the note leave. The
+    // newest lines are the ones kept: a forward slice would spend the visible
+    // space on the oldest diagnostics.
+    const header = `Cloud Agent session ${sessionId} encountered errors:`;
+    const budget = Math.max(
+      0,
+      CHAT_REPLY_MAX_LENGTH - header.length - (errorMessage?.length ?? 0) - OMITTED_NOTE_RESERVE
+    );
+    const shown = newestLines(log.entries(), budget);
+    const details = [errorMessage, missingNote(shown.length), ...shown].filter(Boolean).join('\n');
     return {
-      response: `Cloud Agent session ${sessionId} encountered errors:\n${details}`,
+      response: `${header}\n${details}`,
       sessionId,
       hasError: true,
-      statusMessages,
+      statusMessages: [...log.entries()],
     };
   }
 
@@ -381,14 +423,16 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       response: `Cloud Agent session ${sessionId} completed:\n\n${completionResult}`,
       sessionId,
       hasError: false,
-      statusMessages,
+      statusMessages: [...log.entries()],
     };
   }
 
+  const recent = log.entries().slice(-5);
+  const tail = [missingNote(recent.length), ...recent].filter(Boolean).join('\n');
   return {
-    response: `Cloud Agent session ${sessionId} completed successfully.\n\nStatus:\n${statusMessages.slice(-5).join('\n')}`,
+    response: `Cloud Agent session ${sessionId} completed successfully.\n\nStatus:\n${tail}`,
     sessionId,
     hasError: false,
-    statusMessages,
+    statusMessages: [...log.entries()],
   };
 }

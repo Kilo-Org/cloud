@@ -554,8 +554,11 @@
     "changelogFixesIn": "Mga pag-aayos at pagpapahusay sa {{areas}}.",
     "changelogFixesPolish": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
     "changelogAreas": {
-      "signIn": "Pagpasok",
-      "profileOrganizations": "Propayl pati mga organisasyon"
+      "signIn": "pagpasok",
+      "profileOrganizations": "propayl pati mga organisasyon",
+      "chat": "usapan",
+      "notifications": "mga abiso",
+      "integrations": "mga integration"
     }
   },
   "preferences": {

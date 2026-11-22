@@ -554,8 +554,11 @@
     "changelogFixesIn": "Ukulungiswa nokuthuthukiswa kulezi zingxenye: {{areas}}.",
     "changelogFixesPolish": "Ukulungiswa nokuthuthukiswa kulo lonke uhlelo lokusebenza.",
     "changelogAreas": {
-      "signIn": "Ukungena ngemvume",
-      "profileOrganizations": "Iphrofayela nezinhlangano"
+      "signIn": "ukungena ngemvume",
+      "profileOrganizations": "iphrofayela nezinhlangano",
+      "chat": "ingxoxo",
+      "notifications": "izaziso",
+      "integrations": "ukuhlanganiswa"
     }
   },
   "preferences": {

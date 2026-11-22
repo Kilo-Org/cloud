@@ -556,7 +556,10 @@
     "changelogFixesPolish": "תיקונים ושיפורים בכל האפליקציה.",
     "changelogAreas": {
       "signIn": "התחברות",
-      "profileOrganizations": "פרופיל וארגונים"
+      "profileOrganizations": "פרופיל וארגונים",
+      "chat": "צ׳אט",
+      "notifications": "התראות",
+      "integrations": "אינטגרציות"
     }
   },
   "preferences": {

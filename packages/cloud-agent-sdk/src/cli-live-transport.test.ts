@@ -21,6 +21,7 @@ import {
 } from './user-web-connection';
 import type { KiloSessionId, SessionSnapshot, SessionSnapshotPageOutcome } from './types';
 import type { SessionSnapshotFailure } from './snapshot-page';
+import { CLI_SNAPSHOT_BUFFER_MAX_EVENTS, CLI_SNAPSHOT_REPLAY_DEADLINE_MS } from './limits';
 import { kiloId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 import type { RemoteAttachmentPart } from './transport';
 
@@ -3806,12 +3807,15 @@ describe('CliLiveTransport exitSession', () => {
 
 type FetchPage = (
   kiloSessionId: KiloSessionId,
-  options: { cursor?: string }
+  options: { cursor?: string; signal?: AbortSignal }
 ) => Promise<SessionSnapshotPageOutcome | null>;
 
 type CreatePageTransportOptions = {
   fetchSnapshotPage: FetchPage;
-  fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot?: (
+    kiloSessionId: KiloSessionId,
+    options?: { signal?: AbortSignal }
+  ) => Promise<SessionSnapshot>;
   onInitialPageLoaded?: (page: {
     info: { id: string };
     messages: Array<{ info: { id: string; sessionID: string }; parts: unknown[] }>;
@@ -3885,7 +3889,9 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(fetchSnapshotPage).toHaveBeenCalledWith(KILO_SESSION_ID, {});
+    expect(fetchSnapshotPage).toHaveBeenCalledWith(KILO_SESSION_ID, {
+      signal: expect.any(AbortSignal),
+    });
     expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
     // session.created from the page must have flowed through.
     expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
@@ -4161,6 +4167,134 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     expect(chatEvents).toHaveLength(1);
     expect(getReplayCompleteCount()).toBeGreaterThanOrEqual(2);
     transport.destroy();
+  });
+
+  it('releases the buffer at the replay deadline when a page read stalls', async () => {
+    jest.useFakeTimers();
+    try {
+      // This package's `lib` target predates `Promise.withResolvers`.
+      let resolvePage!: (page: SessionSnapshotPageOutcome | null) => void;
+      let readOptions: { cursor?: string; signal?: AbortSignal } | undefined;
+      const {
+        transport,
+        userWebConnection,
+        chatEvents,
+        onError,
+        onInitialPageLoaded,
+        getReplayCompleteCount,
+      } = createPageTransport({
+        fetchSnapshotPage: (_kiloSessionId, options) => {
+          readOptions = options;
+          return new Promise<SessionSnapshotPageOutcome | null>(resolve => {
+            resolvePage = resolve;
+          });
+        },
+      });
+
+      transport.connect();
+      await Promise.resolve();
+
+      // The live event waits behind the stalled read; it must not be held for
+      // the whole attach.
+      emitMessageUpdated(userWebConnection);
+      expect(chatEvents).toHaveLength(0);
+      expect(getReplayCompleteCount()).toBe(0);
+
+      jest.advanceTimersByTime(CLI_SNAPSHOT_REPLAY_DEADLINE_MS);
+      await Promise.resolve();
+
+      expect(readOptions?.signal?.aborted).toBe(true);
+      expect(chatEvents).toHaveLength(1);
+      expect(getReplayCompleteCount()).toBe(1);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+        kind: 'retryable_failure',
+        message: 'Session history temporarily unavailable',
+      });
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+
+      // A page that lands after the deadline is dropped rather than replayed
+      // over the event already delivered.
+      resolvePage(makeLivePage());
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(chatEvents).toHaveLength(1);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(getReplayCompleteCount()).toBe(1);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('settles the read when the buffer reaches the cap and delivers every event in order once', async () => {
+    const { transport, userWebConnection, chatEvents, onError, getReplayCompleteCount } =
+      createPageTransport({
+        fetchSnapshotPage: () => new Promise<SessionSnapshotPageOutcome | null>(() => undefined),
+      });
+
+    transport.connect();
+    await Promise.resolve();
+
+    for (let index = 0; index < CLI_SNAPSHOT_BUFFER_MAX_EVENTS; index += 1) {
+      userWebConnection.emitCli({
+        sessionId: KILO_SESSION_ID,
+        event: 'message.updated',
+        data: {
+          info: {
+            id: `msg-${index}`,
+            sessionID: KILO_SESSION_ID,
+            role: 'assistant',
+            time: { created: 1 },
+          },
+        },
+      });
+    }
+
+    const deliveredIds = chatEvents.map(event =>
+      event.type === 'message.updated' ? event.info.id : event.type
+    );
+    expect(deliveredIds).toEqual(
+      Array.from({ length: CLI_SNAPSHOT_BUFFER_MAX_EVENTS }, (_, index) => `msg-${index}`)
+    );
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+      kind: 'retryable_failure',
+      message: 'Session history temporarily unavailable',
+    });
+    expect(getReplayCompleteCount()).toBe(1);
+    transport.destroy();
+  });
+
+  it('aborts the pending read on destroy and drops the buffered event', async () => {
+    jest.useFakeTimers();
+    try {
+      let readOptions: { cursor?: string; signal?: AbortSignal } | undefined;
+      const { transport, userWebConnection, chatEvents, getReplayCompleteCount } =
+        createPageTransport({
+          fetchSnapshotPage: (_kiloSessionId, options) => {
+            readOptions = options;
+            return new Promise<SessionSnapshotPageOutcome | null>(() => undefined);
+          },
+        });
+
+      transport.connect();
+      await Promise.resolve();
+      expect(readOptions?.signal?.aborted).toBe(false);
+
+      emitMessageUpdated(userWebConnection);
+      expect(chatEvents).toHaveLength(0);
+
+      transport.destroy();
+
+      expect(readOptions?.signal?.aborted).toBe(true);
+      expect(jest.getTimerCount()).toBe(0);
+      await Promise.resolve();
+      expect(chatEvents).toHaveLength(0);
+      expect(getReplayCompleteCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

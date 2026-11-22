@@ -555,7 +555,10 @@
     "changelogFixesPolish": "ការជួសជុល និងការកែលម្អនៅទូទាំងកម្មវិធី។",
     "changelogAreas": {
       "signIn": "ការចូល",
-      "profileOrganizations": "ប្រវត្តិរូប និងស្ថាប័ន"
+      "profileOrganizations": "ប្រវត្តិរូប និងស្ថាប័ន",
+      "chat": "ជជែក",
+      "notifications": "ការជូនដំណឹង",
+      "integrations": "ការរួមបញ្ចូល"
     }
   },
   "preferences": {

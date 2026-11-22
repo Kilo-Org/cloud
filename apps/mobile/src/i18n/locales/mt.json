@@ -557,8 +557,11 @@
     "changelogFixesIn": "Tiswijiet u titjib f'dawn l-oqsma: {{areas}}.",
     "changelogFixesPolish": "Tiswijiet u titjib fl-applikazzjoni kollha.",
     "changelogAreas": {
-      "signIn": "Dħul",
-      "profileOrganizations": "Profil & organizzazzjonijiet"
+      "signIn": "dħul",
+      "profileOrganizations": "profil & organizzazzjonijiet",
+      "chat": "taħdit",
+      "notifications": "notifiki",
+      "integrations": "integrazzjonijiet"
     }
   },
   "preferences": {

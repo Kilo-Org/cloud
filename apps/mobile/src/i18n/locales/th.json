@@ -555,7 +555,10 @@
     "changelogFixesPolish": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
     "changelogAreas": {
       "signIn": "การลงชื่อเข้าใช้",
-      "profileOrganizations": "โปรไฟล์กับองค์กร"
+      "profileOrganizations": "โปรไฟล์กับองค์กร",
+      "chat": "แชท",
+      "notifications": "การแจ้งเตือน",
+      "integrations": "การเชื่อมต่อ"
     }
   },
   "preferences": {

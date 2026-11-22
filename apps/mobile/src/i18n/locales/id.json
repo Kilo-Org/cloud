@@ -554,8 +554,11 @@
     "changelogFixesIn": "Perbaikan dan peningkatan pada {{areas}}.",
     "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
     "changelogAreas": {
-      "signIn": "Masuk",
-      "profileOrganizations": "Profil & organisasi"
+      "signIn": "masuk",
+      "profileOrganizations": "profil & organisasi",
+      "chat": "obrolan",
+      "notifications": "notifikasi",
+      "integrations": "integrasi"
     }
   },
   "preferences": {

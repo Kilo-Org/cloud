@@ -555,7 +555,10 @@
     "changelogFixesPolish": "त्रुटि-सुधार और बेहतरी।",
     "changelogAreas": {
       "signIn": "साइन-इन",
-      "profileOrganizations": "प्रोफ़ाइल व संगठन"
+      "profileOrganizations": "प्रोफ़ाइल व संगठन",
+      "chat": "चैट",
+      "notifications": "सूचनाएँ",
+      "integrations": "इंटीग्रेशन"
     }
   },
   "preferences": {

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Các bản sửa lỗi và cải tiến trong {{areas}}.",
     "changelogFixesPolish": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
     "changelogAreas": {
-      "signIn": "Đăng nhập",
-      "profileOrganizations": "Hồ sơ & tổ chức"
+      "signIn": "đăng nhập",
+      "profileOrganizations": "hồ sơ & tổ chức",
+      "chat": "trò chuyện",
+      "notifications": "thông báo",
+      "integrations": "tích hợp"
     }
   },
   "preferences": {

@@ -555,7 +555,10 @@
     "changelogFixesPolish": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
     "changelogAreas": {
       "signIn": "ସାଇନ୍ ଇନ୍",
-      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ"
+      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ",
+      "chat": "ଚାଟ୍",
+      "notifications": "ବିଜ୍ଞପ୍ତି",
+      "integrations": "ଇଣ୍ଟିଗ୍ରେସନ୍"
     }
   },
   "preferences": {

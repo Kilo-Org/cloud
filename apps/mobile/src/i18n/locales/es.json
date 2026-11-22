@@ -555,8 +555,11 @@
     "changelogFixesIn": "Correcciones y mejoras en {{areas}}.",
     "changelogFixesPolish": "Correcciones y mejoras en toda la aplicación.",
     "changelogAreas": {
-      "signIn": "Inicio de sesión",
-      "profileOrganizations": "Perfil & organizaciones"
+      "signIn": "inicio de sesión",
+      "profileOrganizations": "perfil & organizaciones",
+      "chat": "conversación",
+      "notifications": "notificaciones",
+      "integrations": "integraciones"
     }
   },
   "preferences": {

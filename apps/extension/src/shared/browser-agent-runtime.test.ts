@@ -26,6 +26,7 @@ import {
   ORIGIN_CHANGED_ERROR,
   SENSITIVE_REASON,
 } from './browser-agent-checks';
+import type { BrowserGrant } from './browser-agent-checks';
 import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
 import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
 import { createDownloadHold } from './browser-download-hold';

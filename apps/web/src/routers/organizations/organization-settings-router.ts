@@ -87,7 +87,9 @@ function createAccessListsDiffMessage(
 
   if (old.provider_allow_list !== newSettings.provider_allow_list) {
     const oldProviders = new Set(normalizeInferenceProviderIds(old.provider_allow_list || []));
-    const newProviders = new Set(normalizeInferenceProviderIds(newSettings.provider_allow_list || []));
+    const newProviders = new Set(
+      normalizeInferenceProviderIds(newSettings.provider_allow_list || [])
+    );
 
     const added = [...newProviders].filter(provider => !oldProviders.has(provider));
     const removed = [...oldProviders].filter(provider => !newProviders.has(provider));
@@ -529,7 +531,8 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const currentSettings = organization.settings || {};
             const settingsUpdate: OrganizationSettings = { ...currentSettings };
             if (provider_allow_list !== undefined) {
-              settingsUpdate.provider_allow_list = normalizeInferenceProviderIds(provider_allow_list);
+              settingsUpdate.provider_allow_list =
+                normalizeInferenceProviderIds(provider_allow_list);
             }
             if (model_deny_list !== undefined) {
               settingsUpdate.model_deny_list = dedupeModels(model_deny_list);

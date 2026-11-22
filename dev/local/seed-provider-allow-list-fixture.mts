@@ -121,7 +121,12 @@ await db
   })
   .onConflictDoUpdate({
     target: organizations.id,
-    set: { settings, plan: 'enterprise', require_seats: false, created_at: createdAt.toISOString() },
+    set: {
+      settings,
+      plan: 'enterprise',
+      require_seats: false,
+      created_at: createdAt.toISOString(),
+    },
   });
 
 await db

@@ -112,6 +112,23 @@ describe('Telugu Code Reviewer feature copy', () => {
     }
   });
 
+  it('names the feature one way across the banner card and its screens', () => {
+    expect(i18n.t('common.codeReviewer')).toBe('Code Reviewer');
+    expect(i18n.t('codeReviewer.actionRequired.selectedModelUnavailable.recoveryLabel')).toBe(
+      'Code Reviewer సెట్టింగ్‌లను అప్‌డేట్ చేయండి'
+    );
+    const card = [
+      i18n.t('codeReviewer.actionRequired.title'),
+      i18n.t('codeReviewer.actionRequired.selectedModelUnavailable.description'),
+      i18n.t('codeReviewer.actionRequired.selectedModelUnavailable.recoveryLabel'),
+    ];
+    for (const value of card) {
+      expect(value).not.toContain('కోడ్ సమీక్షకుడు');
+      expect(value).not.toContain('కోడ్ సమీక్షకుడి');
+      expect(value).not.toContain('కోడ్ సమీక్షకుడిని');
+    }
+  });
+
   it('names the feature that is off before retrying a review', () => {
     expect(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings')).toBe(
       'Code Reviewer ఆఫ్‌లో ఉంది లేదా దాని సెట్టింగ్‌లకు శ్రద్ధ అవసరం. సెట్టింగ్‌లను సరిచేసి, ఆపై ఈ సమీక్షను మళ్లీ ప్రయత్నించండి.'

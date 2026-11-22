@@ -79,7 +79,7 @@
     "added": "జోడించబడింది",
     "cancelled": "రద్దయింది",
     "close": "మూసివేయండి",
-    "codeReviewer": "కోడ్ సమీక్షకుడు",
+    "codeReviewer": "Code Reviewer",
     "connected": "కనెక్ట్ అయింది",
     "couldNotLoadModels": "మోడళ్లను లోడ్ చేయలేకపోయాం.",
     "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయాం.",
@@ -1540,7 +1540,7 @@
       },
       "selectedModelUnavailable": {
         "description": "ఎంచుకున్న మోడల్ క్లౌడ్ ఏజెంట్ సెషన్‌లకు అందుబాటులో లేకపోవడంతో Code Reviewer నిలిపివేయబడింది. అందుబాటులో ఉన్న మోడల్‌ను ఎంచుకుని, Code Reviewerను మళ్లీ ప్రారంభించండి.",
-        "recoveryLabel": "కోడ్ సమీక్షకుడి సెట్టింగ్‌లను అప్‌డేట్ చేయండి"
+        "recoveryLabel": "Code Reviewer సెట్టింగ్‌లను అప్‌డేట్ చేయండి"
       },
       "repeatedRepositoryCloneTimeout": {
         "description": "ఈరోజు రిపోజిటరీని క్లోన్ చేయడానికి మూడుసార్లు సమయం మించిపోవడంతో Code Reviewer నిలిపివేయబడింది. సహాయం కోసం {{supportEmail}}ని సంప్రదించి, Code Reviewerను మళ్లీ ప్రారంభించండి."

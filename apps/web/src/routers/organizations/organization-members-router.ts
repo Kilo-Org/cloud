@@ -384,6 +384,15 @@ export const organizationsMembersRouter = createTRPCRouter({
       const childIds = childOrganizations.map(child => child.id).sort();
       const selectedChildOrganizationIds = new Set(childOrganizationIds);
       const { added, removed } = await db.transaction(async tx => {
+        // The audit rows name the parent organization, so read its display name
+        // once here rather than repeating the parent id for every child.
+        const [parentOrganization] = await tx
+          .select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .limit(1);
+        const parentOrganizationName = parentOrganization?.name ?? organizationId;
+
         for (const childId of childIds) {
           await lockOrganizationMembershipMutation(tx, childId, memberId);
         }
@@ -428,7 +437,7 @@ export const organizationsMembersRouter = createTRPCRouter({
               details: {
                 id: 'member.parentAdded',
                 email: parentMember.email,
-                parent: organizationId,
+                parent: parentOrganizationName,
               },
               message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
               organization_id: childOrganizationId,
@@ -473,7 +482,7 @@ export const organizationsMembersRouter = createTRPCRouter({
             details: {
               id: 'member.parentRemoved',
               email: parentMember.email,
-              parent: organizationId,
+              parent: parentOrganizationName,
             },
             message: `Removed parent organization member ${parentMember.email} from child organization via parent organization ${organizationId}`,
             organization_id: childOrganizationId,

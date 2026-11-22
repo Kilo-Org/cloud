@@ -485,6 +485,13 @@ function submissionWindowKey(params: SubmissionScope, window: number): string {
 }
 
 /**
+ * Outcome of resolving one bucket's identity: the bucket holds a live or settled
+ * row (`live`), the bucket holds only released rows and the walk produced a
+ * runnable re-derived key (`released`), or the bucket holds no row (`absent`).
+ */
+type ResolvedBucket = { state: 'live' | 'released' | 'absent'; key: string };
+
+/**
  * Resolves one released generation of a bucket, or reports that its row is
  * absent or live. The key at the start of every iteration was just read, so the
  * returned key is always one that can be admitted: a repeat replays a settled
@@ -493,10 +500,7 @@ function submissionWindowKey(params: SubmissionScope, window: number): string {
  * identity is minted and this submission still runs; the worker's per-owner
  * lease still keeps two runs apart.
  */
-async function releaseChain(params: {
-  ctx: TRPCContext;
-  base: string;
-}): Promise<{ key: string; live: boolean }> {
+async function releaseChain(params: { ctx: TRPCContext; base: string }): Promise<ResolvedBucket> {
   let key = params.base;
   for (let step = 0; step <= SUBMISSION_RELEASE_CHAIN_LIMIT; step += 1) {
     const previous = await getOperation(db, {
@@ -504,16 +508,16 @@ async function releaseChain(params: {
       domain: 'security',
       operationKey: key,
     });
-    if (!previous) return { key, live: false };
-    if (!RELEASED_SUBMISSION_STATUSES.has(previous.status)) return { key, live: true };
+    if (!previous) return { state: step === 0 ? 'absent' : 'released', key };
+    if (!RELEASED_SUBMISSION_STATUSES.has(previous.status)) return { state: 'live', key };
     if (step === SUBMISSION_RELEASE_CHAIN_LIMIT) {
       // The window has spent its retries: mint a distinct identity so this
       // submission can still run.
-      return { key: `${key}:x${submissionKeyDigest(randomUUID(), 8)}`, live: false };
+      return { state: 'released', key: `${key}:x${submissionKeyDigest(randomUUID(), 8)}` };
     }
     key = `${params.base}:r${submissionKeyDigest(previous.id, 16)}`;
   }
-  return { key, live: false };
+  return { state: 'released', key };
 }
 
 /**
@@ -522,17 +526,23 @@ async function releaseChain(params: {
  * It digests the owner scope, the intent, the ledger resource key of the target
  * and a dedupe window, so two submissions for one target inside a window share
  * an identity: the ledger replays a settled command or conflicts while it is in
- * flight. The window is at least one bucket and at most two, so a live or
- * settled identity from the bucket that just ended still answers a repeat.
- * Another repository, finding or dismissal input is another target and gets its
- * own key, and a submission in a later window is another intent that runs.
+ * flight. Another repository, finding or dismissal input is another target and
+ * gets its own key.
  *
- * A window whose submission settled as failed, or that was interrupted, is
- * released instead: a settled failure cannot replay, so the key is re-derived
- * from that row and the next attempt runs. A released window is walked along a
- * bounded chain, so a retry after a failure runs and a repeat of that retry
- * dedupes; past the cap a distinct identity is minted, and the worker's
- * per-owner lease still keeps two runs apart.
+ * The current bucket answers whenever it holds any row, live or released: a
+ * live row replays or conflicts, and a released row is walked to a runnable key
+ * re-derived from it. The bucket before it is consulted only when the current
+ * bucket holds nothing, so a submission that straddles a bucket boundary still
+ * dedupes against the one that just ended. A retry after a released submission
+ * is therefore never answered from the previous bucket's settled result: it
+ * runs. Two submissions with no row in either bucket mint the current bucket's
+ * key, so the window starts now.
+ *
+ * A bucket whose submission settled as failed, or that was interrupted or
+ * superseded, is released: a settled failure cannot replay, so the key steps
+ * along a bounded chain and the next attempt runs. Past the cap a distinct
+ * identity is minted, and the worker's per-owner lease still keeps two runs
+ * apart.
  */
 async function resolveSubmissionKey(
   params: SubmissionScope & { ctx: TRPCContext }
@@ -543,13 +553,10 @@ async function resolveSubmissionKey(
     submissionWindowKey(params, currentWindow - 1),
   ];
 
-  let fallback: string | null = null;
-  for (const base of candidates) {
-    const { key, live } = await releaseChain({ ctx: params.ctx, base });
-    if (live) return key;
-    fallback ??= key;
-  }
-  return fallback ?? candidates[0];
+  const current = await releaseChain({ ctx: params.ctx, base: candidates[0] });
+  if (current.state !== 'absent') return current.key;
+  const previous = await releaseChain({ ctx: params.ctx, base: candidates[1] });
+  return previous.state === 'absent' ? current.key : previous.key;
 }
 
 /** Trimmed, whitespace-collapsed comment, so cosmetic spacing is not a key-reuse mismatch. */

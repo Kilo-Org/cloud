@@ -7,6 +7,7 @@ import {
 import * as z from 'zod';
 
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   findOrganizationGroupPolicy,
   type OrganizationGroupPolicies,
@@ -200,7 +201,10 @@ function organizationAccessCacheKey(
   const settings = OrganizationSettingsSchema.parse(organization.settings);
   return JSON.stringify({
     plan: organization.plan,
-    providerAllowList: settings.provider_allow_list?.toSorted() ?? null,
+    providerAllowList:
+      settings.provider_allow_list === undefined
+        ? null
+        : normalizeInferenceProviderIds(settings.provider_allow_list).toSorted(),
     modelDenyList: (settings.model_deny_list ?? []).map(normalizeModelId).toSorted(),
     defaultPolicies: defaultPolicies ?? null,
   });
@@ -254,7 +258,7 @@ async function calculateOrganizationCeilingAccess(
   if (organization.plan !== 'enterprise' || settings.provider_allow_list === undefined) {
     return { models: access.models, providers: new Set(catalog.providerSlugs) };
   }
-  const providerCeiling = new Set(settings.provider_allow_list);
+  const providerCeiling = new Set(normalizeInferenceProviderIds(settings.provider_allow_list));
   return {
     models: access.models,
     providers: new Set(

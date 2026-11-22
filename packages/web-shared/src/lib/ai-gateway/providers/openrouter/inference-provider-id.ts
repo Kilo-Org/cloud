@@ -282,6 +282,25 @@ export function normalizeInferenceProviderId(providerId: string | undefined) {
   return (slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId).toLowerCase();
 }
 
+/**
+ * The canonical form of an allow list of provider slugs: each entry trimmed and
+ * through `normalizeInferenceProviderId`, entries that name no provider dropped,
+ * and the first occurrence of a slug kept. Writers store this form and every
+ * comparison against catalog slugs builds its set from it, so one stored value
+ * means the same provider whatever wrote it.
+ */
+export function normalizeInferenceProviderIds(providerIds: readonly string[]): string[] {
+  const canonical: string[] = [];
+  const seen = new Set<string>();
+  for (const providerId of providerIds) {
+    const normalized = normalizeInferenceProviderId(providerId.trim());
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    canonical.push(normalized);
+  }
+  return canonical;
+}
+
 export function openRouterToVercelInferenceProviderId(providerId: string): string {
   const normalizedProviderId = normalizeInferenceProviderId(providerId);
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;

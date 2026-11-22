@@ -10,6 +10,10 @@ import {
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
 
@@ -80,7 +84,9 @@ export function createAllowPredicateFromProviderAllowList(
   customLlmGrantee?: CustomLlmGrantee
 ): ProviderAwareAllowPredicate {
   const modelDenySet = new Set(modelDenyList?.map(normalizeModelId));
-  const providerAllowSet = providerAllowList ? new Set(providerAllowList) : undefined;
+  const providerAllowSet = providerAllowList
+    ? new Set(normalizeInferenceProviderIds(providerAllowList))
+    : undefined;
   return async (modelId: string): Promise<boolean> => {
     const normalizedModelId = normalizeModelId(modelId);
     if (!requireModelInCurrentSnapshot && !providerAllowSet && modelDenySet.size === 0) return true;
@@ -92,7 +98,9 @@ export function createAllowPredicateFromProviderAllowList(
       (await getModelInferenceProviders(modelId)) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
-    return [...providerSlugs].some(slug => providerAllowSet.has(slug));
+    return [...providerSlugs].some(slug =>
+      providerAllowSet.has(normalizeInferenceProviderId(slug))
+    );
   };
 }
 

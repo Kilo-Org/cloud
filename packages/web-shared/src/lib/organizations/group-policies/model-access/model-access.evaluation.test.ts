@@ -66,6 +66,16 @@ const currentSnapshotLookup = async (modelId: string) =>
     }[modelId] ?? []
   );
 
+/** Serves each model from its provider's catalog slug, whatever case the allow list uses. */
+const canonicalProviderLookup = async (modelId: string) =>
+  new Set(
+    {
+      'anthropic/claude': ['anthropic'],
+      'openai/gpt-4o': ['openai'],
+      'meta/llama': ['deepinfra'],
+    }[modelId] ?? []
+  );
+
 describe('effective organization model access', () => {
   beforeAll(async () => {
     await insertCustomLlmForTest(RESTRICTED_PUBLIC_MODEL, publicCustomLlmDefinition(['stepfun']));
@@ -297,6 +307,58 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['deepinfra']) });
     await expect(
       getEffectiveModelDecision(policy, 'nvidia/nemotron:free', variantAwareLookup)
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+  });
+
+  it('admits models through a mixed-case organization provider allow list', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['OpenAI'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/gpt-4o', canonicalProviderLookup)
+    ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['openai']) });
+  });
+
+  it('admits models through a mixed-case member provider grant', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['Anthropic'] },
+            },
+          ],
+        ],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'anthropic/claude', canonicalProviderLookup)
+    ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['anthropic']) });
+  });
+
+  it('denies providers absent from a mixed-case organization allow list', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['OpenAI'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'meta/llama', canonicalProviderLookup)
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 

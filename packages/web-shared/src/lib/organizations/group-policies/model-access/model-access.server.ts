@@ -9,7 +9,7 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   VIRTUAL_PROVIDER,
@@ -64,9 +64,13 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationModelDenyList = organizationRestrictionsEnabled
     ? (context.organization.settings.model_deny_list ?? []).map(normalizeModelId)
     : [];
-  const organizationProviderCeiling = organizationRestrictionsEnabled
-    ? context.organization.settings.provider_allow_list
-    : undefined;
+  // An absent list means no ceiling; a present one, empty or not, is enforced as
+  // written. Both forms are compared in the catalog's canonical slug form.
+  const configuredProviderAllowList = context.organization.settings.provider_allow_list;
+  const organizationProviderCeiling =
+    organizationRestrictionsEnabled && configuredProviderAllowList !== undefined
+      ? normalizeInferenceProviderIds(configuredProviderAllowList)
+      : undefined;
   // `organizationModelDenyList` and `organizationProviderCeiling` set the default
   // model and provider access for organization members. Group policies set the
   // access of their own members. Organization admins manage both.
@@ -117,7 +121,9 @@ export function evaluateEffectiveModelAccessPolicy(
         selectedPolicies.flatMap(policy => policy.data.model_allow_list.map(normalizeModelId))
       ),
       providerAllowList: new Set(
-        selectedPolicies.flatMap(policy => policy.data.provider_allow_list)
+        normalizeInferenceProviderIds(
+          selectedPolicies.flatMap(policy => policy.data.provider_allow_list)
+        )
       ),
     },
   };
@@ -127,6 +133,12 @@ export function evaluateEffectiveModelAccessPolicy(
  * Routers listed under the snapshot-only virtual provider pick a real provider
  * per request. Allowing `virtual` lets them route to every real provider that
  * the same allow list permits; without one, they have nowhere to route.
+ *
+ * Both sets hold canonical provider slugs, as
+ * `evaluateEffectiveModelAccessPolicy` builds them and the catalog side already
+ * stores them, so the membership test is an exact match and needs no
+ * normalization of its own. Normalizing here would repeat the work once per
+ * model, and this runs for every model in the catalog.
  */
 function getEligibleProviderRoutes(
   modelProviders: ReadonlySet<string>,
@@ -372,11 +384,7 @@ export function normalizeModelAccessPolicy(
       model_allow_list: [
         ...new Set(policy.data.model_allow_list.map(value => normalizeModelId(value.trim()))),
       ].sort(),
-      provider_allow_list: [
-        ...new Set(
-          policy.data.provider_allow_list.map(value => normalizeInferenceProviderId(value.trim()))
-        ),
-      ].sort(),
+      provider_allow_list: normalizeInferenceProviderIds(policy.data.provider_allow_list).sort(),
     },
   };
 }

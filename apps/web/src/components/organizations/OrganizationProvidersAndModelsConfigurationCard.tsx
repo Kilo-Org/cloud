@@ -15,6 +15,7 @@ import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-mode
 import { useOrganizationAvailableModels } from '@/app/api/organizations/hooks';
 import type { ProviderSelection } from '@/components/models/util';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 type OrganizationProvidersAndModelsConfigurationCardProps = {
   organizationId: string;
@@ -53,7 +54,9 @@ export function computeProviderSelectionsForSummaryCard(params: {
     return null;
   }
 
-  const providerAllowSet = providerAllowList ? new Set(providerAllowList) : null;
+  const providerAllowSet = providerAllowList
+    ? new Set(normalizeInferenceProviderIds(providerAllowList))
+    : null;
   const availableModelIdSet = new Set(availableModelIds.map(id => normalizeModelId(id)));
 
   const selections: ProviderSelection[] = [];

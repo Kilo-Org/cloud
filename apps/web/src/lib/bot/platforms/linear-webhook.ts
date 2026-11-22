@@ -9,21 +9,18 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/webhook-body';
 
 /**
- * Linear's webhook signature format, confirmed against @linear/sdk's
+ * Linear's documented webhook scheme, as implemented by @linear/sdk's
  * `LinearWebhookClient.verify`:
  *
- *   linear-signature  = hex(hmac-sha256(webhook_secret, raw_body))
- *   linear-timestamp  = unix millis, tolerance 60s
+ *   linear-signature = hex(hmac-sha256(webhook_secret, raw_body))
+ *   freshness        = `webhookTimestamp` in the signed body, tolerance 60s
  *
- * The @chat-adapter/linear adapter already verifies the signature inside its
- * own `handleWebhook`, but we need to also peel off `OAuthApp` revoke events
- * to clean up our own `platform_integrations` row and Redis identity cache.
- * Re-verifying the signature here makes the custom handler safe to trigger
- * the cleanup even before delegating to the adapter.
+ * Freshness is taken from the signed body, so `webhookTimestamp` is required on
+ * every accepted delivery. The `linear-timestamp` header is deprecated upstream
+ * and is not read here.
  */
 
 const LINEAR_SIGNATURE_HEADER = 'linear-signature';
-const LINEAR_TIMESTAMP_HEADER = 'linear-timestamp';
 const LINEAR_TIMESTAMP_TOLERANCE_MS = 60 * 1000;
 
 type LinearOAuthAppRevokedPayload = {
@@ -34,17 +31,7 @@ type LinearOAuthAppRevokedPayload = {
 
 function verifyLinearSignature(rawBody: string, request: Request): boolean {
   const signature = request.headers.get(LINEAR_SIGNATURE_HEADER);
-  const timestamp = request.headers.get(LINEAR_TIMESTAMP_HEADER);
-
-  // Both headers are mandatory. Treating the timestamp as optional would let
-  // an attacker who captures a signed body replay it indefinitely simply by
-  // stripping the timestamp header — the HMAC is computed only over rawBody,
-  // so the signature alone proves nothing about freshness.
-  if (!signature || !timestamp) return false;
-
-  const timestampMs = Number.parseInt(timestamp, 10);
-  if (Number.isNaN(timestampMs)) return false;
-  if (Math.abs(Date.now() - timestampMs) > LINEAR_TIMESTAMP_TOLERANCE_MS) return false;
+  if (!signature) return false;
 
   const expectedHex = crypto
     .createHmac('sha256', LINEAR_WEBHOOK_SECRET)
@@ -61,6 +48,16 @@ function verifyLinearSignature(rawBody: string, request: Request): boolean {
   } catch {
     return false;
   }
+}
+
+function isFreshWebhookDelivery(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  if (!('webhookTimestamp' in payload)) return false;
+
+  const webhookTimestamp = payload.webhookTimestamp;
+  if (typeof webhookTimestamp !== 'number' || !Number.isFinite(webhookTimestamp)) return false;
+
+  return Math.abs(Date.now() - webhookTimestamp) <= LINEAR_TIMESTAMP_TOLERANCE_MS;
 }
 
 function isLinearOAuthAppRevokedPayload(payload: unknown): payload is LinearOAuthAppRevokedPayload {
@@ -128,14 +125,18 @@ export function createLinearWebhookHandler(chat: Chat, linearAdapter: LinearAdap
       return new Response('Invalid signature', { status: 401 });
     }
 
-    await chat.initialize();
-
     let payload: unknown;
     try {
       payload = JSON.parse(body);
     } catch {
-      return linearAdapter.handleWebhook(cloneLinearRequest(request, body), options);
+      return new Response('Invalid signature', { status: 401 });
     }
+
+    if (!isFreshWebhookDelivery(payload)) {
+      return new Response('Invalid signature', { status: 401 });
+    }
+
+    await chat.initialize();
 
     if (isLinearOAuthAppRevokedPayload(payload)) {
       try {

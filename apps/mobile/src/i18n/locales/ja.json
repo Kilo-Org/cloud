@@ -555,7 +555,10 @@
     "changelogFixesPolish": "アプリ全体の修正と改善を行いました。",
     "changelogAreas": {
       "signIn": "サインイン",
-      "profileOrganizations": "プロフィールと組織"
+      "profileOrganizations": "プロフィールと組織",
+      "chat": "チャット",
+      "notifications": "通知",
+      "integrations": "連携"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "クレジットの差し引き",
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
+      "expiredGrant": "期限切れ: {{description}}",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
         "balanceNeutral": "残高変動なし",
         "deduction": "差し引き",
         "grant": "クレジット付与",
+        "promotionalCredits": "プロモーションクレジット",
         "welcomeCredits": "ウェルカムクレジット",
         "purchase": "購入"
+      },
+      "program": {
+        "adminBulkGrant": "管理者クレジット付与",
+        "contributorChampion": "コントリビューターチャンピオンクレジット",
+        "feedback": "フィードバッククレジット",
+        "influencer": "インフルエンサークレジット",
+        "ossMonthlyReset": "OSS支援のリセット",
+        "ossSponsorship": "OSS支援クレジット",
+        "pullRequest": "プルリクエストクレジット",
+        "usageIssue": "利用問題クレジット",
+        "vibeDay": "Vibe dayクレジット"
       },
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。",
-      "retentionLimit": "最新のクレジット履歴を表示しています。"
+      "retentionLimit": "最新のクレジット履歴を表示しています。",
+      "voidedGrant": "無効化済み: {{description}}"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
@@ -5099,6 +5116,20 @@
       "eu": "欧州連合",
       "au": "オーストラリア",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "設定を検索",
+    "noMatches": "該当する設定がありません",
+    "emptyDescription": "別の設定名やキーワードで検索してください。",
+    "resultsStatus": "見つかった設定：{{resultCount}}件",
+    "keywords": {
+      "signOut": "サインアウト|ログアウト",
+      "appearance": "テーマ|配色",
+      "appUnlock": "生体認証|顔認証|指紋認証",
+      "language": "言語|翻訳",
+      "notifications": "通知|プッシュ通知",
+      "privacy": "データ分析|トラッキング|プライバシー"
     }
   }
 }

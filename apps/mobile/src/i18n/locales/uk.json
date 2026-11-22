@@ -556,8 +556,11 @@
     "changelogFixesIn": "Виправлення та покращення в розділах: {{areas}}.",
     "changelogFixesPolish": "Виправлення та покращення в усьому застосунку.",
     "changelogAreas": {
-      "signIn": "Вхід",
-      "profileOrganizations": "Профіль та організації"
+      "signIn": "вхід",
+      "profileOrganizations": "профіль та організації",
+      "chat": "чат",
+      "notifications": "сповіщення",
+      "integrations": "інтеграції"
     }
   },
   "preferences": {
@@ -4664,20 +4667,34 @@
       "deductionFallback": "Списання кредитів",
       "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",
       "emptyTitle": "Історії кредитів немає",
+      "expiredGrant": "Термін дії минув: {{description}}",
       "googlePlayReceipt": "Квитанція в Google Play",
       "kind": {
         "adjustment": "Коригування",
         "balanceNeutral": "Без зміни балансу",
         "deduction": "Списання",
         "grant": "Нарахування кредитів",
+        "promotionalCredits": "Промокредити",
         "welcomeCredits": "Вітальні кредити",
         "purchase": "Покупка"
+      },
+      "program": {
+        "adminBulkGrant": "Нарахування кредитів адміністратором",
+        "contributorChampion": "Кредит для найкращого учасника",
+        "feedback": "Кредит за відгук",
+        "influencer": "Кредит для інфлюенсера",
+        "ossMonthlyReset": "Поновлення підтримки проєктів із відкритим кодом",
+        "ossSponsorship": "Кредит підтримки проєктів із відкритим кодом",
+        "pullRequest": "Кредит за запит на злиття",
+        "usageIssue": "Кредит за проблему з використанням",
+        "vibeDay": "Кредит Vibe day"
       },
       "purchaseFallback": "Покупка кредитів",
       "receipt": "Квитанція",
       "receiptA11y": "Відкрити квитанцію для {{description}}, {{amount}}, від {{date}}",
       "receiptUnavailable": "Квитанція для цієї покупки недоступна.",
-      "retentionLimit": "Показано найновішу історію кредитів."
+      "retentionLimit": "Показано найновішу історію кредитів.",
+      "voidedGrant": "Анульовано: {{description}}"
     },
     "title": "Купити кредити",
     "description": "Кредити — це разова покупка, яка додається на ваш баланс Kilo для запуску AI-сесій кодування в Kilo App. Магазин списує кошти з вашого акаунта, і кредити нараховуються після підтвердження оплати магазином.",
@@ -5273,6 +5290,20 @@
       "eu": "Європейський Союз",
       "au": "Австралія",
       "jp": "Японія"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Пошук налаштувань",
+    "noMatches": "Відповідних налаштувань не знайдено",
+    "emptyDescription": "Спробуйте іншу назву налаштування або ключове слово.",
+    "resultsStatus": "Знайдено налаштувань: {{resultCount}}",
+    "keywords": {
+      "signOut": "вийти|вихід|вихід з облікового запису",
+      "appearance": "тема|колірна схема",
+      "appUnlock": "біометрія|обличчя|відбиток пальця",
+      "language": "мова|переклад",
+      "notifications": "сповіщення|пуш-сповіщення",
+      "privacy": "аналітика|відстеження"
     }
   }
 }

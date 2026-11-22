@@ -15,7 +15,7 @@ const identityMock = vi.hoisted<{
 
 const listOutboxRowsMock = vi.hoisted(() => vi.fn(async (): Promise<OutboxRow[] | null> => []));
 const writeOutboxRowMock = vi.hoisted(() => vi.fn(async (): Promise<void> => undefined));
-const removeOutboxRowMock = vi.hoisted(() => vi.fn(async (): Promise<void> => undefined));
+const removeOutboxRowMock = vi.hoisted(() => vi.fn(async (): Promise<boolean> => true));
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => identityMock.value,
@@ -98,7 +98,7 @@ beforeEach(() => {
   identityMock.value = { userId: 'u1', isLoading: false };
   listOutboxRowsMock.mockResolvedValue([]);
   writeOutboxRowMock.mockResolvedValue(undefined);
-  removeOutboxRowMock.mockResolvedValue(undefined);
+  removeOutboxRowMock.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -194,6 +194,42 @@ describe('useMutationOutbox write helpers', () => {
 
     await requireResult(resultRef).remove('fp-1');
     expect(removeOutboxRowMock).toHaveBeenCalledWith('u1', 'fp-1');
+  });
+
+  it('keeps a reconcile-first row visible when the durable delete fails', async () => {
+    listOutboxRowsMock.mockResolvedValue([
+      safeRetryRow({ fingerprint: 'fp-1', taxonomy: 'reconcile-first', scope: 'personal' }),
+    ]);
+    const { resultRef } = mountOutbox();
+    await flushMicrotasks();
+    expect(requireResult(resultRef).needsReconcile.map(r => r.fingerprint)).toEqual(['fp-1']);
+
+    removeOutboxRowMock.mockResolvedValue(false);
+    let removed = true;
+    await act(async () => {
+      removed = await requireResult(resultRef).remove('fp-1');
+    });
+
+    expect(removed).toBe(false);
+    expect(requireResult(resultRef).needsReconcile.map(r => r.fingerprint)).toEqual(['fp-1']);
+  });
+
+  it('drops a reconcile-first row once the durable delete commits', async () => {
+    listOutboxRowsMock.mockResolvedValue([
+      safeRetryRow({ fingerprint: 'fp-1', taxonomy: 'reconcile-first', scope: 'personal' }),
+    ]);
+    const { resultRef } = mountOutbox();
+    await flushMicrotasks();
+    expect(requireResult(resultRef).needsReconcile.map(r => r.fingerprint)).toEqual(['fp-1']);
+
+    removeOutboxRowMock.mockResolvedValue(true);
+    let removed = false;
+    await act(async () => {
+      removed = await requireResult(resultRef).remove('fp-1');
+    });
+
+    expect(removed).toBe(true);
+    expect(requireResult(resultRef).needsReconcile).toEqual([]);
   });
 
   it('no-ops every write and remove when the userId is unknown', async () => {

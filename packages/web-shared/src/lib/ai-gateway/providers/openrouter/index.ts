@@ -440,26 +440,40 @@ async function fetchOpenRouterModels(
     throw new Error(`Failed to fetch ${subject} from OpenRouter API`);
   }
 
-  const data = removeUpstreamEnkrypt(await response.json());
+  const raw: unknown = await response.json();
 
   try {
-    return parseOpenRouterModels(data, url, OPENROUTER_CATALOGUE_MINIMUM_COUNTS[subject]);
+    return parseOpenRouterCatalogue(raw, url, subject);
   } catch (error) {
     errorExceptInTest(`OpenRouter ${subject} response not in expected format:`, error);
 
     captureMessage(`openrouter ${subject} not in expected format!`, {
       level: 'error',
-      extra: { data, error },
+      extra: { data: removeUpstreamEnkrypt(raw), error },
     });
     throw error;
   }
 }
 
-function openRouterModelsHeaders() {
+function openRouterCatalogueHeaders(authorization: string) {
+  return { Authorization: authorization, ...ATTRIBUTION_HEADERS };
+}
+
+/**
+ * The transport policy of one live OpenRouter catalogue request: a GET, no cache, and the
+ * catalogue timeout. Only the credential differs between the readers.
+ */
+function openRouterCatalogueFetchInit(authorization: string): RequestInit {
   return {
-    Authorization: `Bearer ${OPENROUTER.apiKey}`,
-    ...ATTRIBUTION_HEADERS,
+    method: 'GET',
+    headers: openRouterCatalogueHeaders(authorization),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
   };
+}
+
+function openRouterModelsHeaders() {
+  return openRouterCatalogueHeaders(`Bearer ${OPENROUTER.apiKey}`);
 }
 
 function parseOpenRouterModels(
@@ -472,6 +486,23 @@ function parseOpenRouterModels(
   return parsed;
 }
 
+/**
+ * The one rule that accepts an OpenRouter catalogue payload: strip the upstream-only
+ * `enkrypt` field, then apply the schema and the per-subject minimum count. Both the live
+ * fetch and the stored-row parser go through it.
+ */
+function parseOpenRouterCatalogue(
+  raw: unknown,
+  url: string,
+  subject: OpenRouterCatalogueSubject
+): OpenRouterModelsResponse {
+  return parseOpenRouterModels(
+    removeUpstreamEnkrypt(raw),
+    url,
+    OPENROUTER_CATALOGUE_MINIMUM_COUNTS[subject]
+  );
+}
+
 function openRouterModelsSource(
   url: string,
   subject: OpenRouterCatalogueSubject
@@ -479,12 +510,7 @@ function openRouterModelsSource(
   return {
     url,
     headers: openRouterModelsHeaders,
-    parse: raw =>
-      parseOpenRouterModels(
-        removeUpstreamEnkrypt(raw),
-        url,
-        OPENROUTER_CATALOGUE_MINIMUM_COUNTS[subject]
-      ),
+    parse: raw => parseOpenRouterCatalogue(raw, url, subject),
   };
 }
 
@@ -498,12 +524,7 @@ function createOpenRouterModelsReader(
     fetchFallback: () =>
       fetchOpenRouterModels(
         source.url,
-        {
-          method: 'GET',
-          headers: openRouterModelsHeaders(),
-          cache: 'no-store',
-          signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
-        },
+        openRouterCatalogueFetchInit(`Bearer ${OPENROUTER.apiKey}`),
         { subject, endpoint }
       ),
   });
@@ -519,6 +540,12 @@ export const openRouterTranscriptionModelsMetadataSource = openRouterModelsSourc
   'transcription models'
 );
 
+/** The transcription catalogue's reporting identity: it picks the minimum count and tags reports. */
+const TRANSCRIPTION_CATALOGUE = {
+  subject: 'transcription models',
+  endpoint: 'openrouter/transcription-models',
+} as const satisfies { subject: OpenRouterCatalogueSubject; endpoint: string };
+
 const openRouterModelsReader = createOpenRouterModelsReader(openRouterModelsMetadataSource, {
   subject: 'models',
   endpoint: 'openrouter/models',
@@ -526,7 +553,7 @@ const openRouterModelsReader = createOpenRouterModelsReader(openRouterModelsMeta
 
 const openRouterTranscriptionModelsReader = createOpenRouterModelsReader(
   openRouterTranscriptionModelsMetadataSource,
-  { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
+  TRANSCRIPTION_CATALOGUE
 );
 
 export function resetOpenRouterModelsCaches() {
@@ -576,12 +603,7 @@ export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterMode
   }
   return fetchOpenRouterModels(
     localFakeModelsUrl,
-    {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${LOCAL_FAKE_LLM_API_KEY}`, ...ATTRIBUTION_HEADERS },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
-    },
-    { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
+    openRouterCatalogueFetchInit(`Bearer ${LOCAL_FAKE_LLM_API_KEY}`),
+    TRANSCRIPTION_CATALOGUE
   );
 }

@@ -92,7 +92,7 @@ export type PrepareAgentSessionDeps = {
   rotateKey: () => void;
   getStoredOperationKey: (fingerprint: string) => string | null;
   writeSafeRetry: (row: SafeRetryRowInput) => Promise<void>;
-  removeOutboxRow: (fingerprint: string) => Promise<void>;
+  removeOutboxRow: (fingerprint: string) => Promise<boolean>;
   /**
    * Resolves after the launch load settled. `false` means the stored rows
    * could not be read, and the intent must refuse rather than mint a key over

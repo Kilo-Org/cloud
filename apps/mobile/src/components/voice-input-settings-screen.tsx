@@ -5,7 +5,10 @@ import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import {
+  SettingsSearchScrollView,
+  SettingsTarget,
+} from '@/components/settings-search/settings-target';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
@@ -16,6 +19,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { VOICE_INPUT_SETTINGS } from '@/lib/settings-search/preference-sources';
 import { useGatewayTranscriptionModelSelection } from '@/lib/voice-input/gateway/gateway-transcription-model-selection';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputLanguageDisplayName } from '@/lib/voice-input/voice-input-language';
@@ -36,7 +40,9 @@ const NO_MODEL_VALUE = '—';
  * row renders the live-selection states so "no model selected" is never a
  * present state while the switch is on.
  */
-export function VoiceInputSettingsScreen() {
+export function VoiceInputSettingsScreen({
+  settingsTarget,
+}: Readonly<{ settingsTarget?: string }>) {
   const pushOnce = useSinglePushRoute();
   const { organizationId } = useOrganization();
   const {
@@ -86,7 +92,8 @@ export function VoiceInputSettingsScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('preferences.voiceInput')} backFallback={PROFILE_TAB_HREF} />
-      <TabScreenScrollView
+      <SettingsSearchScrollView
+        settingsTarget={settingsTarget}
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
@@ -102,32 +109,38 @@ export function VoiceInputSettingsScreen() {
       >
         <Section>
           <RowGroup leadingTile>
-            <PreferenceRow
-              icon={Mic}
-              title={t('preferences.gatewayTranscription')}
-              value={gatewayTranscriptionEnabled}
-              disabled={!gatewayTranscriptionLoaded}
-              onValueChange={setGatewayTranscriptionEnabled}
-              resolveValue={getRequestedGatewayTranscriptionEnabled}
-            />
-            <ConfigureRow
-              icon={Cpu}
-              title={t('preferences.transcriptionModel')}
-              subtitle={modelSubtitle}
-              disabled={modelRowDisabled}
-              onPress={() => {
-                pushOnce('/(app)/transcription-model-picker' as Href);
-              }}
-            />
-            <ConfigureRow
-              icon={Globe}
-              title={t('common.language')}
-              subtitle={languageSubtitle}
-              disabled={!languageLoaded}
-              onPress={() => {
-                pushOnce('/(app)/voice-language-picker' as Href);
-              }}
-            />
+            <SettingsTarget item={VOICE_INPUT_SETTINGS.gatewayTranscription}>
+              <PreferenceRow
+                icon={Mic}
+                title={t(VOICE_INPUT_SETTINGS.gatewayTranscription.label)}
+                value={gatewayTranscriptionEnabled}
+                disabled={!gatewayTranscriptionLoaded}
+                onValueChange={setGatewayTranscriptionEnabled}
+                resolveValue={getRequestedGatewayTranscriptionEnabled}
+              />
+            </SettingsTarget>
+            <SettingsTarget item={VOICE_INPUT_SETTINGS.transcriptionModel}>
+              <ConfigureRow
+                icon={Cpu}
+                title={t(VOICE_INPUT_SETTINGS.transcriptionModel.label)}
+                subtitle={modelSubtitle}
+                disabled={modelRowDisabled}
+                onPress={() => {
+                  pushOnce('/(app)/transcription-model-picker' as Href);
+                }}
+              />
+            </SettingsTarget>
+            <SettingsTarget item={VOICE_INPUT_SETTINGS.language}>
+              <ConfigureRow
+                icon={Globe}
+                title={t(VOICE_INPUT_SETTINGS.language.label)}
+                subtitle={languageSubtitle}
+                disabled={!languageLoaded}
+                onPress={() => {
+                  pushOnce('/(app)/voice-language-picker' as Href);
+                }}
+              />
+            </SettingsTarget>
           </RowGroup>
           {/* The explanation is the caption the card answers to, so the switch
               row keeps its two-line budget whatever the language or width. */}
@@ -160,7 +173,7 @@ export function VoiceInputSettingsScreen() {
           />
         ) : null}
         <VoiceTestField />
-      </TabScreenScrollView>
+      </SettingsSearchScrollView>
     </View>
   );
 }

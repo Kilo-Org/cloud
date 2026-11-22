@@ -3143,24 +3143,28 @@ test('rejects the English source label that carries "and"', () => {
   );
 });
 
-// The sentence also joins the areas that render from shared keys, so those
-// labels obey the same rule: a notification or chat name that carries the
+// The sentence names every area from its own `profile.changelogAreas` key, so
+// each of those labels obeys the same rule: a name that carries the
 // conjunction splits one area into two.
 const CHANGELOG_SHARED_AREAS = {
-  common: { chat: 'Chat', notifications: 'Notifications' },
-  integrations: { title: 'Integrations' },
   profile: {
     changelogFixesIn: 'Fixes and improvements in {{areas}}.',
-    changelogAreas: { signIn: 'Sign-in', profileOrganizations: 'Profile & organizations' },
+    changelogAreas: {
+      signIn: 'sign-in',
+      profileOrganizations: 'profile & organizations',
+      chat: 'chat',
+      notifications: 'notifications',
+      integrations: 'integrations',
+    },
   },
 };
 const CHANGELOG_SHARED_SOURCE = [
   "t('profile.changelogFixesIn', { areas });",
-  "t('common.chat');",
-  "t('common.notifications');",
-  "t('integrations.title');",
   "t('profile.changelogAreas.signIn');",
   "t('profile.changelogAreas.profileOrganizations');",
+  "t('profile.changelogAreas.chat');",
+  "t('profile.changelogAreas.notifications');",
+  "t('profile.changelogAreas.integrations');",
 ].join('\n');
 
 test('rejects a shared area label that carries the list conjunction', () => {
@@ -3168,18 +3172,22 @@ test('rejects a shared area label that carries the list conjunction', () => {
     language: 'fr',
     english: CHANGELOG_SHARED_AREAS,
     translated: {
-      common: { chat: 'Discussion', notifications: 'Alertes et notifications' },
-      integrations: { title: 'Intégrations' },
       profile: {
         changelogFixesIn: 'Corrections et améliorations dans {{areas}}.',
-        changelogAreas: { signIn: 'Connexion', profileOrganizations: 'Profil & organisations' },
+        changelogAreas: {
+          signIn: 'Connexion',
+          profileOrganizations: 'Profil & organisations',
+          chat: 'Discussion et conversation',
+          notifications: 'Notifications',
+          integrations: 'Intégrations',
+        },
       },
     },
     source: CHANGELOG_SHARED_SOURCE,
   });
   assert.match(
     found.join('\n'),
-    /^mobile\/fr: "common\.notifications" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
+    /^mobile\/fr: "profile\.changelogAreas\.chat" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
   );
 });
 
@@ -3191,11 +3199,15 @@ test('reads the Serbian conjunction from the Latin script the app formats with',
     language: 'sr',
     english: CHANGELOG_SHARED_AREAS,
     translated: {
-      common: { chat: 'Ćaskanje', notifications: 'Obaveštenja' },
-      integrations: { title: 'Integracije' },
       profile: {
         changelogFixesIn: 'Ispravke i poboljšanja u {{areas}}.',
-        changelogAreas: { signIn: 'Prijavljivanje', profileOrganizations: 'Profil i organizacije' },
+        changelogAreas: {
+          signIn: 'Prijavljivanje',
+          profileOrganizations: 'Profil & organizacije',
+          chat: 'Ćaskanje i razgovor',
+          notifications: 'Obaveštenja',
+          integrations: 'Integracije',
+        },
       },
     },
     source: CHANGELOG_SHARED_SOURCE,
@@ -3203,7 +3215,7 @@ test('reads the Serbian conjunction from the Latin script the app formats with',
   const text = found.join('\n');
   assert.match(
     text,
-    /^mobile\/sr: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "i"/m
+    /^mobile\/sr: "profile\.changelogAreas\.chat" contains the list conjunction "i"/m
   );
   // The Cyrillic conjunction is not what this catalog renders, so a label that
   // happens to contain it is no finding.

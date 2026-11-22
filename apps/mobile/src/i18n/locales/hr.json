@@ -555,8 +555,11 @@
     "changelogFixesIn": "Ispravci i poboljšanja u područjima: {{areas}}.",
     "changelogFixesPolish": "Ispravci i poboljšanja u cijeloj aplikaciji.",
     "changelogAreas": {
-      "signIn": "Prijava",
-      "profileOrganizations": "Profil te organizacije"
+      "signIn": "prijava",
+      "profileOrganizations": "profil te organizacije",
+      "chat": "razgovor",
+      "notifications": "obavijesti",
+      "integrations": "integracije"
     }
   },
   "preferences": {
@@ -4585,20 +4588,34 @@
       "deductionFallback": "Oduzimanje kredita",
       "emptyDescription": "Ovdje će se prikazivati kupnje kredita, računi i potrošnja.",
       "emptyTitle": "Nema povijesti kredita",
+      "expiredGrant": "Isteklo: {{description}}",
       "googlePlayReceipt": "Račun iz trgovine Google Play",
       "kind": {
         "adjustment": "Prilagodba",
         "balanceNeutral": "Bez utjecaja na stanje",
         "deduction": "Oduzimanje",
         "grant": "Dodijeljeni krediti",
+        "promotionalCredits": "Promotivni krediti",
         "welcomeCredits": "Krediti dobrodošlice",
         "purchase": "Kupnja"
+      },
+      "program": {
+        "adminBulkGrant": "Dodjela kredita od administratora",
+        "contributorChampion": "Kredit za prvaka među suradnicima",
+        "feedback": "Kredit za povratne informacije",
+        "influencer": "Kredit za influencere",
+        "ossMonthlyReset": "Mjesečna obnova kredita za otvoreni kod",
+        "ossSponsorship": "Kredit za sponzorstvo otvorenog koda",
+        "pullRequest": "Kredit za zahtjev za spajanje",
+        "usageIssue": "Kredit za problem s potrošnjom",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Kupnja kredita",
       "receipt": "Račun",
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun za ovu kupnju nije dostupan.",
-      "retentionLimit": "Prikazuje se najnovija povijest kredita."
+      "retentionLimit": "Prikazuje se najnovija povijest kredita.",
+      "voidedGrant": "Poništeno: {{description}}"
     },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupnja koja se dodaje tvom Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
@@ -5186,6 +5203,20 @@
       "eu": "Europska unija",
       "au": "Australija",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Pretraga postavki",
+    "noMatches": "Nema odgovarajućih postavki",
+    "emptyDescription": "Pokušaj s drugim nazivom postavke ili ključnom riječi.",
+    "resultsStatus": "Pronađene postavke: {{resultCount}}",
+    "keywords": {
+      "signOut": "odjava|odjavi se",
+      "appearance": "tema|shema boja",
+      "appUnlock": "biometrija|prepoznavanje lica|otisak prsta",
+      "language": "jezik|prijevod",
+      "notifications": "upozorenja|obavijesti",
+      "privacy": "analitika|praćenje"
     }
   }
 }

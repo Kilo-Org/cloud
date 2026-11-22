@@ -557,8 +557,11 @@
     "changelogFixesIn": "Tiswijiet u titjib f'dawn l-oqsma: {{areas}}.",
     "changelogFixesPolish": "Tiswijiet u titjib fl-applikazzjoni kollha.",
     "changelogAreas": {
-      "signIn": "Dħul",
-      "profileOrganizations": "Profil & organizzazzjonijiet"
+      "signIn": "dħul",
+      "profileOrganizations": "profil & organizzazzjonijiet",
+      "chat": "taħdit",
+      "notifications": "notifiki",
+      "integrations": "integrazzjonijiet"
     }
   },
   "preferences": {
@@ -4743,20 +4746,34 @@
       "deductionFallback": "Tnaqqis tal-krediti",
       "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
       "emptyTitle": "L-ebda storja tal-krediti",
+      "expiredGrant": "Skada: {{description}}",
       "googlePlayReceipt": "Irċevuta minn Google Play",
       "kind": {
         "adjustment": "Aġġustament",
         "balanceNeutral": "Newtrali għall-bilanċ",
         "deduction": "Tnaqqis",
         "grant": "Għotja ta' krediti",
+        "promotionalCredits": "Krediti promozzjonali",
         "welcomeCredits": "Krediti tal-merħba",
         "purchase": "Xiri"
+      },
+      "program": {
+        "adminBulkGrant": "Għotja ta' krediti mill-amministratur",
+        "contributorChampion": "Kreditu taċ-champion tal-kontributuri",
+        "feedback": "Kreditu għall-kummenti",
+        "influencer": "Kreditu tal-influencer",
+        "ossMonthlyReset": "Tiġdid ta' kull xahar tal-OSS",
+        "ossSponsorship": "Kreditu ta' sponsorizzazzjoni OSS",
+        "pullRequest": "Kreditu tal-PR",
+        "usageIssue": "Kreditu għal problema fl-użu",
+        "vibeDay": "Kreditu Vibe day"
       },
       "purchaseFallback": "Xiri ta' krediti",
       "receipt": "Irċevuta",
       "receiptA11y": "Iftaħ l-irċevuta għal {{description}}, {{amount}}, minn {{date}}",
       "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri.",
-      "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti."
+      "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti.",
+      "voidedGrant": "Annullat: {{description}}"
     },
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
@@ -5360,6 +5377,20 @@
       "eu": "Unjoni Ewropea",
       "au": "Awstralja",
       "jp": "Ġappun"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Tfittxija tal-preferenzi",
+    "noMatches": "Ebda preferenza li taqbel",
+    "emptyDescription": "Ipprova isem ieħor ta’ preferenza jew kelma ewlenija oħra.",
+    "resultsStatus": "Preferenzi misjuba: {{resultCount}}",
+    "keywords": {
+      "signOut": "oħroġ|ittemm is-sessjoni",
+      "appearance": "tema|kuluri|dehra",
+      "appUnlock": "bijometrija|wiċċ|marka tas-swaba’",
+      "language": "lingwa|traduzzjoni",
+      "notifications": "twissijiet|notifiki",
+      "privacy": "analiżi|traċċar|privatezza"
     }
   }
 }

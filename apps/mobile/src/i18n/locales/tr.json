@@ -554,8 +554,11 @@
     "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
     "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
-      "signIn": "Oturum açma",
-      "profileOrganizations": "Profil & kuruluşlar"
+      "signIn": "oturum açma",
+      "profileOrganizations": "profil & kuruluşlar",
+      "chat": "sohbet",
+      "notifications": "bildirimler",
+      "integrations": "entegrasyonlar"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Kredi düşümü",
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
       "emptyTitle": "Kredi geçmişi yok",
+      "expiredGrant": "Süresi doldu: {{description}}",
       "googlePlayReceipt": "Makbuz Google Play'de",
       "kind": {
         "adjustment": "Düzeltme",
         "balanceNeutral": "Bakiyeyi etkilemez",
         "deduction": "Düşüm",
         "grant": "Kredi hediyesi",
+        "promotionalCredits": "Promosyon kredileri",
         "welcomeCredits": "Hoş geldin kredisi",
         "purchase": "Satın alım"
+      },
+      "program": {
+        "adminBulkGrant": "Yönetici tarafından verilen kredi",
+        "contributorChampion": "Katkı şampiyonu kredisi",
+        "feedback": "Geri bildirim kredisi",
+        "influencer": "Etkileyici kredisi",
+        "ossMonthlyReset": "Açık kaynak sponsorluğu aylık sıfırlaması",
+        "ossSponsorship": "Açık kaynak sponsorluk kredisi",
+        "pullRequest": "Çekme isteği kredisi",
+        "usageIssue": "Kullanım sorunu kredisi",
+        "vibeDay": "Vibe day kredisi"
       },
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
       "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
-      "retentionLimit": "En son kredi geçmişi gösteriliyor."
+      "retentionLimit": "En son kredi geçmişi gösteriliyor.",
+      "voidedGrant": "İptal edildi: {{description}}"
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
@@ -5099,6 +5116,20 @@
       "eu": "Avrupa Birliği",
       "au": "Avustralya",
       "jp": "Japonya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Tercih ara",
+    "noMatches": "Eşleşen tercih bulunamadı",
+    "emptyDescription": "Farklı bir tercih adı veya anahtar kelime deneyin.",
+    "resultsStatus": "Bulunan tercihler: {{resultCount}}",
+    "keywords": {
+      "signOut": "çıkış|oturumu kapat|hesaptan çıkış",
+      "appearance": "tema|renk düzeni|koyu mod",
+      "appUnlock": "biyometri|yüz tanıma|parmak izi",
+      "language": "dil|çeviri",
+      "notifications": "uyarılar|anlık bildirimler",
+      "privacy": "analiz|takip|gizlilik"
     }
   }
 }

@@ -1,6 +1,6 @@
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import type {
-  OpenRouterModel,
+  OpenRouterModel as SnapshotModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
@@ -29,15 +29,15 @@ export function withoutVirtualProvider(providerSlugs: readonly string[]): string
 
 type ProviderModels = Array<{
   provider: OpenRouterProvider;
-  models: OpenRouterModel[];
+  models: SnapshotModel[];
 }>;
 
-function isStandardVariant(model: OpenRouterModel): boolean {
+function isStandardVariant(model: SnapshotModel): boolean {
   const variant = model.endpoint?.variant;
   return !variant || variant === 'standard';
 }
 
-function toVirtualSnapshotModel(model: OpenRouterCatalogModel): OpenRouterModel {
+function toVirtualSnapshotModel(model: OpenRouterCatalogModel): SnapshotModel {
   const { prompt, completion } = model.pricing;
   const isFree = Number(prompt) === 0 && Number(completion) === 0;
   const slug = normalizeModelId(model.id);
@@ -78,7 +78,7 @@ export function injectVirtualModels(params: {
   const snapshotModelIds = new Set(
     providerModelData.flatMap(({ models }) => models.map(model => normalizeModelId(model.slug)))
   );
-  const virtualModels: OpenRouterModel[] = [];
+  const virtualModels: SnapshotModel[] = [];
 
   for (const catalogModel of catalogModels) {
     const modelId = normalizeModelId(catalogModel.id);

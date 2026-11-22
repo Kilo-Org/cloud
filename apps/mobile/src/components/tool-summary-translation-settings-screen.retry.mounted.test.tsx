@@ -43,6 +43,10 @@ vi.mock('@/lib/hooks/use-single-push-route', () => ({
 vi.mock('@/components/ui/icons', () => ({ Cpu: 'Cpu', WandSparkles: 'WandSparkles' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

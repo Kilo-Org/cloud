@@ -6,7 +6,7 @@ import type {
   AzureCredentials,
   BedrockCredentials,
   VertexCredentials,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/app-shared/byok-credentials';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 

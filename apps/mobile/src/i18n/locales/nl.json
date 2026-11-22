@@ -554,8 +554,11 @@
     "changelogFixesIn": "Oplossingen en verbeteringen in {{areas}}.",
     "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
     "changelogAreas": {
-      "signIn": "Inloggen",
-      "profileOrganizations": "Profiel & organisaties"
+      "signIn": "inloggen",
+      "profileOrganizations": "profiel & organisaties",
+      "chat": "gesprek",
+      "notifications": "meldingen",
+      "integrations": "integraties"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Tegoedafschrijving",
       "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
       "emptyTitle": "Geen tegoedgeschiedenis",
+      "expiredGrant": "Verlopen: {{description}}",
       "googlePlayReceipt": "Bon in Google Play",
       "kind": {
         "adjustment": "Correctie",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Afschrijving",
         "grant": "Tegoedtoekenning",
+        "promotionalCredits": "Promotietegoed",
         "welcomeCredits": "Welkomsttegoed",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Tegoedtoekenning door beheerder",
+        "contributorChampion": "Tegoed voor bijdragerskampioen",
+        "feedback": "Feedbacktegoed",
+        "influencer": "Influencertegoed",
+        "ossMonthlyReset": "Maandelijkse herinstelling van opensource-sponsoring",
+        "ossSponsorship": "Tegoed voor opensource-sponsoring",
+        "pullRequest": "PR-tegoed",
+        "usageIssue": "Tegoed voor gebruiksprobleem",
+        "vibeDay": "Vibe-dagtegoed"
       },
       "purchaseFallback": "Tegoedaankoop",
       "receipt": "Bon",
       "receiptA11y": "Open de bon voor {{description}}, {{amount}}, van {{date}}",
       "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop.",
-      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven."
+      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven.",
+      "voidedGrant": "Geannuleerd: {{description}}"
     },
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
@@ -5099,6 +5116,20 @@
       "eu": "Europese Unie",
       "au": "Australië",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Voorkeuren zoeken",
+    "noMatches": "Geen overeenkomende voorkeuren",
+    "emptyDescription": "Probeer een andere naam of een ander trefwoord.",
+    "resultsStatus": "Gevonden voorkeuren: {{resultCount}}",
+    "keywords": {
+      "signOut": "afmelden|uitloggen",
+      "appearance": "thema|kleurenschema|donkere modus",
+      "appUnlock": "biometrie|gezichtsherkenning|vingerafdruk",
+      "language": "taal|vertaling",
+      "notifications": "waarschuwingen|pushmeldingen",
+      "privacy": "analyse|volgen|gegevens"
     }
   }
 }

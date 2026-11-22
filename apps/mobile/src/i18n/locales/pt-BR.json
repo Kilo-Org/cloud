@@ -556,8 +556,11 @@
     "changelogFixesIn": "Correções e melhorias em {{areas}}.",
     "changelogFixesPolish": "Correções e melhorias em todo o app.",
     "changelogAreas": {
-      "signIn": "Acesso",
-      "profileOrganizations": "Perfil & organizações"
+      "signIn": "acesso",
+      "profileOrganizations": "perfil & organizações",
+      "chat": "conversa",
+      "notifications": "notificações",
+      "integrations": "integrações"
     }
   },
   "notifications": {
@@ -4664,20 +4667,34 @@
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras de créditos, recibos e uso aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
+      "expiredGrant": "Expirado: {{description}}",
       "googlePlayReceipt": "Recibo no Google Play",
       "kind": {
         "adjustment": "Ajuste",
         "balanceNeutral": "Sem efeito no saldo",
         "deduction": "Dedução",
         "grant": "Créditos concedidos",
+        "promotionalCredits": "Créditos promocionais",
         "welcomeCredits": "Créditos de boas-vindas",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessão de créditos do administrador",
+        "contributorChampion": "Crédito de campeão de colaboradores",
+        "feedback": "Crédito por feedback",
+        "influencer": "Crédito de influenciador",
+        "ossMonthlyReset": "Renovação mensal do patrocínio de código aberto",
+        "ossSponsorship": "Crédito de patrocínio de código aberto",
+        "pullRequest": "Crédito por PR",
+        "usageIssue": "Crédito por problema de uso",
+        "vibeDay": "Crédito do dia Vibe"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
-      "retentionLimit": "Mostrando o histórico de créditos mais recente."
+      "retentionLimit": "Mostrando o histórico de créditos mais recente.",
+      "voidedGrant": "Cancelado: {{description}}"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",
@@ -5273,6 +5290,20 @@
       "eu": "União Europeia",
       "au": "Austrália",
       "jp": "Japão"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Pesquisar preferências",
+    "noMatches": "Nenhuma preferência encontrada",
+    "emptyDescription": "Tente outro nome de preferência ou palavra-chave.",
+    "resultsStatus": "Preferências encontradas: {{resultCount}}",
+    "keywords": {
+      "signOut": "sair|encerrar sessão|desconectar",
+      "appearance": "tema|cores|modo escuro",
+      "appUnlock": "biometria|reconhecimento facial|impressão digital",
+      "language": "idioma|língua|tradução",
+      "notifications": "alertas|avisos|notificações",
+      "privacy": "análise de dados|rastreamento|privacidade"
     }
   }
 }

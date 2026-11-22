@@ -554,8 +554,11 @@
     "changelogFixesIn": "Àtúnṣe àti ìlọsíwájú nínú {{areas}}.",
     "changelogFixesPolish": "Àtúnṣe àti ìlọsíwájú jákèjádò áàpù.",
     "changelogAreas": {
-      "signIn": "Wíwọlé",
-      "profileOrganizations": "Àkọsílẹ̀ ara ẹni pẹ̀lú àwọn àjọ"
+      "signIn": "wíwọlé",
+      "profileOrganizations": "àkọsílẹ̀ ara ẹni pẹ̀lú àwọn àjọ",
+      "chat": "ìfọ̀rọ̀wérọ̀",
+      "notifications": "àwọn ìfitónilétí",
+      "integrations": "àwọn ìsopọ̀"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Ìyọkúrò kírẹ́dítì",
       "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",
       "emptyTitle": "Kò sí ìtàn kírẹ́dítì",
+      "expiredGrant": "Àkókò ti kọjá: {{description}}",
       "googlePlayReceipt": "Ìwé ẹ̀rí ìsanwó láti Google Play",
       "kind": {
         "adjustment": "Àtúnṣe",
         "balanceNeutral": "Kò yí ìyókù padà",
         "deduction": "Ìyọkúrò",
         "grant": "Ẹ̀bùn kírẹ́dítì",
+        "promotionalCredits": "Kírẹ́dítì ìpolówó",
         "welcomeCredits": "Kírẹ́dítì ìkáàbọ̀",
         "purchase": "Ìrajà"
+      },
+      "program": {
+        "adminBulkGrant": "Ẹ̀bùn kírẹ́dítì alákòóso",
+        "contributorChampion": "Kírẹ́dítì akíkanjú olùkópa",
+        "feedback": "Kírẹ́dítì èsì",
+        "influencer": "Kírẹ́dítì onípa",
+        "ossMonthlyReset": "Àtúntò oṣooṣù OSS",
+        "ossSponsorship": "Kírẹ́dítì ìgbọ́wọ́ OSS",
+        "pullRequest": "Kírẹ́dítì ìbéèrè àkópọ̀",
+        "usageIssue": "Kírẹ́dítì ìṣòro lílò",
+        "vibeDay": "Kírẹ́dítì Vibe day"
       },
       "purchaseFallback": "Ìrajà kírẹ́dítì",
       "receipt": "Ìwé ẹ̀rí ìsanwó",
       "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí.",
-      "retentionLimit": "Ń ṣàfihàn ìtàn kírẹ́dítì tuntun jùlọ."
+      "retentionLimit": "Ń ṣàfihàn ìtàn kírẹ́dítì tuntun jùlọ.",
+      "voidedGrant": "A ti fagilé: {{description}}"
     },
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
@@ -5099,6 +5116,20 @@
       "eu": "Ìṣọ̀kan Yúróòpù",
       "au": "Ọ́sítírélíà",
       "jp": "Jápán"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Ṣàwárí àwọn ààyò",
+    "noMatches": "Kò sí ààyò tó bá ìṣàwárí mu",
+    "emptyDescription": "Gbìyànjú orúkọ ààyò tàbí ọ̀rọ̀ kókó mìíràn.",
+    "resultsStatus": "Àwọn ààyò tí a rí: {{resultCount}}",
+    "keywords": {
+      "signOut": "jáde|kúrò",
+      "appearance": "ìrísí|àwọ̀|àkópọ̀ àwọ̀",
+      "appUnlock": "ìdánimọ̀ àbùdá ara|ojú|ìtẹ̀ka",
+      "language": "èdè|ìtumọ̀",
+      "notifications": "ìfitónilétí|ìkìlọ̀",
+      "privacy": "ìtúpalẹ̀|ìtọpinpin|àṣírí"
     }
   }
 }

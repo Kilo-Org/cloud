@@ -556,8 +556,11 @@
     "changelogFixesIn": "Opravy a vylepšenia v oblastiach: {{areas}}.",
     "changelogFixesPolish": "Opravy a vylepšenia v celej aplikácii.",
     "changelogAreas": {
-      "signIn": "Prihlásenie",
-      "profileOrganizations": "Profil i organizácie"
+      "signIn": "prihlásenie",
+      "profileOrganizations": "profil i organizácie",
+      "chat": "čet",
+      "notifications": "upozornenia",
+      "integrations": "integrácie"
     }
   },
   "preferences": {
@@ -4664,20 +4667,34 @@
       "deductionFallback": "Odpočet kreditov",
       "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
       "emptyTitle": "Žiadna história kreditov",
+      "expiredGrant": "Platnosť vypršala: {{description}}",
       "googlePlayReceipt": "Doklad v obchode Google Play",
       "kind": {
         "adjustment": "Úprava",
         "balanceNeutral": "Bez vplyvu na zostatok",
         "deduction": "Odpočet",
         "grant": "Pridelené kredity",
+        "promotionalCredits": "Propagačné kredity",
         "welcomeCredits": "Uvítacie kredity",
         "purchase": "Nákup"
+      },
+      "program": {
+        "adminBulkGrant": "Pridelenie kreditov správcom",
+        "contributorChampion": "Kredity šampióna prispievateľov",
+        "feedback": "Kredity za spätnú väzbu",
+        "influencer": "Kredity pre influencerov",
+        "ossMonthlyReset": "Mesačné obnovenie kreditov OSS",
+        "ossSponsorship": "Kredity za sponzorstvo OSS",
+        "pullRequest": "Kredity za PR",
+        "usageIssue": "Kredity za problém s využívaním",
+        "vibeDay": "Kredity Vibe Day"
       },
       "purchaseFallback": "Nákup kreditov",
       "receipt": "Doklad",
       "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
       "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad.",
-      "retentionLimit": "Zobrazuje sa najnovšia história kreditov."
+      "retentionLimit": "Zobrazuje sa najnovšia história kreditov.",
+      "voidedGrant": "Stornované: {{description}}"
     },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
@@ -5273,6 +5290,20 @@
       "eu": "Európska únia",
       "au": "Austrália",
       "jp": "Japonsko"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hľadať predvoľby",
+    "noMatches": "Žiadne zodpovedajúce predvoľby",
+    "emptyDescription": "Skúste iný názov predvoľby alebo kľúčové slovo.",
+    "resultsStatus": "Nájdené predvoľby: {{resultCount}}",
+    "keywords": {
+      "signOut": "odhlásiť sa|odhlásenie",
+      "appearance": "téma|farebná schéma",
+      "appUnlock": "biometria|tvár|odtlačok prsta",
+      "language": "jazyk|preklad",
+      "notifications": "upozornenia|oznámenia",
+      "privacy": "analytika|sledovanie"
     }
   }
 }

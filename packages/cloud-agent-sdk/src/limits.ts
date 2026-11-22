@@ -46,6 +46,13 @@ export const CLI_SNAPSHOT_REPLAY_DEADLINE_MS = 15_000;
  */
 export const CLI_SNAPSHOT_BUFFER_MAX_EVENTS = 1024;
 
+// Snapshot reads run beside the live socket: a failed read costs the transcript
+// replay, never the live connection, so it is reported once and retried with a
+// short bounded backoff (500 ms, 1 s, 2 s) that stays well inside a
+// user-noticeable wait.
+export const SNAPSHOT_READ_MAX_RETRIES = 3;
+export const SNAPSHOT_READ_BASE_DELAY_MS = 500;
+
 /**
  * Longest a `reauth_required` ticket mint may take before the socket retires and
  * reconnects. A mint is a single small POST, so a read this old is not

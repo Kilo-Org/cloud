@@ -3,21 +3,19 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ImageViewer } from '@/components/ui/image-viewer';
-import { AlertCircle, Download, RotateCcw } from '@/components/ui/icons';
+import { AlertCircle, RotateCcw } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { formatTrustedImageHost } from '@/lib/hooks/use-trusted-image-hosts';
-import { cn } from '@/lib/utils';
 
 import {
   isMarkdownImageLoadAllowed,
   requestMarkdownImageTrust,
   subscribeMarkdownImageLoadAllowed,
 } from './markdown-image-confirm';
+import { BlockedImageChip, UnconfirmedImageChip } from './markdown-image-chips';
 import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
 import { getLinkAccessibilityActions } from './markdown-link';
 import {
@@ -52,104 +50,6 @@ function FixedImageSlot({
     >
       {children}
     </View>
-  );
-}
-
-/** Static chip for http and data URIs: HTTPS-only copy, host name for http. */
-function BlockedImageChip({
-  kind,
-  uri,
-  alt,
-  onShowLinkActions,
-}: Readonly<{
-  kind: 'http' | 'data';
-  uri: string;
-  alt: string;
-  onShowLinkActions?: () => void;
-}>) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-  const host = kind === 'http' ? formatTrustedImageHost(uri) : null;
-  const reason = host
-    ? `${host} · ${t('agentChat.markdownImage.httpsOnly')}`
-    : t('agentChat.markdownImage.httpsOnly');
-  const description = alt.trim();
-  const label = description ? `${description} · ${reason}` : reason;
-  return (
-    <Pressable
-      onLongPress={onShowLinkActions}
-      className={cn(
-        TOUCH_TARGET_CLASS,
-        'flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900'
-      )}
-      accessibilityRole="text"
-      accessibilityLabel={label}
-      accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
-      onAccessibilityAction={event => {
-        if (event.nativeEvent.actionName === 'showLinkActions') {
-          onShowLinkActions?.();
-        }
-      }}
-    >
-      <AlertCircle size={14} color={colors.mutedForeground} />
-      <Text className="shrink text-xs text-muted-foreground" numberOfLines={2}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-/** HTTPS, not yet confirmed: source host plus a Load affordance. No Image mounts. */
-function UnconfirmedImageChip({
-  uri,
-  alt,
-  onLoad,
-  onShowLinkActions,
-}: Readonly<{
-  uri: string;
-  alt: string;
-  onLoad: () => void;
-  onShowLinkActions?: () => void;
-}>) {
-  const colors = useThemeColors();
-  const { i18n, t } = useTranslation();
-  const host = formatTrustedImageHost(uri);
-  const reason = host ?? t('agentChat.markdownImage.httpsOnly');
-  const description = alt.trim();
-  const label = description ? `${description} · ${reason}` : reason;
-  const loadLabel = host
-    ? t('agentChat.markdownImage.loadWithHost', { host })
-    : t('agentChat.markdownImage.load');
-  return (
-    <Pressable
-      onLongPress={onShowLinkActions}
-      accessible={false}
-      className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
-    >
-      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
-        {label}
-      </Text>
-      <Pressable
-        onPress={onLoad}
-        onLongPress={onShowLinkActions}
-        accessibilityRole="button"
-        accessibilityLabel={
-          description ? formatList([description, loadLabel], i18n.language) : loadLabel
-        }
-        accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
-        onAccessibilityAction={event => {
-          if (event.nativeEvent.actionName === 'showLinkActions') {
-            onShowLinkActions?.();
-          }
-        }}
-        className="min-h-11 min-w-11 shrink-0 flex-row items-center justify-center gap-1 px-2 active:opacity-70"
-      >
-        <Download size={16} color={colors.mutedForeground} />
-        <Text className="text-xs font-medium text-foreground">
-          {t('agentChat.markdownImage.load')}
-        </Text>
-      </Pressable>
-    </Pressable>
   );
 }
 
@@ -204,7 +104,13 @@ export function MarkdownImage({
 
   if (kind === 'http' || kind === 'data') {
     return (
-      <BlockedImageChip kind={kind} uri={uri} alt={alt} onShowLinkActions={onShowLinkActions} />
+      <BlockedImageChip
+        kind={kind}
+        uri={uri}
+        alt={alt}
+        onPress={onPress}
+        onShowLinkActions={onShowLinkActions}
+      />
     );
   }
 

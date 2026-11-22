@@ -720,6 +720,41 @@ describe('MarkdownImage chip descriptions and long press', () => {
     await unmount(renderer);
   });
 
+  it('follows the enclosing link when the blocked chip is tapped', async () => {
+    const onPress = vi.fn<() => void>();
+    const renderer = await mount('http://insecure.com/a.png', 'A chart', {
+      accessibilityLabel: 'Example',
+      onPress,
+    });
+    const chip = ofType(renderer.root, 'Pressable')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    expect(chip.props.accessibilityRole).toBe('link');
+    expect(String(chip.props.className)).toContain('active:opacity-80');
+
+    await act(async () => {
+      await Promise.resolve();
+      (chip.props.onPress as () => void)();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+  });
+
+  it('keeps the blocked chip inert and unflashed without a link press', async () => {
+    const renderer = await mount('http://insecure.com/a.png', 'A chart');
+    const chip = ofType(renderer.root, 'Pressable')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    expect(chip.props.onPress).toBeUndefined();
+    expect(chip.props.accessibilityRole).toBe('text');
+    expect(String(chip.props.className)).not.toContain('active:opacity-80');
+
+    await unmount(renderer);
+  });
+
   it('names the unconfirmed chip row and its Load button with the alt text', async () => {
     const uri = 'https://example.com/a.png';
     const renderer = await mount(uri, 'A chart');
@@ -769,6 +804,35 @@ describe('MarkdownImage chip descriptions and long press', () => {
       (load.props.onLongPress as () => void)();
     });
     expect(onShow).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+  });
+
+  it('retries a failed image on tap instead of following its link', async () => {
+    const uri = 'https://example.com/a.png';
+    confirmMarkdownImage(uri);
+    const onPress = vi.fn<() => void>();
+    const renderer = await mount(uri, 'shot', { accessibilityLabel: 'Example', onPress });
+    const image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    const retry = ofType(renderer.root, 'Pressable')[0];
+    if (!retry) {
+      throw new Error('retry chip not found');
+    }
+    expect(texts(renderer.root)).toContain('Image unavailable\nshot');
+    await act(async () => {
+      await Promise.resolve();
+      (retry.props.onPress as () => void)();
+    });
+    expect(onPress).not.toHaveBeenCalled();
+    expect(ofType(renderer.root, 'Image')).toHaveLength(1);
 
     await unmount(renderer);
   });

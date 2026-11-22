@@ -10,14 +10,20 @@
  *  - A stored-list failure with only stale cached rows shows the full-screen
  *    error when rows were not delivered by this screen's own load. Rows
  *    delivered this mount keep rendering with the inline refresh error.
+ *  - A paused read (offline, nothing of its own cached) owns the surface as
+ *    `offline`: it never settles, so it must not paint skeletons, the
+ *    history-empty body or the unfiltered list while it waits.
  */
 type SessionListContentSurface =
+  | { kind: 'offline' }
   | { kind: 'full-screen-error' }
   | { kind: 'history-empty' }
   | { kind: 'session-list'; listEmpty: 'loading-skeletons' | 'body-empty' | 'none' };
 
 export function selectSessionListContentSurface(input: {
   isLoading: boolean;
+  /** The driving read is paused (offline) with nothing of its own to show. */
+  isPaused: boolean;
   isError: boolean;
   isRetrying: boolean;
   hasAnySessions: boolean;
@@ -28,6 +34,7 @@ export function selectSessionListContentSurface(input: {
 }): SessionListContentSurface {
   const {
     isLoading,
+    isPaused,
     isError,
     isRetrying,
     hasAnySessions,
@@ -35,6 +42,13 @@ export function selectSessionListContentSurface(input: {
     hasActiveQuery,
     hasFreshHistory,
   } = input;
+
+  // A paused read never settles, so it must not paint skeletons, the
+  // history-empty body or the unfiltered list: it owns the whole surface with
+  // its own Retry.
+  if (isPaused) {
+    return { kind: 'offline' };
+  }
 
   // Gate non-list surfaces on !isLoading so a cold open (empty cache for the
   // whole load) cannot flash history-empty or full-screen error.

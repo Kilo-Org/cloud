@@ -44,6 +44,8 @@ export function useAgentSessionListData(options: {
     activeIsError,
     storedIsError,
     storedIsPending,
+    storedIsPaused,
+    storedIsFetching,
     storedFetchedSinceMount,
     hasNextPage,
     isFetchingNextPage,
@@ -75,6 +77,21 @@ export function useAgentSessionListData(options: {
     organizationId,
     enabled: ready,
   });
+  // A paused read (offline, and no page of its own cached) is neither loading
+  // nor errored: it never settles until the network returns, so the body owes
+  // the person the offline state with a retry instead of skeletons that never
+  // land (or the unfiltered list painting under a paused search). Rows an
+  // earlier answer already delivered keep rendering: they are real answers,
+  // and the app-wide offline banner speaks for the connection.
+  const pausedSearch = search.isPaused && search.dateGroups.length === 0;
+  const pausedStored = storedIsPaused && storedSessions.length === 0;
+  const contentIsPaused = isSearching ? pausedSearch : pausedStored;
+  const drivingIsFetching = isSearching ? search.isFetching : storedIsFetching;
+  const handlePausedRetry = useCallback(() => {
+    // Fire-and-forget: a paused refetch settles only after reconnect, so the
+    // caller must not hold a busy state across it.
+    void (isSearching ? search.refetch() : refetch());
+  }, [isSearching, refetch, search]);
   const contentIsError = isSearching ? search.isError : storedIsError;
   const handleRetry = useCallback(async () => {
     if (!isSearching) {
@@ -167,15 +184,19 @@ export function useAgentSessionListData(options: {
     storedSessions,
     activeSessionIds,
     storedIsPending,
+    storedIsPaused,
     storedFetchedSinceMount,
     paging,
     refetch,
     handleRetry,
     handleRefetch,
+    handlePausedRetry,
     isSearching,
     search,
     projectOptions,
     contentIsError,
+    contentIsPaused,
+    isPausedRetrying: drivingIsFetching && !contentIsPaused,
     sections,
   };
 }

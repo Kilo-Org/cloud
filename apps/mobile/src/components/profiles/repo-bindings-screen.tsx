@@ -39,6 +39,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 import { connectedServicesHref } from '@/lib/profile-navigation';
 import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
+import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -189,12 +190,19 @@ export function RepoBindingsScreen({
   // A viewer who cannot add is told the rule instead of an action the screen
   // withholds. The plan ends writes for a manager too, and this empty state is
   // the whole surface then: the slot that states the plan sits inside the list
-  // branch, so the description carries the sentence here.
-  const planEndedDescription =
-    profilePermission === 'plan-ended' ? t('common.organizationTrialEnded') : undefined;
+  // branch, so the description carries the sentence here. That reader holds a
+  // role that can change the plan, so the sentence names the step at kilo.ai
+  // instead of sending them to an owner who is themselves.
+  const planEnded = profilePermission === 'plan-ended';
+  const planEndedDescription = planEnded ? t(trialRefusalCopyKey(true, 'absent')) : undefined;
   const roleDescription =
     profilePermission === 'read-only' ? t('profiles.organizationRoleRequired') : undefined;
-  const readOnlyDescription = planEndedDescription ?? roleDescription;
+  const withheldDescription = planEndedDescription ?? roleDescription;
+  // A lapsed plan would otherwise read as an empty list, because the generic
+  // title says nothing is configured while the list cannot be written at all.
+  const emptyTitle = planEnded
+    ? t('profiles.repoBindings.planEndedTitle')
+    : t('profiles.repoBindings.empty');
 
   return (
     <View className="flex-1 bg-background">
@@ -217,11 +225,11 @@ export function RepoBindingsScreen({
       {emptySurface ? (
         <EmptyState
           icon={GitBranch}
-          title={t('profiles.repoBindings.empty')}
+          title={emptyTitle}
           // The empty state must not name an action the screen withholds: a
           // member cannot add a default, so its state names the role instead.
           description={
-            canManage ? t('profiles.repoBindings.emptyDescription') : readOnlyDescription
+            canManage ? t('profiles.repoBindings.emptyDescription') : withheldDescription
           }
         />
       ) : (

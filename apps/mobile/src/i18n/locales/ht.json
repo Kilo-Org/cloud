@@ -4454,6 +4454,7 @@
       "entryLabel": "Pwofil default",
       "add": "Ajoute default",
       "empty": "Pa gen par défaut configuré",
+      "planEndedTitle": "Plan aktif obligatwa",
       "emptyDescription": "Ajoute yon default pou aplike otomatikman yon pwofil lè w kòmanse sesyon yo pou yon repo.",
       "repo": "Chwazi depo…",
       "profile": "Chwazi pwofil",

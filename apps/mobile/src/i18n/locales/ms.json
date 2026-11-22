@@ -4454,6 +4454,7 @@
       "entryLabel": "Profil lalai",
       "add": "Tambah lalai",
       "empty": "Tiada lalai dikonfigurasikan",
+      "planEndedTitle": "Pelan aktif diperlukan",
       "emptyDescription": "Tambahkan lalai untuk menggunakan profil secara automatik apabila memulakan sesi untuk repo.",
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",

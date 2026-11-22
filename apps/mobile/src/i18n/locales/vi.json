@@ -4454,6 +4454,7 @@
       "entryLabel": "Hồ sơ mặc định",
       "add": "Thêm mặc định",
       "empty": "Không có cấu hình mặc định",
+      "planEndedTitle": "Cần gói hoạt động",
       "emptyDescription": "Thêm mặc định để tự động áp dụng cấu hình khi bắt đầu phiên cho kho lưu trữ.",
       "repo": "Chọn kho lưu trữ…",
       "profile": "Chọn hồ sơ",

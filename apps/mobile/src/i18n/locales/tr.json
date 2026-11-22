@@ -4454,6 +4454,7 @@
       "entryLabel": "Varsayılan profiller",
       "add": "Varsayılan ekle",
       "empty": "Varsayılan ayar yapılandırılmadı",
+      "planEndedTitle": "Etkin plan gerekli",
       "emptyDescription": "Bir depo için oturum başlatırken bir profili otomatik olarak uygulamak için bir varsayılan ekleyin.",
       "repo": "Depoyu seçin…",
       "profile": "Profil seç",

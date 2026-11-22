@@ -8,6 +8,7 @@ import {
   isLatestMutationGeneration,
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
+import { useCanManageBilling } from '@/lib/trial-refusal';
 import { useTRPC } from '@/lib/trpc';
 
 // Optimistic writes on the same cache region are generation-stamped so an older
@@ -38,12 +39,15 @@ export function useAgentProfileInstructionMutations(organizationId?: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const profilesFilter = trpc.agentProfiles.pathFilter();
+  // The toast's plan-refusal sentence names the reader's own step, so the role
+  // is read once here and handed to every mapped failure.
+  const canManageBilling = useCanManageBilling(organizationId);
 
   const invalidateProfiles = () => {
     void queryClient.invalidateQueries(profilesFilter);
   };
   const toastError = (error: { message: string }) => {
-    toast.error(agentProfileMutationErrorMessage(error.message));
+    toast.error(agentProfileMutationErrorMessage(error.message, canManageBilling));
   };
   // `networkMode: 'always'` keeps a save settling while the online manager is
   // offline, so the sheet's save button always returns to idle.

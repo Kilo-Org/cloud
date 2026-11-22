@@ -4533,6 +4533,7 @@
       "entryLabel": "Perfils predeterminats",
       "add": "Afegeix per defecte",
       "empty": "No s'ha configurat cap valor predeterminat",
+      "planEndedTitle": "Cal un pla",
       "emptyDescription": "Afegiu un valor predeterminat per aplicar automàticament un perfil quan inicieu sessions per a un repo.",
       "repo": "Seleccioneu el repositori…",
       "profile": "Seleccioneu el perfil",

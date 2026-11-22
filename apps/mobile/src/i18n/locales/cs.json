@@ -4612,6 +4612,7 @@
       "entryLabel": "Výchozí profily",
       "add": "Přidat výchozí",
       "empty": "Nejsou nakonfigurována žádná výchozí nastavení",
+      "planEndedTitle": "Je vyžadován plán",
       "emptyDescription": "Přidejte výchozí nastavení pro automatické použití profilu při zahájení relací pro repo.",
       "repo": "Vyberte úložiště…",
       "profile": "Vyberte profil",

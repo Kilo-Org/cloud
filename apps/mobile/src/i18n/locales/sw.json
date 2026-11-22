@@ -4454,6 +4454,7 @@
       "entryLabel": "Profaili chaguomsingi",
       "add": "Ongeza chaguomsingi",
       "empty": "Hakuna chaguo-msingi zilizosanidiwa",
+      "planEndedTitle": "Mpango unahitajika",
       "emptyDescription": "Ongeza chaguomsingi ili kutumia wasifu kiotomatiki unapoanzisha vipindi vya repo.",
       "repo": "Chagua hazina…",
       "profile": "Chagua wasifu",

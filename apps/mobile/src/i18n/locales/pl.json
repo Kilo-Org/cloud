@@ -4612,6 +4612,7 @@
       "entryLabel": "Profile domyślne",
       "add": "Dodaj domyślne",
       "empty": "Nie skonfigurowano żadnych ustawień domyślnych",
+      "planEndedTitle": "Wymagany aktywny plan",
       "emptyDescription": "Dodaj ustawienie domyślne, aby automatycznie stosować profil podczas rozpoczynania sesji dla repozytorium.",
       "repo": "Wybierz repozytorium…",
       "profile": "Wybierz profil",

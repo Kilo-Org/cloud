@@ -4454,6 +4454,7 @@
       "entryLabel": "Standaardprofielen",
       "add": "Standaard toevoegen",
       "empty": "Geen standaardinstellingen geconfigureerd",
+      "planEndedTitle": "Abonnement vereist",
       "emptyDescription": "Voeg een standaard toe om automatisch een profiel toe te passen bij het starten van sessies voor een opslagplaats.",
       "repo": "Selecteer opslagplaats…",
       "profile": "Selecteer profiel",

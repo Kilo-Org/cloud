@@ -4454,6 +4454,7 @@
       "entryLabel": "Vaikeprofiilid",
       "add": "Lisa vaikeprofiil",
       "empty": "Ühtegi vaikeprofiili pole seadistatud",
+      "planEndedTitle": "Aktiivne pakett on vajalik",
       "emptyDescription": "Lisa vaikeprofiil, mida rakendatakse automaatselt repo seansside alustamisel.",
       "repo": "Vali hoidla…",
       "profile": "Vali profiil",

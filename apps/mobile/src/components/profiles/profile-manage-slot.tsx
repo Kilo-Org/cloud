@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { type OrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 
 /**
  * The manage-action slot of a profile section: the same place in the layout
@@ -20,6 +21,15 @@ import { type OrganizationProfilePermission } from '@/lib/hooks/use-can-manage-p
  * role is not known yet, so an action would be refused by the server for a
  * member and the sentence would tell an owner they cannot act on what they can.
  * `allowed` renders the caller's action, and nothing when the caller has none.
+ *
+ * A `plan-ended` reader is always a role that can change the plan:
+ * `useOrganizationProfilePermission` returns it only after
+ * `canManageOrganization(role)` passes, and `ORGANIZATION_MANAGE_ROLES` is
+ * `['owner', 'admin']`, a subset of `ORGANIZATION_BILLING_ROLES`. So the
+ * sentence this slot renders for it is the one a reader who can act on the plan
+ * reads, resolved through the shared key table rather than named here. The slot
+ * renders no billing step of its own, which is the `'absent'` row: the sentence
+ * names kilo.ai instead of a step that is not on this screen.
  */
 export function ProfileManageSlot({
   permission,
@@ -39,7 +49,7 @@ export function ProfileManageSlot({
     <View className="items-center">
       <Text variant="muted" className="text-center">
         {permission === 'plan-ended'
-          ? t('common.organizationTrialEnded')
+          ? t(trialRefusalCopyKey(true, 'absent'))
           : t('profiles.organizationRoleRequired')}
       </Text>
     </View>

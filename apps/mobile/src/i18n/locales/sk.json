@@ -4612,6 +4612,7 @@
       "entryLabel": "Predvolené profily",
       "add": "Pridať predvolené",
       "empty": "Nie sú nakonfigurované žiadne predvolené hodnoty",
+      "planEndedTitle": "Vyžaduje sa aktívny plán",
       "emptyDescription": "Pridajte predvolené nastavenie na automatické použitie profilu pri spustení relácií pre repo.",
       "repo": "Vybrať úložisko…",
       "profile": "Vyberte profil",

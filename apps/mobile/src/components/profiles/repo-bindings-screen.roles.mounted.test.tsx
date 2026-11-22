@@ -125,7 +125,11 @@ const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDef
 
 const ADD_LABEL = 'Add default';
 const ROLE_SENTENCE = i18n.t('profiles.organizationRoleRequired');
-const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEnded');
+const EMPTY_TITLE = i18n.t('profiles.repoBindings.empty');
+const PLAN_TITLE = i18n.t('profiles.repoBindings.planEndedTitle');
+// A 'plan-ended' reader holds a role that can change the plan, so the sentence
+// names the step at kilo.ai rather than an owner who can act.
+const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEndedBillingAtKiloAi');
 
 function buttonLabels(root: ReactTestInstance): string[] {
   return findAll(root, 'Button')
@@ -220,8 +224,11 @@ describe('RepoBindingsScreen roles', () => {
     const { renderer, unmount } = await mountScreen('org-1');
 
     // A member's state carries the rule as its own description, so the screen
-    // names the withheld action nowhere else.
-    expect(findOne(renderer.root, 'EmptyState').props.description).toBe(ROLE_SENTENCE);
+    // names the withheld action nowhere else. The title stays the generic empty
+    // title: nothing is blocked about the list itself.
+    const empty = findOne(renderer.root, 'EmptyState');
+    expect(empty.props.title).toBe(EMPTY_TITLE);
+    expect(empty.props.description).toBe(ROLE_SENTENCE);
     expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(0);
     expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(
@@ -231,16 +238,36 @@ describe('RepoBindingsScreen roles', () => {
     unmount();
   });
 
-  it('plan-ended with no bindings: states the ended plan and offers no action', async () => {
+  it('plan-ended with no bindings: names the missing plan and offers no action', async () => {
     permissionState.permission = 'plan-ended';
     bindingsState.bindingsQuery.bindings = [];
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    // The empty list is the whole surface, so its description is where a
-    // manager learns why the action is absent.
-    expect(findOne(renderer.root, 'EmptyState').props.description).toBe(PLAN_ENDED_SENTENCE);
+    // The empty list is the whole surface, so its title says the plan is what
+    // is missing instead of reading as a list nobody configured, and its
+    // description is where a manager learns why the action is absent.
+    const empty = findOne(renderer.root, 'EmptyState');
+    expect(empty.props.title).toBe(PLAN_TITLE);
+    expect(empty.props.title).not.toBe(EMPTY_TITLE);
+    expect(empty.props.description).toBe(PLAN_ENDED_SENTENCE);
     expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
+
+    unmount();
+  });
+
+  it('allowed with no bindings: keeps the empty title and the Add control', async () => {
+    permissionState.permission = 'allowed';
+    bindingsState.bindingsQuery.bindings = [];
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    // A live plan can still be written, so the surface stays the plain empty
+    // list with its create control.
+    const empty = findOne(renderer.root, 'EmptyState');
+    expect(empty.props.title).toBe(EMPTY_TITLE);
+    expect(empty.props.description).toBe(i18n.t('profiles.repoBindings.emptyDescription'));
+    expect(pressableLabels(renderer.root)).toContain(ADD_LABEL);
 
     unmount();
   });

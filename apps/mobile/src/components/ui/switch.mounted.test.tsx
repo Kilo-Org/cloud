@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
+import { resolveAlphaColor } from '@/lib/theme-color';
 import { Switch } from './switch';
 
 const native = vi.hoisted(() => ({ os: 'ios', scheme: 'light' as 'light' | 'dark' }));
@@ -21,6 +22,11 @@ vi.mock('react-native', () => ({
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
+
+// A disabled track is its enabled colour at reduced opacity: see
+// `DISABLED_TRACK_ALPHA` in `switch.tsx`.
+const DISABLED_ALPHA = 0.45;
+const disabledTrack = (hex: string) => resolveAlphaColor(hex, DISABLED_ALPHA);
 
 type SwitchFixture = {
   disabled?: boolean;
@@ -217,27 +223,37 @@ describe('Switch', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
-  it('paints the quiet pair on a disabled on switch and keeps it on', () => {
+  it('keeps the hue of the on track, at reduced opacity, on a disabled on switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     expect(props.value).toBe(true);
-    expect(props.trackColor).toEqual({
-      false: lightColors.ringTrack,
-      true: lightColors.ringTrack,
-    });
+    expect(props.trackColor?.true).toBe(disabledTrack(lightColors.primary));
+    expect(props.trackColor?.true).toBe('rgba(79, 90, 16, 0.45)');
+    expect(props.trackColor?.false).toBe(disabledTrack(lightColors.mutedSoft));
     expect(props.thumbColor).toBe(lightColors.muted);
   });
 
-  it('paints the same quiet pair on a disabled off switch', () => {
+  it('keeps the hue of the off track, at reduced opacity, on a disabled off switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    expect(props.trackColor).toEqual({
-      false: lightColors.ringTrack,
-      true: lightColors.ringTrack,
-    });
+    expect(props.value).toBe(false);
+    expect(props.trackColor?.false).toBe(disabledTrack(lightColors.mutedSoft));
+    expect(props.trackColor?.true).toBe(disabledTrack(lightColors.primary));
     expect(props.thumbColor).toBe(lightColors.muted);
+  });
+
+  it('gives a disabled on switch a different track colour than a disabled off one', () => {
+    native.os = 'android';
+    native.scheme = 'light';
+    const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
+    const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
+    // The stored value stays readable while the control cannot be changed.
+    expect(on.trackColor?.true).not.toBe(on.trackColor?.false);
+    expect(on.trackColor?.true).not.toBe(lightColors.primary);
+    expect(on.trackColor?.false).not.toBe(lightColors.mutedSoft);
+    expect(off.trackColor).toEqual(on.trackColor);
   });
 
   it('never paints a disabled grip in the scheme ink, which outranks an enabled one', () => {
@@ -254,17 +270,16 @@ describe('Switch', () => {
     }
   });
 
-  it('paints one disabled pair shape in dark mode too, off the brand accent', () => {
+  it('paints the same two disabled track shapes in dark mode, off the brand accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    expect(on.trackColor).toEqual({
-      false: darkColors.ringTrack,
-      true: darkColors.ringTrack,
-    });
-    expect(on.thumbColor).toBe(darkColors.mutedForeground);
+    expect(on.trackColor?.true).toBe(disabledTrack(darkColors.selection));
+    expect(on.trackColor?.false).toBe(disabledTrack(darkColors.mutedForeground));
+    expect(on.trackColor?.true).not.toBe(disabledTrack(darkColors.primary));
     expect(off.trackColor).toEqual(on.trackColor);
+    expect(on.thumbColor).toBe(darkColors.mutedForeground);
     expect(off.thumbColor).toBe(on.thumbColor);
   });
 
@@ -272,7 +287,7 @@ describe('Switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
-    expect(props.trackColor?.true).toBe(lightColors.ringTrack);
+    expect(props.trackColor?.true).toBe(disabledTrack(lightColors.primary));
   });
 
   it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {

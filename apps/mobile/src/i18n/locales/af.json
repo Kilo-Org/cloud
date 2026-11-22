@@ -4454,6 +4454,7 @@
       "entryLabel": "Verstekprofiele",
       "add": "Voeg verstek by",
       "empty": "Geen verstekke opgestel nie",
+      "planEndedTitle": "Aktiewe plan vereis",
       "emptyDescription": "Voeg 'n verstek by om 'n profiel outomaties toe te pas wanneer sessies vir 'n repo begin.",
       "repo": "Kies bewaarplek …",
       "profile": "Kies profiel",

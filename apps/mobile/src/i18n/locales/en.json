@@ -4546,6 +4546,7 @@
       "entryLabel": "Default profiles",
       "add": "Add default",
       "empty": "No defaults configured",
+      "planEndedTitle": "Plan required",
       "emptyDescription": "Add a default to automatically apply a profile when starting sessions for a repo.",
       "repo": "Select repository…",
       "profile": "Select profile",

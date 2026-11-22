@@ -4454,6 +4454,7 @@
       "entryLabel": "Profiilin oletukset",
       "add": "Lisää oletusprofiili",
       "empty": "Ei määritettyjä oletusprofiileja",
+      "planEndedTitle": "Suunnitelma vaaditaan",
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",
       "repo": "Valitse koodivarasto…",
       "profile": "Valitse profiili",

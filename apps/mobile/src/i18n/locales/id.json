@@ -4454,6 +4454,7 @@
       "entryLabel": "Profil bawaan",
       "add": "Tambahkan bawaan",
       "empty": "Tidak ada konfigurasi default",
+      "planEndedTitle": "Paket aktif diperlukan",
       "emptyDescription": "Tambahkan default untuk menerapkan profil secara otomatis saat memulai sesi untuk repo.",
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",

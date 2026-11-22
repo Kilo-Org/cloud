@@ -4691,6 +4691,7 @@
       "entryLabel": "Profili default",
       "add": "Żid default",
       "empty": "Ebda defaults konfigurati",
+      "planEndedTitle": "Pjan attiv meħtieġ",
       "emptyDescription": "Żid default biex tapplika profil awtomatikament meta tibda sessjonijiet għal repo.",
       "repo": "Agħżel repożitorju…",
       "profile": "Agħżel il-profil",

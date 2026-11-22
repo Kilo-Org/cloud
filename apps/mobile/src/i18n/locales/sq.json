@@ -4454,6 +4454,7 @@
       "entryLabel": "Profilet e paravendosura",
       "add": "Shto parazgjedhje",
       "empty": "Asnjë parazgjedhje nuk është konfiguruar",
+      "planEndedTitle": "Kërkohet një plan aktiv",
       "emptyDescription": "Shto një parazgjedhje për të aplikuar automatikisht një profil kur nis seancat për një depo.",
       "repo": "Zgjidhni depo…",
       "profile": "Zgjidhni profilin",

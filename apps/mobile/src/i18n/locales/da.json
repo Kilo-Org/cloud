@@ -4454,6 +4454,7 @@
       "entryLabel": "Standardprofiler",
       "add": "Tilføj standard",
       "empty": "Ingen standardindstillinger konfigureret",
+      "planEndedTitle": "Aktiv plan påkrævet",
       "emptyDescription": "Tilføj en standard for automatisk at anvende en profil, når du starter sessioner for en repo.",
       "repo": "Vælg lager…",
       "profile": "Vælg profil",

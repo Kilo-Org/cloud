@@ -4454,6 +4454,7 @@
       "entryLabel": "Standardprofile",
       "add": "Standard hinzufügen",
       "empty": "Keine Standardeinstellungen konfiguriert",
+      "planEndedTitle": "Aktiver Plan erforderlich",
       "emptyDescription": "Füge einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",
       "repo": "Repository auswählen…",
       "profile": "Profil auswählen",

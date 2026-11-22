@@ -4533,6 +4533,7 @@
       "entryLabel": "Perfiles predeterminados",
       "add": "Agregar valor predeterminado",
       "empty": "No hay valores predeterminados configurados",
+      "planEndedTitle": "Se requiere un plan",
       "emptyDescription": "Agregue un valor predeterminado para aplicar automáticamente un perfil al iniciar sesiones para un repositorio.",
       "repo": "Seleccionar repositorio…",
       "profile": "Seleccionar perfil",

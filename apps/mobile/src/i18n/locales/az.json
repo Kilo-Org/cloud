@@ -4454,6 +4454,7 @@
       "entryLabel": "Defolt profillər",
       "add": "Defolt əlavə edin",
       "empty": "Defolt konfiqurasiya edilməyib",
+      "planEndedTitle": "Aktiv plan tələb olunur",
       "emptyDescription": "Repo üçün sessiyalara başladıqda profili avtomatik tətbiq etmək üçün defolt əlavə edin.",
       "repo": "Repozitoru seçin…",
       "profile": "Profil seçin",

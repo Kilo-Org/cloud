@@ -4454,6 +4454,7 @@
       "entryLabel": "默认配置",
       "add": "添加默认值",
       "empty": "没有配置默认值",
+      "planEndedTitle": "需要生效套餐",
       "emptyDescription": "添加默认值以在启动仓库会话时自动应用配置文件。",
       "repo": "选择仓库…",
       "profile": "选择配置文件",

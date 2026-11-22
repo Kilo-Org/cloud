@@ -4533,6 +4533,7 @@
       "entryLabel": "Zadani profili",
       "add": "Dodaj zadano",
       "empty": "Nema konfiguriranih zadanih postavki",
+      "planEndedTitle": "Potreban je aktivan plan",
       "emptyDescription": "Dodajte zadano za automatsku primjenu profila pri pokretanju sesija za repo.",
       "repo": "Odaberite spremište…",
       "profile": "Odaberite profil",

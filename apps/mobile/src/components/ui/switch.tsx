@@ -9,6 +9,13 @@ import {
 
 import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { resolveAlphaColor } from '@/lib/theme-color';
+
+/**
+ * Strength of a disabled track: the enabled hue at reduced opacity, quieter
+ * than its enabled twin in both schemes yet still readable as on or off.
+ */
+const DISABLED_TRACK_ALPHA = 0.45;
 
 /**
  * The native `Switch`, painted with the app palette, with its disabled state
@@ -33,27 +40,29 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * `mutedForeground` with a `foreground` grip in dark. A caller that wants
  * another pair still wins: its own props are applied last.
  *
- * A disabled switch paints one muted pair, at the position it still shows.
- * Android folds the colours into the track and thumb drawables and only sets
- * `isEnabled`, so the platform draws no unavailable appearance of its own;
- * without this pair a row whose title dims for "not available" keeps a
- * full-strength accent track beside it and reads as both unavailable and on.
+ * A disabled switch still has to say which position it holds. Android folds
+ * the colours into the track and thumb drawables and only sets `isEnabled`, so
+ * the platform draws no unavailable appearance of its own; without these
+ * colours a row whose title dims for "not available" keeps a full-strength
+ * accent track beside it and reads as both unavailable and on.
  *
- * The pair is the same for on and off and has one shape in light and dark: a
- * soft grip on the translucent ink track `ringTrack`, `muted` in light and
- * `mutedForeground` in dark. Each half is quieter than its enabled twin (the
- * white or `foreground` grip, the `mutedSoft` or `mutedForeground` off track,
- * the olive on track), so disabled reads quieter than enabled in both schemes,
- * while the thumb's position still says which way it points. The earlier
- * `mutedSoft` track under the ink `foreground` grip painted a near-black grip
- * in light, the darkest mark in its card, and a light one in dark, so one
- * state read two ways across themes (Android critic, 2026-11-19). An olive
- * `primaryDisabled` track read as active (`app-notifications` gate,
- * 2026-11-18).
+ * So each half keeps its enabled track, drawn at `DISABLED_TRACK_ALPHA` (0.45)
+ * instead of full strength: `primary` on and `mutedSoft` off in light,
+ * `selection` on and `mutedForeground` off in dark. The grip drops to one quiet
+ * disabled tone, `muted` in light and `mutedForeground` in dark, so the thumb
+ * never outranks the row title it sits beside. Reduced opacity keeps every half
+ * quieter than its enabled twin in both schemes while its hue still says which
+ * value is stored, which one shared pair cannot do: a read-only screen of
+ * switches would paint on and off alike, hiding the answer the row exists to
+ * give. Both halves used to take the `ringTrack` ink, so the positions read
+ * alike (Android critic, 2026-11-19). Before that, `mutedSoft` under the
+ * `foreground` grip painted a near-black grip in light, the darkest mark in its
+ * card, and an olive `primaryDisabled` track read as active
+ * (`app-notifications` gate, 2026-11-18).
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
- * muted pair there would dim the control twice. Android is the platform that
- * needs the pair, and only it takes it.
+ * tracks there would dim the control twice. Android is the platform that needs
+ * them, and only it takes them.
  *
  * Fabric derives the accessibility traits from the role and
  * `accessibilityState`, then assigns them to the native control, replacing the
@@ -99,7 +108,8 @@ export function Switch({
   const dark = useColorScheme() === 'dark';
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
   const ios = Platform.OS === 'ios';
-  // Only Android needs the muted pair: iOS fades a disabled `UISwitch` itself.
+  // Only Android needs the painted tracks: iOS fades a disabled `UISwitch`
+  // itself.
   const inactive = resolvedDisabled === true && !ios;
   // The on pair is the olive accent at the luminance its grip needs: light
   // fills with `primary`, dark with the muted olive `selection`.
@@ -107,14 +117,19 @@ export function Switch({
   const enabledOnGrip = dark ? colors.selectionForeground : colors.primaryForeground;
   const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
-  // The off grip sits on the off track. A control that cannot change paints
-  // one quiet pair at the position it still shows: a soft grip on the
-  // translucent ink track, quieter than every enabled half in both schemes.
-  const disabledTrack = colors.ringTrack;
+  // A control that cannot change keeps the hue of the position it shows, so a
+  // read-only row still says on or off; only the grip drops to one quiet tone.
+  // Each half is resolved only for such a control: iOS and every live switch
+  // keep the plain palette entries, so neither reads a colour it does not
+  // paint.
   const disabledGrip = dark ? colors.mutedForeground : colors.muted;
   const offGrip = inactive ? disabledGrip : enabledOffGrip;
-  const offTrack = inactive ? disabledTrack : enabledOffTrack;
-  const onTrack = inactive ? disabledTrack : enabledOnTrack;
+  const offTrack = inactive
+    ? resolveAlphaColor(enabledOffTrack, DISABLED_TRACK_ALPHA)
+    : enabledOffTrack;
+  const onTrack = inactive
+    ? resolveAlphaColor(enabledOnTrack, DISABLED_TRACK_ALPHA)
+    : enabledOnTrack;
   const onGrip = inactive ? disabledGrip : enabledOnGrip;
   const boxSize = useRef({ width: 0, height: 0 });
 

@@ -4454,6 +4454,7 @@
       "entryLabel": "Sjálfgefin snið",
       "add": "Bæta við sjálfgefnu",
       "empty": "Engar sjálfgefnar stillingar",
+      "planEndedTitle": "Áætlun nauðsynleg",
       "emptyDescription": "Bættu við sjálfgefnu til að nota prófíl sjálfkrafa þegar þú byrjar lotur fyrir geymslu.",
       "repo": "Veldu geymslu…",
       "profile": "Veldu prófíl",

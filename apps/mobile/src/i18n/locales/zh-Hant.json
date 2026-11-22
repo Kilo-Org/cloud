@@ -4454,6 +4454,7 @@
       "entryLabel": "預設設定檔",
       "add": "新增預設值",
       "empty": "沒有配置預設值",
+      "planEndedTitle": "需要方案",
       "emptyDescription": "新增預設值以在啟動儲存庫會話時自動套用設定檔。",
       "repo": "選擇存儲庫…",
       "profile": "選擇個人資料",

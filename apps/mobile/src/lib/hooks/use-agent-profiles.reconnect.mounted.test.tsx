@@ -31,6 +31,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => connectivity.value,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+// The profile mutations read the reader's role for their plan-refusal toast,
+// and `@/lib/trial-refusal` reaches expo-router and the organization query
+// chain, which the mounted project cannot load without an app build.
+vi.mock('@/lib/trial-refusal', () => ({ useCanManageBilling: () => false }));
 
 const responses: Record<string, unknown> = {
   'agentProfiles.vars': [

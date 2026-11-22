@@ -4770,6 +4770,7 @@
       "entryLabel": "Proffiliau rhagosodedig",
       "add": "Ychwanegu rhagosodiad",
       "empty": "Dim rhagosodiadau wedi'u ffurfweddu",
+      "planEndedTitle": "Angen cynllun",
       "emptyDescription": "Ychwanegu rhagosodiad i gymhwyso proffil yn awtomatig wrth gychwyn sesiynau ar gyfer repo.",
       "repo": "Dewiswch ystorfa…",
       "profile": "Dewiswch broffil",

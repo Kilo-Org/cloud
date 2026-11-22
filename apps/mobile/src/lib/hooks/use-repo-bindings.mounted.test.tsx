@@ -49,6 +49,14 @@ vi.mock('@/lib/trpc', () => {
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
+// The bind mutations' plan-refusal toast depends on the reader's role, and
+// `@/lib/trial-refusal` reaches expo-router and the organization query chain,
+// which the mounted project cannot load without an app build. Only the role
+// read is stubbed; the sentence table stays the real one.
+vi.mock('@/lib/trial-refusal', () => ({
+  useCanManageBilling: () => false,
+}));
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 type BindingsResult = ReturnType<typeof useRepoBindings>;

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness pins the owner gate, the role and plan fallbacks, and the create paths of the new-profile form */
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -11,12 +12,22 @@ const createMutate = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
-const boundaryState = vi.hoisted(() => ({
-  organizationId: 'org-1' as string | null,
-  org: { organizationName: 'First test organization' },
-  role: 'owner' as string | undefined,
-  isResolving: false,
-}));
+/** The membership row the boundary resolves; the plan verdict is optional in the API. */
+type BoundaryOrg = { organizationName: string; isTrialExpiredForEnforcement?: boolean };
+
+const boundaryState = vi.hoisted(
+  (): {
+    organizationId: string | null;
+    org: BoundaryOrg;
+    role: string | undefined;
+    isResolving: boolean;
+  } => ({
+    organizationId: 'org-1',
+    org: { organizationName: 'First test organization' },
+    role: 'owner',
+    isResolving: false,
+  })
+);
 const mutationState = vi.hoisted(() => ({
   create: { mutateAsync: createMutate, isPending: false },
 }));
@@ -122,7 +133,10 @@ describe('NewProfileScreen', () => {
     createMutate.mockResolvedValue({ id: 'profile-1' });
     boundaryState.organizationId = 'org-1';
     boundaryState.role = 'owner';
-    boundaryState.org = { organizationName: 'First test organization' };
+    boundaryState.org = {
+      organizationName: 'First test organization',
+      isTrialExpiredForEnforcement: false,
+    };
     boundaryState.isResolving = false;
     mutationState.create.isPending = false;
   });
@@ -249,6 +263,75 @@ describe('NewProfileScreen', () => {
     const { renderer, unmount } = await mount();
 
     expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it.each(['owner', 'admin'])(
+    'does not offer organization ownership to an %s of an ended-plan organization, and creates personal profiles only',
+    async role => {
+      boundaryState.role = role;
+      boundaryState.org = {
+        organizationName: 'First test organization',
+        isTrialExpiredForEnforcement: true,
+      };
+      const { renderer, unmount } = await mount();
+
+      // The plan gate refuses every organization create from this manager, so
+      // the choice would be a dead end; Personal stays available.
+      expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+
+      typeName(renderer.root, 'Backend debugging');
+      await pressCreate(renderer.root);
+
+      await waitFor(() => createMutate.mock.calls.length > 0);
+      expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+      expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
+
+      unmount();
+    }
+  );
+
+  it('offers organization ownership to a manager of an organization whose plan is live', async () => {
+    boundaryState.role = 'admin';
+    boundaryState.org = {
+      organizationName: 'First test organization',
+      isTrialExpiredForEnforcement: false,
+    };
+    const { renderer, unmount } = await mount();
+
+    const control = findOwnerControl(renderer.root);
+    expect(control.props.options).toEqual([
+      { value: 'personal', label: 'Personal' },
+      { value: 'organization', label: 'Organization' },
+    ]);
+
+    // The test renderer hands element props back untyped; this one control's
+    // handler is the only field the case drives.
+    const ownerControlProps = control.props as { onChange: (value: string) => void };
+    act(() => {
+      ownerControlProps.onChange('organization');
+    });
+    typeName(renderer.root, 'Org profile');
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({
+      name: 'Org profile',
+      organizationId: 'org-1',
+    });
+
+    unmount();
+  });
+
+  it('keeps offering organization ownership when the membership row has no plan verdict', async () => {
+    boundaryState.role = 'owner';
+    boundaryState.org = { organizationName: 'First test organization' };
+    const { renderer, unmount } = await mount();
+
+    // An organization row written before the field existed says nothing about
+    // the plan, and an unknown plan is not a lapsed one.
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(1);
 
     unmount();
   });

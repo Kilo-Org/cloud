@@ -4454,6 +4454,7 @@
       "entryLabel": "Mga default na profile",
       "add": "Magdagdag ng default",
       "empty": "Walang mga default na na-configure",
+      "planEndedTitle": "Kailangan ng plano",
       "emptyDescription": "Magdagdag ng default para awtomatikong maglapat ng profile kapag nagsisimula ng mga session para sa isang repo.",
       "repo": "Pumili ng repositoryo…",
       "profile": "Pumili ng profile",

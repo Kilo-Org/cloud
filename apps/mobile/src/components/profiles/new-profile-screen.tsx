@@ -106,8 +106,15 @@ export function NewProfileScreen({
     organizationId: string | null;
     owner: ProfileOwnerChoice;
   } | null>(null);
+  // The Organization choice is offered only to a manager whose organization has
+  // a plan left: the create for that owner is refused by the plan gate on every
+  // press, so the option would be a dead end. An organization row without the
+  // verdict keeps the choice, as it did before the field existed.
   const canOwnOrganization =
-    !isResolving && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
+    !isResolving &&
+    hasOrganizationContext(boundaryOrganizationId) &&
+    canManageOrganization(role) &&
+    org?.isTrialExpiredForEnforcement !== true;
   const pickedOwner =
     ownerSelection?.organizationId === boundaryOrganizationId ? ownerSelection.owner : null;
   const owner: ProfileOwnerChoice = canOwnOrganization

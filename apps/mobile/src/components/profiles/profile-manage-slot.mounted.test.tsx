@@ -12,7 +12,10 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 const ACTION = 'Profile action';
 
 const SENTENCE = i18n.t('profiles.organizationRoleRequired');
-const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEnded');
+// A `plan-ended` reader is an owner or an admin, which is always a billing
+// role, and this slot renders no billing step: the sentence names kilo.ai.
+const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEndedBillingAtKiloAi');
+const OWNER_NAMING_SENTENCE = i18n.t('common.organizationTrialEnded');
 
 describe('ProfileManageSlot', () => {
   it('allowed: renders the child and not the sentence', async () => {
@@ -69,8 +72,10 @@ describe('ProfileManageSlot', () => {
       .map(node => node.props.children);
 
     // The plan, not the role, is what stops this manager: an action here would
-    // be refused by the server on every press.
+    // be refused by the server on every press. The manager can change the plan,
+    // so the sentence names the destination instead of the owner who can.
     expect(texts).toEqual([PLAN_ENDED_SENTENCE]);
+    expect(texts).not.toContain(OWNER_NAMING_SENTENCE);
     expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
 
     unmount();

@@ -4454,6 +4454,7 @@
       "entryLabel": "Profil lehenetsiak",
       "add": "Gehitu lehenetsia",
       "empty": "Ez dago lehenetsirik konfiguratuta",
+      "planEndedTitle": "Plan aktiboa behar da",
       "emptyDescription": "Gehitu lehenetsitako profil bat automatikoki aplikatzeko repositegi baterako saioak hastean.",
       "repo": "Hautatu biltegia…",
       "profile": "Hautatu profila",

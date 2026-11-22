@@ -4612,6 +4612,7 @@
       "entryLabel": "Privzeti profili",
       "add": "Dodaj privzeto",
       "empty": "Privzete nastavitve niso konfigurirane",
+      "planEndedTitle": "Potreben je aktiven načrt",
       "emptyDescription": "Dodajte privzeto za samodejno uporabo profila ob zagonu sej za repo.",
       "repo": "Izberite repozitorij …",
       "profile": "Izberite profil",

@@ -13,12 +13,22 @@ const routerReplace = vi.hoisted(() => vi.fn());
 const routerBack = vi.hoisted(() => vi.fn());
 const routerCanGoBack = vi.hoisted(() => ({ value: true }));
 const boundaryArgs = vi.hoisted((): { value: (string | undefined)[] } => ({ value: [] }));
-const boundaryState = vi.hoisted(() => ({
-  organizationId: 'org-1' as string | null,
-  org: { organizationName: 'First test organization' },
-  role: 'owner' as string | undefined,
-  isResolving: false,
-}));
+/** The membership row the boundary resolves; the plan verdict is optional in the API. */
+type BoundaryOrg = { organizationName: string; isTrialExpiredForEnforcement?: boolean };
+
+const boundaryState = vi.hoisted(
+  (): {
+    organizationId: string | null;
+    org: BoundaryOrg;
+    role: string | undefined;
+    isResolving: boolean;
+  } => ({
+    organizationId: 'org-1',
+    org: { organizationName: 'First test organization' },
+    role: 'owner',
+    isResolving: false,
+  })
+);
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => ({ create: { mutateAsync: createMutate, isPending: false } }),
@@ -94,7 +104,10 @@ describe('NewProfileScreen caller request', () => {
     createMutate.mockResolvedValue({ id: 'profile-1' });
     boundaryState.organizationId = 'org-1';
     boundaryState.role = 'owner';
-    boundaryState.org = { organizationName: 'First test organization' };
+    boundaryState.org = {
+      organizationName: 'First test organization',
+      isTrialExpiredForEnforcement: false,
+    };
     boundaryState.isResolving = false;
   });
 
@@ -174,6 +187,30 @@ describe('NewProfileScreen caller request', () => {
       returnToCaller: true,
     });
 
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+
+    unmount();
+  });
+
+  it('a manager of an ended-plan organization asked for ownership still only creates a personal profile', async () => {
+    boundaryState.role = 'owner';
+    boundaryState.org = {
+      organizationName: 'First test organization',
+      isTrialExpiredForEnforcement: true,
+    };
+    const { renderer, unmount } = await mount({
+      initialOwner: 'organization',
+      returnToCaller: true,
+    });
+
+    // The caller's requested owner is not offered while the plan gate would
+    // refuse the create, so the form falls back to Personal.
     expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
 
     typeName(renderer.root, 'Backend debugging');

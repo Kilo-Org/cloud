@@ -4454,6 +4454,7 @@
       "entryLabel": "Alapértelmezett profilok",
       "add": "Alapértelmezés hozzáadása",
       "empty": "Nincsenek beállított alapértelmezett profilok",
+      "planEndedTitle": "Aktív csomag szükséges",
       "emptyDescription": "Adjon hozzá egy alapértelmezett profilt, amely automatikusan alkalmazza a profilt az adattár munkameneteinek indításakor.",
       "repo": "Adattár kiválasztása…",
       "profile": "Profil kiválasztása",

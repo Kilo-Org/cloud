@@ -4454,6 +4454,7 @@
       "entryLabel": "Perfís predeterminados",
       "add": "Engadir predeterminado",
       "empty": "Non se configuraron valores predeterminados",
+      "planEndedTitle": "Cómpre un plan activo",
       "emptyDescription": "Engade un predeterminado para aplicar automaticamente un perfil ao iniciar sesións para un repositorio.",
       "repo": "Seleccionar repositorio…",
       "profile": "Seleccione o perfil",

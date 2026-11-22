@@ -4612,6 +4612,7 @@
       "entryLabel": "Numatytieji profiliai",
       "add": "Pridėti numatytąjį",
       "empty": "Jokių numatytųjų sukonfigūruotų",
+      "planEndedTitle": "Reikalingas aktyvus planas",
       "emptyDescription": "Pridėkite numatytąjį nustatymą, kad profilis būtų automatiškai taikomas pradedant seansus saugyklai.",
       "repo": "Pasirinkite saugyklą…",
       "profile": "Pasirinkite profilį",

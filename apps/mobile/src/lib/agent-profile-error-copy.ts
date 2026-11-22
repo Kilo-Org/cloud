@@ -1,6 +1,6 @@
 import { i18n } from '@/i18n';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
-import { TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
+import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 
 /**
  * The sentence `ensureOrganizationAccess` (`packages/web-shared/src/routers/
@@ -19,15 +19,22 @@ export const ORGANIZATION_ROLE_DENIED_MESSAGE =
  *
  * Two refusals have their own sentence here. The role denial names who may act
  * in the organization. The plan gate (`requireActiveSubscriptionOrTrial`) names
- * the lapsed plan, and its copy is the one the organization hub shows for the
- * same verdict, so a refused save and the hub agree on the cause.
+ * the lapsed plan, and its sentence depends on the reader: a profile screen
+ * renders no billing step, so the caller's `canManageBilling` and the key table
+ * decide between the owner-naming sentence and the one that names the
+ * destination for the role that can act. The parameter is required rather than
+ * defaulted, so a call site that forgets the role fails typecheck instead of
+ * quietly reading as a reader who cannot act.
  */
-export function agentProfileMutationErrorMessage(message: string): string {
+export function agentProfileMutationErrorMessage(
+  message: string,
+  canManageBilling: boolean
+): string {
   if (message === ORGANIZATION_ROLE_DENIED_MESSAGE) {
     return i18n.t('profiles.organizationRoleRequired');
   }
   if (message === ORGANIZATION_TRIAL_EXPIRED_MESSAGE) {
-    return i18n.t(TRIAL_ENDED_COPY_KEY);
+    return i18n.t(trialRefusalCopyKey(canManageBilling, 'absent'));
   }
   return message;
 }

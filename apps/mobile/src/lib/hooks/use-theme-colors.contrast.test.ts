@@ -403,19 +403,22 @@ describe('idle composer control and ring track contrast (non-text)', () => {
 });
 
 describe('disabled switch pair contrast (non-text)', () => {
-  // A disabled control keeps each half's own hue at reduced opacity, under the
-  // scheme's `ink2` grip: the enabled on track at `DISABLED_ON_TRACK_ALPHA`
-  // (light 0.8, dark 0.5) and the enabled off track at
-  // `DISABLED_OFF_TRACK_ALPHA` (0.8). iOS keeps the enabled pair and fades it
-  // itself. The switch sits on a `secondary` row, so each painted track is
-  // flattened over that row before it is measured: the translucent token never
-  // reaches the screen on its own. The floors are perception floors: the pair
-  // has to read as a control, the two positions have to stay apart, and no
-  // disabled half may equal an enabled one.
+  // A disabled control keeps each half's own hue at reduced opacity, so a
+  // read-only row still says which value it stores, under a grip that is never
+  // a live grip: `ink2` in light, `mutedForeground` in dark. The enabled on
+  // track is drawn at `DISABLED_ON_TRACK_ALPHA` (light 0.7, dark 0.45) and the
+  // enabled off track at `DISABLED_OFF_TRACK_ALPHA` (light 0.8, dark 0.65).
+  // iOS keeps the enabled pair and fades it itself. The switch sits on a
+  // `secondary` row, so each painted track is flattened over that row before it
+  // is measured: the translucent token never reaches the screen on its own. The
+  // guarantee is that each disabled half stays apart from its own live
+  // counterpart by at least 1.6:1, and that the grip differs from both live
+  // grips; a disabled half keeps its position's live hue, so a cross-position
+  // distance is not claimed.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
   // Mirrors the constants in `components/ui/switch.tsx`.
-  const DISABLED_ON_TRACK_ALPHA = { light: 0.8, dark: 0.5 } as const;
-  const DISABLED_OFF_TRACK_ALPHA = 0.8;
+  const DISABLED_ON_TRACK_ALPHA = { light: 0.7, dark: 0.45 } as const;
+  const DISABLED_OFF_TRACK_ALPHA = { light: 0.8, dark: 0.65 } as const;
   const pairs = (
     [
       ['light', lightColors],
@@ -424,6 +427,11 @@ describe('disabled switch pair contrast (non-text)', () => {
   ).map(([themeName, colors]) => {
     const enabledOnTrack = themeName === 'dark' ? colors.selection : colors.primary;
     const enabledOffTrack = themeName === 'dark' ? colors.mutedForeground : colors.mutedSoft;
+    // The live row the switch sits in: the shared pair, except that light's
+    // `PreferenceRow` overrides the off half with `mutedForeground`, which is
+    // also dark's. The grip the switch paints on each live track is measured
+    // against the disabled grip.
+    const liveOffTrack = colors.mutedForeground;
     return {
       themeName,
       colors,
@@ -432,14 +440,21 @@ describe('disabled switch pair contrast (non-text)', () => {
           resolveAlphaColor(enabledOnTrack, DISABLED_ON_TRACK_ALPHA[themeName]),
           colors.secondary
         ),
-        grip: colors.ink2,
       },
       off: {
         track: compositeToken(
-          resolveAlphaColor(enabledOffTrack, DISABLED_OFF_TRACK_ALPHA),
+          resolveAlphaColor(enabledOffTrack, DISABLED_OFF_TRACK_ALPHA[themeName]),
           colors.secondary
         ),
-        grip: colors.ink2,
+      },
+      grip: themeName === 'dark' ? colors.mutedForeground : colors.ink2,
+      live: {
+        onTrack: enabledOnTrack,
+        offTrack: compositeToken(liveOffTrack, colors.secondary),
+        grips: [
+          themeName === 'dark' ? colors.selectionForeground : colors.primaryForeground,
+          themeName === 'dark' ? colors.foreground : colors.primaryForeground,
+        ],
       },
     };
   });
@@ -470,54 +485,91 @@ describe('disabled switch pair contrast (non-text)', () => {
   // Android's thumb is wider than the track, so its outer arc lands on the row
   // itself and the grip has to read there too, not only on its own fill.
   it('every theme: the disabled grip reads on each track and on the row', () => {
-    for (const { themeName, colors, on, off } of pairs) {
+    for (const { themeName, colors, on, off, grip } of pairs) {
       expect(
-        contrastRatio(on.grip, on.track),
+        contrastRatio(grip, on.track),
         `grip vs on track (${themeName})`
       ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
       expect(
-        contrastRatio(off.grip, off.track),
+        contrastRatio(grip, off.track),
         `grip vs off track (${themeName})`
       ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
       expect(
-        contrastRatio(on.grip, colors.secondary),
+        contrastRatio(grip, colors.secondary),
         `grip vs secondary (${themeName})`
       ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
     }
   });
 
-  // A disabled row has to read as unavailable beside a live one, so no disabled
-  // pair may equal an enabled pair of either position. `PreferenceRow`'s light
-  // enabled off row is the pair to beat there: it overrides the shared off pair
-  // with `mutedForeground` (the `primaryDisabled` token) under a
-  // `primaryForeground` thumb, so the light off row is measured with that
-  // override and not with the shared pair.
-  it('every theme: no disabled pair equals an enabled pair of either position', () => {
-    for (const { themeName, colors, on, off } of pairs) {
-      const liveOn = {
-        track: themeName === 'dark' ? colors.selection : colors.primary,
-        grip: themeName === 'dark' ? colors.selectionForeground : colors.primaryForeground,
-      };
-      // Both schemes' live off row ends on `mutedForeground`: the shared pair
-      // in dark, and `PreferenceRow`'s light override, which equals it.
-      const liveOff = {
-        track: colors.mutedForeground,
-        grip: themeName === 'dark' ? colors.foreground : colors.primaryForeground,
-      };
-      for (const [name, disabled] of [
-        ['on', on],
-        ['off', off],
-      ] as const) {
-        for (const [liveName, live] of [
-          ['live on', liveOn],
-          ['live off', liveOff],
-        ] as const) {
-          expect(
-            `${disabled.track}/${disabled.grip}`,
-            `disabled ${name} vs ${liveName} (${themeName})`
-          ).not.toBe(`${live.track}/${live.grip}`);
-        }
+  // A disabled row has to read as unavailable beside a live one. The track keeps
+  // its position's live hue on purpose, so the measured guarantee is the
+  // same-position distance plus a grip that no live pair paints.
+  it('every theme: each disabled half stays apart from its own live half', () => {
+    for (const { themeName, on, off, live } of pairs) {
+      expect(
+        contrastRatio(on.track, live.onTrack),
+        `disabled on vs live on track (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+      expect(
+        contrastRatio(off.track, live.offTrack),
+        `disabled off vs live off track (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled grip differs from both live grips', () => {
+    for (const { themeName, grip, live } of pairs) {
+      for (const liveGrip of live.grips) {
+        expect(
+          contrastRatio(grip, liveGrip),
+          `disabled grip vs live grip (${themeName})`
+        ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
       }
+    }
+  });
+
+  // The figures the primitive's doc comment cites, so a palette or alpha change
+  // cannot leave that comment describing a pair this file no longer measures.
+  it('every theme: the documented figures still hold', () => {
+    const expected = {
+      light: {
+        onOff: 1.83,
+        onRow: 3.33,
+        offRow: 1.82,
+        gripOn: 3.02,
+        gripOff: 5.53,
+        gripRow: 10.05,
+        onLive: 1.94,
+        offLive: 2.55,
+        gripLive: 11.67,
+      },
+      dark: {
+        onOff: 1.69,
+        onRow: 1.6,
+        offRow: 2.71,
+        gripOn: 2.83,
+        gripOff: 1.67,
+        gripRow: 4.53,
+        onLive: 1.93,
+        offLive: 1.67,
+        gripLive: 3.18,
+      },
+    } as const;
+    const measured = (value: number) => Number(value.toFixed(2));
+    for (const { themeName, colors, on, off, grip, live } of pairs) {
+      const want = expected[themeName];
+      const got = {
+        onOff: measured(contrastRatio(on.track, off.track)),
+        onRow: measured(contrastRatio(on.track, colors.secondary)),
+        offRow: measured(contrastRatio(off.track, colors.secondary)),
+        gripOn: measured(contrastRatio(grip, on.track)),
+        gripOff: measured(contrastRatio(grip, off.track)),
+        gripRow: measured(contrastRatio(grip, colors.secondary)),
+        onLive: measured(contrastRatio(on.track, live.onTrack)),
+        offLive: measured(contrastRatio(off.track, live.offTrack)),
+        gripLive: measured(contrastRatio(grip, live.grips[0] as string)),
+      };
+      expect(got, `documented ratios (${themeName})`).toEqual(want);
     }
   });
 });

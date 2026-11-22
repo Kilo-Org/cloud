@@ -453,16 +453,14 @@ describe('PreferenceRow', () => {
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
     const trackColor = toggle.props.trackColor as { false: string; true: string };
 
-    expect(trackColor.true).toBe('rgba(79, 90, 16, 0.8)');
+    expect(trackColor.true).toBe('rgba(79, 90, 16, 0.7)');
     expect(trackColor.false).toBe('rgba(169, 163, 154, 0.8)');
     expect(trackColor.true).not.toBe(trackColor.false);
     expect(trackColor.true).not.toBe(lightColors.primary);
-    // The grip is `ink2`, never an enabled grip: an enabled one would match
-    // this row's own enabled off pair — `mutedForeground` under a white thumb.
+    // The grip is `ink2`, never a live grip: this row's own enabled off pair is
+    // `mutedForeground` under a white thumb.
     expect(toggle.props.thumbColor).toBe(lightColors.ink2);
-    expect(`${trackColor.true}/${toggle.props.thumbColor as string}`).not.toBe(
-      `${lightColors.mutedForeground}/${lightColors.primaryForeground}`
-    );
+    expect(toggle.props.thumbColor).not.toBe(lightColors.primaryForeground);
   });
 
   it('paints the same reduced hues on a dark unavailable row', () => {
@@ -471,14 +469,15 @@ describe('PreferenceRow', () => {
     const disabledOn = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
     const onToggle = disabledOn.find(node => Object.is(node.type, 'Switch'));
     const onTrack = onToggle.props.trackColor as { false: string; true: string };
-    expect(onTrack.true).toBe('rgba(100, 114, 20, 0.5)');
-    expect(onTrack.false).toBe('rgba(138, 134, 128, 0.8)');
-    expect(onToggle.props.thumbColor).toBe(darkColors.ink2);
+    expect(onTrack.true).toBe('rgba(100, 114, 20, 0.45)');
+    expect(onTrack.false).toBe('rgba(138, 134, 128, 0.65)');
+    expect(onToggle.props.thumbColor).toBe(darkColors.mutedForeground);
+    expect(onToggle.props.thumbColor).not.toBe(darkColors.foreground);
 
     const disabledOff = renderRow({ value: false, disabled: true, onValueChange: () => undefined });
     const offToggle = disabledOff.find(node => Object.is(node.type, 'Switch'));
     expect(offToggle.props.trackColor).toEqual(onTrack);
-    expect(offToggle.props.thumbColor).toBe(darkColors.ink2);
+    expect(offToggle.props.thumbColor).toBe(darkColors.mutedForeground);
   });
 });
 

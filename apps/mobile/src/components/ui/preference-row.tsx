@@ -77,9 +77,11 @@ export function PreferenceRow({
   // takes the shared pair.
   // An unavailable row must not read as both dimmed and on: a full-strength
   // accent track beside the muted title says the control is live. While the row
-  // is disabled the light override yields, so the shared `Switch` paints its two
-  // neutral disabled tracks there (`primaryDisabled` on, `mutedSoft` off); iOS
-  // fades the control itself.
+  // is disabled the light override yields, so the shared `Switch` paints each
+  // half's own hue at reduced opacity there — `primary` at 0.7 on, `mutedSoft`
+  // at 0.8 off in light, `selection` at 0.45 and `mutedForeground` at 0.65 in
+  // dark — under one quiet grip per scheme: `ink2` in light,
+  // `mutedForeground` in dark. iOS fades the control itself.
   const switchColors =
     isDark || disabled
       ? undefined

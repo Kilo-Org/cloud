@@ -24,7 +24,18 @@ jest.mock('@octokit/auth-app', () => ({
   createAppAuth: jest.fn(() => async () => ({ token: 'mock-token', expiresAt: '2099-01-01' })),
 }));
 
-import { findKiloReviewComment } from './adapter';
+import {
+  findKiloReviewComment,
+  GITHUB_LISTING_TIMEOUT_MS,
+  GitHubListingBudgetExceededError,
+  MAX_GITHUB_LISTING_BYTES,
+} from './adapter';
+
+function lastPageHeader(page: number) {
+  return {
+    link: `<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=${page}>; rel="last"`,
+  };
+}
 
 beforeEach(() => {
   mockListComments.mockReset();
@@ -72,6 +83,7 @@ describe('findKiloReviewComment', () => {
       issue_number: 7,
       per_page: 100,
       page: 1,
+      request: { signal: expect.any(AbortSignal) },
     });
     expect(mockListComments).toHaveBeenNthCalledWith(2, {
       owner: 'acme',
@@ -79,6 +91,7 @@ describe('findKiloReviewComment', () => {
       issue_number: 7,
       per_page: 100,
       page: 2,
+      request: { signal: expect.any(AbortSignal) },
     });
   });
 
@@ -180,5 +193,88 @@ describe('findKiloReviewComment', () => {
     });
 
     expect(mockListComments).toHaveBeenCalledTimes(5);
+  });
+
+  it('covers every page of one scan with the same deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockListComments.mockImplementation((params: { request: { signal: AbortSignal } }) => {
+        const { signal } = params.request;
+        signals.push(signal);
+        if (signals.length === 1) {
+          return Promise.resolve({
+            headers: lastPageHeader(3),
+            data: [{ id: 1, body: 'ordinary discussion', updated_at: '2026-05-01T00:00:00Z' }],
+          });
+        }
+        const { promise, reject } = Promise.withResolvers<never>();
+        const abort = () => reject(signal.reason);
+        if (signal.aborted) {
+          abort();
+          return promise;
+        }
+        signal.addEventListener('abort', abort, { once: true });
+        return promise;
+      });
+
+      const scan = findKiloReviewComment('42', 'acme', 'widgets', 7);
+      const settled = scan.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: PR issue-comment scan did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(signals).toHaveLength(2);
+      expect(signals[0]).toBe(signals[1]);
+      expect(signals.every(signal => signal.aborted)).toBe(true);
+      // The abort reason is named AbortError so Octokit's fetch wrapper rethrows it, and it
+      // carries the typed error the scan reports.
+      const [{ reason }] = signals;
+      expect(reason.name).toBe('AbortError');
+      expect(reason.cause).toBeInstanceOf(GitHubListingBudgetExceededError);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('rejects a scan whose retained pages pass the byte budget', async () => {
+    const padding = 'x'.repeat(60_000);
+    mockListComments.mockResolvedValue({
+      headers: lastPageHeader(12),
+      data: Array.from({ length: 100 }, (_value, index) => ({
+        id: index + 1,
+        body: padding,
+        updated_at: '2026-05-01T00:00:00Z',
+      })),
+    });
+
+    const thrown: unknown = await findKiloReviewComment('42', 'acme', 'widgets', 7).catch(
+      (error: unknown) => error
+    );
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      `GitHub pagination limit exceeded: PR issue-comment scan returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockListComments).toHaveBeenCalledTimes(3);
+  });
+
+  it('clears its deadline timer when the scan finishes', async () => {
+    jest.useFakeTimers();
+    try {
+      mockListComments.mockResolvedValueOnce({
+        headers: {},
+        data: [{ id: 1, body: 'ordinary discussion', updated_at: '2026-05-01T00:00:00Z' }],
+      });
+
+      await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).resolves.toBeNull();
+
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

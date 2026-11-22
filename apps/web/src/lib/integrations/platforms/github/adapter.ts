@@ -893,32 +893,52 @@ async function scanPRIssueComments(
     per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
   };
 
-  const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
-  const lastPage = lastLinkedPage(firstResponse.headers.link) ?? 1;
-  const comments: PRIssueComment[] = [...firstResponse.data];
+  // One walk shares one signal and deadline: every page of this scan is charged to the same
+  // total duration.
+  const budget = new GitHubListingBudget('PR issue-comment scan');
 
-  if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
-    for (let page = 2; page <= lastPage; page++) {
-      const { data } = await octokit.issues.listComments({ ...base, page });
+  try {
+    const firstResponse = await withListingDeadline(budget, () =>
+      octokit.issues.listComments({ ...base, page: 1, request: { signal: budget.signal } })
+    );
+    budget.retain(Buffer.byteLength(JSON.stringify(firstResponse.data)));
+    const lastPage = lastLinkedPage(firstResponse.headers.link) ?? 1;
+    const comments: PRIssueComment[] = [...firstResponse.data];
+
+    if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
+      for (let page = 2; page <= lastPage; page++) {
+        const { data } = await withListingDeadline(budget, () =>
+          octokit.issues.listComments({ ...base, page, request: { signal: budget.signal } })
+        );
+        budget.retain(Buffer.byteLength(JSON.stringify(data)));
+        comments.push(...data);
+      }
+      return { comments, reachedScanLimit: false };
+    }
+
+    const pagesAfterTheFirst = MAX_KILO_REVIEW_COMMENT_PAGES - 1;
+    const headPages = Math.ceil(pagesAfterTheFirst / 2);
+    const tailPages = pagesAfterTheFirst - headPages;
+
+    for (let page = 2; page <= 1 + headPages; page++) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.issues.listComments({ ...base, page, request: { signal: budget.signal } })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
       comments.push(...data);
     }
-    return { comments, reachedScanLimit: false };
-  }
+    for (let page = lastPage - tailPages + 1; page <= lastPage; page++) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.issues.listComments({ ...base, page, request: { signal: budget.signal } })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
+      comments.push(...data);
+    }
 
-  const pagesAfterTheFirst = MAX_KILO_REVIEW_COMMENT_PAGES - 1;
-  const headPages = Math.ceil(pagesAfterTheFirst / 2);
-  const tailPages = pagesAfterTheFirst - headPages;
-
-  for (let page = 2; page <= 1 + headPages; page++) {
-    const { data } = await octokit.issues.listComments({ ...base, page });
-    comments.push(...data);
+    return { comments, reachedScanLimit: true };
+  } finally {
+    budget.dispose();
   }
-  for (let page = lastPage - tailPages + 1; page <= lastPage; page++) {
-    const { data } = await octokit.issues.listComments({ ...base, page });
-    comments.push(...data);
-  }
-
-  return { comments, reachedScanLimit: true };
 }
 
 /**
@@ -1052,41 +1072,53 @@ export async function fetchPRInlineComments(
   let reachedByteLimit = false;
   let storedBodyBytes = 0;
 
-  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
-    const { data } = await octokit.pulls.listReviewComments({
-      owner,
-      repo,
-      pull_number: prNumber,
-      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
-      page,
-      // Newest comments first, so a page or byte cap keeps the freshest
-      // duplicate-detection hints and drops the oldest ones.
-      sort: 'created',
-      direction: 'desc',
-    });
-    const rows = data as Array<(typeof data)[number] & ReviewCommentExtras>;
+  // One walk shares one signal and deadline: every page of this listing is charged to the same
+  // total duration.
+  const budget = new GitHubListingBudget('PR inline comment listing');
 
-    for (const c of rows) {
-      const body = c.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
-      storedBodyBytes += Buffer.byteLength(body);
-      comments.push({
-        id: c.id,
-        path: c.path,
-        line: c.line ?? null,
-        body,
-        isOutdated: c.position == null,
-        authoredByKilo: isAuthoredByApp(c, appId),
-        user: { login: c.user?.login ?? 'unknown' },
-      });
+  try {
+    for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.pulls.listReviewComments({
+          owner,
+          repo,
+          pull_number: prNumber,
+          per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
+          page,
+          // Newest comments first, so a page or byte cap keeps the freshest
+          // duplicate-detection hints and drops the oldest ones.
+          sort: 'created',
+          direction: 'desc',
+          request: { signal: budget.signal },
+        })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
+      const rows = data as Array<(typeof data)[number] & ReviewCommentExtras>;
 
-      if (storedBodyBytes >= MAX_PR_INLINE_COMMENT_BODY_BYTES) {
-        reachedByteLimit = true;
-        break;
+      for (const c of rows) {
+        const body = c.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
+        storedBodyBytes += Buffer.byteLength(body);
+        comments.push({
+          id: c.id,
+          path: c.path,
+          line: c.line ?? null,
+          body,
+          isOutdated: c.position == null,
+          authoredByKilo: isAuthoredByApp(c, appId),
+          user: { login: c.user?.login ?? 'unknown' },
+        });
+
+        if (storedBodyBytes >= MAX_PR_INLINE_COMMENT_BODY_BYTES) {
+          reachedByteLimit = true;
+          break;
+        }
       }
-    }
 
-    if (reachedByteLimit || data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
-    reachedPageLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
+      if (reachedByteLimit || data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
+      reachedPageLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
+    }
+  } finally {
+    budget.dispose();
   }
 
   logExceptInTest('[fetchPRInlineComments] Fetched comments', {

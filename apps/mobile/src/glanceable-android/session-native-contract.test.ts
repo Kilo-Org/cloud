@@ -304,9 +304,7 @@ describe('a post that does not land leaves the card answering the request it sho
   });
 
   it('retires an ask a crash left recorded from the teardown too', () => {
-    expect(body(NOTIFICATIONS, 'fun cancel(')).toContain(
-      'sweepRetiring(context, sessionId)'
-    );
+    expect(body(NOTIFICATIONS, 'fun cancel(')).toContain('sweepRetiring(context, sessionId)');
     expect(NOTIFICATIONS).toContain('private const val RETIRING_PREFIX = "retiring:"');
   });
 

@@ -206,7 +206,7 @@ export function toggleProvider(
   providerSlug: string,
   nextAllowed: boolean
 ): ModelAccessDraft {
-  const allowed = new Set(draft.providerAllowList);
+  const allowed = new Set(normalizeInferenceProviderIds(draft.providerAllowList));
   const canonical = normalizeInferenceProviderId(providerSlug);
   if (nextAllowed) {
     allowed.add(canonical);
@@ -236,7 +236,7 @@ export function setProvidersAllowed(
   providerSlugs: readonly string[],
   nextAllowed: boolean
 ): ModelAccessDraft {
-  const allowed = new Set(draft.providerAllowList);
+  const allowed = new Set(normalizeInferenceProviderIds(draft.providerAllowList));
   for (const slug of providerSlugs) {
     const canonical = normalizeInferenceProviderId(slug);
     if (nextAllowed) {

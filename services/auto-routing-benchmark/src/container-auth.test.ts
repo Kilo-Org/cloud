@@ -404,6 +404,34 @@ it('replaces the case credential in every captured stream it returns', async () 
   expect(JSON.stringify(response.body)).not.toContain(runBody.kiloToken);
 });
 
+it('handles a capture cap at both edges of the retained text', async () => {
+  // The container server keeps at most 2 MB of stdout and the last 4 KB of stderr.
+  const stdoutCap = 2 * 1024 * 1024;
+  const stderrCap = 4 * 1024;
+  const { kiloToken } = runBody;
+  const fragment = kiloToken.slice(0, 6);
+  const suffix = kiloToken.slice(-6);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stdout.emit('data', Buffer.from(`${'x'.repeat(stdoutCap - 6)}${kiloToken}`));
+  child.stderr.emit(
+    'data',
+    Buffer.from(`${'y'.repeat(100)}${kiloToken}${'z'.repeat(stderrCap - 1)}`)
+  );
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  const [line] = (response.body.stdoutLines ?? []).map(value => value);
+  expect(line).toMatch(/^x+$/u);
+  expect(line).toHaveLength(stdoutCap - (kiloToken.length - 1));
+  expect(response.body.stderrTail).toBe('z'.repeat(stderrCap - (kiloToken.length - 1)));
+  expect(JSON.stringify(response.body)).not.toContain(fragment);
+  expect(JSON.stringify(response.body)).not.toContain(suffix);
+});
+
 it('keeps local warmup and real cases in the same serialized CLI lane', async () => {
   await loadServer();
   const warmup = request('/warmup');

@@ -266,6 +266,14 @@ function redactToken(text, kiloToken) {
     : text;
 }
 
+// When a cap ends the retained text, that edge drops up to one less than the credential
+// length, so the way the retained text is cut holds no more than a complete value.
+function dropEdgeFragment(text, kiloToken, edge) {
+  if (typeof kiloToken !== 'string' || kiloToken.length === 0) return text;
+  const keep = Math.max(0, text.length - (kiloToken.length - 1));
+  return edge === 'end' ? text.slice(0, keep) : text.slice(text.length - keep);
+}
+
 async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) {
   const startedAt = Date.now();
   const result = await new Promise(resolve => {
@@ -273,6 +281,7 @@ async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) 
     let stdout = '';
     let stdoutTruncated = false;
     let stderrTail = '';
+    let stderrTruncated = false;
     // The kilo wrapper spawns a grandchild; timeout must kill its whole group.
     let child;
     try {
@@ -306,13 +315,17 @@ async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) 
       finished = true;
       clearTimeout(killTimer);
       clearTimeout(finishTimer);
+      const retainedStdout = stdoutTruncated ? dropEdgeFragment(stdout, kiloToken, 'end') : stdout;
+      const retainedStderr = stderrTruncated
+        ? dropEdgeFragment(stderrTail, kiloToken, 'start')
+        : stderrTail;
       resolve({
         exitCode,
-        stdoutLines: stdout
+        stdoutLines: retainedStdout
           .split('\n')
           .filter(line => line.length > 0)
           .map(line => redactToken(line, kiloToken)),
-        stderrTail: redactToken(stderrTail, kiloToken),
+        stderrTail: redactToken(retainedStderr, kiloToken),
         timedOut,
       });
     };
@@ -347,10 +360,14 @@ async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }) 
       }
     });
     child.stderr.on('data', chunk => {
-      stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_CAP_BYTES);
+      const text = chunk.toString('utf8');
+      if (stderrTail.length + text.length > STDERR_CAP_BYTES) stderrTruncated = true;
+      stderrTail = (stderrTail + text).slice(-STDERR_CAP_BYTES);
     });
     child.on('error', error => {
-      stderrTail = (stderrTail + `\nspawn error: ${error.message}`).slice(-STDERR_CAP_BYTES);
+      const text = `\nspawn error: ${error.message}`;
+      if (stderrTail.length + text.length > STDERR_CAP_BYTES) stderrTruncated = true;
+      stderrTail = (stderrTail + text).slice(-STDERR_CAP_BYTES);
       finish(-1);
     });
     child.on('close', code => finish(code ?? -1));

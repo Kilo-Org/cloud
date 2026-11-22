@@ -365,7 +365,7 @@ describe('feature-state matrix — send-admission behavior', () => {
 
 describe('size limits (20 MB / 5 files) — constant parity', () => {
   it('exposes the 20 MB constant for both web and mobile parity', () => {
-    expect(AGENT_ATTACHMENT_MAX_BYTES).toBe(20 * 1024 * 1024);
+    expect(AGENT_ATTACHMENT_MAX_BYTES).toBe(20_000_000);
   });
 });
 

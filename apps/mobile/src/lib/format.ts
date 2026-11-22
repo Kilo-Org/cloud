@@ -201,8 +201,11 @@ export function formatFileSize(bytes: number, locale: string): string {
   const units = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
   let value = bytes;
   let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
+  // The step is 1000 because these are the ECMA-402 decimal unit identifiers.
+  // ECMA-402 sanctions no kibibyte, mebibyte or gibibyte identifier, so a 1024
+  // step could not keep the locale's own unit word and placement.
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000;
     unit += 1;
   }
   return formatNumber(value, locale, {

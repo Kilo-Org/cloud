@@ -1029,8 +1029,9 @@
       "checkActiveConnection": "La connexió està activa, però encara no es pot carregar aquest element.",
       "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
-      "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
+      "reconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
       "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
+      "bitbucketAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que el connecti.",
       "adminOnlyConnectDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"

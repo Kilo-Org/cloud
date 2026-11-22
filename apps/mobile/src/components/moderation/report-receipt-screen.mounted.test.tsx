@@ -32,6 +32,8 @@ type ScreenState = {
   params: Record<string, string>;
   receipt: Receipt;
   error: { data?: { code: string }; message?: string } | undefined;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  connectivity: 'online' | 'offline' | 'unknown';
   mutations: MutationOptions[];
   mutate: Mock;
   alert: Mock;
@@ -47,6 +49,8 @@ const state = vi.hoisted((): ScreenState => ({
     appealStatus: 'none',
   },
   error: undefined as { data?: { code: string }; message?: string } | undefined,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
   alert: vi.fn(),
@@ -75,6 +79,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
       isPending: false,
       isError: state.error !== undefined,
       isFetching: false,
+      fetchStatus: state.fetchStatus,
       error: state.error,
       refetch: vi.fn(),
     }),
@@ -111,8 +116,14 @@ vi.mock('@/components/agents/use-message-copy', () => ({ performCopy: state.perf
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),
 }));
+// The failure face names the connection from the committed connectivity the
+// offline banner paints, so the cases set it instead of a NetInfo subscription.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => state.connectivity,
+}));
 
 const BUTTON = 'Button' as ElementType;
+const QUERY_ERROR = 'QueryError' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -152,6 +163,8 @@ beforeEach(() => {
   state.params = { 'receipt-id': RECEIPT_ID };
   state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'received', appealStatus: 'none' };
   state.error = undefined;
+  state.fetchStatus = 'idle';
+  state.connectivity = 'online';
   state.mutations = [];
   state.mutate.mockClear();
   state.alert.mockClear();
@@ -308,10 +321,13 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('keeps a retry for a failure that could pass', async () => {
-    state.error = { message: 'Service unavailable' };
+    state.error = { data: { code: 'INTERNAL_SERVER_ERROR' }, message: 'Service unavailable' };
     const root = await mount();
 
-    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+    const [failure] = root.findAll(node => Object.is(node.type, QUERY_ERROR));
+    expect(failure).toBeDefined();
+    expect(failure?.props.variant).toBe('server');
+    expect(failure?.props.onRetry).toBeTypeOf('function');
   });
 
   it('reports a refused appeal', async () => {

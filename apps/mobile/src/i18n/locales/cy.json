@@ -4003,7 +4003,7 @@
     "signupStepUpApple": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "I orffen creu'ch cyfrif, ewch yn ôl a defnyddiwch '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Rhowch gynnig eto neu ddefnyddiwch '$t(login.resendCode)'.",
+    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Defnyddiwch '$t(login.resendCode)' neu ddefnyddiwch '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mae'ch cod yn cael ei brosesu. Arhoswch ychydig a rhowch gynnig eto.",
     "tooManyAttempts": "Rydych wedi rhoi cynnig gormod o weithiau. Gofynnwch am god newydd.",
     "invalidToken": "Methodd y mewngofnodi. Rho gynnig arall arni.",

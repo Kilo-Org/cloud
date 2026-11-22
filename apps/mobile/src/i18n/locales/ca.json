@@ -3808,7 +3808,7 @@
     "signupStepUpApple": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Per acabar de crear el teu compte, torna enrere i utilitza «$t(login.moreSignInOptions)».",
-    "invalidCode": "Aquest codi és incorrecte o ha caducat. Torna-ho a provar o utilitza «$t(login.resendCode)».",
+    "invalidCode": "Aquest codi és incorrecte o ha caducat. Utilitza «$t(login.resendCode)» o «$t(login.moreSignInOptions)».",
     "codeInProgress": "S'està processant el teu codi. Espera un moment i torna-ho a provar.",
     "tooManyAttempts": "Has fet massa intents. Sol·licita un codi nou.",
     "invalidToken": "L'inici de sessió ha fallat. Torna-ho a provar.",

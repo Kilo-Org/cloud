@@ -4003,7 +4003,7 @@
     "signupStepUpApple": "لإكمال إنشاء حسابك، استخدم \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "لإكمال إنشاء حسابك، استخدم \"$t(login.signInWithGoogle)\".",
     "signupStepUpBack": "لإكمال إنشاء حسابك، ارجع ثم استخدم \"$t(login.moreSignInOptions)\".",
-    "invalidCode": "هذا الرمز غير صحيح أو منتهي الصلاحية. حاول مرة أخرى أو استخدم \"$t(login.resendCode)\".",
+    "invalidCode": "هذا الرمز غير صحيح أو منتهي الصلاحية. استخدم \"$t(login.resendCode)\" أو \"$t(login.moreSignInOptions)\".",
     "codeInProgress": "جارٍ معالجة رمزك. انتظر قليلًا وحاول مرة أخرى.",
     "tooManyAttempts": "تجاوزت الحد المسموح للمحاولات. اطلب رمزًا جديدًا.",
     "invalidToken": "فشل تسجيل الدخول. حاول مرة أخرى.",

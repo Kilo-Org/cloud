@@ -3873,7 +3873,7 @@
     "signupStepUpApple": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Kad užbaigtum paskyros kūrimą, grįžk atgal ir pasirink „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Kodas neteisingas arba nebegalioja. Bandyk dar kartą arba pasirink „$t(login.resendCode)“.",
+    "invalidCode": "Kodas neteisingas arba nebegalioja. Naudok „$t(login.resendCode)“ arba „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tavo kodas apdorojamas. Palauk akimirką ir bandyk dar kartą.",
     "tooManyAttempts": "Per daug bandymų. Paprašyk naujo kodo.",
     "invalidToken": "Nepavyko prisijungti. Bandyk dar kartą.",

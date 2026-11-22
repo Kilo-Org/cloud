@@ -3873,7 +3873,7 @@
     "signupStepUpApple": "Pro dokončení vytvoření účtu vyber „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Pro dokončení vytvoření účtu vyber „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Pro dokončení vytvoření účtu se vrať zpět a vyber „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávný nebo mu vypršela platnost. Zkus to znovu nebo vyber „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávný nebo mu vypršela platnost. Použij „$t(login.resendCode)“ nebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvůj kód se zpracovává. Chvíli počkej a zkus to znovu.",
     "tooManyAttempts": "Proběhlo příliš mnoho pokusů. Vyžádej si nový kód.",
     "invalidToken": "Přihlášení se nezdařilo. Zkus to prosím znovu.",

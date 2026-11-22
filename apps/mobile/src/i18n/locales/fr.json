@@ -3808,7 +3808,7 @@
     "signupStepUpApple": "Pour finaliser la création de votre compte, utilisez « $t(login.signInWithApple) ».",
     "signupStepUpGoogle": "Pour finaliser la création de votre compte, utilisez « $t(login.signInWithGoogle) ».",
     "signupStepUpBack": "Pour finaliser la création de votre compte, revenez en arrière et utilisez « $t(login.moreSignInOptions) ».",
-    "invalidCode": "Ce code est incorrect ou a expiré. Réessayez ou utilisez « $t(login.resendCode) ».",
+    "invalidCode": "Ce code est incorrect ou a expiré. Utilisez « $t(login.resendCode) » ou « $t(login.moreSignInOptions) ».",
     "codeInProgress": "Votre code est en cours de traitement. Attendez un instant et réessayez.",
     "tooManyAttempts": "Trop de tentatives. Veuillez demander un nouveau code.",
     "invalidToken": "Échec de la connexion. Réessayez.",

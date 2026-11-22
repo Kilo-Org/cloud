@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Për të përfunduar krijimin e llogarisë, kthehu prapa dhe përdor '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kodi është i pasaktë ose ka skaduar. Provo përsëri ose përdor '$t(login.resendCode)'.",
+    "invalidCode": "Kodi është i pasaktë ose ka skaduar. Përdor '$t(login.resendCode)' ose '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kodi yt po përpunohet. Prit pak dhe provo përsëri.",
     "tooManyAttempts": "Ke bërë shumë përpjekje. Kërko një kod të ri.",
     "invalidToken": "Hyrja dështoi. Provo përsëri.",

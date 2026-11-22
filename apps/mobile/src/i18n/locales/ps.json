@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "د خپل حساب د جوړولو بشپړولو لپاره '$t(login.signInWithApple)' وکاروئ.",
     "signupStepUpGoogle": "د خپل حساب د جوړولو بشپړولو لپاره '$t(login.signInWithGoogle)' وکاروئ.",
     "signupStepUpBack": "د خپل حساب د جوړولو بشپړولو لپاره بېرته لاړ شئ او '$t(login.moreSignInOptions)' وکاروئ.",
-    "invalidCode": "دا کوډ سم نه دی یا یې موده پای ته رسېدلې ده. مهرباني وکړئ بیا هڅه وکړئ یا '$t(login.resendCode)' وکاروئ.",
+    "invalidCode": "دا کوډ سم نه دی یا یې موده پای ته رسېدلې ده. '$t(login.resendCode)' وکاروئ یا '$t(login.moreSignInOptions)' وکاروئ.",
     "codeInProgress": "ستاسو کوډ پروسس کېږي. لږ تم شئ او بیا هڅه وکړئ.",
     "tooManyAttempts": "ډېرې هڅې وشوې. مهرباني وکړئ د نوي کوډ غوښتنه وکړئ.",
     "invalidToken": "ننوتل ناکام شو. مهرباني وکړئ بیا هڅه وکړئ.",

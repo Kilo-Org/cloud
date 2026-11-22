@@ -3873,7 +3873,7 @@
     "signupStepUpApple": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithApple)«.",
     "signupStepUpGoogle": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithGoogle)«.",
     "signupStepUpBack": "Za dokončanje ustvarjanja računa se vrni nazaj in izberi »$t(login.moreSignInOptions)«.",
-    "invalidCode": "Ta koda ni pravilna ali je potekla. Poskusi znova ali uporabi »$t(login.resendCode)«.",
+    "invalidCode": "Ta koda ni pravilna ali je potekla. Uporabi »$t(login.resendCode)« ali »$t(login.moreSignInOptions)«.",
     "codeInProgress": "Tvoja koda se obdeluje. Počakaj trenutek in poskusi znova.",
     "tooManyAttempts": "Preveč poskusov. Zahtevaj novo kodo.",
     "invalidToken": "Prijava ni uspela. Poskusi znova.",

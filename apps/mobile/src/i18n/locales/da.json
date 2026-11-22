@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "Brug '$t(login.signInWithApple)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpGoogle": "Brug '$t(login.signInWithGoogle)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpBack": "Gå tilbage og brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
-    "invalidCode": "Koden er forkert eller udløbet. Prøv igen eller brug '$t(login.resendCode)'.",
+    "invalidCode": "Koden er forkert eller udløbet. Brug '$t(login.resendCode)' eller '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Din kode behandles. Vent et øjeblik, og prøv igen.",
     "tooManyAttempts": "For mange forsøg. Bed om en ny kode.",
     "invalidToken": "Det lykkedes ikke at logge ind. Prøv igen.",

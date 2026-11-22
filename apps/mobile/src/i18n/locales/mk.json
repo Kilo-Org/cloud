@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "За да го завршиш создавањето на сметката, врати се назад и избери „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Кодот е неточен или истечен. Обиди се повторно или избери „$t(login.resendCode)“.",
+    "invalidCode": "Кодот е неточен или истечен. Користи „$t(login.resendCode)“ или „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Твојот код се обработува. Почекај малку и обиди се повторно.",
     "tooManyAttempts": "Премногу обиди. Побарај нов код.",
     "invalidToken": "Најавата не успеа. Обиди се повторно.",

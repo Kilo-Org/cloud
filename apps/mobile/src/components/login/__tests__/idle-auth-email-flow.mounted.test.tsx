@@ -447,17 +447,91 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
 
     expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
-      "That code is incorrect or expired. Try again or use 'Resend code'."
+      "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'."
     );
-    // A retryable/wrong code keeps the user on the step they can still finish,
-    // so it never exposes the terminal browser action.
-    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.onBrowserSignIn).toBeUndefined();
+    // The server answers INVALID_CODE for an address it silently refused, so a
+    // resent code never arrives either: the step offers the other methods.
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.recovery).toBe('options');
 
-    // Editing the code retires the refusal message.
+    // Editing the code retires the refusal message, and with it the tag that
+    // offered the other methods.
     act(() => {
       (otpForm.props.onCodeChange as () => void)();
     });
     expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.recovery).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  // The reported dead end: the signup rules or the domain blacklist silently
+  // refuse an address, so the OTP route answers 200 with a challenge but issues
+  // no code, and the token route answers INVALID_CODE. Resending never delivers,
+  // so the step must offer the other sign-in methods its copy names — and that
+  // control must start the browser flow.
+  it('offers the other sign-in methods when the server silently refused the address', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+    const start = vi.fn<StartFn>().mockResolvedValue(undefined);
+
+    const renderer = await mountIdleAuth({ start });
+
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('refused-domain@example.com');
+    });
+
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'INVALID_CODE',
+      ssoOrganizationId: undefined,
+      httpStatus: 401,
+    });
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const refused = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!refused) {
+      throw new Error('EmailOtpForm not found');
+    }
+    expect(refused.props.error).toBe(
+      "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'."
+    );
+    expect(refused.props.recovery).toBe('options');
+    expect(authMock.signIn).not.toHaveBeenCalled();
+
+    const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
+    if (!onAlternativeSignIn) {
+      throw new Error('alternative sign-in action not rendered');
+    }
+    await act(async () => {
+      onAlternativeSignIn();
+      await Promise.resolve();
+    });
+    expect(start).toHaveBeenCalledWith('signin', undefined, undefined);
 
     act(() => {
       renderer.unmount();
@@ -602,13 +676,14 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     expect(refused.props.error).toBe(
       "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
     );
-    const onBrowserSignIn = refused.props.onBrowserSignIn as (() => void) | undefined;
-    if (!onBrowserSignIn) {
-      throw new Error('browser sign-in action not rendered');
+    expect(refused.props.recovery).toBe('options');
+    const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
+    if (!onAlternativeSignIn) {
+      throw new Error('alternative sign-in action not rendered');
     }
 
     await act(async () => {
-      onBrowserSignIn();
+      onAlternativeSignIn();
       await Promise.resolve();
     });
     expect(start).toHaveBeenCalledWith('signin', undefined, undefined);
@@ -683,7 +758,7 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
     expect(refused?.props.error).toBe('Too many sign-in attempts. Please wait and try again.');
     expect(refused?.props.busy).toBeUndefined();
     // A retryable resend refusal never offers the terminal browser action.
-    expect(refused?.props.onBrowserSignIn).toBeUndefined();
+    expect(refused?.props.recovery).toBeUndefined();
 
     act(() => {
       renderer.unmount();
@@ -736,12 +811,13 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
     expect(refused.props.error).toBe(
       "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
     );
-    const onBrowserSignIn = refused.props.onBrowserSignIn as (() => void) | undefined;
-    if (!onBrowserSignIn) {
-      throw new Error('browser sign-in action not rendered');
+    expect(refused.props.recovery).toBe('options');
+    const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
+    if (!onAlternativeSignIn) {
+      throw new Error('alternative sign-in action not rendered');
     }
     await act(async () => {
-      onBrowserSignIn();
+      onAlternativeSignIn();
       await Promise.resolve();
     });
     expect(start).toHaveBeenCalledWith('signin', undefined, 'link-token');

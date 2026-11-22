@@ -3873,7 +3873,7 @@
     "signupStepUpApple": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Aby dokończyć tworzenie konta, wróć i użyj opcji „$t(login.moreSignInOptions)”.",
-    "invalidCode": "Ten kod jest nieprawidłowy lub wygasł. Spróbuj ponownie albo użyj opcji „$t(login.resendCode)”.",
+    "invalidCode": "Ten kod jest nieprawidłowy lub wygasł. Użyj opcji „$t(login.resendCode)” lub „$t(login.moreSignInOptions)”.",
     "codeInProgress": "Trwa sprawdzanie twojego kodu. Poczekaj chwilę i spróbuj ponownie.",
     "tooManyAttempts": "Zbyt wiele prób. Poproś o nowy kod.",
     "invalidToken": "Logowanie nie powiodło się. Spróbuj ponownie.",

@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "Para rematar de crear a túa conta, usa \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "Para rematar de crear a túa conta, usa \"$t(login.signInWithGoogle)\".",
     "signupStepUpBack": "Para rematar de crear a túa conta, volve atrás e usa \"$t(login.moreSignInOptions)\".",
-    "invalidCode": "Ese código é incorrecto ou caducou. Téntao de novo ou usa \"$t(login.resendCode)\".",
+    "invalidCode": "Ese código é incorrecto ou caducou. Usa \"$t(login.resendCode)\" ou \"$t(login.moreSignInOptions)\".",
     "codeInProgress": "O teu código está a procesarse. Agarda un momento e téntao de novo.",
     "tooManyAttempts": "Demasiados intentos. Solicita un código novo.",
     "invalidToken": "Fallou o inicio de sesión. Téntao de novo.",

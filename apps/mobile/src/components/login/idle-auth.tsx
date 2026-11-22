@@ -298,9 +298,13 @@ export function IdleAuth({
         // screen, so the code step shows that refusal in its own slot. Without a pending link the
         // hook toasts it instead and this stays the verify message alone.
         error={verifyRefusal?.message ?? pendingLinkFailure?.message}
-        // Only the terminal admission refusal offers the browser sign-in its copy names.
-        onBrowserSignIn={verifyRefusal?.browserSignIn ? () => void startBrowserAuth() : undefined}
-        browserSignInStarting={browserAuthStarting}
+        // The refusal's data tag decides, never the message: both refusals a code
+        // cannot clear — the admission gate and a silently refused address — show
+        // the other sign-in methods their copy names. The handler is always passed,
+        // so a missing tag only hides the control.
+        recovery={verifyRefusal?.recovery}
+        onAlternativeSignIn={() => void startBrowserAuth()}
+        alternativeSignInStarting={browserAuthStarting}
         onVerify={code => {
           const attempt = verifyAttemptRef.current;
           void (async () => {

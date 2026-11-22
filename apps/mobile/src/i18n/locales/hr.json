@@ -3808,7 +3808,7 @@
     "signupStepUpApple": "Za dovršetak izrade računa odaberi „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Za dovršetak izrade računa odaberi „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Za dovršetak izrade računa vrati se natrag i odaberi „$t(login.moreSignInOptions)”.",
-    "invalidCode": "Kôd nije točan ili je istekao. Pokušaj ponovno ili odaberi „$t(login.resendCode)”.",
+    "invalidCode": "Kôd nije točan ili je istekao. Odaberi „$t(login.resendCode)” ili „$t(login.moreSignInOptions)”.",
     "codeInProgress": "Tvoj se kôd obrađuje. Pričekaj trenutak i pokušaj ponovno.",
     "tooManyAttempts": "Previše pokušaja. Zatraži novi kôd.",
     "invalidToken": "Prijava nije uspjela. Pokušaj ponovno.",

@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.signInWithApple)' વાપરો.",
     "signupStepUpGoogle": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.signInWithGoogle)' વાપરો.",
     "signupStepUpBack": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે પાછા જાઓ અને '$t(login.moreSignInOptions)' વાપરો.",
-    "invalidCode": "આ કોડ ખોટો છે અથવા તેની સમયમર્યાદા પૂરી થઈ ગઈ છે. કૃપા કરીને ફરી પ્રયત્ન કરો અથવા '$t(login.resendCode)' વાપરો.",
+    "invalidCode": "આ કોડ ખોટો છે અથવા તેની સમયમર્યાદા પૂરી થઈ ગઈ છે. '$t(login.resendCode)' વાપરો અથવા '$t(login.moreSignInOptions)' વાપરો.",
     "codeInProgress": "તમારા કોડ પર પ્રક્રિયા ચાલી રહી છે. થોડી રાહ જુઓ અને ફરી પ્રયત્ન કરો.",
     "tooManyAttempts": "ઘણા બધા પ્રયત્નો થયા છે. કૃપા કરીને નવો કોડ માંગો.",
     "invalidToken": "સાઇન ઇન કરી શકાયું નહીં. કૃપા કરીને ફરી પ્રયત્ન કરો.",

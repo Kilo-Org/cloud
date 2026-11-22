@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Kontua sortzen amaitzeko, itzuli atzera eta erabili '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kode hori okerra da edo iraungita dago. Saiatu berriro edo erabili '$t(login.resendCode)'.",
+    "invalidCode": "Kode hori okerra da edo iraungita dago. Erabili '$t(login.resendCode)' edo '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Zure kodea prozesatzen ari da. Itxaron une bat eta saiatu berriro.",
     "tooManyAttempts": "Saiakera gehiegi. Eskatu kode berri bat.",
     "invalidToken": "Saioa hasteak huts egin du. Saiatu berriro.",

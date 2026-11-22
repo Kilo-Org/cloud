@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು '$t(login.signInWithApple)' ಬಳಸಿ.",
     "signupStepUpGoogle": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು '$t(login.signInWithGoogle)' ಬಳಸಿ.",
     "signupStepUpBack": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು ಹಿಂದಕ್ಕೆ ಹೋಗಿ '$t(login.moreSignInOptions)' ಬಳಸಿ.",
-    "invalidCode": "ಆ ಕೋಡ್ ತಪ್ಪಾಗಿದೆ ಅಥವಾ ಅದರ ಅವಧಿ ಮುಗಿದಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ '$t(login.resendCode)' ಬಳಸಿ.",
+    "invalidCode": "ಆ ಕೋಡ್ ತಪ್ಪಾಗಿದೆ ಅಥವಾ ಅದರ ಅವಧಿ ಮುಗಿದಿದೆ. ದಯವಿಟ್ಟು '$t(login.resendCode)' ಬಳಸಿ ಅಥವಾ '$t(login.moreSignInOptions)' ಬಳಸಿ.",
     "codeInProgress": "ನಿಮ್ಮ ಕೋಡ್ ಅನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ. ಸ್ವಲ್ಪ ಕಾದು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "tooManyAttempts": "ಅತಿಯಾಗಿ ಪ್ರಯತ್ನಿಸಿದ್ದೀರಿ. ಹೊಸ ಕೋಡ್‌ಗಾಗಿ ವಿನಂತಿಸಿ.",
     "invalidToken": "ಸೈನ್-ಇನ್ ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",

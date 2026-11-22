@@ -3873,7 +3873,7 @@
     "signupStepUpApple": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Каб завяршыць стварэнне ўліковага запісу, вярніся назад і выберы «$t(login.moreSignInOptions)».",
-    "invalidCode": "Гэты код няправільны або тэрмін яго дзеяння скончыўся. Паспрабуй яшчэ раз або выберы «$t(login.resendCode)».",
+    "invalidCode": "Гэты код няправільны або тэрмін яго дзеяння скончыўся. Выкарыстай «$t(login.resendCode)» або «$t(login.moreSignInOptions)».",
     "codeInProgress": "Твой код апрацоўваецца. Крыху пачакай і паспрабуй яшчэ раз.",
     "tooManyAttempts": "Занадта шмат спроб. Запытай новы код.",
     "invalidToken": "Не атрымалася ўвайсці. Паспрабуй яшчэ раз.",

@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "Veldu „$t(login.signInWithApple)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpGoogle": "Veldu „$t(login.signInWithGoogle)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpBack": "Farðu til baka og veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
-    "invalidCode": "Þessi kóði er rangur eða útrunninn. Reyndu aftur eða veldu „$t(login.resendCode)“.",
+    "invalidCode": "Þessi kóði er rangur eða útrunninn. Notaðu „$t(login.resendCode)“ eða „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Kóðinn þinn er í vinnslu. Bíddu í smá stund og reyndu aftur.",
     "tooManyAttempts": "Of margar tilraunir. Biddu um nýjan kóða.",
     "invalidToken": "Innskráning mistókst. Reyndu aftur.",

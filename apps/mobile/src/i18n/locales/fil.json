@@ -3743,7 +3743,7 @@
     "signupStepUpApple": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para matapos ang paggawa ng iyong account, bumalik at gamitin ang '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mali o expired na ang code na iyon. Pakisubukan muli o gamitin ang '$t(login.resendCode)'.",
+    "invalidCode": "Mali o expired na ang code na iyon. Gamitin ang '$t(login.resendCode)' o ang '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Pinoproseso ang iyong code. Maghintay ng sandali at subukan muli.",
     "tooManyAttempts": "Masyado nang maraming pagsubok. Humiling ng bagong code.",
     "invalidToken": "Hindi makapag-sign in. Pakisubukan muli.",

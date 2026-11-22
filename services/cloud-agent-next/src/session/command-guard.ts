@@ -389,6 +389,11 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
 // glob spelling a shell would resolve to the same directory.
 const SECURITY_REMEDIATION_GIT_DIR_SPELLINGS = ['.git', '.g?t', '.g*t'];
 
+// The allowed programs that name the file they write. Any other program is not
+// in the allow list, so a command that starts with it resolves to no rule and
+// the session rejects the prompt; only these need a rule of their own.
+const SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS = ['cp', 'mv', 'sed'];
+
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git config *push*',
   'git config *force*',
@@ -429,18 +434,28 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git*-c*.*=*',
   'git*-c*?=*',
   // git reads the same configuration from the repository's own file, which a
-  // shell command can rewrite directly. The file is refused by the directory
-  // spelling and the file-name prefix, so `config`, `confi?` and `con?ig` are
-  // all covered, and a command that enters the directory is refused as well so
-  // a relative write of the file cannot follow. The second `cd` form also
-  // covers a trailing slash, because `*` matches an empty run. The user's own
-  // configuration file is refused by name. The bound: a path spelled some other
-  // way is not covered here; the edit tool's own map denies the same file.
-  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [
-    `cd *${spelling}`,
-    `cd *${spelling}/*`,
-    `*${spelling}/con*`,
+  // shell command can rewrite directly. The CLI evaluates each shell node of a
+  // line on its own and never evaluates a `cd` node against this map, so a rule
+  // for `cd` would never run. These rules cover the write instead, by the path
+  // it names: a path in the repository's own directory is refused by the
+  // directory spelling and the file-name prefix, so `config`, `confi?` and
+  // `con?ig` are all covered. The user's own configuration file is refused by
+  // name. The bound: a write performed by a program this policy does not allow
+  // is not covered here, and neither is a path spelled some other way; the edit
+  // tool's own map denies the same file.
+  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [`*${spelling}/con*`]),
+  // A `cd` node is never evaluated, so a write whose target is the bare name
+  // cannot be classified by its directory. These rules refuse that target by
+  // name, at the cost of refusing a legitimate write to a file or directory
+  // named `config`.
+  ...SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS.flatMap(tool => [
+    `${tool} *config`,
+    `${tool} *confi?`,
   ]),
+  '*>> *config',
+  '*>> *confi?',
+  '*> *config',
+  '*> *confi?',
   '*gitconfig*',
 ];
 

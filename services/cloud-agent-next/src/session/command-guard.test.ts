@@ -508,18 +508,21 @@ describe('security-remediation push command guard policy', () => {
       'git push `cat /tmp/ref`',
       'git push $(cat /tmp/ref)',
       // The repository's own configuration file, by directory spelling and file
-      // name prefix, through a literal and a glob path, and through a `cd` into
-      // the directory that would let a relative write follow.
+      // name prefix, through a literal path and a glob path.
       'echo "[alias]" >> ~/.gitconfig',
       'echo "p = push --force" >> ~/.gitconfig',
       'cat ~/.gitconfig',
       'cp /tmp/evil .git/confi?',
       'cp /tmp/evil .g?t/config',
       'mv /tmp/evil .git/con?ig',
-      'cd .git',
-      'cd .git/',
-      'cd /tmp/repo/.git',
-      'cd .git/refs',
+      // A write aimed at the bare file name, which a `cd` node cannot classify
+      // by directory because the CLI never evaluates that node.
+      'mv /tmp/evil config',
+      'cp /tmp/evil config',
+      'sed -i s/a/b/ config',
+      'echo "[alias]" >> config',
+      'printf x > config',
+      'mv /tmp/evil confi?',
       // A shell hands a line continuation to git inside one command; the
       // matcher normalizes the backslash to a slash, so the push rules reach it.
       'git push \\\n--force',
@@ -556,8 +559,11 @@ describe('security-remediation push command guard policy', () => {
       'git branch -c a b',
       'git -C . branch -c a b',
       'git commit -m "tidy the retry path"',
-      'cd .github',
-      'cd .github/workflows',
+      'mv src/a.ts src/b.ts',
+      'cp src/a.ts src/b.ts',
+      'sed -i s/a/b/ src/app.ts',
+      'mv src/config.ts src/conf.ts',
+      'cp config.example.json config.test.json',
       'cat .gitignore',
       'cat .github/workflows/ci.yml',
       'cat package/config.json',

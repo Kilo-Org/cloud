@@ -70,6 +70,7 @@ import type { Owner } from '@/lib/integrations/core/types';
 import {
   INSTALLATION_LOCK_WAIT_MS,
   INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS,
+  withWorkspaceInstallationLock,
 } from '@/lib/integrations/oauth/workspace-installation-lock';
 import {
   addDiscordReaction,
@@ -423,7 +424,7 @@ describe('discord-service previous guild release', () => {
     expect(lockStatements[0]).not.toContain('integration-installation-owner');
   });
 
-  it('bounds the locked section with two budgets that sum below the lock wait', async () => {
+  it('bounds the release section at its worst case below the lock wait', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
 
     await releasePreviousDiscordGuild(owner, guildId);
@@ -436,9 +437,33 @@ describe('discord-service previous guild release', () => {
     expect(
       statements.some(text => text.includes(`lock_timeout = '${INSTALLATION_LOCK_WAIT_MS}ms'`))
     ).toBe(true);
+    // A statement budget is per statement, and the guard read runs up to two
+    // lookups: the canonical query and the legacy account-column fallback.
     expect(
-      INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS + DISCORD_RELEASE_REMOVAL_TIMEOUT_MS
+      2 * INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS + DISCORD_RELEASE_REMOVAL_TIMEOUT_MS
     ).toBeLessThan(INSTALLATION_LOCK_WAIT_MS);
+  });
+
+  it('takes the server lock before lowering the statement budget', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await releasePreviousDiscordGuild(owner, guildId);
+
+    const statements = mockTxExecute.mock.calls.map(([statement]) => statementText(statement));
+    const lockIndex = statements.findIndex(text => text.includes('pg_advisory_xact_lock'));
+    const budgetIndex = statements.findIndex(text => text.includes('statement_timeout'));
+    expect(lockIndex).toBeGreaterThanOrEqual(0);
+    expect(budgetIndex).toBeGreaterThan(lockIndex);
+  });
+
+  it('renders the connect lock wait from the shared constant', async () => {
+    await withWorkspaceInstallationLock('discord', owner, guildId, async () => undefined);
+
+    const statements = mockTxExecute.mock.calls.map(([statement]) => statementText(statement));
+    expect(
+      statements.some(text => text.includes(`lock_timeout = '${INSTALLATION_LOCK_WAIT_MS}ms'`))
+    ).toBe(true);
+    expect(statements.some(text => text.includes("lock_timeout = '5s'"))).toBe(false);
   });
 
   it.each([204, 404])('leaves the server without reporting a %i answer', async status => {

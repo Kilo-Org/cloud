@@ -62,9 +62,10 @@ export class DiscordGuildRebindNotAllowedError extends Error {
 const DISCORD_BOT_REMOVAL_TIMEOUT_MS = 10_000;
 
 /**
- * Budget for the release's removal request. It is the external-call half of the
- * release's locked section, so with the lock's SQL budget it stays below the
- * lock wait: 2s + 2s < 5s.
+ * Budget for the release's removal request, the external call in its locked
+ * section. The section runs at most two lookups at
+ * `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS` each, so its worst case is
+ * `2 statements x 1s + 2s removal = 4s < 5s wait`.
  */
 export const DISCORD_RELEASE_REMOVAL_TIMEOUT_MS = 2_000;
 

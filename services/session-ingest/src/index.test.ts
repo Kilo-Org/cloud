@@ -765,6 +765,36 @@ describe('internal session-rows export route', () => {
     expect(stub.exportSessionRowsStream).toHaveBeenCalledOnce();
   });
 
+  it('writes one audit line per export without row bodies', async () => {
+    const stub = { exportSessionRowsStream: vi.fn(async () => new Response('').body!) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const res = await app.request(
+        route,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ...body,
+            requireSessionRow: false,
+            exportId: 'export-job-1',
+          }),
+        },
+        defaultEnv
+      );
+
+      expect(res.status).toBe(200);
+      expect(log).toHaveBeenCalledWith('Raw session row export', {
+        operation: 'session-rows-export',
+        sessionId: body.sessionId,
+        exportId: 'export-job-1',
+      });
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('returns 404 without touching a Durable Object when the session row is absent', async () => {
     const { db } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);

@@ -23,6 +23,9 @@ export const sessionRawExportRequestSchema = z.object({
   // session created earlier keeps its id, and its rows are addressed by it.
   sessionId: storedSessionIdSchema,
   requireSessionRow: z.boolean().optional(),
+  // Opaque caller-side identifier for the audit line, so one export can be
+  // traced back to the job that asked for it.
+  exportId: z.string().min(1).max(128).optional(),
 });
 
 export type SessionRawExportRequest = z.infer<typeof sessionRawExportRequestSchema>;

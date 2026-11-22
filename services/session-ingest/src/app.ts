@@ -174,6 +174,15 @@ app.post(
     const parsed = sessionRawExportRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ success: false, error: 'Invalid request' }, 400);
 
+    // One audit line per export: the session it covers and the caller's own
+    // correlation id, never a row body. This is what makes a use of the export
+    // token attributable after the fact.
+    console.log('Raw session row export', {
+      operation: 'session-rows-export',
+      sessionId: parsed.data.sessionId,
+      exportId: parsed.data.exportId ?? null,
+    });
+
     const result = await getSessionRawExport(c.env, parsed.data);
     if (result.status !== 'ok') {
       return c.json({ success: false, error: result.status }, 404, { 'cache-control': 'no-store' });

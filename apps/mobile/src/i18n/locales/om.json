@@ -4098,6 +4098,7 @@
         "network": "Buufinsi hin xumuramne. Walqunnamtii keessan sakatta'ii irra deebi'ii yaali.",
         "invalidFile": "Faayiliin buufame moodeela app kanaan hojjetamuu danda'u miti, kanaaf haqame.",
         "checksum": "Faayiliin buufame checksum isaa maxxanfameen wal hin simu, kanaaf haqame. Ammas irra deebi'ii buusi.",
+        "unreadable": "Meensi kun faayilii buufame sakatta'uu hin dandeenye, kanaaf haqame. Ammas irra deebi'ii buusi.",
         "writeFailed": "Meensi kun moodeela saaguu hin dandeenye. Ammas irra deebi'ii buusi."
       }
     },

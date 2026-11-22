@@ -4172,6 +4172,7 @@
         "network": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
         "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts.",
         "checksum": "Lejupielādētais fails neatbilst publicētajai kontrolsummai, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz.",
+        "unreadable": "Šī ierīce nevarēja pārbaudīt lejupielādēto failu, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz.",
         "writeFailed": "Šī ierīce nevarēja saglabāt modeli. Mēģiniet lejupielādēt vēlreiz."
       }
     },

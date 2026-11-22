@@ -4172,6 +4172,7 @@
         "network": "Il download non è terminato. Controlla la connessione e riprova.",
         "invalidFile": "Il file scaricato non è un modello che questa app può eseguire, quindi è stato rimosso.",
         "checksum": "Il file scaricato non corrisponde al checksum pubblicato, quindi è stato rimosso. Riprova a scaricarlo.",
+        "unreadable": "Questo dispositivo non è riuscito a controllare il file scaricato, quindi è stato rimosso. Riprova a scaricarlo.",
         "writeFailed": "Questo dispositivo non è riuscito a salvare il modello. Riprova a scaricarlo."
       }
     },

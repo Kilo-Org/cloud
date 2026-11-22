@@ -4098,6 +4098,7 @@
         "network": "Die aflaai het nie klaargemaak nie. Kontroleer jou verbinding en probeer weer.",
         "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder.",
         "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer.",
+        "unreadable": "Hierdie toestel kon nie die afgelaaide lêer kontroleer nie, so dit is verwyder. Probeer die aflaai weer.",
         "writeFailed": "Hierdie toestel kon nie die model stoor nie. Probeer die aflaai weer."
       }
     },

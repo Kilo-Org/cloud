@@ -4098,6 +4098,7 @@
         "network": "Yükləmə tamamlanmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
         "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi.",
         "checksum": "Yüklənmiş fayl dərc olunmuş yoxlama cəmi ilə uyğun gəlmir, ona görə silindi. Yükləməni yenidən cəhd edin.",
+        "unreadable": "Bu cihaz yüklənmiş faylı yoxlaya bilmədi, ona görə silindi. Yükləməni yenidən cəhd edin.",
         "writeFailed": "Bu cihaz modeli saxlaya bilmədi. Yükləməni yenidən cəhd edin."
       }
     },

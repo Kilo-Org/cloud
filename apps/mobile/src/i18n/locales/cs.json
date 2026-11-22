@@ -4246,6 +4246,7 @@
         "network": "Stahování se nedokončilo. Zkontrolujte připojení a zkuste to znovu.",
         "invalidFile": "Stažený soubor není model, který by tato aplikace mohla spustit, proto byl odstraněn.",
         "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu.",
+        "unreadable": "Toto zařízení nemohlo stažený soubor zkontrolovat, proto byl odstraněn. Zkuste jej stáhnout znovu.",
         "writeFailed": "Toto zařízení nemohlo model uložit. Zkuste jej stáhnout znovu."
       }
     },

@@ -4246,6 +4246,7 @@
         "network": "Prenos se ni dokončal. Preverite povezavo in poskusite znova.",
         "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena.",
         "checksum": "Prenesena datoteka se ne ujema z objavljeno kontrolno vsoto, zato je bila odstranjena. Poskusite znova prenesti.",
+        "unreadable": "Ta naprava ni mogla preveriti prenesene datoteke, zato je bila odstranjena. Poskusite znova prenesti.",
         "writeFailed": "Ta naprava ni mogla shraniti modela. Poskusite znova prenesti."
       }
     },

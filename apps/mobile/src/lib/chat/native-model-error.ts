@@ -6,6 +6,8 @@ import { LocalModelError, type LocalModelProblem } from './local-model-error';
  * Every stable code the on-device modules emit, and the one copy class each
  * picks. `unsupported_os` and `model_unavailable` stay on the neutral class:
  * the iOS and Android sentences differ, and this path has no provider to ask.
+ * `models_unreadable` is the failed check: the saved list could not be read, so
+ * the generic empty-library copy would misdescribe it.
  */
 const REASON_PROBLEMS = {
   model_download_required: 'downloadRequired',
@@ -17,6 +19,7 @@ const REASON_PROBLEMS = {
   device_not_eligible: 'ineligible',
   battery_quota_exceeded: 'quotaExhausted',
   check_failed: 'checkFailed',
+  models_unreadable: 'checkFailed',
   unsupported_os: 'unavailable',
   model_unavailable: 'unavailable',
   busy: 'busy',

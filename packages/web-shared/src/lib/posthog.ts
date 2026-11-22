@@ -25,6 +25,11 @@ export default function PostHogClient(): Pick<
     host: 'https://us.i.posthog.com',
     flushAt: 1,
     flushInterval: 0,
+    // A flag read is bounded at its caller in `posthog-feature-flags.ts`; this
+    // closes the request of an abandoned read instead of letting it hold a
+    // socket for the SDK's own default (its stateful client defaults to 10000
+    // ms; the stateless default is 3000 ms). It does not affect event sends.
+    featureFlagsRequestTimeoutMs: 2_000,
   });
 
   return instance;

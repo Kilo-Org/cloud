@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  canonicalDraft,
   type CatalogModel,
   initialDraft,
   modelAccessSave,
@@ -49,6 +50,17 @@ describe('usableModelIds provider slugs', () => {
         draft: { providerAllowList: ['OpenAI'], modelDenyList: [] },
       })
     ).toEqual(['openai/gpt']);
+  });
+});
+
+describe('canonicalDraft', () => {
+  it('canonicalizes a restored draft so its provider rows render enabled', () => {
+    expect(
+      canonicalDraft({ providerAllowList: ['OpenAI', 'openai'], modelDenyList: ['x:free'] })
+    ).toEqual({
+      providerAllowList: ['openai'],
+      modelDenyList: ['x'],
+    });
   });
 });
 

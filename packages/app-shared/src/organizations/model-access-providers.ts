@@ -1,9 +1,9 @@
 /**
  * The canonical form of one inference provider slug: trimmed, cut at the first
- * `/` so a model-shaped entry names its provider, and lowercased. This mirrors
- * the gateway's own rule (`normalizeInferenceProviderId` in web-shared), which
- * both writers and every read path use, so one stored value means the same
- * provider whatever wrote it.
+ * `/` so a model-shaped entry names its provider, and lowercased. This module
+ * is the single source of that rule; the web-shared `inference-provider-id`
+ * module re-exports it for the web and gateway paths, so one stored value means
+ * the same provider whatever wrote it.
  */
 export function normalizeInferenceProviderId(providerId: string): string {
   const trimmed = providerId.trim();

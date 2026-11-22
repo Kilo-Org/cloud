@@ -185,6 +185,22 @@ export function initialDraft(
   };
 }
 
+/**
+ * The draft with every provider slug in the gateway's canonical form. A draft
+ * the encrypted form store persisted was written by an earlier build, and
+ * `isModelAccessFormDraft` checks the shape only, so it can hold a slug the
+ * current writers no longer store. The rows the Providers tab renders are
+ * canonical, so restoring that draft verbatim would leave its provider off and
+ * its models unusable. The deny list is unaffected: `normalizeModelId` already
+ * ran when the draft was written.
+ */
+export function canonicalDraft(draft: ModelAccessDraft): ModelAccessDraft {
+  return {
+    providerAllowList: sortedUnique(normalizeInferenceProviderIds(draft.providerAllowList)),
+    modelDenyList: sortedUnique(draft.modelDenyList.map(modelId => normalizeModelId(modelId))),
+  };
+}
+
 export function toggleProvider(
   draft: ModelAccessDraft,
   providerSlug: string,

@@ -19,6 +19,7 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import {
   type AvailableModel,
+  canonicalDraft,
   type CatalogModel,
   catalogProviderSlugs,
   denyListModels,
@@ -158,7 +159,8 @@ export function ModelAccessForm({
   // replaces what the person already moved, and a restore runs once per mount.
   const touchedRef = useRef(false);
   const restoredRef = useRef(false);
-  const restoredDraft = formDraft.kind === 'ready' ? formDraft.value : null;
+  const restoredValue = formDraft.kind === 'ready' ? formDraft.value : null;
+  const restoredDraft = restoredValue === null ? null : canonicalDraft(restoredValue);
   useEffect(() => {
     if (restoredDraft === null || touchedRef.current || restoredRef.current) {
       return;

@@ -494,6 +494,37 @@ describe('listChangedFiles', () => {
     });
   });
 
+  it('reads a renamed binary file as binary, not as a no-content rename', async () => {
+    // The placeholder wins over the rename flag: the file's content did change,
+    // it is just binary, so "no content changes" would be the opposite.
+    fetchMock.mockImplementation((url: string) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/diffs')) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              old_path: 'assets/old.gif',
+              new_path: 'assets/new.gif',
+              new_file: false,
+              renamed_file: true,
+              deleted_file: false,
+              diff: 'Binary files a/assets/old.gif and b/assets/new.gif differ\n',
+            },
+          ])
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files[0]).toMatchObject({
+      path: 'assets/new.gif',
+      status: 'renamed',
+      patchMissingCause: 'binary',
+    });
+  });
+
   it('arrives a GitLab `deleted` diff as the shared `removed` status', async () => {
     fetchMock.mockImplementation((url: string) => {
       const path = new URL(url).pathname;

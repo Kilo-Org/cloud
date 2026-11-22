@@ -1,17 +1,20 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
+import { bodyLimit } from 'hono/body-limit';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from './env';
 import { z } from 'zod';
 
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
+import { requireSessionRowsExportToken } from './middleware/session-rows-export-token';
 import { api } from './routes/api';
 import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionExport } from './services/session-export';
+import { getSessionRawExport, sessionRawExportRequestSchema } from './services/session-raw-export';
 import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
 
@@ -154,3 +157,31 @@ app.get('/internal/session/:sessionId/export', requireValidInternalSecret, async
 
   return c.body(result.stream, 200, { 'content-type': 'application/json; charset=utf-8' });
 });
+
+/**
+ * Raw row export for an authorised data export.
+ *
+ * The pair travels in the body, never the URL: a user id and session id in a
+ * path reach the platform's request logs. NDJSON is not cached, and the response
+ * starts streaming as soon as the first page is read, so a large session never
+ * sits in Worker memory.
+ */
+app.post(
+  '/internal/session-rows/export',
+  requireSessionRowsExportToken,
+  bodyLimit({ maxSize: 1024 }),
+  async c => {
+    const parsed = sessionRawExportRequestSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ success: false, error: 'Invalid request' }, 400);
+
+    const result = await getSessionRawExport(c.env, parsed.data);
+    if (result.status !== 'ok') {
+      return c.json({ success: false, error: result.status }, 404, { 'cache-control': 'no-store' });
+    }
+
+    return c.body(result.stream, 200, {
+      'content-type': 'application/x-ndjson; charset=utf-8',
+      'cache-control': 'no-store',
+    });
+  }
+);

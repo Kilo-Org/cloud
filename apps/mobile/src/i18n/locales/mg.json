@@ -2562,7 +2562,6 @@
       "noMatches": "Tsy misy mifanaraka",
       "noRepositories": "Tsy misy tahirin-kaody azo ampiasaina",
       "noRepositoriesDescription": "Mba hahazoana tahirin-kaody, ampifandraiso amin'ny GitHub na GitLab.",
-      "loading": "Maka angona…",
       "accessibility": "Tahirin-kaody: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

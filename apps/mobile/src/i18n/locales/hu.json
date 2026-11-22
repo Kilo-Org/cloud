@@ -2566,7 +2566,6 @@
       "noMatches": "Nincs találat",
       "noRepositories": "Nincs elérhető adattár",
       "noRepositoriesDescription": "Az adattárak betöltéséhez csatlakoztass GitHubot vagy GitLabot.",
-      "loading": "Betöltés…",
       "accessibility": "Adattár: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

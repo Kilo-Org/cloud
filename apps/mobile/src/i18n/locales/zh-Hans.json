@@ -2001,7 +2001,6 @@
       "noMatches": "未找到匹配项",
       "noRepositories": "暂无可用仓库",
       "noRepositoriesDescription": "要加载仓库，请连接 GitHub 或 GitLab。",
-      "loading": "正在加载……",
       "accessibility": "仓库：{{label}}",
       "platformBitbucket": "Bitbucket"
     },

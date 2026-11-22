@@ -2562,7 +2562,6 @@
       "noMatches": "Kāore he mea e hāngai ana",
       "noRepositories": "Kāore he putunga waehere e wātea ana",
       "noRepositoriesDescription": "Hei uta i ngā putunga waehere, honoa tētahi pūkete GitHub, GitLab rānei.",
-      "loading": "Kei te uta…",
       "accessibility": "Putunga waehere: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

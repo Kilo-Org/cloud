@@ -2562,7 +2562,6 @@
       "noMatches": "ကိုက်ညီမှု မရှိပါ",
       "noRepositories": "အသုံးပြုနိုင်သော ကုဒ်သိုလှောင်ခန်း မရှိပါ",
       "noRepositoriesDescription": "ကုဒ်သိုလှောင်ခန်းများ ဖွင့်ရန် GitHub သို့မဟုတ် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
-      "loading": "ဖွင့်နေသည်…",
       "accessibility": "ကုဒ်သိုလှောင်ခန်း: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

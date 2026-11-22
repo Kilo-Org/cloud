@@ -2666,7 +2666,6 @@
       "noMatches": "Žádné shody",
       "noRepositories": "Žádné repozitáře nejsou k dispozici",
       "noRepositoriesDescription": "Chcete-li načíst repozitáře, připojte GitHub nebo GitLab.",
-      "loading": "Načítání…",
       "accessibility": "Repozitář: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

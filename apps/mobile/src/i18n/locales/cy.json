@@ -2770,7 +2770,6 @@
       "noMatches": "Dim canlyniadau cyfatebol",
       "noRepositories": "Dim ystorfeydd ar gael",
       "noRepositoriesDescription": "I lwytho ystorfeydd, cysylltwch â GitHub neu GitLab.",
-      "loading": "Yn llwytho…",
       "accessibility": "Ystorfa: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

@@ -2666,7 +2666,6 @@
       "noMatches": "Няма супадзенняў",
       "noRepositories": "Няма даступных рэпазіторыяў",
       "noRepositoriesDescription": "Каб загрузіць рэпазіторыі, падключыце GitHub або GitLab.",
-      "loading": "Загрузка…",
       "accessibility": "Рэпазіторый: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

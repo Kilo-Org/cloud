@@ -2562,7 +2562,6 @@
       "noMatches": "Няма съвпадения",
       "noRepositories": "Няма налични хранилища",
       "noRepositoriesDescription": "За да заредиш хранилища, свържи GitHub или GitLab.",
-      "loading": "Зареждане…",
       "accessibility": "Хранилище: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

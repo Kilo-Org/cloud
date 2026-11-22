@@ -2562,7 +2562,6 @@
       "noMatches": "Engar samsvaranir",
       "noRepositories": "Engin kóðasöfn tiltæk",
       "noRepositoriesDescription": "Tengdu GitHub eða GitLab til að hlaða kóðasöfnum.",
-      "loading": "Hleður…",
       "accessibility": "Kóðasafn: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

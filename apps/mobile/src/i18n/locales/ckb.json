@@ -2562,7 +2562,6 @@
       "noMatches": "هیچ ئەنجامێکی گونجاو نییە",
       "noRepositories": "هیچ کۆگایەک بەردەست نییە",
       "noRepositoriesDescription": "بۆ بارکردنی کۆگاکان، GitHub یان GitLab ببەستەوە.",
-      "loading": "بارکردن…",
       "accessibility": "کۆگا: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

@@ -2053,7 +2053,6 @@
       "noMatches": "Немає збігів",
       "noRepositories": "Немає доступних репозиторіїв",
       "noRepositoriesDescription": "Щоб завантажити репозиторії, підключіть GitHub або GitLab.",
-      "loading": "Завантаження…",
       "accessibility": "Репозиторій: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

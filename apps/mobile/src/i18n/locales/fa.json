@@ -2562,7 +2562,6 @@
       "noMatches": "موردی پیدا نشد",
       "noRepositories": "هیچ مخزنی در دسترس نیست",
       "noRepositoriesDescription": "برای بارگذاری مخازن، GitHub یا GitLab را وصل کنید.",
-      "loading": "در حال بارگذاری…",
       "accessibility": "مخزن: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

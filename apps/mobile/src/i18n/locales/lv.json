@@ -2614,7 +2614,6 @@
       "noMatches": "Nav atbilstību",
       "noRepositories": "Nav pieejamu repozitoriju",
       "noRepositoriesDescription": "Lai ielādētu repozitorijus, pievieno GitHub vai GitLab kontu.",
-      "loading": "Ielādē…",
       "accessibility": "Repozitorijs: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

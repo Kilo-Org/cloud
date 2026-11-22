@@ -1994,7 +1994,6 @@
       "noMatches": "Nessun risultato",
       "noRepositories": "Nessun repository disponibile",
       "noRepositoriesDescription": "Collega GitHub o GitLab per caricare i repository.",
-      "loading": "Caricamento…",
       "accessibility": "Repository selezionato: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

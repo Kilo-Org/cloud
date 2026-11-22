@@ -2105,7 +2105,6 @@
       "noMatches": "لا توجد نتائج مطابقة",
       "noRepositories": "لا توجد مستودعات متاحة",
       "noRepositoriesDescription": "اربط GitHub أو GitLab لتحميل المستودعات.",
-      "loading": "جارٍ التحميل…",
       "accessibility": "المستودع: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

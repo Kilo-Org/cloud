@@ -2666,7 +2666,6 @@
       "noMatches": "Ni zadetkov",
       "noRepositories": "Ni razpoložljivih skladišč",
       "noRepositoriesDescription": "Za nalaganje skladišč poveži GitHub ali GitLab.",
-      "loading": "Nalaganje…",
       "accessibility": "Skladišče: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

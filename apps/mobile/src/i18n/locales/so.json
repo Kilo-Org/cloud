@@ -2562,7 +2562,6 @@
       "noMatches": "Wax u dhigma lama helin",
       "noRepositories": "Ma jiraan kaydad la heli karo",
       "noRepositoriesDescription": "Si aad u soo shubto kaydadka, ku xir GitHub ama GitLab.",
-      "loading": "Waa la soo shubayaa…",
       "accessibility": "Kaydka: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

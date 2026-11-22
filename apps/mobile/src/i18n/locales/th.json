@@ -2562,7 +2562,6 @@
       "noMatches": "ไม่มีรายการที่ตรงกัน",
       "noRepositories": "ไม่มีคลังโค้ดให้เลือก",
       "noRepositoriesDescription": "หากต้องการโหลดคลังโค้ด ให้เชื่อมต่อ GitHub หรือ GitLab",
-      "loading": "กำลังโหลด…",
       "accessibility": "คลังโค้ด: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

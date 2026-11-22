@@ -2001,7 +2001,6 @@
       "noMatches": "沒有相符項目",
       "noRepositories": "沒有可用的儲存庫",
       "noRepositoriesDescription": "若要載入儲存庫，請連結 GitHub 或 GitLab。",
-      "loading": "載入中…",
       "accessibility": "儲存庫：{{label}}",
       "platformBitbucket": "Bitbucket"
     },

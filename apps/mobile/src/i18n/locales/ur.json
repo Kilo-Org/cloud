@@ -2562,7 +2562,6 @@
       "noMatches": "کوئی نتیجہ نہیں ملا",
       "noRepositories": "کوئی ریپوزٹری دستیاب نہیں",
       "noRepositoriesDescription": "ریپوزٹریز لوڈ کرنے کے لیے GitHub یا GitLab کو منسلک کریں۔",
-      "loading": "لوڈ ہو رہا ہے…",
       "accessibility": "ریپوزٹری: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

@@ -2722,7 +2722,6 @@
       "noMatches": "Níl aon toradh ann",
       "noRepositories": "Níl aon stór ar fáil",
       "noRepositoriesDescription": "Ceangail le GitHub nó le GitLab chun stór a lódáil.",
-      "loading": "Ag lódáil…",
       "accessibility": "Stór: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

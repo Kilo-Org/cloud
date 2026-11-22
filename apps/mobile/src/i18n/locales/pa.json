@@ -2562,7 +2562,6 @@
       "noMatches": "ਕੋਈ ਮੇਲ ਨਹੀਂ",
       "noRepositories": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਉਪਲਬਧ ਨਹੀਂ",
       "noRepositoriesDescription": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਕਰਨ ਲਈ GitHub ਜਾਂ GitLab ਖਾਤਾ ਜੋੜੋ।",
-      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
       "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

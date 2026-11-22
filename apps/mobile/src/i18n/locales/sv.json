@@ -2562,7 +2562,6 @@
       "noMatches": "Inga träffar",
       "noRepositories": "Inga kodarkiv tillgängliga",
       "noRepositoriesDescription": "Anslut GitHub eller GitLab för att läsa in kodarkiv.",
-      "loading": "Läser in…",
       "accessibility": "Kodarkiv: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

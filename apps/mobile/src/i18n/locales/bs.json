@@ -2614,7 +2614,6 @@
       "noMatches": "Nema podudaranja",
       "noRepositories": "Nema dostupnih repozitorija",
       "noRepositoriesDescription": "Da bi učitao repozitorije, poveži GitHub ili GitLab.",
-      "loading": "Učitavanje…",
       "accessibility": "Repozitorij: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

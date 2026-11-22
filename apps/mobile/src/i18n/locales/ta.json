@@ -2562,7 +2562,6 @@
       "noMatches": "பொருத்தமான முடிவுகள் இல்லை",
       "noRepositories": "களஞ்சியங்கள் கிடைக்கவில்லை",
       "noRepositoriesDescription": "களஞ்சியங்களை ஏற்றுவதற்கு, GitHub அல்லது GitLab ஐ இணைக்கவும்.",
-      "loading": "ஏற்றப்படுகிறது…",
       "accessibility": "களஞ்சியம்: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

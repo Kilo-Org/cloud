@@ -2562,7 +2562,6 @@
       "noMatches": "কোনো মিল পাওয়া যায়নি",
       "noRepositories": "কোনো রিপোজিটরি নেই",
       "noRepositoriesDescription": "রিপোজিটরি লোড করতে GitHub বা GitLab সংযুক্ত করুন।",
-      "loading": "লোড হচ্ছে…",
       "accessibility": "রিপোজিটরি: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

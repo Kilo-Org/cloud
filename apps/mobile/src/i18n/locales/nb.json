@@ -2562,7 +2562,6 @@
       "noMatches": "Ingen treff",
       "noRepositories": "Ingen kodelagre tilgjengelige",
       "noRepositoriesDescription": "For å laste inn kodelagre, koble til en GitHub- eller GitLab-konto.",
-      "loading": "Laster inn…",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

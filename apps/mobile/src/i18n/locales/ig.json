@@ -2562,7 +2562,6 @@
       "noMatches": "Enweghị ndakọrịta",
       "noRepositories": "Enweghị ebe nchekwa koodu dị",
       "noRepositoriesDescription": "Jikọọ GitHub ma ọ bụ GitLab iji budata ebe nchekwa koodu.",
-      "loading": "Na-ebudata…",
       "accessibility": "Ebe nchekwa koodu: {{label}}",
       "platformBitbucket": "Bitbucket"
     },

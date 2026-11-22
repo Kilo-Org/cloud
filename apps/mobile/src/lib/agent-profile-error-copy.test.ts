@@ -68,9 +68,7 @@ describe('agentProfileMutationErrorMessage', () => {
         ORGANIZATION_TRIAL_EXPIRED_MESSAGE,
         false
       );
-      expect(portuguesePlanEndedForBilling).toBe(
-        i18n.t(TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY)
-      );
+      expect(portuguesePlanEndedForBilling).toBe(i18n.t(TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY));
       expect(portuguesePlanEndedForBilling).toBe(
         'O período de teste da organização terminou e ela não tem nenhum plano ativo. Você pode atualizar o faturamento em kilo.ai e tentar novamente.'
       );

@@ -5,15 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type LucideIcon } from '@/components/ui/icons';
 import { formatList } from '@/lib/format';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
-import { resolveAlphaColor } from '@/lib/theme-color';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { PreferenceRow } from './preference-row';
 
 const schemeState = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
-// The shared switch paints its own reduced-opacity tracks on Android only: iOS
-// fades a disabled `UISwitch` itself, so the row's light override yields on
-// both.
+// The shared switch paints its own neutral pair on Android only: iOS fades a
+// disabled `UISwitch` itself, so the row's light override yields on both.
 const platformState = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
 
 vi.mock('react-native', () => ({
@@ -443,25 +441,25 @@ describe('PreferenceRow', () => {
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
   });
 
-  it('paints an unavailable row with the reduced-opacity tracks instead of the accent', () => {
+  it('paints an unavailable row with the neutral disabled pair instead of the accent', () => {
     // A dimmed title beside a full-strength accent track reads as both
     // unavailable and on, and Android folds the colours into the switch
     // drawables with no unavailable appearance of its own. The row therefore
-    // yields the light override and lets the shared switch paint each half's
-    // own track at reduced opacity, under its one quiet grip.
+    // yields the light override and lets the shared switch paint two different
+    // neutral tracks, so the stored value still reads.
     schemeState.current = 'light';
     platformState.os = 'android';
     const root = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
     const trackColor = toggle.props.trackColor as { false: string; true: string };
 
-    expect(trackColor.true).toBe(resolveAlphaColor(lightColors.primary, 0.45));
-    expect(trackColor.false).toBe(resolveAlphaColor(lightColors.mutedSoft, 0.45));
+    expect(trackColor.true).toBe(lightColors.primaryDisabled);
+    expect(trackColor.false).toBe(lightColors.mutedSoft);
     // Row and stored value both stay readable: the two tracks differ, and
     // neither is the enabled track a live row would paint.
     expect(trackColor.true).not.toBe(trackColor.false);
     expect(trackColor.true).not.toBe(lightColors.primary);
-    expect(toggle.props.thumbColor).toBe(lightColors.muted);
+    expect(toggle.props.thumbColor).toBe(lightColors.primaryForeground);
   });
 });
 

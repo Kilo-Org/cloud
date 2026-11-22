@@ -408,9 +408,12 @@ describe('disabled switch pair contrast (non-text)', () => {
   // grip for the off one. iOS keeps the brand pair and fades it itself. The
   // switch sits on a `secondary` row, so its tracks are measured over that. The
   // floors are perception floors: the pair has to read as a control and the two
-  // positions have to stay apart. Light has no third neutral for the off track
-  // — `control-idle` equals `secondary` there — so the disabled off track is
-  // the same neutral as the enabled off track, and only its grip dims.
+  // positions have to stay apart. They stay apart because the two tracks are
+  // separate neutral tokens, not because of a hue at reduced opacity — a hue
+  // pair measured under this floor in both schemes. Light has no third neutral
+  // for the off track — `control-idle` equals `secondary` there — so the
+  // disabled off track is the same neutral as the enabled off track, and only
+  // its grip dims.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
   // [theme, palette, the grip the switch paints on the on track]. The on grip
   // is the one colour a disabled pair cannot share with its enabled one: the
@@ -419,6 +422,15 @@ describe('disabled switch pair contrast (non-text)', () => {
     ['light', lightColors, lightColors.primaryForeground],
     ['dark', darkColors, darkColors.mutedSoft],
   ] as const;
+
+  it('every theme: the disabled on track reads on the row surface', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.primaryDisabled, colors.secondary),
+        `primary-disabled vs secondary (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
 
   it('every theme: the disabled off track reads on the row surface', () => {
     for (const [themeName, colors] of themes) {

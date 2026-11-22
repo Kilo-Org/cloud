@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
-import { resolveAlphaColor } from '@/lib/theme-color';
 import { Switch } from './switch';
 
 const native = vi.hoisted(() => ({ os: 'ios', scheme: 'light' as 'light' | 'dark' }));
@@ -22,11 +21,6 @@ vi.mock('react-native', () => ({
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
-
-// A disabled track is its enabled colour at reduced opacity: see
-// `DISABLED_TRACK_ALPHA` in `switch.tsx`.
-const DISABLED_ALPHA = 0.45;
-const disabledTrack = (hex: string) => resolveAlphaColor(hex, DISABLED_ALPHA);
 
 type SwitchFixture = {
   disabled?: boolean;
@@ -223,71 +217,65 @@ describe('Switch', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
-  it('keeps the hue of the on track, at reduced opacity, on a disabled on switch', () => {
+  it('paints the neutral disabled pair on a disabled on switch and keeps it on', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     expect(props.value).toBe(true);
-    expect(props.trackColor?.true).toBe(disabledTrack(lightColors.primary));
-    expect(props.trackColor?.true).toBe('rgba(79, 90, 16, 0.45)');
-    expect(props.trackColor?.false).toBe(disabledTrack(lightColors.mutedSoft));
-    expect(props.thumbColor).toBe(lightColors.muted);
+    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
+    expect(props.trackColor?.false).toBe(lightColors.mutedSoft);
+    expect(props.thumbColor).toBe(lightColors.primaryForeground);
   });
 
-  it('keeps the hue of the off track, at reduced opacity, on a disabled off switch', () => {
+  it('paints the same two neutral tracks on a disabled off switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
     expect(props.value).toBe(false);
-    expect(props.trackColor?.false).toBe(disabledTrack(lightColors.mutedSoft));
-    expect(props.trackColor?.true).toBe(disabledTrack(lightColors.primary));
-    expect(props.thumbColor).toBe(lightColors.muted);
+    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
+    expect(props.trackColor?.false).toBe(lightColors.mutedSoft);
+    // Off dims its grip instead: the light off track has no neutral beneath it.
+    expect(props.thumbColor).toBe(lightColors.mutedForeground);
+    expect(props.thumbColor).not.toBe(lightColors.primaryForeground);
   });
 
-  it('gives a disabled on switch a different track colour than a disabled off one', () => {
+  it('keeps the disabled positions apart with two different neutral tracks', () => {
     native.os = 'android';
     native.scheme = 'light';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
+    const enabledOff = nativeProps(renderSwitch({ value: false }).root);
     // The stored value stays readable while the control cannot be changed.
     expect(on.trackColor?.true).not.toBe(on.trackColor?.false);
     expect(on.trackColor?.true).not.toBe(lightColors.primary);
-    expect(on.trackColor?.false).not.toBe(lightColors.mutedSoft);
     expect(off.trackColor).toEqual(on.trackColor);
+    // Light has no neutral beneath the enabled off track, so off dims its grip
+    // where on changes its track.
+    expect(off.trackColor?.false).toBe(enabledOff.trackColor?.false);
+    expect(off.thumbColor).not.toBe(enabledOff.thumbColor);
   });
 
-  it('never paints a disabled grip in the scheme ink, which outranks an enabled one', () => {
-    native.os = 'android';
-    for (const [scheme, colors] of [
-      ['light', lightColors],
-      ['dark', darkColors],
-    ] as const) {
-      native.scheme = scheme;
-      const disabled = nativeProps(renderSwitch({ disabled: true, value: true }).root);
-      const enabled = nativeProps(renderSwitch({ value: true }).root);
-      expect(disabled.thumbColor).not.toBe(colors.foreground);
-      expect(disabled.thumbColor).not.toBe(enabled.thumbColor);
-    }
-  });
-
-  it('paints the same two disabled track shapes in dark mode, off the brand accent', () => {
+  it('paints the neutral disabled pair in dark mode, off the brand accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    expect(on.trackColor?.true).toBe(disabledTrack(darkColors.selection));
-    expect(on.trackColor?.false).toBe(disabledTrack(darkColors.mutedForeground));
-    expect(on.trackColor?.true).not.toBe(disabledTrack(darkColors.primary));
+    expect(on.trackColor?.true).toBe(darkColors.primaryDisabled);
+    expect(on.trackColor?.false).toBe(darkColors.mutedSoft);
+    expect(on.trackColor?.true).not.toBe(darkColors.selection);
     expect(off.trackColor).toEqual(on.trackColor);
-    expect(on.thumbColor).toBe(darkColors.mutedForeground);
-    expect(off.thumbColor).toBe(on.thumbColor);
+    // Dark's on ink is the near-black card colour, which disappears where the
+    // thumb's arc overhangs the row; the on grip takes the mid neutral instead.
+    expect(on.thumbColor).toBe(darkColors.mutedSoft);
+    expect(on.thumbColor).not.toBe(darkColors.primaryForeground);
+    expect(off.thumbColor).toBe(darkColors.mutedForeground);
   });
 
   it('takes the disabled state from the accessibility state', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
-    expect(props.trackColor?.true).toBe(disabledTrack(lightColors.primary));
+    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
   });
 
   it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {

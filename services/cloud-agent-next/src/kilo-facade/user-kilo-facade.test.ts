@@ -3034,6 +3034,42 @@ describe('hosted native routes', () => {
     );
   });
 
+  it.each([
+    { status: 404 as const, expected: 404, error: 'KILO_SESSION_NOT_FOUND' },
+    { status: 503 as const, expected: 503, error: 'KILO_BALANCE_VALIDATION_FAILED' },
+  ])(
+    'projects a payer scope failure as the prompt route does: $status',
+    async ({ status, expected, error }) => {
+      const env = envStub();
+      const continuation = {
+        messageId: 'msg_answer_scope',
+        turn: { type: 'prompt' as const, prompt: 'Blue' },
+        agent: { mode: 'code', model: 'test/model' },
+      };
+      vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({
+        answer: vi.fn(async () => ({ result: 'continuation' as const, intent: continuation })),
+      })) as never;
+      const validatePromptBalance = vi.fn(async () => ({
+        success: false as const,
+        status,
+        message: 'Session access is temporarily unavailable; retry the request',
+      }));
+      const response = await handleKiloFacadeRequest({
+        request: new Request(
+          `http://worker.test/kilo/question/q_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+          { method: 'POST', body: JSON.stringify({ answers: [['Blue']] }) }
+        ),
+        env,
+        userId: 'usr_1',
+        authToken: 'caller-bearer',
+        deps: hostedDeps({ validatePromptBalance }),
+      });
+      expect(response.status).toBe(expected);
+      await expect(response.json()).resolves.toMatchObject({ error });
+      if (status === 503) expect(response.headers.get('Retry-After')).toBe('1');
+    }
+  );
+
   it('refuses a settled answer it cannot preflight when the caller has no bearer', async () => {
     const env = envStub();
     const answer = vi.fn(async () => ({

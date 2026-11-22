@@ -1537,7 +1537,13 @@ async function answerHostedNativeInteraction(params: {
   }
   if (outcome.outcome === 'sent') return Response.json(true);
   if (outcome.outcome === 'balance') {
-    return facadeError(outcome.status, 'KILO_BALANCE_VALIDATION_FAILED', outcome.message);
+    // Same projection a prompt uses, so one payer scope failure reads the same
+    // on every mutation of the session.
+    return promptBalanceFailureResponse({
+      success: false,
+      status: outcome.status,
+      message: outcome.message,
+    });
   }
   if (outcome.outcome === 'unavailable') {
     return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Durable prompt admission is unavailable');

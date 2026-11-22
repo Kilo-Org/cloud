@@ -47,8 +47,17 @@ async function answerControlPlane(
         message: 'Durable prompt admission is unavailable',
       });
     case 'balance':
+      // Mirror the facade projection: a payer scope the caller cannot reach is a
+      // hidden root, and a read failure is retryable.
       throw new TRPCError({
-        code: outcome.status === 402 ? 'PAYMENT_REQUIRED' : 'INTERNAL_SERVER_ERROR',
+        code:
+          outcome.status === 402
+            ? 'PAYMENT_REQUIRED'
+            : outcome.status === 404
+              ? 'NOT_FOUND'
+              : outcome.status === 503
+                ? 'SERVICE_UNAVAILABLE'
+                : 'INTERNAL_SERVER_ERROR',
         message: outcome.message,
       });
   }

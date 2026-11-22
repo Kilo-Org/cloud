@@ -85,53 +85,26 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: false,
         requesterUserId: 'user-1',
-        threadRepository: 'other/thread',
       })
     ).resolves.toEqual({ allowed: true });
     expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
   });
 
-  it('allows the conversation project when the run has no requesting account', async () => {
-    await expect(
-      authorizeGitLabProject({
-        project: 'group/project',
-        projectInstanceUrl: 'https://gitlab.com',
-        organizationOwned: true,
-        threadRepository: ' Group/Project ',
-      })
-    ).resolves.toEqual({ allowed: true });
-    expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
-    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
-    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
-  });
-
-  it('refuses another project when the run has no requesting account', async () => {
-    const markdown = refusalMarkdown(
-      await authorizeGitLabProject({
-        project: 'group/other',
-        projectInstanceUrl: 'https://gitlab.com',
-        organizationOwned: true,
-        threadRepository: 'group/project',
-      })
-    );
-
-    expect(markdown).toContain('`group/other`');
-    expect(markdown).toContain('GitLab connection in Kilo Code settings');
-    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
-  });
-
-  it('refuses a project when the run has no requesting account and no conversation project', async () => {
+  it('refuses an organization project when the run has no requesting account', async () => {
     const markdown = refusalMarkdown(
       await authorizeGitLabProject({
         project: 'group/project',
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
-        threadRepository: null,
       })
     );
 
     expect(markdown).toContain('`group/project`');
+    expect(markdown).toContain('GitLab connection in Kilo Code settings');
+    expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
   });
 
   it('allows a project the requester holds Developer access to on the same instance', async () => {
@@ -144,7 +117,6 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.example.test',
         organizationOwned: true,
         requesterUserId: 'user-1',
-        threadRepository: 'other/thread',
       })
     ).resolves.toEqual({ allowed: true });
     expect(mockGetIntegrationForOwner).toHaveBeenCalledWith(
@@ -184,7 +156,6 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
-        threadRepository: 'group/project',
       })
     );
 
@@ -202,7 +173,6 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
-        threadRepository: 'group/project',
       })
     );
 
@@ -340,7 +310,6 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
-        threadRepository: 'group/project',
       })
     );
 
@@ -358,7 +327,6 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
-        threadRepository: 'group/project',
       })
     );
 
@@ -378,7 +346,6 @@ describe('authorizeGitLabProject', () => {
         projectInstanceUrl: 'https://gitlab.com',
         organizationOwned: true,
         requesterUserId: 'user-1',
-        threadRepository: 'group/project',
       })
     );
 

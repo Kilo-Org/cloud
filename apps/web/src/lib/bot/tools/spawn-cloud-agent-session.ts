@@ -203,7 +203,6 @@ export default async function spawnCloudAgentSession(
         projectInstanceUrl: instanceUrl,
         organizationOwned: owner.type === 'org',
         requesterUserId: options?.requesterUserId ?? (owner.type === 'user' ? owner.id : undefined),
-        threadRepository: options?.threadRepository,
       });
       if (!projectAuthorization.allowed) {
         return { response: projectAuthorization.markdown };

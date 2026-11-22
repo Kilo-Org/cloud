@@ -45,11 +45,6 @@ function projectWriteAccessRequiredMarkdown(project: string): string {
   );
 }
 
-/** The case-insensitive exact full-path compare used by every GitLab scope check. */
-function isSameProject(left: string, right: string): boolean {
-  return left.trim().toLowerCase() === right.trim().toLowerCase();
-}
-
 /**
  * Whether a credential failure is a definitive refusal: the stored connection
  * cannot answer until its owner reconnects, so mentioning the bot again cannot
@@ -111,11 +106,11 @@ async function requesterGitLabConnection(
  * access, for organization-owned connections.
  *
  * A GitLab integration belongs to an organization or a user, and its
- * connection reaches the projects of one instance. A caller without a
- * requesting account may only use `threadRepository`, the project the
- * conversation belongs to. A caller with a requesting account may use a
- * project on the session's instance that account's own GitLab connection
- * reaches with write access.
+ * connection reaches the projects of one instance. An organization-owned
+ * connection needs a recorded requester, because the conversation repository
+ * is a GitHub repository and never names a GitLab project. The requester's own
+ * GitLab connection must reach a project on the session's instance with write
+ * access.
  *
  * A lookup that fails is not answered here: it propagates to the caller, which
  * reports it as one retry reply. Only a definitive credential refusal answers
@@ -130,21 +125,17 @@ export async function authorizeGitLabProject(params: {
   organizationOwned: boolean;
   /** The person who triggered this run, when the platform supplied a verified account. */
   requesterUserId?: string;
-  /** Repository of the conversation the bot was mentioned in. */
-  threadRepository?: string | null;
 }): Promise<GitLabProjectAuthorization> {
-  const { project, projectInstanceUrl, organizationOwned, requesterUserId, threadRepository } =
-    params;
+  const { project, projectInstanceUrl, organizationOwned, requesterUserId } = params;
 
   // A personally owned connection is controlled by its owner, whose own
   // credential starts the session, so it needs no separate project
   // authorization.
   if (!organizationOwned) return { allowed: true };
 
+  // An organization-owned connection has no implicit project: the conversation
+  // repository is a GitHub repository, so it never names a GitLab project.
   if (!requesterUserId) {
-    if (threadRepository && isSameProject(project, threadRepository)) {
-      return { allowed: true };
-    }
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
   }
 

@@ -345,8 +345,9 @@ export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
  * The check is an ambient declaration, so it compiles away: it emits no
  * runtime value and adds nothing to the exported type. It stays module-local,
  * so it never reaches the published schema entry, and it is still "used" for
- * `noUnusedLocals` in the project that typechecks this file from outside the
- * package.
+ * `noUnusedLocals` in the `apps/extension` program, which reaches this file
+ * through `@kilocode/trpc`'s published `.d.ts` and
+ * `@kilocode/notifications/schemas`.
  */
 type SameUnion<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;

@@ -162,7 +162,7 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
       const record = recordOf(session);
 
       if (record === undefined) {
-        // A closed session keeps no report: there is no model left to read it, and the record is a live session's.
+        // The record holds a live session's facts, and this session has no entry, so nothing is written for it.
         return;
       }
 

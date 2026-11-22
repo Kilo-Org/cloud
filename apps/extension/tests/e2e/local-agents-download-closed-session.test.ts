@@ -2,6 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { z } from 'zod';
+import { DOWNLOAD_HOLD_STATE_KEY } from '../../src/shared/browser-download-hold-record';
 import { LOCAL_AGENT_ERROR_CODES } from '../../src/shared/local-agents/jsonrpc';
 import { DISPOSE_BROWSER_CALLER_MESSAGE } from '../../src/shared/tab-debugger';
 import { ONCE_DOWNLOAD_PATH, startDownloadFixture } from './download-fixture';
@@ -87,12 +88,19 @@ const after = (milliseconds: number): Promise<void> => {
 };
 
 /**
- * The extension's own mirror, read from an extension page. The WXT `session:` prefix
- * selects `storage.session`, so the raw key in that area is the name without the prefix.
+ * The raw `chrome.storage.session` key: the host's exported constant without the WXT `session:`
+ * prefix, which selects that area rather than naming a key inside it.
+ */
+const HOLD_STATE_STORAGE_KEY = DOWNLOAD_HOLD_STATE_KEY.replace(/^session:/, '');
+
+/**
+ * The extension's own mirror, read from an extension page, under the key the host exports. The
+ * WXT `session:` prefix in that constant selects `storage.session`, so the raw key in that area
+ * is the name without the prefix.
  */
 const readHoldRecord = (page: Page): Promise<unknown> =>
   page.evaluate(
-    "chrome.storage.session.get('kiloDownloadHoldState').then(items => items['kiloDownloadHoldState'] ?? null)"
+    `chrome.storage.session.get(${JSON.stringify(HOLD_STATE_STORAGE_KEY)}).then(items => items[${JSON.stringify(HOLD_STATE_STORAGE_KEY)}] ?? null)`
   );
 
 /**
@@ -118,7 +126,9 @@ const settledHoldRecord = async (page: Page): Promise<unknown> => {
     previous = next;
   }
 
-  return JSON.parse(previous) as unknown;
+  throw new Error(
+    'The hold record did not settle after 60 polls 50 ms apart: the value kept changing, so it was never read whole.'
+  );
 };
 
 const recordEntrySchema = z.object({

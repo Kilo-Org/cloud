@@ -246,7 +246,9 @@ describe('a post that does not land leaves the card answering the request it sho
     expect(notify, 'post must post the card').toBeGreaterThan(-1);
     expect(check, 'post must check the card can be shown').toBeGreaterThan(-1);
     expect(check).toBeLessThan(notify);
-    expect(post.slice(check)).toContain(
+    // Bounded to the branch: an unbounded slice would also match the catch's
+    // call, so deleting this branch's call would still pass.
+    expect(post.slice(check, notify)).toContain(
       'abandonPost(context, card, previousJson, previousApprovalKey)'
     );
     const canShow = body(NOTIFICATIONS, 'private fun canShow(');

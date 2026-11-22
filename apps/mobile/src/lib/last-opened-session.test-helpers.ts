@@ -1,13 +1,47 @@
 import { vi } from 'vitest';
 
 /**
- * Shared fixtures for the last-opened-session suite: the record shape, a
- * refused read, and the two flushes the suite needs. Kept beside the suite so
- * the test file stays under the line limit, and free of the module under test
- * so nothing here is hoisted with its mocks.
+ * Shared fixtures for the last-opened-session suite: the fake SecureStore
+ * surface, the record shape, a refused read, and the two flushes the suite
+ * needs. Kept beside the suite so the test file stays under the line limit.
  */
 
 export const KEY = 'last-opened-session';
+
+export const store = new Map<string, string>();
+
+type StoreSurface = {
+  getItemAsync: {
+    mockImplementation: (implementation: (key: string) => Promise<string | null>) => void;
+  };
+  setItemAsync: {
+    mockImplementation: (implementation: (key: string, value: string) => Promise<void>) => void;
+  };
+  deleteItemAsync: {
+    mockImplementation: (implementation: (key: string) => Promise<void>) => void;
+  };
+};
+
+/**
+ * Install the default, healthy fake store: a Map-backed surface. The mock
+ * functions themselves are hoisted in the suite (Vitest cannot hoist them
+ * across modules), so the suite hands them in.
+ */
+export function installHealthyStore(mocks: StoreSurface): void {
+  store.clear();
+  mocks.getItemAsync.mockImplementation(async (key: string) => {
+    await Promise.resolve();
+    return store.get(key) ?? null;
+  });
+  mocks.setItemAsync.mockImplementation(async (key: string, value: string) => {
+    store.set(key, value);
+    await Promise.resolve();
+  });
+  mocks.deleteItemAsync.mockImplementation(async (key: string) => {
+    store.delete(key);
+    await Promise.resolve();
+  });
+}
 
 export function recordFor(sessionId: string, userId: string): string {
   return JSON.stringify({ sessionId, userId, storedAt: 1_700_000_000_000 });

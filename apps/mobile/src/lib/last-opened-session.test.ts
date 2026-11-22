@@ -5,9 +5,11 @@ import {
   deferred,
   flushMirror,
   flushRetryBudget,
+  installHealthyStore,
   KEY,
   recordFor,
   refusedRead,
+  store,
 } from './last-opened-session.test-helpers';
 import { setProtectedDataAvailable } from './protected-data';
 import {
@@ -22,9 +24,8 @@ import {
   subscribeLastOpenedSession,
 } from './last-opened-session';
 
-// Fake SecureStore surface backed by an in-memory Map. The module reads and
-// writes through the shared keychain helpers, so the native module is mocked
-// here instead of injected.
+// The fake SecureStore surface must be hoisted in this file, so it stays here
+// rather than in the helpers module.
 const getItemAsync = vi.hoisted(() => vi.fn<(key: string) => Promise<string | null>>());
 const setItemAsync = vi.hoisted(() => vi.fn<(key: string, value: string) => Promise<void>>());
 const deleteItemAsync = vi.hoisted(() => vi.fn<(key: string) => Promise<void>>());
@@ -34,25 +35,10 @@ vi.mock('expo-secure-store', () => ({ getItemAsync, setItemAsync, deleteItemAsyn
 // cannot load under Vitest, and this suite drives its own refusals.
 vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 
-const store = new Map<string, string>();
-
 beforeEach(() => {
   vi.useFakeTimers();
   _resetLastOpenedSessionForTests();
-  store.clear();
-  vi.clearAllMocks();
-  getItemAsync.mockImplementation(async (key: string) => {
-    await Promise.resolve();
-    return store.get(key) ?? null;
-  });
-  setItemAsync.mockImplementation(async (key: string, value: string) => {
-    store.set(key, value);
-    await Promise.resolve();
-  });
-  deleteItemAsync.mockImplementation(async (key: string) => {
-    store.delete(key);
-    await Promise.resolve();
-  });
+  installHealthyStore({ getItemAsync, setItemAsync, deleteItemAsync });
 });
 
 afterEach(() => {
@@ -193,6 +179,33 @@ describe('last opened session', () => {
     await flushMirror();
     expect(getLastOpenedSessionSnapshot()).toBeNull();
     expect(getItemAsync).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not let a read in flight at clear time reopen the hydration', async () => {
+    store.set(KEY, recordFor('s1', 'u1'));
+    // Every read of this budget refuses, and the first one is held open until
+    // after the clear has landed.
+    const gate = deferred();
+    getItemAsync.mockImplementation(async () => {
+      await gate.promise;
+      throw new Error('keychain unavailable');
+    });
+
+    expect(getLastOpenedSession('u1')).toBeNull();
+    clearLastOpenedSession();
+    gate.resolve();
+    await flushRetryBudget();
+
+    // The clear owns the state, so the refusal it did not cause must not reopen
+    // the hydration: no later reader asks the mirror and the removed record
+    // cannot come back.
+    expect(getLastOpenedSessionSnapshot()).toBeNull();
+    const settledReads = getItemAsync.mock.calls.length;
+
+    expect(getLastOpenedSession('u1')).toBeNull();
+    await flushMirror();
+    expect(getItemAsync.mock.calls.length).toBe(settledReads);
+    expect(getLastOpenedSessionSnapshot()).toBeNull();
   });
 
   it('settles rapid mirror writes in order, so the last record wins', async () => {

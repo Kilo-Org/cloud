@@ -179,12 +179,16 @@ async function restore(nextAttempt: 'budget' | 'single'): Promise<void> {
       nextAttempt === 'budget'
         ? await readStoredValueWithRetry(LAST_OPENED_SESSION_KEY)
         : await readStoredValue(LAST_OPENED_SESSION_KEY);
+    // A write or a clear that landed while this read was in flight owns the
+    // state, and its answer is newer than these bytes.
+    if (epoch !== startEpoch) {
+      return;
+    }
     // The read answered: a record, or nothing stored. Either way this is the
-    // answer for the run, so no reader asks the keychain again. It also covers
-    // the case below where a write landed first and already owns the state.
+    // answer for the run, so no reader asks the keychain again.
     disarmUnlockRetry();
     hydration = { status: 'answered' };
-    if (raw === null || epoch !== startEpoch || record !== null) {
+    if (raw === null || record !== null) {
       return;
     }
     const parsed = parseStoredRecord(raw);
@@ -193,6 +197,12 @@ async function restore(nextAttempt: 'budget' | 'single'): Promise<void> {
       notify();
     }
   } catch (error) {
+    // A write or a clear that landed during the read owns the state, so a
+    // refusal it did not cause must not reopen the hydration and let a later
+    // reader restore what the caller just established is gone.
+    if (epoch !== startEpoch) {
+      return;
+    }
     // The read never answered, so this run must not serve its absence for the
     // rest of the process. The next reader tries again: with the full reported
     // budget while the device is locked, because an unlock can make the record

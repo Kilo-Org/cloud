@@ -26,6 +26,7 @@ describe('Hermes NumberFormat compatibility', () => {
     expect(formatSignedPrefixedMoney(-0.004, 'de')).toBe('$0,00');
     expect(formatSignedPrefixedMoney(12.5, 'de')).toBe('+$12,50');
     expect(formatFileSize(1024, 'de')).toBe('1,02 kB');
+    expect(formatFileSize(1_500_000_000_000, 'de')).toBe('1,5 TB');
     // The device path validates through the polyfilled formatter as well.
     expect(parseLocalizedNumber('1.234,5', 'de')).toBe(1234.5);
     expect(parseLocalizedNumber('1,5', 'de')).toBe(1.5);

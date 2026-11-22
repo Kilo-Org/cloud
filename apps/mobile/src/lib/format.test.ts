@@ -184,6 +184,12 @@ describe('localized format helpers', () => {
     expect(formatFileSize(999_500, 'en')).toBe('999.5 kB');
     expect(formatFileSize(999_999, 'en')).toBe('1 MB');
     expect(formatFileSize(999_999_999, 'en')).toBe('1 GB');
+    // The promotion rounds at the digits the unit shows, so a fractional byte
+    // count just under the step promotes instead of printing "1,000 bytes", and
+    // the top step is the last one, holding any larger count.
+    expect(formatFileSize(999.5, 'en')).toBe('1 kB');
+    expect(formatFileSize(1_000_000_000_000, 'en')).toBe('1 TB');
+    expect(formatFileSize(1_000_000_000_000_000, 'en')).toBe('1,000 TB');
   });
 
   it('parses localized numbers and rejects other input', () => {

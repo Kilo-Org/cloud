@@ -294,4 +294,47 @@ describe('readTextWithinBudget', () => {
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(jest.getTimerCount()).toBe(0);
   });
+
+  test('stops collecting an owned body at maxChars and cancels the reader', async () => {
+    // The upstream keeps an error page streaming after the excerpt is complete.
+    // A read that ran to the end would buffer all of it; with a cap the loop
+    // stops at the excerpt and cancels the reader it owns, so nothing is left
+    // transferring.
+    const cancel = jest.fn(async () => undefined);
+    const encoder = new TextEncoder();
+    let pulls = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        // Five 100-character bursts; the cap is reached during the first.
+        controller.enqueue(encoder.encode('z'.repeat(100)));
+        if (pulls === 5) {
+          controller.close();
+        }
+      },
+      cancel,
+    });
+    const response = new Response(stream, { status: 502 });
+
+    const text = await readTextWithinBudget(response, 1_000, 1_000, 200);
+
+    expect(text).toBe('z'.repeat(200));
+    // The reader was cancelled at the cap rather than read to the end, so the
+    // remaining bursts were never pulled and the stream was torn down.
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(pulls).toBeLessThan(5);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('slices a body it cannot take over to maxChars', async () => {
+    // A locked body is read by the platform in full, so the cap is applied to
+    // what `text()` already returned.
+    const response = {
+      text: async () => 'y'.repeat(500),
+      body: { locked: true },
+      bodyUsed: true,
+    } as unknown as Response;
+
+    await expect(readTextWithinBudget(response, 1_000, 1_000, 200)).resolves.toBe('y'.repeat(200));
+  });
 });

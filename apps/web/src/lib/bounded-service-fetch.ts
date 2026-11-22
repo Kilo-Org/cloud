@@ -199,18 +199,31 @@ export async function readJsonWithinBudget<T = unknown>(
  * this read was configured with, and it is the value the timeout error reports
  * so logs and Sentry show the configured budget instead of the few milliseconds
  * that were left when the body started.
+ *
+ * `maxChars` caps the result: with it set, a body the reader owns is collected
+ * only up to that many characters and the reader is then cancelled, so a long
+ * upstream error page is neither buffered to its end nor kept streaming after
+ * the caller has all it will use; a body that cannot be taken over is read in
+ * full and sliced. Without it the whole body is returned, exactly as before.
  */
 export async function readTextWithinBudget(
   response: Response,
   remainingBudgetMs: number,
-  totalBudgetMs: number = remainingBudgetMs
+  totalBudgetMs: number = remainingBudgetMs,
+  maxChars?: number
 ): Promise<string> {
   return readBodyWithinBudget(
     response,
     remainingBudgetMs,
     totalBudgetMs,
-    body => body.text(),
-    text => text
+    async body => {
+      const text = await body.text();
+      // A body this function cannot take over is read by the platform, so the
+      // cap can only be applied to what it already returned.
+      return maxChars !== undefined && text.length > maxChars ? text.slice(0, maxChars) : text;
+    },
+    text => text,
+    maxChars
   );
 }
 
@@ -231,13 +244,17 @@ export async function readTextWithinBudget(
  * this read was configured with, and it is the value the timeout error reports
  * so logs and Sentry show the configured budget instead of the few milliseconds
  * that were left when the body started.
+ *
+ * `maxChars` is forwarded to {@link readAllText} so an owned reader stops
+ * collecting at the cap instead of buffering a body the caller will slice away.
  */
 async function readBodyWithinBudget<T>(
   response: Response,
   remainingBudgetMs: number,
   totalBudgetMs: number,
   readFallback: (response: Response) => Promise<T>,
-  parseText: (text: string) => T
+  parseText: (text: string) => T,
+  maxChars?: number
 ): Promise<T> {
   const budgetError = new ServiceFetchTimeoutError(remainingBudgetMs, totalBudgetMs);
   const expired = Promise.withResolvers<never>();
@@ -259,26 +276,43 @@ async function readBodyWithinBudget<T>(
     if (!reader) {
       return await Promise.race([readFallback(response), expired.promise]);
     }
-    return parseText(await Promise.race([readAllText(reader), expired.promise]));
+    return parseText(await Promise.race([readAllText(reader, maxChars), expired.promise]));
   } finally {
     clearTimeout(timer);
   }
 }
 
 /**
- * Read a streamed body to its end as text. Cancellation belongs to the caller:
- * the reader it passed in is the only thing that can end a stalled transfer.
+ * Read a streamed body as text, optionally stopping at `maxChars` characters.
+ *
+ * Cancellation belongs to the caller when the read runs to its end: the reader
+ * it passed in is the only thing that can end a stalled transfer. With a cap,
+ * the loop stops as soon as the decoded text reaches it and cancels the reader
+ * itself — this function owns that reader — so a long body is neither buffered
+ * to its end nor left transferring after the caller has its excerpt.
+ *
+ * The cap counts decoded characters, so a multi-byte sequence split across
+ * chunks is decoded before it is measured and never counted as fragments.
  */
-async function readAllText(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<string> {
+async function readAllText(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  maxChars?: number
+): Promise<string> {
   const decoder = new TextDecoder();
   const chunks: string[] = [];
+  let length = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) {
-      break;
+      chunks.push(decoder.decode());
+      return chunks.join('');
     }
-    chunks.push(decoder.decode(value, { stream: true }));
+    const chunk = decoder.decode(value, { stream: true });
+    chunks.push(chunk);
+    length += chunk.length;
+    if (maxChars !== undefined && length >= maxChars) {
+      void reader.cancel().catch(() => undefined);
+      return chunks.join('').slice(0, maxChars);
+    }
   }
-  chunks.push(decoder.decode());
-  return chunks.join('');
 }

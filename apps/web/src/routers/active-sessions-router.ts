@@ -300,20 +300,37 @@ export const activeSessionsRouter = createTRPCRouter({
     }
 
     if (!response.ok) {
-      // The upstream error body is unclassified text. Read it inside what the
-      // headers left of the budget and log a bounded excerpt, never the whole
-      // payload on a polled procedure.
-      const remaining = remainingBudgetMs();
+      if (response.status === 503 || response.status === 504) {
+        // The worker reports a retryable condition with 503/504, and that is
+        // already known from the status line. Answer it before touching the
+        // body: a worker that sends the status and then stalls the body must
+        // not hold the poll for the rest of the budget to report an error the
+        // code already knows. Keep it retryable instead of flattening it into a
+        // gateway error the client would treat as final.
+        console.warn(
+          `[active-sessions.instances] non-2xx: ${response.status} ${response.statusText}`
+        );
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session ingest is unavailable',
+        });
+      }
+      // Every other non-2xx is unclassified text. Read a bounded excerpt of it
+      // inside what the headers left of the budget — never the whole payload on
+      // a polled procedure — and report the failure as a bad gateway.
       let excerpt: string | null = null;
       try {
+        // The cap is the excerpt length itself, so a long error page is neither
+        // buffered to its end nor sliced after the fact.
         const text = await readTextWithinBudget(
           response,
-          remaining,
-          CONTROL_PLANE_UPSTREAM_BUDGET_MS
+          remainingBudgetMs(),
+          CONTROL_PLANE_UPSTREAM_BUDGET_MS,
+          INSTANCE_ERROR_LOG_EXCERPT_CHARS
         );
         // The first 200 characters of the upstream error body, whatever its
         // content type.
-        excerpt = text.slice(0, INSTANCE_ERROR_LOG_EXCERPT_CHARS);
+        excerpt = text;
       } catch {
         // A body that outlives the budget adds no note; the status below is the
         // whole report.
@@ -322,15 +339,6 @@ export const activeSessionsRouter = createTRPCRouter({
         `[active-sessions.instances] non-2xx: ${response.status} ${response.statusText}`,
         ...(excerpt === null ? [] : [excerpt])
       );
-      if (response.status === 503 || response.status === 504) {
-        // The worker reports a retryable condition with 503/504. Keep it
-        // retryable instead of flattening it into a gateway error the client
-        // would treat as final.
-        throw new TRPCError({
-          code: 'SERVICE_UNAVAILABLE',
-          message: 'Session ingest is unavailable',
-        });
-      }
       throw new TRPCError({
         code: 'BAD_GATEWAY',
         message: `Session ingest worker returned ${response.status}`,

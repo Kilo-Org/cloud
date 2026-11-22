@@ -599,6 +599,45 @@ describe('active-sessions-router', () => {
       });
     });
 
+    it('answers a 503 with a stalled body without waiting for the body read', async () => {
+      // A worker that sends the 503 status line and then never finishes the
+      // body: its `pull` never resolves, so any read of it would hang. The
+      // status alone decides the answer, so the procedure must settle on that
+      // instead of spending the rest of the poll's budget on a body it will not
+      // use.
+      const cancel = jest.fn(async () => undefined);
+      const stream = new ReadableStream<Uint8Array>({
+        pull: () => new Promise<void>(() => {}),
+        cancel,
+      });
+      const stalled = new Response(stream, { status: 503 });
+      jest.spyOn(global, 'fetch').mockResolvedValue(stalled);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const rejection = caller.activeSessions.listInstances();
+        // No timer advance at all: settling here proves the answer came from
+        // the status line, not from the budget expiring.
+        await expect(rejection).rejects.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session ingest is unavailable',
+        });
+        // The body was never taken, so nothing had to be torn down either.
+        expect(stalled.bodyUsed).toBe(false);
+        expect(cancel).not.toHaveBeenCalled();
+        expect(jest.getTimerCount()).toBe(0);
+        // Status only: the 503 log line carries no excerpt argument.
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0]?.[0]).toMatch(/^\[active-sessions\.instances\] non-2xx: 503/);
+        expect(warn.mock.calls[0]?.length).toBe(1);
+      } finally {
+        jest.useRealTimers();
+        warn.mockRestore();
+      }
+    });
+
     it('reports a body that never completes as SERVICE_UNAVAILABLE instead of hanging', async () => {
       jest
         .spyOn(global, 'fetch')

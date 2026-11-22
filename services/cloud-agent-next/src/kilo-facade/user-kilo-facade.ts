@@ -579,9 +579,16 @@ function promptPayerScopeFailure(error: unknown): BalanceOnlyResult {
 const PROMPT_PAYER_SCOPE_READ_ATTEMPTS = 2;
 /** Pause between attempts. */
 const PROMPT_PAYER_SCOPE_RETRY_MS = 50;
+/**
+ * A failure slower than this may already have spent the pool's connection
+ * timeout, so repeating it would double the wait before the answer. Only a fast
+ * failure is repeated.
+ */
+const PROMPT_PAYER_SCOPE_SLOW_FAILURE_MS = 1_000;
 
 /**
- * Reads the payer scope, repeating a failed read within the attempt bound.
+ * Reads the payer scope, repeating a quick failure within the attempt bound. A
+ * slow failure and a denial are reported at once.
  */
 async function readPromptPayerScope(params: {
   env: Env;
@@ -589,6 +596,7 @@ async function readPromptPayerScope(params: {
   cloudAgentSessionId: string;
 }): Promise<string | null> {
   for (let attempt = 1; ; attempt += 1) {
+    const startedAt = Date.now();
     try {
       const { organizationId } = await requireCurrentSessionAccess({
         env: params.env,
@@ -599,6 +607,7 @@ async function readPromptPayerScope(params: {
     } catch (error) {
       if (error instanceof TRPCError && error.code === 'FORBIDDEN') throw error;
       if (attempt >= PROMPT_PAYER_SCOPE_READ_ATTEMPTS) throw error;
+      if (Date.now() - startedAt >= PROMPT_PAYER_SCOPE_SLOW_FAILURE_MS) throw error;
       const wait = Promise.withResolvers<void>();
       setTimeout(wait.resolve, PROMPT_PAYER_SCOPE_RETRY_MS);
       await wait.promise;

@@ -376,6 +376,39 @@ describe('prompt payer scope', () => {
     expect(loggerWarnMock).toHaveBeenCalledWith('Prompt payer scope read failed');
   });
 
+  it('reports a slow payer read failure without repeating it', async () => {
+    vi.useFakeTimers();
+    try {
+      const env = envStub();
+      const admitPrompt = vi.fn();
+      requireCurrentSessionAccessMock.mockImplementation(async () => {
+        // Past the slow-failure threshold: the pool's connect timeout is already
+        // spent, so a repeat would only lengthen the wait before the answer.
+        vi.advanceTimersByTime(1_050);
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session access is temporarily unavailable',
+          cause: new Error('Connection terminated due to connection timeout'),
+        });
+      });
+
+      const response = await postMutation({
+        env,
+        path: 'prompt_async',
+        body: PROMPT_BODY,
+        admitPrompt,
+      });
+
+      expect(response.status).toBe(503);
+      expect(requireCurrentSessionAccess).toHaveBeenCalledOnce();
+      expect(validateBalanceOnly).not.toHaveBeenCalled();
+      expect(admitPrompt).not.toHaveBeenCalled();
+      expect(loggerWarnMock).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not repeat a denied payer scope and records nothing', async () => {
     const env = envStub();
     const admitPrompt = vi.fn();

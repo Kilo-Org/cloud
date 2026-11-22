@@ -18,8 +18,6 @@ import { launchRealDownloadBrowser } from './real-download-launch';
  * faked pieces are the Kilo API routes.
  */
 
-test.use({ viewport: { height: 900, width: 1400 } });
-
 // eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
 test('the panel shows its own gateway error in the real browser', async ({}, testInfo) => {
   test.setTimeout(120_000);

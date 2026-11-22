@@ -10,6 +10,7 @@ import {
   type BriefingEstimateLineQuote,
   parseBriefingEstimateLineQuote,
 } from '@/components/agent-briefing/briefing-estimate-line';
+import { useBriefingLocale } from '@/components/agent-briefing/briefing-locale';
 import { useBriefingEnableFlow } from '@/components/agent-briefing/use-briefing-enable-flow';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -46,12 +47,12 @@ export function BriefingContextSettings({
   readonly defaultModel: string;
   readonly timezone: string;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const trpc = useTRPC();
   const client = useQueryClient();
   const offline = useOfflineBannerState();
   const enableFlow = useBriefingEnableFlow();
-  const locale = i18n.resolvedLanguage ?? i18n.language;
+  const locale = useBriefingLocale();
   const organizationId = preference.context.organizationId ?? undefined;
   const catalog = useAvailableModels(organizationId);
   const [model, setModel] = useState(preference.model);
@@ -146,8 +147,6 @@ export function BriefingContextSettings({
       valid,
       refetch: () => estimate.refetch(),
       contextName,
-      locale,
-      language: i18n.language,
       confirm: estimateToken => {
         update.mutate({
           organizationId,

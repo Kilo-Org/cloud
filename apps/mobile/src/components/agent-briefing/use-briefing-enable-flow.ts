@@ -10,6 +10,7 @@ import { type SurfaceAttempt } from '@/lib/surface-feedback';
 import { briefingEstimateUnavailableKey } from '@/lib/agent-briefing-state';
 import { briefingMoney } from '@/lib/agent-briefing-format';
 import { formatNumber } from '@/lib/format';
+import { resolveBriefingLocale } from './briefing-locale';
 
 /**
  * The enable flow reports every outcome as a toast or the platform dialog, so
@@ -27,8 +28,6 @@ export type BriefingEnableFlowInput = {
   readonly valid: boolean;
   readonly refetch: () => Promise<{ data: BriefingEstimate | undefined }>;
   readonly contextName: string;
-  readonly locale: string;
-  readonly language: string;
   readonly confirm: (estimateToken: string) => void;
 };
 
@@ -46,9 +45,13 @@ export type BriefingEnableFlowInput = {
  * `invalidateAll` on unmount), a superseded attempt, or a changed account
  * cannot present a dialog or fire the paid write. Nothing persists on the
  * surface, so no outcome writes a failure here.
+ *
+ * One sentence reads one locale: the disclosure's estimate, maximum and minute
+ * limit all format in the tag whose catalog the sentence is written in.
  */
 export function useBriefingEnableFlow() {
   const { t, i18n } = useTranslation();
+  const locale = resolveBriefingLocale(i18n);
   const { feedback: enabling, begin } = useSurfaceFeedback<EnableSurfaceFailure>();
   // One admission guard covers the switch and the primary button: both start
   // the same confirm-and-enable flow, so a tap on either while one runs does
@@ -88,11 +91,11 @@ export function useBriefingEnableFlow() {
     Alert.alert(
       t('agentBriefing.confirmPaid', { context: input.contextName }),
       t('agentBriefing.paidDisclosure', {
-        estimate: briefingMoney(confirmed.estimatedCostMicrodollars, i18n.language),
-        maximum: briefingMoney(confirmed.maximumCostMicrodollars, i18n.language),
+        estimate: briefingMoney(confirmed.estimatedCostMicrodollars, locale),
+        maximum: briefingMoney(confirmed.maximumCostMicrodollars, locale),
         minutes: formatNumber(
           confirmed.maxDurationSeconds / 60,
-          input.locale,
+          locale,
           SAFEGUARD_DISCLOSURE_FORMAT
         ),
       }),

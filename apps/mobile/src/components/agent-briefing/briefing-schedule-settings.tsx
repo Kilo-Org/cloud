@@ -24,6 +24,7 @@ import { formatClockTime } from '@/lib/format';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+import { useBriefingLocale } from './briefing-locale';
 
 export function ScheduleSettings({
   preferences,
@@ -35,7 +36,8 @@ export function ScheduleSettings({
 }) {
   const trpc = useTRPC();
   const client = useQueryClient();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   const offline = useOfflineBannerState();
   const draft = useRef({
     timezone: preferences.timezone,
@@ -92,7 +94,7 @@ export function ScheduleSettings({
     if (problems.timezone || problems.times) {
       return;
     }
-    update.mutate({ ...next, language: i18n.resolvedLanguage ?? i18n.language });
+    update.mutate({ ...next, language: locale });
   };
   return (
     <Card>
@@ -129,7 +131,7 @@ export function ScheduleSettings({
         const pickerValue = briefingPickerDate(time);
         // One value for what the button shows and announces, in the locale
         // convention the picker itself uses.
-        const clock = formatClockTime(pickerValue, i18n.resolvedLanguage ?? i18n.language);
+        const clock = formatClockTime(pickerValue, locale);
         return (
           <View key={field.key} className="gap-2">
             {/* The same label the text fields above wear: one relation, one
@@ -154,7 +156,7 @@ export function ScheduleSettings({
                   value={pickerValue}
                   mode="time"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  locale={i18n.resolvedLanguage ?? i18n.language}
+                  locale={locale}
                   positiveButton={{ label: t('common.done') }}
                   negativeButton={{ label: t('common.cancel') }}
                   onDismiss={() => {

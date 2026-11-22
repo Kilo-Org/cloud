@@ -23,6 +23,11 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabProjectAccessLevel: jest.fn(),
   GITLAB_ACCESS_LEVELS: { GUEST: 10, REPORTER: 20, DEVELOPER: 30, MAINTAINER: 40, OWNER: 50 },
+  // The credential refusal classification checks this class, so the mock keeps
+  // the real one instead of an undefined binding.
+  GitLabAuthenticationError: jest.requireActual<{
+    GitLabAuthenticationError: unknown;
+  }>('@/lib/integrations/platforms/gitlab/adapter').GitLabAuthenticationError,
 }));
 
 // The production lookup always answers a row or null; the declared type omits the
@@ -262,6 +267,57 @@ describe('authorizeGitLabProject', () => {
       code: 'SERVICE_UNAVAILABLE',
       message: 'GitLab credentials are temporarily unavailable',
     });
+    mockGetValidGitLabToken.mockRejectedValue(failure);
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    ).rejects.toBe(failure);
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it('propagates a rejected request instead of reporting it as this access', async () => {
+    const failure = new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Invalid GitLab credential request',
+    });
+    mockGetValidGitLabToken.mockRejectedValue(failure);
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    ).rejects.toBe(failure);
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it('propagates a connection that changed while its credential resolved', async () => {
+    const failure = new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'GitLab integration changed while resolving credentials',
+    });
+    mockGetValidGitLabToken.mockRejectedValue(failure);
+
+    await expect(
+      authorizeGitLabProject({
+        project: 'group/project',
+        projectInstanceUrl: 'https://gitlab.com',
+        organizationOwned: true,
+        requesterUserId: 'user-1',
+      })
+    ).rejects.toBe(failure);
+    expect(mockFetchGitLabProjectAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it('propagates an untyped credential failure instead of reporting it as this access', async () => {
+    const failure = new Error('socket hang up');
     mockGetValidGitLabToken.mockRejectedValue(failure);
 
     await expect(

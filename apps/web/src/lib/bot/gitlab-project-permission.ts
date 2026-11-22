@@ -51,15 +51,19 @@ function isSameProject(left: string, right: string): boolean {
 }
 
 /**
- * Whether a credential failure is temporary: the token service could not answer
- * now, and the same request can succeed later. The broker reports that case as
- * `SERVICE_UNAVAILABLE`; a transport failure reaches here untyped. A definitive
- * refusal — no connection, reconnect required, a rejected request — is not
- * temporary, so the caller reports it as the access answer.
+ * Whether a credential failure is a definitive refusal: the stored connection
+ * cannot answer until its owner reconnects, so mentioning the bot again cannot
+ * change the answer. Only these two answers reach the access copy.
+ *
+ * Every other failure propagates so the caller answers its retry reply and
+ * captures the error. A transport error or the broker's `SERVICE_UNAVAILABLE`
+ * says nothing about the project, and neither does a rejected request or a
+ * connection that changed while its credential resolved: blaming the caller's
+ * access would be wrong, and an operator would not see the real fault.
  */
-function isGitLabCredentialAvailabilityError(error: unknown): boolean {
-  if (error instanceof TRPCError) return error.code === 'SERVICE_UNAVAILABLE';
-  return !isGitLabReconnectRequiredError(error);
+function isGitLabCredentialRefusal(error: unknown): boolean {
+  if (isGitLabReconnectRequiredError(error)) return true;
+  return error instanceof TRPCError && error.code === 'NOT_FOUND';
 }
 
 /** The instance URL a GitLab connection stores, defaulting to gitlab.com. */
@@ -78,9 +82,9 @@ function readInstanceUrl(integration: Pick<PlatformIntegration, 'metadata'>): st
 /**
  * The requester's own GitLab connection and the credential it stores. A row is
  * usable only when it is healthy: a suspended or reauthorization-required row
- * cannot answer for the account. A definitive credential refusal is null; an
- * availability failure propagates, because it is temporary and the caller
- * answers it with a retry.
+ * cannot answer for the account. A definitive credential refusal is null; every
+ * other failure propagates, so the caller answers one retry reply and captures
+ * the error instead of reporting it as this account's access.
  */
 async function requesterGitLabConnection(
   requesterUserId: string
@@ -97,7 +101,7 @@ async function requesterGitLabConnection(
     const token = await getValidGitLabToken(integration, { userId: requesterUserId });
     return { integration, token };
   } catch (error) {
-    if (isGitLabCredentialAvailabilityError(error)) throw error;
+    if (!isGitLabCredentialRefusal(error)) throw error;
     return null;
   }
 }
@@ -114,7 +118,8 @@ async function requesterGitLabConnection(
  * reaches with write access.
  *
  * A lookup that fails is not answered here: it propagates to the caller, which
- * reports it as one transient reply.
+ * reports it as one retry reply. Only a definitive credential refusal answers
+ * the access copy.
  */
 export async function authorizeGitLabProject(params: {
   /** Requested project path, `group/project` or `group/subgroup/project`. */

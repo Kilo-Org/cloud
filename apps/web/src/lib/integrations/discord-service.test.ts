@@ -296,6 +296,15 @@ describe('discord-service bot removal', () => {
     });
   });
 
+  it('reports a rejected bot token as unavailable', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
+
+    await expect(removeBotFromGuild(guildId)).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'rejected_token',
+    });
+  });
+
   it('reports a transport failure as a temporary failure', async () => {
     jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('socket hang up'));
 
@@ -363,6 +372,17 @@ describe('discord-service uninstall', () => {
     await expect(uninstallApp(owner)).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
       message: DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
+    });
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+  });
+
+  it('keeps the association when Discord rejects the bot token', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
+
+    await expect(uninstallApp(owner)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
     });
     expect(mockDeleteWhere).not.toHaveBeenCalled();
   });

@@ -70,11 +70,12 @@ export const DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE =
 
 /**
  * The message the server puts on a Discord disconnect it cannot attempt at all:
- * no bot token is configured, or the connection records no usable server id, so
- * no retry of the same request can revoke the bot's membership.
+ * no bot token is configured, Discord rejects the token, or the connection
+ * records no usable server id. No retry of the same request can revoke the
+ * bot's membership, so the client names the support step instead.
  */
 export const DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE =
-  'Kilo could not identify the Discord server saved for this connection. Contact support to finish disconnecting it.';
+  'Kilo could not complete the Discord disconnect for this connection. Contact support to finish disconnecting it.';
 
 /**
  * Outcome of asking Discord to remove the bot from a server.
@@ -87,7 +88,7 @@ export type DiscordBotRemoval =
   | { status: 'left' }
   | { status: 'already_absent' }
   | { status: 'temporary_failure'; reason: 'rate_limited' | 'response_error' | 'network' }
-  | { status: 'unavailable'; reason: 'not_configured' | 'invalid_guild_id' };
+  | { status: 'unavailable'; reason: 'not_configured' | 'invalid_guild_id' | 'rejected_token' };
 
 /**
  * Discord OAuth2 token response shape
@@ -482,6 +483,12 @@ export async function removeBotFromGuild(guildId: string | null): Promise<Discor
 
     if (response.ok) {
       return { status: 'left' };
+    }
+
+    // 401 means Discord does not accept the configured bot token at all, so
+    // repeating the same request cannot succeed.
+    if (response.status === 401) {
+      return { status: 'unavailable', reason: 'rejected_token' };
     }
 
     // 404 is an unknown server and 403 a server the bot is not in; in both

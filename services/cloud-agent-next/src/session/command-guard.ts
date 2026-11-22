@@ -127,6 +127,10 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'sort * -o?*',
   'sort --output*',
   'sort * --output*',
+  // The only long option of `sort` that starts with `o` is `--output`, so the
+  // abbreviation has exactly one meaning and a prefix is refused here.
+  'sort --o*',
+  'sort * --o*',
   'find *-exec*',
   'find *-ok*',
   'find *-delete*',

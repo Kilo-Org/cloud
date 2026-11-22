@@ -130,6 +130,8 @@ describe('code-review command guard policy', () => {
       'sort -k1 --compress-program=/bin/sh src/app.ts',
       'sort --co=/bin/sh src/app.ts',
       'sort -o out.txt src/app.ts',
+      'sort --out=out.txt in.txt',
+      'sort --o=out.txt in.txt',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
@@ -141,6 +143,9 @@ describe('code-review command guard policy', () => {
       'find src -maxdepth 2 -type d',
       'sort -u src/app.ts',
       'sort -k2 -n src/app.ts',
+      'sort in.txt',
+      'sort -rn in.txt',
+      'sort --random-sort in.txt',
       'head -20 src/app.ts',
       'tail -n 40 src/app.ts',
       'wc -l src/app.ts',

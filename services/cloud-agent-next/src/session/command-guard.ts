@@ -452,10 +452,12 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
     `${tool} *config`,
     `${tool} *confi?`,
   ]),
-  '*>> *config',
-  '*>> *confi?',
+  // The redirect operator is written with or without a space before the target,
+  // so one rule covers both spellings and either operator.
   '*> *config',
   '*> *confi?',
+  '*>config',
+  '*>confi?',
   '*gitconfig*',
 ];
 

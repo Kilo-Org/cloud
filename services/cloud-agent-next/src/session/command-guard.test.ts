@@ -522,6 +522,8 @@ describe('security-remediation push command guard policy', () => {
       'sed -i s/a/b/ config',
       'echo "[alias]" >> config',
       'printf x > config',
+      'echo "[alias]" >>config',
+      'printf x >config',
       'mv /tmp/evil confi?',
       // A shell hands a line continuation to git inside one command; the
       // matcher normalizes the backslash to a slash, so the push rules reach it.

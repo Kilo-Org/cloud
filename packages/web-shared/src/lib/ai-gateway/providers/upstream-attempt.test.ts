@@ -131,7 +131,7 @@ describe('bounded spending provider enforcement', () => {
   it('serves a connected customer without applying a Kilo debit limit to the external bill', async () => {
     jest
       .mocked(applyProviderSpecificLogic)
-      .mockImplementationOnce(async (_provider, _model, request) => {
+      .mockImplementationOnce(async ({ requestToMutate: request }) => {
         Object.assign(request.body, {
           billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
         });
@@ -253,7 +253,7 @@ describe('upstream model catalog validation', () => {
           };
     jest
       .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, request) => {
+      .mockImplementation(async ({ requestToMutate: request }) => {
         request.body.model = wireModel;
       });
     return sendUpstreamAttempt({
@@ -451,7 +451,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     // The real transform puts the delegated token in this header.
     jest
       .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, _request, extraHeaders) => {
+      .mockImplementation(async ({ extraHeaders }) => {
         extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
       });
   });
@@ -549,7 +549,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     // The credential the row holds now still records its own limit.
     jest
       .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, _request, extraHeaders) => {
+      .mockImplementation(async ({ extraHeaders }) => {
         extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = RECONNECTED_TOKEN;
       });
     await send(usageLimitResponse());

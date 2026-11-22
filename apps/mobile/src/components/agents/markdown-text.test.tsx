@@ -1439,7 +1439,7 @@ describe('MarkdownText streaming conversion tail', () => {
         // steps long.
         expect(convertedCharacters, `publish ${index}`).toBeLessThanOrEqual(3 * step.length);
         if (index >= 5) {
-          expect(convertedCharacters, `publish ${index}`).toBeLessThan(100000);
+          expect(convertedCharacters, `publish ${index}`).toBeLessThan(value.length / 2);
         }
         // The composition closure saw exactly the appended region.
         expect(componentCalls, `publish ${index}`).toContain(appended);

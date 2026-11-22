@@ -9,18 +9,13 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/webhook-body';
 
 /**
- * Linear's documented webhook scheme, as implemented by @linear/sdk's
- * `LinearWebhookClient.verify`:
+ * Linear's documented webhook scheme:
  *
  *   linear-signature = hex(hmac-sha256(webhook_secret, raw_body))
  *   freshness        = `webhookTimestamp` in the signed body, tolerance 60s
  *
- * Freshness is taken from the signed body, so `webhookTimestamp` is required on
- * every accepted delivery. The `linear-timestamp` header is deprecated upstream
- * and is not read here.
- *
- * Each delivery whose signed `webhookTimestamp` is inside the tolerance window is
- * processed once, when it arrives. This handler keeps no delivery ledger.
+ * Every accepted delivery carries a `webhookTimestamp` inside the signed body.
+ * Freshness is read from that field only.
  */
 
 const LINEAR_SIGNATURE_HEADER = 'linear-signature';

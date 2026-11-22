@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "አንተ የ…",
       "tools": "መሳሪያዎች",
       "wholeToolRule": "ይህ ወኪል በአንድ ጊዜ በሁሉም መሳሪያዎች ላይ አንድ ደንብ ይተገብራል፦ {{rule}}። እነዚህ ማብሪያ ማጥፊያዎች ለንባብ ብቻ ናቸው።",
+      "toolRule": "የተከማቸ ደንብ፦ {{rule}}",
       "visibility": "ታይነት",
       "visibilityPrimary": "ዋና — በቃሚው ውስጥ ይታያል",
       "visibilitySubagent": "ሱባጀንት — ከሌሎች ብቻ የሚጠራ",

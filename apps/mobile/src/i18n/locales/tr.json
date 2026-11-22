@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Sen bir…",
       "tools": "Aletler",
       "wholeToolRule": "Bu ajan tüm aletlere aynı anda tek bir kural uygular: {{rule}}. Bu anahtarlar salt okunur.",
+      "toolRule": "Kayıtlı kural: {{rule}}",
       "visibility": "Görünürlük",
       "visibilityPrimary": "Birincil — seçicide gösterilir",
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",

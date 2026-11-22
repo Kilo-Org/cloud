@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Siz …",
       "tools": "Asboblar",
       "wholeToolRule": "Bu agent bir vaqtning o'zida har bir asbobga bitta qoidani qo'llaydi: {{rule}}. Bu almashtirgichlar faqat o'qish uchun.",
+      "toolRule": "Saqlangan qoida: {{rule}}",
       "visibility": "Ko'rinish",
       "visibilityPrimary": "Asosiy — tanlovchida ko'rsatilgan",
       "visibilitySubagent": "Subagent — faqat boshqalar tomonidan chaqirilishi mumkin",

@@ -4480,6 +4480,7 @@
       "promptPlaceholder": "Tu esi…",
       "tools": "Rīki",
       "wholeToolRule": "Šis aģents vienlaikus piemēro vienu noteikumu visiem rīkiem: {{rule}}. Šie slēdži ir tikai lasāmi.",
+      "toolRule": "Saglabātais noteikums: {{rule}}",
       "visibility": "Redzamība",
       "visibilityPrimary": "Primārais — parādīts atlasītājā",
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",

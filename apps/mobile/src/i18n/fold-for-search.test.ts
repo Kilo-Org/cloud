@@ -6,6 +6,7 @@ describe('foldForSearch', () => {
   it('strips diacritics and folds case', () => {
     expect(foldForSearch('Türkçe')).toBe('turkce');
     expect(foldForSearch('Español')).toBe('espanol');
+    expect(foldForSearch('Indonesian')).toBe('indonesian');
   });
 
   it('folds compatibility forms to the plain letters they stand for', () => {
@@ -24,11 +25,20 @@ describe('foldForSearch', () => {
 
   it('folds case without consulting the device locale', () => {
     // A tr/az device lowers 'I' to 'ı', so a locale-sensitive fold would make
-    // a search for "indonesian" miss "Indonesian". The fold must not use the
-    // device locale.
+    // a search for "indonesian" miss "Indonesian". The fold must not follow
+    // the device locale, so only the no-locale call is stubbed; a pinned
+    // locale is allowed, because 'en' still folds to the ASCII 'i'.
+    const original = String.prototype.toLocaleLowerCase;
     const toLocaleLowerCase = vi
       .spyOn(String.prototype, 'toLocaleLowerCase')
-      .mockImplementation(() => 'ındonesıan');
+      .mockImplementation(function (this: string, locales?: Intl.LocalesArgument) {
+        const noLocaleList =
+          locales === undefined || (Array.isArray(locales) && locales.length === 0);
+        if (noLocaleList) {
+          return 'ındonesıan';
+        }
+        return original.call(this, locales);
+      });
     try {
       expect(foldForSearch('Indonesian')).toBe('indonesian');
     } finally {

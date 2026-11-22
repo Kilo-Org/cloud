@@ -41,8 +41,8 @@ describe('Telugu tool-card labels name the tool', () => {
     expect(i18n.t('agentChat.toolCard.toolPatch')).toBe('ప్యాచ్');
     expect(i18n.t('agentChat.toolCard.toolWebFetch')).toBe('వెబ్ పేజీ పొందడం');
     expect(i18n.t('agentChat.toolCard.toolWebSearch')).toBe('ఆన్‌లైన్ శోధన');
-    expect(i18n.t('agentChat.toolCard.toolSkill')).toBe('నైపుణ్యం లోడ్ అవుతోంది');
-    expect(i18n.t('agentChat.toolCard.toolQuestion')).toBe('మిమ్మల్ని ప్రశ్నలు అడుగుతోంది');
+    expect(i18n.t('agentChat.toolCard.toolSkill')).toBe('నైపుణ్యం లోడ్ చేయడం');
+    expect(i18n.t('agentChat.toolCard.toolQuestion')).toBe('మీకు ప్రశ్నలు అడగడం');
     expect(i18n.t('agentChat.toolCard.toolSuggest')).toBe('సూచనలు');
     expect(i18n.t('agentChat.toolCard.toolRecall')).toBe('జ్ఞాపకాల స్మరణ');
     expect(i18n.t('agentChat.toolCard.toolRepoClone')).toBe('రిపోజిటరీ క్లోనింగ్');
@@ -50,6 +50,20 @@ describe('Telugu tool-card labels name the tool', () => {
 
   it('keeps the patch label different from the edit label', () => {
     expect(i18n.t('agentChat.toolCard.toolPatch')).not.toBe(i18n.t('agentChat.toolCard.toolEdit'));
+  });
+
+  it('fits the permission sentence that interpolates the same labels', () => {
+    // permission-tool-label.ts maps the skill and question ids onto these keys,
+    // and the card reads "{{permission}} అనుమతించాలా?", so each value must be a
+    // noun or gerund phrase rather than a finite clause.
+    for (const key of ['agentChat.toolCard.toolSkill', 'agentChat.toolCard.toolQuestion']) {
+      const sentence = i18n.t('agentChat.permissionCard.allowQuestion', {
+        permission: i18n.t(key),
+      });
+      expect(sentence).toBe(`${i18n.t(key)} అనుమతించాలా?`);
+    }
+    expect(i18n.t('agentChat.toolCard.toolSkill')).toBe('నైపుణ్యం లోడ్ చేయడం');
+    expect(i18n.t('agentChat.toolCard.toolQuestion')).toBe('మీకు ప్రశ్నలు అడగడం');
   });
 });
 

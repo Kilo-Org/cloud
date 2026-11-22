@@ -6,6 +6,7 @@ import {
   DARK_PIE_STROKE_COLOR,
   darkPieThemeVariables,
 } from './mermaid-pie-theme';
+import { pieThemeVariables } from './mermaid-pie-fills';
 import { darkColors } from '@/lib/hooks/theme-colors.generated';
 import { compositeOver, relativeLuminance } from '@/lib/pr-review/diff/syntax-colors';
 
@@ -90,5 +91,21 @@ describe('dark pie theme variables', () => {
 
     expect(second).toEqual(first);
     expect(second).not.toBe(first);
+  });
+});
+
+describe('pie theme variables', () => {
+  it('takes the page colour it is given as both the ink and the stroke', () => {
+    // The wrapper above names the dark page from the tokens; this is the builder
+    // it delegates to, so a surface threaded through as a literal is the case
+    // the web page test relies on.
+    const variables = pieThemeVariables('#0E0E10');
+
+    expect(variables.pieSectionTextColor).toBe('#0E0E10');
+    expect(variables.pieStrokeColor).toBe('#0E0E10');
+    expect(variables.pieOpacity).toBe('1');
+    expect(variables.pie1).toBe(DARK_PIE_FILLS[0]);
+    expect(variables.pie2).toBe(DARK_PIE_FILLS[1]);
+    expect(Object.keys(variables)).toHaveLength(15);
   });
 });

@@ -9,7 +9,7 @@ import {
   HOST_PAGE,
   SCRIPT_FILE_NAME,
 } from '../../../mobile/src/components/agents/markdown-mermaid-host';
-import { darkPieThemeVariables } from '../../../mobile/src/components/agents/mermaid-pie-theme';
+import { DARK_PIE_FILLS } from '../../../mobile/src/components/agents/mermaid-pie-fills';
 
 const IMAGE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="blue"/></svg>';
@@ -219,10 +219,19 @@ test('renders a data image shape', async ({ page, host }) => {
 // The page applies `themeVariables` to `mermaid.initialize`, which is the branch
 // that makes a pie slice visible: without it Mermaid's dark theme paints the
 // first slice and its legend swatch near the page colour. This case renders the
-// real page and reads the fills back, so a dropped spread or a map passed under
-// the wrong key fails here instead of regressing silently.
+// real page and reads the fills back, so a map passed under the wrong key, or a
+// ramp whose first two fills the page no longer receives, fails here instead of
+// regressing silently.
 test('applies the dark pie theme to the rendered slices and legend', async ({ page, host }) => {
-  const variables = darkPieThemeVariables();
+  // The two fills the page must paint, plus full opacity: mermaid blends every
+  // fill toward the page at its own 0.7 default, so the readback would not equal
+  // the ramp's own values. The ramp and the rest of the map are owned by
+  // `mermaid-pie-theme.test.ts`.
+  const variables = {
+    pie1: DARK_PIE_FILLS[0],
+    pie2: DARK_PIE_FILLS[1],
+    pieOpacity: '1',
+  };
   await page.evaluate(themeVariables => {
     (window as HostWindow).kiloRenderDiagram({
       source: 'pie title Status\n  "Working" : 3\n  "Idle" : 5',

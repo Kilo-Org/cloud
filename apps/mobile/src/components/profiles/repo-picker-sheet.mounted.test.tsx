@@ -126,10 +126,13 @@ describe('RepoPickerSheet empty state', () => {
     mountSheet(connectedServicesHref());
 
     const state = emptyStateProps();
+    const label = i18n.t('integrations.sectionTitle');
+    // The message's own interpolation names the destination, so the sentence is
+    // not a copy of the label spelled twice in two places: it resolves to the
+    // same translated words the action carries.
     expect(state.description).toBe(i18n.t('agentChat.repoPicker.noRepositoriesDescription'));
-    // The description quotes the action's own label, so the pair reads as one
-    // instruction: connect a service on the screen this action opens.
-    expect(actionProps()?.label).toBe(i18n.t('integrations.sectionTitle'));
+    expect(state.description).toContain(label);
+    expect(actionProps()?.label).toBe(label);
   });
 
   it('pushes Connected services only after the native dismissal reports', () => {

@@ -49,19 +49,31 @@ export default function RepoPickerScreen() {
     router.back();
   }, [router]);
 
+  // One admission guard for both ways out: a pick and the empty state's exit
+  // each pop this route once, and the attempt stays pending until the route
+  // unmounts, which is the adapter's invalidation.
+  const selection = useSurfaceFeedback<PickerSelectionFailure>();
+
   /**
    * The empty state's way out. The picker is a formSheet in the composer's
    * Stack, so it clears its own bridge slot and pops first; the push must
    * follow that pop, or Connected services joins the stack under the picker
    * instead of the stack the composer left.
+   *
+   * It shares the selection's admission guard: one press is one pop and one
+   * push, so the second tap of a dismissal burst cannot take the composer's
+   * screen off the stack as well.
    */
   const openConnectedServices = useCallback(() => {
+    if (selection.begin() === null) {
+      return;
+    }
     const organizationId = bridgeRef.current?.organizationId ?? undefined;
     repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
     bridgeRef.current = undefined;
     closePicker();
     router.push(connectedServicesHref(organizationId));
-  }, [closePicker, router]);
+  }, [closePicker, router, selection]);
 
   useFocusEffect(
     useCallback(() => {
@@ -118,15 +130,11 @@ export default function RepoPickerScreen() {
     return items;
   }, [bridge, filtered, deferredSearch]);
 
-  const selection = useSurfaceFeedback<PickerSelectionFailure>();
-
   const handleSelect = useCallback(
     (repo: string) => {
       if (selection.begin() === null) {
         // A second tap in the dismissal burst must not select and pop again.
-        // The attempt stays pending until this route unmounts, which is the
-        // adapter's invalidation; a picker that fails to pop therefore keeps
-        // refusing rather than popping the screen beneath it.
+        // The attempt stays pending until this route unmounts.
         return;
       }
       dismissSearchPickerKeyboard();

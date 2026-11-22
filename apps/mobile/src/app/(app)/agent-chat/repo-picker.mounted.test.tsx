@@ -2,7 +2,7 @@
 // rows inside a provider section drop the redundant provider cell, and the name
 // is middle-ellipsized inside its own box so the head and the distinguishing
 // tail both stay visible and the text can never reach the trailing check.
-import { act, createElement, type EffectCallback, useEffect } from 'react';
+import { act, createElement, type EffectCallback, type ReactNode, useEffect } from 'react';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -30,7 +30,7 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: routerMock.back }),
+  useRouter: () => ({ back: routerMock.back, push: routerMock.push }),
   useLocalSearchParams: () => ({}),
   useFocusEffect: (effect: EffectCallback) => {
     useEffect(effect, [effect]);
@@ -42,6 +42,7 @@ vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   Info: 'Info',
   Lock: 'Lock',
+  Plug: 'Plug',
   Search: 'Search',
   SearchX: 'SearchX',
   Unlock: 'Unlock',
@@ -49,6 +50,17 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111111', mutedForeground: '#777777' }),
+}));
+// The route's empty state is what this suite drives, not the button's own
+// surface: `StateAction` becomes a host pressable carrying the action a person
+// would press, so the suite reads the handler the route supplies.
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+  StateAction: (props: { label: string; onPress: () => void }) =>
+    createElement('Pressable', {
+      accessibilityLabel: props.label,
+      onPress: props.onPress,
+    }),
 }));
 
 // Two rows that only differ in their last three characters: a tail cut hides
@@ -67,12 +79,16 @@ const sections: RepoPickerSection[] = [{ key: 'github', titleKey: 'common.github
 
 const slotBridge = vi.hoisted(() => ({ onSelect: vi.fn<(repo: string) => void>() }));
 
-const routerMock = vi.hoisted(() => ({ back: vi.fn<() => void>() }));
+const routerMock = vi.hoisted(() => ({
+  back: vi.fn<() => void>(),
+  push: vi.fn<(href: string) => void>(),
+}));
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   slotBridge.onSelect.mockReset();
   routerMock.back.mockReset();
+  routerMock.push.mockReset();
   repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
     repositories: rows,
     sections,
@@ -166,6 +182,47 @@ describe('repository picker header dismissal', () => {
     });
 
     expect(routerMock.back).toHaveBeenCalledTimes(1);
+    expect(slotBridge.onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe('repository picker empty state', () => {
+  beforeEach(() => {
+    repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
+      repositories: [],
+      sections: [],
+      organizationId: 'org-1',
+      currentValue: '',
+      onSelect: slotBridge.onSelect,
+    });
+  });
+
+  function emptyAction(renderer: ReactTestRenderer) {
+    const label = i18n.t('integrations.sectionTitle');
+    const [action] = renderer.root.findAll(
+      node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === label
+    );
+    if (!action) {
+      throw new Error('The empty state did not mount its action');
+    }
+    return action;
+  }
+
+  it('offers the Connected services action and exits to that route once per press', async () => {
+    const renderer = await mount();
+
+    const press = emptyAction(renderer).props.onPress as () => void;
+    act(() => {
+      press();
+      // The second tap of a dismissal burst must not pop the composer too.
+      press();
+    });
+
+    expect(routerMock.back).toHaveBeenCalledTimes(1);
+    expect(routerMock.push).toHaveBeenCalledTimes(1);
+    expect(routerMock.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/integrations?org=org-1'
+    );
     expect(slotBridge.onSelect).not.toHaveBeenCalled();
   });
 });

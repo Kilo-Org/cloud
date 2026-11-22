@@ -28,11 +28,18 @@ export function clearTrackingPromptDismissed(): void {
   dismissedStore.clear();
 }
 
+/**
+ * App Tracking Transparency exists only on iOS. The pre-prompt, its failure
+ * alert and the retry all belong to that platform, so one guard names it once
+ * and the effect reads the guard instead of the platform.
+ */
+const isTrackingPermissionSupported = Platform.OS === 'ios';
+
 export function useTrackingPermissionPrompt(enabled: boolean): void {
   useEffect(() => {
     let cancelled = false;
 
-    if (!enabled || Platform.OS !== 'ios') {
+    if (!enabled || !isTrackingPermissionSupported) {
       // No-op cleanup so every branch returns the same type.
     } else {
       const checkAndPrompt = async () => {

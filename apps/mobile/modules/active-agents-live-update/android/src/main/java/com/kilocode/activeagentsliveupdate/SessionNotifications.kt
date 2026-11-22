@@ -31,25 +31,18 @@ import org.json.JSONObject
  * timer. Every other card hides the system time, which draws a relative age,
  * and its text names the absolute time the JS side formats.
  *
- * The module holds exactly one notification per session, keyed by a stable id
- * derived from the session id, tagged so a session can never take another
- * session's place. SharedPreferences keeps the card's facts and the scope it was
- * followed in, so a press can answer with the right organization after the
- * process was killed, and so a restart can prune the cards that are no longer in
- * the shade.
+ * The module holds exactly one notification per session, tagged with the
+ * session id, so an update can only reach that session's card. Each action
+ * carries the session in its Intent data for the same reason; see
+ * `SessionNotificationIdentity`. SharedPreferences keeps the card's facts and
+ * the scope it was followed in, so a press can answer with the right
+ * organization after the process was killed, and so a restart can prune the
+ * cards that are no longer in the shade.
  */
 internal object SessionNotifications {
   private const val STORE = "active_agents_session_notifications"
   private const val KEY_PREFIX = "session:"
   private const val CHANNEL_ID = "followed-sessions-lock-screen"
-
-  /** The notification id of one session: stable, and never the aggregate card's. */
-  private fun notificationId(sessionId: String): Int =
-    SESSION_NOTIFICATION_ID_BASE + (sessionId.hashCode() and 0xFFFF)
-
-  /** A request code unique to this session, so two cards' actions never collide. */
-  private fun requestCode(sessionId: String, offset: Int): Int =
-    (sessionId.hashCode() and 0xFFFF) * 4 + offset
 
   private fun state(context: Context) =
     context.getSharedPreferences(STORE, Context.MODE_PRIVATE)
@@ -88,12 +81,44 @@ internal object SessionNotifications {
 
   /** Cancel one session's notification and forget its stored card. */
   fun cancel(context: Context, sessionId: String) {
-    manager(context).cancel(TAG, notificationId(sessionId))
+    manager(context).cancel(
+      SessionNotificationIdentity.tag(sessionId),
+      SessionNotificationIdentity.NOTIFICATION_ID
+    )
     state(context)
       .edit()
       .remove(KEY_PREFIX + sessionId)
       .commitOrReport("Cannot forget the cancelled session card")
     alarms(context).cancel(quietIntent(context, sessionId, 0))
+    cancelLegacy(context, sessionId)
+  }
+
+  /**
+   * Cancel the card record an earlier app version posted for this session. An
+   * update posts the card under the identity above, so the record from the
+   * version before it is cancelled here — from `post` as well as from `cancel` —
+   * or the same session would be drawn twice until it ends.
+   *
+   * The notification and its quiet alarm are both cancelled, because the alarm
+   * fires on its own; the action records are reached only through the card's
+   * own actions, so they need nothing once the card is gone.
+   */
+  private fun cancelLegacy(context: Context, sessionId: String) {
+    manager(context).cancel(
+      SessionNotificationIdentity.LEGACY_TAG,
+      SessionNotificationIdentity.legacyNotificationId(sessionId)
+    )
+    PendingIntent.getBroadcast(
+      context,
+      SessionNotificationIdentity.legacyRequestCode(sessionId, QUIET_REQUEST_CODE),
+      Intent(context, ActiveAgentsActionReceiver::class.java)
+        .setAction(ActiveAgentsActionReceiver.ACTION_QUIET)
+        .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.let { operation ->
+      alarms(context).cancel(operation)
+      operation.cancel()
+    }
   }
 
   /**
@@ -125,7 +150,12 @@ internal object SessionNotifications {
     if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
       builder.setTimeoutAfter(timeoutMs)
     }
-    manager(context).notify(TAG, notificationId(card.sessionId), builder.build())
+    cancelLegacy(context, card.sessionId)
+    manager(context).notify(
+      SessionNotificationIdentity.tag(card.sessionId),
+      SessionNotificationIdentity.NOTIFICATION_ID,
+      builder.build()
+    )
     scheduleQuiet(context, card, nowMs)
   }
 
@@ -176,9 +206,10 @@ internal object SessionNotifications {
   private fun quietIntent(context: Context, sessionId: String, quietAtMs: Long): PendingIntent =
     PendingIntent.getBroadcast(
       context,
-      requestCode(sessionId, QUIET_OFFSET),
+      QUIET_REQUEST_CODE,
       Intent(context, ActiveAgentsActionReceiver::class.java)
         .setAction(ActiveAgentsActionReceiver.ACTION_QUIET)
+        .setData(Uri.parse(SessionNotificationIdentity.sessionData(sessionId)))
         .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
         .putExtra(ActiveAgentsActionReceiver.EXTRA_QUIET_AT, quietAtMs),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -191,7 +222,7 @@ internal object SessionNotifications {
     val icon = CardStyle.icon(context)
     val openIntent = PendingIntent.getActivity(
       context,
-      requestCode(card.sessionId, OPEN_OFFSET),
+      OPEN_REQUEST_CODE,
       Intent(Intent.ACTION_VIEW, Uri.parse(card.openUrl)).setPackage(context.packageName),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
@@ -252,7 +283,7 @@ internal object SessionNotifications {
     val approvalKey = card.approvalKey ?: return deleteIntent(context, card.sessionId)
     return ApprovalGate.pendingIntent(
       context,
-      requestCode(card.sessionId, APPROVE_OFFSET),
+      APPROVE_REQUEST_CODE,
       card.sessionId,
       approvalKey
     )
@@ -267,9 +298,10 @@ internal object SessionNotifications {
   private fun deleteIntent(context: Context, sessionId: String): PendingIntent =
     PendingIntent.getBroadcast(
       context,
-      requestCode(sessionId, DELETE_OFFSET),
+      DELETE_REQUEST_CODE,
       Intent(context, ActiveAgentsActionReceiver::class.java)
         .setAction(ActiveAgentsActionReceiver.ACTION_DISMISS)
+        .setData(Uri.parse(SessionNotificationIdentity.sessionData(sessionId)))
         .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
@@ -279,12 +311,13 @@ internal object SessionNotifications {
 
   /** Stored beside a finished card: the epoch time its window ends. */
   private const val FINISHED_UNTIL = "finishedUntil"
-  private const val TAG = "session"
-  private const val SESSION_NOTIFICATION_ID_BASE = 20_000
-  private const val OPEN_OFFSET = 0
-  private const val APPROVE_OFFSET = 1
-  private const val DELETE_OFFSET = 2
-  private const val QUIET_OFFSET = 3
+
+  // One request code per action kind. The session is named by each Intent's
+  // data URI, so the code only has to separate the actions of one session.
+  private const val OPEN_REQUEST_CODE = 0
+  private const val APPROVE_REQUEST_CODE = 1
+  private const val DELETE_REQUEST_CODE = 2
+  private const val QUIET_REQUEST_CODE = 3
 }
 
 /** One followed session's notification, as the JS side maps it. */

@@ -40,23 +40,29 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * accent track beside it and reads as both unavailable and on.
  *
  * So the disabled control paints two different neutral tracks instead of the
- * brand pair: `primaryDisabled` on and `mutedSoft` off, in both schemes. The
- * positions stay apart because those are two separate tokens — each measures at
- * least 1.6:1 against the `secondary` row it sits on and 1.6:1 against the
- * other, pinned by `use-theme-colors.contrast.test.ts` — and not because of a
- * hue, which is why one shared pair would leave on and off looking alike on a
- * read-only screen. Off keeps the enabled off track (light has no third neutral
- * below `mutedSoft`; `controlIdle` equals `secondary`), so its grip dims
- * instead: `mutedForeground` rather than the enabled `primaryForeground` or
- * `foreground`.
+ * brand pair: `primaryDisabled` on and `mutedSoft` off, in both schemes, each
+ * under one neutral grip. The positions stay apart because those are two
+ * separate tokens — each measures at least 1.6:1 against the `secondary` row it
+ * sits on and 1.6:1 against the other, pinned by
+ * `use-theme-colors.contrast.test.ts` — and not because of a hue, which is why
+ * one shared pair would leave on and off looking alike on a read-only screen.
+ * Light has no third neutral below `mutedSoft` (`controlIdle` equals
+ * `secondary`), so in light the disabled off track is the same token as the
+ * enabled one and only its grip dims to `mutedForeground`; dark's disabled off
+ * track is not its enabled off track, which is `mutedForeground`, so the dark
+ * off pair differs in both halves.
  *
- * The on grip is `primaryForeground` in light and `mutedSoft` in dark, never
- * the scheme's on ink: dark defines `primaryForeground` as the near-black card
- * colour, and Android's thumb is wider than the track, so its outer arc lands on
- * the row itself — 1.1:1 there, with no shadow in the dark scheme to outline
- * it, so the pill read as a blank grey bar (measured regression). An olive
- * accent track in either position was rejected: `primaryDisabled` is a neutral,
- * while an olive track at full or reduced strength reads as active
+ * Neither grip is an enabled grip, in either scheme: `mutedSoft` on and
+ * `mutedForeground` off. Light's `PreferenceRow` already paints an enabled off
+ * row with `primaryDisabled` — its own `mutedForeground` override for the light
+ * card — under a `primaryForeground` thumb, so an enabled grip on the disabled
+ * on track would paint the same switch a live off row does. The neutrals also
+ * stay visible where Android's thumb, wider than the track, lets its outer arc
+ * overhang onto the row: dark's `primaryForeground` is the near-black card
+ * colour, 1.1:1 on that row with no shadow in the dark scheme to outline it, so
+ * the pill read as a blank grey bar (measured regression). An olive accent
+ * track in either position was rejected: `primaryDisabled` is a neutral, while
+ * an olive track at full or reduced strength reads as active
  * (`app-notifications` gate, 2026-11-18).
  *
  * Both halves once took the `ringTrack` ink, so the positions looked alike
@@ -126,10 +132,12 @@ export function Switch({
   // untouched, and iOS keeps it because UIKit fades the control itself.
   const disabledOnTrack = colors.primaryDisabled;
   const disabledOffTrack = colors.mutedSoft;
-  // The on grip is never the scheme's on ink: dark's `primaryForeground` is the
-  // near-black card colour, which vanishes where the thumb's arc overhangs the
-  // row.
-  const disabledOnGrip = dark ? colors.mutedSoft : colors.primaryForeground;
+  // Neither grip is an enabled grip. Light's enabled off row passes exactly
+  // `primaryDisabled` (its `mutedForeground` override) under a
+  // `primaryForeground` thumb, so an enabled grip here would make a disabled on
+  // row paint the same switch a live off row does. The neutrals are also the
+  // only pair that stays visible where the thumb's arc overhangs the row.
+  const disabledOnGrip = colors.mutedSoft;
   const disabledOffGrip = colors.mutedForeground;
   const offGrip = inactive ? disabledOffGrip : enabledOffGrip;
   const offTrack = inactive ? disabledOffTrack : enabledOffTrack;

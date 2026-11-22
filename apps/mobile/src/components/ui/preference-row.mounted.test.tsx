@@ -459,7 +459,31 @@ describe('PreferenceRow', () => {
     // neither is the enabled track a live row would paint.
     expect(trackColor.true).not.toBe(trackColor.false);
     expect(trackColor.true).not.toBe(lightColors.primary);
-    expect(toggle.props.thumbColor).toBe(lightColors.primaryForeground);
+    // The disabled on grip is a neutral: an enabled one would match this row's
+    // own enabled off pair — `mutedForeground` under a white thumb.
+    expect(toggle.props.thumbColor).toBe(lightColors.mutedSoft);
+    expect(`${trackColor.true}/${toggle.props.thumbColor as string}`).not.toBe(
+      `${lightColors.mutedForeground}/${lightColors.primaryForeground}`
+    );
+  });
+
+  it('paints the same neutral disabled pair on a dark unavailable row', () => {
+    // Dark's disabled off track is `mutedSoft`, not its `mutedForeground`
+    // enabled off track, so both halves of the off pair differ from a live row.
+    schemeState.current = 'dark';
+    platformState.os = 'android';
+    const disabledOn = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
+    const onToggle = disabledOn.find(node => Object.is(node.type, 'Switch'));
+    const onTrack = onToggle.props.trackColor as { false: string; true: string };
+    expect(onTrack.true).toBe(darkColors.primaryDisabled);
+    expect(onTrack.false).toBe(darkColors.mutedSoft);
+    expect(onToggle.props.thumbColor).toBe(darkColors.mutedSoft);
+
+    const disabledOff = renderRow({ value: false, disabled: true, onValueChange: () => undefined });
+    const offToggle = disabledOff.find(node => Object.is(node.type, 'Switch'));
+    expect(offToggle.props.trackColor).toEqual(onTrack);
+    expect(offToggle.props.thumbColor).toBe(darkColors.mutedForeground);
+    expect(offToggle.props.thumbColor).not.toBe(darkColors.foreground);
   });
 });
 

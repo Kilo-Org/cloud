@@ -224,7 +224,10 @@ describe('Switch', () => {
     expect(props.value).toBe(true);
     expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
     expect(props.trackColor?.false).toBe(lightColors.mutedSoft);
-    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+    // A neutral grip: light's enabled off row paints this same track under a
+    // white thumb, so an enabled grip here would match a live off row.
+    expect(props.thumbColor).toBe(lightColors.mutedSoft);
+    expect(props.thumbColor).not.toBe(lightColors.primaryForeground);
   });
 
   it('paints the same two neutral tracks on a disabled off switch', () => {
@@ -249,10 +252,30 @@ describe('Switch', () => {
     expect(on.trackColor?.true).not.toBe(on.trackColor?.false);
     expect(on.trackColor?.true).not.toBe(lightColors.primary);
     expect(off.trackColor).toEqual(on.trackColor);
+    expect(on.thumbColor).not.toBe(off.thumbColor);
     // Light has no neutral beneath the enabled off track, so off dims its grip
     // where on changes its track.
     expect(off.trackColor?.false).toBe(enabledOff.trackColor?.false);
     expect(off.thumbColor).not.toBe(enabledOff.thumbColor);
+  });
+
+  it('never paints a disabled on switch the grip a live off row shows', () => {
+    native.os = 'android';
+    for (const [scheme, colors] of [
+      ['light', lightColors],
+      ['dark', darkColors],
+    ] as const) {
+      native.scheme = scheme;
+      const disabledOn = nativeProps(renderSwitch({ disabled: true, value: true }).root);
+      const enabledOff = nativeProps(renderSwitch({ value: false }).root);
+      expect(disabledOn.thumbColor, `disabled on grip (${scheme})`).not.toBe(enabledOff.thumbColor);
+      // A live off row is `PreferenceRow`'s light override: the
+      // `mutedForeground` track under a white thumb.
+      expect(disabledOn.trackColor?.false).not.toBe(colors.mutedForeground);
+      expect(`${disabledOn.trackColor?.true}/${disabledOn.thumbColor}`).not.toBe(
+        `${colors.mutedForeground}/${colors.primaryForeground}`
+      );
+    }
   });
 
   it('paints the neutral disabled pair in dark mode, off the brand accent', () => {
@@ -264,11 +287,12 @@ describe('Switch', () => {
     expect(on.trackColor?.false).toBe(darkColors.mutedSoft);
     expect(on.trackColor?.true).not.toBe(darkColors.selection);
     expect(off.trackColor).toEqual(on.trackColor);
-    // Dark's on ink is the near-black card colour, which disappears where the
-    // thumb's arc overhangs the row; the on grip takes the mid neutral instead.
     expect(on.thumbColor).toBe(darkColors.mutedSoft);
     expect(on.thumbColor).not.toBe(darkColors.primaryForeground);
+    // Dark's disabled off track is `mutedSoft`, not its `mutedForeground`
+    // enabled off track.
     expect(off.thumbColor).toBe(darkColors.mutedForeground);
+    expect(off.trackColor?.false).not.toBe(darkColors.mutedForeground);
   });
 
   it('takes the disabled state from the accessibility state', () => {

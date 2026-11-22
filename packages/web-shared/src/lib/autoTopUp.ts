@@ -31,7 +31,6 @@ import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   MAX_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
   parseOrgAutoTopUpThresholdCents,
-  DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
   SYSTEM_AUTO_TOP_UP_USER_ID,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
@@ -345,7 +344,7 @@ async function performAutoTopUpForEntity(
       return failureResult('no_stripe_customer');
     }
 
-    const amountCents = config.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
+    const amountCents = config.amount_cents;
     // Bouncer's payer for an org charge is the org; the user id is the org's billing actor.
     const bouncerUserId =
       entity.type === 'user'

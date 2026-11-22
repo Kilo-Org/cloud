@@ -4,7 +4,10 @@ import type { Organization } from '@kilocode/db/schema';
 import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import type { ModelRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -62,7 +65,9 @@ function checkAvailability(
 
   const { providerAllowSet } = precomputed;
   if (providerAllowSet !== undefined) {
-    const allowedProvider = sortedProviders.find(slug => providerAllowSet.has(slug));
+    const allowedProvider = sortedProviders.find(slug =>
+      providerAllowSet.has(normalizeInferenceProviderId(slug))
+    );
     return allowedProvider
       ? { allowed: true, reasonProvider: allowedProvider }
       : { allowed: false, reasonProvider: null };

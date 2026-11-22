@@ -110,6 +110,22 @@ describe('computeRelevantChangesForOrg', () => {
     expect(relevantChangesIsEmpty(changes)).toBe(false);
   });
 
+  test('allow-list mode: a snapshot provider slug in another case still matches the allow list', () => {
+    const org = buildEnterpriseOrg({
+      settings: {
+        provider_allow_list: ['z-ai'],
+      },
+    });
+    const oldSnapshot = buildSnapshot([{ slug: 'Z-AI', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'Z-AI', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+    const changes = computeRelevantChangesForOrg(org, diff);
+
+    expect(changes.addedByReasonProvider.get('Z-AI')).toEqual(['z-ai/glm-5.1']);
+    expect(relevantChangesIsEmpty(changes)).toBe(false);
+  });
+
   test('allow-list mode: new model from non-allowed provider is NOT relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {

@@ -44,7 +44,8 @@ export type ToolStateCompleted = Omit<generated.ToolStateCompleted, 'attachments
 };
 
 export type ToolState =
-  Exclude<generated.ToolState, generated.ToolStateCompleted> | ToolStateCompleted;
+  | Exclude<generated.ToolState, generated.ToolStateCompleted>
+  | ToolStateCompleted;
 
 export type ToolPart = Omit<generated.ToolPart, 'state'> & { state: ToolState };
 

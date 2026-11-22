@@ -7,6 +7,7 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   computeExpiration,
   earliestUnexpiredExpiry,
+  ORGANIZATION_CREDIT_ACTOR,
   reconcileCreditExpirationsInTransaction,
   type CreditOwner,
   type ExpiringTransaction,
@@ -132,7 +133,12 @@ export function computeNextExpirationAmount(
 ): number | null {
   if (!nextExpirationAt) return null;
 
-  const result = computeExpiration(transactions, entity, new Date(nextExpirationAt), 'system');
+  const result = computeExpiration(
+    transactions,
+    entity,
+    new Date(nextExpirationAt),
+    ORGANIZATION_CREDIT_ACTOR
+  );
 
   const totalExpiring = result.newTransactions.reduce(
     (sum, t) => sum + -(t.amount_microdollars ?? 0),
@@ -264,7 +270,7 @@ export async function processOrganizationExpirationsBatch(
   // mapper needs no miss guard.
   const prepared = [...organizationsById.values()].flatMap(org => {
     const transactions = transactionsByOrganizationId.get(org.id) ?? [];
-    const expirationResult = computeExpiration(transactions, org, now, 'system');
+    const expirationResult = computeExpiration(transactions, org, now, ORGANIZATION_CREDIT_ACTOR);
     const expiredTransactionIds = new Set(
       expirationResult.newTransactions.map(transaction => transaction.original_transaction_id)
     );

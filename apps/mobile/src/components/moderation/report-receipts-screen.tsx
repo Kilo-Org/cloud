@@ -204,11 +204,16 @@ export function ReportReceiptsScreen() {
               const triage = statusLabel(TRIAGE_KEYS, item.triageStatus);
               const age = timeAgo(parseTimestamp(item.createdAt), undefined, now);
               // The appeal line is only drawn when the reader appealed, so a
-              // report without one keeps the row it has always had.
+              // report without one keeps the row it has always had. It names
+              // itself as the appeal: the triage line above it can already hold
+              // the same word (a rejected report and a declined appeal share
+              // one), and a bare second status reads as the report's own.
               const appeal =
                 item.appealStatus === 'none'
                   ? undefined
-                  : statusLabel(APPEAL_KEYS, item.appealStatus);
+                  : t('profile.reportReceipt.appealStatusLine', {
+                      status: statusLabel(APPEAL_KEYS, item.appealStatus),
+                    });
               // A screen reader hears the whole row in one pass: what was
               // reported, why, how it was decided, and the appeal when there is
               // one. The visual lines are separate nodes, so each is also

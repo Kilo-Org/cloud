@@ -522,6 +522,7 @@
       "receiptLabel": "Resit",
       "copyReceiptId": "Salin ID resit",
       "appealLabel": "Rayuan",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Diterima",
       "triageOpen": "Dalam semakan",
       "triageActioned": "Disahkan",
@@ -555,7 +556,7 @@
       "title": "Laporan",
       "rowSubtitle": "Laporan yang anda failkan dan hasilnya",
       "emptyTitle": "Belum ada laporan",
-      "emptyDescription": "Laporan yang anda failkan daripada ulasan atau respons AI akan dipaparkan di sini.",
+      "emptyDescription": "Laporan yang anda failkan daripada ulasan dalam perbincangan pull request, atau daripada respons AI dalam sesi ejen, akan dipaparkan di sini bersama hasilnya.",
       "couldNotLoad": "Tidak dapat memuatkan laporan anda",
       "capped": "Memaparkan laporan terkini anda."
     },

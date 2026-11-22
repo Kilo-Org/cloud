@@ -522,6 +522,7 @@
       "receiptLabel": "Bestätigung",
       "copyReceiptId": "Bestätigungs-ID kopieren",
       "appealLabel": "Einspruch",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Eingegangen",
       "triageOpen": "In Prüfung",
       "triageActioned": "Stattgegeben",
@@ -555,7 +556,7 @@
       "title": "Meldungen",
       "rowSubtitle": "Eingereichte Meldungen und ihre Ergebnisse",
       "emptyTitle": "Noch keine Meldungen",
-      "emptyDescription": "Meldungen, die du zu einem Kommentar oder einer KI-Antwort einreichst, erscheinen hier.",
+      "emptyDescription": "Meldungen, die du zu einem Kommentar in einer Pull-Request-Diskussion oder zu einer KI-Antwort in einer Agentensitzung einreichst, erscheinen hier mit ihrem Ergebnis.",
       "couldNotLoad": "Deine Meldungen konnten nicht geladen werden",
       "capped": "Deine neuesten Meldungen werden angezeigt."
     },

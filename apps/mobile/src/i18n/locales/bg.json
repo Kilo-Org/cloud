@@ -522,6 +522,7 @@
       "receiptLabel": "Потвърждение",
       "copyReceiptId": "Копирай идентификатора на потвърждението",
       "appealLabel": "Обжалване",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Получен",
       "triageOpen": "В процес на преглед",
       "triageActioned": "Уважен",
@@ -555,7 +556,7 @@
       "title": "Сигнали",
       "rowSubtitle": "Подадени от теб сигнали и резултатите им",
       "emptyTitle": "Още няма сигнали",
-      "emptyDescription": "Сигналите, които подадеш от коментар или от AI отговор, се появяват тук.",
+      "emptyDescription": "Сигналите, които подадеш от коментар в дискусия в pull request или от AI отговор в сесия на агент, се появяват тук с резултата си.",
       "couldNotLoad": "Сигналите ти не можаха да се заредят",
       "capped": "Показват се най-новите ти сигнали."
     },

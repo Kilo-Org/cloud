@@ -472,6 +472,11 @@ describe('ReportReceiptsScreen', () => {
 
     const [empty] = root.findAll(node => Object.is(node.type, EMPTY_STATE));
     expect(empty?.props.title).toBe('No reports yet');
+    // The reader who has filed nothing learns both where a report is filed and
+    // that the outcome comes back here.
+    expect(empty?.props.description).toBe(
+      'Reports you file from a comment in a pull request discussion, or from an AI response in an agent session, appear here with their outcome.'
+    );
     expect(rows(root)).toHaveLength(0);
   });
 
@@ -600,17 +605,18 @@ describe('ReportReceiptsScreen', () => {
     const root = await mount();
 
     // The report on the first line, the outcome and the age on the second, and
-    // the appeal outcome — the same words the receipt screen prints for it — on
-    // the third.
+    // the appeal outcome on the third, labelled as the appeal: the triage line
+    // can already carry the appeal's own word (a rejected report and a declined
+    // appeal share one), so the bare status would read as the report's.
     expect(rows(root).map(row => rowTexts(row))).toEqual([
-      ['PR comment · Harassment', 'Not upheld · 1 hour ago', 'Under review'],
-      ['Person · Another reason', 'Upheld · 2 hours ago', 'Accepted'],
+      ['PR comment · Harassment', 'Not upheld · 1 hour ago', 'Appeal: Under review'],
+      ['Person · Another reason', 'Upheld · 2 hours ago', 'Appeal: Accepted'],
     ]);
     // The three lines are separate nodes, so the row's own name joins them: a
     // screen reader hears one sentence per report, appeal outcome last.
     expect(rows(root).map(row => row.props.accessibilityLabel)).toEqual([
-      'PR comment · Harassment. Not upheld · 1 hour ago. Under review',
-      'Person · Another reason. Upheld · 2 hours ago. Accepted',
+      'PR comment · Harassment. Not upheld · 1 hour ago. Appeal: Under review',
+      'Person · Another reason. Upheld · 2 hours ago. Appeal: Accepted',
     ]);
   });
 

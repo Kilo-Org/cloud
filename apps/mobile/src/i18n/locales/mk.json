@@ -522,6 +522,7 @@
       "receiptLabel": "Потврда",
       "copyReceiptId": "Копирај ID на потврда",
       "appealLabel": "Жалба",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Примено",
       "triageOpen": "Во разгледување",
       "triageActioned": "Прифатено",
@@ -555,7 +556,7 @@
       "title": "Пријави",
       "rowSubtitle": "Пријави што сте ги поднеле и нивните исходи",
       "emptyTitle": "Сè уште нема пријави",
-      "emptyDescription": "Пријавите што ги поднесувате од коментар или од AI одговор се прикажуваат овде.",
+      "emptyDescription": "Пријавите што ги поднесувате од коментар во дискусија за pull request, или од одговор од асистентот во сесија на агентот, се прикажуваат овде со нивниот исход.",
       "couldNotLoad": "Не можеа да се вчитаат вашите пријави",
       "capped": "Се прикажуваат вашите најнови пријави."
     },

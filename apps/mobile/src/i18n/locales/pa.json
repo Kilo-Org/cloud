@@ -522,6 +522,7 @@
       "receiptLabel": "ਰਸੀਦ",
       "copyReceiptId": "ਰਸੀਦ ਦੀ ID ਕਾਪੀ ਕਰੋ",
       "appealLabel": "ਅਪੀਲ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ਪ੍ਰਾਪਤ ਹੋਈ",
       "triageOpen": "ਸਮੀਖਿਆ ਅਧੀਨ",
       "triageActioned": "ਸਹੀ ਪਾਈ ਗਈ",
@@ -555,7 +556,7 @@
       "title": "ਰਿਪੋਰਟਾਂ",
       "rowSubtitle": "ਤੁਹਾਡੀਆਂ ਦਰਜ ਕੀਤੀਆਂ ਰਿਪੋਰਟਾਂ ਅਤੇ ਉਨ੍ਹਾਂ ਦੇ ਨਤੀਜੇ",
       "emptyTitle": "ਹਾਲੇ ਕੋਈ ਰਿਪੋਰਟ ਨਹੀਂ",
-      "emptyDescription": "ਕਿਸੇ ਟਿੱਪਣੀ ਜਾਂ AI ਜਵਾਬ ਤੋਂ ਤੁਸੀਂ ਜੋ ਰਿਪੋਰਟਾਂ ਦਰਜ ਕਰਦੇ ਹੋ, ਉਹ ਇੱਥੇ ਦਿਖਦੀਆਂ ਹਨ।",
+      "emptyDescription": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਚਰਚਾ ਦੀ ਕਿਸੇ ਟਿੱਪਣੀ ਤੋਂ ਜਾਂ ਏਜੰਟ ਸੈਸ਼ਨ ਦੇ AI ਜਵਾਬ ਤੋਂ ਤੁਸੀਂ ਜੋ ਰਿਪੋਰਟਾਂ ਦਰਜ ਕਰਦੇ ਹੋ, ਉਹ ਆਪਣੇ ਨਤੀਜਿਆਂ ਸਮੇਤ ਇੱਥੇ ਦਿਖਦੀਆਂ ਹਨ।",
       "couldNotLoad": "ਤੁਹਾਡੀਆਂ ਰਿਪੋਰਟਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
       "capped": "ਤੁਹਾਡੀਆਂ ਸਭ ਤੋਂ ਹਾਲੀਆ ਰਿਪੋਰਟਾਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।"
     },

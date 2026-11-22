@@ -522,6 +522,7 @@
       "receiptLabel": "රිසිට්පත",
       "copyReceiptId": "රිසිට්පතේ ID පිටපත් කරන්න",
       "appealLabel": "අභියාචනය",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ලැබුණි",
       "triageOpen": "සමාලෝචනය වෙමින් පවතී",
       "triageActioned": "තහවුරු කරන ලදී",
@@ -555,7 +556,7 @@
       "title": "වාර්තා",
       "rowSubtitle": "ඔබ ඉදිරිපත් කළ වාර්තා සහ ඒවායේ ප්‍රතිඵල",
       "emptyTitle": "තවම වාර්තා නැත",
-      "emptyDescription": "ඔබ අදහසකින් හෝ AI ප්‍රතිචාරයකින් ඉදිරිපත් කරන වාර්තා මෙහි දිස්වේ.",
+      "emptyDescription": "ඔබ pull request සාකච්ඡාවක ඇති අදහසකින් හෝ නියෝජිත සැසියක AI පිළිතුරකින් ඉදිරිපත් කරන වාර්තා ඒවායේ ප්‍රතිඵලය සමඟ මෙහි දිස්වේ.",
       "couldNotLoad": "ඔබේ වාර්තා පූරණය කළ නොහැකි විය",
       "capped": "ඔබේ නවතම වාර්තා පෙන්වමින් පවතී."
     },

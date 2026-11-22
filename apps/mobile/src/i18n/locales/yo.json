@@ -522,6 +522,7 @@
       "receiptLabel": "Ìwé ẹ̀rí",
       "copyReceiptId": "Dákọ ID ìwé ẹ̀rí",
       "appealLabel": "Ẹ̀bẹ̀",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "A ti gbà á",
       "triageOpen": "Ó wà lábẹ́ àtúnyẹ̀wò",
       "triageActioned": "A fọwọ́ sí i",
@@ -555,7 +556,7 @@
       "title": "Àwọn ìjábọ̀",
       "rowSubtitle": "Àwọn ìjábọ̀ tí o fi ránṣẹ́ àti àbájáde wọn",
       "emptyTitle": "Kò tíì sí ìjábọ̀ kankan",
-      "emptyDescription": "Àwọn ìjábọ̀ tí o bá fi ránṣẹ́ láti inú ọ̀rọ̀ kan tàbí ìdáhùn AI yóò hàn níbí.",
+      "emptyDescription": "Àwọn ìjábọ̀ tí o bá fi ránṣẹ́ láti inú àsọyé kan nínú ìjíròrò pull request tàbí láti inú ìdáhùn AI nínú ìgbà iṣẹ́ aṣojú yóò hàn níbí pẹ̀lú àbájáde wọn.",
       "couldNotLoad": "A kò lè gbé àwọn ìjábọ̀ rẹ wá",
       "capped": "À ń fi àwọn ìjábọ̀ rẹ tó ṣẹ̀ṣẹ̀ wá hàn."
     },

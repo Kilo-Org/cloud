@@ -522,6 +522,7 @@
       "receiptLabel": "Tanda terima",
       "copyReceiptId": "Salin ID tanda terima",
       "appealLabel": "Banding",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Diterima",
       "triageOpen": "Sedang ditinjau",
       "triageActioned": "Dikabulkan",
@@ -555,7 +556,7 @@
       "title": "Laporan",
       "rowSubtitle": "Laporan yang Anda ajukan dan hasilnya",
       "emptyTitle": "Belum ada laporan",
-      "emptyDescription": "Laporan yang Anda ajukan dari komentar atau respons AI akan muncul di sini.",
+      "emptyDescription": "Laporan yang Anda ajukan dari komentar dalam diskusi pull request, atau dari balasan AI dalam sesi agen, muncul di sini beserta hasilnya.",
       "couldNotLoad": "Tidak dapat memuat laporan Anda",
       "capped": "Menampilkan laporan terbaru Anda."
     },

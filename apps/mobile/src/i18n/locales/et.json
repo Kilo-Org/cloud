@@ -522,6 +522,7 @@
       "receiptLabel": "Kinnitus",
       "copyReceiptId": "Kopeeri kinnituse ID",
       "appealLabel": "Vaidlustus",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Vastu võetud",
       "triageOpen": "Ülevaatamisel",
       "triageActioned": "Rahuldatud",
@@ -555,7 +556,7 @@
       "title": "Teated",
       "rowSubtitle": "Sinu esitatud teated ja nende tulemused",
       "emptyTitle": "Teateid veel pole",
-      "emptyDescription": "Siia ilmuvad teated, mille esitad kommentaari või AI vastuse kohta.",
+      "emptyDescription": "Siia ilmuvad koos tulemusega teated, mille esitad PR-arutelu kommentaari või agendi seansi AI vastuse kohta.",
       "couldNotLoad": "Sinu teateid ei õnnestunud laadida",
       "capped": "Kuvatakse sinu viimased teated."
     },

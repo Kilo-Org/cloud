@@ -522,6 +522,7 @@
       "receiptLabel": "رسید",
       "copyReceiptId": "رسید کی آئی ڈی کاپی کریں",
       "appealLabel": "اپیل",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "موصول ہو گئی",
       "triageOpen": "زیرِ جائزہ",
       "triageActioned": "برقرار رکھی گئی",
@@ -555,7 +556,7 @@
       "title": "رپورٹس",
       "rowSubtitle": "آپ کی جمع کرائی گئی رپورٹس اور ان کے نتائج",
       "emptyTitle": "ابھی کوئی رپورٹ نہیں",
-      "emptyDescription": "تبصرے یا AI جواب سے آپ کی جمع کرائی گئی رپورٹس یہاں نظر آئیں گی۔",
+      "emptyDescription": "پل ریکویسٹ مباحثے میں کسی تبصرے سے یا ایجنٹ سیشن میں اے آئی جواب سے جمع کرائی گئی رپورٹس اپنے نتیجے کے ساتھ یہاں نظر آئیں گی۔",
       "couldNotLoad": "آپ کی رپورٹس لوڈ نہیں ہو سکیں",
       "capped": "آپ کی حالیہ ترین رپورٹس دکھائی جا رہی ہیں۔"
     },

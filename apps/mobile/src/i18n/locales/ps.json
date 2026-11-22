@@ -522,6 +522,7 @@
       "receiptLabel": "رسید",
       "copyReceiptId": "د رسید ID کاپي کړئ",
       "appealLabel": "استیناف",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ترلاسه شو",
       "triageOpen": "تر بیاکتنې لاندې",
       "triageActioned": "تایید شو",
@@ -555,7 +556,7 @@
       "title": "راپورونه",
       "rowSubtitle": "هغه راپورونه چې تاسو سپارلي دي او پایلې یې",
       "emptyTitle": "لا هېڅ راپور نشته",
-      "emptyDescription": "هغه راپورونه چې تاسو له یوې تبصرې یا د AI له ځواب څخه سپارئ، دلته ښکاري.",
+      "emptyDescription": "هغه راپورونه چې تاسو یې د PR د بحث له یوې تبصرې یا د یوه ایجنټ په ناسته کې د مصنوعي ځیرکتیا له ځواب څخه سپارئ، دلته د خپلو پایلو سره ښکاري.",
       "couldNotLoad": "ستاسو راپورونه ونه لوستل شول",
       "capped": "ستاسو تر ټولو وروستي راپورونه ښودل کېږي."
     },

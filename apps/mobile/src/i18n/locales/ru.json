@@ -524,6 +524,7 @@
       "receiptLabel": "Квитанция",
       "copyReceiptId": "Скопировать идентификатор квитанции",
       "appealLabel": "Апелляция",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Получена",
       "triageOpen": "На рассмотрении",
       "triageActioned": "Удовлетворена",
@@ -557,7 +558,7 @@
       "title": "Жалобы",
       "rowSubtitle": "Поданные вами жалобы и их результаты",
       "emptyTitle": "Жалоб пока нет",
-      "emptyDescription": "Жалобы, поданные из комментария или ответа ИИ, появятся здесь.",
+      "emptyDescription": "Жалобы, поданные из комментария в обсуждении pull request или из ответа ИИ в сеансе агента, появятся здесь вместе с их результатом.",
       "couldNotLoad": "Не удалось загрузить ваши жалобы",
       "capped": "Показаны только последние жалобы."
     },

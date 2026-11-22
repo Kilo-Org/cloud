@@ -522,6 +522,7 @@
       "receiptLabel": "回执",
       "copyReceiptId": "复制回执 ID",
       "appealLabel": "申诉",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "已收到",
       "triageOpen": "审核中",
       "triageActioned": "举报成立",
@@ -555,7 +556,7 @@
       "title": "举报记录",
       "rowSubtitle": "你提交的举报及其处理结果",
       "emptyTitle": "暂无举报",
-      "emptyDescription": "你从评论或 AI 回复中提交的举报将显示在这里。",
+      "emptyDescription": "你从拉取请求讨论中的评论或智能体会话中的 AI 回复提交的举报会连同处理结果显示在这里。",
       "couldNotLoad": "无法加载你的举报",
       "capped": "仅显示你最近的举报。"
     },

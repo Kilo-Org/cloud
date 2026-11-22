@@ -522,6 +522,7 @@
       "receiptLabel": "ደረሰኝ",
       "copyReceiptId": "የደረሰኙን መለያ ቁጥር ይቅዱ",
       "appealLabel": "ይግባኝ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ደርሷል",
       "triageOpen": "በግምገማ ላይ",
       "triageActioned": "ተቀባይነት አግኝቷል",
@@ -555,7 +556,7 @@
       "title": "ሪፖርቶች",
       "rowSubtitle": "ያቀረቧቸው ሪፖርቶች እና ውጤቶቻቸው",
       "emptyTitle": "እስካሁን ምንም ሪፖርት የለም",
-      "emptyDescription": "ከአስተያየት ወይም ከ AI ምላሽ የሚያቀርቧቸው ሪፖርቶች እዚህ ይታያሉ።",
+      "emptyDescription": "ከPR ውይይት ውስጥ ካለው አስተያየት ወይም በኤጀንት ክፍለ ጊዜ ውስጥ ካለው የ AI ምላሽ የሚያቀርቧቸው ሪፖርቶች ከውጤታቸው ጋር እዚህ ይታያሉ።",
       "couldNotLoad": "ሪፖርቶችዎን መጫን አልተቻለም",
       "capped": "የቅርብ ጊዜ ሪፖርቶችዎን ያሳያል።"
     },

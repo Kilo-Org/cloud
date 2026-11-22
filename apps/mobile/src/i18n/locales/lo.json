@@ -522,6 +522,7 @@
       "receiptLabel": "ໃບຮັບ",
       "copyReceiptId": "ຄັດລອກ ID ຂອງໃບຮັບ",
       "appealLabel": "ການອຸທອນ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ໄດ້ຮັບແລ້ວ",
       "triageOpen": "ກຳລັງກວດສອບ",
       "triageActioned": "ໄດ້ຮັບການຮັບຮອງ",
@@ -555,7 +556,7 @@
       "title": "ການລາຍງານ",
       "rowSubtitle": "ການລາຍງານທີ່ທ່ານໄດ້ຍື່ນ ແລະ ຜົນຂອງມັນ",
       "emptyTitle": "ຍັງບໍ່ມີການລາຍງານ",
-      "emptyDescription": "ການລາຍງານທີ່ທ່ານຍື່ນຈາກຄຳເຫັນ ຫຼື ຄຳຕອບຂອງ AI ຈະສະແດງຢູ່ນີ້.",
+      "emptyDescription": "ການລາຍງານທີ່ທ່ານຍື່ນຈາກຄຳເຫັນໃນການສົນທະນາໃນ pull request ຫຼື ຈາກຄຳຕອບ AI ໃນເຊດຊັນຂອງເອເຈນ ຈະສະແດງຢູ່ນີ້ ພ້ອມກັບຜົນຂອງມັນ.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການລາຍງານຂອງທ່ານໄດ້",
       "capped": "ກຳລັງສະແດງການລາຍງານລ່າສຸດຂອງທ່ານ."
     },

@@ -523,6 +523,7 @@
       "receiptLabel": "Comprovant",
       "copyReceiptId": "Copia l'identificador del comprovant",
       "appealLabel": "Apel·lació",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Rebuda",
       "triageOpen": "En revisió",
       "triageActioned": "Estimada",
@@ -556,7 +557,7 @@
       "title": "Denúncies",
       "rowSubtitle": "Les denúncies que has presentat i els seus resultats",
       "emptyTitle": "Encara no hi ha denúncies",
-      "emptyDescription": "Les denúncies que presentis des d'un comentari o d'una resposta d'IA apareixeran aquí.",
+      "emptyDescription": "Les denúncies que presentis des d'un comentari en una discussió d'una pull request o des d'una resposta d'IA en una sessió d'agent apareixeran aquí amb el resultat.",
       "couldNotLoad": "No s'han pogut carregar les teves denúncies",
       "capped": "Es mostren les teves denúncies més recents."
     },

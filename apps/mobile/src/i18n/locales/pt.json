@@ -524,6 +524,7 @@
       "receiptLabel": "Comprovativo",
       "copyReceiptId": "Copiar ID do comprovativo",
       "appealLabel": "Recurso",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Recebida",
       "triageOpen": "Em análise",
       "triageActioned": "Procedente",
@@ -557,7 +558,7 @@
       "title": "Denúncias",
       "rowSubtitle": "As denúncias que fizeste e os respetivos resultados",
       "emptyTitle": "Ainda não há denúncias",
-      "emptyDescription": "As denúncias que fizeres a partir de um comentário ou de uma resposta de IA aparecem aqui.",
+      "emptyDescription": "As denúncias que fizeres a partir de um comentário numa discussão de pull request ou de uma resposta da IA numa sessão de agente aparecem aqui com o respetivo resultado.",
       "couldNotLoad": "Não foi possível carregar as tuas denúncias",
       "capped": "A mostrar as tuas denúncias mais recentes."
     },

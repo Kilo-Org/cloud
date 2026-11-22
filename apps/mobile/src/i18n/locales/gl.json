@@ -522,6 +522,7 @@
       "receiptLabel": "Xustificante",
       "copyReceiptId": "Copiar ID do xustificante",
       "appealLabel": "Recurso",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Recibida",
       "triageOpen": "En revisión",
       "triageActioned": "Aceptada",
@@ -555,7 +556,7 @@
       "title": "Denuncias",
       "rowSubtitle": "Denuncias que presentaches e os seus resultados",
       "emptyTitle": "Aínda non hai denuncias",
-      "emptyDescription": "As denuncias que presentes desde un comentario ou unha resposta da IA aparecerán aquí.",
+      "emptyDescription": "As denuncias que presentes desde un comentario nunha conversa dunha pull request, ou desde unha resposta da IA nunha sesión do axente, aparecen aquí co seu resultado.",
       "couldNotLoad": "Non se puideron cargar as túas denuncias",
       "capped": "Mostrando as túas denuncias máis recentes."
     },

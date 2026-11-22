@@ -524,6 +524,7 @@
       "receiptLabel": "Patvirtinimas",
       "copyReceiptId": "Kopijuoti patvirtinimo ID",
       "appealLabel": "Apskundimas",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Gautas",
       "triageOpen": "Peržiūrimas",
       "triageActioned": "Pagrįstas",
@@ -557,7 +558,7 @@
       "title": "Pranešimai",
       "rowSubtitle": "Jūsų pateikti pranešimai ir jų rezultatai",
       "emptyTitle": "Kol kas pranešimų nėra",
-      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro arba AI atsakymo, rodomi čia.",
+      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro PR diskusijoje arba iš DI atsakymo agento sesijoje, rodomi čia kartu su savo rezultatu.",
       "couldNotLoad": "Nepavyko įkelti jūsų pranešimų",
       "capped": "Rodomi naujausi jūsų pranešimai."
     },

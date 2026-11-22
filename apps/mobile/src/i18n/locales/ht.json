@@ -522,6 +522,7 @@
       "receiptLabel": "Resi",
       "copyReceiptId": "Kopye ID resi a",
       "appealLabel": "Apèl",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Resevwa",
       "triageOpen": "Nan revizyon",
       "triageActioned": "Konfime",
@@ -555,7 +556,7 @@
       "title": "Rapò",
       "rowSubtitle": "Rapò ou te soumèt ak rezilta yo",
       "emptyTitle": "Poko gen rapò",
-      "emptyDescription": "Rapò ou soumèt soti nan yon kòmantè oswa nan yon repons AI ap parèt isit la.",
+      "emptyDescription": "Rapò ou soumèt soti nan yon kòmantè nan yon diskisyon pull request, oswa nan yon repons AI nan yon sesyon ajan, ap parèt isit la ak rezilta yo.",
       "couldNotLoad": "Nou pa t ka chaje rapò ou",
       "capped": "Ap montre rapò ou ki pi resan yo."
     },

@@ -46,6 +46,54 @@ describe('resolveResetTarget', () => {
     });
   });
 
+  it('treats an empty path as the user database', () => {
+    // `pg` connects as the user's database when the URL names none, so the empty path names postgres.
+    expect(resolveResetTarget(`postgres://${USER}:${PASSWORD}@localhost:5432/`, APP_URL)).toEqual({
+      kind: 'use',
+      scriptUrl: APP_URL,
+    });
+  });
+
+  it('refuses an empty path for another user', () => {
+    // Another user names another database, so an empty path is not the same target.
+    expect(resolveResetTarget(`postgres://other:${PASSWORD}@localhost:5432/`, APP_URL)).toEqual({
+      kind: 'refuse',
+      reason: 'different-databases',
+    });
+  });
+
+  it('accepts an escaped database name beside its plain spelling', () => {
+    // The pool decodes the name, so `%70ostgres` names the same database as `postgres`.
+    expect(resolveResetTarget(dbUrl('localhost', '5432', '%70ostgres'), APP_URL)).toEqual({
+      kind: 'use',
+      scriptUrl: APP_URL,
+    });
+  });
+
+  it('accepts an uppercase host beside its lowercase spelling', () => {
+    // The comparison lowercases the host, so case alone never refuses the reset.
+    expect(resolveResetTarget(dbUrl('LOCALHOST', '5432', 'postgres'), APP_URL)).toEqual({
+      kind: 'use',
+      scriptUrl: APP_URL,
+    });
+  });
+
+  it('refuses a trailing slash because it names another database', () => {
+    // A trailing slash is part of the name, so `postgres/` is not the `postgres` database.
+    expect(resolveResetTarget(dbUrl('localhost', '5432', 'postgres/'), APP_URL)).toEqual({
+      kind: 'refuse',
+      reason: 'different-databases',
+    });
+  });
+
+  it('accepts URLs that differ only by host and port query parameters', () => {
+    // The pool never reads `?host=` or `?port=`, so the parameters cannot change the target.
+    expect(resolveResetTarget(`${APP_URL}?host=other&port=1`, APP_URL)).toEqual({
+      kind: 'use',
+      scriptUrl: APP_URL,
+    });
+  });
+
   it('refuses two databases on one host', () => {
     expect(resolveResetTarget(APP_URL, dbUrl('localhost', '5432', 'scripts'))).toEqual({
       kind: 'refuse',

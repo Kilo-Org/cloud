@@ -1,6 +1,11 @@
 import '../../../apps/web/src/lib/load-env';
 
-import { computeDatabaseUrl, createDrizzleClient, type DrizzleClient } from '@kilocode/db';
+import {
+  computeDatabaseUrl,
+  createDrizzleClient,
+  postgresConnectionTarget,
+  type DrizzleClient,
+} from '@kilocode/db';
 import { isLoopbackHostname } from '../../../packages/web-shared/src/lib/loopback-host';
 
 process.env.IS_SCRIPT = 'true';
@@ -18,7 +23,7 @@ export function assertLocalSeedDatabase(fixture: string): string {
   if (process.env.USE_PRODUCTION_DB === 'true') {
     throw new Error(`${fixture} refuses to run with USE_PRODUCTION_DB=true.`);
   }
-  const hostname = new URL(computeDatabaseUrl()).hostname;
+  const hostname = postgresConnectionTarget(computeDatabaseUrl()).host;
   if (!isLoopbackHostname(hostname)) {
     throw new Error(`${fixture} requires a loopback database host; received ${hostname}.`);
   }

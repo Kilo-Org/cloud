@@ -26,6 +26,44 @@ export function computeDatabaseUrl(): string {
   return url.toString();
 }
 
+/** The port `pg` connects to when a connection string omits one. */
+const DEFAULT_POSTGRES_PORT = 5432;
+
+export type PostgresConnectionTarget = {
+  /** The server, lowercase so one host compares equal however a URL spells it. */
+  host: string;
+  /** The port, with the default filled in when the URL omits it. */
+  port: number;
+  /**
+   * The database the pool connects to. `pg` falls back to the user name when the URL names no
+   * database, so an empty path names the user's database rather than no database.
+   */
+  database: string;
+  /** The user the pool connects as. */
+  user: string;
+};
+
+/**
+ * The database a connection string names, as the pool will connect to it.
+ *
+ * This is the one parse every caller uses: the pool configuration below, and every caller that
+ * has to name the target without handling the URL. `new URL()` leaves a non-special scheme such
+ * as `postgres:` unnormalized, so the host keeps its case and the path keeps its escapes, while
+ * the pool receives decoded values. Query parameters are not part of the target: `pg` reads
+ * `?host=` and `?port=` only when it parses a `connectionString` itself, and this package never
+ * hands it one.
+ */
+export function postgresConnectionTarget(connectionString: string): PostgresConnectionTarget {
+  const url = new URL(connectionString);
+  const user = decodeURIComponent(url.username);
+  return {
+    host: decodeURIComponent(url.hostname).toLowerCase(),
+    port: Number(url.port) || DEFAULT_POSTGRES_PORT,
+    database: decodeURIComponent(url.pathname.slice(1)) || user,
+    user,
+  };
+}
+
 /**
  * WHATWG `URL` keeps the user, password, host and database name percent-encoded, while `pg` only
  * decodes parts it parses itself out of a `connectionString`. The config here is built by hand and
@@ -34,13 +72,15 @@ export function computeDatabaseUrl(): string {
  */
 export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
   const databaseUrl = new URL(postgresUrl);
-  const host = decodeURIComponent(databaseUrl.hostname);
+  // The shared parse decodes the user, host and database name, and fills in the port and database
+  // name that the pool would use anyway, so the config below cannot disagree with it.
+  const { host, port, database, user } = postgresConnectionTarget(postgresUrl);
   const clientConfig: ClientConfig = {
-    user: decodeURIComponent(databaseUrl.username),
+    user,
     password: decodeURIComponent(databaseUrl.password),
     host,
-    port: Number(databaseUrl.port),
-    database: decodeURIComponent(databaseUrl.pathname.slice(1)),
+    port,
+    database,
   };
 
   if (process.env.DATABASE_CA) {

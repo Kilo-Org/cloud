@@ -7,24 +7,26 @@
  * another leaves the developer with an empty database and no error, so the two must name the same
  * database before the reset runs.
  *
+ * The comparison uses the same parse the pool uses, so a URL written with a different case, an
+ * escape, or no path compares equal to the database it names, while a URL naming another database
+ * is still refused.
+ *
  * This module holds no side effect: `./require-reset-target` applies the decision, and the tests
  * read it here.
  */
 
-/** Postgres's default port. A URL may omit it, and `pg` connects to this port when it does. */
-const DEFAULT_POSTGRES_PORT = '5432';
+import { postgresConnectionTarget } from '@kilocode/db';
 
 /**
  * A connection target that two URLs must share for the reset and the migrate step to agree.
  *
- * An omitted port normalizes to the default, because `new URL()` keeps `''` for it while `pg`
- * connects to 5432, and the same server must compare equal however its URL was written.
+ * The database name is part of the target, because two databases on one host are still two
+ * databases.
  */
 function connectionTarget(value: string): string | null {
   try {
-    const url = new URL(value);
-    // The database name is part of the target: two databases on one host are still two databases.
-    return [url.hostname, url.port || DEFAULT_POSTGRES_PORT, url.pathname].join('\u0000');
+    const { host, port, database } = postgresConnectionTarget(value);
+    return [host, port, database].join('\u0000');
   } catch {
     return null;
   }

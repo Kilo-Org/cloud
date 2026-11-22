@@ -4,7 +4,11 @@ import {
   readReplicaInventory,
 } from '@kilocode/web-shared/lib/read-replicas';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
-import { computeDatabaseUrl, getDatabaseClientConfig } from '@kilocode/db';
+import {
+  computeDatabaseUrl,
+  getDatabaseClientConfig,
+  postgresConnectionTarget,
+} from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { attachDatabasePool } from '@vercel/functions';
 import { parseIPv6 } from '@kilocode/web-shared/lib/cloudflare-ip';
@@ -52,11 +56,12 @@ const appName = IS_SCRIPT ? 'kilocode-script' : 'kilocode-web';
 
 /**
  * The host the pools below connect to: the `POSTGRES_SCRIPT_URL` host when `IS_SCRIPT` is set,
- * the app's host otherwise. A caller that has to name the target, without handling the URL or its
- * credentials, reads it here so it cannot disagree with the connection that is actually used.
+ * the app's host otherwise. This is the same parse the pool uses, so the host is lowercase, and a
+ * caller that names the target without handling the URL or its credentials cannot disagree with
+ * the connection that is actually used.
  */
 export function primaryDatabaseHost(): string {
-  return new URL(postgresUrl).hostname;
+  return postgresConnectionTarget(postgresUrl).host;
 }
 
 /**

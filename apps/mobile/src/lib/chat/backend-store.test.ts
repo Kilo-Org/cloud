@@ -244,6 +244,20 @@ describe('secure backend profiles', () => {
     expect((save as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
   });
 
+  it('drops a stored profile holding a value no build could have stored', async () => {
+    const store = await import('./backend-store');
+    const keyWithLineBreak = { ...draft, apiKey: 'sec\r\nret', id: firstId, revision: 1 };
+    expect(store.parseChatBackends(JSON.stringify([keyWithLineBreak]))).toEqual([]);
+
+    const headerWithNul = {
+      ...draft,
+      headers: { Authorization: 'Bearer a\u0000b' },
+      id: secondId,
+      revision: 1,
+    };
+    expect(store.parseChatBackends(JSON.stringify([headerWithNul]))).toEqual([]);
+  });
+
   it('names the API key before a blank name, so one line reports the credential problem', async () => {
     const store = await import('./backend-store');
     const failure = captureError(() =>

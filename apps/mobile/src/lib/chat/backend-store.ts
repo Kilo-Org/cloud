@@ -121,6 +121,13 @@ const backendModelSchema = z
 /** The printable text the app sends: one rule for the key and every header value. */
 const SENDABLE_TEXT = /^[\u0020-\u007E\u00A0-\u00FF]*$/;
 
+/**
+ * The set every shipped build accepted before the printable rule narrowed it, and
+ * therefore the widest one a stored profile can hold. A stored read keeps it, so an
+ * older profile stays listed; a save refuses what this build cannot send.
+ */
+const STORED_TEXT = /^[\u0020-\u007E\u0080-\u00FF]*$/;
+
 /** Names the transport sets itself, or that would rewrite the header object. */
 const RESERVED_HEADER_NAMES = new Set(
   'host content-length content-type connection transfer-encoding proxy-authorization __proto__ constructor prototype'.split(
@@ -128,13 +135,14 @@ const RESERVED_HEADER_NAMES = new Set(
   )
 );
 
-/** The header rules a save and a stored read share: every name and its shape. */
+/** Header rules a stored read applies: every name rule plus the widest stored value. */
 const storedBackendHeadersSchema = z.record(z.string(), z.string()).superRefine((headers, ctx) => {
   const names = new Set<string>();
-  for (const name of Object.keys(headers)) {
+  for (const [name, value] of Object.entries(headers)) {
     const lower = name.toLowerCase();
     if (
       !/^[!#$%&'*+.^_`|~\da-z-]+$/i.test(name) ||
+      !STORED_TEXT.test(value) ||
       lower.startsWith('x-kilo') ||
       RESERVED_HEADER_NAMES.has(lower) ||
       names.has(lower)
@@ -179,6 +187,10 @@ const apiKeySchema = z
   .string()
   .trim()
   .refine(value => SENDABLE_TEXT.test(value));
+const storedApiKeySchema = z
+  .string()
+  .trim()
+  .refine(value => STORED_TEXT.test(value));
 
 const draftSchema = z
   .object({ ...draftFields, apiKey: apiKeySchema, headers: backendHeadersSchema })
@@ -188,7 +200,7 @@ const draftSchema = z
  * stays listed and can be opened and fixed; the next save applies the strict rules.
  */
 const storedDraftSchema = z
-  .object({ ...draftFields, apiKey: z.string().trim(), headers: storedBackendHeadersSchema })
+  .object({ ...draftFields, apiKey: storedApiKeySchema, headers: storedBackendHeadersSchema })
   .strip();
 
 /** A draft can fail several fields at once and the form shows one line, so this order decides it. */

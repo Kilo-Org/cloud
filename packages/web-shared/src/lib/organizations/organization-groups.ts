@@ -96,6 +96,47 @@ function upsertPolicy(
   ]);
 }
 
+/**
+ * Serialize a policy with its object keys sorted, so two policies that differ
+ * only in key order serialize identically. Array order is the order stored,
+ * because a rule list is matched in the order it was written.
+ */
+function stablePolicyJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stablePolicyJson).join(',')}]`;
+  if (typeof value !== 'object' || value === null) return JSON.stringify(value);
+  const entries = Object.entries(value)
+    .filter(([, entry]) => entry !== undefined)
+    .sort(([left], [right]) => {
+      if (left === right) return 0;
+      return left < right ? -1 : 1;
+    });
+  return `{${entries
+    .map(([key, entry]) => `${JSON.stringify(key)}:${stablePolicyJson(entry)}`)
+    .join(',')}}`;
+}
+
+/** The content of one policy, with the model allow lists compared as the sets they are. */
+function policyContent(policy: OrganizationGroupPolicy): string {
+  if (policy.type !== 'model_access' || policy.data.mode !== 'selected') {
+    return stablePolicyJson(policy);
+  }
+  return stablePolicyJson({
+    type: policy.type,
+    data: {
+      mode: policy.data.mode,
+      model_allow_list: [...policy.data.model_allow_list].sort(),
+      provider_allow_list: [...policy.data.provider_allow_list].sort(),
+    },
+  });
+}
+
+/** Whether two policy lists hold the same content, whatever their entry order. */
+function samePolicies(left: OrganizationGroupPolicies, right: OrganizationGroupPolicies): boolean {
+  if (left.length !== right.length) return false;
+  const rightContent = new Map(right.map(policy => [policy.type, policyContent(policy)]));
+  return left.every(policy => rightContent.get(policy.type) === policyContent(policy));
+}
+
 async function assertEnterpriseOrganization(
   organizationId: string,
   client: typeof db | DrizzleTransaction = db
@@ -206,7 +247,13 @@ export async function withOrganizationGroupPolicyMutation<T>(
     tx: DrizzleTransaction;
     organization: Organization;
     currentSettings: CanonicalOrganizationGroupPolicySettings;
-    policyRevision: number;
+    /**
+     * The revision this mutation would publish: the stored revision plus one,
+     * or 1 when the mutation creates the settings row. It is a prediction until
+     * the mutation returns `policyStateChanged`, so an audit message names it
+     * only on a path that reports a change.
+     */
+    pendingPolicyRevision: number;
   }) => Promise<{ result: T; policyStateChanged: boolean }>
 ): Promise<{ result: T; policyRevision: number }> {
   return await db.transaction(async tx => {
@@ -224,7 +271,7 @@ export async function withOrganizationGroupPolicyMutation<T>(
       tx,
       organization,
       currentSettings,
-      policyRevision: nextPolicyRevision,
+      pendingPolicyRevision: nextPolicyRevision,
     });
 
     if (!existingSettings) return { result, policyRevision: 1 };
@@ -557,7 +604,7 @@ export async function createOrganizationGroup(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, policyRevision }) => {
+    async ({ tx, pendingPolicyRevision }) => {
       const policies = OrganizationGroupPoliciesSchema.parse(
         params.policies.map(normalizeOrganizationGroupPolicy)
       );
@@ -598,7 +645,7 @@ export async function createOrganizationGroup(params: {
       await createAuditLog({
         action: 'organization.group.create',
         ...actorAudit(params.actor),
-        message: `Created group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, policyRevision)}`,
+        message: `Created group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision)}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -665,7 +712,7 @@ export async function updateOrganizationGroupDetails(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, policyRevision }) => {
+    async ({ tx, pendingPolicyRevision }) => {
       const existing = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       await assertGroupNameAvailable(tx, params.organizationId, params.name.trim(), params.groupId);
       const userIds = [...new Set(params.userIds)];
@@ -707,7 +754,7 @@ export async function updateOrganizationGroupDetails(params: {
       await createAuditLog({
         action: 'organization.group.update',
         ...actorAudit(params.actor),
-        message: `Updated group "${existing.name}" (${existing.id}) with ${counted(userIds.length, 'member', 'members')}${permissionPolicyAuditSuffix(policyTypes, policyRevision, namedPolicies)}`,
+        message: `Updated group "${existing.name}" (${existing.id}) with ${counted(userIds.length, 'member', 'members')}${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -728,19 +775,18 @@ export async function setOrganizationGroupPolicy(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, policyRevision }) => {
+    async ({ tx, pendingPolicyRevision }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       if (params.policy.type !== 'model_access') {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
-      const policies = upsertPolicy(
-        parseOrganizationGroupPolicies(group.policies, {
-          organizationId: params.organizationId,
-          groupId: group.id,
-          source: 'group',
-        }),
-        params.policy
-      );
+      const currentPolicies = parseOrganizationGroupPolicies(group.policies, {
+        organizationId: params.organizationId,
+        groupId: group.id,
+        source: 'group',
+      });
+      const policies = upsertPolicy(currentPolicies, params.policy);
+      const policyStateChanged = !samePolicies(policies, currentPolicies);
       await tx
         .update(organization_groups)
         .set({ policies, updated_at: sql`now()` })
@@ -756,11 +802,13 @@ export async function setOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.policy.set',
         ...actorAudit(params.actor),
-        message: `Set ${params.policy.type} policy for group "${group.name}" (${group.id}) at revision ${policyRevision}`,
+        message: policyStateChanged
+          ? `Set ${params.policy.type} policy for group "${group.name}" (${group.id}) at revision ${pendingPolicyRevision}`
+          : `Set ${params.policy.type} policy for group "${group.name}" (${group.id})`,
         organization_id: params.organizationId,
         tx,
       });
-      return { result: policies, policyStateChanged: true };
+      return { result: policies, policyStateChanged };
     }
   );
 }
@@ -774,7 +822,7 @@ export async function removeOrganizationGroupPolicy(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, policyRevision }) => {
+    async ({ tx, pendingPolicyRevision }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       if (params.policyType !== 'model_access') {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
@@ -784,8 +832,8 @@ export async function removeOrganizationGroupPolicy(params: {
         groupId: group.id,
         source: 'group',
       });
-      const removed = currentPolicies.some(policy => policy.type === params.policyType);
       const policies = currentPolicies.filter(policy => policy.type !== params.policyType);
+      const policyStateChanged = !samePolicies(policies, currentPolicies);
       await tx
         .update(organization_groups)
         .set({ policies, updated_at: sql`now()` })
@@ -798,13 +846,13 @@ export async function removeOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.policy.remove',
         ...actorAudit(params.actor),
-        message: removed
-          ? `Removed ${params.policyType} policy from group "${group.name}" (${group.id}) at revision ${policyRevision}`
+        message: policyStateChanged
+          ? `Removed ${params.policyType} policy from group "${group.name}" (${group.id}) at revision ${pendingPolicyRevision}`
           : `Removed ${params.policyType} policy from group "${group.name}" (${group.id})`,
         organization_id: params.organizationId,
         tx,
       });
-      return { result: policies, policyStateChanged: removed };
+      return { result: policies, policyStateChanged };
     }
   );
 }
@@ -819,7 +867,7 @@ export async function setOrganizationGroupMembers(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, policyRevision }) => {
+    async ({ tx, pendingPolicyRevision }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       const userIds = [...new Set(params.userIds)];
       await assertDirectMembers(tx, params.organizationId, userIds);
@@ -846,7 +894,7 @@ export async function setOrganizationGroupMembers(params: {
       await createAuditLog({
         action: 'organization.group.members.set',
         ...actorAudit(params.actor),
-        message: `Set ${counted(userIds.length, 'member', 'members')} for group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, policyRevision, namedPolicies)}`,
+        message: `Set ${counted(userIds.length, 'member', 'members')} for group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -865,7 +913,7 @@ export async function setOrganizationMemberGroups(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, policyRevision }) => {
+    async ({ tx, pendingPolicyRevision }) => {
       const groupIds = [...new Set(params.groupIds.map(groupId => groupId.toLowerCase()))];
       const nextGroupIds = new Set(groupIds);
       await assertDirectMembers(tx, params.organizationId, [params.userId]);
@@ -897,13 +945,15 @@ export async function setOrganizationMemberGroups(params: {
       if (groups.filter(group => nextGroupIds.has(group.id)).length !== nextGroupIds.size) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'One or more groups are invalid.' });
       }
-      const changedGroups = groups.filter(
-        group => nextGroupIds.has(group.id) !== (group.currentGroupId !== null)
-      );
       const memberGroupDiff = diffMemberIds(
         groups.filter(group => group.currentGroupId !== null).map(group => group.id),
         groupIds
       );
+      // One comparison decides both the guard and the revision: the rows the
+      // diff adds or removes are the groups whose policy leaves or joins this
+      // member's effective policy.
+      const changedGroupIds = new Set([...memberGroupDiff.added, ...memberGroupDiff.removed]);
+      const changedGroups = groups.filter(group => changedGroupIds.has(group.id));
       const policyTypes = [...new Set(changedGroups.flatMap(groupPermissionPolicyTypes))].sort();
       const namedPolicies = await getActiveNamedGroupPolicyLinks(
         tx,
@@ -956,7 +1006,7 @@ export async function setOrganizationMemberGroups(params: {
       await createAuditLog({
         action: 'organization.group.member_groups.set',
         ...actorAudit(params.actor),
-        message: `Set ${counted(groupIds.length, 'group', 'groups')} for ${auditTarget}${permissionPolicyAuditSuffix(policyTypes, policyRevision, namedPolicies)}`,
+        message: `Set ${counted(groupIds.length, 'group', 'groups')} for ${auditTarget}${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -1018,7 +1068,7 @@ export async function deleteOrganizationGroup(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, policyRevision }) => {
+    async ({ tx, pendingPolicyRevision }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       const policyTypes = groupPermissionPolicyTypes(group);
       const namedPolicies = await getActiveNamedGroupPolicyLinks(tx, params.organizationId, [
@@ -1043,7 +1093,7 @@ export async function deleteOrganizationGroup(params: {
       await createAuditLog({
         action: 'organization.group.delete',
         ...actorAudit(params.actor),
-        message: `Deleted group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, policyRevision, namedPolicies)}`,
+        message: `Deleted group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -1060,11 +1110,12 @@ export async function setDefaultOrganizationGroupPolicy(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, currentSettings, policyRevision }) => {
+    async ({ tx, currentSettings, pendingPolicyRevision }) => {
       if (params.policy.type !== 'model_access') {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
       const defaultPolicies = upsertPolicy(currentSettings.defaultPolicies, params.policy);
+      const policyStateChanged = !samePolicies(defaultPolicies, currentSettings.defaultPolicies);
       await tx
         .update(organization_group_policy_settings)
         .set({ default_policies: defaultPolicies, updated_at: sql`now()` })
@@ -1075,11 +1126,13 @@ export async function setDefaultOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.default_policy.set',
         ...actorAudit(params.actor),
-        message: `Set default ${params.policy.type} group policy at revision ${policyRevision}`,
+        message: policyStateChanged
+          ? `Set default ${params.policy.type} group policy at revision ${pendingPolicyRevision}`
+          : `Set default ${params.policy.type} group policy`,
         organization_id: params.organizationId,
         tx,
       });
-      return { result: defaultPolicies, policyStateChanged: true };
+      return { result: defaultPolicies, policyStateChanged };
     }
   );
 }
@@ -1092,16 +1145,14 @@ export async function removeDefaultOrganizationGroupPolicy(params: {
   return await withOrganizationGroupPolicyMutation(
     params.organizationId,
     params.actor.id,
-    async ({ tx, currentSettings, policyRevision }) => {
+    async ({ tx, currentSettings, pendingPolicyRevision }) => {
       if (params.policyType !== 'model_access') {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
-      const removed = currentSettings.defaultPolicies.some(
-        policy => policy.type === params.policyType
-      );
       const defaultPolicies = currentSettings.defaultPolicies.filter(
         policy => policy.type !== params.policyType
       );
+      const policyStateChanged = !samePolicies(defaultPolicies, currentSettings.defaultPolicies);
       await tx
         .update(organization_group_policy_settings)
         .set({ default_policies: defaultPolicies, updated_at: sql`now()` })
@@ -1109,13 +1160,13 @@ export async function removeDefaultOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.default_policy.remove',
         ...actorAudit(params.actor),
-        message: removed
-          ? `Removed default ${params.policyType} group policy at revision ${policyRevision}`
+        message: policyStateChanged
+          ? `Removed default ${params.policyType} group policy at revision ${pendingPolicyRevision}`
           : `Removed default ${params.policyType} group policy`,
         organization_id: params.organizationId,
         tx,
       });
-      return { result: defaultPolicies, policyStateChanged: removed };
+      return { result: defaultPolicies, policyStateChanged };
     }
   );
 }

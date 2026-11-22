@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
+  ai_gateway_config,
   kilocode_users,
   organization_audit_logs,
   organization_group_memberships,
@@ -20,6 +21,7 @@ import {
   OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
+  type OrganizationGroupPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.schema';
 import {
@@ -27,7 +29,9 @@ import {
   listOrganizationGroupsForManager,
   normalizeOrganizationGroupPolicy,
   removeOrganizationGroupPolicy,
+  setDefaultOrganizationGroupPolicy,
   setOrganizationGroupMembers,
+  setOrganizationGroupPolicy,
   setOrganizationMemberGroups,
   updateOrganizationGroupDetails,
   updateOrganizationGroupMetadata,
@@ -630,17 +634,16 @@ describe('organization group policy revision', () => {
     return row;
   }
 
-  async function policyRemoveMessages(organizationId: string) {
+  async function policyAuditMessages(organizationId: string, action: AuditLogAction) {
     const rows = await db
       .select({
         action: organization_audit_logs.action,
         message: organization_audit_logs.message,
       })
       .from(organization_audit_logs)
-      .where(eq(organization_audit_logs.organization_id, organizationId));
-    return rows
-      .filter(row => row.action === 'organization.group.policy.remove')
-      .map(row => row.message);
+      .where(eq(organization_audit_logs.organization_id, organizationId))
+      .orderBy(organization_audit_logs.id);
+    return rows.filter(row => row.action === action).map(row => row.message);
   }
 
   it('leaves the policy revision alone when a metadata rename changes no policy state', async () => {
@@ -807,10 +810,14 @@ describe('organization group policy revision', () => {
     expect(removal.result).toEqual([]);
     expect(removal.policyRevision).toBe(3);
     expect(await readPolicyRevision(organization.id)).toBe(3);
-    expect(await policyRemoveMessages(organization.id)).toEqual([
+    const removalMessages = await policyAuditMessages(
+      organization.id,
+      'organization.group.policy.remove'
+    );
+    expect(removalMessages).toEqual([
       `Removed model_access policy from group "Golf" (${group.id})`,
     ]);
-    expect((await policyRemoveMessages(organization.id)).join(' ')).not.toContain('revision');
+    expect(removalMessages.join(' ')).not.toContain('revision');
 
     const deletion = await deleteOrganizationGroup({
       organizationId: organization.id,
@@ -820,5 +827,101 @@ describe('organization group policy revision', () => {
 
     expect(deletion.policyRevision).toBe(4);
     expect(await readPolicyRevision(organization.id)).toBe(4);
+  });
+
+  it('keeps the revision and omits the revision clause when a policy write repeats the stored policy', async () => {
+    const organization = await createOrganization(4);
+    const group = await createGroup(organization.id, 'Hotel');
+    const storedPolicy = {
+      type: 'agent_permissions',
+      data: {
+        schema_version: 1,
+        tools: { webfetch: 'deny', bash: 'ask' },
+        shell: { bash: { fallback: 'ask', rules: [{ pattern: 'git *', action: 'allow' }] } },
+      },
+    } satisfies OrganizationGroupPolicy;
+    const modelPolicy = {
+      type: 'model_access',
+      data: { mode: 'none' },
+    } satisfies OrganizationGroupPolicy;
+    // The stored rows hold the same content as the write below in another tool-key
+    // order and another entry order, so only a content comparison sees them as equal.
+    await db
+      .update(organization_groups)
+      .set({ policies: [storedPolicy, modelPolicy] })
+      .where(eq(organization_groups.id, group.id));
+    await db
+      .update(organization_group_policy_settings)
+      .set({ default_policies: [storedPolicy] })
+      .where(eq(organization_group_policy_settings.organization_id, organization.id));
+
+    const originalWriteSwitch = process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
+    const [existingConfig] = await db
+      .select()
+      .from(ai_gateway_config)
+      .where(eq(ai_gateway_config.id, 1));
+    process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED = 'true';
+    await db
+      .insert(ai_gateway_config)
+      .values({ config: { organization_features: { org_permission_policy: [organization.id] } } })
+      .onConflictDoUpdate({
+        target: ai_gateway_config.id,
+        set: { config: { organization_features: { org_permission_policy: [organization.id] } } },
+      });
+    try {
+      const write = {
+        type: 'agent_permissions',
+        data: {
+          schema_version: 1,
+          tools: { bash: 'ask', webfetch: 'deny' },
+          shell: { bash: { fallback: 'ask', rules: [{ pattern: 'git *', action: 'allow' }] } },
+        },
+      } satisfies OrganizationGroupPolicy;
+
+      const groupWrite = await setOrganizationGroupPolicy({
+        organizationId: organization.id,
+        groupId: group.id,
+        actor,
+        policy: write,
+      });
+      const defaultWrite = await setDefaultOrganizationGroupPolicy({
+        organizationId: organization.id,
+        actor,
+        policy: write,
+      });
+
+      expect(groupWrite.result).toEqual([modelPolicy, write]);
+      expect(defaultWrite.result).toEqual([write]);
+      expect(groupWrite.policyRevision).toBe(4);
+      expect(defaultWrite.policyRevision).toBe(4);
+      expect(await readPolicyRevision(organization.id)).toBe(4);
+      expect(await readSettingsRow(organization.id)).toMatchObject({ policy_revision: 4 });
+
+      const groupMessages = await policyAuditMessages(
+        organization.id,
+        'organization.group.policy.set'
+      );
+      const defaultMessages = await policyAuditMessages(
+        organization.id,
+        'organization.group.default_policy.set'
+      );
+      expect(groupMessages).toEqual([
+        `Set agent_permissions policy for group "Hotel" (${group.id})`,
+      ]);
+      expect(defaultMessages).toEqual(['Set default agent_permissions group policy']);
+      expect([...groupMessages, ...defaultMessages].join(' ')).not.toContain('revision');
+    } finally {
+      if (originalWriteSwitch === undefined)
+        delete process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
+      else process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED = originalWriteSwitch;
+      if (existingConfig === undefined) {
+        await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+      } else {
+        await db
+          .update(ai_gateway_config)
+          .set({ config: existingConfig.config })
+          .where(eq(ai_gateway_config.id, 1));
+      }
+    }
   });
 });

@@ -1,13 +1,17 @@
 // Setup command field: the value is code, so the field keeps the mono family
 // whenever it holds a command. Only an empty field whose localized placeholder
-// is written in a right-to-left script keeps the interface font, because the
-// mono family ships no glyph of either script and drew that placeholder one
-// character at a time. The value is also pinned left to right with the family's
-// ligatures off, so a flag like `--frozen-lockfile` renders as two hyphens.
+// is written in a script the mono family cannot draw — a right-to-left block or
+// a joined script — keeps the interface font, because a fallback drew that
+// placeholder glyph by glyph. The value is also pinned left to right with the
+// family's ligatures off, so a flag like `--frozen-lockfile` renders as two
+// hyphens.
 import { act, type ElementType, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
+
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
+import { INPUT_FRAME_CLASS } from '@/components/ui/input-frame';
 
 import { SetupCommandField } from './setup-command-field';
 
@@ -20,7 +24,7 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/form-field-label', () => ({ FormFieldLabel: 'FormFieldLabel' }));
-vi.mock('@/components/ui/input', () => ({ INPUT_BOX_SHAPE_CLASS: 'rounded-md' }));
+vi.mock('@/components/ui/input', () => ({ INPUT_BOX_SHAPE_CLASS: 'min-h-[44px] pl-3 pr-3' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The catalog copy is checked by tools/i18n; this stub only has to hand the
@@ -83,6 +87,23 @@ describe('<SetupCommandField>', () => {
     expect(String(field.props.className)).not.toContain('font-mono');
   });
 
+  it('uses the interface font for an empty field whose joined-script placeholder needs its glyphs', () => {
+    // A joined script that is not right to left reaches the same rule: the mono
+    // family draws none of its clusters, so the empty field keeps the
+    // interface font.
+    copy.placeholder = 'उदा. pnpm install';
+    const field = fieldFor('');
+
+    expect(String(field.props.className)).not.toContain('font-mono');
+  });
+
+  it('keeps mono on a field holding a command beside a joined-script placeholder', () => {
+    copy.placeholder = 'उदा. pnpm install';
+    const field = fieldFor('pnpm install --frozen-lockfile');
+
+    expect(String(field.props.className)).toContain('font-mono');
+  });
+
   it('pins the value left to right with the ligatures off', () => {
     const field = fieldFor('pnpm install --frozen-lockfile');
 
@@ -92,5 +113,34 @@ describe('<SetupCommandField>', () => {
       textAlign: 'left',
       fontVariant: ['no-common-ligatures', 'no-discretionary-ligatures', 'no-contextual'],
     });
+  });
+
+  it('draws the read-only box on the shared input frame', () => {
+    // The box is the same preview surface a read-only single-line field uses:
+    // it composes the shared frame token instead of restating its chrome, so a
+    // change to the frame reaches this row too.
+    act(() => {
+      renderer = TestRenderer.create(
+        <SetupCommandField
+          command="pnpm install --frozen-lockfile"
+          label="Command"
+          readOnly
+          onChangeText={noop}
+        />
+      );
+    });
+    const value = renderer?.root.findByType('SelectableText');
+    const classes = String(value?.parent?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(INPUT_FRAME_CLASS.split(' ')));
+    // Nothing is restated beside the token: the box is the shape, the frame and
+    // its own centering, so a literal copy of the frame's chrome cannot creep
+    // back in and drift from `INPUT_FRAME_CLASS`.
+    expect(classes).toEqual([
+      ...INPUT_BOX_SHAPE_CLASS.split(' '),
+      ...INPUT_FRAME_CLASS.split(' '),
+      'justify-center',
+      'py-2.5',
+    ]);
   });
 });

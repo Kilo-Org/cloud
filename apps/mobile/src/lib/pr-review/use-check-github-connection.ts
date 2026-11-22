@@ -16,6 +16,10 @@ export function useCheckGitHubConnection() {
       if (authorization.connected) {
         await queryClient.invalidateQueries(trpc.githubPrReview.pathFilter());
       }
+      // The settled answer is what a calling surface clears its own recovery
+      // state with: a connection that still answers cannot explain a latch the
+      // surface raised when the connection had expired.
+      return { connected: authorization.connected };
     },
     onError: error => {
       toast.error(error.message);

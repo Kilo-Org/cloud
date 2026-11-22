@@ -14,6 +14,9 @@ const kvMock = vi.hoisted(() => ({
   setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
   removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
   listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
+  listEntryValues: vi.fn(
+    async (_scope: string): Promise<{ k: string; v: string; updatedAt: number }[]> => []
+  ),
 }));
 
 vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
@@ -113,6 +116,12 @@ beforeEach(() => {
       .filter(entry => entry.scope === scope)
       .toSorted((a, b) => a.updatedAt - b.updatedAt)
       .map(entry => ({ k: entry.k, updatedAt: entry.updatedAt }))
+  );
+  kvMock.listEntryValues.mockImplementation(async scope =>
+    [...kvStore.values()]
+      .filter(entry => entry.scope === scope)
+      .toSorted((a, b) => a.updatedAt - b.updatedAt)
+      .map(entry => ({ k: entry.k, v: entry.v, updatedAt: entry.updatedAt }))
   );
 });
 
@@ -780,5 +789,90 @@ describe('eviction at the entry cap', () => {
     const entries = await kvMock.listEntries('draft:u1');
     expect(entries).toHaveLength(DRAFT_MAX_ENTRIES);
     expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('does not read stored values while the scope is at or below the cap', async () => {
+    for (let index = 0; index < DRAFT_MAX_ENTRIES; index += 1) {
+      seedStoredValue('draft:u1', `old-${index}`, `"${index}"`);
+    }
+    saveDraft('u1', 'old-0', 'updated');
+    await flushDraft('u1', 'old-0');
+    expect(kvMock.listEntryValues).not.toHaveBeenCalled();
+  });
+
+  it('drops a newer empty text draft instead of much older drafts that hold text', async () => {
+    for (let index = 0; index < DRAFT_MAX_ENTRIES - 1; index += 1) {
+      seedStoredValue('draft:u1', `text-${index}`, `"${index}"`);
+    }
+    // Seeded last, so it is the newest entry: the old rule would keep it and
+    // drop `text-0`.
+    seedStoredValue('draft:u1', 'empty-text', '""');
+    saveDraft('u1', 'overflow', 'v');
+    await flushDraft('u1', 'overflow');
+
+    await expect(loadDraft('u1', 'text-0', isStringDraft)).resolves.toBe('0');
+    expect(kvMock.removeItem).toHaveBeenCalledTimes(1);
+    expect(kvMock.removeItem).toHaveBeenCalledWith('draft:u1', 'empty-text');
+    expect(kvMock.removeItem).not.toHaveBeenCalledWith('draft:u1', 'text-0');
+  });
+
+  it('keeps another form text draft when a save overflows and an empty draft can go', async () => {
+    const reviewKey = prReviewDraftKey('acme', 'kilo', 7);
+    const reviewItem = {
+      id: 'c1',
+      path: 'src/a.ts',
+      side: 'RIGHT' as const,
+      line: 3,
+      body: 'this looks right',
+      commitSha: 'abc123',
+    };
+    // The review draft is the oldest entry, so the old rule dropped exactly the
+    // text a reader would come back for.
+    seedStoredValue('draft:u1', reviewKey, JSON.stringify([reviewItem]));
+    for (let index = 0; index < DRAFT_MAX_ENTRIES - 2; index += 1) {
+      seedStoredValue('draft:u1', `text-${index}`, `"${index}"`);
+    }
+    seedStoredValue('draft:u1', agentComposerDraftKey('idle'), '""');
+    saveDraft('u1', agentComposerDraftKey('other'), 'second composer');
+    await flushDraft('u1', agentComposerDraftKey('other'));
+
+    await expect(loadDraft('u1', reviewKey, isReviewDraft)).resolves.toEqual([reviewItem]);
+    expect(kvMock.removeItem).toHaveBeenCalledTimes(1);
+    expect(kvMock.removeItem).toHaveBeenCalledWith('draft:u1', agentComposerDraftKey('idle'));
+  });
+
+  it('falls back to the oldest text drafts when no empty draft is left', async () => {
+    seedStoredValue('draft:u1', 'empty-text', '""');
+    for (let index = 0; index < DRAFT_MAX_ENTRIES; index += 1) {
+      seedStoredValue('draft:u1', `text-${index}`, `"${index}"`);
+    }
+    saveDraft('u1', 'overflow', 'v');
+    await flushDraft('u1', 'overflow');
+
+    expect(kvMock.removeItem).toHaveBeenCalledWith('draft:u1', 'empty-text');
+    expect(kvMock.removeItem).toHaveBeenCalledWith('draft:u1', 'text-0');
+    expect(kvMock.removeItem).not.toHaveBeenCalledWith('draft:u1', 'text-1');
+    await expect(loadDraft('u1', 'text-1', isStringDraft)).resolves.toBe('1');
+    await expect(loadDraft('u1', 'empty-text', isStringDraft)).resolves.toBeNull();
+    const entries = await kvMock.listEntries('draft:u1');
+    expect(entries).toHaveLength(DRAFT_MAX_ENTRIES);
+  });
+
+  it('never treats a structured draft as empty', async () => {
+    const mergeKey = prMergeDraftKey('acme', 'kilo', 9);
+    // A JSON object whose strings are empty is still a merge draft: only a
+    // JSON string can be an empty text draft.
+    seedStoredValue('draft:u1', mergeKey, JSON.stringify({ title: '' }));
+    for (let index = 0; index < DRAFT_MAX_ENTRIES - 2; index += 1) {
+      seedStoredValue('draft:u1', `text-${index}`, `"${index}"`);
+    }
+    seedStoredValue('draft:u1', 'empty-text', '""');
+    saveDraft('u1', 'overflow', 'v');
+    await flushDraft('u1', 'overflow');
+
+    await expect(loadDraft('u1', mergeKey, isMergeDraft)).resolves.toEqual({ title: '' });
+    expect(kvMock.removeItem).toHaveBeenCalledTimes(1);
+    expect(kvMock.removeItem).toHaveBeenCalledWith('draft:u1', 'empty-text');
+    expect(kvMock.removeItem).not.toHaveBeenCalledWith('draft:u1', mergeKey);
   });
 });

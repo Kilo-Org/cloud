@@ -3710,7 +3710,7 @@ describe('GitHub installation persistence', () => {
     } finally {
       releaseHolder.resolve();
     }
-    await holder;
+    await githubTestTimeout(holder, 'backfill lock release');
     const result = backfill ? await backfill : undefined;
     if (observationError) throw observationError;
     if (!result) throw new Error('Backfill did not start');

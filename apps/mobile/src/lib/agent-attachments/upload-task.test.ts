@@ -4,11 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { trpcClient } from '@/lib/trpc';
 import { classifyUploadFailure } from './agent-attachment-types';
-import {
-  AGENT_ATTACHMENT_UPLOAD_STALL_MS,
-  setUploadForegroundSource,
-  uploadOne,
-} from './upload-task';
+import { setUploadForegroundSource } from './upload-foreground';
+import { AGENT_ATTACHMENT_UPLOAD_STALL_MS, uploadOne } from './upload-task';
 import { classifyAttachment } from './validate';
 
 vi.mock('@/lib/trpc', () => ({

@@ -6,6 +6,10 @@ import {
   type AgentAttachmentExtension,
   type AgentAttachmentMime,
 } from '@/lib/agent-attachments/constants';
+import {
+  type ForegroundSource,
+  uploadForegroundSource,
+} from '@/lib/agent-attachments/upload-foreground';
 import { NativeUploadProgress } from '@/lib/native-transfer-progress';
 
 export function normalizeFilename(name: string, extension: AgentAttachmentExtension): string {
@@ -41,26 +45,6 @@ type UploadOutcome = { key: string };
  * blocking Send for as long as the connection hangs.
  */
 export const AGENT_ATTACHMENT_UPLOAD_STALL_MS = 20_000;
-
-/**
- * The app's foreground signal, as one subscription. `uploadOne` stays free of
- * `react-native` imports so its contract runs in the node test project; the
- * caller that owns the app shell supplies the real source.
- */
-export type ForegroundSource = {
-  addEventListener(type: 'change', handler: (state: string) => void): { remove(): void };
-};
-
-let foregroundSource: ForegroundSource | undefined = undefined;
-
-/**
- * Registers the app's `AppState`-shaped source for the stall window. The app
- * root calls this once; without it the window measures wall-clock inactivity,
- * which is correct on Android and for a foreground iOS transfer.
- */
-export function setUploadForegroundSource(source: ForegroundSource): void {
-  foregroundSource = source;
-}
 
 /**
  * One inactivity window for one native transfer. `touch()` arms it at the
@@ -99,7 +83,8 @@ function uploadStallWindow() {
     }, AGENT_ATTACHMENT_UPLOAD_STALL_MS);
   };
 
-  const subscription = foregroundSource?.addEventListener('change', next => {
+  const source: ForegroundSource | undefined = uploadForegroundSource();
+  const subscription = source?.addEventListener('change', next => {
     if (!running) {
       return;
     }

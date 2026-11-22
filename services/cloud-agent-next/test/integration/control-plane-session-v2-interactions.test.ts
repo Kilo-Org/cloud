@@ -879,6 +879,49 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     ).toHaveLength(1);
   });
 
+  it('carries the chat callback context into the admitted continuation', async () => {
+    const sessionId = newSessionId();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const stub = sessions.getByName(sessionDoName(USER_ID, sessionId));
+    const peer = new FakeSandboxPeer();
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => peer;
+    });
+    await stub.registerSessionFromMetadata({
+      metadata: parseSessionMetadata({
+        ...metadata({
+          sessionId,
+          kiloSessionId: kiloSessionId(),
+          sandboxId: await generateSandboxId(sessionId),
+          worktreeId,
+        }),
+        allowSubagentSessions: true,
+      }),
+      sandboxSelection: { provider: 'cloudflare-containers' },
+    });
+    await stub.send(promptPayload(messageId(), 'start'));
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+    const reply = { action: 'answer' as const, questionId: 'q_1', answers: [['yes']] };
+    const continuation = await stub.answer({ sessionId, reply });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
+    await expect(
+      stub.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+    ).resolves.toBe('sent');
+
+    // The stored turn carries the callback target a subagent needs, exactly as a
+    // sent prompt does.
+    const stored = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.sql
+        .exec<{ intent: string }>(
+          `SELECT intent FROM control_plane_messages WHERE message_id = '${continuation.intent.messageId}'`
+        )
+        .toArray()
+    );
+    const intent = JSON.parse(stored[0]?.intent ?? '{}') as { context?: unknown };
+    expect(typeof intent.context).toBe('string');
+    expect(intent.context).toContain(`session-id="${sessionId}"`);
+  });
+
   it('projects questions and permissions and resolves each through getPendingInteractions', async () => {
     const { stub } = await registerOnlySession();
     await stub.onEvents({

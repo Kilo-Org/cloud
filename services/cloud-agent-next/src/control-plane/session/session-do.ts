@@ -2219,9 +2219,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (this.messages.some(message => message.state === 'accepted')) {
         return this.forwardToLiveTurn(parsed.reply);
       }
-      if ((await this.admitMessage(admittedPayload(parsed.intent))) === 'queue-full') {
-        return 'not_connected';
-      }
+      // Same callback context `send` injects, so a subagent the continuation
+      // spawns can route its completion back to this chat.
+      const admitted = await this.admitMessage(
+        await this.withSessionCallbackContext(admittedPayload(parsed.intent))
+      );
+      if (admitted === 'queue-full') return 'not_connected';
       await this.resolvePendingInteraction(parsed.reply);
       return 'sent';
     });

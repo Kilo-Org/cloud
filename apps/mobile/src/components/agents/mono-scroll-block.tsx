@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
+import { ltrValueTextStyle } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
@@ -131,7 +132,10 @@ export function MonoScrollBlock({
             {displayText}
           </Text>
         ) : (
-          <SelectableText className={cn(wrapContentClasses, textClassName)}>
+          <SelectableText
+            className={cn(wrapContentClasses, textClassName)}
+            style={ltrValueTextStyle()}
+          >
             {displayText}
           </SelectableText>
         )}
@@ -168,6 +172,7 @@ export function MonoScrollBlock({
           <SelectableText
             onLayout={handleContentLayout}
             className={cn(contentClasses, textClassName)}
+            style={ltrValueTextStyle()}
           >
             {displayText}
           </SelectableText>

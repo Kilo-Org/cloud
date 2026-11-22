@@ -22,7 +22,11 @@ import {
 } from './tool-cards';
 import { BashToolCardBody as RealBashToolCardBody } from './tool-cards/bash-tool-card';
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  // The bash command pins its direction, which reads the interface direction.
+  I18nManager: { isRTL: false },
+}));
 vi.mock('./suggest-tool-card', () => ({ SuggestToolCardBody: 'SuggestToolCardBody' }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();

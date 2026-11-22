@@ -32,6 +32,8 @@ type ScreenState = {
   params: Record<string, string>;
   receipt: Receipt;
   error: { data?: { code: string }; message?: string } | undefined;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  connectivity: 'online' | 'offline' | 'unknown';
   mutations: MutationOptions[];
   mutate: Mock;
   alert: Mock;
@@ -47,6 +49,8 @@ const state = vi.hoisted((): ScreenState => ({
     appealStatus: 'none',
   },
   error: undefined as { data?: { code: string }; message?: string } | undefined,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
   alert: vi.fn(),
@@ -75,6 +79,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
       isPending: false,
       isError: state.error !== undefined,
       isFetching: false,
+      fetchStatus: state.fetchStatus,
       error: state.error,
       refetch: vi.fn(),
     }),
@@ -111,8 +116,14 @@ vi.mock('@/components/agents/use-message-copy', () => ({ performCopy: state.perf
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),
 }));
+// The failure face names the connection from the committed connectivity the
+// offline banner paints, so the cases set it instead of a NetInfo subscription.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => state.connectivity,
+}));
 
 const BUTTON = 'Button' as ElementType;
+const QUERY_ERROR = 'QueryError' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -152,6 +163,8 @@ beforeEach(() => {
   state.params = { 'receipt-id': RECEIPT_ID };
   state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'received', appealStatus: 'none' };
   state.error = undefined;
+  state.fetchStatus = 'idle';
+  state.connectivity = 'online';
   state.mutations = [];
   state.mutate.mockClear();
   state.alert.mockClear();
@@ -308,10 +321,52 @@ describe('ReportReceiptScreen', () => {
   });
 
   it('keeps a retry for a failure that could pass', async () => {
-    state.error = { message: 'Service unavailable' };
+    state.error = { data: { code: 'INTERNAL_SERVER_ERROR' }, message: 'Service unavailable' };
     const root = await mount();
 
-    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+    const [failure] = root.findAll(node => Object.is(node.type, QUERY_ERROR));
+    expect(failure?.props.variant).toBe('server');
+    expect(failure?.props.onRetry).toBeTypeOf('function');
+  });
+
+  it('names the connection for a failure the server never answered', async () => {
+    // A transport rejection carries no tRPC code: the reader is offline, not
+    // looking at a backend that refused.
+    state.error = { message: 'Network request failed' };
+    state.connectivity = 'offline';
+    const root = await mount();
+
+    const [failure] = root.findAll(node => Object.is(node.type, QUERY_ERROR));
+    expect(failure?.props.variant).toBe('offline');
+    // The connection can come back, so the face offers the read again.
+    expect(failure?.props.onRetry).toBeTypeOf('function');
+  });
+
+  it('names the connection for a failed read while connectivity is unsettled', async () => {
+    state.error = { message: 'Network request failed' };
+    state.connectivity = 'unknown';
+    const root = await mount();
+
+    const [failure] = root.findAll(node => Object.is(node.type, QUERY_ERROR));
+    expect(failure?.props.variant).toBe('offline');
+  });
+
+  it('names the deadline instead of the connection when the read ran out of time', async () => {
+    state.error = { data: { code: 'TIMEOUT', message: 'Control-plane request timed out' } };
+    const root = await mount();
+
+    const [failure] = root.findAll(node => Object.is(node.type, QUERY_ERROR));
+    expect(failure?.props.variant).toBe('timeout');
+    expect(failure?.props.onRetry).toBeTypeOf('function');
+  });
+
+  it('offers no retry for a failure that asking again cannot fix', async () => {
+    state.error = { data: { code: 'FORBIDDEN' }, message: 'Forbidden' };
+    const root = await mount();
+
+    const [failure] = root.findAll(node => Object.is(node.type, QUERY_ERROR));
+    expect(failure?.props.variant).toBe('permission');
+    expect(failure?.props.onRetry).toBeUndefined();
   });
 
   it('reports a refused appeal', async () => {

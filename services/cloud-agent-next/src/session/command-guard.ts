@@ -646,8 +646,14 @@ export function getCommandGuardPermissions(
         // file, so both stay out of reach while every other path stays writable.
         {
           '*': 'allow',
+          '.git': 'deny',
           '.git/*': 'deny',
+          '*.git': 'deny',
           '*.git/*': 'deny',
+          '.g?t': 'deny',
+          '.g?t/*': 'deny',
+          '.g*t': 'deny',
+          '.g*t/*': 'deny',
           '*gitconfig*': 'deny',
           '*/git/config*': 'deny',
         }

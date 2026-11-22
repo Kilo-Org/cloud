@@ -699,8 +699,8 @@ async function runLockedDiscordDisconnect(
  * connection to another server cannot interleave with it. Inside the locks it
  * reads the row, requires the server to be exclusively this connection's, and
  * removes the bot; its delete then names both the row it read and the server it
- * removed, so it only removes the row it decided on. Every outcome removes a row
- * this call read in the same locked section.
+ * removed, so it only removes the row it decided on. Every delete this call
+ * makes names a row it read in the same locked section.
  *
  * A row that records a different server when the lock is held is followed to
  * that server, at most `DISCORD_DISCONNECT_ATTEMPTS` times, so the call acts on

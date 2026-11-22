@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, ScrollText } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -198,6 +199,17 @@ export function OrganizationAuditLogScreen() {
   // reading `isFetchNextPageError` rather than `isError` keeps a failed
   // background refetch of page one from replacing the list.
   const isLaterPageError = query.isFetchNextPageError;
+  const isEmptyList = entries.length === 0 && !hasMore && !isLaterPageError;
+
+  // The populated list's reduced-motion band sits above the scroller, never
+  // inside it. Under reduced motion it reserves its own row whether or not a
+  // pull is in flight, so in flow inside the scroll body it would move the
+  // first row at rest and scroll away with the rows; above the scroller it is a
+  // sibling in this screen's own column, which carries no gap, so under motion
+  // its empty box changes nothing. The skeleton and first-page-error branches
+  // carry no pull, and the empty state's own centered scroller draws its band,
+  // so this one belongs to the list branch alone.
+  const showsRefreshBand = !query.isPending && !isFirstPageError && !isEmptyList;
 
   let body: ReactNode = null;
   if (query.isPending) {
@@ -210,7 +222,7 @@ export function OrganizationAuditLogScreen() {
     );
   } else if (isFirstPageError) {
     body = <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />;
-  } else if (entries.length === 0 && !hasMore && !isLaterPageError) {
+  } else if (isEmptyList) {
     body = (
       <EmptyState
         icon={ScrollText}
@@ -276,6 +288,7 @@ export function OrganizationAuditLogScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('organization.auditLog.title')} backFallback={ORGANIZATION_HUB_PATH} />
+      {showsRefreshBand ? <RefreshProgress refreshControl={refreshControl} /> : null}
       {body}
     </View>
   );

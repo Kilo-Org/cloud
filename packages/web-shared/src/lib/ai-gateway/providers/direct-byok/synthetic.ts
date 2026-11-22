@@ -2,7 +2,7 @@ import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/p
 import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
-  faviconIcon,
+  providerListing,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
@@ -17,14 +17,11 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   models: cachedDirectByokModelList(id),
-  provider_listing: {
-    dataPolicy: {
-      training: false,
-      retainsPrompts: false,
-      canPublish: false,
-      termsOfServiceURL: 'https://synthetic.new/policies/terms-of-service',
-      privacyPolicyURL: 'https://synthetic.new/policies/privacy',
-    },
-    icon: faviconIcon('https://synthetic.new/'),
-  },
+  provider_listing: providerListing({
+    siteUrl: 'https://synthetic.new/',
+    training: false,
+    retainsPrompts: false,
+    termsOfServiceURL: 'https://synthetic.new/policies/terms-of-service',
+    privacyPolicyURL: 'https://synthetic.new/policies/privacy',
+  }),
 } satisfies DirectByokProvider;

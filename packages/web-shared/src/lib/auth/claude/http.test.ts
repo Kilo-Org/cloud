@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { fetchClaudeWithRetry } from './http';
+import { CLAUDE_RETRY_MAX_ATTEMPTS, fetchClaudeWithRetry } from './http';
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -68,5 +68,21 @@ describe('Claude refusal retries', () => {
       )
     ).rejects.toThrow('connection lost');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops at the attempt cap and returns the last retryable response', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('busy', { status: 503, headers: { 'retry-after': '0' } }));
+    expect(
+      (
+        await fetchClaudeWithRetry(
+          'https://example.test',
+          async () => ({}),
+          code => code === 503
+        )
+      ).status
+    ).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(CLAUDE_RETRY_MAX_ATTEMPTS);
   });
 });

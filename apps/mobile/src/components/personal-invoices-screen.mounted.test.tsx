@@ -140,6 +140,14 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 // The pull control reaches the reduced-motion policy, which loads expo-battery;
 // this suite drives the header contract, not the gesture's indicator.
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+// The pull's reduced-motion band paints from the motion policy and the palette;
+// this suite drives the header contract, not the band.
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
+// The pull's hook reads the motion policy; the real module needs reanimated's
+// `useReducedMotion`, which this suite's partial reanimated stub does not carry.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+}));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',

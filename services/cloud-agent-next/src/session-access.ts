@@ -49,10 +49,12 @@ export async function requireCurrentSessionAccess(
       kiloUserId: request.kiloUserId,
       cloudAgentSessionId: request.cloudAgentSessionId,
     });
-  } catch {
+  } catch (error) {
+    // Carry the underlying failure so a persistent fault is diagnosable.
     throw new TRPCError({
       code: 'SERVICE_UNAVAILABLE',
       message: 'Session access is temporarily unavailable',
+      cause: error,
     });
   }
 

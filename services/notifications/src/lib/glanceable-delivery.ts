@@ -280,9 +280,10 @@ export async function deliverGlanceableSnapshot(
     await deps.sendIosLiveActivity(
       iosSends,
       contentState,
-      // The aggregate banner is the agent-briefing generic copy, so it renders
-      // from the one catalog-backed source instead of restating it here.
-      genericPushContentForPushData({ type: 'agent_briefing', url: '/agent-briefing' }, locale),
+      // The aggregate card is the Active Agents ongoing notification, so its
+      // alert reads that kind's own generic body: a scheduled brief has its own
+      // sentence and must not be what this card announces.
+      genericPushContentForPushData(aggregate.snapshot, locale),
       timestampSeconds,
       deps.isCurrent,
       deps.beforeIosEnd,

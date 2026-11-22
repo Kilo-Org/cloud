@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- one mounted suite pins the card's skeleton, both error classifications, rows, pin and unbind */
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,11 +24,21 @@ type TestBinding = {
 };
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+};
+
 const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
+  connectivity: 'online' as string,
   bindingsQuery: {
     bindings: [] as TestBinding[],
+    error: undefined as unknown,
     isLoading: true,
     isError: false,
     isRefetching: false,
@@ -40,6 +52,7 @@ const h = vi.hoisted(() => ({
     repositories: [] as TestRepoOption[],
     isLoading: false,
     isError: false,
+    error: undefined as unknown,
     isRefetching: false,
     refetch: vi.fn(),
   },
@@ -51,6 +64,9 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoOptions: () => h.repoOptions,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
   impactAsync: vi.fn(),
@@ -133,8 +149,10 @@ function mountSection(organizationId?: string, canManage = true) {
 describe('ProfileRepoPinsSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.connectivity = 'online';
     Object.assign(h.bindingsQuery, {
       bindings: [],
+      error: undefined,
       isLoading: true,
       isError: false,
       isRefetching: false,
@@ -159,14 +177,85 @@ describe('ProfileRepoPinsSection', () => {
   });
 
   it('retryable: a bindings failure shows QueryError and Retry refetches', async () => {
-    Object.assign(h.bindingsQuery, { isError: true, isLoading: false });
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
     const { renderer, unmount } = await mountSection();
-    const queryError = findAll(renderer.root, 'QueryError')[0];
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
     if (!queryError) {
       throw new Error('QueryError was not rendered');
     }
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
     act(() => {
-      (queryError.props as { onRetry: () => void }).onRetry();
+      queryError.onRetry?.();
+    });
+    expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('permission');
+    expect(queryError?.title).toBeUndefined();
+    // The permission state names who can grant access instead of repeating its
+    // own title.
+    expect(queryError?.message).toBe('Ask an organization owner or admin to grant you access.');
+    expect(queryError?.onRetry).toBeUndefined();
+    unmount();
+  });
+
+  it('forbidden: withholds the Pin a repo action on a terminal read', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    // The section names a read failure, so it must not offer the write the
+    // failed read was going to show.
+    expect(
+      findAll(renderer.root, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Pin a repo'
+      )
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('offline: keeps the load-failure title and a Retry that refetches', async () => {
+    h.connectivity = 'offline';
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('offline');
+    expect(queryError?.title).toBe("Couldn't load profiles");
+    expect(typeof queryError?.onRetry).toBe('function');
+    act(() => {
+      queryError?.onRetry?.();
     });
     expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
     unmount();
@@ -233,6 +322,45 @@ describe('ProfileRepoPinsSection', () => {
       repoFullName: 'acme/infra',
       platform: 'gitlab',
     });
+
+    unmount();
+  });
+
+  it('closes the pin sheet when the read turns terminal under it', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, queryClient, unmount } = await mountSection();
+    pressPressable(renderer.root, 'Pin a repo');
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    // The same read now answers terminally, so the sheet it opened closes with
+    // it; leaving the state set would reopen it without a tap once the key
+    // answered successfully again.
+    Object.assign(h.bindingsQuery, { isError: true, error: { data: { code: 'FORBIDDEN' } } });
+    await act(async () => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(ProfileRepoPinsSection, { profileId: 'profile-1', canManage: true })
+        )
+      );
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+
+    Object.assign(h.bindingsQuery, { isError: false, error: undefined });
+    await act(async () => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(ProfileRepoPinsSection, { profileId: 'profile-1', canManage: true })
+        )
+      );
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 
     unmount();
   });

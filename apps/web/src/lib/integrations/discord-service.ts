@@ -1,4 +1,5 @@
 import 'server-only';
+import { captureException } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
@@ -7,6 +8,11 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
+import {
+  INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS,
+  withInstallationServerLock,
+  withWorkspaceInstallationLock,
+} from '@/lib/integrations/oauth/workspace-installation-lock';
 import {
   DISCORD_CLIENT_ID,
   DISCORD_CLIENT_SECRET,
@@ -55,6 +61,64 @@ export class DiscordGuildRebindNotAllowedError extends Error {
     this.name = 'DiscordGuildRebindNotAllowedError';
   }
 }
+
+/** How long a single bot-removal request may take before it counts as failed. */
+const DISCORD_BOT_REMOVAL_TIMEOUT_MS = 10_000;
+
+/**
+ * Budget for the release's removal request, the external call in its locked
+ * section. The section runs at most two lookups at
+ * `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS` each, so its worst case is
+ * `2 statements x 1s + 2s removal = 4s < 5s wait`.
+ */
+export const DISCORD_RELEASE_REMOVAL_TIMEOUT_MS = 2_000;
+
+/**
+ * Budget for the disconnect's removal request, the external call in its locked
+ * section. That section runs at most three statements (row read, ownership
+ * check, delete) at `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS` each, so its
+ * worst case is `3 statements x 1s + 1.5s removal = 4.5s < 5s wait`. Another
+ * statement in the section needs this budget re-checked against the lock wait.
+ */
+export const DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS = 1_500;
+
+/**
+ * The message the server puts on a Discord disconnect Discord did not confirm.
+ *
+ * The row and its server id are kept, so repeating the same Disconnect action
+ * once Discord answers settles the connection.
+ */
+export const DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE =
+  'Discord could not confirm the disconnect, so the bot is still in the server. Try again.';
+
+/**
+ * The message the server puts on a Discord disconnect it cannot attempt at all:
+ * no bot token is configured, Discord rejects the token, the connection records
+ * no usable server id, or the server is not exclusively this connection's. No
+ * retry of the same request can revoke the bot's membership, so the client names
+ * the support step instead.
+ */
+export const DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE =
+  'Kilo could not complete the Discord disconnect for this connection. Contact support to finish disconnecting it.';
+
+/**
+ * Outcome of asking Discord to remove the bot from a server.
+ *
+ * `left` is Discord's 204. `already_absent` is its 404 answer, which is the
+ * answer for a server the bot is not in, so the membership this disconnect
+ * revokes is already gone. `unavailable` names an outcome no repeat of the same
+ * request can change: no configured token, an unusable server id, a rejected
+ * token, or a guild the token may not act on. Every other outcome is a failure
+ * the owner can retry.
+ */
+export type DiscordBotRemoval =
+  | { status: 'left' }
+  | { status: 'already_absent' }
+  | { status: 'temporary_failure'; reason: 'rate_limited' | 'response_error' | 'network' }
+  | {
+      status: 'unavailable';
+      reason: 'not_configured' | 'invalid_guild_id' | 'rejected_token' | 'forbidden';
+    };
 
 /**
  * Discord OAuth2 token response shape
@@ -296,6 +360,16 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
   return null;
 }
 
+export type UpsertDiscordInstallationResult = {
+  integration: PlatformIntegration;
+  /**
+   * The server this write moved the connection away from, when the owner
+   * reconnected onto a different one. The caller releases it after the write has
+   * committed; see `releasePreviousDiscordGuild`.
+   */
+  previousGuildId: string | null;
+};
+
 /**
  * Persist the selected Discord installation while preserving owner configuration.
  *
@@ -303,6 +377,11 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
  * connection holds a shared bot token and model policy, so moving it to another
  * server requires `allowGuildRebind`, which callers set only after verifying the
  * organization role that controls the integration.
+ *
+ * Discord adds the bot to the selected server during the OAuth consent, so a
+ * connection that moves to another server records the new one and reports the
+ * server it replaced. The caller releases that server after this write has
+ * committed.
  */
 export async function upsertDiscordInstallation(
   owner: Owner,
@@ -312,7 +391,7 @@ export async function upsertDiscordInstallation(
     defaultModel,
   }: { allowGuildRebind?: boolean; defaultModel?: string | null } = {},
   database: typeof db | DrizzleTransaction = db
-): Promise<PlatformIntegration> {
+): Promise<UpsertDiscordInstallationResult> {
   if (!oauthResponse.guild?.id) {
     throw new Error(
       'Discord OAuth response did not include guild information. The bot must be added to a server during authorization.'
@@ -364,13 +443,20 @@ export async function upsertDiscordInstallation(
         platform_account_login: guildName,
         scopes,
         integration_status: INTEGRATION_STATUS.ACTIVE,
+        // A re-authorization replaces the connection, so the status and both
+        // suspension columns describe the new authorization.
+        suspended_at: null,
+        suspended_by: null,
         metadata: updatedMetadata,
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, existing.id))
       .returning();
 
-    return updated;
+    return {
+      integration: updated,
+      previousGuildId: boundGuildId && boundGuildId !== guildId ? boundGuildId : null,
+    };
   }
 
   // For org integrations, use a model that respects org access policy. A null
@@ -407,25 +493,488 @@ export async function upsertDiscordInstallation(
     })
     .returning();
 
-  return created;
+  return { integration: created, previousGuildId: null };
 }
 
 /**
- * Uninstall Discord integration for an owner
+ * Remove the bot from a server through the Discord API.
+ *
+ * `DELETE /users/@me/guilds/{guild.id}` is the endpoint a bot uses to leave a
+ * server. The OAuth exchange stores no user token, deliberately, so this call is
+ * the one that ends the membership the integration holds. Discord answers 204
+ * when the bot left and 404 for a server it is not in. A 403 means the token may
+ * not act on that guild, so it is reported as `unavailable` for the support step,
+ * because repeating the same request cannot change it.
+ *
+ * `timeoutMs` bounds the request. A caller inside the installation lock passes a
+ * value below that lock's wait; without one the full default applies.
+ */
+export async function removeBotFromGuild(
+  guildId: string | null,
+  timeoutMs = DISCORD_BOT_REMOVAL_TIMEOUT_MS
+): Promise<DiscordBotRemoval> {
+  if (!DISCORD_BOT_TOKEN) {
+    return { status: 'unavailable', reason: 'not_configured' };
+  }
+
+  if (!guildId) {
+    return { status: 'unavailable', reason: 'invalid_guild_id' };
+  }
+
+  let validatedGuildId: string;
+  try {
+    validatedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
+  } catch {
+    return { status: 'unavailable', reason: 'invalid_guild_id' };
+  }
+
+  try {
+    const response = await fetch(buildDiscordApiUrl(['users', '@me', 'guilds', validatedGuildId]), {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (response.ok) {
+      return { status: 'left' };
+    }
+
+    // 401 means Discord does not accept the configured bot token at all, so
+    // repeating the same request cannot succeed.
+    if (response.status === 401) {
+      return { status: 'unavailable', reason: 'rejected_token' };
+    }
+
+    // 404 is an unknown server, which is the answer for a server the bot is not
+    // in, so the membership is already gone.
+    if (response.status === 404) {
+      return { status: 'already_absent' };
+    }
+
+    // 403 means Discord will not let this token act on that guild. It does not
+    // confirm the bot left, and repeating the same request cannot change that,
+    // so it needs the support step rather than a retry.
+    if (response.status === 403) {
+      return { status: 'unavailable', reason: 'forbidden' };
+    }
+
+    return {
+      status: 'temporary_failure',
+      reason: response.status === 429 ? 'rate_limited' : 'response_error',
+    };
+  } catch {
+    return { status: 'temporary_failure', reason: 'network' };
+  }
+}
+
+/**
+ * Whether the bot is in one server, as the connect path needs it.
+ *
+ * `absent` is Discord's answer that the bot is not in the server, which is what
+ * a server the bot was never added to and a server the bot was kicked from both
+ * look like. `unreachable` names every answer that does not settle the question,
+ * so a caller keeps the connection instead of acting on an answer it never got.
+ */
+export type DiscordBotPresence =
+  | { status: 'present' }
+  | { status: 'absent' }
+  | {
+      status: 'unreachable';
+      reason: 'not_configured' | 'rejected_token' | 'network' | 'response_error';
+    };
+
+/** How long the connect's presence probe may take before it counts as unreachable. */
+const DISCORD_GUILD_PROBE_TIMEOUT_MS = 5_000;
+
+/**
+ * Read whether the bot is in `guildId` through `GET /guilds/{guild.id}`, the
+ * endpoint `testConnection` reads.
+ *
+ * On that GET a bot token gets 403 only for a guild the bot is not in, so 403
+ * and 404 both answer `absent`. A 401 means Discord rejects the token itself, and
+ * every other answer, including a throw, leaves the question open.
+ *
+ * `timeoutMs` bounds the request. The connect path sits in the request path with
+ * this probe both before and after the connection write, so a slow answer is
+ * reported as unreachable rather than held.
+ */
+export async function probeBotInGuild(
+  guildId: string,
+  timeoutMs = DISCORD_GUILD_PROBE_TIMEOUT_MS
+): Promise<DiscordBotPresence> {
+  if (!DISCORD_BOT_TOKEN) {
+    return { status: 'unreachable', reason: 'not_configured' };
+  }
+
+  let validatedGuildId: string;
+  try {
+    validatedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
+  } catch {
+    // A value that is not a snowflake names no Discord server, so the bot is not
+    // in it. That is the honest answer, and it is the actionable one: a row that
+    // records an impossible server is exactly the dead connection this probe
+    // exists to find.
+    return { status: 'absent' };
+  }
+
+  try {
+    const response = await fetch(buildDiscordApiUrl(['guilds', validatedGuildId]), {
+      headers: {
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (response.ok) {
+      return { status: 'present' };
+    }
+
+    // 403 is the answer for a guild this bot is not in, and 404 is an unknown
+    // guild, which the bot is not in either.
+    if (response.status === 403 || response.status === 404) {
+      return { status: 'absent' };
+    }
+
+    if (response.status === 401) {
+      return { status: 'unreachable', reason: 'rejected_token' };
+    }
+
+    return { status: 'unreachable', reason: 'response_error' };
+  } catch {
+    return { status: 'unreachable', reason: 'network' };
+  }
+}
+
+/**
+ * The row a connect wrote, as the write returned it. `updatedAt` is part of the
+ * identity because a re-authorization updates the row in place, so the id alone
+ * does not say which write the row carries.
+ */
+export type DiscordDiscardTarget = {
+  readonly id: string;
+  readonly updatedAt: string;
+};
+
+/**
+ * Delete the row `row` names for this owner and server, and report how many rows
+ * were removed.
+ *
+ * The connect path calls this once it has proven the bot is not in the server
+ * that row records: such a row describes a connection that cannot act, so it is
+ * discarded. `row` is the row the write returned, because the probe that settled
+ * the question runs after the connect lock was released, and a connect by the
+ * same owner to the same server can commit while it runs. A re-authorization
+ * updates the row in place and keeps its id, so the id alone does not name the
+ * write: the id with the `updated_at` that write returned does, and a later
+ * write bumps that column.
+ *
+ * The delete therefore takes the connect's owner and server locks, and names
+ * that id with that timestamp, so every condition is re-checked under the lock
+ * and a row a connect wrote in between is left alone.
+ *
+ * The remaining conditions are the disconnect's, so a legacy row that carries
+ * the server id only in `platform_account_id` goes with the canonical one, and
+ * the owner conditions keep every other owner's row out of the delete. The
+ * section runs one statement at the server lock budget, so it stays below the
+ * lock wait.
+ */
+export async function discardDiscordGuildRows(
+  owner: Owner,
+  guildId: string,
+  row: DiscordDiscardTarget
+): Promise<number> {
+  // A row without an id names no row, so there is nothing to delete and no lock
+  // to take.
+  if (!row.id) {
+    return 0;
+  }
+
+  return withWorkspaceInstallationLock(
+    PLATFORM.DISCORD,
+    owner,
+    guildId,
+    async tx => {
+      const deleted = await tx
+        .delete(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DISCORD),
+            recordsDiscordGuildCondition(guildId),
+            ...getOwnershipConditions(owner),
+            eq(platform_integrations.id, row.id),
+            eq(platform_integrations.updated_at, row.updatedAt)
+          )
+        )
+        .returning({ id: platform_integrations.id });
+
+      return deleted.length;
+    },
+    { statementTimeoutMs: INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS }
+  );
+}
+
+/**
+ * Release the server a connection moved away from.
+ *
+ * The connection records the selected server, so this removal keeps the bot's
+ * memberships matching it. Call it once the write that records the new server has
+ * committed: it never throws, because a release that does not settle is reported
+ * to operators rather than reported as a failed connection.
+ *
+ * The previous server is released only while it is still unclaimed. A server
+ * that another owner has since recorded belongs to that connection, so it is
+ * left alone. The lookup and the removal hold the per-server lock the connect
+ * write takes, so the two steps are one decision. That lock takes no owner key,
+ * so a release in flight never delays another connection of the same owner.
+ */
+export async function releasePreviousDiscordGuild(
+  owner: Owner,
+  previousGuildId: string
+): Promise<void> {
+  try {
+    const removal = await withInstallationServerLock(
+      PLATFORM.DISCORD,
+      previousGuildId,
+      async tx => {
+        const recordedByAnotherOwner = await getConflictingDiscordInstallation(
+          owner,
+          previousGuildId,
+          tx
+        );
+        if (recordedByAnotherOwner) {
+          return null;
+        }
+
+        return removeBotFromGuild(previousGuildId, DISCORD_RELEASE_REMOVAL_TIMEOUT_MS);
+      }
+    );
+
+    if (removal === null || removal.status === 'left' || removal.status === 'already_absent') {
+      return;
+    }
+
+    captureException(new Error(`Previous Discord server release ended as ${removal.status}`), {
+      tags: { source: 'discord_oauth', op: 'release_previous_guild' },
+      extra: { guildId: previousGuildId, status: removal.status, reason: removal.reason },
+    });
+  } catch (error) {
+    // The connection write has already committed, so a failure here cannot fail
+    // the connect; it is reported and the callback continues.
+    captureException(error, {
+      tags: { source: 'discord_oauth', op: 'release_previous_guild' },
+      extra: { guildId: previousGuildId, outcome: 'lookup_failed' },
+    });
+  }
+}
+
+/**
+ * The one outcome a locked Discord disconnect settles on. Each tag names what
+ * the section found, so no follow-up decision can read a stale flag. `moved` is
+ * a control signal for the retry loop, never a return value.
+ */
+type DiscordDisconnectOutcome =
+  | { kind: 'missing' }
+  | { kind: 'moved'; guildId: string | null }
+  | { kind: 'shared' }
+  | { kind: 'removal'; removal: DiscordBotRemoval };
+
+/** How many times a disconnect may follow the row to the server it now records. */
+const DISCORD_DISCONNECT_ATTEMPTS = 2;
+
+/**
+ * The disconnect's serialized section. It holds the locks the connect path takes
+ * for this owner and server, reads the row, requires the server to be
+ * exclusively this connection's, removes the bot, and deletes the rows this
+ * owner records that server in, only for a server it just removed. It runs at
+ * most three statements (row read, ownership check, delete), which is what
+ * `DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS` budgets for.
+ */
+async function runLockedDiscordDisconnect(
+  owner: Owner,
+  guildId: string
+): Promise<DiscordDisconnectOutcome> {
+  return withWorkspaceInstallationLock(
+    PLATFORM.DISCORD,
+    owner,
+    guildId,
+    async (tx): Promise<DiscordDisconnectOutcome> => {
+      const current = await getInstallation(owner, tx);
+      if (!current) {
+        return { kind: 'missing' };
+      }
+
+      const currentGuildId = current.platform_installation_id ?? current.platform_account_id;
+      if (currentGuildId !== guildId) {
+        return { kind: 'moved', guildId: currentGuildId };
+      }
+
+      // The server must belong to this connection alone before its bot
+      // membership is revoked.
+      const [shared] = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DISCORD),
+            recordsDiscordGuildCondition(guildId),
+            isOwnedByAnotherOwner(owner)
+          )
+        )
+        .limit(1);
+      if (shared) {
+        return { kind: 'shared' };
+      }
+
+      const removal = await removeBotFromGuild(guildId, DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS);
+      if (removal.status === 'unavailable' || removal.status === 'temporary_failure') {
+        return { kind: 'removal', removal };
+      }
+
+      // The row was re-read and the server was checked above, so the delete
+      // names the owner and the server: a row that moved matches nothing here.
+      // Naming the owner and the server covers every row that records the
+      // server, whichever identifier column carries it.
+      await tx
+        .delete(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DISCORD),
+            recordsDiscordGuildCondition(guildId),
+            ...getOwnershipConditions(owner)
+          )
+        );
+
+      return { kind: 'removal', removal };
+    },
+    { statementTimeoutMs: INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS }
+  );
+}
+
+/**
+ * Uninstall Discord integration for an owner.
+ *
+ * Disconnecting ends the access the installation holds: a bot installation's
+ * durable grant is its membership in the recorded server, so the bot leaves that
+ * server through the Discord API before the association is discarded. When the
+ * removal does not settle, the association is kept and the caller reports the
+ * failure, so the owner can repeat the same action.
+ *
+ * The disconnect reads and decides in one serialized section. It takes the owner
+ * and server locks the connect path takes, so a connect that moves this owner's
+ * connection to another server cannot interleave with it. Inside the locks it
+ * reads the row, requires the server to be exclusively this connection's, and
+ * removes the bot; its delete then names the owner and the server it removed, so
+ * it removes the rows of that server. Every delete this call makes names a
+ * server it checked in the same locked section.
+ *
+ * A row that records a different server when the lock is held is followed to
+ * that server, at most `DISCORD_DISCONNECT_ATTEMPTS` times, so the call acts on
+ * the server the row records while the lock is held and never deletes a row it
+ * did not check. The server the row left is released by the connect that moved
+ * it, not by this call. A row that is still moving after the last attempt was
+ * not disconnected, and repeating the disconnect is the safe action, so the
+ * caller gets the retryable message rather than a success it cannot back.
  */
 export async function uninstallApp(owner: Owner) {
   const integration = await getInstallation(owner);
 
-  if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
+  if (!integration) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Discord installation not found',
     });
   }
 
-  await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+  // A suspended association still holds a live membership in the server, so its
+  // disconnect revokes that membership like any other.
+  const initialGuildId = integration.platform_installation_id ?? integration.platform_account_id;
+  if (!initialGuildId) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+    });
+  }
 
-  return { success: true };
+  let targetGuildId = initialGuildId;
+
+  for (let attempt = 1; ; attempt++) {
+    const guildId = targetGuildId;
+    const outcome = await runLockedDiscordDisconnect(owner, guildId);
+
+    if (outcome.kind === 'moved') {
+      // A connect moved the row while this section waited for the lock. The
+      // server it left is released by that connect, so this call follows the
+      // row instead of removing anything the row no longer records.
+      if (outcome.guildId === null) {
+        // The row now records no server, so no retry of this request can name
+        // one to remove.
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+        });
+      }
+      if (attempt >= DISCORD_DISCONNECT_ATTEMPTS) {
+        // Still rebinding after the last attempt: nothing was removed and
+        // repeating the disconnect is safe, so the caller may retry.
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
+        });
+      }
+      targetGuildId = outcome.guildId;
+      continue;
+    }
+
+    if (outcome.kind === 'missing') {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Discord installation not found',
+      });
+    }
+
+    if (outcome.kind === 'shared') {
+      captureException(
+        new Error('Discord disconnect skipped a server another connection records'),
+        {
+          tags: { source: 'discord_disconnect', op: 'shared_server' },
+          extra: { guildId },
+        }
+      );
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+      });
+    }
+
+    const { removal } = outcome;
+
+    if (removal.status === 'unavailable') {
+      // The owner's message names no cause, so the event carries the server
+      // and the reason, and the support step reads both from one record.
+      captureException(
+        new Error(`Discord disconnect could not remove the bot: ${removal.reason}`),
+        {
+          tags: { source: 'discord_disconnect', op: 'guild_removal_unavailable' },
+          extra: { guildId, reason: removal.reason },
+        }
+      );
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+      });
+    }
+
+    if (removal.status === 'temporary_failure') {
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
+      });
+    }
+
+    return { success: true };
+  }
 }
 
 /**

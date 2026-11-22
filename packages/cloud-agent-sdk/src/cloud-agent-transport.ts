@@ -9,6 +9,7 @@ import type { ToolDisplayMode } from './tool-detail-marker';
 import { createAgentBoardReader } from './agent-board';
 import { createBackgroundActivityReader } from './background-activity';
 import { setBounded } from './bounded-map';
+import { SNAPSHOT_READ_BASE_DELAY_MS, SNAPSHOT_READ_MAX_RETRIES } from './limits';
 import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { isChatEvent, type NormalizedEvent } from './normalizer';
@@ -116,13 +117,6 @@ type CloudAgentTransportConfig = {
    */
   toolDisplay?: ToolDisplayMode | undefined;
 };
-
-// Snapshot reads run beside the live socket: a failed read costs the transcript
-// replay, never the live connection, so it is reported once and retried with a
-// short bounded backoff (500 ms, 1 s, 2 s) that stays well inside a
-// user-noticeable wait.
-const SNAPSHOT_READ_MAX_RETRIES = 3;
-const SNAPSHOT_READ_BASE_DELAY_MS = 500;
 
 /** One settled snapshot read. Reads never reject; a failure is a value. */
 type SnapshotRead =

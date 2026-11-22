@@ -183,6 +183,7 @@ export function TriggerFormBasics({
           repositories={repositories.repositories}
           isLoading={repositories.isLoading}
           isError={repositories.isError}
+          error={repositories.error}
           onRetry={() => {
             repositories.refetch();
           }}

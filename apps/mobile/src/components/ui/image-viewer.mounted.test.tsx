@@ -146,6 +146,21 @@ describe('ImageViewer mounted', () => {
     expect(unavailable).toHaveLength(1);
     expect(unavailable[0]?.props.className).toContain('text-white');
 
+    // The row announces through AccessibleStatus: one polite live region on
+    // Android carrying the same white text, not the destructive error tone.
+    const statuses = renderer.root.findAll(node => node.type === AccessibleStatus);
+    expect(statuses).toHaveLength(1);
+    const fallbackStatus = statuses[0];
+    if (!fallbackStatus) {
+      throw new Error('fallback AccessibleStatus not found');
+    }
+    expect(fallbackStatus.props.message).toBe('Image unavailable');
+    const announced = findByType(fallbackStatus, 'Text');
+    expect(announced).toHaveLength(1);
+    expect(announced[0]?.props.accessibilityLiveRegion).toBe('polite');
+    expect(announced[0]?.props.className).toContain('text-white');
+    expect(announced[0]?.props.className).not.toContain('text-destructive');
+
     // The Share header pressable stays enabled when onShare exists.
     const share = findByType(renderer.root, 'Pressable').find(
       node =>

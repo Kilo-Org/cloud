@@ -488,11 +488,79 @@ test('folds a Devanagari danda as sentence-final punctuation', () => {
   // so the shared-wording rule must read them as one wording.
   const found = run({
     language: 'hi',
-    english: { label: 'Choose a model', error: 'Choose a model.' },
-    translated: { label: 'मॉडल चुनें', error: 'मॉडल चुनें।' },
-    source: "t('label'); t('error');",
+    english: {
+      common: { sentenceJoiner: '. ' },
+      label: 'Choose a model',
+      error: 'Choose a model.',
+    },
+    translated: {
+      common: { sentenceJoiner: '। ' },
+      label: 'मॉडल चुनें',
+      error: 'मॉडल चुनें।',
+    },
+    source: "t('common.sentenceJoiner'); t('label'); t('error');",
   });
   assert.deepEqual(found, []);
+});
+
+test('accepts the Devanagari danda in a catalog that joins sentences with it', () => {
+  const found = run({
+    language: 'hi',
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: { common: { sentenceJoiner: '। ' }, first: 'मॉडल चुनें।', second: 'फिर से प्रयास करें।' },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a borrowed Devanagari danda in a catalog that writes another mark', () => {
+  const found = run({
+    language: 'kn',
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: { common: { sentenceJoiner: '.' }, first: 'ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ।', second: 'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.' },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /mobile\/kn/);
+  assert.match(found[0], /«।»/);
+  assert.match(found[0], /"first"/);
+});
+
+test('rejects a borrowed Devanagari danda in Marathi, which closes sentences with the full stop', () => {
+  const found = run({
+    language: 'mr',
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: {
+      common: { sentenceJoiner: '.' },
+      first: 'मॉडेल निवडा।',
+      second: 'पुन्हा प्रयत्न करा.',
+    },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /mobile\/mr/);
+  assert.match(found[0], /«।»/);
+});
+
+test('rejects a borrowed Devanagari danda in a catalog that writes no sentence mark', () => {
+  // The push catalog carries no `common.sentenceJoiner`, so it states no
+  // sentence mark at all and a danda there belongs to no script of its own.
+  const found = run({
+    language: 'hi',
+    pushEnglish: {
+      generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
+    },
+    pushTranslated: {
+      generic: { title: 'Kilo', body: { chatMessage: 'आपके पास एक नया संदेश है।' } },
+    },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "translatePush(locale, 'generic.body.chatMessage', undefined, 'You have a new message');",
+    ].join('\n'),
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /«।»/);
+  assert.match(found[0], /no sentence mark/);
 });
 
 for (const [language, title, badge] of [
@@ -1522,6 +1590,28 @@ test('rejects a catalog that translates the sampling parameter label', () => {
   assert.match(
     found.join('\n'),
     /mobile\/ru: "profiles\.agents\.topP" must read "Top P" in every catalog/
+  );
+});
+
+test('rejects a serialized JSON value in a verbatim English label', () => {
+  // `checkVerbatimLabels` compares English with itself, so it cannot catch a
+  // verbatim key whose English text is JSON: the storage-slip rule is the only
+  // guard there, and it must stay on for every key but the JSON sample.
+  const topP = '{"value":"Top P"}';
+  const found = run({
+    english: {
+      ...AGENT_EDITOR,
+      profiles: { agents: { ...AGENT_EDITOR.profiles.agents, topP } },
+    },
+    translated: {
+      ...AGENT_EDITOR_TRANSLATED,
+      profiles: { agents: { ...AGENT_EDITOR_TRANSLATED.profiles.agents, topP } },
+    },
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.match(
+    found.join('\n'),
+    /mobile\/en: "profiles\.agents\.topP" is serialized JSON; write the label text/
   );
 });
 
@@ -3175,14 +3265,15 @@ const CHANGELOG_AREAS_SOURCE = [
 test('accepts a changelog area label that joins its nouns without the list conjunction', () => {
   const found = run({
     language: 'hi',
-    english: CHANGELOG_AREAS,
+    english: { common: { sentenceJoiner: '. ' }, ...CHANGELOG_AREAS },
     translated: {
+      common: { sentenceJoiner: '। ' },
       profile: {
         changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
         changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल व संगठन' },
       },
     },
-    source: CHANGELOG_AREAS_SOURCE,
+    source: `${CHANGELOG_AREAS_SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.deepEqual(found, []);
 });
@@ -3190,14 +3281,15 @@ test('accepts a changelog area label that joins its nouns without the list conju
 test('rejects a changelog area label that carries the catalog list conjunction', () => {
   const found = run({
     language: 'hi',
-    english: CHANGELOG_AREAS,
+    english: { common: { sentenceJoiner: '. ' }, ...CHANGELOG_AREAS },
     translated: {
+      common: { sentenceJoiner: '। ' },
       profile: {
         changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
         changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल और संगठन' },
       },
     },
-    source: CHANGELOG_AREAS_SOURCE,
+    source: `${CHANGELOG_AREAS_SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(

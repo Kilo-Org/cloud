@@ -12,11 +12,7 @@ import type {
   GetCloudAgentRootSessionMessagesParams,
   ListCloudAgentRootSessionsParams,
 } from '../session-ingest-binding.js';
-import {
-  fetchOrgIdForSession,
-  validateBalanceOnly,
-  type BalanceOnlyResult,
-} from '../balance-validation.js';
+import type { BalanceOnlyResult } from '../balance-validation.js';
 import type {
   QueueExecutionTurnCommand,
   SubmittedSessionMessageRequest,
@@ -26,6 +22,11 @@ import { getPgDb } from '../db/pg.js';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
+import { answerWithAdmission, type AnswerAdmissionOutcome } from '../session/answer-admission.js';
+import {
+  defaultValidatePromptBalance,
+  type PromptBalanceParams,
+} from '../session/prompt-balance.js';
 import {
   buildControlPlaneMessagePayload,
   ControlPlaneMessageInputError,
@@ -40,7 +41,6 @@ import type {
 import type {
   ControlPlaneAnswerReply,
   ControlPlaneControlResult,
-  ControlPlaneDispatchResult,
 } from '../shared/control-plane-protocol.js';
 import { createMessageId } from '../session/message-id.js';
 import { interruptControlSession } from '../router/control-plane-session.js';
@@ -77,6 +77,8 @@ import {
   publicCloudAgentDirectory,
 } from './public-sdk-projection.js';
 import { openSystemFeedStream, SYSTEM_FEED_KILO_PATH } from './system-feed.js';
+import { decodeSessionHistoryCursor } from '../control-plane/session/history.js';
+import { readPublicV2History, validatePublicV2HistoryCursor } from './persisted-v2-history.js';
 
 export const KILO_FACADE_USER_ID_HEADER = 'x-kilo-facade-user-id';
 export const KILO_FACADE_AUTH_TOKEN_HEADER = 'x-kilo-facade-auth-token';
@@ -154,12 +156,7 @@ export type KiloFacadeRequestDeps = {
     cloudAgentSessionId: string;
     request: SubmittedSessionMessageRequest;
   }) => Promise<SessionMessageAdmissionResult>;
-  validatePromptBalance?: (params: {
-    env: Env;
-    authToken: string;
-    userId: string;
-    cloudAgentSessionId: string;
-  }) => Promise<BalanceOnlyResult>;
+  validatePromptBalance?: (params: PromptBalanceParams) => Promise<BalanceOnlyResult>;
   interruptPrompt?: (params: {
     env: Env;
     userId: string;
@@ -238,6 +235,19 @@ function isSessionIngestKiloSessionId(kiloSessionId: string): boolean {
 
 function missingRootKiloSessionResponse(): Response {
   return facadeError(404, 'KILO_SESSION_NOT_FOUND', 'Cloud Agent root Kilo session was not found');
+}
+
+/**
+ * Projects a failed payer balance check. A payer scope the caller cannot reach
+ * reads as a hidden root, so it does not confirm that the session exists.
+ */
+function promptBalanceFailureResponse(
+  balance: Extract<BalanceOnlyResult, { success: false }>
+): Response {
+  if (balance.status === 404) return missingRootKiloSessionResponse();
+  const response = facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+  if (balance.status === 503) response.headers.set('Retry-After', '1');
+  return response;
 }
 
 function pendingSessionSnapshotResponse(): Response {
@@ -431,7 +441,7 @@ function parseSessionMessagesQuery(
         'Session messages before requires a positive limit'
       );
     }
-    if (!validateKiloSdkMessagesCursor(before)) {
+    if (!validateKiloSdkMessagesCursor(before) && !isV2HistoryCursor(before)) {
       return facadeError(
         400,
         'KILO_QUERY_INVALID',
@@ -441,6 +451,15 @@ function parseSessionMessagesQuery(
     params.before = before;
   }
   return params;
+}
+
+function isV2HistoryCursor(cursor: string): boolean {
+  try {
+    decodeSessionHistoryCursor(cursor);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isExactSessionDetailRead(method: string, kiloPath: string, routePath: string): boolean {
@@ -555,16 +574,6 @@ async function readRequestJson(request: Request): Promise<ReadRequestJsonResult>
   }
 }
 
-async function defaultValidatePromptBalance(params: {
-  env: Env;
-  authToken: string;
-  userId: string;
-  cloudAgentSessionId: string;
-}): Promise<BalanceOnlyResult> {
-  const orgId = await fetchOrgIdForSession(params.env, params.userId, params.cloudAgentSessionId);
-  return validateBalanceOnly(params.authToken, orgId, params.env);
-}
-
 async function defaultAdmitPrompt(params: {
   env: Env;
   userId: string;
@@ -650,7 +659,7 @@ async function admitBasicPrompt(params: {
     cloudAgentSessionId: params.cloudAgentSessionId,
   });
   if (!balance.success) {
-    return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+    return promptBalanceFailureResponse(balance);
   }
   const command = {
     turn: {
@@ -890,9 +899,49 @@ async function persistedSessionMessagesResponse(params: {
   env: Env;
   userId: string;
   kiloSessionId: string;
+  cloudAgentSessionId: string;
   url: URL;
   query: Pick<GetCloudAgentRootSessionMessagesParams, 'limit' | 'before'>;
 }): Promise<Response> {
+  let source;
+  try {
+    source = await withDORetry(
+      () => getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId),
+      stub => stub.getSessionHistorySource(params.kiloSessionId),
+      'getSessionHistorySource'
+    );
+  } catch {
+    return retryableSessionReadResponse();
+  }
+  if (source === null) return missingRootKiloSessionResponse();
+  if (source === 'v2') {
+    if (!validatePublicV2HistoryCursor(params))
+      return facadeError(
+        400,
+        'KILO_QUERY_INVALID',
+        'Session messages before is not a valid cursor'
+      );
+    const history = await readPublicV2History(params);
+    switch (history.kind) {
+      case 'not_found':
+        return missingRootKiloSessionResponse();
+      case 'retryable_failure':
+        return retryableSessionReadResponse();
+      case 'invalid_data':
+        return invalidPersistedSessionDataResponse('messages');
+      case 'too_large':
+        return transcriptTooLargeResponse();
+      case 'success':
+        return messagesPageResponse(
+          params.url,
+          history.messages,
+          history.nextCursor,
+          history.omittedItemCount
+        );
+    }
+  }
+  if (params.query.before !== undefined && !validateKiloSdkMessagesCursor(params.query.before))
+    return facadeError(400, 'KILO_QUERY_INVALID', 'Session messages before is not a valid cursor');
   const result = await params.env.SESSION_INGEST.getCloudAgentRootSessionMessages({
     kiloUserId: params.userId,
     kiloSessionId: params.kiloSessionId,
@@ -934,6 +983,7 @@ function persistedSessionReadResponse(params: {
   env: Env;
   userId: string;
   kiloSessionId: string;
+  cloudAgentSessionId: string;
   url: URL;
   read: PersistedSessionRead;
 }): Promise<Response> {
@@ -1144,6 +1194,7 @@ async function readOwnedKiloSession(params: {
     env: params.env,
     userId: params.userId,
     kiloSessionId: params.kiloSessionId,
+    cloudAgentSessionId: params.cloudAgentSessionId,
     url: params.url,
     read: params.read,
   });
@@ -1193,8 +1244,10 @@ export async function handleKiloFacadeRequest(params: {
       request,
       env,
       userId,
+      authToken,
       cloudAgentSessionId: session.cloudAgentSessionId,
       route: collectionNativeRoute,
+      deps,
     });
   }
   if (collectionNativeRoute !== null) {
@@ -1202,7 +1255,6 @@ export async function handleKiloFacadeRequest(params: {
       request,
       env,
       userId,
-      authToken,
       deps,
       url,
       route: collectionNativeRoute,
@@ -1238,8 +1290,10 @@ export async function handleKiloFacadeRequest(params: {
       request,
       env,
       userId,
+      authToken,
       cloudAgentSessionId: root.cloudAgentSessionId,
       route: sessionNativeRoute,
+      deps,
     });
   }
 
@@ -1388,12 +1442,11 @@ async function handleCollectionNativeRoute(params: {
   request: Request;
   env: Env;
   userId: string;
-  authToken?: string;
   deps?: KiloFacadeRequestDeps;
   url: URL;
-  route: NativeSessionRoute;
+  route: Exclude<NativeSessionRoute, { kind: 'answering' }>;
 }): Promise<Response> {
-  const { request, env, userId, deps, route } = params;
+  const { env, userId, deps, route } = params;
   const session = await resolveNativeRouteSession(params);
   if (session instanceof Response) return session;
 
@@ -1411,16 +1464,6 @@ async function handleCollectionNativeRoute(params: {
       }),
     });
     return nativeReadErrorResponse(outcome);
-  }
-  if (route.kind === 'answering') {
-    const body = await parseNativeAnswerBody(request, route);
-    if (!body.ok) return facadeError(body.status, body.code, body.message);
-    return answerHostedNativeInteraction({
-      env,
-      userId,
-      cloudAgentSessionId: session.cloudAgentSessionId,
-      reply: body.reply,
-    });
   }
   return facadeError(501, 'KILO_ROUTE_UNSUPPORTED', 'Kilo facade route is not supported');
 }
@@ -1474,29 +1517,37 @@ async function answerOwnedNativeInteraction(params: {
   request: Request;
   env: Env;
   userId: string;
+  authToken?: string;
   cloudAgentSessionId: string;
   route: Extract<NativeSessionRoute, { kind: 'answering' }>;
+  deps?: KiloFacadeRequestDeps;
 }): Promise<Response> {
   const body = await parseNativeAnswerBody(params.request, params.route);
   if (!body.ok) return facadeError(body.status, body.code, body.message);
   return answerHostedNativeInteraction({
     env: params.env,
     userId: params.userId,
+    ...(params.authToken === undefined ? {} : { authToken: params.authToken }),
     cloudAgentSessionId: params.cloudAgentSessionId,
     reply: body.reply,
+    ...(params.deps === undefined ? {} : { deps: params.deps }),
   });
 }
 
 /**
  * Questions and permissions route through the Session DO's answer path, which
  * names the route itself and validates membership of the pending set. A stale
- * runtime id or a sibling attachment therefore cannot answer anything.
+ * runtime id or a sibling attachment therefore cannot answer anything. An
+ * answer that would become a new turn is preflighted here, with the caller's
+ * verified bearer, exactly like a prompt.
  */
 async function answerHostedNativeInteraction(params: {
   env: Env;
   userId: string;
+  authToken?: string;
   cloudAgentSessionId: string;
   reply: Extract<NativeSessionRoute, { kind: 'answering' }>['reply'];
+  deps?: KiloFacadeRequestDeps;
 }): Promise<Response> {
   const payload: ControlPlaneAnswerReply =
     params.reply.action === 'question.reply'
@@ -1508,19 +1559,60 @@ async function answerHostedNativeInteraction(params: {
             permissionId: params.reply.permissionId,
             response: params.reply.response,
           };
-  const result = await withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneDispatchResult>(
-    () => getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId),
-    stub => stub.answer({ sessionId: params.cloudAgentSessionId, reply: payload }),
-    'answer'
-  );
-  if (result === 'not_connected') {
-    return facadeError(
-      409,
-      'KILO_INTERACTION_UNAVAILABLE',
-      'The session does not wait on this interaction'
-    );
+  let outcome: AnswerAdmissionOutcome;
+  try {
+    outcome = await answerWithAdmission({
+      env: params.env,
+      userId: params.userId,
+      ...(params.authToken === undefined ? {} : { authToken: params.authToken }),
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      reply: payload,
+      ...(params.deps?.validatePromptBalance === undefined
+        ? {}
+        : { deps: { validatePromptBalance: params.deps.validatePromptBalance } }),
+    });
+  } catch (error) {
+    return promptPreflightError(error);
   }
-  return Response.json(true);
+  if (outcome.outcome === 'sent') return Response.json(true);
+  if (outcome.outcome === 'balance') {
+    // Same projection a prompt uses, so one payer scope failure reads the same
+    // on every mutation of the session.
+    return promptBalanceFailureResponse({
+      success: false,
+      status: outcome.status,
+      message: outcome.message,
+    });
+  }
+  if (outcome.outcome === 'unavailable') {
+    return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Durable prompt admission is unavailable');
+  }
+  if (outcome.outcome === 'queue-full') {
+    // The same retryable capacity refusal a prompt reports.
+    return facadeError(429, 'KILO_PROMPT_QUEUE_FULL', pendingQueueFullAdmissionFailure().error);
+  }
+  if (outcome.outcome === 'invalid') {
+    // The reply carries nothing to send. The interaction still waits, so a
+    // distinct 400 keeps a client from reading it as a dead interaction.
+    return facadeError(400, 'KILO_ANSWER_INVALID', 'The answer carries no text; reply again');
+  }
+  if (outcome.outcome === 'retryable') {
+    // The interaction still waits, but the session moved on, so the same reply
+    // is admitted once it settles again. A distinct code keeps a client from
+    // reading a retry as a dead interaction.
+    const response = facadeError(
+      409,
+      'KILO_ANSWER_RETRY_REQUIRED',
+      'The session moved on; send the answer again'
+    );
+    response.headers.set('Retry-After', '1');
+    return response;
+  }
+  return facadeError(
+    409,
+    'KILO_INTERACTION_UNAVAILABLE',
+    'The session does not wait on this interaction'
+  );
 }
 
 /**
@@ -1546,7 +1638,7 @@ async function admitHostedCommand(params: {
     cloudAgentSessionId: params.cloudAgentSessionId,
   });
   if (!balance.success) {
-    return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+    return promptBalanceFailureResponse(balance);
   }
   const messageId = params.body.messageID ?? createMessageId();
   const command = {

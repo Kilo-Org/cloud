@@ -173,6 +173,10 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
+  [
+    '{{values}}',
+    'two format-only sentences a key builds from its parts: the list of advanced-policy changes an audit row scanned, versus the joined pair of counted clauses a review-agent secret rotation reports',
+  ],
 ]);
 
 /**
@@ -253,12 +257,11 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.repoPicker.platformBitbucket',
   'agentChat.prBadge.label',
   // Profile-editor examples that name the value's own syntax, not prose: a
-  // slug the field validator accepts, a server name, a JSON snippet, and
-  // command lines whose tool and package paths must stay literal. Every
-  // catalog keeps them English so the example never contradicts validation.
+  // slug the field validator accepts, a server name, and command lines whose
+  // tool and package paths must stay literal. Every catalog keeps them English
+  // so the example never contradicts validation.
   'profiles.mcp.namePlaceholder',
   'profiles.mcp.commandPlaceholder',
-  'profiles.mcp.jsonPlaceholder',
   'profiles.agents.slugPlaceholder',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
@@ -325,6 +328,62 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'common.durationHourShort',
   'common.durationMinuteShort',
   'cloudAgent.compute.perHour',
+  // The organization audit log's detail lines. Most of them are a formatted
+  // event whose words belong to another key: a `$t()` reference to the field,
+  // role, region or brand label the app already translates, or a lone
+  // `{{placeholder}}` the row fills with a value the reader supplied. A
+  // catalog that keeps the reference resolves it to its own language, so an
+  // identical value there is the finished translation, not a missing one. The
+  // keys that do carry words are absent from this list and must be translated.
+  'organization.auditLog.detail.autoRoutingAdded',
+  'organization.auditLog.detail.brand.github',
+  'organization.auditLog.detail.brand.gitlab',
+  'organization.auditLog.detail.brand.bitbucket',
+  'organization.auditLog.detail.brand.discord',
+  'organization.auditLog.detail.brand.slack',
+  'organization.auditLog.detail.brand.linear',
+  'organization.auditLog.detail.disabled',
+  'organization.auditLog.detail.enabled',
+  'organization.auditLog.detail.field.name',
+  'organization.auditLog.detail.field.slug',
+  'organization.auditLog.detail.field.roleDefinition',
+  'organization.auditLog.detail.field.whenToUse',
+  'organization.auditLog.detail.field.description',
+  'organization.auditLog.detail.field.customInstructions',
+  'organization.auditLog.detail.field.groups',
+  'organization.auditLog.detail.fieldChange',
+  'organization.auditLog.detail.fundsGranted',
+  'organization.auditLog.detail.guardrailIdentity',
+  'organization.auditLog.detail.guardrailStatus',
+  'organization.auditLog.detail.guardrailEnforcement',
+  'organization.auditLog.detail.guardrailSkill',
+  'organization.auditLog.detail.guardrailTarget.mcp',
+  'organization.auditLog.detail.guardrailTarget.skill',
+  'organization.auditLog.detail.memberRole',
+  'organization.auditLog.detail.region.us',
+  'organization.auditLog.detail.region.eu',
+  'organization.auditLog.detail.region.au',
+  'organization.auditLog.detail.region.jp',
+  'organization.auditLog.detail.reviewAgentPlatform',
+  // The rotation sentence is format only: the renderer joins two counted
+  // clauses, each translated in this catalog, so `{{values}}` reads the same in
+  // every language on purpose.
+  'organization.auditLog.detail.reviewAgentSecretRotated',
+  'organization.auditLog.detail.role.owner',
+  'organization.auditLog.detail.role.admin',
+  'organization.auditLog.detail.role.billing_manager',
+  'organization.auditLog.detail.role.member',
+  'organization.auditLog.detail.settingAdvancedPolicies',
+  'organization.auditLog.detail.settingBrowserControl',
+  'organization.auditLog.detail.settingDataCollection',
+  'organization.auditLog.detail.settingDefaultBehavior.auto',
+  'organization.auditLog.detail.settingDefaultBehavior.specific',
+  'organization.auditLog.detail.settingDefaultModelSet',
+  'organization.auditLog.detail.settingDefaultModelRemoved',
+  // The threshold on its own, for a balance-alert row whose recipient list was
+  // emptied. It is the money value the row already formats, so `{{threshold}}`
+  // reads the same in every language.
+  'organization.auditLog.detail.settingMinimumBalanceThreshold',
 ]);
 
 /**
@@ -408,6 +467,10 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
     '{{count}} agents': 'Catalan spells the plural agents the same way',
     '{{count}} secret': 'Catalan spells secret the same way in the singular',
     '{{count}} secrets': 'Catalan spells the plural secrets the same way',
+    '{{displayCount}} error':
+      'Catalan spells the noun "error" identically in the singular (DIEC: l\'error), so the counted one form matches',
+    '{{displayCount}} errors':
+      'Catalan plurals "error" as "errors", which is spelled identically to English, so the counted base and other forms match',
   },
   cs: {
     '{{count}} agent':
@@ -440,6 +503,10 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
   },
   eu: {
     token: 'Basque "token" is a loaned root (plural "tokenak"), so the one-category value matches',
+  },
+  es: {
+    '{{displayCount}} error':
+      'Spanish spells the noun "error" identically in the singular (RAE: el error), so the counted one form matches; the plural (errores) and the many form (de errores) are translated',
   },
   fi: {
     token: 'Finnish keeps the nominative singular token unchanged; its partitive is tokenia',
@@ -886,16 +953,27 @@ const VISIBILITY_KEYS = [
 ];
 
 /**
- * Catalog values that read the same in every language. `profiles.agents.topP`
+ * Catalog values that must read the same in every language. `profiles.agents.topP`
  * is the sampling parameter's published name, so a translated word would hide
  * which parameter the field sets; `profiles.mcp.jsonPlaceholder` is the JSON
  * sample the multiline field shows the reader, and a translated one stops
- * demonstrating the shape. A key listed here reads English in every catalog:
- * `checkVerbatimLabels` requires it, and `ENGLISH_IDENTICAL_ALLOWLIST` and,
- * for the JSON sample, `JSON_SAMPLE_EXEMPT_KEYS` exempt the same key from the
- * rules that would otherwise reject the identical or serialized value.
+ * demonstrating the shape. This list is the only registry of keys that must read
+ * English: `checkVerbatimLabels` requires it, and the identical-copy rules
+ * derive their exemption from it through `VERBATIM_KEY_SET`. The serialized-JSON
+ * rule exempts only `JSON_SAMPLE_KEY`, because a verbatim label still must not
+ * hold JSON text in English.
  */
 const VERBATIM_KEYS = ['profiles.agents.topP', 'profiles.mcp.jsonPlaceholder'];
+
+const VERBATIM_KEY_SET = new Set(VERBATIM_KEYS);
+
+/**
+ * Whether a key may read English here: one listed in `VERBATIM_KEYS` must,
+ * while one in `ENGLISH_IDENTICAL_ALLOWLIST` may.
+ */
+function expectsEnglishCopy(key) {
+  return VERBATIM_KEY_SET.has(key) || ENGLISH_IDENTICAL_ALLOWLIST.has(key);
+}
 
 function checkVerbatimLabels(values, english, label) {
   const problems = [];
@@ -1082,6 +1160,34 @@ function checkArmenianSentenceTerminator(tag, values, label) {
         `${label}: "${key}" ends a sentence with the ASCII "${mark}"; Armenian writes «։»`
       );
     }
+  }
+  return problems;
+}
+
+/**
+ * The Devanagari danda `।` (U+0964) closes a sentence in the scripts that
+ * write it. A catalog states its own sentence mark in `common.sentenceJoiner`,
+ * so a catalog that joins its sentences with another mark must not borrow it:
+ * a batch imported from a danda source leaves one screen with two sentence
+ * terminators, and the mark belongs to another script. The notifications push
+ * catalog carries no joiner at all and writes no sentence mark, so a danda
+ * there is reported too.
+ */
+function checkBorrowedDanda(values, label) {
+  const problems = [];
+  const joiner = values.get('common.sentenceJoiner');
+  if (typeof joiner === 'string' && joiner.startsWith('\u0964')) {
+    return problems;
+  }
+  for (const [key, value] of values) {
+    if (!value.includes('\u0964')) {
+      continue;
+    }
+    problems.push(
+      typeof joiner === 'string'
+        ? `${label}: "${key}" writes the Devanagari danda «।» while this catalog joins its sentences with "${joiner}"`
+        : `${label}: "${key}" writes the Devanagari danda «।», and this catalog writes no sentence mark of its own`
+    );
   }
   return problems;
 }
@@ -2027,20 +2133,19 @@ function isSerializedJson(value) {
 }
 
 /**
- * Catalog values whose text is literally a JSON sample the reader types
- * beside: the MCP form's multiline config placeholder shows the shape the
- * stored value takes, so its braces and quoted key are the content, not a
- * storage slip. The same key is registered in VERBATIM_KEYS (whose
- * checkVerbatimLabels requires the English text) and in
- * ENGLISH_IDENTICAL_ALLOWLIST (which exempts it from the "equals English
- * everywhere" failure), so a maintainer registering a sister key lists it in
- * all three.
+ * The one key whose text is a JSON sample by design: the MCP form's multiline
+ * config placeholder shows the shape the stored value takes, so its braces and
+ * quoted key are the content, not a storage slip. It is registered in
+ * `VERBATIM_KEYS` too, because `checkVerbatimLabels` requires the English text.
+ * Every other key, verbatim or not, still fails a serialized value — including
+ * the English catalog, where `checkVerbatimLabels` cannot see a deviation.
  */
-const JSON_SAMPLE_EXEMPT_KEYS = new Set(['profiles.mcp.jsonPlaceholder']);
+const JSON_SAMPLE_KEY = 'profiles.mcp.jsonPlaceholder';
 
 /** Reject a catalog value that a JSON encoder wrote instead of a label. */
 function checkSerializedJson(label, key, value) {
-  if (JSON_SAMPLE_EXEMPT_KEYS.has(key) || !isSerializedJson(value)) {
+  // Only the JSON sample is JSON text by design; every other label must be prose.
+  if (key === JSON_SAMPLE_KEY || !isSerializedJson(value)) {
     return [];
   }
   return [`${label}: "${key}" is serialized JSON; write the label text`];
@@ -2591,6 +2696,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkBorrowedDanda(translated, label));
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a
@@ -2643,7 +2749,7 @@ function checkMobileEnglishIdentical({ catalogName, english, localeValues }) {
     return problems;
   }
   for (const [key, englishValue] of english) {
-    if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
+    if (expectsEnglishCopy(key)) {
       continue;
     }
     // A value with prose of its own is judged per locale by
@@ -2685,7 +2791,7 @@ function checkMobileLocaleEnglishCopy({ catalogName, english, localeValues }) {
       if (translated.get(key) !== englishValue) {
         continue;
       }
-      if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
+      if (expectsEnglishCopy(key)) {
         continue;
       }
       if (!carriesEnglishProse(englishValue)) {

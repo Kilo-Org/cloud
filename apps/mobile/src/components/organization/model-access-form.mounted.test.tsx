@@ -130,6 +130,7 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 function element(
   providerAllowList: readonly string[] | undefined,
   overrides: {
+    canEdit?: boolean;
     catalogUnavailable?: boolean;
     catalogIsFetching?: boolean;
     onRetryCatalog?: () => void;
@@ -140,7 +141,7 @@ function element(
 ) {
   return createElement(ModelAccessForm, {
     organizationId: 'org-1',
-    canEdit: true,
+    canEdit: overrides.canEdit ?? true,
     canManageBilling: true,
     models: overrides.models ?? [],
     catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
@@ -160,6 +161,7 @@ function element(
 function render(
   providerAllowList: readonly string[] | undefined,
   overrides: {
+    canEdit?: boolean;
     catalogUnavailable?: boolean;
     catalogIsFetching?: boolean;
     onRetryCatalog?: () => void;
@@ -182,6 +184,7 @@ function render(
 function renderWithCatalog(
   providerAllowList: readonly string[] | undefined,
   overrides: {
+    canEdit?: boolean;
     catalogUnavailable?: boolean;
     modelDenyList?: readonly string[];
     catalog?: readonly CatalogModel[];
@@ -198,12 +201,15 @@ function renderWithCatalog(
 }
 
 /** Re-render the same form, so a mocked draft load can land after mount. */
-function rerender(providerAllowList: readonly string[] | undefined) {
+function rerender(
+  providerAllowList: readonly string[] | undefined,
+  overrides: { canEdit?: boolean } = {}
+) {
   if (!renderer) {
     throw new Error('Missing form renderer');
   }
   act(() => {
-    renderer?.update(element(providerAllowList));
+    renderer?.update(element(providerAllowList, overrides));
   });
   return renderer.root;
 }
@@ -969,6 +975,134 @@ describe('ModelAccessForm durable draft', () => {
     expect(list(root, 'ModelDenyList').props.draft).toEqual({
       providerAllowList: ['anthropic'],
       modelDenyList: [],
+    });
+  });
+
+  describe('ModelAccessForm for a viewer who may not manage the organization', () => {
+    // The lists are disabled for this viewer, so a stored draft cannot be
+    // theirs: the form shows the saved policy, Save stays off, and the draft
+    // stays in the store for a later session that holds the role again.
+    const stored = { providerAllowList: ['openai'], modelDenyList: ['anthropic/claude'] };
+
+    function renderAsViewer() {
+      draftStore.kind = 'ready';
+      draftStore.value = stored;
+      return render(['anthropic'], { canEdit: false });
+    }
+
+    it('shows the saved lists instead of the stored draft', () => {
+      const root = renderAsViewer();
+
+      expect(list(root, 'ModelDenyList').props.draft).toEqual({
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
+      });
+    });
+
+    it('leaves Save disabled', () => {
+      const root = renderAsViewer();
+
+      expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+    });
+
+    it('keeps the stored draft for a later editor session', () => {
+      renderAsViewer();
+
+      expect(draftStore.clear).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing when Save is pressed', async () => {
+      const root = renderAsViewer();
+
+      await pressSave(root);
+
+      expect(saved.mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('turns Save off when the role resolves to viewer under a dirty draft', async () => {
+      const root = render(['anthropic']);
+      const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+      changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+      expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+
+      // The edit is still there, so the dirty flag alone no longer refuses the
+      // write: the role has to, or the person could save from a screen that
+      // told them the policy is read-only.
+      const viewerRoot = rerender(['anthropic'], { canEdit: false });
+
+      expect(viewerRoot.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+      // The demoted session shows the organization's saved policy, not the edit
+      // it made while it held the role.
+      expect(list(viewerRoot, 'ModelDenyList').props.draft).toEqual({
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
+      });
+      // A clean draft disables Cancel, so no viewer press can clear the account's
+      // stored copy of the person's work.
+      const cancel = viewerRoot
+        .findAllByType('Button' as never)
+        .find(node => node.props.variant === 'outline');
+      expect(cancel?.props.disabled).toBe(true);
+      expect(draftStore.clear).not.toHaveBeenCalled();
+      await pressSave(viewerRoot);
+      expect(saved.mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('shows the person their edits again when the role returns to editor in the same mount', () => {
+      const root = render(['anthropic']);
+      const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+      changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+
+      rerender(['anthropic'], { canEdit: false });
+      const editorRoot = rerender(['anthropic'], { canEdit: true });
+
+      // The demoted render only hid the edit: it never discarded it, so coming
+      // back to the role restores what the person still had in the form.
+      expect(list(editorRoot, 'ModelDenyList').props.draft).toEqual({
+        providerAllowList: ['anthropic'],
+        modelDenyList: ['openai/gpt'],
+      });
+    });
+
+    it('adopts the stored draft when the role returns after a viewer changes tab', () => {
+      // The tab control stays available to a viewer, and looking at another
+      // tab is not an edit: the viewer's tab change must not count as touching
+      // the form, or the stored draft would never be adopted once the role
+      // arrives in the same mount and the person's next edit would overwrite
+      // the account's unfinished work.
+      draftStore.kind = 'ready';
+      draftStore.value = { providerAllowList: ['openai'], modelDenyList: [] };
+      const root = render(['anthropic'], { canEdit: false });
+
+      selectTab(root, 'providers');
+      const editorRoot = rerender(['anthropic'], { canEdit: true });
+
+      expect(list(editorRoot, 'ProviderAllowList').props.draft).toEqual({
+        providerAllowList: ['openai'],
+        modelDenyList: [],
+      });
+    });
+
+    it('ignores a stored draft that lands while the person is still a viewer', () => {
+      // A draft the store answers late belongs to a session that held the role:
+      // it must not move the lists a viewer is reading, and it stays in the
+      // store for the editor mount that will hold the role again.
+      const root = render(['anthropic'], { canEdit: false });
+
+      selectTab(root, 'providers');
+
+      draftStore.kind = 'ready';
+      draftStore.value = { providerAllowList: ['openai'], modelDenyList: ['anthropic/claude'] };
+      const viewerRoot = rerender(['anthropic'], { canEdit: false });
+      // The deny list renders only on its own tab, so this reads the pair the
+      // form still shows the viewer.
+      selectTab(viewerRoot, 'models');
+
+      expect(list(viewerRoot, 'ModelDenyList').props.draft).toEqual({
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
+      });
+      expect(draftStore.clear).not.toHaveBeenCalled();
     });
   });
 });

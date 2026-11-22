@@ -470,6 +470,88 @@ describe('genericPushContentForPushData', () => {
     });
   });
 
+  it.each([
+    [
+      'cloud_agent_session',
+      { type: 'cloud_agent_session', cliSessionId: 'cli1' },
+      'Your agent session has an update',
+    ],
+    [
+      'session_live_update',
+      {
+        type: 'session_live_update',
+        schemaVersion: 1,
+        event: 'end',
+        content: {
+          sessionId: 'ses-1',
+          title: 'Fix the login bug',
+          statusKind: 'running',
+          statusSince: '2026-01-01T00:00:00.000Z',
+          scheduledAt: null,
+          awaitingPermission: false,
+          approvalKey: null,
+          updatedAt: '2026-01-01T00:00:01.000Z',
+        },
+      },
+      'Your agent session has an update',
+    ],
+    [
+      'agent_briefing',
+      { type: 'agent_briefing', url: '/agent-briefing' },
+      'Your agent brief is ready',
+    ],
+    [
+      'active_agents_glanceable',
+      {
+        type: 'active_agents_glanceable',
+        schemaVersion: 1,
+        revision: 1,
+        scopeKey: 'scope-1',
+        organizationBound: false,
+        status: 'happy',
+        running: 1,
+        needsInput: 0,
+        idle: 0,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        expiresAt: '2026-01-01T08:00:00.000Z',
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      },
+      'Active agents have an update',
+    ],
+  ] as const)('shows the English generic banner for the %s push', (_label, payload, body) => {
+    expect(genericPushContentForPushData(pushDataSchema.parse(payload))).toEqual({
+      title: 'Kilo',
+      body,
+    });
+  });
+
+  it('gives the briefing and the glanceable card their own bodies', () => {
+    const briefing = pushDataSchema.parse({ type: 'agent_briefing', url: '/agent-briefing' });
+    const glanceable = pushDataSchema.parse({
+      type: 'active_agents_glanceable',
+      schemaVersion: 1,
+      revision: 1,
+      scopeKey: 'scope-1',
+      organizationBound: false,
+      status: 'happy',
+      running: 1,
+      needsInput: 0,
+      idle: 0,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2026-01-01T08:00:00.000Z',
+      needsInputSince: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(genericPushContentForPushData(briefing)).toEqual({
+      title: 'Kilo',
+      body: 'Your agent brief is ready',
+    });
+    expect(genericPushContentForPushData(glanceable)).toEqual({
+      title: 'Kilo',
+      body: 'Active agents have an update',
+    });
+  });
+
   it('returns the spend alert copy for the spend_alert variant', () => {
     const parsed = pushDataSchema.parse({
       type: 'spend_alert',

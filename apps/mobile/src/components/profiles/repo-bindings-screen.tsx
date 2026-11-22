@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { RepoBindingsEmptyState } from '@/components/profiles/repo-bindings-empty-state';
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { RepoBindingsAddForm } from '@/components/profiles/repo-bindings-add-form';
 import {
   chosenProfileOf,
@@ -29,6 +30,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useRepoBindingMutations,
   useRepoBindings,
@@ -75,6 +77,11 @@ export function RepoBindingsScreen({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const bindingsQuery = useRepoBindings(organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: bindingsQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const profileList = useAgentProfileList(organizationId);
   // Personal scope is always manageable; an organization bind, unbind or
@@ -86,6 +93,9 @@ export function RepoBindingsScreen({
   // (`ensureOrganizationManageAccess`), so the screen withholds those controls
   // instead of offering a write that comes back rejected.
   const canManage = profilePermission === 'allowed';
+  // A terminal read failure means the screen is not showing this profile's
+  // bindings at all, so the header must not offer to add one.
+  const readErrorTerminal = bindingsQuery.isError && !readError.showRetry;
 
   const [isAdding, setIsAdding] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<RepoOption | null>(null);
@@ -93,14 +103,17 @@ export function RepoBindingsScreen({
   const [repoPickerOpen, setRepoPickerOpen] = useState(false);
   const [profilePickerOpen, setProfilePickerOpen] = useState(false);
 
-  // The Add flow belongs to the permission it opened under, and the screen can
-  // learn a new permission while that flow is on screen: the sheets are native
-  // sheets over this route, so the route keeps focus and nothing else closes
-  // them. The flow therefore lasts only as long as the permission that allows
-  // it, and closing it here keeps every control it presents in step with the
-  // slot that decides whether Add is offered.
+  // The Add flow belongs to the permission and the read it opened under, and
+  // the screen can learn either while that flow is on screen: the sheets are
+  // native sheets over this route, so the route keeps focus and nothing else
+  // closes them. The flow therefore lasts only as long as the permission that
+  // allows it and a read that was not answered terminally, and closing it here
+  // keeps every control it presents in step with the slot that decides whether
+  // Add is offered. A terminal read failure removes the form and the header's
+  // create control, so an open sheet would sit over a state that no longer
+  // offers it.
   useEffect(() => {
-    if (canManage) {
+    if (canManage && !readErrorTerminal) {
       return;
     }
     setSelectedRepo(null);
@@ -108,7 +121,7 @@ export function RepoBindingsScreen({
     setIsAdding(false);
     setRepoPickerOpen(false);
     setProfilePickerOpen(false);
-  }, [canManage]);
+  }, [canManage, readErrorTerminal]);
 
   const repoOptions = useRepoOptions(organizationId, isAdding);
   const profileChoices =
@@ -200,7 +213,7 @@ export function RepoBindingsScreen({
         title={t('profiles.repoBindings.title')}
         backFallback={backFallback}
         headerRight={
-          canManage ? (
+          canManage && !readErrorTerminal ? (
             <IconButton
               accessibilityLabel={t('profiles.repoBindings.add')}
               onPress={() => {
@@ -229,10 +242,11 @@ export function RepoBindingsScreen({
         >
           {bindingsQuery.isError ? (
             <QueryError
-              variant="server"
+              variant={readError.variant}
               placement="top"
-              title={t('profiles.loadFailed')}
-              onRetry={() => void bindingsQuery.refetch()}
+              title={readError.titleKey ? t(readError.titleKey) : undefined}
+              message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+              onRetry={readError.showRetry ? () => void bindingsQuery.refetch() : undefined}
               isRetrying={bindingsQuery.isRefetching}
             />
           ) : null}
@@ -265,27 +279,31 @@ export function RepoBindingsScreen({
           ) : null}
 
           {/* The form opens from the header's create control, so the slot holds
-              the form or the sentence that names who may add one. */}
-          <ProfileManageSlot permission={profilePermission} organizationId={organizationId}>
-            {isAdding ? (
-              <RepoBindingsAddForm
-                chosenRepo={chosenRepo}
-                chosenProfile={chosenProfile}
-                isPending={bind.isPending}
-                canAdd={canAdd}
-                onPickRepo={() => {
-                  setRepoPickerOpen(true);
-                }}
-                onPickProfile={() => {
-                  setProfilePickerOpen(true);
-                }}
-                onCancel={resetAdd}
-                onAdd={() => {
-                  void handleAdd();
-                }}
-              />
-            ) : null}
-          </ProfileManageSlot>
+              the form or the sentence that names who may add one. A terminal
+              read failure already states who can grant access, so the slot
+              would repeat it under the same state. */}
+          {readErrorTerminal ? null : (
+            <ProfileManageSlot permission={profilePermission} organizationId={organizationId}>
+              {isAdding ? (
+                <RepoBindingsAddForm
+                  chosenRepo={chosenRepo}
+                  chosenProfile={chosenProfile}
+                  isPending={bind.isPending}
+                  canAdd={canAdd}
+                  onPickRepo={() => {
+                    setRepoPickerOpen(true);
+                  }}
+                  onPickProfile={() => {
+                    setProfilePickerOpen(true);
+                  }}
+                  onCancel={resetAdd}
+                  onAdd={() => {
+                    void handleAdd();
+                  }}
+                />
+              ) : null}
+            </ProfileManageSlot>
+          )}
         </TabScreenScrollView>
       )}
 
@@ -294,6 +312,7 @@ export function RepoBindingsScreen({
           repositories={repoOptions.repositories}
           isLoading={repoOptions.isLoading}
           isError={repoOptions.isError}
+          error={repoOptions.error}
           onRetry={() => {
             repoOptions.refetch();
           }}
@@ -314,6 +333,7 @@ export function RepoBindingsScreen({
           profiles={profileChoices}
           isLoading={profileList.isLoading}
           isError={profileList.isError}
+          error={profileList.error}
           isRefetching={profileList.isRefetching}
           selectedProfileId={selectedProfileId}
           emptyDescription={pickerEmptyDescription}

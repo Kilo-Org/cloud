@@ -1,5 +1,3 @@
-#!/usr/bin/env bun
-
 /**
  * Enforces the "no padded markdown tables" rule from AGENTS.md.
  *
@@ -9,9 +7,9 @@
  * check catches them.
  *
  * Usage:
- *   bun run script/check-md-table-padding.ts               # check all tracked *.md
- *   bun run script/check-md-table-padding.ts path/to/file.md [more.md ...]
- *   bun run script/check-md-table-padding.ts --fix [paths…] # rewrite in place
+ *   pnpm check:md-table-padding                # check all tracked *.md
+ *   pnpm check:md-table-padding path/to/file.md [more.md ...]
+ *   pnpm check:md-table-padding --fix [paths…] # rewrite in place
  *
  * What counts as a failure:
  *   - Separator row cells are anything other than `---`, `:---`, `---:`,
@@ -23,8 +21,9 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(import.meta.dir, '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const ok = new Set(['---', ':---', '---:', ':---:']);
 
@@ -222,6 +221,6 @@ console.error(
 console.error(
   'Fix: rewrite the table separator as |---|---| and use single-space padding on content cells.'
 );
-console.error('Or run: bun run script/check-md-table-padding.ts --fix');
+console.error('Or run: pnpm check:md-table-padding --fix');
 console.error('See AGENTS.md > Markdown Tables.');
 process.exit(1);

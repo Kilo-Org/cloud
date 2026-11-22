@@ -36,3 +36,10 @@ export const SECURITY_REMEDIATION_REJECTED_MESSAGE =
  * which is what lets the mobile ledger map it onto localized copy.
  */
 export const SECURITY_ANALYSIS_REJECTED_MESSAGE = 'Security analysis service request was rejected';
+
+/**
+ * The marker a submission receives when its operation identity is already
+ * running. The mobile ledger and the web copy match it by exact string, so it
+ * never varies.
+ */
+export const SECURITY_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';

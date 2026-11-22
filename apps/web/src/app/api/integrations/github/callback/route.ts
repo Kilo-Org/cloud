@@ -21,6 +21,7 @@ import {
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
+import { isInstallationAdministrationListingOverflow } from '@/lib/integrations/platforms/github/listing-budget';
 import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
 import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import {
@@ -555,12 +556,12 @@ async function handleCoreInstallFlow(params: {
   let exchangedGitHubUserId: string | null = null;
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
-    const rejectUnauthorizedInstallation = () =>
+    const rejectWithReason = (reason: string) =>
       NextResponse.redirect(
         new URL(
           isAppInitiated
-            ? appFallbackPath('error=not_installation_admin')
-            : appendQueryParam(redirectPath, 'error=not_installation_admin'),
+            ? appFallbackPath(`error=${reason}`)
+            : appendQueryParam(redirectPath, `error=${reason}`),
           APP_URL
         )
       );
@@ -570,7 +571,7 @@ async function handleCoreInstallFlow(params: {
         installation_id: installationId,
         setup_action: setupAction,
       });
-      return rejectUnauthorizedInstallation();
+      return rejectWithReason('not_installation_admin');
     }
 
     try {
@@ -594,7 +595,7 @@ async function handleCoreInstallFlow(params: {
           github_user_login: exchangeResult.login,
           installation_id: installationId,
         });
-        return rejectUnauthorizedInstallation();
+        return rejectWithReason('not_installation_admin');
       }
       if (typeof authorization !== 'boolean') {
         verifiedGitHubUserId = authorization.identity.id;
@@ -618,7 +619,10 @@ async function handleCoreInstallFlow(params: {
         },
         extra: { installationId },
       });
-      return rejectUnauthorizedInstallation();
+      if (isInstallationAdministrationListingOverflow(error)) {
+        return rejectWithReason('installation_listing_too_large');
+      }
+      return rejectWithReason('not_installation_admin');
     }
   }
 
@@ -682,6 +686,29 @@ async function handleCoreInstallFlow(params: {
       return NextResponse.redirect(new URL(appFallbackPath('error=installation_failed'), APP_URL));
     }
     throw error;
+  }
+
+  // A suspended installation reaches no repository, so this request records
+  // nothing: it answers with the unavailable-installation outcome, and the
+  // recorded state stays as the provider's own webhooks wrote it until GitHub
+  // reports the installation active again.
+  if (
+    (setupAction === 'install' || setupAction === 'update') &&
+    installation.suspended_at != null
+  ) {
+    captureMessage('GitHub callback for a suspended installation', {
+      level: 'warning',
+      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
+      extra: { installationId, suspendedAt: installation.suspended_at },
+    });
+    if (isAppInitiated) {
+      return NextResponse.redirect(
+        new URL(appFallbackPath('error=installation_unavailable'), APP_URL)
+      );
+    }
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, 'error=installation_unavailable'), APP_URL)
+    );
   }
 
   // Get selected repositories

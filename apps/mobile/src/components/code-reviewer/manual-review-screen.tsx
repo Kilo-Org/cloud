@@ -259,7 +259,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       return true;
     }
   );
-  const { models } = useReviewerModels(scope);
+  const reviewerModels = useReviewerModels(scope);
   const [modelChoice, setModelChoice] = useState<ModelChoice | null>(null);
   const effectiveModel = modelChoice ?? {
     modelSlug: config.data?.modelSlug ?? '',
@@ -468,9 +468,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             {/* flex-row so the pill hugs its content instead of stretching to column width */}
             <View className="flex-row">
               <ModelSelector
-                options={models}
+                options={reviewerModels.models}
                 value={effectiveModel.modelSlug}
                 variant={effectiveModel.thinkingEffort ?? ''}
+                isLoading={reviewerModels.isLoading}
+                onRetryModels={() => {
+                  void reviewerModels.refetch();
+                }}
                 acceptsVariant
                 onSelect={(modelId, variant) => {
                   setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });

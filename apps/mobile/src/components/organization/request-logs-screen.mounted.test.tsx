@@ -1,19 +1,24 @@
 /* eslint-disable max-lines -- one mounted suite covers the screen's gate, its four body states, the window stepper and the row fields */
 
 // Request-logs screen state contract: the billing-role gate, the skeleton while a
-// window loads, a retryable failure that offers the retry, a refusal that offers
-// none, the empty state, the row's fields, the truncation notice, and the window
-// stepper that is both the time range and the paging. The query layer is mocked
-// so each state is driven directly through the screen JSX, the same way the
-// audit-log suite does it.
+// window loads, one failure body whose copy and retry come from the shared
+// failure classifier, the empty state, the row's fields, the truncation notice,
+// the window stepper that is both the time range and the paging, and a pull that
+// refetches the read in place and announces its failure. The query layer is
+// mocked so each state is driven directly through the screen JSX, the same way
+// the audit-log suite does it.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
+// The side-effect registration of the i18n module rides on the named import
+// above; the screen reaches this adapter through `use-manual-refresh`, and
+// importing the mocked module here is how the test reads its spy.
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { canStepOlderTo, HISTORY_DAYS } from './request-log-window';
 import { OrganizationRequestLogsScreen } from './request-logs-screen';
 
@@ -57,7 +62,6 @@ vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
     return {
       data: logsQuery.data,
       error: logsQuery.error,
-      isPending: false,
       isFetching: logsQuery.isFetching,
       refetch: logsQuery.refetch,
     };
@@ -67,7 +71,8 @@ vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
 // `vi.mock` factories are hoisted above this file's imports, so they import
 // `createElement` themselves rather than closing over the top-level import.
 // The list is a native list in production; here it renders the rows and the
-// footer element it was given, so the suite can read them.
+// footer element it was given, and forwards its own props (the pull control
+// among them) onto the host node, so the suite reads them from there.
 vi.mock('@shopify/flash-list', async () => {
   const { createElement: h, Fragment: fragment } = await import('react');
   return {
@@ -78,7 +83,7 @@ vi.mock('@shopify/flash-list', async () => {
     }) =>
       h(
         'FlashList',
-        null,
+        props,
         props.data.map((item, index) =>
           h(fragment, { key: index }, props.renderItem({ item, index }) as never)
         ),
@@ -87,7 +92,18 @@ vi.mock('@shopify/flash-list', async () => {
   };
 });
 
-vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+// The screen's empty and failure bodies ride in `TabScreenScrollView`, so a
+// pull handed to a `placement="top"` state (which renders no scroller and drops
+// the prop) would never reach the gesture. The stub forwards every prop onto a
+// host node, so the suite reads the control from the scroller the screen
+// actually renders.
+vi.mock('@/components/tab-screen', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    useTabBarBottomPadding: () => 0,
+    TabScreenScrollView: (props: { children?: unknown }) => h('TabScreenScrollView', props),
+  };
+});
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
@@ -107,6 +123,10 @@ vi.mock('@/components/ui/directional-icons', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
+// The failed pull announces through this adapter, and the real module pulls
+// native deps; the spy records the screen's announcement instead.
+vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
 
 vi.mock('@/components/organization/organization-boundary', async () => {
   const { createElement: h } = await import('react');
@@ -188,6 +208,22 @@ function mount() {
 
 type Handler = () => void;
 
+/** Props a pull-to-refresh control carries. */
+type PullControl = ReactElement<{ refreshing: boolean; onRefresh: () => void }>;
+
+/**
+ * The pull gesture a pull-to-refresh surface carries; a missing one fails the
+ * test. The control is a host stub here (`'RefreshControl'`), so it is read
+ * from the host's props rather than found by type.
+ */
+function pullControl(host: ReactTestInstance): PullControl {
+  const control = host.props.refreshControl as PullControl | undefined;
+  if (!control) {
+    throw new Error(`${String(host.type)} rendered no pull control`);
+  }
+  return control;
+}
+
 /** The element's callback, narrowed out of the renderer's untyped props. */
 function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onRetry'): Handler | undefined {
   const handler: unknown = node.props[name];
@@ -208,6 +244,9 @@ beforeEach(() => {
   logsQuery.error = null;
   logsQuery.isFetching = false;
   logsQuery.refetch.mockClear();
+  // The pull reads the settled result, so the spy resolves one by default.
+  logsQuery.refetch.mockResolvedValue({ isError: false });
+  vi.mocked(announcingToast.error).mockClear();
   boundary.organizationId = 'org-1';
   boundary.role = 'owner';
   boundary.isResolving = false;
@@ -236,7 +275,26 @@ describe('OrganizationRequestLogsScreen', () => {
     unmount();
   });
 
-  it('offers the retry a transient failure can use', async () => {
+  it('names the connection for a failure that never reached the server', async () => {
+    // The read settles instead of pausing, so an offline cold start fails with
+    // the transport rejection rather than a paused read.
+    logsQuery.error = new TypeError('Network request failed');
+    const { renderer, unmount } = await mount();
+
+    const [error] = renderer.root.findAllByType('QueryError');
+    expect(error?.props.variant).toBe('offline');
+    // The failure replaced the skeleton, which is the point of settling.
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
+    await act(() => {
+      if (error) {
+        handlerOf(error, 'onRetry')?.();
+      }
+    });
+    expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('offers the retry a server failure can use', async () => {
     logsQuery.error = { data: { code: 'INTERNAL_SERVER_ERROR', message: 'boom' } };
     const { renderer, unmount } = await mount();
 
@@ -258,6 +316,31 @@ describe('OrganizationRequestLogsScreen', () => {
     const [error] = renderer.root.findAllByType('QueryError');
     expect(error?.props.variant).toBe('permission');
     // Asking again returns the same verdict, so the state has no action.
+    expect(error?.props.onRetry).toBeUndefined();
+    unmount();
+  });
+
+  it('names a removed window as not-found and offers no retry', async () => {
+    logsQuery.error = { data: { code: 'NOT_FOUND', message: 'no such organization' } };
+    const { renderer, unmount } = await mount();
+
+    const [error] = renderer.root.findAllByType('QueryError');
+    expect(error?.props.variant).toBe('not-found');
+    expect(error?.props.onRetry).toBeUndefined();
+    unmount();
+  });
+
+  it('keeps its own copy for a terminal failure that no retry can fix', async () => {
+    // The procedure rejects a start time outside its own bound with a bad
+    // request, and the device clock supplies that time, so this branch is
+    // reachable from the screen. Its state withholds the retry, so the copy
+    // must not promise one.
+    logsQuery.error = { data: { code: 'BAD_REQUEST', message: 'Start time must be recent' } };
+    const { renderer, unmount } = await mount();
+
+    const [error] = renderer.root.findAllByType('QueryError');
+    expect(error?.props.variant).toBe('server');
+    expect(error?.props.message).toBe("Couldn't load request logs.");
     expect(error?.props.onRetry).toBeUndefined();
     unmount();
   });
@@ -406,6 +489,104 @@ describe('OrganizationRequestLogsScreen', () => {
 
     const [header] = renderer.root.findAllByType('ScreenHeader');
     expect(header?.props.title).toBe(i18n.t('organization.settingsOnWeb.requestLogs'));
+    unmount();
+  });
+});
+
+describe('OrganizationRequestLogsScreen pull to refresh', () => {
+  // The pull is read from the scroller the screen actually renders, never from
+  // the state inside it: a `placement="top"` state renders no scroller and
+  // drops a `refreshControl`, so a pull handed to one would leave the gesture
+  // with nowhere to land while the suite still passed.
+  it('puts the pull on the scroller over the empty hour and refetches from it', async () => {
+    // The hour settled with no rows, so this scroller carries the only pull.
+    logsQuery.data = [];
+    const { renderer, unmount } = await mount();
+
+    const [scroller] = renderer.root.findAllByType('TabScreenScrollView');
+    if (!scroller) {
+      throw new Error('the empty hour rendered no scroller');
+    }
+    const control = pullControl(scroller);
+    expect(control.type).toBe('RefreshControl');
+    expect(control.props.refreshing).toBe(false);
+    expect(logsQuery.refetch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
+    // The pull succeeded, so nothing is announced.
+    expect(announcingToast.error).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('puts the pull on the scroller over the failure body and refetches from it', async () => {
+    // A failure that never left the device: the body is the only surface, so a
+    // reader with no connection must still be able to pull the read again.
+    logsQuery.error = new TypeError('Network request failed');
+    const { renderer, unmount } = await mount();
+
+    const [scroller] = renderer.root.findAllByType('TabScreenScrollView');
+    if (!scroller) {
+      throw new Error('the failure body rendered no scroller');
+    }
+    const control = pullControl(scroller);
+    expect(control.type).toBe('RefreshControl');
+    expect(logsQuery.refetch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('announces a failed pull once and keeps the empty copy on screen', async () => {
+    // The read already settled empty; only the pull's own verdict fails, so the
+    // screen announces it instead of replacing what is on screen.
+    logsQuery.data = [];
+    logsQuery.refetch.mockResolvedValue({ isError: true });
+    const { renderer, unmount } = await mount();
+
+    const [scroller] = renderer.root.findAllByType('TabScreenScrollView');
+    if (!scroller) {
+      throw new Error('the empty hour rendered no scroller');
+    }
+
+    await act(async () => {
+      pullControl(scroller).props.onRefresh();
+      await Promise.resolve();
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledTimes(1);
+    expect(announcingToast.error).toHaveBeenCalledWith(i18n.t('common.couldNotRefresh'));
+    const [stillEmpty] = renderer.root.findAllByType('EmptyState');
+    expect(stillEmpty?.props.title).toBe('No requests in this hour');
+    unmount();
+  });
+
+  it('keeps the list branch on its own pull, not in the state scroller', async () => {
+    logsQuery.data = entries(2);
+    const { renderer, unmount } = await mount();
+
+    // The rows are a virtualized list, so its own pull is the only one; nesting
+    // it in the state scroller would break the list's recycling.
+    expect(renderer.root.findAllByType('TabScreenScrollView')).toHaveLength(0);
+    const [list] = renderer.root.findAllByType('FlashList');
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    const control = pullControl(list);
+    expect(control.type).toBe('RefreshControl');
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
     unmount();
   });
 });

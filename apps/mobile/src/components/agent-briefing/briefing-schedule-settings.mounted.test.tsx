@@ -179,7 +179,31 @@ describe('briefing schedule validation', () => {
     });
   });
 
-  it('shows overlapping periods inline and sends no mutation', () => {
+  it('names the empty night window inline and sends no mutation', () => {
+    const renderer = mount();
+    press(row(renderer, 1));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 8, 0));
+    press(all(renderer, 'Button').at(-1) as Node);
+    expect(mutate).not.toHaveBeenCalled();
+    expect(renderedTexts(renderer)).toContain('agentBriefing.scheduleEmptyNight');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('names the empty morning window inline and sends no mutation', () => {
+    const renderer = mount();
+    press(row(renderer, 3));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 8, 0));
+    press(all(renderer, 'Button').at(-1) as Node);
+    expect(mutate).not.toHaveBeenCalled();
+    expect(renderedTexts(renderer)).toContain('agentBriefing.scheduleEmptyMorning');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('names the full-day periods inline, clears the message on the next pick, and sends no mutation', () => {
     const renderer = mount();
     press(row(renderer, 1));
     choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 8, 0));
@@ -187,7 +211,11 @@ describe('briefing schedule validation', () => {
     choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 6, 0));
     press(all(renderer, 'Button').at(-1) as Node);
     expect(mutate).not.toHaveBeenCalled();
-    expect(renderedTexts(renderer)).toContain('agentBriefing.invalidSchedule');
+    expect(renderedTexts(renderer)).toContain('agentBriefing.scheduleFullDay');
+    // Its own refusal leaves the surface as soon as a picker changes a time.
+    press(row(renderer, 1));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 23, 0));
+    expect(renderedTexts(renderer)).not.toContain('agentBriefing.scheduleFullDay');
     act(() => {
       renderer.unmount();
     });

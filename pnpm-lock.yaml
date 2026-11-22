@@ -96,6 +96,9 @@ catalogs:
     ulid:
       specifier: 3.0.2
       version: 3.0.2
+    undici:
+      specifier: 7.30.1
+      version: 7.30.1
     vitest:
       specifier: 4.1.12
       version: 4.1.12
@@ -169,7 +172,6 @@ overrides:
   qs: 6.16.1
   smol-toml: 1.9.0
   uuid@<11.1.1: 11.1.1
-  serialize-javascript: '>=7.0.3 <8'
   hono: 4.13.16
   '@modelcontextprotocol/sdk@1.29.0': 1.32.2
   '@simplewebauthn/server>@peculiar/asn1-schema': 2.9.4
@@ -1571,7 +1573,7 @@ importers:
   packages/app-shared:
     dependencies:
       '@kilocode/organization-entitlement':
-        specifier: 'workspace:*'
+        specifier: workspace:*
         version: link:../organization-entitlement
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
@@ -1611,6 +1613,9 @@ importers:
 
   packages/cloud-agent-profile:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../app-shared
       '@kilocode/db':
         specifier: workspace:*
         version: link:../db
@@ -2215,7 +2220,7 @@ importers:
         specifier: 7.4.18
         version: 7.4.18
       undici:
-        specifier: 7.30.1
+        specifier: 'catalog:'
         version: 7.30.1
       uuid:
         specifier: 11.1.1
@@ -2471,6 +2476,9 @@ importers:
       '@kilocode/cloud-agent-profile':
         specifier: workspace:*
         version: link:../../packages/cloud-agent-profile
+      '@kilocode/cloud-agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/cloud-agent-sdk
       '@kilocode/container-usage':
         specifier: workspace:*
         version: link:../../packages/container-usage
@@ -10125,6 +10133,7 @@ packages:
   '@sapphire/shapeshift@4.0.0':
     resolution: {integrity: sha512-d9dUmWVA7MMiKobL3VpLF8P2aeanRTu6ypG2OIaEv/ZHH/SUQ2iHOVyi5wAPjQ+HmnMuL0whK9ez8I/raWbtIg==}
     engines: {node: '>=v16'}
+    deprecated: Shapeshift was created when other validation libraries had significant limitations in performance and error reporting. Those advantages have diminished as libraries such as Zod have become faster and improved their error messages, while also gaining broader environment support, a larger community, and custom error printers.
 
   '@sapphire/snowflake@3.5.3':
     resolution: {integrity: sha512-jjmJywLAFoWeBi1W7994zZyiNWPIiqRRNAmSERxyg93xRGzNYvGjlZ0gR6x0F4gPRi2+0O6S71kOZYyr3cxaIQ==}

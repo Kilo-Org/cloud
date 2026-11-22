@@ -1,4 +1,5 @@
 import { fetchNativeSnapshot, projectNativeSnapshot } from './native-sync-snapshot';
+import { NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import {
   readKilo2Messages,
   hasUnresolvedKilo2Assets,
@@ -1713,6 +1714,155 @@ describe('authorized native snapshot attachments', () => {
         })
       ).success
     ).toBe(false);
+  });
+});
+
+describe('retained native attachment bodies', () => {
+  const messageID = 'msg_media_cache';
+  /** One user message with a stored attachment for each index, all at `bytes` advertised bytes. */
+  function mediaSnapshot(indexes: number[], bytes = 3): unknown[] {
+    const files = indexes.map(index => ({
+      mime: 'image/png',
+      name: `image-${index}.png`,
+      uri: `media:${hashOf(index)}`,
+      source: { type: 'inline' },
+    }));
+    return [
+      entity('message', messageID, {
+        seq: 0,
+        message: { id: messageID, type: 'user', time: { created: 1 }, text: 'inspect', files },
+      }),
+      ...indexes.map((index, position) =>
+        entity('asset', `asset-${index}`, {
+          entity: { kind: 'message', id: messageID },
+          pointer: `/message/files/${position}`,
+          reference: `media:${hashOf(index)}`,
+          mime: 'image/png',
+          blob: { hash: hashOf(index), bytes },
+        })
+      ),
+    ];
+  }
+  /** The `data:` URL each attachment of `indexes` resolves to, keyed by its asset identity. */
+  function expectedURLs(indexes: number[], bytes = 3): Record<string, string> {
+    const bytesValue = new Uint8Array(bytes).fill(1);
+    const url = `data:image/png;base64,${Buffer.from(bytesValue).toString('base64')}`;
+    return Object.fromEntries(
+      indexes.map((index, position) => [
+        kilo2AssetKey(kilo2PartId(messageID, position + 1), `media:${hashOf(index)}`, 'image/png'),
+        url,
+      ])
+    );
+  }
+  /** A binary reader that answers the authorized byte count with a fixed body. */
+  function reader(): jest.Mock<Promise<ArrayBuffer>, [string, number]> {
+    return jest.fn(async (_path: string, bytes: number) => new Uint8Array(bytes).fill(1).buffer);
+  }
+  /** Read `indexes` once, asserting every attachment resolved to its expected `data:` URL. */
+  async function readAssets(
+    indexes: number[],
+    bytes: number,
+    readAsset: jest.Mock<Promise<ArrayBuffer>, [string, number]>,
+    cache?: NativeSnapshotBlobCache
+  ): Promise<void> {
+    const snapshot = await fetchNativeSnapshot(
+      snapshotFetch(mediaSnapshot(indexes, bytes)).request,
+      sessionID,
+      undefined,
+      readAsset,
+      cache
+    );
+    expect(snapshot.assetURLs).toEqual(expectedURLs(indexes, bytes));
+  }
+
+  it('answers a later read of the same session from the cache without downloading again', async () => {
+    const cache = new NativeSnapshotBlobCache(1024);
+    const readAsset = reader();
+    await readAssets([0, 1], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(2);
+    await readAssets([0, 1], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(2);
+  });
+
+  it('downloads again on a later read of the same session without a cache', async () => {
+    const readAsset = reader();
+    await readAssets([0, 1], 3, readAsset);
+    await readAssets([0, 1], 3, readAsset);
+    expect(readAsset).toHaveBeenCalledTimes(4);
+  });
+
+  it('resolves a snapshot larger than the cache budget and reuses its own bodies across a retry', async () => {
+    // Each entry costs 4 * 2 + (10 + 64) * 2 = 156 bytes, its body text plus its keys. Against
+    // a 320-byte budget the cache holds two of the three, so only this call's own settled bodies
+    // keep the final asset loop answerable.
+    const cache = new NativeSnapshotBlobCache(320);
+    const entities = mediaSnapshot([0, 1, 2]);
+    const readAsset = reader();
+    await readAssets([0, 1, 2], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(3);
+    // The budget held two bodies, so a second call re-downloads only the evicted oldest one.
+    await readAssets([0, 1, 2], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(4);
+
+    // Within one call, a retry reuses every body the earlier attempt settled. A budget that
+    // holds a single 156-byte entry keeps this independent of the shared cache: attempt two must
+    // serve two bodies from the call's own store and read only the one that failed.
+    let failed = false;
+    const retrying = jest.fn(async (path: string, bytes: number) => {
+      if (!failed && path.endsWith(hashOf(2))) {
+        failed = true;
+        throw Object.assign(new Error('Reclaimed'), { code: 'blob_not_found' });
+      }
+      return new Uint8Array(bytes).fill(1).buffer;
+    });
+    const resolved = await fetchNativeSnapshot(
+      fakeFetch([
+        { path: sessionPath, body: state() },
+        { path: pagePath(), body: page(entities) },
+        { path: sessionPath, body: state() },
+        { path: pagePath(), body: page(entities) },
+      ]).request,
+      sessionID,
+      undefined,
+      retrying,
+      new NativeSnapshotBlobCache(156)
+    );
+    expect(resolved.assetURLs).toEqual(expectedURLs([0, 1, 2]));
+    // Two bodies settled before the failure; only the reclaimed one is read a second time.
+    const asked = (index: number) =>
+      retrying.mock.calls.filter(([path]) => path.endsWith(hashOf(index))).length;
+    expect([asked(0), asked(1), asked(2)]).toEqual([1, 1, 2]);
+
+    // A budget below one retained entry (156 bytes here) keeps nothing, so each call reads all
+    // three again.
+    const tiny = new NativeSnapshotBlobCache(155);
+    const again = reader();
+    await readAssets([0, 1, 2], 3, again, tiny);
+    await readAssets([0, 1, 2], 3, again, tiny);
+    expect(again).toHaveBeenCalledTimes(6);
+  });
+
+  it('evicts the oldest retained body so re-reading it downloads again', async () => {
+    // A 156-byte budget holds exactly one retained entry, keys included.
+    const cache = new NativeSnapshotBlobCache(156);
+    const readAsset = reader();
+    await readAssets([0], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(1);
+    // A second body evicts the first.
+    await readAssets([1], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(2);
+    // The evicted body is downloaded again.
+    await readAssets([0], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not serve a retained body whose advertised size changed', async () => {
+    const cache = new NativeSnapshotBlobCache(1024);
+    const readAsset = reader();
+    await readAssets([0], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(1);
+    await readAssets([0], 4, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(2);
   });
 });
 

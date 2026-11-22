@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 import { agent_configs, platform_integrations } from '@kilocode/db/schema';
 import { CodeReviewAgentConfigSchema } from '@kilocode/db/schema-types';
+import { BITBUCKET_MAX_REPOSITORY_ITEMS } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { BITBUCKET_CODE_REVIEW_WEBHOOK_SIGNING_KEYS } from '@kilocode/web-shared/lib/config.server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -115,7 +116,10 @@ function selectedRepositoryFromConfig(
     return null;
   }
 
-  const repositories = z.array(CachedRepositorySchema).safeParse(integrationRepositories);
+  const repositories = z
+    .array(CachedRepositorySchema)
+    .max(BITBUCKET_MAX_REPOSITORY_ITEMS)
+    .safeParse(integrationRepositories);
   if (!repositories.success) return null;
   const repository = repositories.data.find(candidate => candidate.id === repositoryUuid);
   if (!repository) return null;

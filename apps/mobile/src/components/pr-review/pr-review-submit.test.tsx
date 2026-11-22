@@ -1,6 +1,7 @@
 /* eslint-disable promise/prefer-await-to-callbacks -- exercises work scheduled through the native idle callback */
 /* eslint-disable max-lines -- the submit suite covers queue retention, the footer preference, and the refused-submit wording wiring in one cohesive file */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutation and drafts factories settle without await because they resolve immediately */
+import { type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -176,6 +177,8 @@ const ITEM_STALE: PendingReviewItem = {
 
 let latestItems: PendingReviewItem[] = [];
 let addCommentFn: ((item: PendingReviewItem) => void) | null = null;
+/** Stable across the re-renders one test drives, so a dismissal is observable. */
+const dismissMock = vi.fn(() => undefined);
 
 function Consumer() {
   const value = usePendingReview();
@@ -192,35 +195,50 @@ const GITLAB_REF: ProviderPrRef = {
   mrIid: 42,
 };
 
+function submitSheet(prRef?: ProviderPrRef): ReactElement {
+  // The sheet requests the post-submit prompt through the
+  // FeedbackPromptProvider host mounted by the PR-review layout, so the
+  // mount mirrors that wiring.
+  return (
+    <FeedbackPromptProvider>
+      <PendingReviewProvider>
+        <Consumer />
+        <PrReviewSubmit
+          owner="acme"
+          repo="kilo"
+          number={42}
+          headSha="head-1"
+          title={SUBMIT_TITLE}
+          eyebrow="acme/kilo#42"
+          prRef={prRef}
+          onDismiss={dismissMock}
+        />
+      </PendingReviewProvider>
+    </FeedbackPromptProvider>
+  );
+}
+
 function mount(prRef?: ProviderPrRef): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   act(() => {
-    renderer = TestRenderer.create(
-      // The sheet requests the post-submit prompt through the
-      // FeedbackPromptProvider host mounted by the PR-review layout, so the
-      // mount mirrors that wiring.
-      <FeedbackPromptProvider>
-        <PendingReviewProvider>
-          <Consumer />
-          <PrReviewSubmit
-            owner="acme"
-            repo="kilo"
-            number={42}
-            headSha="head-1"
-            title={SUBMIT_TITLE}
-            eyebrow="acme/kilo#42"
-            prRef={prRef}
-            onDismiss={vi.fn(() => undefined)}
-          />
-        </PendingReviewProvider>
-      </FeedbackPromptProvider>
-    );
+    renderer = TestRenderer.create(submitSheet(prRef));
   });
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
   if (!renderer) {
     throw new Error('Failed to mount PrReviewSubmit');
   }
   return renderer;
+}
+
+/**
+ * Re-render the sheet after the mocked mutation's error changed. The real
+ * hook re-renders its consumer when the mutation settles; this mock returns a
+ * plain snapshot, so the test has to drive that render itself.
+ */
+function update(renderer: TestRenderer.ReactTestRenderer, prRef?: ProviderPrRef): void {
+  act(() => {
+    renderer.update(submitSheet(prRef));
+  });
 }
 
 async function flush(): Promise<void> {
@@ -265,6 +283,8 @@ beforeEach(() => {
   });
   latestItems = [];
   addCommentFn = null;
+  dismissMock.mockReset();
+  dismissMock.mockImplementation(() => undefined);
   submitMutationMock.mutateAsync.mockReset();
   submitMutationMock.mutateAsync.mockResolvedValue(undefined);
   submitMutationMock.error = null;
@@ -511,5 +531,103 @@ describe('PrReviewSubmit refused-submit wording (s6f)', () => {
           "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request."
       )
     ).toBe(true);
+  });
+});
+
+// ── reconnect latch ──────────────────────────────────────────────────
+
+/** The precondition the server rejects a submit with once the connection expired. */
+function reconnectError(): Error {
+  return Object.assign(new Error('GitHub connection expired'), {
+    data: { code: 'PRECONDITION_FAILED' },
+  });
+}
+
+function forbiddenError(): Error {
+  return Object.assign(new Error('You cannot perform the requested action'), {
+    data: { code: 'FORBIDDEN' },
+  });
+}
+
+/** The mocked notice node, whose props are the host contract under test. */
+function findReconnectNotice(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  const notice = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice')[0];
+  if (!notice) {
+    throw new Error('Reconnect notice not found');
+  }
+  return notice.props as Record<string, unknown>;
+}
+
+/** The notice's callback, which the confirmed check the notice ran calls. */
+function connectionRestored(renderer: TestRenderer.ReactTestRenderer): () => void {
+  const callback = findReconnectNotice(renderer).onConnectionRestored;
+  if (typeof callback !== 'function') {
+    throw new TypeError('Reconnect notice has no onConnectionRestored prop');
+  }
+  return callback as () => void;
+}
+
+/** Queue two fresh comments and let a submit fail with `error`. */
+async function failSubmit(renderer: TestRenderer.ReactTestRenderer, error: Error): Promise<void> {
+  act(() => {
+    addCommentFn?.(ITEM_FRESH_A);
+    addCommentFn?.(ITEM_FRESH_B);
+  });
+  submitMutationMock.mutateAsync.mockRejectedValueOnce(error);
+  act(() => {
+    submitOnPress(renderer, 'Submit review')();
+  });
+  await flush();
+  // The mocked hook returns its error as a snapshot, so the sheet only sees it
+  // on the render after the settle that the real hook schedules itself.
+  submitMutationMock.error = error;
+  update(renderer);
+}
+
+describe('PrReviewSubmit reconnect latch', () => {
+  it('blocks submit and keeps the queue when a submit fails on the expired connection', async () => {
+    const renderer = mount();
+    await failSubmit(renderer, reconnectError());
+
+    // The latch owns the footer CTA, and the failed attempt drains nothing:
+    // both queued comments stay available for the retry the notice enables.
+    expect(findSubmitButton(renderer).disabled).toBe(true);
+    expect(findReconnectNotice(renderer)).toBeDefined();
+    expect(latestItems.map(item => item.id)).toEqual(['fresh-a', 'fresh-b']);
+    expect(dismissMock).not.toHaveBeenCalled();
+  });
+
+  it('re-enables submit on the same queue once the notice confirms the connection', async () => {
+    const renderer = mount();
+    await failSubmit(renderer, reconnectError());
+    expect(findSubmitButton(renderer).disabled).toBe(true);
+
+    act(() => {
+      connectionRestored(renderer)();
+    });
+
+    // The confirmed check clears only the latch: the queue is untouched, the
+    // sheet stays open, and nothing is resubmitted on the user's behalf.
+    expect(findSubmitButton(renderer).disabled).toBe(false);
+    expect(latestItems.map(item => item.id)).toEqual(['fresh-a', 'fresh-b']);
+    expect(dismissMock).not.toHaveBeenCalled();
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a forbidden refusal latched when a stale check confirms the connection', async () => {
+    const renderer = mount();
+    await failSubmit(renderer, reconnectError());
+    // The check the notice started is still in flight when a newer attempt
+    // fails for a reason a working connection cannot explain.
+    const staleCallback = connectionRestored(renderer);
+    submitMutationMock.error = forbiddenError();
+    update(renderer);
+    expect(findSubmitButton(renderer).disabled).toBe(true);
+
+    act(() => {
+      staleCallback();
+    });
+
+    expect(findSubmitButton(renderer).disabled).toBe(true);
   });
 });

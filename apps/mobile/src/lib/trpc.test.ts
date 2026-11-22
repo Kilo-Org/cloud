@@ -151,6 +151,30 @@ describe('getAuthHeaders', () => {
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('reads TOKEN_EXPIRES_AT_KEY once for a session with only a token', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    const headers = await loadHeaders();
+
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    // Cold path: one token read plus one expiry read.
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+
+    // The completed read found no stored expiry, which is a resolved answer:
+    // normal requests read neither key again instead of retrying the cold read.
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+
+    // `afterEach` resets the module registry, so the owner must be loaded from
+    // the same graph as `./trpc` inside the case rather than imported statically.
+    const { getActiveTokenSnapshot } = await import('@/lib/auth/token-owner');
+    expect(getActiveTokenSnapshot()).toMatchObject({
+      token: 'stored-token',
+      expiry: { kind: 'absent' },
+    });
+  });
+
   it('sends the app product token as the User-Agent on every tRPC call', async () => {
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
@@ -188,7 +212,7 @@ describe('getAuthHeaders', () => {
     // the newer expiry instead of having been overwritten by it.
     expect(getActiveTokenSnapshot()).toMatchObject({
       token: 'newer-token',
-      expiresAtMs: newerExpiresAt,
+      expiry: { kind: 'known', atMs: newerExpiresAt },
     });
   });
 
@@ -207,7 +231,10 @@ describe('getAuthHeaders', () => {
       // the request.
       expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
       // An unknown expiry is not published as a known one.
-      expect(getActiveTokenSnapshot()).toMatchObject({ token: 'held-token', expiresAtMs: null });
+      expect(getActiveTokenSnapshot()).toMatchObject({
+        token: 'held-token',
+        expiry: { kind: 'unknown' },
+      });
 
       // A later request behaves the same: the expiry is still unknown.
       await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
@@ -223,7 +250,7 @@ describe('getAuthHeaders', () => {
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('token-expires-at');
     expect(getActiveTokenSnapshot()).toMatchObject({
       token: 'held-token',
-      expiresAtMs: storedExpiresAt,
+      expiry: { kind: 'known', atMs: storedExpiresAt },
     });
   });
 
@@ -784,6 +811,21 @@ describe('latency wiring', () => {
     }
     expect(condition({ path: 'kiloPass.getState', context: {} })).toBe(false);
     expect(condition({ path: 'some.unlisted.procedure', context: {} })).toBe(false);
+  });
+
+  // The server admits a blocked account only for a request whose every call is
+  // a self-cleanup procedure, so each cleanup must ride the single link alone.
+  it('routes every self-cleanup procedure to the single link', async () => {
+    const { condition } = await loadLatencyLinks();
+
+    for (const path of [
+      'user.revokeCurrentDeviceSession',
+      'user.unregisterPushToken',
+      'user.unregisterActivityToken',
+    ]) {
+      expect(condition({ path, context: {} })).toBe(true);
+    }
+    expect(condition({ path: 'organizations.list', context: {} })).toBe(false);
   });
 
   it('keeps the explicit skipBatch override for every path', async () => {

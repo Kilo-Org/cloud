@@ -234,6 +234,9 @@ describe('getOpenAiChatGptByokModelIds', () => {
     await expect(
       getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
     ).resolves.toBeNull();
+    // The key decides first, as in routing: an unconfigured deployment must not
+    // read and decrypt the stored row to learn it cannot tag anything.
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
   });
 
   it('never tags a gpt-oss model', async () => {
@@ -817,11 +820,12 @@ describe('checkOpenAiChatGptByok', () => {
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
   });
 
-  it('returns no provider without the deployment partner key, keeping the existing route', async () => {
+  it('returns no provider without the deployment partner key, without touching the stored connection', async () => {
     process.env.OPENAI_CHATGPT_API_KEY = '   ';
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(USER_OWNER);
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 
   it('builds no provider without the deployment partner key', () => {
@@ -1154,6 +1158,72 @@ describe('delegated request normalization', () => {
     expect((await normalize({ input, tools: [namespace('files')] })).input).toEqual(original);
   });
 
+  it('leaves items unchanged for a large tool tree with unmatched calls', async () => {
+    const tools = Array.from({ length: 200 }, (_unused, namespaceIndex) => ({
+      type: 'namespace',
+      name: `namespace_${namespaceIndex}`,
+      tools: Array.from({ length: 20 }, (_other, toolIndex) => ({
+        type: toolIndex % 2 === 0 ? 'function' : 'custom',
+        name: `tool_${namespaceIndex}_${toolIndex}`,
+        parameters: {},
+        strict: false,
+      })),
+    }));
+    const input = [
+      ...Array.from({ length: 500 }, (_unused, index) => ({
+        type: 'function_call',
+        name: `missing_function_${index}`,
+        call_id: `call_function_${index}`,
+        arguments: '{}',
+      })),
+      ...Array.from({ length: 500 }, (_unused, index) => ({
+        type: 'custom_tool_call',
+        name: `missing_custom_${index}`,
+        call_id: `call_custom_${index}`,
+        input: '{}',
+      })),
+    ];
+    const original = structuredClone(input);
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
+  it('does not add a namespace when two entries share the name and the nested tool', async () => {
+    const input = [{ type: 'function_call', name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+    const tools = [namespace('files'), namespace('files')];
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
+  it('adds the namespace when one entry repeats the nested tool name', async () => {
+    const body = await normalize({
+      input: [{ type: 'function_call', name: 'read', call_id: 'short' }],
+      tools: [
+        {
+          type: 'namespace',
+          name: 'files',
+          tools: [
+            { type: 'function', name: 'read', parameters: {}, strict: false },
+            { type: 'function', name: 'read', parameters: {}, strict: false },
+          ],
+        },
+      ],
+    });
+
+    expect(body.input).toEqual([
+      { type: 'function_call', name: 'read', call_id: 'short', namespace: 'files' },
+    ]);
+  });
+
+  it('does not add a namespace when a same-named tool of another top-level type exists', async () => {
+    const input = [{ type: 'function_call', name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+    const tools = [namespace('files'), { type: 'web_search', name: 'read' }];
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
   it('is deterministic and leaves a normalized body unchanged on its second pass', async () => {
     const fields = {
       model: 'openai/gpt-6.1-sol',
@@ -1266,6 +1336,16 @@ describe('shared-services routing', () => {
     expect(result?.kind).toBe('provider');
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
     expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('returns no provider before consulting the shared connection without the deployment partner key', async () => {
+    process.env.OPENAI_CHATGPT_API_KEY = '';
+
+    await expect(
+      checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID, botId: 'reviewer' }))
+    ).resolves.toBeNull();
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 
   it('falls back to the caller own connection when the organization has no shared connection', async () => {

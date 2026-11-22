@@ -19,7 +19,11 @@ import {
 
 import { ShortCenteredBandProvider } from '@/components/centered-state-band';
 import { useStateSurface } from '@/components/centered-state-surface';
-import { RefreshProgress } from '@/components/ui/refresh-progress';
+import {
+  REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT,
+  RefreshProgress,
+} from '@/components/ui/refresh-progress';
+import { useProvidedMotionPolicy } from '@/lib/a11y/motion-context';
 import {
   getCenteredStateBandStyle,
   getCenteredStateLayout,
@@ -92,6 +96,11 @@ export function CenteredState({
   const surface = useStateSurface();
   const windowSize = useWindowDimensions();
   const shortBand = isShortViewport(windowSize.width, windowSize.height);
+  const reducedMotion = useProvidedMotionPolicy()?.reducedMotion ?? false;
+  // The box `RefreshProgress` reserves above the caller's children under reduced
+  // motion — exactly the decoration the placement must look past, so the visible
+  // stack centres in the band rather than the box that carries it.
+  const topReserve = refreshControl && reducedMotion ? REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT : 0;
   // The clip the band lives in: the window, in the same window coordinates the
   // scroller reports through `measureInWindow`. Measured bands carry sub-pixel
   // noise — a re-measure of the same layout can report a different fraction of
@@ -232,6 +241,7 @@ export function CenteredState({
       bottomInset,
       nativeViewportFillsSurface,
       nativeViewportBottom: boundsBottom,
+      topReserve,
     };
     if (contentHeight === null) {
       return getCenteredStateBandStyle(band);
@@ -249,6 +259,7 @@ export function CenteredState({
     measuredViewport,
     nativeViewportFillsSurface,
     topInset,
+    topReserve,
   ]);
   // The pending placement centers in the scroller and carries the caller's
   // bottom reserve, so the band the surface reserved (the fixed tab bar) stays
@@ -285,8 +296,10 @@ export function CenteredState({
     if (layout && !holdForSurface) {
       return layout;
     }
-    return estimateFits || unplaceable ? getPendingCenteredStateStyle(bottomInset) : null;
-  }, [bottomInset, estimateFits, holdForSurface, layout, unplaceable]);
+    return estimateFits || unplaceable
+      ? getPendingCenteredStateStyle(bottomInset, topReserve)
+      : null;
+  }, [bottomInset, estimateFits, holdForSurface, layout, topReserve, unplaceable]);
   useEffect(() => {
     if (placement !== null && !hasPainted) {
       setHasPainted(true);

@@ -347,10 +347,13 @@ export function NotificationHistoryScreen() {
                       ? 'notifications.history.emptyTitle'
                       : 'notifications.history.emptyCategoryTitle'
                   )}
-                  // The retention window describes the whole list, not one category.
+                  // The retention window describes the whole list, not one
+                  // category. The count selects the day-noun form: a language
+                  // whose numeral needs its own case reads it from the family.
                   description={
                     category === null
                       ? t('notifications.history.emptyBody', {
+                          count: NOTIFICATION_HISTORY_RETENTION_DAYS,
                           days: NOTIFICATION_HISTORY_RETENTION_DAYS,
                         })
                       : undefined

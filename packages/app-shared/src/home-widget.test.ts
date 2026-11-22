@@ -326,6 +326,33 @@ describe('Home-only widget policy', () => {
     });
   });
 
+  it('withholds Approve and its key from a terminal snapshot that still carries an approvable permission row', () => {
+    const approvalKey = 'a'.repeat(64);
+    // A built terminal payload has empty details, so the gate is only reachable by
+    // forcing the status on a payload whose counts and key survived.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey }],
+    });
+    expect(data.snapshot.needsApproval).toBe(1);
+    expect(data.snapshot.needsInput).toBe(1);
+    expect(data.details.approvalKey).toBe(approvalKey);
+    expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+      canApprove: true,
+      approvalKey,
+    });
+    for (const status of ['signed_out', 'privacy'] as const) {
+      data.snapshot.status = status;
+      expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+        status,
+        canApprove: false,
+        approvalKey: null,
+      });
+      // The details survive; only the presentation gate drops them.
+      expect(data.details.approvalKey).toBe(approvalKey);
+    }
+  });
+
   it('offers Approve only from a permission row and keeps the count key-independent', () => {
     const questionKey = 'a'.repeat(64);
     // Both rows need input, only the permission row can be approved. The

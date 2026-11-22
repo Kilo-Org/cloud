@@ -6,6 +6,7 @@ import { PartDetailTransitionFixture } from '@/components/agents/part-detail-tra
 const fixtureParams = z.object({
   open: z.enum(['file', 'missing']).optional(),
   state: z.enum(['completed', 'running']).optional(),
+  media: z.enum(['loaded', 'failed', 'superseded']).optional(),
 });
 const fixturePartIds = { file: 'part-detail-transition-file', missing: 'missing-part' };
 
@@ -14,11 +15,13 @@ export default function PartDetailTransitionFixtureRoute() {
   const initialPartId =
     parsed.success && parsed.data.open ? fixturePartIds[parsed.data.open] : undefined;
   const state = parsed.success ? parsed.data.state : undefined;
+  const media = parsed.success ? parsed.data.media : undefined;
   return __DEV__ ? (
     <PartDetailTransitionFixture
-      key={`${initialPartId ?? 'chat'}:${state ?? 'completed'}`}
+      key={`${initialPartId ?? 'chat'}:${state ?? 'completed'}:${media ?? 'none'}`}
       initialPartId={initialPartId}
       state={state}
+      media={media}
     />
   ) : (
     <Redirect href="/(auth)/login" />

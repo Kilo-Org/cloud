@@ -494,8 +494,8 @@ tsx services/cloud-agent-next/test/e2e/run.ts large-stream _
 tsx services/cloud-agent-next/test/e2e/run.ts concurrent-chats _
 
 # Callback delivery — the scenario opens a callback sink and asserts on receipt.
-# `callbackTarget` is accepted by prepareSession only, so these scenarios pin
-# `api: 'legacy'` themselves; `--api=legacy` is not needed. Under local Docker
+# The scenarios use unified `start` and register `callbackTarget` after boot
+# through internal `updateSession`. Under local Docker
 # the sink is a host HTTP server (workerd can POST http://127.0.0.1:<ephemeral>
 # on the same host; no tunnel). Over HTTP the sink is the e2e surface
 # (`POST /__e2e/callbacks`) and the Worker self-fetches the returned URL. Use the
@@ -1192,9 +1192,9 @@ reusable catalog of planned and existing scenarios, see
 | `interrupt-mid-stream` | Interrupt an actively paced fake request and assert the active message is interrupted, not a queued message. |
 | `unknown-model` | Use a model rejected by the fake validation route and require synchronous rejection before sandbox creation or fake chat dispatch. |
 | `auth-reject` | Probes the deployed fake Worker's public auth boundary (model routes and `/test/*`) with/without valid bearers; declares `deployedHttpAuthBoundary`, so it is unsupported locally. |
-| `callback-completion` | Open the profile's callback sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
+| `callback-completion` | Run a cold `echo:warmup` turn, then register the callback sink and run `echo:done`. After the completed callback, verify the boot result still has its own stream-correlated assistant ID and `warmup` text, completed preparation with no failed step, and no failure. Verify the follow-up result has a different assistant ID and matches the callback text. Both results must match the callback's non-empty branch. |
 | `callback-batch-followup` | Queue two turns behind a paced callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback and no extra one after the batch settles. |
-| `callback-interrupt` | Paced active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
+| `callback-interrupt` | Interrupt an active paced turn. Require the callback and message result to report `interrupted` with failure stage `interruption` and code `user_interrupt`. Verify the result's retryability and branch match the callback. |
 | `worktree-multi-chat-parallel` | New-plane only (`controlPlaneV2` + `controlPlaneRuntime`). See the new-plane table above: proves two chats stream at the same instant. |
 | `control-plane-callbacks` | New-plane only. See the new-plane table above: new-plane callback + persisted `cloud_agent_session_runs` report row. |
 | `command` | New-plane only. See the new-plane table above: `/compact` command and a required increase in the Kilo summary count. |

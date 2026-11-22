@@ -18,15 +18,22 @@ import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-gr
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { SCREEN_GUTTER_DP } from '@/lib/layout';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
   hasRetentionBudget,
   reconcileFirstPage,
   withInfiniteRetention,
 } from '@/lib/query/infinite-retention';
-import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { reportReceiptRoute } from '@/lib/report-receipt-route';
-import { APPEAL_KEYS, statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
+import {
+  APPEAL_KEYS,
+  REASON_KEYS,
+  statusLabel,
+  TARGET_KEYS,
+  TRIAGE_KEYS,
+} from '@/lib/report-receipt-status';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -37,12 +44,26 @@ const PAGE_SIZE = 30;
 /** Retained pages; the bound refuses the next page rather than dropping the newest. */
 const MAX_PAGES = 10;
 
+/**
+ * The row's parts are described in one line, so a list of reports reads as a
+ * list of things rather than a stack of unrelated settings. `·` matches the
+ * separator the app's other lead-plus-detail rows use.
+ */
+const SEPARATOR = ' · ';
+
 const listStyle = { flex: 1 } satisfies ViewStyle;
 // The page gutter and the top pad live on the content container; the cells are
 // one continuous grouped card, so no per-cell inset and no gap between them.
+//
+// Both branches take this one style, so the skeleton keeps the geometry of the
+// rows that replace it: the gutter is the app's single page inset, the same one
+// the header and the receipt this list opens use, and the top pad is the 14pt
+// the loading branch's `pt-4` painted before (the native rem is 14pt). One
+// inset value for both axes is what stops the card moving 2dp sideways and 2dp
+// up the moment the first page settles.
 const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingTop: 16,
+  paddingHorizontal: SCREEN_GUTTER_DP,
+  paddingTop: SCREEN_GUTTER_DP,
 } satisfies ViewStyle;
 
 /**
@@ -144,7 +165,7 @@ export function ReportReceiptsScreen() {
       />
       <View className="flex-1">
         {loading ? (
-          <TabScreenScrollView className="flex-1" contentContainerClassName="px-4 pt-4">
+          <TabScreenScrollView className="flex-1" contentContainerStyle={listContentContainerStyle}>
             {/* The loaded rows are one grouped card, so the reserve is one. */}
             <RowGroup>
               <RowSkeleton subtitle />
@@ -185,29 +206,48 @@ export function ReportReceiptsScreen() {
             style={listStyle}
             data={items}
             keyExtractor={item => item.receiptId}
-            renderItem={({ item, index }) => (
-              <RowGroupItem
-                position={rowGroupPosition({
-                  first: index === 0,
-                  last: index === items.length - 1,
-                })}
-              >
-                <RowFrame
-                  title={statusLabel(TRIAGE_KEYS, item.triageStatus)}
-                  subtitle={{ text: timeAgo(parseTimestamp(item.createdAt), undefined, now) }}
-                  // A second line only when the reader has appealed, so a report
-                  // without one keeps the row it has always had.
-                  secondSubtitle={
-                    item.appealStatus === 'none'
-                      ? undefined
-                      : { text: statusLabel(APPEAL_KEYS, item.appealStatus) }
-                  }
-                  onPress={() => {
-                    router.push(reportReceiptRoute(item.receiptId));
-                  }}
-                />
-              </RowGroupItem>
-            )}
+            renderItem={({ item, index }) => {
+              const target = statusLabel(TARGET_KEYS, item.targetKind);
+              const reason = statusLabel(REASON_KEYS, item.reason);
+              const triage = statusLabel(TRIAGE_KEYS, item.triageStatus);
+              const age = timeAgo(parseTimestamp(item.createdAt), undefined, now);
+              // The appeal line is only drawn when the reader appealed, so a
+              // report without one keeps the row it has always had. It names
+              // itself as the appeal: the triage line above it can already hold
+              // the same word (a rejected report and a declined appeal share
+              // one), and a bare second status reads as the report's own.
+              const appeal =
+                item.appealStatus === 'none'
+                  ? undefined
+                  : t('profile.reportReceipt.appealStatusLine', {
+                      status: statusLabel(APPEAL_KEYS, item.appealStatus),
+                    });
+              // A screen reader hears the whole row in one pass: what was
+              // reported, why, how it was decided, and the appeal when there is
+              // one. The visual lines are separate nodes, so each is also
+              // joined with '.' here.
+              const lead = [target, reason].join(SEPARATOR);
+              const outcome = [triage, age].join(SEPARATOR);
+              const spoken = [lead, outcome, appeal].filter(part => part !== undefined);
+              return (
+                <RowGroupItem
+                  position={rowGroupPosition({
+                    first: index === 0,
+                    last: index === items.length - 1,
+                  })}
+                >
+                  <RowFrame
+                    title={lead}
+                    subtitle={{ text: outcome }}
+                    secondSubtitle={appeal === undefined ? undefined : { text: appeal }}
+                    accessibilityLabel={spoken.join('. ')}
+                    onPress={() => {
+                      router.push(reportReceiptRoute(item.receiptId));
+                    }}
+                  />
+                </RowGroupItem>
+              );
+            }}
             contentContainerStyle={listContentContainerStyle}
             // FlashList adds its own control from this pair; the element
             // below is for the state scrollers that accept one.

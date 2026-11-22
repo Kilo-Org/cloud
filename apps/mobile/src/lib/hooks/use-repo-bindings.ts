@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { toast } from 'sonner-native';
 
+import { pickReadError } from '@/components/profiles/profile-read-error-view';
 import { mergeRepositoryOptions, type RepoOption } from '@/components/profiles/repo-bindings-model';
 import { agentProfileMutationErrorMessage } from '@/lib/agent-profile-error-copy';
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
@@ -46,6 +47,7 @@ export function useRepoBindings(organizationId?: string) {
     bindings: query.data ?? NO_BINDINGS,
     isLoading: query.isPending,
     isError: query.isError,
+    error: query.error,
     isRefetching: query.isRefetching,
     refetch: query.refetch,
   };
@@ -128,6 +130,9 @@ export function useRepoOptions(organizationId: string | undefined, enabled: bool
     repositories,
     isLoading: enabled && (github.isPending || gitlab.isPending),
     isError: github.isError || gitlab.isError,
+    // Two parallel reads can fail for different reasons; the picker classifies
+    // the terminal one, because that is the cause no retry can clear.
+    error: pickReadError([github.error, gitlab.error]),
     isRefetching: github.isRefetching || gitlab.isRefetching,
     refetch: () => {
       void github.refetch();

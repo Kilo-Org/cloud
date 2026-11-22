@@ -1,15 +1,16 @@
 export type RemoteMcpUrlProblem = 'invalidUrl' | 'credentials' | 'fragment' | 'insecureEndpoint';
 
 /**
- * The copy key each URL refusal is said with. The form already refuses every
- * URL it cannot normalize with `fieldUrlInvalid`, so the toast says the same
- * thing the form said, and no other key exists for these.
+ * The copy key each URL refusal is said with, one key per problem. The form and
+ * the toast both read this map, so the sentence under the field is the sentence
+ * the toast shows. `fieldUrlInvalid` is only for a value that does not parse;
+ * a URL the policy refuses for another reason says why.
  */
 export const REMOTE_MCP_URL_ERROR_KEYS = {
   invalidUrl: 'modelChat.mcp.fieldUrlInvalid',
-  credentials: 'modelChat.mcp.fieldUrlInvalid',
-  fragment: 'modelChat.mcp.fieldUrlInvalid',
-  insecureEndpoint: 'modelChat.mcp.fieldUrlInvalid',
+  credentials: 'modelChat.mcp.fieldUrlCredentials',
+  fragment: 'modelChat.mcp.fieldUrlFragment',
+  insecureEndpoint: 'modelChat.mcp.fieldUrlInsecure',
 } as const satisfies Record<RemoteMcpUrlProblem, string>;
 
 export class RemoteMcpUrlError extends Error {

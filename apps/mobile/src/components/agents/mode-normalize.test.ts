@@ -88,6 +88,15 @@ describe('visibleProfileAgents', () => {
     const agent = { ...base, config: { mode: 'subagent' } };
     expect(visibleProfileAgents([agent])).toHaveLength(0);
   });
+
+  it('drops a stored agent whose id belongs to the CLI', () => {
+    const agents = [
+      { ...base, slug: 'explore', name: 'Explore', config: {} },
+      { ...base, slug: 'title', name: 'Title', config: { mode: 'primary' } },
+      { ...base, slug: 'reviewer', name: 'Reviewer', config: {} },
+    ];
+    expect(visibleProfileAgents(agents).map(a => a.slug)).toEqual(['reviewer']);
+  });
 });
 
 describe('customModeOptionsFromProfileAgents', () => {

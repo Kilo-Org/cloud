@@ -37,7 +37,10 @@ import {
 import { AgentModeSchema, AgentVariantSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
-import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
+import {
+  SAFE_FAILURE_MESSAGE_MAX_LENGTH,
+  SafeFailureProjectionSchema,
+} from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
 import { GetEgressAuditInputSchema } from '../shared/egress-audit.js';
 import { mcpServersRecordSchema } from '../shared/prepare-session-limits.js';
@@ -1406,6 +1409,15 @@ export const GetMessageResultOutput = z
     completionSource: SessionMessageCompletionSourceSchema.optional(),
     failure: SafeFailureProjectionSchema.extend({ retryable: z.boolean() }).optional(),
     gateResult: z.enum(['pass', 'fail']).optional(),
+    branch: z.string().optional(),
+    preparation: z
+      .object({
+        status: z.enum(['running', 'completed', 'failed']),
+        failedStepLabel: z.string().optional(),
+        reason: z.string().max(SAFE_FAILURE_MESSAGE_MAX_LENGTH).optional(),
+      })
+      .strict()
+      .optional(),
     assistant: z
       .object({
         messageId: z.string(),
@@ -1416,10 +1428,8 @@ export const GetMessageResultOutput = z
   })
   .strict()
   .superRefine((result, ctx) => {
-    const isTerminal =
-      result.status === 'completed' ||
-      result.status === 'failed' ||
-      result.status === 'interrupted';
+    const isFailedOrInterrupted = result.status === 'failed' || result.status === 'interrupted';
+    const isTerminal = result.status === 'completed' || isFailedOrInterrupted;
     if (result.status === 'queued' && result.acceptedAt !== undefined) {
       ctx.addIssue({
         code: 'custom',
@@ -1441,11 +1451,15 @@ export const GetMessageResultOutput = z
         path: ['completionSource'],
       });
     }
-    if (
-      result.status !== 'failed' &&
-      result.status !== 'interrupted' &&
-      result.failure !== undefined
-    ) {
+    if (isFailedOrInterrupted) {
+      if (result.failure?.stage === undefined || result.failure.code === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Failed or interrupted results require failure stage and code',
+          path: ['failure'],
+        });
+      }
+    } else if (result.failure !== undefined) {
       ctx.addIssue({
         code: 'custom',
         message: 'Only failed or interrupted results can include failure details',

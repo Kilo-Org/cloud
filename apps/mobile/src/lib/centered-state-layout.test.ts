@@ -432,3 +432,88 @@ describe('intersectStateFrames', () => {
     });
   });
 });
+
+describe('centered state top reserve', () => {
+  // `RefreshProgress` reserves a 31.5dp box above the caller's children under
+  // reduced motion. That box is decoration, not the state, so every placement
+  // looks past it: the visible stack centres in the band and the box that
+  // carries it sits half the reserve higher.
+  const RESERVE = 31.5;
+
+  it('centres the visible stack rather than the box that carries the reserve', () => {
+    const geometry = { window: { top: 0, bottom: 800 }, viewport: { top: 0, bottom: 800 } };
+    const reserved = getCenteredStateLayout({
+      ...geometry,
+      contentHeight: 200,
+      topReserve: RESERVE,
+    });
+    // The stack starts one reserve below the box, and its centre is the band's.
+    expect(renderedTop(reserved, 0, 200) + RESERVE + (200 - RESERVE) / 2).toBe(400);
+    expect(renderedTop(reserved, 0, 200)).toBe(284.25);
+    // No reserve is the whole box: today's placement stands unchanged.
+    expect(renderedTop(getCenteredStateLayout({ ...geometry, contentHeight: 200 }), 0, 200)).toBe(
+      300
+    );
+  });
+
+  it.each([
+    {
+      name: 'a centred band',
+      window: { top: 0, bottom: 800 },
+      viewport: { top: 0, bottom: 800 },
+      contentHeight: 200,
+      centre: 400,
+    },
+    {
+      name: 'a stack one gap short of the band',
+      window: { top: 0, bottom: 200 },
+      viewport: { top: 0, bottom: 200 },
+      // The strip where the layout engine and the measured layout part company
+      // starts one gap and one reserve below the band, because the reserve is
+      // part of the box both of them centre.
+      contentHeight: 200 - 2 * 16 - RESERVE,
+      centre: 100,
+    },
+  ])('paints the first frame and the measured placement at one point in $name', band => {
+    const { contentHeight, centre, ...frames } = band;
+    const geometry = { ...frames, topReserve: RESERVE };
+    const bandStyle = getCenteredStateBandStyle(geometry);
+    const layout = getCenteredStateLayout({ ...geometry, contentHeight });
+    const pending = getPendingCenteredStateStyle(0, RESERVE);
+    const measuredTop = renderedTop(layout, frames.viewport.top, contentHeight);
+    expect(measuredTop + RESERVE + (contentHeight - RESERVE) / 2).toBe(centre);
+    expect(renderedTop(bandStyle, frames.viewport.top, contentHeight)).toBeCloseTo(measuredTop, 6);
+    expect(
+      renderedTop(
+        { ...pending, minHeight: frames.viewport.bottom - frames.viewport.top },
+        frames.viewport.top,
+        contentHeight
+      )
+    ).toBeCloseTo(measuredTop, 6);
+  });
+
+  it('keeps an overflowing stack at the top of the scroll content under a reserve', () => {
+    const geometry = { window: { top: 0, bottom: 800 }, viewport: { top: 0, bottom: 800 } };
+    const layout = getCenteredStateLayout({ ...geometry, contentHeight: 900, topReserve: RESERVE });
+    // The reserve is the content box's own first band, and that box cannot start
+    // above the scroller's top, so an overflowing box gives up the one gap: the
+    // padding clamps to 0 and the visible stack starts at the reserve rather
+    // than one gap below the scroller's top.
+    expect(layout).toEqual({ minHeight: 800, paddingTop: 0, paddingBottom: 16 });
+    expect(layout.paddingTop).toBeGreaterThanOrEqual(0);
+    expect(renderedTop(layout, 0, 900)).toBe(0);
+    expect(renderedTop(layout, 0, 900) + RESERVE).toBe(RESERVE);
+    // The unreserved stack keeps the one gap it has always had.
+    expect(getCenteredStateLayout({ ...geometry, contentHeight: 900 }).paddingTop).toBe(16);
+  });
+
+  it('clamps a reserve larger than the content it decorates', () => {
+    const geometry = { window: { top: 0, bottom: 800 }, viewport: { top: 0, bottom: 800 } };
+    // A reserve taller than the reported content is the whole box: it must not
+    // invert the placement or reach a padding below zero.
+    const layout = getCenteredStateLayout({ ...geometry, contentHeight: 20, topReserve: 40 });
+    expect(layout.paddingTop).toBeGreaterThanOrEqual(0);
+    // The visible stack is empty, so it sits at the band's centre.
+    expect(renderedTop(layout, 0, 20) + 20).toBe(400);
+  });
+});

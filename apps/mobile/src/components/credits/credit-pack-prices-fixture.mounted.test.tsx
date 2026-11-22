@@ -93,8 +93,7 @@ vi.mock('react-native-keyboard-controller', () => ({
 }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 
-const CONNECTION_TILE =
-  'Could not connect to the App Store. Check your connection and try again.';
+const CONNECTION_TILE = 'Could not connect to the App Store. Check your connection and try again.';
 const TIMEOUT_TILE = "App Store didn't respond in time. Try again.";
 
 function textOf(instance: TestRenderer.ReactTestInstance): string {

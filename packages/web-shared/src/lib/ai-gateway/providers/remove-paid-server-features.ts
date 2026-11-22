@@ -27,11 +27,17 @@ function getServerToolType(tool: unknown): string | null {
   return tool.type === 'function' || tool.type === 'custom' ? null : tool.type;
 }
 
+// An array is used as is and a single value is wrapped, so the predicate and the mutator always
+// inspect the same list.
+function toPluginArray(value: unknown): unknown[] {
+  return value === undefined || value === null ? [] : Array.isArray(value) ? value : [value];
+}
+
 /** Whether the request asks for a plugin or server tool that a gateway bills separately. */
 export function requestsPaidServerFeatures(request: GatewayRequest): boolean {
   // The request body is unvalidated client JSON, so its declared types are not trusted here.
   const body: { tools?: unknown; plugins?: unknown } = request.body;
-  const plugins = body.plugins === undefined || body.plugins === null ? [] : [body.plugins].flat();
+  const plugins = toPluginArray(body.plugins);
   return (
     plugins.some(plugin => !isFreePlugin(plugin)) ||
     (Array.isArray(body.tools) && body.tools.some(tool => getServerToolType(tool) !== null))
@@ -55,10 +61,7 @@ export function removePaidServerFeatures(
   // The request body is unvalidated client JSON, so its declared types are not trusted here.
   const body: { tools?: unknown; tool_choice?: unknown } = requestToMutate.body;
   const { tools, tool_choice } = body;
-  const plugins: unknown = requestToMutate.body.plugins;
-
-  const requestedPlugins: unknown[] =
-    plugins === undefined || plugins === null ? [] : Array.isArray(plugins) ? plugins : [plugins];
+  const requestedPlugins = toPluginArray(requestToMutate.body.plugins);
   const removedPlugins = requestedPlugins.filter(plugin => !isFreePlugin(plugin));
   const keptPlugins: OpenRouterPlugin[] = [
     ...requestedPlugins.filter(isFreePlugin),

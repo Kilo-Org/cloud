@@ -287,15 +287,14 @@ describe('SessionPageSheet mounted', () => {
     });
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
-    // The focus sink comes first in the tree but paints nothing and takes no
-    // space, so the header still leads what the sheet shows.
     // The sink leads the tree but paints nothing and takes no space, so the
     // header is still the first thing the sheet shows. Read the surface's own
-    // element children and drop the sink from that list.
-    const visible = findByType(renderer.root, 'SheetHeader').filter(
-      node => node.parent === surface
+    // children in order and drop the sink: the header must be what remains.
+    const ordered = (surface?.children ?? []).map(child =>
+      typeof child === 'object' ? String(child.type) : ''
     );
-    expect(visible).toHaveLength(1);
+    const firstVisible = ordered.find(type => type !== '' && type !== 'SheetFocusSink');
+    expect(firstVisible).toBe('SheetHeader');
 
     const header = findByType(renderer.root, 'SheetHeader')[0];
     if (!header) {

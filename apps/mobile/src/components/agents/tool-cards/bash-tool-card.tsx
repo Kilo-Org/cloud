@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
-import { ltrValueTextStyle } from '@/lib/rtl-text';
+import { codeFieldTextStyle } from '@/lib/rtl-text';
 
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
@@ -33,11 +33,13 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
     <View className="gap-2">
       {command.length > 0 ? (
         <View className={TOOL_VALUE_SURFACE_CLASS}>
-          {/* A command is copied verbatim: pinning its direction keeps the RTL
-              base mark out of the copied text (see `rtlBaseMarkedChildren`). */}
+          {/* A command is code that must copy verbatim: the code field's own
+              style keeps it on the left in every interface (not on the label's
+              start edge) and pins its direction, which also keeps the RTL base
+              mark out of the copied text (see `rtlBaseMarkedChildren`). */}
           <SelectableText
             className="font-mono text-xs leading-[1rem] text-foreground"
-            style={ltrValueTextStyle()}
+            style={codeFieldTextStyle()}
           >
             {commandText}
           </SelectableText>

@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "උපදෙස සුරැකීමට නොහැකි විය",
     "instructionDeleteFailed": "උපදෙස මැකීමට නොහැකි විය",
     "instructionToggleFailed": "උපදෙස යාවත්කාලීන කිරීමට නොහැකි විය",
+    "instructionViewTitle": "උපදෙස් ගොනුව",
     "instructionLimitReached": "පැතිකඩකට උපදෙස් {{max}}ක් දක්වා තබා ගත හැක. තවත් එකක් එකතු කිරීමට එකක් මකන්න.",
     "mcp": {
       "title": "MCP සේවාදායකයන්",

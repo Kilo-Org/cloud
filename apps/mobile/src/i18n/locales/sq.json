@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Udhëzimi nuk u ruajt",
     "instructionDeleteFailed": "Udhëzimi nuk u fshi",
     "instructionToggleFailed": "Udhëzimi nuk u përditësua",
+    "instructionViewTitle": "Skedari i udhëzimit",
     "instructionLimitReached": "Një profil mund të mbajë deri në {{max}} udhëzime. Fshi një për të shtuar një tjetër.",
     "mcp": {
       "title": "serverët MCP",

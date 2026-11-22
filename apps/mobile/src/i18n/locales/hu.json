@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Nem sikerült menteni az utasítást",
     "instructionDeleteFailed": "Nem sikerült törölni az utasítást",
     "instructionToggleFailed": "Nem sikerült frissíteni az utasítást",
+    "instructionViewTitle": "Utasításfájl",
     "instructionLimitReached": "Egy profil legfeljebb {{max}} utasítást tartalmazhat. Törölj egyet az új hozzáadásához.",
     "mcp": {
       "title": "MCP szerverek",

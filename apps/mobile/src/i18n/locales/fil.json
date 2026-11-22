@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Hindi na-save ang tagubilin",
     "instructionDeleteFailed": "Hindi nabura ang tagubilin",
     "instructionToggleFailed": "Hindi na-update ang tagubilin",
+    "instructionViewTitle": "File ng tagubilin",
     "instructionLimitReached": "Hanggang {{max}} tagubilin lamang ang maaaring taglayin ng isang profile. Burahin ang isa para magdagdag ng panibago.",
     "mcp": {
       "title": "Mga MCP server",

@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Kon nie die instruksie stoor nie",
     "instructionDeleteFailed": "Kon nie die instruksie verwyder nie",
     "instructionToggleFailed": "Kon nie die instruksie bywerk nie",
+    "instructionViewTitle": "Instruksielêer",
     "instructionLimitReached": "'n Profiel kan tot {{max}} instruksies hou. Verwyder een om nog een by te voeg.",
     "mcp": {
       "title": "MCP-bedieners",

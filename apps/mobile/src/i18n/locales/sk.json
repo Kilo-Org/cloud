@@ -4521,6 +4521,7 @@
     "instructionSaveFailed": "Pokyn sa nepodarilo uložiť",
     "instructionDeleteFailed": "Pokyn sa nepodarilo odstrániť",
     "instructionToggleFailed": "Pokyn sa nepodarilo aktualizovať",
+    "instructionViewTitle": "Súbor pokynu",
     "instructionLimitReached": "Profil môže obsahovať najviac {{max}} pokynov. Ak chcete pridať ďalší, jeden odstráňte.",
     "mcp": {
       "title": "servery MCP",

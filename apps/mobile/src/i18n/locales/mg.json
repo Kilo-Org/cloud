@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Tsy afaka nitahiry ny torolalana",
     "instructionDeleteFailed": "Tsy afaka namafa ny torolalana",
     "instructionToggleFailed": "Tsy afaka nanavao ny torolalana",
+    "instructionViewTitle": "Rakitra torolalana",
     "instructionLimitReached": "Ny profil iray dia mahazaka torolalana hatramin'ny {{max}}. Fafao ny iray hanampiana ny hafa.",
     "mcp": {
       "title": "Mpizara MCP",

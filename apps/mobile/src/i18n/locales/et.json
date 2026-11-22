@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Juhise salvestamine ebaõnnestus",
     "instructionDeleteFailed": "Juhise kustutamine ebaõnnestus",
     "instructionToggleFailed": "Juhise uuendamine ebaõnnestus",
+    "instructionViewTitle": "Juhise fail",
     "instructionLimitReached": "Profiil mahutab kuni {{max}} juhist. Kustuta üks, et lisada veel.",
     "mcp": {
       "title": "MCP-serverid",

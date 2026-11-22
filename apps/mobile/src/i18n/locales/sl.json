@@ -4521,6 +4521,7 @@
     "instructionSaveFailed": "Navodila ni bilo mogoče shraniti",
     "instructionDeleteFailed": "Navodila ni bilo mogoče izbrisati",
     "instructionToggleFailed": "Navodila ni bilo mogoče posodobiti",
+    "instructionViewTitle": "Datoteka z navodili",
     "instructionLimitReached": "Profil lahko vsebuje največ {{max}} navodil. Izbrišite eno, da dodate drugo.",
     "mcp": {
       "title": "MCP strežniki",

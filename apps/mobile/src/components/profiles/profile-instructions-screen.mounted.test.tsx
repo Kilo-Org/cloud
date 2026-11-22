@@ -54,6 +54,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  // The font-scale module falls back to the window's scale outside its
+  // provider, and the row's chevron reads the interface direction.
+  I18nManager: { isRTL: false },
+  useWindowDimensions: () => ({ fontScale: 1 }),
   View: 'View',
   Pressable: 'Pressable',
   Switch: 'Switch',
@@ -76,6 +80,8 @@ vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
   FileText: 'FileText',
   Pencil: 'Pencil',
   Plus: 'Plus',
@@ -105,13 +111,16 @@ vi.mock('@/components/profiles/profile-section-header', () => ({
 vi.mock('@/components/profiles/instruction-form-sheet', () => ({
   InstructionFormSheet: 'InstructionFormSheet',
 }));
+vi.mock('@/components/profiles/instruction-view-sheet', () => ({
+  InstructionViewSheet: 'InstructionViewSheet',
+}));
 
 /** The name the fixture row holds; the dialog must isolate exactly this run. */
 const INSTRUCTION_NAME = 'zalgo-2026';
 
-/** A file name far longer than a phone row paints on one line. */
+/** The longest file name the server stores, i.e. `INSTRUCTION_NAME_MAX_LENGTH`. */
 const LONG_INSTRUCTION_NAME =
-  'release-checklist-for-the-hindi-and-urdu-partner-team-handoff-before-every';
+  'release-checklist-for-the-hindi-and-urdu-partner-team-handoff-before-every-quarter-close-safety-revi';
 
 type TestInstruction = { id: string; name: string; content: string; enabled: boolean };
 
@@ -208,6 +217,15 @@ async function confirmRequestAndSettle(request: ConfirmRequest): Promise<void> {
 
 function rowControls(root: ReactTestInstance): string[] {
   return findAll(root, 'Pressable').map(node => String(node.props.accessibilityLabel));
+}
+
+/** The instruction the mocked detail sheet was handed, or `null` while it is closed. */
+function sheetInstruction(root: ReactTestInstance): { name: string; content: string } | null {
+  const sheet = findAll(root, 'InstructionViewSheet')[0];
+  if (!sheet) {
+    throw new TypeError('the detail sheet was not rendered');
+  }
+  return (sheet.props.instruction ?? null) as { name: string; content: string } | null;
 }
 
 beforeEach(() => {
@@ -397,8 +415,9 @@ describe('ProfileInstructionsScreen row controls', () => {
       )
     ).toBe(false);
 
-    // The press opens the form that shows the whole name, so this row keeps the
-    // name on one line and paints it bare: no clamp to lift, no isolate marks.
+    // The press opens the form that shows the whole name, so this row clamps
+    // the name to the title's one line at the default font scale and paints it
+    // bare: no isolate marks, and the row's spoken name is the content press.
     const nameLine = findAll(renderer.root, 'Text').find(
       node => node.props.children === INSTRUCTION_NAME
     );
@@ -414,47 +433,75 @@ describe('ProfileInstructionsScreen read-only row', () => {
     permission.value = 'read-only';
   });
 
-  it('drops the edit control and keeps the file name and its path readable', async () => {
+  it('drops the edit control and names the file on the row it presses', async () => {
     const { renderer, unmount } = await mountScreen();
 
-    // The content is the edit action, so a read-only profile renders no row
-    // control at all — and, because there is no press to name the row, the
-    // painted file name stays a text stop that carries the path itself.
+    // The content is the edit action, so a read-only profile renders no edit
+    // control. The row itself is the press, and it carries the name and path
+    // the painted line used to speak.
     expect(rowControls(renderer.root)).not.toContain(
       i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME })
     );
+    const rowLabel = [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ');
+    expect(rowControls(renderer.root)).toContain(rowLabel);
+
+    // The painted name is out of the accessibility tree because the row above
+    // it now speaks the same name, and it clamps to the row's one line: the
+    // press opens the detail sheet that paints it in full.
     const nameLine = findAll(renderer.root, 'Text').find(
       node => node.props.children === isolateLtrBidiText(INSTRUCTION_NAME)
     );
-    expect(nameLine?.props.accessibilityLabel).toBe(
-      [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ')
-    );
-    expect(nameLine?.props.accessible).toBeUndefined();
-    expect(nameLine?.props.importantForAccessibility).toBeUndefined();
-    // No press opens the form that would show a cut name, so this line wraps
-    // instead of clamping, and its run keeps its own left-to-right direction.
-    expect(nameLine?.props.numberOfLines).toBeUndefined();
+    expect(nameLine?.props.accessibilityLabel).toBeUndefined();
+    expect(nameLine?.props.accessible).toBe(false);
+    expect(nameLine?.props.importantForAccessibility).toBe('no');
+    expect(nameLine?.props.numberOfLines).toBe(1);
     expect(nameLine?.props.children).toBe(isolateLtrBidiText(INSTRUCTION_NAME));
     expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
 
     unmount();
   });
 
-  it('paints a long file name in full instead of clamping it', async () => {
+  it('opens the detail sheet with the whole instruction on a row press', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    expect(sheetInstruction(renderer.root)).toBeNull();
+
+    pressRowControl(
+      renderer.root,
+      [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ')
+    );
+
+    expect(sheetInstruction(renderer.root)).toMatchObject({
+      name: INSTRUCTION_NAME,
+      content: '# Rules',
+    });
+
+    unmount();
+  });
+
+  // The row clamps the name to one line, so the longest file the server stores
+  // reaches the sheet unchanged and the sheet is what makes it readable.
+  it('hands a 100-character file name to the sheet unchanged', async () => {
     h.query.data = [testInstruction({ name: LONG_INSTRUCTION_NAME })];
     const { renderer, unmount } = await mountScreen();
 
-    // The row's own spoken name finds the line on either revision, so the two
-    // assertions below are what differ: the clamped bare name before the fix,
-    // the isolated run with no line cap after it.
+    expect(LONG_INSTRUCTION_NAME).toHaveLength(100);
+
+    // The row's own spoken name finds the press on either arm; the row no
+    // longer wraps, so the clamp and the untouched sheet value are what differ.
     const nameLine = findAll(renderer.root, 'Text').find(
-      node =>
-        node.props.accessibilityLabel ===
-        [LONG_INSTRUCTION_NAME, `.kilocode/rules/${LONG_INSTRUCTION_NAME}.md`].join(', ')
+      node => node.props.children === isolateLtrBidiText(LONG_INSTRUCTION_NAME)
     );
     expect(nameLine).toBeDefined();
-    expect(nameLine?.props.children).toBe(isolateLtrBidiText(LONG_INSTRUCTION_NAME));
-    expect(nameLine?.props.numberOfLines).toBeUndefined();
+    expect(nameLine?.props.numberOfLines).toBe(1);
+
+    pressRowControl(
+      renderer.root,
+      [LONG_INSTRUCTION_NAME, `.kilocode/rules/${LONG_INSTRUCTION_NAME}.md`].join(', ')
+    );
+
+    const shown = sheetInstruction(renderer.root);
+    expect(shown?.name).toBe(LONG_INSTRUCTION_NAME);
 
     unmount();
   });

@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Không thể lưu hướng dẫn",
     "instructionDeleteFailed": "Không thể xóa hướng dẫn",
     "instructionToggleFailed": "Không thể cập nhật hướng dẫn",
+    "instructionViewTitle": "Tệp hướng dẫn",
     "instructionLimitReached": "Mỗi hồ sơ có tối đa {{max}} hướng dẫn. Xóa một hướng dẫn để thêm hướng dẫn khác.",
     "mcp": {
       "title": "máy chủ MCP",

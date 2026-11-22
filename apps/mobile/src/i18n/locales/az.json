@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Təlimat saxlanıla bilmədi",
     "instructionDeleteFailed": "Təlimat silinə bilmədi",
     "instructionToggleFailed": "Təlimat yenilənə bilmədi",
+    "instructionViewTitle": "Təlimat faylı",
     "instructionLimitReached": "Profildə ən çoxu {{max}} təlimat ola bilər. Yenisini əlavə etmək üçün birini silin.",
     "mcp": {
       "title": "MCP serverləri",

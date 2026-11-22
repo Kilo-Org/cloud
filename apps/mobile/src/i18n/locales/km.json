@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "មិនអាចរក្សាទុកការណែនាំបានទេ",
     "instructionDeleteFailed": "មិនអាចលុបការណែនាំបានទេ",
     "instructionToggleFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពការណែនាំបានទេ",
+    "instructionViewTitle": "ឯកសារការណែនាំ",
     "instructionLimitReached": "profile មួយអាចផ្ទុកការណែនាំបានរហូតដល់ {{max}}។ លុបមួយ ដើម្បីបន្ថែមមួយទៀត។",
     "mcp": {
       "title": "ម៉ាស៊ីនមេ MCP",

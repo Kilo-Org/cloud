@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Δεν ήταν δυνατή η αποθήκευση της οδηγίας",
     "instructionDeleteFailed": "Δεν ήταν δυνατή η διαγραφή της οδηγίας",
     "instructionToggleFailed": "Δεν ήταν δυνατή η ενημέρωση της οδηγίας",
+    "instructionViewTitle": "Αρχείο οδηγίας",
     "instructionLimitReached": "Ένα προφίλ μπορεί να έχει έως {{max}} οδηγίες. Διαγράψτε μία για να προσθέσετε άλλη.",
     "mcp": {
       "title": "Διακομιστές MCP",

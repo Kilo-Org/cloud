@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Kon de instructie niet opslaan",
     "instructionDeleteFailed": "Kon de instructie niet verwijderen",
     "instructionToggleFailed": "Kon de instructie niet bijwerken",
+    "instructionViewTitle": "Instructiebestand",
     "instructionLimitReached": "Een profiel kan maximaal {{max}} instructies bevatten. Verwijder er een om er nog een toe te voegen.",
     "mcp": {
       "title": "MCP-servers",

@@ -4442,6 +4442,7 @@
     "instructionSaveFailed": "Uputstvo nije moguće sačuvati",
     "instructionDeleteFailed": "Uputstvo nije moguće izbrisati",
     "instructionToggleFailed": "Uputstvo nije moguće ažurirati",
+    "instructionViewTitle": "Datoteka uputstva",
     "instructionLimitReached": "Profil može sadržavati najviše {{max}} uputstava. Izbrišite jedno da biste dodali novo.",
     "mcp": {
       "title": "MCP serveri",

@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "ਹਦਾਇਤ ਸੰਭਾਲੀ ਨਹੀਂ ਜਾ ਸਕੀ",
     "instructionDeleteFailed": "ਹਦਾਇਤ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ",
     "instructionToggleFailed": "ਹਦਾਇਤ ਅੱਪਡੇਟ ਨਹੀਂ ਹੋ ਸਕੀ",
+    "instructionViewTitle": "ਹਦਾਇਤ ਫ਼ਾਈਲ",
     "instructionLimitReached": "ਇੱਕ ਪ੍ਰੋਫ਼ਾਈਲ ਵਿੱਚ ਵੱਧ ਤੋਂ ਵੱਧ {{max}} ਹਦਾਇਤਾਂ ਹੋ ਸਕਦੀਆਂ ਹਨ। ਹੋਰ ਸ਼ਾਮਲ ਕਰਨ ਲਈ ਇੱਕ ਮਿਟਾਓ।",
     "mcp": {
       "title": "MCP ਸਰਵਰ",

@@ -4521,6 +4521,7 @@
     "instructionSaveFailed": "Не ўдалося захаваць інструкцыю",
     "instructionDeleteFailed": "Не ўдалося выдаліць інструкцыю",
     "instructionToggleFailed": "Не ўдалося абнавіць інструкцыю",
+    "instructionViewTitle": "Файл інструкцыі",
     "instructionLimitReached": "Профіль можа змяшчаць да {{max}} інструкцый. Выдаліце адну, каб дадаць яшчэ.",
     "mcp": {
       "title": "MCP серверы",

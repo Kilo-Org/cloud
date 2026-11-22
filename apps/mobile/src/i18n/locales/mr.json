@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "सूचना सेव्ह करता आली नाही",
     "instructionDeleteFailed": "सूचना हटवता आली नाही",
     "instructionToggleFailed": "सूचना अद्ययावत करता आली नाही",
+    "instructionViewTitle": "सूचना फाइल",
     "instructionLimitReached": "एका प्रोफाइलमध्ये जास्तीत जास्त {{max}} सूचना ठेवता येतात. अजून एक जोडण्यासाठी एक हटवा.",
     "mcp": {
       "title": "MCP सर्व्हर",

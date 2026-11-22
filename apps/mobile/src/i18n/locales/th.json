@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "ไม่สามารถบันทึกคำแนะนำได้",
     "instructionDeleteFailed": "ไม่สามารถลบคำแนะนำได้",
     "instructionToggleFailed": "ไม่สามารถอัปเดตคำแนะนำได้",
+    "instructionViewTitle": "ไฟล์คำแนะนำ",
     "instructionLimitReached": "โปรไฟล์หนึ่งเก็บคำแนะนำได้สูงสุด {{max}} รายการ ลบหนึ่งรายการเพื่อเพิ่มรายการใหม่",
     "mcp": {
       "title": "เซิร์ฟเวอร์ MCP",

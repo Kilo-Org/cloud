@@ -4600,6 +4600,7 @@
     "instructionSaveFailed": "Níorbh fhéidir an treoir a shábháil",
     "instructionDeleteFailed": "Níorbh fhéidir an treoir a scriosadh",
     "instructionToggleFailed": "Níorbh fhéidir an treoir a nuashonrú",
+    "instructionViewTitle": "Comhad treorach",
     "instructionLimitReached": "Is féidir le próifíl suas le {{max}} treoir a choinneáil. Scrios ceann chun ceann eile a chur leis.",
     "mcp": {
       "title": "Freastalaithe MCP",

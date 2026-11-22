@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Չհաջողվեց պահել հրահանգը",
     "instructionDeleteFailed": "Չհաջողվեց ջնջել հրահանգը",
     "instructionToggleFailed": "Չհաջողվեց թարմացնել հրահանգը",
+    "instructionViewTitle": "Հրահանգի ֆայլ",
     "instructionLimitReached": "Պրոֆիլը կարող է պարունակել մինչև {{max}} հրահանգ։ Ջնջեք մեկը՝ նորը ավելացնելու համար։",
     "mcp": {
       "title": "MCP սերվերներ",

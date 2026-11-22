@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Pa t kapab sovgade enstriksyon an",
     "instructionDeleteFailed": "Pa t kapab efase enstriksyon an",
     "instructionToggleFailed": "Pa t kapab mete enstriksyon an ajou",
+    "instructionViewTitle": "Fichye enstriksyon",
     "instructionLimitReached": "Yon pwofil ka kenbe jiska {{max}} enstriksyon. Efase youn pou ajoute yon lòt.",
     "mcp": {
       "title": "MCP serveurs",

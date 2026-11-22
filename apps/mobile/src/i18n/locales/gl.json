@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Non se puido gardar a instrución",
     "instructionDeleteFailed": "Non se puido eliminar a instrución",
     "instructionToggleFailed": "Non se puido actualizar a instrución",
+    "instructionViewTitle": "Ficheiro de instrución",
     "instructionLimitReached": "Un perfil pode ter ata {{max}} instrucións. Elimina unha para engadir outra.",
     "mcp": {
       "title": "Servidores MCP",

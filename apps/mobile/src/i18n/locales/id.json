@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Gagal menyimpan instruksi",
     "instructionDeleteFailed": "Gagal menghapus instruksi",
     "instructionToggleFailed": "Gagal memperbarui instruksi",
+    "instructionViewTitle": "File instruksi",
     "instructionLimitReached": "Satu profil dapat memuat hingga {{max}} instruksi. Hapus satu untuk menambah lagi.",
     "mcp": {
       "title": "server MCP",

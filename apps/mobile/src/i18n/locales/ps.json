@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "لارښوونه ونه ساتل شوه",
     "instructionDeleteFailed": "لارښوونه ونه ړنګېده",
     "instructionToggleFailed": "لارښوونه ونه نویول شوه",
+    "instructionViewTitle": "د لارښوونې فایل",
     "instructionLimitReached": "یو پروفایل تر {{max}} لارښوونو پورې ساتلی شي. د بلې زیاتولو لپاره یوه ړنګه کړه.",
     "mcp": {
       "title": "MCP سرورونه",

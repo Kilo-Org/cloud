@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Lama kaydin karin tilmaanta",
     "instructionDeleteFailed": "Lama tirtiri karin tilmaanta",
     "instructionToggleFailed": "Lama cusboonaysiin karin tilmaanta",
+    "instructionViewTitle": "Faylka tilmaanta",
     "instructionLimitReached": "Borofilku wuxuu qaadi karaa ilaa {{max}} tilmaamood. Tirtir mid si aad u darto mid kale.",
     "mcp": {
       "title": "Adeegayaasha MCP",

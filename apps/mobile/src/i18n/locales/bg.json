@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Инструкцията не можа да се запази",
     "instructionDeleteFailed": "Инструкцията не можа да се изтрие",
     "instructionToggleFailed": "Инструкцията не можа да се обнови",
+    "instructionViewTitle": "Файл с инструкции",
     "instructionLimitReached": "Профилът може да съдържа до {{max}} инструкции. Изтрийте една, за да добавите друга.",
     "mcp": {
       "title": "MCP сървъри",

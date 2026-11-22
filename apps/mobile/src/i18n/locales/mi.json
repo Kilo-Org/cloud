@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Kāore i taea te tiaki i te tohutohu",
     "instructionDeleteFailed": "Kāore i taea te muku i te tohutohu",
     "instructionToggleFailed": "Kāore i taea te whakahou i te tohutohu",
+    "instructionViewTitle": "Kōnae tohutohu",
     "instructionLimitReached": "Ka taea e tētahi kōtaha te pupuri kia {{max}} tohutohu. Mukua tētahi kia tāpiri ai i tētahi atu.",
     "mcp": {
       "title": "Tūmau MCP",

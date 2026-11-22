@@ -4521,6 +4521,7 @@
     "instructionSaveFailed": "Не удалось сохранить инструкцию",
     "instructionDeleteFailed": "Не удалось удалить инструкцию",
     "instructionToggleFailed": "Не удалось обновить инструкцию",
+    "instructionViewTitle": "Файл инструкции",
     "instructionLimitReached": "В профиле может быть до {{max}} инструкций. Удалите одну, чтобы добавить другую.",
     "mcp": {
       "title": "MCP-серверы",

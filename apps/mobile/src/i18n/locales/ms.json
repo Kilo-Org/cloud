@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Tidak dapat menyimpan arahan",
     "instructionDeleteFailed": "Tidak dapat memadam arahan",
     "instructionToggleFailed": "Tidak dapat mengemas kini arahan",
+    "instructionViewTitle": "Fail arahan",
     "instructionLimitReached": "Profil boleh memuatkan sehingga {{max}} arahan. Padam satu untuk menambah yang lain.",
     "mcp": {
       "title": "pelayan MCP",

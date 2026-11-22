@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "ညွှန်ကြားချက်ကို သိမ်း၍ မရပါ",
     "instructionDeleteFailed": "ညွှန်ကြားချက်ကို ဖျက်၍ မရပါ",
     "instructionToggleFailed": "ညွှန်ကြားချက်ကို အပ်ဒိတ် မလုပ်နိုင်ပါ",
+    "instructionViewTitle": "ညွှန်ကြားချက် ဖိုင်",
     "instructionLimitReached": "ပရိုဖိုင်တစ်ခုတွင် ညွှန်ကြားချက် {{max}} ခုအထိ ထားနိုင်သည်။ နောက်တစ်ခု ထည့်ရန် တစ်ခု ဖျက်ပါ။",
     "mcp": {
       "title": "MCP ဆာဗာများ",

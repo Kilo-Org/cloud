@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Qajeelfama olkaa'uu hin dandeenye",
     "instructionDeleteFailed": "Qajeelfama haquu hin dandeenye",
     "instructionToggleFailed": "Qajeelfama haaromsuu hin dandeenye",
+    "instructionViewTitle": "Faayilii qajeelfamaa",
     "instructionLimitReached": "Profaayiliin qajeelfama hamma {{max}} qofa qabata. Kan biraa dabaluuf tokko haqi.",
     "mcp": {
       "title": "Sarvaroota MCP",

@@ -282,7 +282,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     },
     {
       // Exactly the server's `MAX_IMPORT_INSTRUCTION_NAME_LENGTH` and the mobile
-      // form's `INSTRUCTION_NAME_MAX_LENGTH`, so a read-only row wraps in full.
+      // form's `INSTRUCTION_NAME_MAX_LENGTH`, so the row's one line ends in an
+      // ellipsis that the read-only detail sheet lifts.
       profile_id: MEMBER_INSTRUCTIONS_PROFILE_ID,
       name: 'release-checklist-for-the-hindi-and-urdu-partner-team-handoff-before-every-partner-session-check-now',
       content: [

@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Instruktionen kunne ikke gemmes",
     "instructionDeleteFailed": "Instruktionen kunne ikke slettes",
     "instructionToggleFailed": "Instruktionen kunne ikke opdateres",
+    "instructionViewTitle": "Instruktionsfil",
     "instructionLimitReached": "En profil kan have op til {{max}} instruktioner. Slet en for at tilføje en ny.",
     "mcp": {
       "title": "MCP-servere",

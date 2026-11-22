@@ -4442,6 +4442,7 @@
     "instructionSaveFailed": "Impossible d'enregistrer l'instruction",
     "instructionDeleteFailed": "Impossible de supprimer l'instruction",
     "instructionToggleFailed": "Impossible de mettre à jour l'instruction",
+    "instructionViewTitle": "Fichier d'instruction",
     "instructionLimitReached": "Un profil peut contenir jusqu'à {{max}} instructions. Supprimez-en une pour en ajouter une autre.",
     "mcp": {
       "title": "Serveurs MCP",

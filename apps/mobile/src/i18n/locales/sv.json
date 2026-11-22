@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "Det gick inte att spara instruktionen",
     "instructionDeleteFailed": "Det gick inte att ta bort instruktionen",
     "instructionToggleFailed": "Det gick inte att uppdatera instruktionen",
+    "instructionViewTitle": "Instruktionsfil",
     "instructionLimitReached": "En profil kan ha högst {{max}} instruktioner. Ta bort en för att lägga till en annan.",
     "mcp": {
       "title": "MCP-servrar",

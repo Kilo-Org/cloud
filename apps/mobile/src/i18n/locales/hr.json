@@ -4442,6 +4442,7 @@
     "instructionSaveFailed": "Uputu nije moguće spremiti",
     "instructionDeleteFailed": "Uputu nije moguće izbrisati",
     "instructionToggleFailed": "Uputu nije moguće ažurirati",
+    "instructionViewTitle": "Datoteka upute",
     "instructionLimitReached": "Profil može sadržavati do {{max}} uputa. Izbrišite jednu da biste dodali drugu.",
     "mcp": {
       "title": "MCP poslužitelji",

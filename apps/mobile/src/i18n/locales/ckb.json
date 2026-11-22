@@ -4363,6 +4363,7 @@
     "instructionSaveFailed": "نەتوانرا ڕێنماییەکە پاشەکەوت بکرێت",
     "instructionDeleteFailed": "نەتوانرا ڕێنماییەکە بسڕدرێتەوە",
     "instructionToggleFailed": "نەتوانرا ڕێنماییەکە نوێ بکرێتەوە",
+    "instructionViewTitle": "فایلی ڕێنمایی",
     "instructionLimitReached": "پرۆفایلێک دەتوانێت تا {{max}} ڕێنمایی هەڵبگرێت. یەکێک بسڕەوە بۆ زیادکردنی یەکێکی تر.",
     "mcp": {
       "title": "سێرڤەرەکانی MCP",

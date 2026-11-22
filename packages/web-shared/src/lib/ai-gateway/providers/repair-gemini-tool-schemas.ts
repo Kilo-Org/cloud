@@ -161,16 +161,17 @@ function lowerMixedTypeArray(node: Record<string, unknown>): boolean {
   if (values.length === 0) return false;
   const keys = Object.keys(node).filter(key => key !== 'type' && key !== 'description');
   if (!movesWithoutCopies(node, keys)) return false;
+  const branchTypes = new Set<JsonType>(types);
   const branches: Record<string, unknown>[] = [];
-  for (const type of new Set(types)) {
+  for (const type of branchTypes) {
     if (type === 'null') continue;
     // Every integer is a number, so the number branch already covers it.
-    if (type === 'integer' && types.includes('number')) continue;
+    if (type === 'integer' && branchTypes.has('number')) continue;
     const branch: Record<string, unknown> = { type };
     if (copyKeywordsForType(branch, node, keys, type)) branches.push(branch);
   }
   if (branches.length < 2) return false;
-  if (types.includes('null') && values.includes(null)) branches.push({ type: 'null' });
+  if (branchTypes.has('null') && values.includes(null)) branches.push({ type: 'null' });
   replaceContents(node, { anyOf: branches, ...descriptionOf(node) });
   return true;
 }
@@ -198,7 +199,7 @@ function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
   if (keys.length === 0) return false;
   const anyOf = node.anyOf as unknown[];
   if (anyOf.length > Object.keys(TYPE_KEYWORDS).length) return false;
-  const types = anyOf.map(branch =>
+  const types: (JsonType | undefined)[] = anyOf.map(branch =>
     isRecord(branch) && isJsonType(branch.type) ? branch.type : undefined
   );
   if (types.some(type => type === undefined) || new Set(types).size !== types.length) {

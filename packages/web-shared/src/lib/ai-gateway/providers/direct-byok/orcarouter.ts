@@ -2,7 +2,7 @@ import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/p
 import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
-  faviconIcon,
+  providerListing,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
@@ -17,14 +17,11 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   models: cachedDirectByokModelList(id),
-  provider_listing: {
-    dataPolicy: {
-      training: true,
-      retainsPrompts: true,
-      canPublish: false,
-      termsOfServiceURL: 'https://www.orcarouter.ai/terms.html',
-      privacyPolicyURL: 'https://www.orcarouter.ai/privacy.html',
-    },
-    icon: faviconIcon('https://www.orcarouter.ai/'),
-  },
+  provider_listing: providerListing({
+    siteUrl: 'https://www.orcarouter.ai/',
+    training: true,
+    retainsPrompts: true,
+    termsOfServiceURL: 'https://www.orcarouter.ai/terms.html',
+    privacyPolicyURL: 'https://www.orcarouter.ai/privacy.html',
+  }),
 } satisfies DirectByokProvider;

@@ -1,5 +1,5 @@
 import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
-import { replaceReasoningObjectWithReasoningEffort } from '../openrouter/request-helpers';
+import { replaceReasoningObjectWithReasoningEffort } from '../request-helpers';
 import { applyReasoningDetailsTransform } from '../apply-provider-specific-logic';
 import type { Provider } from '../types';
 import type { DirectByokProvider, DirectByokTransformRequestContext } from './types';

@@ -35,6 +35,23 @@ export const SESSION_LIVE_FAILURE_KINDS = ['provider', 'tool', 'cancelled', 'oth
 
 export type SessionLiveFailureKind = (typeof SESSION_LIVE_FAILURE_KINDS)[number];
 
+/**
+ * The todo statuses the `todowrite` tool emits, and the only statuses
+ * `sessionLivePlan` can classify: it leaves `cancelled` out of the count,
+ * counts `completed` as done, and shows the first `in_progress` step as the
+ * current one. A status outside this set is not a task state the projection
+ * understands, so the plan leaves that entry out rather than counting it as
+ * neither done nor current.
+ */
+export const SESSION_LIVE_TODO_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'cancelled',
+] as const;
+
+export type SessionLiveTodoStatus = (typeof SESSION_LIVE_TODO_STATUSES)[number];
+
 /** The longest step target (a file basename or a short tool target). */
 export const SESSION_LIVE_TARGET_LIMIT = 40;
 export const SESSION_LIVE_PLAN_STEP_LIMIT = 40;
@@ -194,10 +211,14 @@ export function sessionLiveCut(text: string, limit: number): string {
  * `limit` ends with an ellipsis inside the limit. The cut falls on a character
  * boundary, so the line never ends half drawn, and the whole result stays
  * within `limit` UTF-16 code units. Empty text, white space, and text made only
- * of joiners give null.
+ * of joiners give null, and so does a limit below one: a caller that computed
+ * no room for text gets no text back, never an ellipsis that overruns the
+ * budget.
  */
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;
+  // A non-positive limit cannot hold a drawn character, so it holds no text.
+  if (!(limit >= 1)) return null;
   const line = sessionDisplayLine(raw).replace(/\s+/g, ' ').trim();
   if (line === '') return null;
   // Joiners alone draw nothing, so they are empty display text like blanks.
@@ -300,10 +321,17 @@ export function sessionLiveToolStep(
   }
 }
 
-const todoSchema = z.object({ content: z.string(), status: z.string() });
+const todoSchema = z.object({ content: z.string(), status: z.enum(SESSION_LIVE_TODO_STATUSES) });
 const todoInputSchema = z.object({ todos: z.array(z.unknown()) });
 
-/** `todowrite` input: completed count, total (cancelled excluded) and the active step. */
+/**
+ * `todowrite` input: completed count, total (cancelled excluded) and the active
+ * step. Every entry is validated against `SESSION_LIVE_TODO_STATUSES`, so the
+ * branches below cover every status that reaches them and an entry the
+ * projection cannot classify is left out of the count. Null when no entry
+ * counts, which is an empty list and a list of only cancelled or unclassifiable
+ * entries.
+ */
 export function sessionLivePlan(input: Record<string, unknown>): SessionLivePlan | null {
   const parsed = todoInputSchema.safeParse(input);
   if (!parsed.success) return null;

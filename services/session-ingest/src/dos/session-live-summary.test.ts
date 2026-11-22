@@ -162,6 +162,31 @@ describe('foldSessionLiveSummary', () => {
     expect(state.plan).toEqual({ done: 1, total: 3, current: 'second' });
   });
 
+  it('leaves a todo with an unknown status out of the count', () => {
+    const state = run([
+      part('todowrite', 'running', {
+        todos: [
+          { content: 'one', status: 'completed' },
+          { content: 'two', status: 'in_progress' },
+          { content: 'typo', status: 'complete' },
+        ],
+      }),
+    ]);
+    expect(state.plan).toEqual({ done: 1, total: 2, current: 'two' });
+  });
+
+  it('drops the plan when every todo has an unknown status', () => {
+    const state = run([
+      part('todowrite', 'running', {
+        todos: [
+          { content: 'a', status: 'complete' },
+          { content: 'b', status: 'done' },
+        ],
+      }),
+    ]);
+    expect(state.plan).toBeNull();
+  });
+
   it('drops the plan when every todo is cancelled', () => {
     const state = run([
       part('todowrite', 'running', { todos: [{ content: 'never', status: 'cancelled' }] }),

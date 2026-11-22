@@ -56,12 +56,34 @@ function clearSearchIndexBestEffort(): void {
 /**
  * Re-runs the clears for a launch with no stored session, so the surfaces that
  * outlive a session start empty.
+ *
+ * Every member here outlives the process that ran the account boundary: the OS
+ * search index, the App Intents catalog, the on-disk artifact mirror and PR
+ * recents, and the OS launcher surfaces. The boundary's clear of any of them can
+ * be lost to a process killed during sign-out's awaited teardown, or to an OS
+ * call the platform refused, so a launch that positively restored no session
+ * repeats them. The rest of the boundary's members are this process's memory,
+ * which a fresh launch starts empty without a re-clear.
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
   clearSessionCatalogBestEffort();
   runClear(clearArtifactMirror);
   runClear(notifyArtifactsChanged);
+  // The launcher shortcuts, quick-settings tile and Quick Actions are
+  // device-wide and their labels come from the signed-in account's sessions, so
+  // a launch with no stored session must not keep offering the previous
+  // account's session. Recording the clear in the surface revision makes a
+  // publisher that mounts later write its own derivation instead of trusting
+  // the surface it wrote before.
+  runClear(() => {
+    clearLauncherSurfaces();
+    noteLauncherSurfacesCleared();
+  });
+  // The device-global PR recents the search index folds into its documents:
+  // leaving them would let the next account's first index sync publish the
+  // previous account's pull-request titles.
+  runClear(clearRecentPrsBestEffort);
 }
 
 /**

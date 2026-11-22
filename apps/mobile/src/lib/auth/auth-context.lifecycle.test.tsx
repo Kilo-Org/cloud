@@ -1106,6 +1106,9 @@ describe('sign-out teardown ordering', () => {
 
   it('keeps a parked account-independent launch destination on sign-in', async () => {
     const { ctx, unmount } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the account boundary's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
     nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
       'kiloapp:///cloud/sessions/new'
     );
@@ -1130,6 +1133,9 @@ describe('sign-out teardown ordering', () => {
 
   it('keeps the destination already in the pending slot over the parked one', async () => {
     const { ctx, unmount } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the account boundary's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
     nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
       'kiloapp:///cloud/sessions/new'
     );
@@ -1187,6 +1193,11 @@ describe('sign-out teardown ordering', () => {
 
   it('clears the last-opened session and the launcher surfaces on sign-out', async () => {
     const { ctx } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the sign-out body's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    lastOpenedSessionMock.clearLastOpenedSession.mockClear();
+    lastRouteMock.clearLastRoute.mockClear();
 
     await act(async () => {
       await ctx.signOut();
@@ -2138,6 +2149,39 @@ describe('bootstrap and foreground race fencing', () => {
 
     unmount();
   });
+
+  it('regression: a signed-out launch clears the OS launcher surfaces the teardown may not have reached', async () => {
+    // The beforeEach leaves every read null: the launch positively restored no
+    // session, so this is the retry for a sign-out killed during its awaited
+    // teardown, before the account-boundary clear ran. The launcher shortcuts and
+    // Quick Actions label themselves from the departing account's sessions, so
+    // the launch must drop them too, not only the search index.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().isLoading).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('a restore-failure bootstrap leaves the launcher surfaces alone', async () => {
+    useFakeBackoffClock();
+    // Every credential read rejects: the account may still own the surfaces, so
+    // only a positively signed-out launch may drop them.
+    hoisted.secureStore.getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+
+    const { getCtx, unmount } = await mountProvider();
+    await settleBootstrap(getCtx);
+    expect(getCtx().restoreFailed).toBe(true);
+
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).not.toHaveBeenCalled();
+
+    unmount();
+  }, 60_000);
 
   it('a restore-failure bootstrap never wipes the search index', async () => {
     useFakeBackoffClock();

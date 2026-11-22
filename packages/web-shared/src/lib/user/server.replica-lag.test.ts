@@ -9,9 +9,6 @@ jest.mock('next/headers', () => ({
 }));
 
 const mockGetServerSession = jest.fn();
-const mockRedirect = jest.fn((url: string) => {
-  throw new Error(`NEXT_REDIRECT:${url}`);
-});
 
 jest.mock('next-auth', () => ({
   __esModule: true,
@@ -19,15 +16,11 @@ jest.mock('next-auth', () => ({
   getServerSession: (...args: unknown[]) => mockGetServerSession(...args),
 }));
 
-jest.mock('next/navigation', () => ({
-  ...jest.requireActual('next/navigation'),
-  redirect: (url: string) => mockRedirect(url),
-}));
-
 // The browser-session branch reads the user row through `readDb` and the session
-// pepper through the primary. `db` stays real, so the primary read and the
-// fixtures are the test database. `readDb` delegates to the real client except
-// for the user lookup, which returns `mockReplicaUser` while a test sets it.
+// verdict from the primary. `db` stays real, so the primary read and the fixtures
+// are the test database. `readDb` delegates to the real client except for the
+// user row, which returns `mockReplicaUser` while a test sets it, and that row is
+// the only thing the replica contributes.
 let mockReplicaUser: User | null = null;
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => {
@@ -62,7 +55,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { getUserFromAuth, getUserFromSessionForCredentialIssuanceOrRedirect } from './server';
+import { getUserFromAuth } from './server';
 
 describe('web session revocation read from the primary', () => {
   const insertedUserIds: string[] = [];
@@ -76,7 +69,6 @@ describe('web session revocation read from the primary', () => {
   beforeEach(() => {
     mockHeaders.mockReset();
     mockGetServerSession.mockReset();
-    mockRedirect.mockClear();
     mockReplicaUser = null;
   });
 
@@ -118,18 +110,18 @@ describe('web session revocation read from the primary', () => {
     expect(result.authFailedResponse?.status).toBe(401);
   });
 
-  test('redirects a revoked session to sign-in instead of a user', async () => {
+  test('admits a session minted after a revocation while the replica still holds the earlier pepper', async () => {
     const user = await insertSessionUser('primary-pepper');
     mockReplicaUser = { ...user, web_session_pepper: 'replica-pepper' };
-    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
+    mockHeaders.mockResolvedValue(new Headers());
     mockGetServerSession.mockResolvedValue({
       kiloUserId: user.id,
-      webSessionPepper: 'replica-pepper',
+      webSessionPepper: 'primary-pepper',
     });
 
-    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
-      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fprofile'
-    );
-    expect(mockRedirect).toHaveBeenCalledWith('/users/sign_in?callbackPath=%2Fprofile');
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
   });
 });

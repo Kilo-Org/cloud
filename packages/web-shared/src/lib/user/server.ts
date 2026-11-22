@@ -689,20 +689,15 @@ async function resolveUserFromSession(
   const user = await findUserById(maybeKiloUserId, fromDb);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
-  // A replica only lags behind the primary, so a row that does not carry this
-  // session's pepper is already the answer.
-  if (!isWebSessionCurrent(session.webSessionPepper, user))
-    return authError(401, 'Reauthentication required', maybeKiloUserId);
-
   // `revokeWebSessions` commits the pepper on the primary and that write is the
-  // authoritative revocation, so the decision uses the primary value: a replica
-  // that has not caught up yet still holds the pre-revocation pepper. When the
-  // caller already read the primary this row is that value, so this costs nothing.
-  if (fromDb !== db) {
-    const primaryPepper = await readWebSessionPepper(maybeKiloUserId);
-    if (!isWebSessionCurrent(session.webSessionPepper, { web_session_pepper: primaryPepper }))
-      return authError(401, 'Reauthentication required', maybeKiloUserId);
-  }
+  // authoritative revocation. A replica cannot answer either way: after a
+  // revocation it still holds the previous pepper, and a pepper minted after a
+  // revocation reaches the session before the replica does. So the replica row
+  // supplies the payload only, and the verdict comes from the primary.
+  const pepperSource =
+    fromDb === db ? user : { web_session_pepper: await readWebSessionPepper(maybeKiloUserId) };
+  if (!isWebSessionCurrent(session.webSessionPepper, pepperSource))
+    return authError(401, 'Reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
   return await validateUserAuthorization({

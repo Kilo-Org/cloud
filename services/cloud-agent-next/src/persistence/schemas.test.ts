@@ -6,6 +6,7 @@ import {
   MetadataSchema,
   modelIdSchema,
   RuntimeAgentSchema,
+  RuntimeAgentsSchema,
   RuntimeInstructionSchema,
   RuntimeInstructionsSchema,
   RuntimeSkillSchema,
@@ -404,7 +405,7 @@ describe('MetadataSchema', () => {
     [
       'runtimeAgents',
       [{ slug: 'reviewer', name: 'Reviewer', config: { prompt: 'Review the diff' } }],
-      [{ slug: 'code', name: 'Code override', config: {} }],
+      [{ slug: 'Reviewer', name: 'Reviewer', config: {} }],
     ],
   ] as const)(
     'keeps nested and legacy-flat %s validation equivalent for representative values',
@@ -415,6 +416,39 @@ describe('MetadataSchema', () => {
       expect(MetadataSchema.safeParse({ ...legacyMetadata, [field]: invalid }).success).toBe(false);
     }
   );
+
+  it.each([
+    ['SessionProfileBundleSchema', (stored: object) => SessionProfileBundleSchema.parse(stored)],
+    ['MetadataSchema', (stored: object) => MetadataSchema.parse({ ...legacyMetadata, ...stored })],
+  ] as const)(
+    'drops a stored agent with a CLI-owned id so the bundle still loads in %s',
+    (_name, parse) => {
+      const cliOwnedAgent = { slug: 'code', name: 'Code override', config: {} };
+      const customAgent = { slug: 'reviewer', name: 'Reviewer', config: {} };
+
+      expect(parse({ runtimeAgents: [cliOwnedAgent] }).runtimeAgents).toEqual([]);
+      expect(parse({ runtimeAgents: [cliOwnedAgent, customAgent] }).runtimeAgents).toEqual([
+        customAgent,
+      ]);
+    }
+  );
+
+  it('rejects an agent with a CLI-owned id supplied on the wire'), () => {
+    expect(
+      RuntimeAgentsSchema.safeParse([{ slug: 'code', name: 'Code override', config: {} }]).success
+    ).toBe(false);
+  });
+
+  it('loads a stored bundle written under an earlier slug rule'), () => {
+    const parsed = SessionProfileBundleSchema.parse({
+      runtimeAgents: [
+        { slug: 'explore', name: 'Explore', config: {} },
+        { slug: 'reviewer', name: 'Reviewer', config: {} },
+      ],
+    });
+
+    expect(parsed.runtimeAgents).toEqual([{ slug: 'reviewer', name: 'Reviewer', config: {} }]);
+  });
 
   it('keeps kilo commands in nested profiles only', () => {
     const kiloCommands = [{ name: 'review', template: 'Review $ARGUMENTS' }];
@@ -1089,7 +1123,20 @@ describe('RuntimeAgentSchema', () => {
   });
 
   it('rejects built-in slugs so they cannot override the bundled agents', () => {
-    for (const slug of ['code', 'plan', 'architect', 'custom', 'orchestrator', 'ask']) {
+    for (const slug of [
+      'code',
+      'plan',
+      'architect',
+      'custom',
+      'orchestrator',
+      'ask',
+      'build',
+      'general',
+      'explore',
+      'compaction',
+      'title',
+      'summary',
+    ]) {
       const result = RuntimeAgentSchema.safeParse({ slug, name: slug, config: {} });
       expect(result.success).toBe(false);
     }

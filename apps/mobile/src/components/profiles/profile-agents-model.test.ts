@@ -207,6 +207,11 @@ describe('validateAgentForm', () => {
 
   it('refuses a reserved or already-taken slug and allows a free one', () => {
     expect(validateAgentForm(formState({ slug: 'code' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'general' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'explore' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'compaction' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'title' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'summary' }))).toBe('slug-conflict');
     expect(validateAgentForm(formState({ slug: 'reviewer' }), ['reviewer'])).toBe('slug-conflict');
     expect(validateAgentForm(formState({ slug: 'reviewer' }), ['plan'])).toBeNull();
   });

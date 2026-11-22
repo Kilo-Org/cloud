@@ -12,24 +12,9 @@
  * preserved except for the tools the user explicitly switches off.
  */
 
-import { type AgentProfileDetail } from '@/lib/hooks/agent-profile-types';
+import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
 
-/**
- * Built-in agent slugs reserved by cloud-agent-next. Mirrors
- * `BUILTIN_AGENT_SLUGS` in `@kilocode/cloud-agent-profile`; the mobile app does
- * not depend on that server package, so the set is repeated here. The server
- * rejects a create or rename that collides, so the form refuses it first.
- */
-const BUILTIN_AGENT_SLUGS = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
+import { type AgentProfileDetail } from '@/lib/hooks/agent-profile-types';
 
 /**
  * Tools the UI exposes as disableable per agent. Cloud sessions allow every
@@ -344,7 +329,7 @@ export function validateAgentForm(
   if (slug.length > AGENT_SLUG_MAX_LENGTH || !AGENT_SLUG_PATTERN.test(slug)) {
     return 'slug-invalid';
   }
-  if (BUILTIN_AGENT_SLUGS.has(slug) || otherSlugs.some(item => item.toLowerCase() === slug)) {
+  if (isReservedAgentSlug(slug) || otherSlugs.some(item => item.toLowerCase() === slug)) {
     return 'slug-conflict';
   }
   const name = state.name.trim();

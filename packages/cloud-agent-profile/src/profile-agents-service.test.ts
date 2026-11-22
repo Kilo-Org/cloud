@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest';
+import type { WorkerDb } from '@kilocode/db';
 import { createLimitTestDb, TEST_PROFILE_ID } from './profile-limit-test-db';
-import { MAX_PROFILE_AGENTS, createAgent, type AgentCreateInput } from './profile-agents-service';
+import {
+  MAX_PROFILE_AGENTS,
+  createAgent,
+  getAgentsForSession,
+  listAgentsForProfile,
+  type AgentCreateInput,
+} from './profile-agents-service';
 import type { ProfileOwner } from './types';
 
 const OWNER: ProfileOwner = { type: 'user', id: 'user_test' };
@@ -41,5 +48,48 @@ describe('createAgent cap enforcement', () => {
     expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected']);
     expect(state.rowCount).toBe(MAX_PROFILE_AGENTS);
     expect(state.lockCalls).toBe(2);
+  });
+});
+
+describe('getAgentsForSession', () => {
+  // The limit fake models inserts and locks, not this read, so a fixed row list is enough here.
+  const storedRow = (slug: string, name: string, config: Record<string, unknown> = {}) => ({
+    id: `agent_${slug}`,
+    profile_id: TEST_PROFILE_ID,
+    slug,
+    name,
+    config,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  });
+  const db = {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          orderBy: () =>
+            Promise.resolve([
+              storedRow('reviewer', 'Reviewer'),
+              storedRow('explore', 'Explore', { prompt: 'x' }),
+              storedRow('general', 'General'),
+            ]),
+        }),
+      }),
+    }),
+  } as unknown as WorkerDb;
+
+  test('omits stored agents whose id belongs to the CLI'), async () => {
+    await expect(getAgentsForSession(db, TEST_PROFILE_ID)).resolves.toEqual([
+      { slug: 'reviewer', name: 'Reviewer', config: {} },
+    ]);
+  });
+
+  test('keeps CLI-owned ids visible to the profile editor'), async () => {
+    const agents = await listAgentsForProfile(db, TEST_PROFILE_ID);
+
+    expect(agents.map(agent => ({ slug: agent.slug, config: agent.config }))).toEqual([
+      { slug: 'reviewer', config: {} },
+      { slug: 'explore', config: { prompt: 'x' } },
+      { slug: 'general', config: {} },
+    ]);
   });
 });

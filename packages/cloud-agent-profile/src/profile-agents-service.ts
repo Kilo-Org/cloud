@@ -5,6 +5,7 @@ import {
   type AgentEnvironmentProfileAgent,
 } from '@kilocode/db/schema';
 import { AgentConfigSchema, type AgentConfig } from '@kilocode/db/schema-types';
+import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
 import { and, eq, count } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { ProfileOwner, ProfileAgentResponse } from './types';
@@ -195,6 +196,11 @@ export type AgentForSession = {
   config: AgentConfig;
 };
 
+/**
+ * A stored agent whose id belongs to the CLI stays visible in the profile
+ * editor, and a session materializes only the agents that have an id of their
+ * own.
+ */
 export async function getAgentsForSession(
   db: WorkerDb,
   profileId: string
@@ -208,9 +214,11 @@ export async function getAgentsForSession(
     .from(agent_environment_profile_agents)
     .where(eq(agent_environment_profile_agents.profile_id, profileId))
     .orderBy(agent_environment_profile_agents.slug);
-  return rows.map(row => ({
-    slug: row.slug,
-    name: row.name,
-    config: AgentConfigSchema.parse(row.config ?? {}),
-  }));
+  return rows
+    .filter(row => !isReservedAgentSlug(row.slug))
+    .map(row => ({
+      slug: row.slug,
+      name: row.name,
+      config: AgentConfigSchema.parse(row.config ?? {}),
+    }));
 }

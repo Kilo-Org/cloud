@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { BUILTIN_AGENT_MODES } from './agent-modes';
+import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
 
 export const RuntimeProfileLimits = {
   MAX_RUNTIME_INSTRUCTIONS: 50,
@@ -178,15 +178,41 @@ export function projectStoredRuntimeSkills(value: unknown): unknown {
   });
 }
 
+/** Drop stored runtime agents whose slug the CLI owns, whatever the stored shape. */
+export function projectStoredRuntimeAgents(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const agents: unknown[] = value;
+  return agents.filter(agent => {
+    if (typeof agent !== 'object' || agent === null) return true;
+    if (!('slug' in agent)) return true;
+    const slug = agent.slug;
+    return typeof slug !== 'string' || !isReservedAgentSlug(slug);
+  });
+}
+
 /**
  * Route spec read back from storage: its runtime skills keep the entries the
- * current path rule accepts, so a spec written under an earlier rule still
+ * current path rule accepts and its runtime agents keep the entries whose slug
+ * the CLI leaves to the profile, so a spec written under an earlier rule still
  * loads. A spec that arrives on the wire is parsed with
  * `controlPlaneRouteSpecSchema` and stays strict.
  */
-export function projectStoredRouteSpecSkills(spec: unknown): unknown {
-  if (typeof spec !== 'object' || spec === null || !('runtimeSkills' in spec)) return spec;
-  return { ...spec, runtimeSkills: projectStoredRuntimeSkills(spec.runtimeSkills) };
+export function projectStoredRouteSpec(spec: unknown): unknown {
+  if (typeof spec !== 'object' || spec === null) return spec;
+  let projected = spec;
+  if ('runtimeSkills' in projected) {
+    projected = {
+      ...projected,
+      runtimeSkills: projectStoredRuntimeSkills(projected.runtimeSkills),
+    };
+  }
+  if ('runtimeAgents' in projected) {
+    projected = {
+      ...projected,
+      runtimeAgents: projectStoredRuntimeAgents(projected.runtimeAgents),
+    };
+  }
+  return projected;
 }
 
 /**
@@ -214,10 +240,12 @@ const PermissionConfigSchema = z.union([PermissionActionSchema, z.record(z.strin
  * `KILO_CONFIG_CONTENT.agent.<slug>` at session preparation time. Mirrors the
  * CLI's AgentConfig shape so we pass through verbatim.
  *
- * Reserved built-in slugs (`code`, `plan`, `architect`, `custom`, …) are
- * rejected here so an inline or persisted runtime agent cannot override a
- * built-in agent's prompt or permissions inside the sandbox. The web-side
- * profile service applies the same rule when persisting agents.
+ * A runtime agent slug uses an id of its own. The CLI's own agent ids
+ * (`build`, `plan`, `general`, `explore`, `compaction`, `title`, `summary`) and
+ * the cloud mode aliases that resolve to them (`code`, `debug`, `orchestrator`,
+ * `ask`, `architect`, `custom`) stay reserved, for an inline runtime agent and
+ * for a stored one alike. The web-side profile service applies the same rule
+ * when persisting agents.
  */
 export const RuntimeAgentSchema = z.object({
   slug: z
@@ -225,7 +253,7 @@ export const RuntimeAgentSchema = z.object({
     .min(1)
     .max(RuntimeProfileLimits.MAX_RUNTIME_AGENT_SLUG_LENGTH)
     .regex(/^[a-z][a-z0-9-]*$/, 'Agent slug must start with a letter')
-    .refine(slug => !BUILTIN_AGENT_MODES.has(slug), {
+    .refine(slug => !isReservedAgentSlug(slug), {
       message: 'Slug conflicts with a built-in agent; choose a different slug',
     }),
   name: z.string().min(1).max(RuntimeProfileLimits.MAX_RUNTIME_AGENT_NAME_LENGTH),
@@ -263,6 +291,17 @@ export const RuntimeAgentsSchema = z
     RuntimeProfileLimits.MAX_RUNTIME_AGENTS,
     `Maximum ${RuntimeProfileLimits.MAX_RUNTIME_AGENTS} runtime agents allowed`
   );
+
+/**
+ * Runtime agents read back from storage. A bundle written under an earlier
+ * slug rule keeps loading: entries whose slug the CLI owns are dropped, so a
+ * stored session or registration parses with the rest of its configuration.
+ * Anything a caller supplies is validated with `RuntimeAgentsSchema` instead.
+ */
+export const PersistedRuntimeAgentsSchema = z.preprocess(
+  projectStoredRuntimeAgents,
+  RuntimeAgentsSchema.optional()
+);
 
 export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
 

@@ -57,8 +57,9 @@ jest.mock('@/components/ui/button', () => ({
 let LinearIntegrationDetails: typeof LinearIntegrationDetailsModule.LinearIntegrationDetails;
 
 beforeAll(() => {
-  ({ LinearIntegrationDetails } =
-    jest.requireActual<typeof LinearIntegrationDetailsModule>('./LinearIntegrationDetails'));
+  ({ LinearIntegrationDetails } = jest.requireActual<typeof LinearIntegrationDetailsModule>(
+    './LinearIntegrationDetails'
+  ));
 });
 
 const activeInstallation = {
@@ -95,9 +96,7 @@ function renderCard(props: React.ComponentProps<typeof LinearIntegrationDetails>
  */
 function rendersButtonLabel(label: string): boolean {
   return mockButtons.some(button =>
-    renderToStaticMarkup(React.createElement(React.Fragment, null, button.children)).includes(
-      label
-    )
+    renderToStaticMarkup(React.createElement(React.Fragment, null, button.children)).includes(label)
   );
 }
 

@@ -932,6 +932,11 @@ const INCREMENTAL_CORPUS = [
 
 const STREAM_STEPS = 40;
 
+// The append size of the chunked corpus pass: large enough to carry a whole
+// element and a block separator in one region, which a one-character pass never
+// does.
+const CHUNKED_PUBLISH_STEP = 24;
+
 // Block fragments whose token boundaries move when an append arrives: an item
 // marker that only becomes a list item once its dot lands (`2.`), a loose list
 // that flips tight→loose, a paragraph a later line can interrupt or extend, a
@@ -1066,6 +1071,107 @@ describe('splitMarkdownHtmlIncremental', () => {
       };
     }
     expect(gatedPublishes).toBeGreaterThan(0);
+  });
+
+  it('keeps the composition equal over multi-character appends of the corpus', () => {
+    // One-character publishes only ever extend the final text node, so they
+    // cannot reach a gate decision that depends on a whole appended region. A
+    // chunked pass appends elements, blocks and separators in one region, which
+    // is the shape a streamed model reply produces.
+    let prior: MarkdownHtmlIncrementalConverted | undefined = undefined;
+    let gatedPublishes = 0;
+    let publishes = 0;
+    for (
+      let end = CHUNKED_PUBLISH_STEP;
+      end <= INCREMENTAL_CORPUS.length;
+      end += CHUNKED_PUBLISH_STEP
+    ) {
+      const value = INCREMENTAL_CORPUS.slice(0, end);
+      const whole = convertHtmlToMarkdown(value);
+      const record = extendsPreviousRaw(value, prior);
+      const conversion = publishConversion(value, record, prior);
+      const composed =
+        record?.mode === 'appended' && prior !== undefined
+          ? prior.convert(record.appended, prior.tail.value)
+          : whole;
+      publishes += 1;
+      expect(composed, `publish at ${end}`).toBe(whole);
+      if (record?.mode === 'appended') {
+        gatedPublishes += 1;
+      }
+      const result = splitMarkdownHtmlIncremental(conversion.input);
+      expect(result.segments, `publish at ${end}`).toEqual(splitMarkdownHtml(whole));
+      prior = {
+        tail: result.snapshot,
+        rawValue: value,
+        conversion: conversion.tail,
+        convert: (suffix, previous) =>
+          suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
+      };
+    }
+    expect(publishes).toBeGreaterThan(0);
+    expect(gatedPublishes).toBeGreaterThan(0);
+  });
+
+  it('declines an append whose block separator the whole conversion does not add', () => {
+    // A zero-output inline element closes a line whose conversion is already
+    // final, then a root block follows. Converted alone, the append inserts its
+    // own block separator, so composing it after the previous conversion adds a
+    // newline the whole value does not have. The gate must decline: the composed
+    // string has to stay byte-identical to a whole conversion, not merely render
+    // the same.
+    const first = 'some <b>bold</b> text\n';
+    const appended = '<b></b>\n<h1>Title</h1>';
+    const firstConversion = publishConversion(first, null, undefined);
+    const firstSplit = splitMarkdownHtmlIncremental(firstConversion.input);
+    const prior: MarkdownHtmlIncrementalConverted = {
+      tail: firstSplit.snapshot,
+      rawValue: first,
+      conversion: firstConversion.tail,
+      convert: (suffix, previous) =>
+        suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
+    };
+    const value = first + appended;
+
+    const record = extendsPreviousRaw(value, prior);
+    expect(record?.mode).toBe('whole');
+    expect(publishConversion(value, record, prior).input).toEqual({
+      value,
+      previous: prior,
+      wholeConverted: convertHtmlToMarkdown(value),
+    });
+    // The composition the gate refused is a different string, which is why the
+    // refusal is load-bearing rather than cosmetic.
+    expect(`${convertHtmlToMarkdown(first)}${convertHtmlToMarkdown(appended)}`).not.toBe(
+      convertHtmlToMarkdown(value)
+    );
+  });
+
+  it('declines an append that turns a final backtick into an open code span', () => {
+    // A backtick at the end of the last content line is literal text while that
+    // line ends at a paragraph break: the scan treats it as a closed span. The
+    // next append removes the break, so the backtick opens a span that swallows
+    // the appended tag. The isolated conversion of the append cannot see that,
+    // so the gate must decline rather than drop the tag.
+    const first = 'a`\n';
+    const appended = '<i>x</i>';
+    const firstConversion = publishConversion(first, null, undefined);
+    const firstSplit = splitMarkdownHtmlIncremental(firstConversion.input);
+    const prior: MarkdownHtmlIncrementalConverted = {
+      tail: firstSplit.snapshot,
+      rawValue: first,
+      conversion: firstConversion.tail,
+      convert: (suffix, previous) =>
+        suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
+    };
+    const value = first + appended;
+
+    expect(extendsPreviousRaw(value, prior)?.mode).toBe('whole');
+    // The refused composition would have rendered different markdown: it
+    // converts the appended tag into emphasis the whole value keeps as HTML.
+    expect(`${convertHtmlToMarkdown(first)}${convertHtmlToMarkdown(appended)}`).not.toBe(
+      convertHtmlToMarkdown(value)
+    );
   });
 
   it('keeps the snapshot to the fields the next parse reuses', () => {

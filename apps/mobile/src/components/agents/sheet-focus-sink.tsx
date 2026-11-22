@@ -1,3 +1,5 @@
+import { View } from 'react-native';
+
 import { Text } from '@/components/ui/text';
 
 /**
@@ -12,25 +14,29 @@ import { Text } from '@/components/ui/text';
  * long-press selection when the node stops being focusable, so the focus has to
  * land somewhere harmless instead.
  *
- * The sink is that place. It must be `selectable` rather than a plain focusable
- * `View`: a sheet window opens in touch mode, and only a focusable-in-touch-mode
- * node takes the focus there. It paints nothing — fully transparent, one pixel,
- * out of flow — takes no touch (`setTextIsSelectable` also makes a text view
- * clickable, which `pointerEvents` turns off), and is hidden from assistive
- * readers with the two flags each platform reads, so it never becomes a focus
- * stop a screen reader announces.
+ * The sink is that place. The text must be `selectable` rather than a plain
+ * focusable `View`: a sheet window opens in touch mode, and only a
+ * focusable-in-touch-mode node takes the focus there. It paints nothing — fully
+ * transparent, one pixel, out of flow — and both accessibility flags keep it off
+ * the reader tree, so it never becomes a focus stop a screen reader announces.
+ *
+ * The wrapper carries the touch refusal, because a `Text` has no `pointerEvents`
+ * prop: `ReactTextView` does not implement `ReactPointerEventsView`, so the
+ * touch dispatcher reads AUTO for it and a `pointerEvents` on the text itself
+ * would do nothing. `setTextIsSelectable` also makes the text clickable, so
+ * without the wrapper the sink would be a hit target inside the sheet.
  *
  * Render it once, before the sheet's content.
  */
 export function SheetFocusSink() {
   return (
-    <Text
-      selectable
+    <View
       pointerEvents="none"
       aria-hidden
       importantForAccessibility="no-hide-descendants"
-      allowFontScaling={false}
-      className="absolute size-px opacity-0"
-    />
+      className="absolute size-px"
+    >
+      <Text selectable allowFontScaling={false} className="opacity-0" />
+    </View>
   );
 }

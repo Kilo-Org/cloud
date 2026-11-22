@@ -1,16 +1,18 @@
 import { Context } from 'effect';
 
 /**
- * How many web searches one question may spend. Each search draws on the
- * account's allowance, so a model that keeps searching is stopped here, as the
- * extension's tool stops it.
+ * How many web searches one question may spend. Each search Kilo answers draws
+ * on the account's allowance, so a model that keeps searching is stopped here,
+ * as the extension's tool stops it. An attempt that produced no answer, because
+ * the device was offline, the person was signed out, the proxy was unreachable,
+ * the proxy refused, or the attempt timed out, costs nothing.
  */
 export const MAX_SEARCHES_PER_QUESTION = 5;
 
 export type QuestionSearches = { used: number };
 
 /**
- * The searches spent on the question being answered.
+ * The searches Kilo answered for the question being answered.
  *
  * Tools are shared by every chat and are told nothing about the session that
  * calls them, but a tool runs inside the fiber that reads the answer. The

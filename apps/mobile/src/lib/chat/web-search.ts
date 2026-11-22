@@ -157,9 +157,6 @@ async function search(argumentsText: string, context: SearchContext): Promise<Se
   if (token === null) {
     return failed(SIGNED_OUT);
   }
-  if (spent !== undefined) {
-    spent.used += 1;
-  }
   const response = await postSearch({ query: args.query, token, organizationId, signal });
   if (response === undefined) {
     return failed(
@@ -176,6 +173,12 @@ async function search(argumentsText: string, context: SearchContext): Promise<Se
     return failed(
       `Web search failed with status ${String(response.status)}.${detail === undefined ? '' : ` ${detail.error}`}`
     );
+  }
+  /* Kilo answered, so the search draws on the account's allowance even when it
+     found nothing. A transport failure, a refusal or a timeout above answers
+     nothing and costs nothing. */
+  if (response.status < 400 && spent !== undefined) {
+    spent.used += 1;
   }
   return resultsBody(text);
 }

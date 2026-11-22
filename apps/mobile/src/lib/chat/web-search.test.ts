@@ -1,4 +1,5 @@
 import { onlineManager } from '@tanstack/react-query';
+import { type ToolFailure } from '@kilocode/harness-sdk';
 import { Effect, Result } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,6 +20,10 @@ const world = vi.hoisted(() => ({
   token: 'token-one' as string | null,
   response: { status: 200, body: '{"results":[]}' },
   requests: [] as { url: string; headers: Record<string, string>; body: string }[],
+  // How many of the next requests never reach a response: they fail in transport.
+  transportFailures: 0,
+  // Whether the next request hangs until the search times out.
+  hang: false,
   settings: new Map<string, string>(),
   toastError: vi.fn(),
 }));
@@ -38,6 +43,13 @@ vi.mock('./fetch', () => ({
   ) => {
     await Promise.resolve();
     world.requests.push({ url, headers: request.headers, body: request.body });
+    if (world.transportFailures > 0) {
+      world.transportFailures -= 1;
+      throw new TypeError('Network request failed');
+    }
+    if (world.hang) {
+      return new Promise<never>(() => undefined);
+    }
     const { status, body } = world.response;
     return {
       ok: status < 400,
@@ -82,9 +94,36 @@ beforeEach(() => {
   world.token = 'token-one';
   world.response = { status: 200, body: '{"results":[]}' };
   world.requests.length = 0;
+  world.transportFailures = 0;
+  world.hang = false;
   world.settings.clear();
   world.toastError.mockClear();
 });
+
+/**
+ * One question's searches as the chat runs them: the same tool call repeated,
+ * against a counter this helper owns so the test can read what was charged.
+ * The effect starts at once, and `answers` resolves with every attempt's result.
+ */
+function askQuestion(calls: number) {
+  const spent = { used: 0 };
+  const tool = webSearchTool();
+  const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
+  const answers = Effect.runPromise(
+    Effect.forEach(Array.from({ length: calls }), () => Effect.result(tool.run(call))).pipe(
+      Effect.provideService(questionSearches, spent)
+    )
+  );
+  return { spent, answers };
+}
+
+/** What a refused search told the model. */
+function reasonOf(answer: Result.Result<string, ToolFailure> | undefined): string {
+  if (answer === undefined || Result.isSuccess(answer)) {
+    return '';
+  }
+  return String(answer.failure.cause);
+}
 
 describe('a web search', () => {
   it('asks the Kilo proxy for five results, billed to the chat organization', async () => {
@@ -142,14 +181,7 @@ describe('a web search', () => {
   });
 
   it('stops after five searches in one question, and a new question starts again', async () => {
-    const tool = webSearchTool();
-    const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
-    const question = () =>
-      Effect.forEach(Array.from({ length: 6 }), () => Effect.result(tool.run(call))).pipe(
-        Effect.provideService(questionSearches, { used: 0 })
-      );
-
-    const first = await Effect.runPromise(question());
+    const first = await askQuestion(6).answers;
 
     expect(first.map(answer => Result.isSuccess(answer))).toEqual([
       true,
@@ -161,7 +193,7 @@ describe('a web search', () => {
     ]);
     expect(world.requests).toHaveLength(5);
 
-    const second = await Effect.runPromise(question());
+    const second = await askQuestion(6).answers;
 
     expect(Result.isSuccess(second[0] ?? Result.fail(undefined))).toBe(true);
     expect(world.requests).toHaveLength(10);
@@ -172,6 +204,87 @@ describe('a web search', () => {
 
     expect(Result.isFailure(await searched())).toBe(true);
     expect(world.requests).toEqual([]);
+  });
+
+  it('charges nothing for five searches that never reach the proxy', async () => {
+    world.transportFailures = 5;
+
+    const { spent, answers } = askQuestion(5);
+    const outcome = await answers;
+
+    expect(outcome.every(answer => Result.isFailure(answer))).toBe(true);
+    expect(world.requests).toHaveLength(5);
+    expect(spent.used).toBe(0);
+  });
+
+  it('allows five answered searches and refuses the sixth with the limit reason', async () => {
+    const { spent, answers } = askQuestion(6);
+    const outcome = await answers;
+
+    expect(outcome.map(answer => Result.isSuccess(answer))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
+    expect(world.requests).toHaveLength(5);
+    expect(spent.used).toBe(5);
+    expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
+  });
+
+  it('charges nothing when the proxy answers 402 for used-up free searches', async () => {
+    world.response = {
+      status: 402,
+      body: '{"error":"Exa free allowance exhausted and no credit balance available"}',
+    };
+
+    const { spent, answers } = askQuestion(1);
+    const [answer] = await answers;
+
+    expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
+    expect(spent.used).toBe(0);
+  });
+
+  it('charges nothing when the proxy fails with status 500', async () => {
+    world.response = { status: 500, body: '{"error":"upstream exploded"}' };
+
+    const { spent, answers } = askQuestion(1);
+    const [answer] = await answers;
+
+    expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
+    expect(spent.used).toBe(0);
+  });
+
+  it('charges a search Kilo answered even when the body cannot be read', async () => {
+    world.response = { status: 200, body: '{"unexpected":true}' };
+
+    const { spent, answers } = askQuestion(1);
+    const [answer] = await answers;
+
+    expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
+    // Kilo ran the search and billed the account, so the allowance still moved.
+    expect(spent.used).toBe(1);
+  });
+
+  it('charges nothing when the search times out at fifteen seconds', async () => {
+    vi.useFakeTimers();
+    try {
+      world.hang = true;
+
+      const { spent, answers } = askQuestion(1);
+      await vi.advanceTimersByTimeAsync(15_000);
+      const [answer] = await answers;
+      // A fiber that ran under the timeout must not leak past the test.
+      await vi.runAllTimersAsync();
+
+      expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
+      expect(reasonOf(answer)).toContain('took too long');
+      expect(spent.used).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

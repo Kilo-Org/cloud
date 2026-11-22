@@ -284,11 +284,12 @@ export async function validateOrganizationAutoTarget(
 
   let models;
   try {
-    // A replica read sends the model-stats snapshot to that replica too, so the gateway keeps its
-    // `sfo1` reads local; a transaction caller reads the primary, where it just wrote.
+    // The catalog's model-stats snapshot follows the seam only when the caller names one: a
+    // transaction caller reads the primary, and a replica read sends the snapshot to that replica.
+    // A caller that names no seam keeps the catalog's documented primary default.
     models = await getEnhancedOpenRouterModels({
       countryCode: null,
-      fromDb: 'fromDb' in read ? read.fromDb : undefined,
+      fromDb: options.read && 'fromDb' in options.read ? options.read.fromDb : undefined,
     });
   } catch {
     return {

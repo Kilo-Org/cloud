@@ -101,8 +101,6 @@ function removeRemovedContainers(value: string): string {
       }
       const tagEnd = nextTagEnd;
       if (tagEnd === -1) {
-        // No `>` at or after this point means no start tag later in the value
-        // can complete either, so one truncated tag ends the scan.
         break;
       }
       const offsets = endTags.get(name);
@@ -182,8 +180,6 @@ function removeRemovedTags(value: string): string {
       const nameEnd = start + name.length + (isEndTag ? 2 : 1);
       const tagEnd = value.indexOf('>', nameEnd);
       if (tagEnd === -1) {
-        // No `>` at or after this point means no later candidate completes
-        // either; the rest of the value stays as it is.
         break;
       }
       result += value.slice(kept, start);
@@ -215,10 +211,6 @@ function removeRemovedTags(value: string): string {
 function removeEmptyContainers(value: string): string {
   let kept = 0;
   let result = '';
-  // The `>` that ends the current open tag, and the closer scan after it; both
-  // are unset until the first candidate searches. The cursor only moves forward,
-  // so an offset still at or after a later candidate's name end is reused with
-  // its scan, and each region of the value is read once.
   let openEndCursor = -1;
   let closer: EmptyContainerCloser | undefined = undefined;
   let at = 0;
@@ -238,8 +230,6 @@ function removeEmptyContainers(value: string): string {
           openEndCursor === -1 ? undefined : emptyContainerCloserAt(value, openEndCursor + 1);
       }
       if (openEndCursor === -1) {
-        // No `>` at or after this name: no open tag later in the value can
-        // complete either, so the rest stays as it is.
         break;
       }
       closerEnd = emptyContainerEnd(value, nameAt, closer);

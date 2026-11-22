@@ -32,12 +32,10 @@ export class CharacterBoundedCache<T> {
     this.pinned = pinned;
   }
 
-  /** Entries currently held. */
   get size(): number {
     return this.entries.size;
   }
 
-  /** Sum of the weights of the entries currently held. */
   get weight(): number {
     return this.totalWeight;
   }

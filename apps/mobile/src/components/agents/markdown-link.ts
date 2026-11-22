@@ -9,7 +9,6 @@ function getUrlHost(href: string): string | null {
   return URL_HOST_PATTERN.exec(href)?.[1] ?? null;
 }
 
-/** Accessible label for a markdown link: explicit title, else visible link text, else the URL host. */
 export function resolveLinkAccessibilityLabel(
   children: string | ReactNode[],
   href: string,

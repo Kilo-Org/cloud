@@ -52,8 +52,6 @@ export function ModeSelector({
   const selectedValue = normalizeAgentMode(value);
   const customOptionsDeduped = dedupeCustomModeOptions(customOptions);
   const customMatch = customOptionsDeduped.find(option => option.value === selectedValue);
-  // An empty label means no loaded option names this mode, so the chip falls
-  // back to the generic label rather than printing the slug.
   const customLabel = customMatch?.label ?? '';
   const selectedLabel = isBuiltinAgentMode(selectedValue)
     ? t(getBuiltinModeLabelKey(selectedValue) ?? '')

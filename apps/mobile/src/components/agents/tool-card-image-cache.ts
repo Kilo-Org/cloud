@@ -64,7 +64,7 @@ function ensureCacheDirectory(): Directory {
 
 /**
  * Map any MIME type to a file extension.
- * `image/jpeg` → `jpg`; `application/pdf` → `pdf`; `text/plain` → `txt`.
+ * `image/jpeg` → `jpg`; `application/pdf` → `pdf`; `text/plain` → `plain`.
  * Falls back to `bin` when the MIME has no slash or an empty subtype.
  */
 export function extensionForMime(mime: string): string {
@@ -103,7 +103,8 @@ function base64DecodedByteLength(payload: string): number {
 
 /**
  * Strip the `data:<mime>;base64,` prefix from a data URL. Returns undefined
- * when the payload is not a base64 data URL for the given mime.
+ * when the payload is not a base64 data URL. A data URL of another mime with a
+ * base64 payload is accepted and its payload returned.
  */
 export function stripDataUrlBase64Prefix(dataUrl: string, mime: string): string | undefined {
   const prefix = `data:${mime};base64,`;
@@ -287,10 +288,8 @@ function bestEffortDelete(file: File): void {
 }
 
 /**
- * Backward-compatible alias. Calls {@link cacheToolAttachment} without a
- * filename, using the legacy extension-based naming. Kept for existing
- * consumers that don't pass a filename (call sites that only handle images).
- *
+ * Backward-compatible alias for call sites that only handle images; see
+ * {@link cacheToolAttachment}.
  */
 export function cacheToolCardImage(partId: string, mime: string, dataUrl: string): void {
   cacheToolAttachment(partId, { mime, dataUrl });
@@ -347,7 +346,7 @@ export function clearToolCardImageCache(): void {
       directory.delete();
     }
   } catch {
-    // Best-effort cache hygiene; ignore delete failures.
+    // Ignore: the reset below still runs.
   }
   cacheGeneration += 1;
   inFlightOrDone.clear();

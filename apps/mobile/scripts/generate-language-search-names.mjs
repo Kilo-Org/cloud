@@ -76,7 +76,6 @@ export function collectLanguageSearchNames(displayTag) {
   return names;
 }
 
-/** The generated module's source for one display language's names. */
 export function generateLanguageSearchNamesSource(
   displayTag,
   names = collectLanguageSearchNames(displayTag)

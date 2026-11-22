@@ -71,11 +71,8 @@ export async function readMobileSessionSnapshotPage(
   };
 
   const history = result.history as KiloSdkMessageHistory | null;
-  // The rows a message page cannot carry, shared by both success arms. The
-  // preparation rows come first: a run whose sandbox preparation failed has no
-  // messages at all, and without them the open would paint an empty transcript
-  // instead of the run's own failure. Omitted when the router sends none, so
-  // the SDK's restore keeps the live rows it already holds.
+  // Omitted when the router sends none, so the SDK's restore keeps the live rows
+  // it already holds.
   // Mobile ships independently of the API: an older server omits the rows, so
   // the page is read structurally rather than trusted.
   const preparationAttempts = Array.isArray(result.preparationAttempts)

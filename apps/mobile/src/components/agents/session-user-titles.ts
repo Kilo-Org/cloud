@@ -119,9 +119,6 @@ function persistTitles(): void {
     // it erases other sessions' titles.
     await hydrate();
     if (!hydratedUnderEpoch) {
-      // The blob has never been read on this account boundary, so the map may
-      // be missing entries it holds. Skipping the write keeps them; the next
-      // rename retries the read and persists then.
       return;
     }
     const serialized = serializeTitles();
@@ -226,9 +223,6 @@ async function hydrate(): Promise<void> {
   return next;
 }
 
-// Hydrate at module init, before the first read. The store stays empty until
-// this completes, so a title chosen before the restart stays hidden in the
-// meantime; a consumer subscribed to the revision repaints when it lands.
 void hydrate();
 
 // ── Store ───────────────────────────────────────────────────────────────────
@@ -299,9 +293,6 @@ export function getUserSessionTitle(sessionId: string): string | undefined {
  * Best effort: a storage failure is swallowed so it can never abort sign-out.
  */
 export async function clearUserSessionTitles(): Promise<void> {
-  // Invalidate any hydration in flight before wiping: its KV read may resolve
-  // after this clear and would otherwise restore the signed-out account's
-  // entries into the now-empty map.
   hydrationEpoch += 1;
   store.titles.clear();
   bumpRevision();
@@ -317,9 +308,6 @@ export async function clearUserSessionTitles(): Promise<void> {
     }
   });
   await lastWrite;
-  // Re-arm hydration so the next account does not read the cleared blob
-  // through the settled promise of this run, and require its own read before
-  // any write replaces the blob.
   hydrationPromise = null;
   hydratedUnderEpoch = false;
 }

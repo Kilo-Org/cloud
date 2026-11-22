@@ -395,15 +395,8 @@ function tailBoundaryIndex(tokens: readonly Token[], groupStarts: readonly numbe
       break;
     }
   }
-  // The boundary must never land inside a block run. Pulling an absorbing list
-  // or blockquote into the tail is not enough on its own: the run that holds it
-  // can start earlier, and a block earlier in that run (a paragraph a list item
-  // merges into, as in `<b>x</b>\n2. b \n-`) can absorb the absorbing block and
-  // everything after it. Walk back to the run's first token every time the
-  // boundary moves, then repeat the absorbing-block and details checks, because
-  // that run can itself begin with an absorbing block behind a stable separator
-  // or sit inside a details element. The result is always 0 or a boundary
-  // directly preceded by a stable separator.
+  // A block earlier in a run, as in `<b>x</b>\n2. b \n-`, can absorb the
+  // absorbing block and everything after it, so the walk back repeats.
   let backedUp = true;
   while (backedUp) {
     while (start > 0 && !isStableSeparator(tokens[start - 1])) {
@@ -477,19 +470,12 @@ function appendTokens(
 export function splitMarkdownHtmlIncremental(
   input: MarkdownHtmlIncrementalInput
 ): MarkdownHtmlSplit {
-  // The three forms reuse the same body over one string. A plain value and a
-  // snapshot value segment as stored; the previous form folds only the
-  // appended region through the previous publish's conversion and joins the
-  // result after that publish's source, so the body sees one string whose
-  // head is still the previous publish's exact value.
+  // The body must see one string whose head is still the previous publish's
+  // exact value.
   const previous = input.previous;
   if (previous !== undefined) {
     // The closure joins the previous converted source itself; joining here a
-    // second time would duplicate that source in every reuse. A gated publish
-    // passes only the appended region and the closure returns the previous
-    // converted source joined with the appended region's conversion; a
-    // declined publish passes the whole converted value, which replaces the
-    // previous source entirely.
+    // second time would duplicate that source in every reuse.
     const effective = input.wholeConverted ?? previous.convert(input.appended, previous.tail.value);
     return splitFromSnapshot(effective, previous.tail);
   }

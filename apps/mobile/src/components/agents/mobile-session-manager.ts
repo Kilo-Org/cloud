@@ -118,7 +118,7 @@ export function isCancelQueuedUpgradeRequired(error: unknown): boolean {
   return readFetchSessionErrorCode(error) === CANCEL_QUEUED_UPGRADE_REQUIRED_CODE;
 }
 
-/* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
+/* eslint-disable require-await -- thin tRPC passthrough */
 async function defaultFetchSessionQuery(
   sessionId: KiloSessionId
 ): Promise<SessionWithRuntimeState> {
@@ -126,7 +126,7 @@ async function defaultFetchSessionQuery(
     session_id: sessionId,
   });
 }
-/* eslint-enable @typescript-eslint/promise-function-async, require-await */
+/* eslint-enable require-await */
 
 async function defaultFetchSessionSleep(ms: number): Promise<void> {
   await new Promise<void>(resolve => {
@@ -349,10 +349,8 @@ export function createMobileAgentSessionManager({
         messageId,
       });
     },
-    // A tRPC call whose client control-plane deadline expired never got an
-    // answer: the open is stalled, not failed. The manager keeps the skeleton
-    // (then the slow-load state with Retry) instead of a premature error
-    // screen. Unwrapped from the TRPCClientError tRPC layers over it.
+    // The manager keeps the skeleton and then the slow-load Retry state instead
+    // of a premature error screen.
     // The composer materializes presigned GET parts and sends them as
     // `attachmentParts`, so the `supportsAttachments` gate may report a remote
     // session supported before its CLI advertises the capability. Consumers
@@ -502,7 +500,7 @@ export function createMobileAgentSessionManager({
           await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
         });
       },
-      /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
+      /* eslint-disable require-await -- thin tRPC passthrough */
       cancelQueuedMessage: async input =>
         withCloudAgentDiagnostics('cancelQueuedMessage', organizationId, async () => {
           if (organizationId) {
@@ -516,7 +514,7 @@ export function createMobileAgentSessionManager({
             skipBatchOptions
           );
         }),
-      /* eslint-enable @typescript-eslint/promise-function-async, require-await */
+      /* eslint-enable require-await */
       interrupt: async payload => {
         await withCloudAgentDiagnostics('interrupt', organizationId, async () => {
           if (organizationId) {
@@ -633,7 +631,6 @@ export function createMobileAgentSessionManager({
       // requests carry it. An explicit route scope always wins.
       organizationId ??= parseOrganizationScope(sessionResult.organization_id);
       const cloudAgentSessionId = parseCloudAgentSessionId(sessionResult.cloud_agent_session_id);
-      // Memoize the metadata `resolveSession` needs so it never re-reads the row.
       fetchedMetadata = { sessionId: kiloSessionId, cloudAgentSessionId };
       const rs = sessionResult.runtimeState;
       return {

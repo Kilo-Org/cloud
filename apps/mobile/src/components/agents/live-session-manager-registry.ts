@@ -43,7 +43,6 @@ export function unregisterLiveSessionManager(
   }
 }
 
-/** The open screen's manager for a session, or null when that session is not open. */
 export function getLiveSessionManager(sessionId: string): LiveSessionManagerHandle | null {
   return liveManagers.get(sessionId) ?? null;
 }

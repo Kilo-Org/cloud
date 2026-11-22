@@ -30,7 +30,7 @@ export type FilePartCacheEntry = {
   writePending?: boolean;
 };
 
-/** Reactive map of partId → captured FilePart entry. First write wins. */
+/** Reactive map of partId → captured FilePart entry. */
 const entriesByPartId = new Map<string, FilePartCacheEntry>();
 const subscriptions = createPartSubscriptions();
 /** Part ids whose `data:` body is still being written; keeps first write wins
@@ -188,7 +188,6 @@ function applyOverwrite(
   emitChange(partId);
 }
 
-/** Mark an existing entry's last on-demand presign as failed. */
 export function markFilePartResolveFailed(partId: string): void {
   const entry = entriesByPartId.get(partId);
   if (!entry) {
@@ -200,7 +199,6 @@ export function markFilePartResolveFailed(partId: string): void {
   emitChange(partId);
 }
 
-/** Clear the failed mark from an existing entry. */
 export function clearFilePartResolveFailed(partId: string): void {
   const entry = entriesByPartId.get(partId);
   if (!entry) {
@@ -212,7 +210,6 @@ export function clearFilePartResolveFailed(partId: string): void {
   emitChange(partId);
 }
 
-/** Mark an existing entry as having an automatic URL renew in flight. */
 export function markFilePartRenewing(partId: string): void {
   const entry = entriesByPartId.get(partId);
   if (!entry) {
@@ -222,7 +219,6 @@ export function markFilePartRenewing(partId: string): void {
   emitChange(partId);
 }
 
-/** Clear the renewing mark from an existing entry. */
 export function clearFilePartRenewing(partId: string): void {
   const entry = entriesByPartId.get(partId);
   if (!entry) {
@@ -266,7 +262,6 @@ export function useFilePartCache(partId: string): FilePartCacheEntry | undefined
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/** True only for `http:`, `https:`, and `data:` URLs. */
 export function isUsableFilePartUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }

@@ -177,15 +177,23 @@ export function supportsCatalogMode(providerId: string): boolean {
 
 export type DirectByokCatalogEntry = { catalogModelId: string; model: DirectByokModel };
 
+/** The servable catalog models of a provider, each with the model that serves it. */
+async function* servableCatalogModels(
+  provider: DirectByokProvider
+): AsyncGenerator<DirectByokCatalogEntry> {
+  const models = getPrimaryCatalogModels(await provider.models());
+  for (const [catalogModelId, model] of models) {
+    if (await isByokServableCatalogModelId(catalogModelId)) yield { catalogModelId, model };
+  }
+}
+
 /** The catalog ids a provider with catalog data serves, with the model serving each. */
 async function listCatalogModelsOfProvider(
   provider: DirectByokProvider
 ): Promise<DirectByokCatalogEntry[]> {
   if (!hasCatalogData(provider)) return [];
   const entries: DirectByokCatalogEntry[] = [];
-  for (const [catalogModelId, model] of getPrimaryCatalogModels(await provider.models())) {
-    if (await isByokServableCatalogModelId(catalogModelId)) entries.push({ catalogModelId, model });
-  }
+  for await (const entry of servableCatalogModels(provider)) entries.push(entry);
   return entries;
 }
 
@@ -202,11 +210,21 @@ export async function listDirectByokCatalogModels(
  * otherwise a key in catalog mode would serve nothing.
  */
 export async function offersCatalogMode(providerId: string): Promise<boolean> {
-  return (await listDirectByokCatalogModels(providerId)).length > 0;
+  const provider = findDirectByokProvider(providerId);
+  if (!provider || !hasCatalogData(provider)) return false;
+  for await (const _ of servableCatalogModels(provider)) return true;
+  return false;
+}
+
+/** The provider a key serves catalog models with, or undefined when the key is not in catalog mode. */
+function catalogModeProvider(key: EnabledByokProvider): DirectByokProvider | undefined {
+  if (!key.serveCatalogModels) return undefined;
+  const provider = findDirectByokProvider(key.providerId);
+  return provider !== undefined && hasCatalogData(provider) ? provider : undefined;
 }
 
 function isCatalogModeKey(key: EnabledByokProvider): boolean {
-  return key.serveCatalogModels && supportsCatalogMode(key.providerId);
+  return catalogModeProvider(key) !== undefined;
 }
 
 /** The catalog id that replaces `model`'s bespoke id in catalog mode, or null when unmapped. */
@@ -282,9 +300,8 @@ async function getCatalogModeModelIds(
 ): Promise<ReadonlySet<string>> {
   const providersByModelId: CatalogModeProviders = new Map();
   for (const key of keys) {
-    if (!key.serveCatalogModels) continue;
-    const provider = findDirectByokProvider(key.providerId);
-    if (!provider || !hasCatalogData(provider)) continue;
+    const provider = catalogModeProvider(key);
+    if (!provider) continue;
     for (const { catalogModelId } of await listCatalogModelsOfProvider(provider)) {
       providersByModelId.set(catalogModelId, [
         ...(providersByModelId.get(catalogModelId) ?? []),

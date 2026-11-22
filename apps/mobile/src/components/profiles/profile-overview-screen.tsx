@@ -271,6 +271,7 @@ export function ProfileOverviewScreen({
                 ? undefined
                 : t('profiles.loadFailed')
             }
+            message={errorView.descriptionKey ? t(errorView.descriptionKey) : undefined}
             onRetry={errorView.showRetry ? () => void profileQuery.refetch() : undefined}
             isRetrying={profileQuery.isRefetching}
           />

@@ -7,7 +7,9 @@ import {
   OrganizationGroupPoliciesSchema,
   type OrganizationGroupPolicies,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
-import type { organization_group_policy_settings } from '@kilocode/db/schema';
+import { organization_group_policy_settings } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import type { db, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export type OrganizationGroupPolicySettingsRow =
   typeof organization_group_policy_settings.$inferSelect;
@@ -16,6 +18,19 @@ export type CanonicalOrganizationGroupPolicySettings = {
   defaultPolicies: OrganizationGroupPolicies;
   policyRevision: number;
 };
+
+/** Read the organization's stored group-policy settings row, if it has one. */
+export async function readOrganizationGroupPolicySettingsRow(
+  client: typeof db | DrizzleTransaction,
+  organizationId: string
+): Promise<OrganizationGroupPolicySettingsRow | undefined> {
+  const [settings] = await client
+    .select()
+    .from(organization_group_policy_settings)
+    .where(eq(organization_group_policy_settings.organization_id, organizationId))
+    .limit(1);
+  return settings;
+}
 
 /**
  * The canonical view of an organization's group-policy settings: the stored

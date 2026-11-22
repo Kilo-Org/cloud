@@ -20,6 +20,7 @@ import type * as GitLabAdapter from '@/lib/integrations/platforms/gitlab/adapter
 import type * as GitLabMetadataMutation from '@/lib/integrations/platforms/gitlab/metadata-mutation';
 import type { GitLabCredentialBrokerResult } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { storeGitLabOAuthIntegration } from './oauth-integration-writer';
+import { isPlatformIntegrationActive } from '@/lib/integrations/core/health';
 
 const testKeyPair = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -1161,5 +1162,59 @@ describe('GitLab OAuth integration writer', () => {
       ['new-access-secret', '42', 991, providerBaseUrl],
     ]);
     expect(settled.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
+  });
+});
+
+describe('a GitLab OAuth reconnect of an existing integration', () => {
+  it('records an active association without a suspension', async () => {
+    const user = await insertTestUser();
+    const providerBaseUrl = 'https://gitlab.example.com/root';
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        platform_account_id: 'suspended-provider-id',
+        platform_account_login: 'suspended-login',
+        integration_status: 'suspended',
+        suspended_at: new Date('2026-11-20T00:00:00.000Z').toISOString(),
+        suspended_by: 'integration-operator',
+        metadata: {
+          gitlab_instance_url: providerBaseUrl,
+          webhook_secret: 'kept-webhook-secret',
+          auth_type: 'oauth',
+        },
+      })
+      .returning();
+    if (!integration) throw new Error('Expected existing integration');
+
+    await storeGitLabOAuthIntegration({
+      owner: { type: 'user', id: user.id },
+      authorizedByUserId: user.id,
+      providerBaseUrl,
+      providerUser: { id: 'suspended-provider-id', login: 'suspended-login' },
+      accessToken: 'reconnect-access-secret',
+      refreshToken: 'reconnect-refresh-secret',
+      accessTokenExpiresAt: '2031-01-01T00:00:00.000Z',
+      oauthClientId: null,
+      oauthClientSecret: null,
+      scopes: ['api'],
+      repositories: null,
+    });
+
+    const [reconnected] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+
+    expect(reconnected).toMatchObject({
+      integration_status: 'active',
+      suspended_at: null,
+      suspended_by: null,
+      auth_invalid_at: null,
+      auth_invalid_reason: null,
+    });
+    expect(isPlatformIntegrationActive(reconnected)).toBe(true);
   });
 });

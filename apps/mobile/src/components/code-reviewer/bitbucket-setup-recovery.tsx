@@ -27,11 +27,14 @@ import { cn } from '@/lib/utils';
 export function BitbucketSetupRecovery({
   scope,
   readiness,
+  organizationName,
   message,
   className,
 }: Readonly<{
   scope: string;
   readiness: BitbucketReadiness;
+  /** The display name the role sentence names when the call refuses the role. */
+  organizationName: string;
   /** The state's own explanation, which names what the reader is missing. */
   message: string;
   className?: string;
@@ -61,7 +64,7 @@ export function BitbucketSetupRecovery({
         if (attempt.owns()) {
           // Every failure here comes from a call against the stored token, so
           // a refusal reads as the expired connection it sits on.
-          attempt.fail(bitbucketConnectionFailure(error, t, 'replace-token'));
+          attempt.fail(bitbucketConnectionFailure(error, t, 'replace-token', organizationName));
         }
       }
     })();

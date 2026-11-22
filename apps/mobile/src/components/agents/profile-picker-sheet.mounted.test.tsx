@@ -47,6 +47,12 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The sheet classifies a failed read through the shared selector, which reads
+// the committed connectivity; this suite exercises the coded states online.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
@@ -95,6 +101,7 @@ function defaults(overrides: Partial<ProfilePickerSheetProps> = {}): ProfilePick
     defaultProfileApplies: false,
     isLoading: false,
     isError: false,
+    error: undefined,
     needsAttention: false,
     onSelect: vi.fn<() => void>(),
     onManageProfiles: vi.fn<() => void>(),
@@ -297,16 +304,33 @@ describe('ProfilePickerSheet', () => {
     }
   });
 
-  it('renders the retryable failure with Retry and refetches', () => {
+  // The sheet lists profiles, so a load failure names what did not load in the
+  // sheet's own words, not the Environment row's; an access refusal reads as
+  // the permission state, which offers no Retry.
+  const FAILED_READS = [
+    {
+      code: 'INTERNAL_SERVER_ERROR',
+      expected: { variant: 'server', title: "Couldn't load profiles", retryable: true },
+    },
+    { code: 'FORBIDDEN', expected: { variant: 'permission', retryable: false } },
+  ] as const;
+  it.each(FAILED_READS)('classifies a $code failure', ({ code, expected }) => {
     const onRetry = vi.fn<() => void>();
-    const renderer = mount({ isError: true, onRetry });
+    const renderer = mount({ isError: true, error: { data: { code } }, onRetry });
 
-    const empty = renderer.root.findByType('EmptyState' as never);
-    expect(empty.props.title).toBe("Couldn't load profiles");
-    const retry = renderer.root.findByType('StateAction' as never);
-    expect(retry.props.label).toBe('Retry');
-    press(retry);
-    expect(onRetry).toHaveBeenCalledTimes(1);
+    const node = renderer.root.findByType('QueryError' as never);
+    const hasRetry = typeof node.props.onRetry === 'function';
+    expect({ variant: node.props.variant, title: node.props.title, retryable: hasRetry }).toEqual(
+      'title' in expected ? expected : { ...expected, title: undefined }
+    );
+    if (hasRetry) {
+      act(() => {
+        (node.props.onRetry as () => void)();
+      });
+      expect(onRetry).toHaveBeenCalledTimes(1);
+    } else {
+      expect(onRetry).not.toHaveBeenCalled();
+    }
     expect(radios(renderer)).toHaveLength(0);
   });
 

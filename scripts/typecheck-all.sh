@@ -9,7 +9,7 @@ set -euo pipefail
 #   scripts/typecheck-all.sh --group <name>   # CI: one group of KILO_AFFECTED
 #
 # Groups split the work across parallel CI jobs:
-#   web       apps/web, scripts/web-env and storybook
+#   web       apps/web, scripts/web-env, dev and storybook
 #   trpc      the tRPC build and the apps that compile against it
 #   packages  every other workspace package
 #
@@ -133,6 +133,7 @@ if [ -n "$group" ]; then
         # rechecks more than a full check costs.
         tsgo --noEmit -p apps/web/tsconfig.json --incremental false
         tsgo --noEmit -p scripts/web-env/tsconfig.json
+        tsgo --noEmit -p dev/tsconfig.json
       fi
       if affects @kilocode/storybook; then
         pnpm --filter @kilocode/storybook run typecheck
@@ -251,6 +252,7 @@ fi
 # 2. Root typechecks (always — they are fast with incremental tsgo)
 tsgo --noEmit -p apps/web/tsconfig.json
 tsgo --noEmit -p scripts/web-env/tsconfig.json
+tsgo --noEmit -p dev/tsconfig.json
 
 # 3. Workspace typecheck
 if ! $changes_only || [ "$full" = true ]; then
@@ -260,8 +262,8 @@ if ! $changes_only || [ "$full" = true ]; then
 fi
 
 # The selection names the changed workspaces and every workspace that reads
-# them. The root checks above compile apps/web and scripts/web-env, and step 1
-# builds @kilocode/trpc.
+# them. The root checks above compile apps/web, scripts/web-env and dev, and
+# step 1 builds @kilocode/trpc.
 filters=()
 while IFS= read -r name; do
   [ -z "$name" ] && continue

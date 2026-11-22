@@ -257,12 +257,11 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.repoPicker.platformBitbucket',
   'agentChat.prBadge.label',
   // Profile-editor examples that name the value's own syntax, not prose: a
-  // slug the field validator accepts, a server name, a JSON snippet, and
-  // command lines whose tool and package paths must stay literal. Every
-  // catalog keeps them English so the example never contradicts validation.
+  // slug the field validator accepts, a server name, and command lines whose
+  // tool and package paths must stay literal. Every catalog keeps them English
+  // so the example never contradicts validation.
   'profiles.mcp.namePlaceholder',
   'profiles.mcp.commandPlaceholder',
-  'profiles.mcp.jsonPlaceholder',
   'profiles.agents.slugPlaceholder',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
@@ -954,16 +953,27 @@ const VISIBILITY_KEYS = [
 ];
 
 /**
- * Catalog values that read the same in every language. `profiles.agents.topP`
+ * Catalog values that must read the same in every language. `profiles.agents.topP`
  * is the sampling parameter's published name, so a translated word would hide
  * which parameter the field sets; `profiles.mcp.jsonPlaceholder` is the JSON
  * sample the multiline field shows the reader, and a translated one stops
- * demonstrating the shape. A key listed here reads English in every catalog:
- * `checkVerbatimLabels` requires it, and `ENGLISH_IDENTICAL_ALLOWLIST` and,
- * for the JSON sample, `JSON_SAMPLE_EXEMPT_KEYS` exempt the same key from the
- * rules that would otherwise reject the identical or serialized value.
+ * demonstrating the shape. This list is the only registry of keys that must read
+ * English: `checkVerbatimLabels` requires it, and the identical-copy rules
+ * derive their exemption from it through `VERBATIM_KEY_SET`. The serialized-JSON
+ * rule exempts only `JSON_SAMPLE_KEY`, because a verbatim label still must not
+ * hold JSON text in English.
  */
 const VERBATIM_KEYS = ['profiles.agents.topP', 'profiles.mcp.jsonPlaceholder'];
+
+const VERBATIM_KEY_SET = new Set(VERBATIM_KEYS);
+
+/**
+ * Whether a key may read English here: one listed in `VERBATIM_KEYS` must,
+ * while one in `ENGLISH_IDENTICAL_ALLOWLIST` may.
+ */
+function expectsEnglishCopy(key) {
+  return VERBATIM_KEY_SET.has(key) || ENGLISH_IDENTICAL_ALLOWLIST.has(key);
+}
 
 function checkVerbatimLabels(values, english, label) {
   const problems = [];
@@ -2095,20 +2105,19 @@ function isSerializedJson(value) {
 }
 
 /**
- * Catalog values whose text is literally a JSON sample the reader types
- * beside: the MCP form's multiline config placeholder shows the shape the
- * stored value takes, so its braces and quoted key are the content, not a
- * storage slip. The same key is registered in VERBATIM_KEYS (whose
- * checkVerbatimLabels requires the English text) and in
- * ENGLISH_IDENTICAL_ALLOWLIST (which exempts it from the "equals English
- * everywhere" failure), so a maintainer registering a sister key lists it in
- * all three.
+ * The one key whose text is a JSON sample by design: the MCP form's multiline
+ * config placeholder shows the shape the stored value takes, so its braces and
+ * quoted key are the content, not a storage slip. It is registered in
+ * `VERBATIM_KEYS` too, because `checkVerbatimLabels` requires the English text.
+ * Every other key, verbatim or not, still fails a serialized value — including
+ * the English catalog, where `checkVerbatimLabels` cannot see a deviation.
  */
-const JSON_SAMPLE_EXEMPT_KEYS = new Set(['profiles.mcp.jsonPlaceholder']);
+const JSON_SAMPLE_KEY = 'profiles.mcp.jsonPlaceholder';
 
 /** Reject a catalog value that a JSON encoder wrote instead of a label. */
 function checkSerializedJson(label, key, value) {
-  if (JSON_SAMPLE_EXEMPT_KEYS.has(key) || !isSerializedJson(value)) {
+  // Only the JSON sample is JSON text by design; every other label must be prose.
+  if (key === JSON_SAMPLE_KEY || !isSerializedJson(value)) {
     return [];
   }
   return [`${label}: "${key}" is serialized JSON; write the label text`];
@@ -2711,7 +2720,7 @@ function checkMobileEnglishIdentical({ catalogName, english, localeValues }) {
     return problems;
   }
   for (const [key, englishValue] of english) {
-    if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
+    if (expectsEnglishCopy(key)) {
       continue;
     }
     // A value with prose of its own is judged per locale by
@@ -2753,7 +2762,7 @@ function checkMobileLocaleEnglishCopy({ catalogName, english, localeValues }) {
       if (translated.get(key) !== englishValue) {
         continue;
       }
-      if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
+      if (expectsEnglishCopy(key)) {
         continue;
       }
       if (!carriesEnglishProse(englishValue)) {

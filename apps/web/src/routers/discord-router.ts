@@ -8,6 +8,7 @@ import {
   resolveAuthorizedOwner,
   optionalOrgInput,
 } from '@/lib/integrations/resolve-owner';
+import { isPlatformIntegrationActive } from '@/lib/integrations/core/health';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 
@@ -27,7 +28,7 @@ export const discordRouter = createTRPCRouter({
       };
     }
 
-    const isInstalled = integration.integration_status === 'active';
+    const isInstalled = isPlatformIntegrationActive(integration);
     const metadata = integration.metadata as { model_slug?: string } | null;
 
     return {

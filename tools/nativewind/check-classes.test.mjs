@@ -1644,6 +1644,51 @@ test('flags a horizontal inset wider than the page gutter', () => {
   assert.equal(variants.length, 2);
   assert.match(variants.join('\n'), /\[L12\] "px-8"/);
   assert.match(variants.join('\n'), /\[L12\] "-mx-6"/);
+  // The important modifier is written on either side of the utility and only
+  // raises its specificity, so both report the same inset; the diagnostic names
+  // the utility without the modifier.
+  const important = layoutProblems(SCREEN_FILE, screen('<View className="!px-6 px-6!" />'));
+  assert.equal(important.length, 2);
+  for (const problem of important) {
+    assert.match(problem, /\[L12\] "px-6"/);
+  }
+  // Every shape of a wider inset is one decision against the gutter: an
+  // all-side form and a half step are judged beside the side forms, and the
+  // diagnostic keeps the utility the call site wrote.
+  const shapes = layoutProblems(
+    SCREEN_FILE,
+    screen('<View className="p-6 m-10 px-4.5 px-12.5" />')
+  );
+  assert.equal(shapes.length, 4);
+  for (const token of ['p-6', 'm-10', 'px-4.5', 'px-12.5']) {
+    assert.match(shapes.join('\n'), new RegExp(`\\[L12\\] "${token.replace('.', '\\.')}"`));
+  }
+});
+
+test('gives one wider inset one decision from both inset rules', () => {
+  // The two rules read the same table: on a surface that owns the page column
+  // a wider inset is both the wrong gutter and wider than it, and on a plain
+  // element only the width rule applies.
+  const container = layoutProblems(
+    SCREEN_FILE,
+    screen('<ScrollView contentContainerClassName="p-6" />')
+  );
+  assert.equal(container.length, 2);
+  assert.match(container.join('\n'), /\[L2\] "p-6 on <ScrollView> contentContainerClassName"/);
+  assert.match(container.join('\n'), /\[L12\] "p-6"/);
+  const view = layoutProblems(SCREEN_FILE, screen('<View className="p-6" />'));
+  assert.equal(view.length, 1);
+  assert.match(view[0], /\[L12\] "p-6"/);
+  assert.doesNotMatch(view[0], /\[L2\]/);
+});
+
+test('leaves an arbitrary inset to the rule that bans it', () => {
+  // The width rule reads a number of steps; an arbitrary value is not one, so
+  // it stays L1's single finding instead of being reported twice.
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="px-[22px]" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /\[L1\] "px-\[22px\]"/);
+  assert.doesNotMatch(found[0], /\[L12\]/);
 });
 
 test('accepts the gutter, a narrower inset and the modules that own one', () => {
@@ -1652,6 +1697,19 @@ test('accepts the gutter, a narrower inset and the modules that own one', () => 
     []
   );
   assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="px-6 mx-8" />')), []);
+});
+
+test('accepts the gutter in both all-side forms beside an exempt margin and a narrower step', () => {
+  // The gutter as a padding both ways, the same gutter under the important
+  // modifier on either side, a zero and an auto margin the rule exempts, a half
+  // step below the gutter, and the vertical utilities the family never held.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<View className="p-4 px-4 !px-4 px-4! m-0 mx-auto px-3.5 gap-6 py-6 mt-6 pb-5" />')
+    ),
+    []
+  );
 });
 
 test('flags a margin on a scroll content container as the page inset', () => {
@@ -1675,7 +1733,8 @@ test('flags a margin on a scroll content container as the page inset', () => {
     /\[L2\] "mx-6 on <CenteredState> contentContainerClassName"/
   );
   // A margin on an element that is not one of those surfaces is L12's business
-  // at 5+ and nobody's below it, so a plain View never reads as L2.
+  // when it is wider than the gutter and nobody's below it, so a plain View
+  // never reads as L2.
   assert.doesNotMatch(
     layoutProblems(SCREEN_FILE, screen('<View className="mx-6 ml-3 m-2" />')).join('\n'),
     /\[L2\]/
@@ -1684,8 +1743,8 @@ test('flags a margin on a scroll content container as the page inset', () => {
 
 test('exempts auto and zero margins from the page-inset rule', () => {
   // An auto margin is centering geometry and a zero margin writes no inset at
-  // all, so neither moves the page column L2 judges; L12's 5-or-more threshold
-  // does not reach either value either, so no rule judges them.
+  // all, so neither moves the page column L2 judges; neither is a number of
+  // steps on the scale, so L12 skips both as well and no rule judges them.
   for (const classes of ['mx-auto', 'ms-auto', 'm-auto', 'mx-0', 'm-0']) {
     for (const tag of ['DetailScreenScrollView', 'CenteredState']) {
       const found = layoutProblems(
@@ -1718,13 +1777,13 @@ test('keeps the header gutter rule padding-only', () => {
   // so it is accepted outright.
   assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="mx-2" />')), []);
   assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="ml-3" />')), []);
-  // A margin at 5+ is neither an L2 line (padding only) nor unflagged: L12 owns
-  // the side inset.
+  // A margin wider than the gutter is neither an L2 line (padding only) nor
+  // unflagged: L12 owns the page inset.
   const margin = layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="mx-6" />'));
   assert.equal(margin.length, 1);
   assert.match(margin[0], /\[L12\] "mx-6"/);
-  // A padding at 5+ is both: L2 because a header takes no padding of its own,
-  // L12 because the side inset is wider than the gutter.
+  // A padding wider than the gutter is both: L2 because a header takes no
+  // padding of its own, L12 because the inset is wider than the gutter.
   const padding = layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="px-5" />'));
   assert.equal(padding.length, 2);
   assert.match(padding.join('\n'), /\[L12\] "px-5"/);
@@ -1769,15 +1828,21 @@ test('accepts the page gutter and vertical padding on a CenteredState', () => {
   assert.match(view[0], /\[L12\] "px-6"/);
 });
 
-test('judges the margin sides L12 now covers and leaves the all-side utilities out', () => {
+test('judges every side the inset table lists, all-side forms included', () => {
   const found = layoutProblems(SCREEN_FILE, screen('<View className="ml-6 mr-8" />'));
   assert.equal(found.length, 2);
   assert.match(found.join('\n'), /\[L12\] "ml-6"/);
   assert.match(found.join('\n'), /\[L12\] "mr-8"/);
-  // Under the 5 threshold, and never L12's: an all-side padding or margin is
-  // L2's policy on a content container, not a side inset here.
-  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="ml-2 mr-4" />')), []);
-  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="p-5 m-6" />')), []);
+  // The all-side utilities are the same family now: `p-5` and `m-6` are wider
+  // than the one gutter, so one rule judges them beside the side forms.
+  const all = layoutProblems(SCREEN_FILE, screen('<View className="p-5 m-6" />'));
+  assert.equal(all.length, 2);
+  assert.match(all.join('\n'), /\[L12\] "p-5"/);
+  assert.match(all.join('\n'), /\[L12\] "m-6"/);
+  // The gutter itself, a zero margin and an auto margin are not wider than it.
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="p-4 m-0 mx-auto" />')), []);
+  // A vertical utility is not a page inset, whatever its step.
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="pb-5 my-6" />')), []);
 });
 
 test('reads an Animated container through the one bare-tag helper in both rules', () => {

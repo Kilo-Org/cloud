@@ -292,6 +292,65 @@ describe('cliSessionsV2 listWorkspaces', () => {
     expect(searched.workspaces.map(workspace => workspace.worktreeId)).toEqual([oldMerged]);
   });
 
+  it('finds a workspace by the decoded branch its row paints, and by the stored branch', async () => {
+    const encodedWorktree = worktreeId();
+    const plainWorktree = worktreeId();
+    await insertWorktree(encodedWorktree);
+    await insertWorktree(plainWorktree);
+    await db.insert(cli_sessions_v2).values([
+      makeSession('ses_ws_encoded_branch_0001', encodedWorktree, {
+        git_branch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+      }),
+      makeSession('ses_ws_plain_branch_0001', plainWorktree, {
+        git_branch: 'fix/checkout-retries',
+      }),
+    ]);
+
+    // The row paints `fix/請求書`, so the branch a person reads must find the
+    // workspace even though the stored ref is percent-encoded.
+    const decoded = await sessionCaller().listWorkspaces({
+      organizationId: null,
+      search: '請求書',
+    });
+    expect(decoded.workspaces.map(workspace => workspace.worktreeId)).toEqual([encodedWorktree]);
+
+    const readable = await sessionCaller().listWorkspaces({
+      organizationId: null,
+      search: 'fix/請求書',
+    });
+    expect(readable.workspaces.map(workspace => workspace.worktreeId)).toEqual([encodedWorktree]);
+
+    const plain = await sessionCaller().listWorkspaces({
+      organizationId: null,
+      search: 'checkout',
+    });
+    expect(plain.workspaces.map(workspace => workspace.worktreeId)).toEqual([plainWorktree]);
+  });
+
+  it('finds a workspace by a stored escape of an ASCII character the row paints decoded', async () => {
+    const ampWorktree = worktreeId();
+    await insertWorktree(ampWorktree);
+    await db.insert(cli_sessions_v2).values([
+      makeSession('ses_ws_amp_branch_0001', ampWorktree, {
+        git_branch: 'fix/a%26b',
+      }),
+    ]);
+
+    // The row paints `fix/a&b`, so the decoder's inverse — not `encodeURI`,
+    // which leaves `&` literal — must find the stored `fix/a%26b`.
+    const amp = await sessionCaller().listWorkspaces({
+      organizationId: null,
+      search: 'a&b',
+    });
+    expect(amp.workspaces.map(workspace => workspace.worktreeId)).toEqual([ampWorktree]);
+
+    const readable = await sessionCaller().listWorkspaces({
+      organizationId: null,
+      search: 'fix/a&b',
+    });
+    expect(readable.workspaces.map(workspace => workspace.worktreeId)).toEqual([ampWorktree]);
+  });
+
   it.each(['merged', 'closed'] as const)(
     'includes existing old %s workspaces only when Done is enabled in the same owner scope',
     async state => {

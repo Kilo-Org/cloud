@@ -51,6 +51,7 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
+import { BlockedAccountSurface } from '@/components/blocked-account-surface';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { DesignGateProbe } from '@/components/design-gate-probe';
@@ -64,7 +65,21 @@ import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { isAppLandingSegments } from '@/lib/agent-attachments/picker-launch-restore';
 import { useAuth } from '@/lib/auth/auth-context';
-import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
+import { useBlockedAccountFromAccountRead } from '@/lib/auth/account-blocked-read';
+import {
+  getBlockedAccountExplanation,
+  setBlockedAccountExplanation,
+  subscribeBlockedAccount,
+} from '@/lib/auth/blocked-account-state';
+import { buildBlockedAccountSupportLink } from '@/lib/auth/blocked-account-support';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+import { openExternalUrl } from '@/lib/external-link';
+import {
+  resolveBootstrapDecision,
+  shouldAnnounceContentReady,
+  shouldShowBootstrapLoading,
+  shouldShowBootstrapLoadingSurface,
+} from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -247,7 +262,7 @@ function RootLayoutNav({
   const navigationReady = useRootNavigationReady();
   // The gated pending-deep-link consumer below switches to the tapped
   // notification's organization through this provider before it navigates.
-  const { setOrganizationId } = useOrganization();
+  const { setOrganizationId, retry: retryOrganization } = useOrganization();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
@@ -256,7 +271,9 @@ function RootLayoutNav({
     email,
     isLoading: userIdLoading,
     isError: userIdError,
+    error: userIdQueryError,
     isUnreachable: userIdUnreachable,
+    isFetching: userIdFetching,
     refetch: refetchUserId,
   } = useCurrentUserId({ enabled: token != null });
   // A cold start that cannot reach the API has no confirmed account once the
@@ -277,6 +294,47 @@ function RootLayoutNav({
   const accountUserId = userId ?? offlineUserId ?? undefined;
   const identityLoading = userIdLoading && offlineUserId === null;
   const identityError = userIdError && offlineUserId === null;
+  const blockedAccountExplanation = useSyncExternalStore(
+    subscribeBlockedAccount,
+    getBlockedAccountExplanation
+  );
+  // The current-user read is the first authenticated call a restored account
+  // makes, so a blocked account's context-level refusal lands on it: the
+  // envelope carries `accountBlocked`, which turns the generic "could not load
+  // your account" surface into the block explanation. The same read is how the
+  // explanation leaves again: a later attempt that reaches the account clears
+  // it, and the overlay's Retry is exactly such an attempt. The hook reads the
+  // raw query error, not the derived boolean: only the error object carries
+  // the flag.
+  useBlockedAccountFromAccountRead({
+    error: userIdQueryError,
+    userId,
+    enabled: token != null,
+    fetching: userIdFetching,
+    // Every query refused while the account was blocked holds a cached
+    // failure, so the reveal would show stale error cards until each surface
+    // is retried by hand. Refetch the tree instead: a lifted block makes those
+    // reads answer. The identity read is the exception — it is the read that
+    // just answered, so invalidating it would only refetch it. The stored
+    // organization choice is not a query — its provider keeps the failed
+    // restore in its own state — so it is retried through the same call its
+    // own Retry makes.
+    onAnswered: () => {
+      const identityPath = trpc.user.getMe.pathKey()[0];
+      void queryClient.invalidateQueries({
+        predicate: query => {
+          // tRPC stores the procedure path as the key's first element.
+          const path = query.queryKey[0];
+          return !(
+            Array.isArray(path) &&
+            path.length === identityPath.length &&
+            path.every((segment, index) => segment === identityPath[index])
+          );
+        },
+      });
+      retryOrganization();
+    },
+  });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   const [optionalConsent, setOptionalConsentState] = useState(false);
@@ -902,38 +960,6 @@ function RootLayoutNav({
   // login screen is the deterministic entry context in both cases.
   const wrapperObscured = hidden || signingOutWindow;
 
-  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
-  // both accessibility trees. On the hidden → visible transition,
-  // `announceForA11y` is the deterministic entry context for screen-reader
-  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
-  // only when the wrapper has no node yet or the native call throws — no retry),
-  // deferred to the next frame so the revealed tree is measurable. Per-screen
-  // heading/first-control focus is owned by the screens themselves; the gate
-  // cannot know the active screen's heading.
-  //
-  // The transition is skipped while a bootstrap error is shown: the wrapper
-  // is unmounted then (the error screen replaces it), so "Content ready"
-  // would be a false announcement and the wrapper focus has no target. The
-  // cleanup cancels the pending frame, which React runs before any later
-  // render's frame can fire, so an interrupted reveal never focuses a stale
-  // wrapper.
-  const wrapperRef = useRef<ViewInstance>(null);
-  const wasHiddenRef = useRef(wrapperObscured);
-  useEffect(() => {
-    const wasHidden = wasHiddenRef.current;
-    wasHiddenRef.current = wrapperObscured;
-    if (!wasHidden || wrapperObscured || hasBootstrapError) {
-      return undefined;
-    }
-    announceForA11y(i18n.t('bootstrap.contentReady'));
-    const frame = requestAnimationFrame(() => {
-      requestA11yFocus(wrapperRef);
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [wrapperObscured, hasBootstrapError]);
-
   // The restore-error surface is settled, but a successful Retry does not
   // reveal the app immediately: the token publish, the user fetch, and the
   // consent check still run behind the loading gate, and the splash overlay
@@ -951,11 +977,6 @@ function RootLayoutNav({
     isSigningOut,
   });
 
-  // The wait surface (or the held restore surface) covers the tree: it leaves
-  // both accessibility trees, stops taking touches, and paints nothing that
-  // would show through the opaque surface above it.
-  const obscureTree = wrapperObscured || showRestoreError;
-
   // Sign-out from either error screen below outranks the error: the failure
   // belongs to the account being revoked, and its Sign out starts the teardown
   // behind the screen, so the branch would leave the stale error (and the
@@ -966,7 +987,96 @@ function RootLayoutNav({
   // fall-through also keeps Slot mounted for the login replace.
   const bootstrapErrorOwnsScreen = !signingOutWindow;
 
-  if (hasUserBootstrapError && bootstrapErrorOwnsScreen) {
+  // A blocked account is the answer behind the failed account read (and the
+  // refresh route's `USER_BLOCKED`): the person learns why their every call
+  // refuses instead of a bare session end. It is an absolute overlay like the
+  // restore surface — never an early return — because the flag outlives the
+  // refresh-path teardown that clears the token, and the bootstrap decision
+  // that then settles (redirect-login) must be able to land in a mounted Slot.
+  //
+  // Two things dismiss it. While the session lives — the current-user read was
+  // refused, so the session is still there — the overlay's Retry re-reads the
+  // account, and an attempt that reaches it clears the explanation (a block
+  // lifted server-side needs no sign-out). The refresh route's raise has no
+  // session behind it, so no read can answer for it: the exit is then the only
+  // way out, it clears the explanation and reveals whatever the tree has
+  // settled on (login when signed out), and it is labelled Continue rather
+  // than Sign out — there is nothing left to sign out of. A new sign-in clears
+  // it too, since that is the one event that proves the block no longer
+  // applies.
+  //
+  // The raised value is the refusal reason, and it picks the actions. Contact
+  // support is the filled primary in every state: it is the only step that can
+  // change a block, and the copy says a fresh sign-in cannot. It opens a mail
+  // to the support address and leaves the explanation up. An account block
+  // keeps Retry as the outlined secondary under it; a domain refusal offers
+  // none (a re-read answers the same thing), so the exit takes that slot. The
+  // overlay only renders with a non-null reason, so the surface always
+  // receives one.
+  const blockedAccountReason =
+    blockedAccountExplanation !== null && bootstrapErrorOwnsScreen
+      ? blockedAccountExplanation
+      : null;
+  const showBlockedAccountError = blockedAccountReason !== null;
+
+  // The wait surface (or the held restore or blocked surface) covers the tree:
+  // it leaves both accessibility trees, stops taking touches, and paints
+  // nothing that would show through the opaque surface above it.
+  const obscureTree = wrapperObscured || showRestoreError || showBlockedAccountError;
+
+  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
+  // both accessibility trees. On the hidden → visible transition,
+  // `announceForA11y` is the deterministic entry context for screen-reader
+  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
+  // only when the wrapper has no node yet or the native call throws — no retry),
+  // deferred to the next frame so the revealed tree is measurable. Per-screen
+  // heading/first-control focus is owned by the screens themselves; the gate
+  // cannot know the active screen's heading.
+  //
+  // The transition is skipped while a bootstrap error is shown: the wrapper
+  // is unmounted then (the error screen replaces it), so "Content ready"
+  // would be a false announcement and the wrapper focus has no target. A
+  // full-screen overlay that owns the screen (the blocked explanation) also
+  // defers the entry announcement, because the wrapper it would focus stays
+  // hidden from both accessibility trees. The cleanup cancels the pending
+  // frame, which React runs before any later render's frame can fire, so an
+  // interrupted reveal never focuses a stale wrapper.
+  const wrapperRef = useRef<ViewInstance>(null);
+  const wasHiddenRef = useRef(wrapperObscured);
+  useEffect(() => {
+    const wasHidden = wasHiddenRef.current;
+    wasHiddenRef.current = wrapperObscured;
+    if (
+      !shouldAnnounceContentReady({
+        wasHidden,
+        wrapperObscured,
+        hasBootstrapError,
+        showBlockedAccountError,
+      })
+    ) {
+      return undefined;
+    }
+    announceForA11y(i18n.t('bootstrap.contentReady'));
+    const frame = requestAnimationFrame(() => {
+      requestA11yFocus(wrapperRef);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [wrapperObscured, hasBootstrapError, showBlockedAccountError]);
+
+  // Both early returns below are guarded on `!showBlockedAccountError`: the
+  // blocked overlay explains a "could not load your account" whose retry can
+  // never succeed (every authenticated call refuses), and a blocked read can
+  // also fail the consent check, so the consent surface must not outrank it.
+  // Each visible error surface here is an early return that unmounts Slot, and
+  // the blocked flag is raised mid-session by any procedure's blocked refusal
+  // (the query and mutation caches' `onError`), so it can arrive while the app
+  // tree is settled and in use. That is why it is an overlay and never one of
+  // these branches: an early return would unmount the tree under the person,
+  // while the overlay's Sign out actions clear the flag and let the bootstrap's
+  // settled route show again.
+  if (hasUserBootstrapError && bootstrapErrorOwnsScreen && !showBlockedAccountError) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
@@ -983,7 +1093,7 @@ function RootLayoutNav({
     );
   }
 
-  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen) {
+  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen && !showBlockedAccountError) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadPrivacy')}
@@ -1065,7 +1175,13 @@ function RootLayoutNav({
       >
         <Slot />
       </View>
-      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
+      {shouldShowBootstrapLoadingSurface({
+        showBootstrapLoading,
+        showRestoreError,
+        showBlockedAccountError,
+      }) ? (
+        <BootstrapLoadingSurface />
+      ) : null}
       {showRestoreError ? (
         <View className="absolute inset-0">
           <BootstrapErrorScreen
@@ -1078,6 +1194,39 @@ function RootLayoutNav({
             secondaryLabel={t('common.signOut')}
             secondaryAccessibilityLabel={t('common.signOut')}
             onSecondaryPress={() => {
+              void signOut();
+            }}
+          />
+        </View>
+      ) : null}
+      {showBlockedAccountError ? (
+        <View className="absolute inset-0">
+          <BlockedAccountSurface
+            // `showBlockedAccountError` already required a non-null
+            // explanation, so the overlay never renders without a reason.
+            reason={blockedAccountReason}
+            // A live token means the session that was refused is still there,
+            // so the retry has an account to re-read. Without one the refresh
+            // route's refusal already tore the session down.
+            canRetry={token != null}
+            retrying={userIdFetching}
+            onRetry={refetchUserId}
+            onContactSupport={() => {
+              // `email` is absent precisely when the identity read was refused,
+              // which is the common blocked case: the builder omits the body
+              // then rather than naming a placeholder account.
+              const link = buildBlockedAccountSupportLink({
+                subject: t('accountBlocked.title'),
+                email,
+              });
+              void openExternalUrl(link, { label: SUPPORT_EMAIL });
+            }}
+            onSignOut={() => {
+              // The escape hatch must actually reach the login screen: the
+              // explanation outlives a refresh-path teardown, so this explicit
+              // sign-out is what clears it and reveals the route the bootstrap
+              // has already settled on (login once the token is gone).
+              setBlockedAccountExplanation(null);
               void signOut();
             }}
           />

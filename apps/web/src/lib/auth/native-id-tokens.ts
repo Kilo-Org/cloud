@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import type jwt from 'jsonwebtoken';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, type Certificates } from 'google-auth-library';
 import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
 import {
   APPLE_APP_BUNDLE_ID,
@@ -270,18 +270,28 @@ type GoogleVerificationMessages = {
  *
  * The certificate fetch stays outside the try so provider or network failures
  * propagate as server errors (5xx); only a rejected token becomes a
- * NativeIdTokenError (401).
+ * NativeIdTokenError (401). A caller that must not spend a single-use
+ * credential before the certificates exist fetches them first and passes them
+ * in as `certs`, so that one fetch is the only one for the request.
  */
 async function verifyGoogleIdTokenWith(
   client: OAuth2Client,
   idToken: string,
   audience: string[],
-  messages: GoogleVerificationMessages
+  messages: GoogleVerificationMessages,
+  certs?: Certificates
 ): Promise<VerifiedGoogleIdToken> {
-  const { certs } = await client.getFederatedSignonCertsAsync();
+  // Outside the try on purpose: a certificate/network fault must surface as a
+  // server error (5xx), not as a rejected token (401).
+  const signingCerts = certs ?? (await client.getFederatedSignonCertsAsync()).certs;
   let ticket;
   try {
-    ticket = await client.verifySignedJwtWithCertsAsync(idToken, certs, audience, GOOGLE_ISSUERS);
+    ticket = await client.verifySignedJwtWithCertsAsync(
+      idToken,
+      signingCerts,
+      audience,
+      GOOGLE_ISSUERS
+    );
   } catch (error) {
     throw new NativeIdTokenError(messages.verificationFailed, { cause: error });
   }
@@ -334,6 +344,17 @@ export async function exchangeNativeGoogleAuthCode(
 
   const client = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
 
+  // Fetch the signing certificates BEFORE the code is redeemed. The code is
+  // single-use: if a certificate fetch happened after `getToken`, a transient
+  // signer/network fault would arrive with the code already spent, and the
+  // client's retry would re-submit a spent code and get a 401 instead of the
+  // retryable 5xx. Fetched here, the same fault throws while the code is still
+  // unspent, and the set fetched here is the set verification uses, so no
+  // fetch can follow the redemption. The shared client keeps the set only for
+  // as long as the certificate response allows, so treat this as one fetch
+  // per request, not a cache the next request can rely on.
+  const certs = (await getGoogleClient().getFederatedSignonCertsAsync()).certs;
+
   let tokenResponse;
   try {
     tokenResponse = await client.getToken(serverAuthCode);
@@ -353,11 +374,17 @@ export async function exchangeNativeGoogleAuthCode(
   }
 
   // Verify the returned ID token against the web client audience through the
-  // shared helper, so both Google paths apply the same payload checks. The
-  // helper fetches the certificates outside its try: cert/network failures
-  // surface as 5xx; invalid tokens surface as 401.
-  return verifyGoogleIdTokenWith(client, idToken, [GOOGLE_CLIENT_ID], {
-    verificationFailed: 'Google ID token verification failed after code exchange',
-    invalidPayload: 'Invalid Google ID token payload from code exchange',
-  });
+  // shared helper, so both Google paths apply the same payload checks, reusing
+  // the certificate set fetched before the exchange. Cert/network failures
+  // already surfaced above as 5xx; invalid tokens surface as 401.
+  return verifyGoogleIdTokenWith(
+    client,
+    idToken,
+    [GOOGLE_CLIENT_ID],
+    {
+      verificationFailed: 'Google ID token verification failed after code exchange',
+      invalidPayload: 'Invalid Google ID token payload from code exchange',
+    },
+    certs
+  );
 }

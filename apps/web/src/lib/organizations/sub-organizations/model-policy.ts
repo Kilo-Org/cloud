@@ -8,6 +8,10 @@ import * as z from 'zod';
 
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
   findOrganizationGroupPolicy,
   type OrganizationGroupPolicies,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
@@ -180,12 +184,15 @@ function buildCatalogIndex(snapshot: z.infer<typeof NormalizedOpenRouterResponse
   const providerSlugs = new Set<string>();
   const providersByModelId = new Map<string, Set<string>>();
   for (const provider of snapshot.providers) {
-    providerSlugs.add(provider.slug);
+    // Snapshot slugs are stored verbatim; canonical slugs let the provider
+    // ceiling and the model-access policy compare the same form on both sides.
+    const providerSlug = normalizeInferenceProviderId(provider.slug);
+    providerSlugs.add(providerSlug);
     for (const model of provider.models) {
       const modelId = normalizeModelId(model.slug);
       modelIds.add(modelId);
       const providers = providersByModelId.get(modelId) ?? new Set<string>();
-      providers.add(provider.slug);
+      providers.add(providerSlug);
       providersByModelId.set(modelId, providers);
     }
   }
@@ -203,7 +210,10 @@ function organizationAccessCacheKey(
   const settings = OrganizationSettingsSchema.parse(organization.settings);
   return JSON.stringify({
     plan: organization.plan,
-    providerAllowList: settings.provider_allow_list?.toSorted() ?? null,
+    providerAllowList:
+      settings.provider_allow_list === undefined
+        ? null
+        : normalizeInferenceProviderIds(settings.provider_allow_list).toSorted(),
     modelDenyList: (settings.model_deny_list ?? []).map(normalizeModelId).toSorted(),
     defaultPolicies: defaultPolicies ?? null,
   });
@@ -256,7 +266,7 @@ async function calculateOrganizationCeilingAccess(
   if (organization.plan !== 'enterprise' || settings.provider_allow_list === undefined) {
     return { models: access.models, providers: new Set(catalog.providerSlugs) };
   }
-  const providerCeiling = new Set(settings.provider_allow_list);
+  const providerCeiling = new Set(normalizeInferenceProviderIds(settings.provider_allow_list));
   return {
     models: access.models,
     providers: new Set(

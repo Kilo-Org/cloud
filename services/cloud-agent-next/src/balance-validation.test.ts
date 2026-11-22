@@ -12,17 +12,9 @@ import {
   extractBalanceRequestScope,
   readTrpcCalls,
   extractOrgIdFromUrl,
-  fetchOrgIdForSession,
   BALANCE_REQUIRED_MUTATIONS,
 } from './balance-validation.js';
-import type { PersistenceEnv } from './persistence/types.js';
 import type { Env } from './types.js';
-import { parseSessionMetadata } from './persistence/session-metadata.js';
-
-// Mock the session-service module
-vi.mock('./session/metadata.js', () => ({
-  fetchSessionMetadata: vi.fn(),
-}));
 
 vi.mock('./logger.js', () => ({
   logger: {
@@ -31,8 +23,6 @@ vi.mock('./logger.js', () => ({
     warn: vi.fn(),
   },
 }));
-
-import { fetchSessionMetadata } from './session/metadata.js';
 
 describe('balance-validation', () => {
   const originalFetch = global.fetch;
@@ -609,74 +599,6 @@ describe('balance-validation', () => {
     it('returns undefined when input is null', () => {
       const url = new URL(`https://example.com/trpc/test?input=${encodeURIComponent('null')}`);
       expect(extractOrgIdFromUrl(url)).toBeUndefined();
-    });
-  });
-
-  describe('fetchOrgIdForSession', () => {
-    const mockPersistenceEnv = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(),
-        get: vi.fn(),
-      },
-      SESSION_INGEST: {
-        fetch: vi.fn(),
-      },
-    } as unknown as PersistenceEnv;
-
-    beforeEach(() => {
-      vi.mocked(fetchSessionMetadata).mockReset();
-    });
-
-    it('returns orgId when session metadata exists', async () => {
-      vi.mocked(fetchSessionMetadata).mockResolvedValue(
-        parseSessionMetadata({
-          version: 1,
-          sessionId: 'agent_123',
-          orgId: 'org-456',
-          userId: 'user-789',
-          timestamp: Date.now(),
-        })
-      );
-
-      const result = await fetchOrgIdForSession(mockPersistenceEnv, 'user-789', 'agent_123');
-
-      expect(result).toBe('org-456');
-      expect(fetchSessionMetadata).toHaveBeenCalledWith(
-        mockPersistenceEnv,
-        'user-789',
-        'agent_123'
-      );
-    });
-
-    it('returns undefined when session metadata does not exist', async () => {
-      vi.mocked(fetchSessionMetadata).mockResolvedValue(null);
-
-      const result = await fetchOrgIdForSession(mockPersistenceEnv, 'user-789', 'agent_123');
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns undefined when session metadata has no orgId (personal account)', async () => {
-      vi.mocked(fetchSessionMetadata).mockResolvedValue(
-        parseSessionMetadata({
-          version: 1,
-          sessionId: 'agent_123',
-          userId: 'user-789',
-          timestamp: Date.now(),
-        })
-      );
-
-      const result = await fetchOrgIdForSession(mockPersistenceEnv, 'user-789', 'agent_123');
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns undefined and logs warning when fetchSessionMetadata throws', async () => {
-      vi.mocked(fetchSessionMetadata).mockRejectedValue(new Error('DO unavailable'));
-
-      const result = await fetchOrgIdForSession(mockPersistenceEnv, 'user-789', 'agent_123');
-
-      expect(result).toBeUndefined();
     });
   });
 

@@ -5,7 +5,7 @@ import { GitLabBranchesFetchError } from '@/lib/integrations/platforms/gitlab/ad
 import {
   GITHUB_LISTING_BUDGET_MESSAGE,
   GitHubListingBudgetExceededError,
-} from '@/lib/integrations/platforms/github/adapter';
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { getProviderBranchHead, listProviderRepositoryBranches } from './provider-branch-listing';
 
 const mockGetIntegrationForOwner = jest.fn();

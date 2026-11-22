@@ -1525,6 +1525,28 @@ test('rejects a catalog that translates the sampling parameter label', () => {
   );
 });
 
+test('rejects a serialized JSON value in a verbatim English label', () => {
+  // `checkVerbatimLabels` compares English with itself, so it cannot catch a
+  // verbatim key whose English text is JSON: the storage-slip rule is the only
+  // guard there, and it must stay on for every key but the JSON sample.
+  const topP = '{"value":"Top P"}';
+  const found = run({
+    english: {
+      ...AGENT_EDITOR,
+      profiles: { agents: { ...AGENT_EDITOR.profiles.agents, topP } },
+    },
+    translated: {
+      ...AGENT_EDITOR_TRANSLATED,
+      profiles: { agents: { ...AGENT_EDITOR_TRANSLATED.profiles.agents, topP } },
+    },
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.match(
+    found.join('\n'),
+    /mobile\/en: "profiles\.agents\.topP" is serialized JSON; write the label text/
+  );
+});
+
 const PULL_REQUEST_TERM = {
   agents: { title: 'Agents' },
   manualReview: { startNotFound: 'Could not read that PR from GitHub.' },

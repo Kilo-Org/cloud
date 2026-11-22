@@ -1,7 +1,7 @@
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { performRefresh, REFRESH_MARGIN_MS } from '@/lib/auth/credentials';
 import {
-  getActiveTokenSnapshot,
+  getActiveToken,
   getAuthTokenForRequest,
   isSignOutTeardownActive,
 } from '@/lib/auth/token-owner';
@@ -16,12 +16,8 @@ export async function nativeRemoteCredential(epoch: number): Promise<string> {
   assertOwner();
   let token = await getAuthTokenForRequest();
   assertOwner();
-  const active = getActiveTokenSnapshot();
-  if (
-    active?.expiresAtMs !== null &&
-    active?.expiresAtMs !== undefined &&
-    active.expiresAtMs <= Date.now() + REFRESH_MARGIN_MS
-  ) {
+  const active = getActiveToken();
+  if (active?.expiresAtMs != null && active.expiresAtMs <= Date.now() + REFRESH_MARGIN_MS) {
     await performRefresh();
     assertOwner();
     token = await getAuthTokenForRequest();

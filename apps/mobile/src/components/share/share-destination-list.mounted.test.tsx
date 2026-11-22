@@ -214,6 +214,28 @@ describe('ShareDestinationList surface states', () => {
     unmount();
   });
 
+  it('matches the decoded branch the row paints as well as the stored one', async () => {
+    // The destination row is a `StoredSessionRow`, which paints
+    // `sessionBranchLabel(row.git_branch)`, so typing the branch the person
+    // reads must find the row even though the stored value is percent-encoded.
+    const encodedBranch = 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8';
+    const rows = destinations.map((row, index) =>
+      index === 0 ? { ...row, title: 'Zebra', git_branch: encodedBranch } : row
+    );
+    const { renderer, unmount } = await mount(happy, [], rows);
+    const input = renderer.root.find(node => String(node.type) === 'TextInput');
+    const searchFor = (text: string) => {
+      act(() => {
+        (input.props as { onChangeText: (text: string) => void }).onChangeText(text);
+      });
+    };
+    searchFor('請求書');
+    expect(renderer.root.findAll(node => String(node.type) === 'StoredSessionRow')).toHaveLength(1);
+    searchFor('%E8%AB%8B%E6%B1%82%E6%9B%B8');
+    expect(renderer.root.findAll(node => String(node.type) === 'StoredSessionRow')).toHaveLength(1);
+    unmount();
+  });
+
   it('gives every destination row one constant item type', async () => {
     const { renderer, unmount } = await mount(happy, [], destinations);
     const list = renderer.root.find(node => String(node.type) === 'FlashList');

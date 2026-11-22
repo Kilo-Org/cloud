@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { launchExtensionContext, readExtensionLocalStorage } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 import { FAKE_HUB_ID, startFakeHub } from './local-agents-hub-fixture';
+import { LOCAL_AGENT_ERROR_CODES } from '../../src/shared/local-agents/jsonrpc';
 import {
   LOCAL_AGENT_PAIRING_KEY,
   activateTab,
@@ -388,6 +389,67 @@ test('a session gets its own tab from the first navigate, without touching the u
         { timeout: 10_000 }
       )
       .toStrictEqual({ collapsed: true, color: 'grey', title: 'Kilo · ended' });
+  } finally {
+    await context.close();
+    await hub.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('a browser_tabs new reports the origin its opened tab loaded', async () => {
+  test.setTimeout(60_000);
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const userPage = await context.newPage();
+
+    await userPage.goto(hub.pageUrl);
+
+    // A shared tab, so the step runs as `browser_tabs` on a session that already holds one.
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, hub.pageUrl);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Tabs redirect session',
+    });
+    const origin = `http://127.0.0.1:${String(hub.port)}`;
+    const grants = grant(origin);
+
+    // The destination answers with a redirect to a second loopback server, and the call reports where the tab loaded.
+    const landing = await startFakeHub();
+    const landingOrigin = `http://127.0.0.1:${String(landing.port)}`;
+
+    try {
+      const answered = await sendAgentRpc(hub, session.controllerId, 900, 'tools.call', {
+        arguments: { action: 'new', url: hub.redirectUrl(landing.pageUrl) },
+        authorized: grants,
+        name: 'browser_tabs',
+        sessionHandle: session.sessionHandle,
+      });
+
+      // The answer names both origins: the destination the call asked for and the origin the tab loaded.
+      expect(answered.error).toMatchObject({
+        code: LOCAL_AGENT_ERROR_CODES.originChanged,
+        data: { from: origin, to: landingOrigin },
+      });
+
+      // The tab the call opened is on the redirect's target, so the answer describes the real load.
+      const listed = await listTabs(session.callTool, grants);
+      expect(listed.tabs.some(row => row.url.startsWith(landingOrigin))).toBe(true);
+    } finally {
+      await landing.close();
+    }
   } finally {
     await context.close();
     await hub.close();

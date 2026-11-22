@@ -195,24 +195,22 @@ describe('readStoredGatewayModels', () => {
         },
         endpoints: [
           {
-            data: {
-              endpoints: [
-                {
-                  tag: 'provider-one/fp8',
-                  provider_name: 'Provider One',
-                  context_length: 200_000,
-                  pricing: {
-                    prompt: '0.000001',
-                    completion: '0.000002',
-                    input_cache_read: '0.0000001',
-                    discount: 0.25,
-                  },
-                  has_zdr: true,
-                  has_no_training: false,
+            endpoints: [
+              {
+                tag: 'provider-one/fp8',
+                provider_name: 'Provider One',
+                context_length: 200_000,
+                pricing: {
+                  prompt: '0.000001',
+                  completion: '0.000002',
+                  input_cache_read: '0.0000001',
+                  discount: 0.25,
                 },
-                { tag: 'provider-two', provider_name: 'Provider Two' },
-              ],
-            },
+                has_zdr: true,
+                has_no_training: false,
+              },
+              { tag: 'provider-two', provider_name: 'Provider Two' },
+            ],
           },
           ...fillerModels.map(() => null),
         ],
@@ -486,13 +484,15 @@ describe('joinGatewayModelEndpoints', () => {
     expect(joined.withoutStoredEndpoints).toEqual(['vendor/b', 'vendor/c']);
   });
 
-  it('throws when fewer than 100 models have endpoints', () => {
+  it('throws when fewer than 100 models have usable endpoints', () => {
     expect(() =>
       joinGatewayModelEndpoints(gateway, [
         { model: { id: 'vendor/a-batch', name: 'A batch' }, endpoints: NO_ENDPOINTS_RESOURCE },
         ...listedFillers.slice(1),
       ])
-    ).toThrow('Suspicious: total number of vercel models is 99 < 100');
+    ).toThrow(
+      'Suspicious: only 99 vercel models have usable endpoints, fewer than 100; excluded: vendor/a-batch'
+    );
   });
 });
 

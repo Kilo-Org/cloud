@@ -10,14 +10,17 @@ import {
   useProfileOwnerLabel,
 } from '@/components/profiles/profile-owner-heading';
 import { profileOwnerType } from '@/components/profiles/profile-owner-model';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
+import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { RotateCcw, Settings2 } from '@/components/ui/icons';
+import { Settings2 } from '@/components/ui/icons';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { type SheetHeaderTopInset } from '@/lib/form-sheet';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 
@@ -61,6 +64,8 @@ export type ProfilePickerSheetProps = {
   defaultProfileName?: string | null;
   isLoading: boolean;
   isError: boolean;
+  /** The failed read's error, classified by the shared selector. */
+  error: unknown;
   /** The picked id no longer resolves to a profile. */
   needsAttention: boolean;
   onSelect: (id: string | null) => void;
@@ -89,6 +94,7 @@ export function ProfilePickerSheet({
   selectedOverrideProfileId,
   isLoading,
   isError,
+  error,
   needsAttention,
   onSelect,
   onManageProfiles,
@@ -98,6 +104,8 @@ export function ProfilePickerSheet({
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
   const ownerLabel = useProfileOwnerLabel();
+  const connectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({ error, connectivity });
   // The same split and order the profile manager renders: an organization
   // group, then a personal one, and a single untitled list in a personal
   // scope where there is only one owner to name.
@@ -154,13 +162,11 @@ export function ProfilePickerSheet({
         scrollable={false}
         topInset={SHEET_TOP_INSET}
       >
-        <EmptyState
-          icon={Settings2}
-          // The sheet lists profiles, so its failure names what did not load
-          // in the sheet's own words, not the Environment row's.
-          title={t('profiles.loadFailed')}
-          description={t('organization.boundary.loadErrorMessage')}
-          action={<StateAction label={t('common.retry')} icon={RotateCcw} onPress={onRetry} />}
+        <QueryError
+          variant={readError.variant}
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? onRetry : undefined}
         />
       </PickerSheet>
     );

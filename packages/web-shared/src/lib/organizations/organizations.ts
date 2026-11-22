@@ -20,7 +20,6 @@ import {
   organization_invitations,
   organization_membership_removals,
   organization_memberships,
-  organization_seats_purchases,
   organization_user_limits,
   organization_user_usage,
   organizations,
@@ -54,20 +53,7 @@ import {
   lockOrganizationGroupPolicy,
 } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
-
-// `organization_seats_purchases` is append-only, so the most recently created
-// row is the organization's current subscription state — the same input the
-// subscription gate classifies with. Lazily built: suites that mock the
-// drizzle module must not see this evaluated at import time.
-function latestSeatPurchaseStatusSql() {
-  return sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-    SELECT ${organization_seats_purchases.subscription_status}
-    FROM ${organization_seats_purchases}
-    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-    ORDER BY ${organization_seats_purchases.created_at} DESC
-    LIMIT 1
-  )`;
-}
+import { latestSeatPurchaseStatusSql } from './organization-seat-purchases';
 
 /** An invitation is live while it is unaccepted and unexpired. */
 function liveInvitationCondition(organizationId: string) {
@@ -267,11 +253,9 @@ export async function getProfileOrganizations(
 ): Promise<ProfileOrganization[]> {
   const { excludeAccessBlocked = false } = options;
 
-  // Only pull in each org's current subscription status when the caller needs
-  // to hide "Access Blocked" orgs. organization_seats_purchases is append-only,
-  // so the most recently created row reflects the current state. This keeps
-  // getProfileOrganizations a single query and adds no seat-purchase lookup for
-  // callers that don't opt in.
+  // Only add the subquery when the caller opts in to hiding "Access Blocked"
+  // orgs, so getProfileOrganizations stays a single query for callers that do
+  // not need it.
   const latestSeatPurchaseStatus = excludeAccessBlocked
     ? latestSeatPurchaseStatusSql()
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
@@ -1367,22 +1351,4 @@ export async function markOrganizationAsDeleted(
   };
   if (txn) return execute(txn);
   return db.transaction(execute);
-}
-
-export async function getOrganizationMemberByEmail(
-  organizationId: Organization['id'],
-  email: string
-) {
-  const result = await db
-    .select()
-    .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-    .where(
-      and(
-        eq(organization_memberships.organization_id, organizationId),
-        eq(kilocode_users.google_user_email, email)
-      )
-    )
-    .limit(1);
-  return result.length > 0 ? result[0] : null;
 }

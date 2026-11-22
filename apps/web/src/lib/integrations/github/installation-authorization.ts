@@ -2,6 +2,12 @@ import 'server-only';
 
 import { Octokit } from '@octokit/rest';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
+import {
+  checkGitHubPaginationBounds,
+  GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
+  GitHubListingBudget,
+  withListingDeadline,
+} from '@/lib/integrations/platforms/github/listing-budget';
 
 export type GitHubInstallationCandidate = {
   installationId: string;
@@ -23,6 +29,7 @@ type GitHubInstallationAuthorizationClient = {
         page: number;
         per_page: number;
         state: 'active';
+        request: { signal: AbortSignal };
       }) => Promise<{
         data: Array<{
           state: string;
@@ -35,6 +42,7 @@ type GitHubInstallationAuthorizationClient = {
       listInstallationsForAuthenticatedUser: (input: {
         page: number;
         per_page: number;
+        request: { signal: AbortSignal };
       }) => Promise<{
         data: {
           installations: Array<{
@@ -58,12 +66,26 @@ function isOrganizationAccountType(value: string | null | undefined): value is '
   return value === 'Organization';
 }
 
-async function allPages<T>(fetchPage: (page: number) => Promise<T[]>) {
-  const values: T[] = [];
-  for (let page = 1; ; page += 1) {
-    const current = await fetchPage(page);
-    values.push(...current);
-    if (current.length < 100) return values;
+async function allPages<T>(
+  context: string,
+  fetchPage: (page: number, signal: AbortSignal) => Promise<T[]>
+): Promise<T[]> {
+  const budget = new GitHubListingBudget(context);
+  try {
+    const values: T[] = [];
+    let page = 1;
+    while (true) {
+      const current = await withListingDeadline(budget, () => fetchPage(page, budget.signal));
+      budget.retain(Buffer.byteLength(JSON.stringify(current)));
+      values.push(...current);
+      if (current.length === 0) return values;
+      const isLastPage = current.length < 100;
+      checkGitHubPaginationBounds(page, values.length, context);
+      if (isLastPage) return values;
+      page += 1;
+    }
+  } finally {
+    budget.dispose();
   }
 }
 
@@ -82,32 +104,38 @@ export async function discoverAuthorizedGitHubInstallations(params: {
   const [{ data: user }, memberships, installations] = await Promise.all([
     client.rest.users.getAuthenticated(),
     allPages(
-      async page =>
+      'GitHub organization membership listing',
+      async (page, signal) =>
         (
           await client.rest.orgs.listMembershipsForAuthenticatedUser({
             page,
             per_page: 100,
             state: 'active',
+            request: { signal },
           })
         ).data
     ),
-    allPages<GitHubInstallationPageItem>(async page => {
-      const { data } = await client.rest.apps.listInstallationsForAuthenticatedUser({
-        page,
-        per_page: 100,
-      });
-      return data.installations.map(installation => ({
-        id: installation.id,
-        appId: installation.app_id ?? null,
-        account: installation.account
-          ? {
-              id: installation.account.id ?? null,
-              login: installation.account.login ?? null,
-              type: installation.account.type ?? null,
-            }
-          : null,
-      }));
-    }),
+    allPages<GitHubInstallationPageItem>(
+      GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
+      async (page, signal) => {
+        const { data } = await client.rest.apps.listInstallationsForAuthenticatedUser({
+          page,
+          per_page: 100,
+          request: { signal },
+        });
+        return data.installations.map(installation => ({
+          id: installation.id,
+          appId: installation.app_id ?? null,
+          account: installation.account
+            ? {
+                id: installation.account.id ?? null,
+                login: installation.account.login ?? null,
+                type: installation.account.type ?? null,
+              }
+            : null,
+        }));
+      }
+    ),
   ]);
 
   const activeOwnerAccountIds = new Set(

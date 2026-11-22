@@ -18,7 +18,7 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     listener => onlineManager.subscribe(listener),
     () => onlineManager.isOnline()
   );
-  const { data, error, isLoading, isError, isFetched, refetch } = useQuery({
+  const { data, error, isLoading, isError, isFetched, isFetching, refetch } = useQuery({
     ...trpc.user.getMe.queryOptions(),
     enabled: options.enabled ?? true,
     // Every surface gated on the identity waits on this read.
@@ -41,7 +41,18 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     userId: data?.id,
     email: data?.email,
     isLoading,
+    // True while an attempt is in flight: a retry is running.
+    isFetching,
     isError: data === undefined && (isError || (isLoading && isFetched)),
+    /**
+     * The last attempt's error, for a surface that must name WHAT failed: a
+     * refusal and a terminal code are not transient failures, and the card that
+     * reads this identity must not offer a retry for them. It is also how a
+     * caller reads a server verdict out of the failure rather than only "the
+     * read failed" — the blocked-account explanation comes from the refusal
+     * this object carries.
+     */
+    error,
     // True when the latest attempt failed even though a cached identity is
     // still present. `isError` deliberately stays false there (a refetch
     // failure must not read as "signed out"), but a surface that presents the

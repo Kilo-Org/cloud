@@ -149,11 +149,17 @@ it depends on, deploys `pages-dev`. Nothing else deploys it: no Wrangler
 deploy from a laptop.
 
 A change to `source.json` also deploys `services/pages-output`, the output
-shell, in the same run. The two deploys run side by side, in no fixed order.
-The frame protocol is versioned for that window: a change that breaks it adds
-a new frame path and the shell keeps the previous one for at least one release.
-The viewer's default frame address is the shell's origin, so this Worker sets
-no `PAGES_OUTPUT_FRAME_URL`.
+shell, in the same run. The two deploys run side by side, in no fixed order,
+each with its own retry. The shell serves a fixed bootstrap document, and the
+viewer sends the frame runtime from its own build, so a runtime or port
+protocol change needs no shell change. A change to the bootstrap adds a new
+frame path, and the shell keeps the previous one for at least one release.
+A release that changes the bootstrap at the same path does not work with the
+previous viewer: interactive views fail to start until both Workers run it, and
+for good if one deploy job fails. Say so in the pull request that moves the
+pin, re-run a failed job at once, and roll the two Workers back together. The
+viewer's default frame address is the shell's origin, so this Worker sets no
+`PAGES_OUTPUT_FRAME_URL`.
 
 A deploy is a pull request that moves the pin. Run the "Pages package release"
 workflow in nteract for the commit you want, then pin its release here:
@@ -197,8 +203,10 @@ repository.
 pnpm exec wrangler rollback --name pages-dev
 ```
 
-This puts the previous version back at once, with no build. Then revert the
-`source.json` change, or the next deploy puts the newer build back.
+This puts the previous version back at once, with no build. When the release
+changed the output shell's bootstrap, roll back `nteract-pages-outputs` in the
+same step (see `../pages-output/README.md`). Then revert the `source.json`
+change, or the next deploy puts the newer build back.
 
 A rollback changes code only:
 
@@ -248,6 +256,7 @@ Plain variables, set in `vars` in `wrangler.jsonc`.
 | `PAGES_KILO_AUDIENCE` | The name the web app holds this deployment under. Sign-in fails unless it is an audience in the web app's `pages-auth-clients.ts` |
 | `PAGES_DEFAULT_PAGE_QUOTA` | How many active Pages one account may hold |
 | `PAGES_CATALOG_INDEX` | Epoch label of the D1 catalog index |
+| `PAGES_SOCIAL_CARD` | Key of the link-preview card in the `pages-dev-assets` bucket, `brand/social-card-<12 hex>.png`. Pages serves it at `/social-card.png?v=<12 hex>` in the tags of `/`, `/connect`, every app route and Page links with no published preview. Without it, Pages serves the card in its package |
 | `NOTEBOOK_CLOUD_OIDC_FLOW` | `server`. Structural: the package names it, and the build checks it |
 | `PAGES_OAUTH_METADATA_EGRESS` | `public-https`. Structural: the package names it, and the build checks it. Tells Pages the Worker fetches client metadata as public Internet traffic, which the `global_fetch_strictly_public` compatibility flag provides. Without it, new metadata authorizations get a 503 |
 | `NOTEBOOK_CLOUD_ANACONDA_API_KEY_*` | Not read while `PAGES_KILO_APP_URL` is set |

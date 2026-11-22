@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { openModelPicker } from '@/components/agents/model-selector';
@@ -25,13 +26,19 @@ import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
+import { classifyListBody } from '@/lib/query/list-body-state';
+import {
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+} from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
+  useRetrySecurityAgentConfig,
+  useRetrySecurityAgentSettings,
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -80,19 +87,31 @@ function AnalysisSettingsSkeleton() {
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  // Only a settled denial disables the controls: a failed or still-unanswered role
+  // read is not evidence that the viewer cannot manage the settings.
+  const readOnly = capability.status === 'denied';
+  const settingsRecovery = useRetrySecurityAgentSettings(scope);
   const config = useSecurityAgentConfig(scope);
+  const pausedRetry = useRetrySecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
   const feedback = useSettingsSaveFeedback();
   const {
     models,
-    isLoading: modelsLoading,
     isError: modelsUnavailableFlag,
     error: modelsError,
+    isLoading: modelsLoading,
+    isFetched: modelsFetched,
+    isFetching: modelsFetching,
+    hasDeliveredData: modelsDelivered,
     fetchStatus: modelsFetchStatus,
     refetch: refetchModels,
   } = useAvailableModels(isPersonalSecurityScope(scope) ? undefined : scope);
   const connectivity = useCommittedConnectivityStatus();
+  const capabilityPaused = isReadPausedBeforeData({
+    ...capability,
+    connectivity,
+  });
 
   const [triageModelSlug, setTriageModelSlug] = useState('');
   const [analysisModelSlug, setAnalysisModelSlug] = useState('');
@@ -147,16 +166,34 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   });
 
   if (config.isError && !config.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <PlatformErrorScreen
         title={t('securityAgent.analysisSettings.title')}
+        errorTitle={t('securityAgent.analysisSettings.couldNotLoad')}
         variant={classifyReadFailureVariant({
           errors: [config.error],
           isPaused: config.fetchStatus === 'paused',
           connectivity,
         })}
-        message={t('securityAgent.analysisSettings.couldNotLoad')}
         onRetry={() => void config.refetch()}
+      />
+    );
+  }
+  // A first read the online manager paused (the app's connectivity is known,
+  // offline or online) can never finish: the loading gate would hold the
+  // skeleton until connectivity returns. Name the connection and offer Retry.
+  if (isReadPausedBeforeData({ ...config, connectivity })) {
+    return (
+      <PlatformErrorScreen
+        title={t('securityAgent.analysisSettings.title')}
+        errorTitle={t('securityAgent.analysisSettings.couldNotLoad')}
+        variant="offline"
+        onRetry={() => {
+          void pausedRetry.retry();
+        }}
+        isRetrying={pausedRetry.isRetrying}
       />
     );
   }
@@ -174,17 +211,29 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   }
 
   const modelName = (slug: string) => modelLabelFromCatalogue(models, slug);
-  // A failed catalogue refetch keeps the last list. Hide the rows only when the
-  // failure left nothing to show, so an offline visit with a warm catalogue keeps
-  // the current slugs readable and pickable, as the new-session picker does.
-  const modelsUnavailable = modelsUnavailableFlag && models.length === 0;
-  const modelsFailureVariant = classifyReadFailureVariant({
-    errors: modelsError ? [modelsError] : [],
-    isPaused: modelsFetchStatus === 'paused',
-    connectivity,
+  // A failed catalogue refetch keeps the last list: the classifier answers
+  // `rows` whenever the catalogue delivered any, so an offline visit with a warm
+  // list keeps the current slugs readable and pickable, as the new-session
+  // picker does. Only a failure with nothing delivered names its cause and Retry.
+  //
+  // v5 downgrades a no-data refetch back to `pending` and clears `error`, so the
+  // failure has to survive the Retry's own request, and `hasDeliveredData` must
+  // be the delivered list, not `isFetched` (true after a failed read too).
+  const modelsBody = classifyListBody({
+    rowCount: models.length,
+    hasDeliveredData: modelsDelivered,
+    // The classifier answers `rows` before it reads `isError` whenever the
+    // catalogue delivered any row, so a warm list already keeps the picker
+    // usable through a failure; only a read that delivered nothing reaches
+    // this branch.
+    isError: modelsUnavailableFlag || (modelsLoading && modelsFetched),
+    isFetching: modelsFetching,
+    fetchStatus: modelsFetchStatus,
+    connectivityKnown: connectivity !== 'unknown',
   });
+  const modelsPickable = modelsBody.status === 'rows';
   const modelRowOnPress = (value: string, onSelect: (modelSlug: string) => void) =>
-    canManage && !modelsLoading && models.length > 0
+    !readOnly && models.length > 0
       ? () => {
           // The Security Agent config stores a model slug and nothing else, so
           // the picker must not offer a thinking effort it would have to drop.
@@ -204,7 +253,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         title={t('securityAgent.analysisSettings.title')}
         onBack={onBack}
         headerRight={
-          canManage ? (
+          readOnly ? undefined : (
             <SettingsSaveButton
               dirty={dirty}
               valid={valid}
@@ -212,12 +261,21 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
               onSave={handleSave}
               skipNextGuardRef={skipNextGuardRef}
             />
-          ) : undefined
+          )
         }
       />
       {feedback.node}
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
-        {!canManage && (
+        {capability.status === 'error' || capabilityPaused ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
+            isRetrying={settingsRecovery.isRetrying}
+            onRetry={() => {
+              void settingsRecovery.retry();
+            }}
+          />
+        ) : null}
+        {readOnly && (
           <Text className="text-center text-xs text-muted-foreground">
             {t('securityAgent.sla.permissionNote')}
           </Text>
@@ -230,48 +288,59 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
               label: t(option.labelKey),
             }))}
             value={analysisMode}
-            disabled={!canManage}
+            disabled={readOnly}
             onChange={setAnalysisMode}
           />
         </Section>
 
-        {modelsLoading && (
+        {modelsBody.status === 'loading' && (
           <RowGroup leadingTile>
             {Array.from({ length: ROW_COUNT }, (_, index) => (
               <RowSkeleton key={index} tile subtitle />
             ))}
           </RowGroup>
         )}
-        {modelsUnavailable && (
+        {modelsBody.status === 'error' && (
           <QueryError
-            variant={modelsFailureVariant}
+            variant={classifyReadFailureVariant({
+              errors: modelsError ? [modelsError] : [],
+              isPaused: modelsFetchStatus === 'paused',
+              connectivity,
+            })}
             placement="top"
             title={t('common.couldNotLoadModels')}
             onRetry={() => void refetchModels()}
-            isRetrying={modelsLoading}
+            isRetrying={modelsBody.isRetrying}
           />
         )}
-        {!modelsLoading && !modelsUnavailable && (
+        {modelsBody.status === 'empty' && (
+          // A delivered empty catalogue is not a failure, so the rows stay under
+          // their notice and stay disabled: there is nothing to pick from.
+          <Text className="text-center text-xs text-muted-foreground">
+            {t('common.noModelsAvailable')}
+          </Text>
+        )}
+        {(modelsPickable || modelsBody.status === 'empty') && (
           <RowGroup leadingTile>
             <ConfigureRow
               icon={Search}
               title={t('securityAgent.analysisSettings.triageModel')}
               subtitle={modelName(triageModelSlug)}
-              disabled={!canManage}
+              disabled={readOnly || !modelsPickable}
               onPress={modelRowOnPress(triageModelSlug, setTriageModelSlug)}
             />
             <ConfigureRow
               icon={Brain}
               title={t('securityAgent.analysisSettings.analysisModel')}
               subtitle={modelName(analysisModelSlug)}
-              disabled={!canManage}
+              disabled={readOnly || !modelsPickable}
               onPress={modelRowOnPress(analysisModelSlug, setAnalysisModelSlug)}
             />
             <ConfigureRow
               icon={Wrench}
               title={t('securityAgent.analysisSettings.remediationModel')}
               subtitle={modelName(remediationModelSlug)}
-              disabled={!canManage}
+              disabled={readOnly || !modelsPickable}
               onPress={modelRowOnPress(remediationModelSlug, setRemediationModelSlug)}
             />
           </RowGroup>

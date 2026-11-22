@@ -5,7 +5,7 @@ import { Buffer } from 'node:buffer';
  * module mints values and re-exports these validators; the wrapper imports this
  * shared module so it can classify a credential without pulling in minting.
  */
-export type ControlCredentialPurpose = 'kilo' | 'github' | 'gitlab' | 'bitbucket';
+export type ControlCredentialPurpose = 'kilo' | 'github' | 'gitlab' | 'bitbucket' | 'secret';
 
 export const CONTROL_CREDENTIAL_PREFIX = 'kcp1';
 export const MAX_CONTROL_CREDENTIAL_LENGTH = 512;
@@ -22,7 +22,11 @@ export function isSafeSandboxId(sandboxId: string): boolean {
 
 export function isControlCredentialPurpose(purpose: string): purpose is ControlCredentialPurpose {
   return (
-    purpose === 'kilo' || purpose === 'github' || purpose === 'gitlab' || purpose === 'bitbucket'
+    purpose === 'kilo' ||
+    purpose === 'github' ||
+    purpose === 'gitlab' ||
+    purpose === 'bitbucket' ||
+    purpose === 'secret'
   );
 }
 

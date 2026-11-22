@@ -31,6 +31,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -233,7 +234,10 @@ function makeAssistantMessage(id: string, parts: Part[]): StoredMessage {
   };
 }
 
-function transcriptElement(messages: StoredMessage[]): ReactElement {
+function transcriptElement(
+  messages: StoredMessage[],
+  emptyPlacement?: 'center' | 'static'
+): ReactElement {
   return createElement(SessionPreviewTranscript, {
     sessionId: 's1',
     messages,
@@ -241,15 +245,19 @@ function transcriptElement(messages: StoredMessage[]): ReactElement {
     isError: false,
     error: undefined,
     onRetry: () => undefined,
+    emptyPlacement,
   });
 }
 
 const mounted: TestRenderer.ReactTestRenderer[] = [];
 
-function mountTranscript(messages: StoredMessage[]): TestRenderer.ReactTestRenderer {
+function mountTranscript(
+  messages: StoredMessage[],
+  emptyPlacement?: 'center' | 'static'
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(transcriptElement(messages));
+    ref.current = TestRenderer.create(transcriptElement(messages, emptyPlacement));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -327,5 +335,42 @@ describe('SessionPreviewTranscript part detail', () => {
 
     // The read-only sheet shows the completed bash output.
     expect(sheetOutput(renderer)).toHaveLength(1);
+  });
+});
+
+describe('SessionPreviewTranscript empty placement', () => {
+  // These cases assert the rendered structure only: `CenteredState` is a host
+  // element here, so where the band lands is `CenteredState`'s own suite's job,
+  // and the device run measures the painted gap between the two placements.
+  it('centres an empty transcript only when the caller asks', () => {
+    const title = i18n.t('agentChat.session.emptyTitle');
+    const titled = (node: TestRenderer.ReactTestInstance): boolean =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      propOf(node, 'children') === title;
+
+    // The preview card reserves the transcript's space, so the default keeps the
+    // state static in place and nothing can move the card around it.
+    const card = mountTranscript([]);
+    expect(
+      card.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'CenteredState'
+      )
+    ).toHaveLength(0);
+    expect(card.root.findAll(titled)).toHaveLength(1);
+
+    // A caller whose transcript is the whole surface below its header hands the
+    // state the band below that header, mocked here as a host element, where the
+    // state centres with the same copy.
+    const surface = mountTranscript([], 'center');
+    const bands = surface.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'CenteredState'
+    );
+    const [band] = bands;
+    if (!band) {
+      throw new Error('the empty transcript did not render a centred band');
+    }
+    expect(bands).toHaveLength(1);
+    expect(band.findAll(titled)).toHaveLength(1);
   });
 });

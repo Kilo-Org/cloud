@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  SECURITY_ANALYSIS_REJECTED_MESSAGE,
+  SECURITY_OPERATION_IN_PROGRESS_MESSAGE,
   SECURITY_REMEDIATION_REJECTED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
 } from './stable-error-messages';
@@ -17,5 +19,15 @@ describe('stable error sentences', () => {
     expect(SECURITY_REMEDIATION_REJECTED_MESSAGE).toBe(
       'Security remediation service request was rejected'
     );
+  });
+
+  it('pins the exact wire sentence for the analysis-rejection marker', () => {
+    expect(SECURITY_ANALYSIS_REJECTED_MESSAGE).toBe(
+      'Security analysis service request was rejected'
+    );
+  });
+
+  it('pins the exact wire sentence for the operation-in-progress marker', () => {
+    expect(SECURITY_OPERATION_IN_PROGRESS_MESSAGE).toBe('operation_in_progress');
   });
 });

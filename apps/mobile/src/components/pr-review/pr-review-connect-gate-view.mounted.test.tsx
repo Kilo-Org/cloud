@@ -92,6 +92,7 @@ vi.mock('@/lib/app-shell-handoff', () => ({
 }));
 const router = vi.hoisted(() => ({ dismissTo: vi.fn(), push: vi.fn() }));
 vi.mock('expo-router', () => ({
+  useSegments: () => ['(app)', 'pr-review', 'github', 'owner', 'repo', '1'],
   usePathname: () => '/pr-review/github/owner/repo/1',
   useRouter: () => router,
   useFocusEffect: (effect: () => undefined | (() => void)) => {
@@ -125,6 +126,7 @@ vi.mock('expo-web-browser', () => ({
   WebBrowserResultType: { OPENED: 'opened', DISMISS: 'dismiss', CANCEL: 'cancel' },
 }));
 vi.mock('@/components/ui/icons', () => ({
+  GitMerge: 'GitMerge',
   PlugZap: 'PlugZap',
   RefreshCcw: 'RefreshCcw',
   ShieldAlert: 'ShieldAlert',

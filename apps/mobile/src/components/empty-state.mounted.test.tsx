@@ -27,6 +27,9 @@ const band = vi.hoisted(() => ({ short: false }));
 
 vi.mock('react-native', () => ({
   View: 'View',
+  // EmptyState reads the scheme for its dark disc and glyph ink. These cases
+  // pin the light presentation; the dark disc is measured in the design gate.
+  useColorScheme: () => 'light',
 }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('@/components/centered-state', () => ({
@@ -50,7 +53,11 @@ vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#777777', primaryForeground: '#ffffff' }),
+  useThemeColors: () => ({
+    mutedForeground: '#777777',
+    primaryForeground: '#ffffff',
+    foreground: '#111111',
+  }),
   useMutedDisabledInk: () => '#777777',
 }));
 
@@ -350,5 +357,30 @@ describe('StateAction busy', () => {
     );
     expect(disabledAction.renderer.root.findByType(SearchX).props.color).toBe('#777777');
     disabledAction.unmount();
+  });
+});
+
+// A state slot on a screen that already owns its primary action takes the quiet
+// face: the outlined control's ink in the same 48pt frame, so the screen keeps
+// one brand-filled primary (DESIGN.md 'one primary action per surface').
+describe('StateAction emphasis', () => {
+  it('paints the brand fill by default and an outlined control when quiet', async () => {
+    const primary = await renderWithProviders(
+      <StateAction label="Try again" icon={SearchX} onPress={() => undefined} />
+    );
+    expect(primary.renderer.root.findByType('Button').props.variant).toBe('default');
+    expect(primary.renderer.root.findByType(SearchX).props.color).toBe('#ffffff');
+    primary.unmount();
+
+    const quiet = await renderWithProviders(
+      <StateAction label="Try again" icon={SearchX} onPress={() => undefined} emphasis="quiet" />
+    );
+    const button = quiet.renderer.root.findByType('Button');
+    expect(button.props.variant).toBe('outline');
+    // The outline fill is the card step in dark — the same step the card under
+    // this control paints — so the filled neutral separates it.
+    expect(String(button.props.className)).toBe('min-h-[48px] dark:bg-secondary-fill');
+    expect(quiet.renderer.root.findByType(SearchX).props.color).toBe('#111111');
+    quiet.unmount();
   });
 });

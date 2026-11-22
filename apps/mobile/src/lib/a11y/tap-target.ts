@@ -227,11 +227,13 @@ export const COMPACT_CONTROL_ROW_END_CLASS = '-me-[7px]';
 
 /**
  * A settings row's content band: the row's 48pt frame
- * (`ROW_FRAME_CLASS`) less its 10.5pt vertical padding a side. A trailing
- * control that contributes more than this sets the row's height, so it must
- * cancel down to it.
+ * (`ROW_FRAME_CLASS`) less its 10.5pt vertical padding a side, spelled
+ * `min-h-[48px]` less `py-3` twice. A trailing control that contributes more
+ * than this sets the row's height, so it must cancel down to it, and a
+ * placeholder that stands in for such a control derives its own height from
+ * this number.
  */
-const ROW_FRAME_CONTENT_DP = 27;
+export const ROW_FRAME_CONTENT_DP = 27;
 
 /**
  * The vertical margin a full {@link TOUCH_TARGET_DP} control cancels per side
@@ -258,6 +260,39 @@ export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - ROW_FRAME_CONTENT_DP)
  * it, and cancels the same overhang, so the row still sees only the content band.
  */
 export const SWITCH_HOST_CLASS = 'h-[44px] -my-[8.5px] shrink-0 items-center justify-center';
+
+/**
+ * The line a settings section's `Text variant="heading"` lays out on, in dp:
+ * `text-base` at this app's 14dp rem, measured at 21.33dp in the design gate's
+ * Android dump. A header row carrying a switch lands on a taller band, and this
+ * line is the half of that band's excess the row's pull is measured from.
+ */
+export const SETTINGS_HEADING_LINE_DP = 21;
+
+/**
+ * The pull a settings section header takes below its title row, in dp:
+ * `(28 - 21) / 2 = 3.5`, where the band is {@link MIN_TAP_TARGET_DP}. The
+ * switch's box is centred in the row, so half of the band it adds over the
+ * heading line sits under the title's own line; the row's bottom margin cancels
+ * exactly that half, and the title-to-description gap stays the tight inner gap
+ * `gap-1` (3.5dp) that the detector groups and the replaced card use. A row
+ * sized by the switch instead pushed the description half a box further from
+ * the title.
+ */
+export const SETTINGS_SWITCH_ROW_PULL_DP = (MIN_TAP_TARGET_DP - SETTINGS_HEADING_LINE_DP) / 2;
+
+/**
+ * The title row of a settings section header with a switch, as
+ * {@link MIN_TAP_TARGET_DP} plus the pull below it: `min-h-[28px]` for the row's
+ * own band (the control-size floor, because the row is the switch's parent and a
+ * touch is delivered only inside each ancestor's bounds), `-mb-[3.5px]` for the
+ * bottom margin. The row's `items-center` centres both the heading and the
+ * switch in that band, so the switch's visible track (about 27dp) sits fully
+ * inside the delivered area while its node keeps {@link TOUCH_TARGET_DP}. The
+ * row carries no negative top margin: it starts at the header group's top, and
+ * anything above it is clipped by the group.
+ */
+export const SETTINGS_SWITCH_ROW_CLASS = 'min-h-[28px] -mb-[3.5px]';
 
 /**
  * The label pressable inside a `ROW_FRAME_CLASS` row cancels the frame's
@@ -324,6 +359,14 @@ export const FIELD_CLEAR_BOX_CLASS = 'h-[48px] w-[48px] -my-[7px] items-center j
  * 6 per side.
  */
 export const COMPACT_BUTTON_HIT_SLOP = { top: 5, bottom: 5, left: 5, right: 5 } as const;
+
+/**
+ * The frame the shared `Button` renders at its compact size (`sm`). The size is
+ * a minimum, not a fixed height, so a label scaled by large Dynamic Type grows
+ * the button instead of clipping it; the frame plus
+ * {@link COMPACT_BUTTON_HIT_SLOP} reaches the design target.
+ */
+export const COMPACT_BUTTON_FRAME_CLASS = 'min-h-[36px] rounded-md px-3 py-1.5';
 
 /**
  * The frame a compact `h-11` control renders, in pt. NativeWind's rem is 14pt
@@ -456,18 +499,59 @@ export function textActionTargetDp(): number {
  * cancellation ({@link TOUCH_TARGET_OVERHANG_DP}), taken at the action's
  * target.
  *
- * The action keeps {@link textActionTargetClass}'s box on its own node, because
- * a control-size audit reads that node's rect. Without the margin the node
- * contributes its whole target to the frame: a row with a text action laid out
- * at 65pt on iOS and 69dp on Android beside a two-line row's 57.75pt, so a
- * group grew when one of its rows swapped a text action for a button (the
- * Integrations hub's Connect and Disconnect rows, 2026-11-18 gate). Cancelling
- * to {@link ROW_FRAME_CONTENT_DP} leaves the node inside the row's own `py-3`
- * padding, which keeps every touch on it inside the row's bounds — Android
- * delivers a touch only inside a parent view.
+ * This is the text-action variant's geometry only — the Integrations hub's
+ * Connect cell. It keeps {@link textActionTargetClass}'s box on its own node,
+ * because a control-size audit reads that node's rect, and cancels the box's
+ * overhang with `textActionBoxStyle` in `row-trailing.tsx`. Without the margin
+ * the node contributes its whole target to the frame: a row with a text action
+ * laid out at 65pt on iOS and 69dp on Android beside a two-line row's 57.75pt,
+ * so a group grew when one of its rows carried the action (2026-11-18 gate).
+ * Cancelling to {@link ROW_FRAME_CONTENT_DP} leaves the node inside the row's
+ * own `py-3` padding, which keeps every touch on it inside the row's bounds —
+ * Android delivers a touch only inside a parent view.
+ *
+ * A plain compact button, such as the hub's outline cells, takes neither: it
+ * carries no target box of its own, so it reaches the target through the shared
+ * `Button`'s `sm` {@link COMPACT_BUTTON_HIT_SLOP} and needs no overhang cancel,
+ * because its 36pt frame already lays out inside the row's `py-3`.
  */
 export function textActionRowOverhangDp(): number {
   return (textActionTargetDp() - ROW_FRAME_CONTENT_DP) / 2;
+}
+
+/**
+ * The host a stacked row wraps a target-sized trailing control in, so the
+ * control's own box is reachable through its ancestor.
+ *
+ * A stacked row puts the leading cell and the trailing cell on a line of their
+ * own, above the text column, and that line lays its children out on the row's
+ * {@link ROW_FRAME_CONTENT_DP} band. Two cells arrive at the target by
+ * different means. A text action (the hub's Connect cell) carries
+ * {@link textActionTargetClass}'s box on its own node and cancels
+ * {@link textActionRowOverhangDp} per side, which is right for a flat row: the
+ * box overhangs the frame's own `py-3` padding, inside the row's bounds. A plain
+ * compact button (the hub's outline cells) carries no target box of its own: it
+ * relies on the shared `Button`'s `sm` {@link COMPACT_BUTTON_HIT_SLOP}, and its
+ * 36pt frame sits inside the row's `py-3` without any cancel. Stacked, either
+ * cell's touches are delivered through the wrapper this class names, not
+ * through the row, and Android delivers a touch only inside every ancestor
+ * view: a 27pt wrapper held the delivered area at 27pt — under both the action's
+ * target box and the compact button's slop-widened frame — while a control-size
+ * audit still read the cell's own rect.
+ *
+ * The host is that ancestor, so it takes the platform target as its own layout
+ * height and does not cancel the cell's overhang: the delivered area is the
+ * host's layout box, and cancelling the overhang would shrink it back to the
+ * 27pt band and reintroduce the clipping. The stacked line therefore grows to
+ * the target — in the stacked presentation only — while the flat frame keeps the
+ * row's own band, where the action's box overhangs the row's padding and the
+ * compact button's slop already reaches outside its frame.
+ * `justify-center` keeps the cell on the host's centre. The value is
+ * {@link textActionTargetDp} spelled as classes, because NativeWind reads
+ * literals at build time.
+ */
+export function rowTargetHostClass(): string {
+  return Platform.OS === 'android' ? 'min-h-[48px] justify-center' : 'min-h-[44px] justify-center';
 }
 
 /**

@@ -38,6 +38,7 @@ import {
   clearPendingDeepLink,
   consumePendingDeepLink,
   getPendingDeepLink,
+  getPendingDeepLinkArrival,
   getPendingDeepLinkSnapshot,
   restorePersistedPendingDeepLink,
   setCurrentDeepLinkUserId,
@@ -90,6 +91,20 @@ describe('deep-link-launch', () => {
       setPendingDeepLink(href, 'notification');
       expect(getPendingDeepLinkSnapshot()).toBeNull();
       expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('marks a destination a person chose in this process as live', () => {
+      setPendingDeepLink('/(app)/agent-chat/ses_1', 'notification');
+      expect(getPendingDeepLinkArrival()).toBe('live');
+    });
+
+    it('reads live again once a recovered destination is cleared', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/profile');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkArrival()).toBe('restored');
+
+      clearPendingDeepLink();
+      expect(getPendingDeepLinkArrival()).toBe('live');
     });
   });
 
@@ -520,6 +535,24 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
     });
 
+    it('marks a record an earlier process persisted as restored', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/(tabs)/(3_profile)',
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+      _resetDeepLinkLaunchForTests();
+
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkArrival()).toBe('restored');
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+    });
+
     it.each([
       [
         '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1?source=push',
@@ -636,6 +669,45 @@ describe('deep-link-launch', () => {
       await vi.waitFor(() => {
         expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
       });
+    });
+
+    it('keeps the capture time across a restart so the bound counts from capture', async () => {
+      const capturedAt = Date.now() - 23 * 60 * 60 * 1000;
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/(tabs)/(3_profile)',
+          source: 'notification',
+          storedAt: capturedAt,
+          userId: null,
+        })
+      );
+
+      // The first start restores the destination, and nothing consumes it.
+      await restorePersistedPendingDeepLink();
+      await vi.waitFor(() => {
+        expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+          PENDING_DEEP_LINK_KEY,
+          expect.any(String)
+        );
+      });
+      const restored = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as { storedAt: number };
+      expect(restored.storedAt).toBe(capturedAt);
+
+      // A restart two hours later still finds the destination unconsumed.
+      _resetDeepLinkLaunchForTests();
+      vi.useFakeTimers({ now: Date.now() + 2 * 60 * 60 * 1000 });
+      try {
+        await restorePersistedPendingDeepLink();
+
+        // 25 h have passed since capture, so the record expires.
+        expect(getPendingDeepLinkSnapshot()).toBeNull();
+        await vi.waitFor(() => {
+          expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('discards a corrupt record with no navigation', async () => {
@@ -845,6 +917,20 @@ describe('deep-link-launch', () => {
       setPendingDeepLink('/pre-existing', 'notification');
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBe('/pre-existing');
+    });
+
+    it('marks a launch capture as restored, not a choice made in this process', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/profile');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkArrival()).toBe('restored');
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+    });
+
+    it("marks a launch that opened one of the app's own routes as restored", () => {
+      _setGetLinkingURLForTests(() => 'kiloapp:///(app)/(tabs)/(3_profile)/organization/invoices');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkArrival()).toBe('restored');
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)/organization/invoices');
     });
 
     it('is a no-op when getLinkingURL returns null', () => {

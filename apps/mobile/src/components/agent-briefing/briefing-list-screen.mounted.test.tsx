@@ -12,6 +12,7 @@ const requests = vi.hoisted(() => ({
 }));
 const filters = vi.hoisted(() => ({ history: false }));
 const preferences = vi.hoisted(() => ({ enabled: false }));
+const network = vi.hoisted(() => ({ offline: false }));
 const queryKey = ['briefing-list'];
 
 vi.mock('@shopify/flash-list', () => ({
@@ -69,11 +70,17 @@ vi.mock('@/lib/agent-briefing', () => ({
 vi.mock('@/lib/hooks/use-briefing-list-filters', () => ({
   useBriefingListFilters: () => ({ history: filters.history, organizationId: undefined }),
 }));
-vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: () => false }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => network.offline,
+}));
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({ data: [] }),
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
+// The pull's hook now announces under reduced motion through this adapter, whose
+// real module reaches `react-native`'s `AccessibilityInfo`; this suite stubs
+// only the hosts it renders.
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentBriefing: {
@@ -135,29 +142,15 @@ function mountBriefings(reports: readonly unknown[]): TestRenderer.ReactTestRend
   return mounted;
 }
 
-afterEach(() => {
-  act(() => renderer?.unmount());
-  client?.clear();
-  renderer = undefined;
-  client = undefined;
-  requests.list.mockReset();
-  requests.push.mockReset();
-  filters.history = false;
-  preferences.enabled = false;
-  vi.useRealTimers();
-});
-
-it('keeps background updates silent and shows progress only for a pull until it finishes', async () => {
-  const page = { reports: [report], nextCursor: null };
-  const background = Promise.withResolvers<typeof page>();
-  const pull = Promise.withResolvers<typeof page>();
-  requests.list.mockReturnValueOnce(background.promise).mockReturnValueOnce(pull.promise);
-  vi.useFakeTimers();
+/**
+ * The first load: no cached page, so the mocked `requests.list` decides whether
+ * the read stays pending or fails.
+ */
+function mountBriefingsLive(): TestRenderer.ReactTestRenderer {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   client = queryClient;
-  queryClient.setQueryData(queryKey, { pages: [page], pageParams: [undefined] });
   act(() => {
     renderer = TestRenderer.create(
       createElement(QueryClientProvider, { client: queryClient }, createElement(BriefingListScreen))
@@ -167,6 +160,30 @@ it('keeps background updates silent and shows progress only for a pull until it 
   if (!mounted) {
     throw new Error('Briefing list did not mount');
   }
+  return mounted;
+}
+
+afterEach(() => {
+  act(() => renderer?.unmount());
+  client?.clear();
+  renderer = undefined;
+  client = undefined;
+  requests.list.mockReset();
+  requests.push.mockReset();
+  filters.history = false;
+  preferences.enabled = false;
+  network.offline = false;
+  vi.useRealTimers();
+});
+
+it('keeps background updates silent and shows progress only for a pull until it finishes', async () => {
+  const page = { reports: [report], nextCursor: null };
+  const background = Promise.withResolvers<typeof page>();
+  const pull = Promise.withResolvers<typeof page>();
+  requests.list.mockReturnValueOnce(background.promise).mockReturnValueOnce(pull.promise);
+  vi.useFakeTimers();
+  const mounted = mountBriefings([report]);
+  const queryClient = client as QueryClient;
   const list = () => mounted.root.findByType('FlashList' as ElementType);
 
   let backgroundRefresh: Promise<void> | undefined = undefined;
@@ -211,11 +228,12 @@ it('renders the shared empty state with its settings action when no context is e
   // the filter hint stays on screen instead.
   expect(emptyState.props.description).toBeUndefined();
   expect(emptyState.props.icon).toBe('Newspaper');
-  // The state sits under the filter controls, inside the list that owns the
-  // pull-to-refresh gesture.
+  // The empty phase rides in the list, so the state sits under the controls it
+  // follows and keeps the list's pull-to-refresh gesture.
   expect(emptyState.props.placement).toBe('top');
-  expect(emptyState.props.refreshControl).toBeUndefined();
-  const listProps: { onRefresh: unknown } = list.props as { onRefresh: unknown };
+  expect(emptyState.props.inset).toBe('gutter');
+  const listProps = list.props as { data: readonly unknown[]; onRefresh: unknown };
+  expect(listProps.data).toHaveLength(0);
   expect(typeof listProps.onRefresh).toBe('function');
   const texts = mounted.root
     .findAllByType('Text' as ElementType)
@@ -224,8 +242,9 @@ it('renders the shared empty state with its settings action when no context is e
   // The empty state's own action is the only settings entry point while it shows.
   const header = mounted.root.findByType('ScreenHeader' as ElementType);
   expect(header.findAllByType('IconButton' as ElementType)).toHaveLength(0);
-  const buttons = mounted.root.findAllByType('StateAction' as ElementType);
-  expect(buttons).toHaveLength(1);
+  const actions = mounted.root.findAllByType('StateAction' as ElementType);
+  expect(actions).toHaveLength(1);
+  expect(actions[0]?.props.label).toBe('agentBriefing.settings');
   pressSettings(mounted.root);
   expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');
 });
@@ -265,4 +284,57 @@ it('keeps the settings action in the header while the list has reports', () => {
   expect(mounted.root.findAllByType('Button' as ElementType)).toHaveLength(0);
   pressSettings(header);
   expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');
+});
+
+it('says it is offline, not empty, while the first fetch is paused', () => {
+  // A paused read keeps `isPending` true forever, so the empty state and the
+  // retry would both be claims about a list nothing has answered yet.
+  network.offline = true;
+  // The read a paused fetch represents: it never settles while offline.
+  const { promise } = Promise.withResolvers<{ reports: unknown[]; nextCursor: null }>();
+  requests.list.mockImplementation(() => promise);
+  const mounted = mountBriefingsLive();
+
+  const errors = mounted.root.findAllByType('QueryError' as ElementType);
+  expect(errors).toHaveLength(1);
+  expect(errors[0]?.props).toMatchObject({ variant: 'offline' });
+  expect(errors[0]?.props.onRetry).toBeUndefined();
+  expect(errors[0]?.props.title).toBe('offline.noInternet');
+  expect(mounted.root.findAllByType('EmptyState' as ElementType)).toHaveLength(0);
+  // The paused read owns the body: no list, and with it no empty state, is a
+  // claim about a list that has not answered yet.
+  expect(mounted.root.findAllByType('FlashList' as ElementType)).toHaveLength(0);
+  const texts = mounted.root
+    .findAllByType('Text' as ElementType)
+    .map(node => String(node.props.children));
+  expect(texts).not.toContain('agentBriefing.loadError');
+});
+
+it('keeps rendering cached reports offline and names the offline note once', () => {
+  network.offline = true;
+  const mounted = mountBriefings([report]);
+
+  expect(mounted.root.findAllByType('FlashList' as ElementType)).toHaveLength(1);
+  expect(mounted.root.findAllByType('QueryError' as ElementType)).toHaveLength(0);
+  expect(mounted.root.findAllByType('EmptyState' as ElementType)).toHaveLength(0);
+  const texts = mounted.root
+    .findAllByType('Text' as ElementType)
+    .map(node => String(node.props.children));
+  expect(texts).toContain('agentBriefing.offline');
+});
+
+it('renders a rejected read as a permission state with no retry', async () => {
+  requests.list.mockImplementation(() =>
+    Promise.reject(Object.assign(new Error('FORBIDDEN'), { data: { code: 'FORBIDDEN' } }))
+  );
+  const mounted = mountBriefingsLive();
+
+  await vi.waitFor(() => {
+    expect(mounted.root.findAllByType('QueryError' as ElementType)).toHaveLength(1);
+  });
+  const [error] = mounted.root.findAllByType('QueryError' as ElementType);
+  // Retrying a rejected read returns the same rejection, so the state offers none.
+  expect(error?.props).toMatchObject({ variant: 'permission' });
+  expect(error?.props.onRetry).toBeUndefined();
+  expect(mounted.root.findAllByType('EmptyState' as ElementType)).toHaveLength(0);
 });

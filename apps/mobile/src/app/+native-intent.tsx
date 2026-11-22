@@ -3,6 +3,7 @@ import { getShareExtensionKey } from 'expo-share-intent';
 import { agentChatPickerFixtureRoute } from '@/lib/agent-chat-picker-fixture';
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
 import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
+import { contextPickerFixtureRoute } from '@/lib/context-picker-fixture';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { applyForceStatePath } from '@/lib/force-state-fixture';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
@@ -12,6 +13,7 @@ import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { loginFixtureRoute } from '@/lib/login-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handleOrganizationInviteMemberFixturePath } from '@/lib/organization-invite-member-fixture';
+import { nativeRemoteFixtureRoute } from '@/lib/native-remote-fixture';
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
 import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
 import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
@@ -50,6 +52,13 @@ export function redirectSystemPath({
   // Dev-only glanceable fixture links (`kiloapp:///dev/glanceable-fixture/<name>`).
   if (__DEV__ && handleGlanceableFixturePath(path)) {
     return null;
+  }
+  // Dev-only native-remote transcript fixtures (`kiloapp:///dev/native-remote-
+  // fixture/reconnecting|gaps`): the handler records the state and returns the
+  // demo route, so the resolver lands on the screen with the fixture active.
+  const nativeRemoteFixture = nativeRemoteFixtureRoute(path);
+  if (nativeRemoteFixture) {
+    return nativeRemoteFixture;
   }
   // Dev-only Home fixture links (`kiloapp:///dev/home-fixture/<name>`).
   if (__DEV__ && handleHomeFixturePath(path)) {
@@ -117,6 +126,13 @@ export function redirectSystemPath({
     if (handlePrReviewCopyFixturePath(path)) {
       return null;
     }
+    // Dev-only account picker sheet, opened with the bridge Home's header
+    // writes (`dev/context-picker-fixture`) so the sheet renders its accounts
+    // instead of the "Options expired" shell a bare route link produces.
+    const contextPickerFixture = contextPickerFixtureRoute(path);
+    if (contextPickerFixture) {
+      return contextPickerFixture;
+    }
     if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/button-label-fixture';
     }
@@ -143,6 +159,9 @@ export function redirectSystemPath({
     }
     if (/(?:^|\/)dev\/save-profile-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/save-profile-sheet-fixture';
+    }
+    if (/(?:^|\/)dev\/mcp-form-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/mcp-form-sheet-fixture';
     }
     if (/(?:^|\/)dev\/account-picker-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/account-picker-sheet-fixture';
@@ -272,9 +291,9 @@ export function redirectSystemPath({
       return profilePickerRoute;
     }
     // Dev-only Buy credits rows against fixed store answers
-    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed>`).
+    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|priced-expiring|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed>`).
     const creditsPackPrices =
-      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed)\/?$/.exec(
+      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|priced-expiring|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed)\/?$/.exec(
         path
       );
     if (creditsPackPrices) {

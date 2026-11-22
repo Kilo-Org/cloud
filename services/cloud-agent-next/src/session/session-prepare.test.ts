@@ -2326,6 +2326,49 @@ describe('explicit sandbox session creation', () => {
       );
     });
 
+    it('rejects network secrets for an unpinned V1 environment with a Vercel owner default', async () => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      ctx.env.BYOC_VERCEL_IDS = orgId;
+      fetchByocVercelEnrollmentMock.mockResolvedValue({ setupStatus: 'ready' });
+      getSandboxAllocationCandidatesMock.mockResolvedValueOnce({
+        contextAllocation: 'vercel-small',
+      });
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+
+      await expect(
+        createSessionWithLedger(
+          {
+            ...environmentRequest(v1Environment),
+            profile: {
+              resolved: {
+                networkSecrets: {
+                  SERVICE_TOKEN: {
+                    allowedHosts: ['api.example.com'],
+                    locations: ['header'],
+                    envelope: {
+                      encryptedData: 'abc',
+                      encryptedDEK: 'def',
+                      algorithm: 'rsa-aes-256-gcm',
+                      version: 1,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          ctx,
+          { ...CREATE_OPTIONS, resolveSavedAllocationBeforeAdmission: true }
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Network secrets require a Cloudflare sandbox',
+      });
+      expect(settleOptions(0)?.outboxEvent).toMatchObject({ properties: { outcome: 'failed' } });
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    });
+
     it('skips a retired shared owner default for a V1 environment', async () => {
       getSandboxAllocationCandidatesMock.mockResolvedValue({
         contextAllocation: 'cloudflare-shared',
@@ -6806,6 +6849,39 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       },
     });
   }
+
+  it('replays a matching hosted checkout manifest and rejects changes without registering again', async () => {
+    const integrationId = '22222222-2222-4222-8222-222222222222';
+    const request: SessionCreateRequest = {
+      ...originalRequest(),
+      repository: { type: 'github', repo: 'acme/repo', githubIntegrationId: integrationId },
+      hostedGitHubRepositories: {
+        integrationId,
+        primary: { id: 123, fullName: 'acme/repo' },
+        additional: [{ id: 456, fullName: 'acme/other' }],
+      },
+    };
+    const row = await completedRowFor(request);
+    admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+    const stub = makeDoStub();
+    await expect(runCreate(makeContext(stub), request)).resolves.toMatchObject({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    const { hostedGitHubRepositories, ...withoutSelection } = request;
+    await expectRejectedWithoutEffects(withoutSelection);
+    await expectRejectedWithoutEffects({
+      ...request,
+      hostedGitHubRepositories: {
+        ...hostedGitHubRepositories,
+        primary: { id: 123, fullName: 'acme/repo' },
+        integrationId,
+        additional: [{ id: 789, fullName: 'acme/different' }],
+      },
+    });
+  });
 
   /** Asserts the request is rejected with the typed error and no effect runs. */
   async function expectRejectedWithoutEffects(

@@ -67,13 +67,25 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
+const { WebClient: MockWebClient } = jest.requireMock<{ WebClient: jest.Mock }>('@slack/web-api');
+
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
+import type { WebClientOptions } from '@slack/web-api';
+import type { PlatformIntegration } from '@kilocode/db/schema';
+import {
+  SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+  SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+} from '@kilocode/app-shared/integrations-errors';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { SlackCredentialDecryptionError } from '@/lib/integrations/platforms/slack/credential-encryption';
 import {
   deleteInstallationByTeamId,
   getMissingSlackScopes,
+  readSlackBotToken,
+  revokeSlackToken,
   SlackWorkspaceAlreadyConnectedError,
   SlackWorkspaceRebindNotAllowedError,
   SLACK_SCOPES,
@@ -84,6 +96,11 @@ import {
 
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
 const orgOwner = { type: 'org', id: 'org-1' } satisfies Owner;
+
+// The revoke path reports failures on purpose; no test may inherit that call count.
+afterEach(() => {
+  mockCaptureException.mockReset();
+});
 
 function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
   return {
@@ -182,7 +199,7 @@ describe('slack-service uninstallApp', () => {
   it('revokes the credential-store token for an active integration', async () => {
     mockLimit.mockResolvedValue([buildSlackIntegration()]);
 
-    await uninstallApp(owner);
+    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
 
     expect(mockGetSlackCredentialByIntegrationId).toHaveBeenCalledWith('integration-1');
     expect(mockDecryptSlackBotToken).toHaveBeenCalledWith({ id: 'credential-1' }, owner);
@@ -208,7 +225,338 @@ describe('slack-service uninstallApp', () => {
     expect(mockAuthRevoke).not.toHaveBeenCalled();
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
     expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+    expect(mockGetSlackCredentialByIntegrationId).not.toHaveBeenCalled();
+    expect(mockDecryptSlackBotToken).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes the platform integration row when Slack reports the token already invalid', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockAuthRevoke.mockRejectedValue({
+      code: 'slack_webapi_platform_error',
+      data: { ok: false, error: 'invalid_auth' },
+    });
+
+    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
+
+    expect(mockAuthRevoke).toHaveBeenCalledTimes(1);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the platform integration row when the Slack revoke request is rate limited', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockAuthRevoke.mockRejectedValue({ code: 'slack_webapi_rate_limited_error', retryAfter: 30 });
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+    });
+
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+  });
+
+  it('keeps the platform integration row when a platform error is not a terminal token code', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockAuthRevoke.mockRejectedValue({
+      code: 'slack_webapi_platform_error',
+      data: { ok: false, error: 'something_else' },
+    });
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+    });
+
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+  });
+
+  it('keeps the platform integration row when the stored credential cannot be read', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockGetSlackCredentialByIntegrationId.mockRejectedValue(new Error('database is down'));
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+    });
+
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+  });
+
+  it('keeps the platform integration row when the stored credential cannot be decrypted', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockDecryptSlackBotToken.mockImplementation(() => {
+      throw new SlackCredentialDecryptionError('access');
+    });
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+    });
+
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+  });
+
+  it('keeps the platform integration row when the row has no exclusive owner', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({ owned_by_user_id: null, owned_by_organization_id: null }),
+    ]);
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+    });
+
+    expect(mockGetSlackCredentialByIntegrationId).not.toHaveBeenCalled();
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+  });
+
+  it('removes the platform integration row when no credential was ever stored', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue(null);
+
+    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
+
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('slack-service readSlackBotToken', () => {
+  beforeEach(() => {
+    mockGetSlackCredentialByIntegrationId.mockReset();
+    mockDecryptSlackBotToken.mockReset();
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue({ id: 'credential-1' });
+    mockDecryptSlackBotToken.mockReturnValue('xoxb-token');
+  });
+
+  it('returns the token when the stored credential decrypts', async () => {
+    const read = await readSlackBotToken(buildSlackIntegration() as PlatformIntegration);
+
+    expect(read).toEqual({ status: 'available', token: 'xoxb-token' });
+    expect(mockDecryptSlackBotToken).toHaveBeenCalledWith({ id: 'credential-1' }, owner);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('reports absent when no credential row exists', async () => {
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue(null);
+
+    const read = await readSlackBotToken(buildSlackIntegration() as PlatformIntegration);
+
+    expect(read).toEqual({ status: 'absent' });
+    expect(mockDecryptSlackBotToken).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('reports absent when the stored credential row is already revoked', async () => {
+    mockDecryptSlackBotToken.mockReturnValue(null);
+
+    const read = await readSlackBotToken(buildSlackIntegration() as PlatformIntegration);
+
+    expect(read).toEqual({ status: 'absent' });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('reports a read failure when the credential row cannot be loaded', async () => {
+    const failure = new Error('database is down');
+    mockGetSlackCredentialByIntegrationId.mockRejectedValue(failure);
+
+    const read = await readSlackBotToken(buildSlackIntegration() as PlatformIntegration);
+
+    expect(read).toEqual({ status: 'unavailable', reason: 'read_failed' });
+    expect(mockCaptureException).toHaveBeenCalledWith(failure, expect.anything());
+  });
+
+  it('reports a decrypt failure when the stored credential cannot be decrypted', async () => {
+    const failure = new SlackCredentialDecryptionError('access');
+    mockDecryptSlackBotToken.mockImplementation(() => {
+      throw failure;
+    });
+
+    const read = await readSlackBotToken(buildSlackIntegration() as PlatformIntegration);
+
+    expect(read).toEqual({ status: 'unavailable', reason: 'decrypt_failed' });
+    expect(mockCaptureException).toHaveBeenCalledWith(failure, expect.anything());
+  });
+
+  it('reports a missing owner when the row has no exclusive owner', async () => {
+    const read = await readSlackBotToken(
+      buildSlackIntegration({
+        owned_by_user_id: null,
+        owned_by_organization_id: null,
+      }) as PlatformIntegration
+    );
+
+    expect(read).toEqual({ status: 'unavailable', reason: 'owner_missing' });
+    expect(mockGetSlackCredentialByIntegrationId).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('slack-service revokeSlackToken', () => {
+  beforeEach(() => {
+    mockAuthRevoke.mockReset();
+    mockCaptureException.mockReset();
+    MockWebClient.mockClear();
+  });
+
+  it('bounds the SDK retry policy so the disconnect cannot outlast the request timeout', async () => {
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+
+    await revokeSlackToken('xoxb-token');
+
+    expect(MockWebClient).toHaveBeenCalledTimes(1);
+    const [token, options] = MockWebClient.mock.calls[0] as [
+      string,
+      { retryConfig: { retries: number }; rejectRateLimitedCalls: boolean },
+    ];
+    expect(token).toBe('xoxb-token');
+    expect(options.retryConfig.retries).toBe(1);
+    expect(options.rejectRateLimitedCalls).toBe(true);
+  });
+
+  it('reports revoked when Slack accepts the revoke', async () => {
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+
+    await expect(revokeSlackToken('xoxb-token')).resolves.toEqual({ status: 'revoked' });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it.each(['token_revoked', 'invalid_auth', 'not_authed', 'account_inactive', 'token_expired'])(
+    'reports already_invalid when Slack rejects the token with %s',
+    async slackError => {
+      mockAuthRevoke.mockRejectedValue({
+        code: 'slack_webapi_platform_error',
+        data: { ok: false, error: slackError },
+      });
+
+      await expect(revokeSlackToken('xoxb-token')).resolves.toEqual({
+        status: 'already_invalid',
+        slackError,
+      });
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reports a temporary failure when the revoke is rate limited', async () => {
+    mockAuthRevoke.mockRejectedValue({ code: 'slack_webapi_rate_limited_error', retryAfter: 30 });
+
+    await expect(revokeSlackToken('xoxb-token')).resolves.toEqual({
+      status: 'temporary_failure',
+      reason: 'rate_limited',
+    });
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers at once when the real SDK meets a 429 with a retry-after', async () => {
+    const { WebClient: ActualWebClient } = jest.requireActual<{
+      WebClient: new (token: string, options: WebClientOptions) => unknown;
+    }>('@slack/web-api');
+    // The mock stands in for the SDK, so only the real client shows that a 429
+    // turns into an immediate coded error instead of a sleep inside the attempt.
+    const arrivals: number[] = [];
+    const server = createServer((_request, response) => {
+      arrivals.push(Date.now());
+      response.writeHead(429, { 'retry-after': '5', 'content-type': 'application/json' });
+      response.end(JSON.stringify({ ok: false, error: 'ratelimited' }));
+    });
+    const listening = Promise.withResolvers<void>();
+    server.listen(0, '127.0.0.1', () => listening.resolve());
+    await listening.promise;
+    const { port } = server.address() as AddressInfo;
+    const originalImplementation = MockWebClient.getMockImplementation();
+    MockWebClient.mockImplementation(
+      (token: string, options: WebClientOptions) =>
+        new ActualWebClient(token, { ...options, slackApiUrl: `http://127.0.0.1:${port}/` })
+    );
+
+    try {
+      const startedAt = Date.now();
+      const result = await revokeSlackToken('xoxb-token');
+      const elapsedMs = Date.now() - startedAt;
+
+      // The bound is the defect: without the option the SDK sleeps out the
+      // retry-after on every attempt, so the call takes about 10 s, not 3 s.
+      expect(elapsedMs).toBeLessThan(3_000);
+      expect(arrivals).toHaveLength(1);
+      expect(result).toEqual({ status: 'temporary_failure', reason: 'rate_limited' });
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    } finally {
+      MockWebClient.mockImplementation(originalImplementation);
+      const closed = Promise.withResolvers<void>();
+      server.close(() => closed.resolve());
+      await closed.promise;
+    }
+  }, 20_000);
+
+  it('reports a temporary failure when Slack answers with an HTTP error', async () => {
+    mockAuthRevoke.mockRejectedValue({ code: 'slack_webapi_http_error', statusCode: 503 });
+
+    await expect(revokeSlackToken('xoxb-token')).resolves.toEqual({
+      status: 'temporary_failure',
+      reason: 'http_error',
+    });
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a temporary failure when the request fails in transport', async () => {
+    mockAuthRevoke.mockRejectedValue({
+      code: 'slack_webapi_request_error',
+      original: new Error('socket hang up'),
+    });
+
+    await expect(revokeSlackToken('xoxb-token')).resolves.toEqual({
+      status: 'temporary_failure',
+      reason: 'network',
+    });
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a temporary failure when a platform error is not a terminal token code', async () => {
+    mockAuthRevoke.mockRejectedValue({
+      code: 'slack_webapi_platform_error',
+      data: { ok: false, error: 'something_else' },
+    });
+
+    await expect(revokeSlackToken('xoxb-token')).resolves.toEqual({
+      status: 'temporary_failure',
+      reason: 'unknown',
+    });
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain('xoxb-token');
   });
 });
 

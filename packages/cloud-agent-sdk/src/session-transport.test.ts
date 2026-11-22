@@ -107,6 +107,7 @@ function createUserWebConnection() {
     disconnect: jest.fn(),
     destroy: jest.fn(),
     isConnected: jest.fn(() => false),
+    socketPhase: jest.fn(() => 'absent' as const),
     onConnectionChange: jest.fn(() => jest.fn()),
     isReconnectExhausted: jest.fn(() => false),
     onReconnectExhaustionChange: jest.fn(() => jest.fn()),
@@ -2367,12 +2368,116 @@ describe('workspace DO-only session transport', () => {
       await fixture.manager.hydrateChildSession(childId);
       expect(fixture.store.get(fixture.manager.atoms.childSessionHydrationState)(childId)).toEqual({
         status: 'error',
-        message: 'Connection failed. Please retry in a moment.',
+        message: 'Session history is unavailable',
       });
       expect(fixture.store.get(fixture.manager.atoms.childMessages)(childId)).toEqual([]);
       expect(fixture.resolveSession).toHaveBeenCalledTimes(1);
       expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
       expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('ends child paging on a later page the schema cannot parse', async () => {
+    const fixture = workspaceManager();
+    const childId = kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb');
+    fixture.fetchCloudSnapshotPage.mockImplementation(async (_id, options) => {
+      if (options.kiloSessionId !== childId) return page();
+      if (options.cursor === undefined) {
+        return page({
+          info: { id: childId, parentID: nativeId, title: 'Child title' },
+          messages: [
+            { info: stubUserMessage({ id: 'msg_child_001', sessionID: childId }), parts: [] },
+          ],
+          nextCursor: 'child-older',
+        });
+      }
+      return {
+        kind: 'success',
+        info: { id: childId },
+        messages: 'nope',
+      } as unknown as CloudSessionSnapshotPage;
+    });
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      await fixture.manager.hydrateChildSession(childId);
+      await fixture.manager.loadOlderChildMessages(childId);
+      expect(fixture.store.get(fixture.manager.atoms.childSessionHydrationState)(childId)).toEqual({
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: { kind: 'invalid_data' },
+        omittedItemCount: 0,
+      });
+      expect(fixture.store.get(fixture.manager.atoms.hasOlderMessages)).toBe(true);
+      expect(fixture.store.get(fixture.manager.atoms.olderMessagesError)).toBeNull();
+      expect(fixture.store.get(fixture.manager.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(
+        fixture.fetchCloudSnapshotPage.mock.calls.filter(
+          ([, options]) => options.cursor === 'child-older'
+        )
+      ).toHaveLength(1);
+      await fixture.manager.loadOlderChildMessages(childId);
+      expect(
+        fixture.fetchCloudSnapshotPage.mock.calls.filter(
+          ([, options]) => options.cursor === 'child-older'
+        )
+      ).toHaveLength(1);
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('ends child paging on a later page that belongs to another session', async () => {
+    const fixture = workspaceManager();
+    const childId = kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb');
+    fixture.fetchCloudSnapshotPage.mockImplementation(async (_id, options) => {
+      if (options.kiloSessionId !== childId) return page();
+      if (options.cursor === undefined) {
+        return page({
+          info: { id: childId, parentID: nativeId, title: 'Child title' },
+          messages: [
+            { info: stubUserMessage({ id: 'msg_child_001', sessionID: childId }), parts: [] },
+          ],
+          nextCursor: 'child-older',
+        });
+      }
+      return page({
+        info: { id: kiloId('ses_cccccccccccccccccccccccccc'), parentID: nativeId },
+        messages: [],
+        nextCursor: null,
+      });
+    });
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      await fixture.manager.hydrateChildSession(childId);
+      await fixture.manager.loadOlderChildMessages(childId);
+      expect(fixture.store.get(fixture.manager.atoms.childSessionHydrationState)(childId)).toEqual({
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: { kind: 'invalid_data' },
+        omittedItemCount: 0,
+      });
+      expect(fixture.store.get(fixture.manager.atoms.hasOlderMessages)).toBe(true);
+      expect(fixture.store.get(fixture.manager.atoms.olderMessagesError)).toBeNull();
+      expect(fixture.store.get(fixture.manager.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(
+        fixture.fetchCloudSnapshotPage.mock.calls.filter(
+          ([, options]) => options.cursor === 'child-older'
+        )
+      ).toHaveLength(1);
+      await fixture.manager.loadOlderChildMessages(childId);
+      expect(
+        fixture.fetchCloudSnapshotPage.mock.calls.filter(
+          ([, options]) => options.cursor === 'child-older'
+        )
+      ).toHaveLength(1);
     } finally {
       fixture.manager.destroy();
     }
@@ -2603,7 +2708,12 @@ describe('workspace DO-only session transport', () => {
       try {
         session.connect();
         await jest.advanceTimersByTimeAsync(0);
-        expect(fetchSnapshotPage).toHaveBeenCalledWith(routeId, {});
+        // The live transport passes its abort signal; the historical transport
+        // keeps its own bounded read and passes no options.
+        expect(fetchSnapshotPage).toHaveBeenCalledWith(
+          routeId,
+          type === 'remote' ? { signal: expect.any(AbortSignal) } : {}
+        );
         expect(fetchCloudSnapshotPage).not.toHaveBeenCalled();
       } finally {
         session.destroy();

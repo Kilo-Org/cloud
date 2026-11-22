@@ -258,6 +258,10 @@ export function buildControlPlaneSessionRegistration(
   // carry the trusted review skill that the Code Reviewer attaches.
   const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
   const encryptedSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.encryptedSecrets;
+  const networkSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.networkSecrets;
+  if (Object.keys(networkSecrets ?? {}).length > 0 && sandboxProvider !== 'cloudflare-containers') {
+    throw new Error('Network secrets require a Cloudflare sandbox');
+  }
   const hasEncryptedSecrets =
     encryptedSecrets !== undefined && Object.keys(encryptedSecrets).length > 0;
   const profile = readProfileBundle(metadata);
@@ -374,6 +378,7 @@ export function buildControlPlaneSessionRegistration(
     ...(metadata.allowSubagentSessions === true ? { allowSubagentSessions: true } : {}),
     ...(encryptedMcpServers === undefined ? {} : { mcpServers: encryptedMcpServers }),
     ...(encryptedSecrets === undefined ? {} : { encryptedSecrets }),
+    ...(networkSecrets === undefined ? {} : { networkSecrets }),
   };
   return {
     sandboxId,

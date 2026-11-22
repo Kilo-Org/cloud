@@ -27,3 +27,11 @@ export function defineGatewayProvider<
   // object literal itself widens it to `ProviderType`.
   return provider satisfies Provider;
 }
+
+/**
+ * Serves a base gateway definition with a caller-supplied key. The base is left untouched; the
+ * result is a copy that keeps every routing field of the base.
+ */
+export function withApiKey(base: Provider, apiKey: string): Provider {
+  return { ...base, apiKey };
+}

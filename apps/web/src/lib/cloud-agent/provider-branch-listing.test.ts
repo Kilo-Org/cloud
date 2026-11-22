@@ -5,7 +5,7 @@ import { GitLabBranchesFetchError } from '@/lib/integrations/platforms/gitlab/ad
 import {
   GITHUB_LISTING_BUDGET_MESSAGE,
   GitHubListingBudgetExceededError,
-} from '@/lib/integrations/platforms/github/adapter';
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { getProviderBranchHead, listProviderRepositoryBranches } from './provider-branch-listing';
 
 const mockGetIntegrationForOwner = jest.fn();
@@ -668,5 +668,166 @@ describe('getProviderBranchHead', () => {
         branch: 'feat',
       })
     ).resolves.toEqual({ missing: true });
+  });
+
+  it('maps a refused credential on the exact supplied integration to the reconnect state', async () => {
+    mockGetGitHubIntegrationById.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(401, 'Bad credentials'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+        githubIntegrationId: 'intg_github_exact',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Your GitHub connection is no longer valid. Reconnect GitHub and try again.',
+    });
+  });
+
+  it('maps a refused credential on a personal connection to the reconnect state', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(401, 'Bad credentials'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Your GitHub connection is no longer valid. Reconnect GitHub and try again.',
+    });
+
+    expect(mockGetIntegrationForOwner).toHaveBeenCalledWith(
+      { type: 'user', id: 'user_1' },
+      'github'
+    );
+  });
+
+  it('rethrows a non-refusal failure on a personal connection unchanged', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(githubIntegration);
+    const failure = new TypeError('fetch failed');
+    mockFetchGitHubBranchHead.mockRejectedValue(failure);
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+      })
+    ).rejects.toBe(failure);
+  });
+
+  it('keeps a rate limit retryable on a personal connection', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+
+  it('keeps a rate limit retryable on an exact supplied integration', async () => {
+    mockGetGitHubIntegrationById.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+        githubIntegrationId: 'intg_github_exact',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+});
+
+describe('getProviderBranchHead (organization github installations)', () => {
+  /** The head walk needs an installation id, which the listing rows leave off. */
+  function headInstallation(id: string, cachedRepository: string | null, installationId: string) {
+    return {
+      ...organizationInstallation(id, cachedRepository),
+      platform_installation_id: installationId,
+    } as unknown as PlatformIntegration;
+  }
+
+  // The cache decides the order: the installation that lists the repository
+  // goes first, so an unchanged expectation on the first call pins the walk.
+  beforeEach(() => {
+    mockGetIntegrationsByOrganization.mockResolvedValue([
+      headInstallation('intg_first', 'octocat/hello', 'install_first'),
+      headInstallation('intg_second', null, 'install_second'),
+    ]);
+  });
+
+  it('falls through a refused credential to the installation that resolves the branch', async () => {
+    mockFetchGitHubBranchHead
+      .mockRejectedValueOnce(githubRefusal(401, 'Bad credentials'))
+      .mockResolvedValueOnce({ sha: 'b'.repeat(40) });
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+        branch: 'feat',
+      })
+    ).resolves.toEqual({ sha: 'b'.repeat(40) });
+
+    expect(mockFetchGitHubBranchHead).toHaveBeenCalledTimes(2);
+    expect(mockFetchGitHubBranchHead).toHaveBeenLastCalledWith(
+      expect.objectContaining({ installationId: 'install_second' })
+    );
+  });
+
+  it('reports the reconnect state when every installation refuses the credential', async () => {
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(401, 'Bad credentials'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+        branch: 'feat',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Your GitHub connection is no longer valid. Reconnect GitHub and try again.',
+    });
+
+    expect(mockFetchGitHubBranchHead).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the retryable rate limit ahead of the reconnect state', async () => {
+    mockFetchGitHubBranchHead
+      .mockRejectedValueOnce(githubRefusal(401, 'Bad credentials'))
+      .mockRejectedValueOnce(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+        branch: 'feat',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+
+    expect(mockFetchGitHubBranchHead).toHaveBeenCalledTimes(2);
   });
 });

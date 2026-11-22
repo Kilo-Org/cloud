@@ -10,6 +10,7 @@ import {
   mountVoiceInputSettingsScreen,
   unmountVoiceInputSettingsScreen,
 } from '@/components/voice-input-settings-screen.test-helpers';
+import { expectRenderedSettingsTargets } from '@/test/settings-search-targets';
 
 type SelectionStatus = 'off' | 'loading' | 'error' | 'empty' | 'unavailable' | 'ready';
 type SelectionState = {
@@ -63,6 +64,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -152,30 +157,30 @@ describe('VoiceInputSettingsScreen', () => {
     expect(selectionArgs.organizationId).toBeUndefined();
   });
 
-  it('shows the empty caption disabled while the switch is off', async () => {
-    // The catalogue is loaded, so the hook reports a model; the off status must
-    // still win and keep the caption unset rather than naming that model.
-    setSelection({ status: 'off', model: MODELS[0], models: MODELS });
-    const renderer = await mountVoiceInputSettingsScreen();
+  it.each([
+    {
+      state: { status: 'off' as const, model: MODELS[0], models: MODELS },
+      enabled: false,
+      expected: { icon: 'Cpu', subtitle: 'None chosen', disabled: true },
+    },
+    {
+      state: { status: 'loading' as const, isLoading: true },
+      enabled: true,
+      expected: { subtitle: 'Loading…', disabled: true },
+    },
+  ])(
+    'disables the model row with its $expected.subtitle caption',
+    async ({ state, enabled, expected }) => {
+      // The catalogue is loaded for the off case, so the hook reports a model;
+      // the off status must still win and keep the caption unset.
+      gatewayTranscription.enabled = enabled;
+      setSelection(state);
+      const renderer = await mountVoiceInputSettingsScreen();
 
-    expect(findConfigureRow(renderer, 'Transcription model').props).toMatchObject({
-      icon: 'Cpu',
-      subtitle: 'None chosen',
-      disabled: true,
-    });
-  });
-
-  it('shows the loading caption disabled while the catalogue settles', async () => {
-    gatewayTranscription.enabled = true;
-    setSelection({ status: 'loading', isLoading: true });
-    const renderer = await mountVoiceInputSettingsScreen();
-
-    expect(findConfigureRow(renderer, 'Transcription model').props).toMatchObject({
-      subtitle: 'Loading…',
-      disabled: true,
-    });
-    expect(findQueryErrors(renderer)).toHaveLength(0);
-  });
+      expect(findConfigureRow(renderer, 'Transcription model').props).toMatchObject(expected);
+      expect(findQueryErrors(renderer)).toHaveLength(0);
+    }
+  );
 
   it('shows the auto-selected model and opens the picker when ready', async () => {
     gatewayTranscription.enabled = true;
@@ -293,47 +298,26 @@ describe('VoiceInputSettingsScreen', () => {
     expectGatewaySwitchState(renderer, { disabled: true });
   });
 
-  it('shows the automatic language and opens the picker when no choice is stored', async () => {
-    voiceLanguage.chosen = null;
+  // Android's speech service stores the choice as `cmn-Hans-CN`; the row must
+  // read like the picker rows (p16, p4) instead of quoting the tag.
+  it.each([
+    [null, true, { icon: 'Globe', subtitle: 'Automatic', disabled: false }],
+    ['de-DE', true, { subtitle: 'Deutsch', disabled: false }],
+    ['cmn-Hans-CN', true, { subtitle: '简体中文', disabled: false }],
+    ['de-DE', false, { subtitle: 'Loading…', disabled: true }],
+  ] as const)('names the language row as %s', async (chosen, loaded, expected) => {
+    voiceLanguage.chosen = chosen;
+    voiceLanguage.loaded = loaded;
     const renderer = await mountVoiceInputSettingsScreen();
 
     const row = findConfigureRow(renderer, 'Language');
-    expect(row.props).toMatchObject({
-      icon: 'Globe',
-      subtitle: 'Automatic',
-      disabled: false,
-    });
-
-    act(() => {
-      (row.props.onPress as () => void)();
-    });
-    expect(push).toHaveBeenCalledWith('/(app)/voice-language-picker');
-  });
-
-  it.each([
-    ['de-DE', 'Deutsch'],
-    // Android's speech service stores the choice as `cmn-Hans-CN`; the row
-    // must read like the picker rows (p16, p4) instead of quoting the tag.
-    ['cmn-Hans-CN', '简体中文'],
-  ])('names the stored voice language %s by its endonym', async (chosen, endonym) => {
-    voiceLanguage.chosen = chosen;
-    const renderer = await mountVoiceInputSettingsScreen();
-
-    expect(findConfigureRow(renderer, 'Language').props).toMatchObject({
-      subtitle: endonym,
-      disabled: false,
-    });
-  });
-
-  it('shows the loading caption and disables the language row until the choice has loaded', async () => {
-    voiceLanguage.loaded = false;
-    voiceLanguage.chosen = 'de-DE';
-    const renderer = await mountVoiceInputSettingsScreen();
-
-    expect(findConfigureRow(renderer, 'Language').props).toMatchObject({
-      subtitle: 'Loading…',
-      disabled: true,
-    });
+    expect(row.props).toMatchObject(expected);
+    if (chosen === null) {
+      act(() => {
+        (row.props.onPress as () => void)();
+      });
+      expect(push).toHaveBeenCalledWith('/(app)/voice-language-picker');
+    }
   });
 
   it('renders the voice testing field below the model states', async () => {
@@ -363,5 +347,12 @@ describe('VoiceInputSettingsScreen', () => {
     // Clear control dismissing the keyboard, so the text survives the tap
     // (e3, 2026-09-12). 'handled' hands the tap to the control itself.
     expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  });
+
+  it('renders a search target for every indexed Voice input row', async () => {
+    expectRenderedSettingsTargets(
+      await mountVoiceInputSettingsScreen(),
+      '/(app)/(tabs)/(3_profile)/voice-input'
+    );
   });
 });

@@ -6,8 +6,8 @@ export {
 } from '@kilocode/worker-utils/cloud-agent-attachments';
 import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
-  RuntimeSkillsSchema,
-  RuntimeAgentsSchema,
+  PersistedRuntimeSkillsSchema,
+  PersistedRuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
   RuntimeModelContextLimitsSchema,
   RuntimeKiloCommandsSchema,
@@ -16,6 +16,7 @@ import {
 export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
 import { webSearchProviderSchema } from '../shared/web-search-provider.js';
+import { networkSecretsSchema } from '@kilocode/worker-utils/network-secrets';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { AgentVariantSchema, Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
@@ -195,8 +196,15 @@ const SharedSessionProfileFields = {
   encryptedSecrets: EncryptedSecretsSchema.optional(),
   setupCommands: setupCommandsSchema.optional(),
   mcpServers: mcpServersRecordSchema(MCPServerConfigSchema).optional(),
-  runtimeSkills: RuntimeSkillsSchema.optional(),
-  runtimeAgents: RuntimeAgentsSchema.optional(),
+  /**
+   * Stored bundles are read with the path rule's tolerance for skills and for
+   * agent slugs the CLI owns: a companion file written under an earlier rule,
+   * and an agent entry with a reserved id, are dropped instead of failing the
+   * whole payload. A caller's own skills and agents are validated with
+   * `RuntimeSkillsSchema` and `RuntimeAgentsSchema`.
+   */
+  runtimeSkills: PersistedRuntimeSkillsSchema,
+  runtimeAgents: PersistedRuntimeAgentsSchema,
   builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
   modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
   webSearchDisabled: z.literal(true).optional(),
@@ -205,6 +213,7 @@ const SharedSessionProfileFields = {
 
 export const SessionProfileBundleSchema = z.object({
   ...SharedSessionProfileFields,
+  networkSecrets: networkSecretsSchema.optional(),
   /**
    * The environment's start commands. They run after setup in every prepared
    * workspace, including one whose environment snapshot already ran setup.

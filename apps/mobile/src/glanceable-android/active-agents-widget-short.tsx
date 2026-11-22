@@ -7,10 +7,12 @@ import { lock, logo } from './active-agents-widget-glyphs';
 import {
   bar,
   baselineAbove,
-  centredBaseline,
+  centredLineBaseline,
+  centredRowBaseline,
   estimateWidth,
   type Frame,
   type Ink,
+  insideBand,
   label,
   lineBox,
   PAD,
@@ -66,7 +68,8 @@ function narrowFirst(f: Frame): Block {
       draw: dy => [
         label(f, 'status', {
           x: PAD,
-          baseline: centredBaseline(14, cy) + dy,
+          // The empty wording's own box centred on the band, not Roboto's line.
+          baseline: centredLineBaseline(copy.emptyShort, 14, cy) + dy,
           width: W - 2 * PAD,
           value: copy.emptyShort,
           size: 14,
@@ -80,7 +83,8 @@ function narrowFirst(f: Frame): Block {
     draw: dy => [
       statusRow(f, {
         x: PAD,
-        baseline: centredBaseline(22, cy) + dy,
+        // The count's own box centred on the band: its digits may draw taller.
+        baseline: centredLineBaseline(copy.primaryCount, 22, cy) + dy,
         width: W - 2 * PAD,
         countSize: 22,
         labelSize: 13,
@@ -188,7 +192,12 @@ function landscapeLead(f: Frame, cy: number): Lead {
       draw: (x, width) => [
         label(f, 'status', {
           x,
-          baseline: centredBaseline(14, cy),
+          baseline: insideBand({
+            value,
+            size: 14,
+            baseline: centredLineBaseline(value, 14, cy),
+            top: PAD,
+          }),
           width,
           value,
           size: 14,
@@ -208,7 +217,8 @@ function landscapeLead(f: Frame, cy: number): Lead {
     draw: (x, width) => [
       statusRow(f, {
         x,
-        baseline: centredBaseline(20, cy),
+        // The count's own box centred on the row: its digits may draw taller.
+        baseline: centredLineBaseline(copy.primaryCount, 20, cy),
         width,
         countSize: 20,
         labelSize: 14,
@@ -245,14 +255,22 @@ function landscapeTail(f: Frame) {
 
 function landscapeLocked(f: Frame, x: number, cy: number) {
   const size = 16;
+  const value = f.copy.status ?? '';
   return [
     // The body (86% of the box) starts the lead, like the status does in the other states.
     ...lock(f, { cx: x + size * 0.43, cy, size }),
     label(f, 'status', {
       x: x + size + LANDSCAPE_LOGO_GAP,
-      baseline: centredBaseline(14, cy),
+      // The locked wording's own box centred on the row; `insideBand` still holds
+      // it clear of the band above it.
+      baseline: insideBand({
+        value,
+        size: 14,
+        baseline: centredLineBaseline(value, 14, cy),
+        top: PAD,
+      }),
       width: f.width - PAD - (x + size + LANDSCAPE_LOGO_GAP),
-      value: f.copy.status ?? '',
+      value,
       size: 14,
       weight: '600',
     }),
@@ -281,12 +299,17 @@ export function landscape(f: Frame): ReactNode[] {
       ? [
           textRow(f, 'line', {
             x: tailX,
-            baseline: centredBaseline(12, cy),
+            baseline: centredRowBaseline(
+              parts.map(part => part.value),
+              12,
+              cy
+            ),
             width: end - tailX,
             size: 12,
             gap: 6,
             fill: false,
             parts,
+            top: PAD,
           }),
         ]
       : [];

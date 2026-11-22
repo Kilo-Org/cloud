@@ -280,8 +280,8 @@ vi.mock('expo-router', () => ({
 // the navigation call so these assertions stay about the resulting route list.
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({
-    replace: (href: string) => {
-      navigationRoutes.splice(-1, 1, href);
+    replace: (href: string | { pathname: string }) => {
+      navigationRoutes.splice(-1, 1, typeof href === 'string' ? href : href.pathname);
     },
   }),
 }));
@@ -1411,9 +1411,7 @@ describe('SessionDetailContent display scope', () => {
     expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
     const rename = header.findByProps({
       accessibilityLabel: `Root ${ROOT_ID}`,
-      accessibilityHint: i18n.t('agentChat.session.renameAccessibility', {
-        title: `Root ${ROOT_ID}`,
-      }),
+      accessibilityHint: i18n.t('agentChat.session.renameSession'),
     });
     expect(rename.props.accessibilityLabel).toBe(`Root ${ROOT_ID}`);
     act(rename.props.onPress as () => void);

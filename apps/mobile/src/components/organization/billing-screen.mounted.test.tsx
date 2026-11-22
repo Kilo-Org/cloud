@@ -9,14 +9,56 @@ import {
   reads,
   resetBillingQueries,
   seatsReadout,
+  stateReadout,
   subscriptionReadout,
   SUBSCRIPTIONS_URL,
   texts,
 } from './billing-screen.test-helpers';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 beforeEach(() => {
   resetBillingQueries();
+});
+
+describe('OrganizationBillingScreen state row', () => {
+  /** The subscription read of an organization that has bought no seats. */
+  function seatlessReadout() {
+    return {
+      subscription: null,
+      seatsUsed: 3,
+      totalSeats: 3,
+      nextSeatCount: null,
+      nextSeatCountEffectiveAt: null,
+      paidSeatItemId: null,
+      latestSeatPurchaseStatus: null,
+    };
+  }
+
+  it('states the running trial when Stripe has no seat subscription', async () => {
+    // An organization inside its Enterprise trial has bought no seats, so the
+    // subscription read answers null and the row used to claim there was none.
+    boundary.trialStatus = 'trial_active';
+    boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
+    queries.subscription.data = seatlessReadout();
+
+    const { renderer, unmount } = await mount();
+
+    expect(String(stateReadout(renderer)).startsWith('Trial ends on ')).toBe(true);
+    const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'State');
+    expect(row?.props.valueTone).toBe('default');
+    unmount();
+  });
+
+  it('keeps "No subscription" for an organization with no trial and no subscription', async () => {
+    queries.subscription.data = seatlessReadout();
+
+    const { renderer, unmount } = await mount();
+
+    expect(stateReadout(renderer)).toBe('No subscription');
+    unmount();
+  });
 });
 
 describe('OrganizationBillingScreen seats row', () => {
@@ -140,7 +182,7 @@ describe('OrganizationBillingScreen change plan placement', () => {
     // own neutral tone instead of a second danger colour.
     const plan = renderer.root
       .findAllByType('KvRow' as never)
-      .find(node => node.props.label === 'Organization plan');
+      .find(node => node.props.label === 'Plan');
     expect(plan).toBeDefined();
     expect(plan?.props.valueTone).toBeUndefined();
     unmount();
@@ -156,7 +198,7 @@ describe('OrganizationBillingScreen change plan placement', () => {
 
     expect(bannerAction(renderer)).toBeUndefined();
     expect(renderer.root.findAllByType('ExternalBillingLink' as never)).toHaveLength(0);
-    expect(texts(renderer)).toContain('The plan, seats and auto top-up are managed on the web.');
+    expect(texts(renderer)).toContain(i18n.t('organization.billing.managedOnWeb'));
     unmount();
   });
 

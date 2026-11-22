@@ -75,5 +75,8 @@
     "PAGES_KILO_AUDIENCE": "pages-dev",
     "NOTEBOOK_CLOUD_OIDC_FLOW": "server",
     "PAGES_OAUTH_METADATA_EGRESS": "public-https",
+    // The link-preview card, a PNG in PAGES_ASSETS. The 12 hex digits in its
+    // key version /social-card.png, so a new card needs a new key.
+    "PAGES_SOCIAL_CARD": "brand/social-card-bd333d89160d.png",
   },
 }

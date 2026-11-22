@@ -75,13 +75,37 @@ const PRESETS: Record<Platform, Record<MatrixName, readonly CellId[]>> = {
 };
 
 /**
- * Cells a run may add to its matrix with `--cell`, opt-in only: no preset holds
- * `font-max`, so the default matrices keep font scale at 1. iOS has no
- * simulator command for rotation or window size.
+ * The widest window `--cell compact` accepts on iOS. An iPhone simulator's
+ * display has one mode, so `simctl io screenConfig geometry` cannot shrink it
+ * the way Android's `wm size` can; the compact cell is instead a *device*
+ * choice, run on an SE/mini simulator, and the cell asserts the device really
+ * is one. 380 dp clears the 375 pt SE and mini widths and refuses a 402 pt
+ * iPhone 17 Pro.
+ */
+export const IOS_COMPACT_MAX_WIDTH_DP = 380;
+
+/**
+ * The narrowest window a compact iOS cell accepts. No iPhone simulator is
+ * narrower than a 320 pt first-generation SE, so a window below that is a bad
+ * `Pixel Size`/`Preferred UI Scale` read rather than a small phone.
+ */
+export const IOS_COMPACT_MIN_WIDTH_DP = 320;
+
+/**
+ * Cells a run may add to its matrix with `--cell`, opt-in only: no iOS preset
+ * holds `font-max`, `compact` or `landscape`, so an iOS run keeps font scale at
+ * 1 and the portrait window of one device unless it asks. (The Android presets
+ * do include `compact`, and `full` also `landscape` and `rtl-compact`.)
+ *
+ * iOS runs both cells, with a device-side difference from Android: landscape
+ * rotates the simulator itself (`devicectl device orientation`, the BackBoard
+ * path the Device ▸ Rotate Left menu drives) and fails when the display did not
+ * flip, and compact is a smaller *device type* rather than a window size,
+ * because an iPhone simulator's display has a single mode.
  */
 export const OPTIONAL_CELLS: Record<Platform, readonly CellId[]> = {
   android: ['base', 'dark', 'compact', 'rtl', 'landscape', 'rtl-compact', 'font-max'],
-  ios: ['base', 'dark', 'rtl', 'font-max'],
+  ios: ['base', 'dark', 'compact', 'rtl', 'landscape', 'font-max'],
 };
 
 /** Throws for a `--cell` the platform cannot run, before any device work. */
@@ -114,11 +138,24 @@ export function mirrorReference(config: CellConfig): CellId {
   return config.compact ? 'compact' : 'base';
 }
 
+/**
+ * The window width a cell expects, in dp.
+ *
+ * Android's compact cell overrides the window to exactly 360 dp. iOS cannot:
+ * an iPhone simulator's display has one mode, so compact is a smaller *device*
+ * (see `IOS_COMPACT_MAX_WIDTH_DP`) and the expectation is the cap, not a
+ * number — the window must fit inside a compact phone. Landscape expects the
+ * base window's height as its width on both platforms, because a rotation
+ * swaps the two.
+ */
 export function expectedWidth(
   config: CellConfig,
-  baseWindow: ProbeEnv['window'] | undefined
+  baseWindow: ProbeEnv['window'] | undefined,
+  platform: Platform = 'android'
 ): number | undefined {
-  if (config.compact) return COMPACT_WIDTH_DP;
+  if (config.compact) {
+    return platform === 'android' ? COMPACT_WIDTH_DP : IOS_COMPACT_MAX_WIDTH_DP;
+  }
   if (baseWindow === undefined) return undefined;
   return config.landscape ? baseWindow.height : baseWindow.width;
 }
@@ -127,7 +164,8 @@ export function envMismatches(
   config: CellConfig,
   env: ProbeEnv,
   baseWindow: ProbeEnv['window'] | undefined,
-  language?: string
+  language?: string,
+  platform: Platform = 'android'
 ): string[] {
   const mismatches: string[] = [];
   const scheme = config.dark ? 'dark' : 'light';
@@ -140,9 +178,24 @@ export function envMismatches(
   if (language !== undefined && env.language !== language) {
     mismatches.push(`language ${env.language}, expected ${language}`);
   }
-  const width = expectedWidth(config, baseWindow);
-  if (width !== undefined && Math.abs(env.window.width - width) > WIDTH_TOLERANCE_DP) {
-    mismatches.push(`window width ${env.window.width} dp, expected ${width} dp`);
+  const width = expectedWidth(config, baseWindow, platform);
+  if (width !== undefined) {
+    // iOS compact has no exact target: any phone between the floor and the cap
+    // is a compact phone, and a bigger one is refused here even though the
+    // device adapter already refused it before measuring. A window below the
+    // floor is not a small phone — it is a bad display read — so it is refused
+    // rather than confirmed.
+    if (platform === 'ios' && config.compact) {
+      if (env.window.width > width) {
+        mismatches.push(`window width ${env.window.width} dp, expected at most ${width} dp`);
+      } else if (env.window.width < IOS_COMPACT_MIN_WIDTH_DP) {
+        mismatches.push(
+          `window width ${env.window.width} dp, expected at least ${IOS_COMPACT_MIN_WIDTH_DP} dp`
+        );
+      }
+    } else if (Math.abs(env.window.width - width) > WIDTH_TOLERANCE_DP) {
+      mismatches.push(`window width ${env.window.width} dp, expected ${width} dp`);
+    }
   }
   return mismatches;
 }

@@ -406,11 +406,11 @@ describe('SessionMessageList landscape side insets', () => {
     });
   });
 
-  // An Android sheet is its own capped, centred window, so its edges never
-  // reach the cutout: the sheet's header drops the side insets, and the
-  // transcript inside the same sheet must drop them too.
-  it('drops the side insets inside an Android sheet, as the sheet header does', () => {
-    platform.OS = 'android';
+  // A sheet is its own capped, centred window on Android and an inset surface
+  // on iOS, so its edges never reach the cutout: the sheet's header drops the
+  // side insets, and the transcript inside the same sheet must drop them too.
+  it.each(['android', 'ios'])('drops the side insets inside a sheet surface (%s)', os => {
+    platform.OS = os;
     insets.left = 47;
     insets.right = 59;
     act(() => {

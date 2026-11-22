@@ -30,6 +30,15 @@ describe('variableRows', () => {
       },
     ]);
   });
+
+  it('leaves out network secrets', () => {
+    const rows = variableRows([
+      { key: 'NPM_TOKEN', value: '***', isSecret: true, delivery: 'network' },
+      { key: 'API_KEY', value: '***', isSecret: true, delivery: 'env' },
+    ]);
+
+    expect(rows.map(row => row.key)).toEqual(['API_KEY']);
+  });
 });
 
 describe('savedVariableKey', () => {

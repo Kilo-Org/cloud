@@ -1,4 +1,4 @@
-import { sameRepositoryIdentity } from '@kilocode/cloud-agent-profile';
+import { repositoryLeaf, sameRepositoryIdentity } from '@kilocode/cloud-agent-profile';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { launchRepositoryIdentity, memberCloneUrl } from '../../session/environment-launch.js';
 import type {
@@ -22,28 +22,57 @@ export function rootBranchMode(
 }
 
 /**
- * Where a session's repositories are checked out: the route directory (the Kilo
- * cwd) and, for a V2 environment, the git roots the wrapper clones. A V1 session
- * has no roots on the wire, so its route is what it was before V2.
+ * The shared checkout layout for route preparation and worktree capture.
  */
+export function sessionWorkspaceLayout(
+  metadata: SessionMetadata,
+  sessionDirectory = getControlPlaneSessionDirectory({
+    workspacePath: metadata.workspace?.workspacePath,
+    sandboxId: metadata.workspace?.sandboxId,
+    sandboxKind: metadata.workspace?.sandboxKind,
+    orgId: metadata.identity.orgId,
+    userId: metadata.identity.userId,
+    sessionId: metadata.identity.sessionId,
+  })
+) {
+  const hosted = metadata.hostedGitHubRepositories;
+  if (hosted) {
+    const generatedBranch = metadata.workspace?.generatedBranchName;
+    if (generatedBranch === undefined)
+      throw new Error('Hosted workspace is missing its generated branch');
+    return environmentWorkspace({
+      sessionDirectory,
+      environment: {
+        repositories: [hosted.primary, ...hosted.additional].map(({ id, fullName }) => ({
+          id,
+          identity: { platform: 'github' as const, repoFullName: fullName },
+          repoFullName: fullName,
+          leaf: repositoryLeaf(fullName),
+          branch:
+            id === hosted.primary.id
+              ? (metadata.workspace?.branchName ??
+                metadata.repository?.upstreamBranch ??
+                generatedBranch)
+              : generatedBranch,
+        })),
+      },
+      isLaunch: member => member.id === hosted.primary.id,
+    });
+  }
+  const launch =
+    metadata.repository === undefined ? undefined : launchRepositoryIdentity(metadata.repository);
+  return environmentWorkspace({
+    sessionDirectory,
+    environment: metadata.environment,
+    isLaunch: member => launch !== undefined && sameRepositoryIdentity(member.identity, launch),
+  });
+}
+
 export function sessionWorkspace(
   metadata: SessionMetadata,
   launchGit: ControlPlaneRouteGit | undefined
 ): { directory: string; roots?: ControlPlaneWorkspaceRoot[] } {
-  const launch =
-    metadata.repository === undefined ? undefined : launchRepositoryIdentity(metadata.repository);
-  const workspace = environmentWorkspace({
-    sessionDirectory: getControlPlaneSessionDirectory({
-      workspacePath: metadata.workspace?.workspacePath,
-      sandboxId: metadata.workspace?.sandboxId,
-      sandboxKind: metadata.workspace?.sandboxKind,
-      orgId: metadata.identity.orgId,
-      userId: metadata.identity.userId,
-      sessionId: metadata.identity.sessionId,
-    }),
-    environment: metadata.environment,
-    isLaunch: member => launch !== undefined && sameRepositoryIdentity(member.identity, launch),
-  });
+  const workspace = sessionWorkspaceLayout(metadata);
   const generatedBranch = metadata.workspace?.generatedBranchName;
   const baseBranch = metadata.repository?.baseBranch;
   const baseSha = metadata.repository?.baseSha;
@@ -51,7 +80,10 @@ export function sessionWorkspace(
     const { repository } = root;
     if (repository === null) return [];
     const url = root.launch && launchGit ? launchGit.url : memberCloneUrl(repository);
-    const mode = rootBranchMode(repository.branch, generatedBranch);
+    const mode =
+      root.launch && metadata.hostedGitHubRepositories && metadata.repository?.upstreamBranch
+        ? undefined
+        : rootBranchMode(repository.branch, generatedBranch);
     return [
       {
         directory: root.directory,

@@ -1,18 +1,21 @@
 /* eslint-disable import/max-dependencies, import/no-nodejs-modules, max-lines, promise/avoid-new, vitest/no-conditional-in-test -- the spec reads a real downloads directory and drives a real hub session */
 import { expect, test } from '@playwright/test';
-import type { Download } from '@playwright/test';
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import type { Page } from '@playwright/test';
 import { z } from 'zod';
 import { hashBrowserToolArguments } from '../../src/shared/browser-agent-checks';
+import { LOCAL_AGENT_ERROR_CODES } from '../../src/shared/local-agents/jsonrpc';
 import {
   DOWNLOAD_BODY,
   DOWNLOAD_FILENAME,
   DOWNLOAD_PATH,
+  ONCE_DOWNLOAD_PATH,
+  SECOND_DOWNLOAD_FILENAME,
   startDownloadFixture,
+  TWO_DOWNLOADS_PAGE_PATH,
+  USER_DOWNLOAD_FILENAME,
+  USER_DOWNLOAD_PATH,
+  USER_PAGE_PATH,
 } from './download-fixture';
-import { launchExtensionContext } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 import { startFakeHub } from './local-agents-hub-fixture';
 import {
@@ -23,17 +26,32 @@ import {
   sendAgentRpc,
 } from './local-agents-fixture';
 import type { LocalAgentSession, LocalAgentToolResponse } from './local-agents-fixture';
+import {
+  downloadFiles,
+  launchRealDownloadBrowser,
+  readDownloadedFile,
+  tempDownloadFiles,
+} from './real-download-launch';
 
 /*
  * SPEC "Permission flow" step 6 and the wire contract §3: an agent `act` call
- * that starts a download cancels it and answers `needs_permission` with
- * `afterAction: true`; the identical call re-sent with that step token runs
- * once with the guard off. The downloads directory is a real directory, so
- * "the file did not land" is a directory read rather than an event count.
+ * that starts a download refuses it and answers `needs_permission` with
+ * `afterAction: true`; the identical call re-sent with that step token runs once
+ * with the guard off. The downloads directory is a real directory Chrome writes
+ * into, so "the file did not land" is a directory read rather than an event
+ * count.
  *
- * `downloads` is an optional permission and this run does not have it, which is
- * the state every existing user starts in: the guard is the response-stage
- * interception, and the page's file never becomes a download.
+ * Every spec here runs on the real launch: Chrome started as a child process,
+ * downloading into a folder its profile names, with Playwright attached over
+ * CDP. Playwright's own `launchPersistentContext` installs the DevTools download
+ * delegate, which writes under a GUID and never dispatches
+ * `chrome.downloads.onDeterminingFilename` — the event the guard is built on.
+ * The probe in download-launch-probe.test.ts pins that difference.
+ *
+ * A download in flight writes a dot-prefixed temp file in the folder
+ * (`.org.chromium.Chromium.XXXXXX`). A folder read during a call ignores it —
+ * it is not a finished file — but a refusal leaves none behind, so the refusal
+ * specs assert the temp files are gone too.
  */
 
 const grant = (origin: string) => [
@@ -42,12 +60,17 @@ const grant = (origin: string) => [
   { class: 'read', origin },
 ];
 
-/** How many tabs the browser holds, from a `browser_tabs list` answer: the same count is how "no second tab" shows. */
-const listedTabCount = (answer: LocalAgentToolResponse): number => {
-  const parsed: unknown = JSON.parse(answer.kind === 'result' ? answer.text : '{"tabs":[]}');
-
-  return z.object({ tabs: z.array(z.record(z.string(), z.unknown())) }).parse(parsed).tabs.length;
-};
+/**
+ * Every open tab's id, read from the extension page. `browser_tabs list` is not
+ * the surface for "no second tab": it lists only the session's inspectable
+ * tabs, and the tab a guarded `new` opens stays blank because its navigation
+ * was refused, so a correct list is empty there. A failed answer throws instead
+ * of counting as zero, which would make a `0 === 0` comparison prove nothing.
+ */
+const openTabIds = (sidePanel: Page): Promise<number[]> =>
+  sidePanel.evaluate(
+    "chrome.tabs.query({}).then(tabs => tabs.map(tab => tab.id)).then(ids => { if (ids.length === 0) { throw new Error('the browser reported no tabs'); } return ids; })"
+  );
 
 const permissionItemSchema = z.object({
   class: z.string(),
@@ -55,12 +78,11 @@ const permissionItemSchema = z.object({
   reason: z.string().optional(),
 });
 
-const refPattern = /link "Download report" \[ref=(e\d+)\]/u;
-
-/** The download link's ref from a fresh snapshot of the fixture page. */
-const downloadRef = async (
+/** The control's ref from a fresh snapshot of the fixture page: its accessible name is how the model names it. */
+const controlRef = async (
   session: LocalAgentSession,
-  grants: readonly Record<string, unknown>[]
+  grants: readonly Record<string, unknown>[],
+  pattern: RegExp
 ) => {
   const snapshot = await session.callTool('browser_snapshot', {}, grants);
 
@@ -68,25 +90,38 @@ const downloadRef = async (
     throw new Error(`browser_snapshot failed: ${JSON.stringify(snapshot)}`);
   }
 
-  const ref = refPattern.exec(snapshot.text)?.[1];
+  const ref = pattern.exec(snapshot.text)?.[1];
 
   if (ref === undefined) {
-    throw new Error(`no download link in snapshot:\n${snapshot.text}`);
+    throw new Error(`no matching control in snapshot:\n${snapshot.text}`);
   }
 
   return ref;
 };
 
+const downloadRef = (session: LocalAgentSession, grants: readonly Record<string, unknown>[]) =>
+  controlRef(session, grants, /link "Download report" \[ref=(e\d+)\]/u);
+
+/** The approved file is the only finished file, and no download is still writing one. */
+const expectOnlyFinishedFile = async (downloadsPath: string, filename: string): Promise<void> => {
+  await expect
+    .poll(() => downloadFiles(downloadsPath), { timeout: 20_000 })
+    .toStrictEqual([filename]);
+  await expect.poll(() => tempDownloadFiles(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+};
+
+/** A refusal leaves the folder as it was: no finished file, and no temp file still growing. */
+const expectNothingSaved = async (downloadsPath: string): Promise<void> => {
+  await expect.poll(() => downloadFiles(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+  await expect.poll(() => tempDownloadFiles(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+};
+
 test('a guarded click cancels the download, and the approved retry keeps it', async () => {
   test.setTimeout(120_000);
-  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
-  const { context, extensionId, userDataDir } = await launchExtensionContext({
-    downloadsPath,
-    // The state after the switch's permission prompt is accepted; automation cannot answer it.
-    grantPermissions: ['downloads'],
-  });
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
   await mockKiloApi(context, {});
   await context.addInitScript({
     content:
@@ -96,9 +131,6 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
   try {
     const sidePanel = await context.newPage();
     const agentPage = await context.newPage();
-    const downloads: Download[] = [];
-
-    agentPage.on('download', download => downloads.push(download));
 
     await agentPage.goto(`${fixture.url}/page`);
 
@@ -124,7 +156,7 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
 
     const target = await downloadRef(session, grants);
 
-    // 1. Guarded: the click runs once, the download it starts is cancelled, and the call refuses.
+    // 1. Guarded: the click runs once, the download it starts is refused, and the folder stays empty.
     const guarded = await session.callTool(
       'browser_click',
       { element: 'Download report', target },
@@ -139,20 +171,9 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
     expect(fixture.hits()).toBeGreaterThan(0);
 
-    // The browser created the download and the guard cancelled it, so nothing reached the directory.
-    await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toStrictEqual([]);
-    await expect.poll(() => downloads.length, { timeout: 15_000 }).toBe(1);
-    // `cancel` may lose a race with a file this small, in which case the guard deletes the completed file instead.
-    // Either way the item may not leave a file behind, so no particular failure string is required.
-    for (const download of downloads) {
-      // eslint-disable-next-line no-await-in-loop -- one item, and the read depends on where it landed
-      const saved = await download.path().catch(() => null);
-
-      if (saved !== null) {
-        // eslint-disable-next-line no-await-in-loop -- see above
-        await expect(readFile(saved, 'utf8')).rejects.toThrow();
-      }
-    }
+    // The browser created the item and the guard stopped it before it settled, so nothing is in the folder, and
+    // Nothing is still writing one. The request reaching the fixture is the proof the click ran the download.
+    await expectNothingSaved(downloadsPath);
 
     // 2. The human approved: the identical call with the token runs with the guard off once.
     const approved = await session.callTool(
@@ -163,24 +184,9 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     );
     expect(approved).toMatchObject({ isError: false, kind: 'result' });
 
-    // Playwright stores an accepted download under its own name inside the directory; the page named it.
-    await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toHaveLength(1);
-
-    const download = downloads.at(-1);
-
-    if (download === undefined) {
-      throw new Error('the approved click produced no download');
-    }
-
-    expect(download.suggestedFilename()).toBe(DOWNLOAD_FILENAME);
-    expect(await download.failure()).toBeNull();
-    const saved = await download.path();
-
-    if (saved === null) {
-      throw new Error('the approved download has no file on disk');
-    }
-
-    expect(await readFile(saved, 'utf8')).toBe(DOWNLOAD_BODY);
+    // The page named the file, so Chrome wrote it under that name in the folder it was given.
+    await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
+    expect(await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME)).toBe(DOWNLOAD_BODY);
 
     // 3. The token was burned: the same call again is guarded, so the guard is not left off.
     const reguarded = await session.callTool(
@@ -191,26 +197,23 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     );
     expect(reguarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
     // The approved file is still the only one, unchanged.
-    await expect.poll(() => readdir(downloadsPath), { timeout: 10_000 }).toHaveLength(1);
-    expect(await readFile(saved, 'utf8')).toBe(DOWNLOAD_BODY);
+    await expect
+      .poll(() => downloadFiles(downloadsPath), { timeout: 10_000 })
+      .toStrictEqual([DOWNLOAD_FILENAME]);
+    expect(await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME)).toBe(DOWNLOAD_BODY);
   } finally {
-    await context.close();
+    await launch.close();
     await hub.close();
     await fixture.close();
-    await rm(downloadsPath, { force: true, recursive: true });
-    await rm(userDataDir, { force: true, recursive: true });
   }
 });
 
 test('a download that lands after the click is reported on the next call, and the approved repeat keeps one file', async () => {
   test.setTimeout(180_000);
-  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
-  const { context, extensionId, userDataDir } = await launchExtensionContext({
-    downloadsPath,
-    grantPermissions: ['downloads'],
-  });
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
   await mockKiloApi(context, {});
   await context.addInitScript({
     content:
@@ -220,9 +223,7 @@ test('a download that lands after the click is reported on the next call, and th
   try {
     const sidePanel = await context.newPage();
     const agentPage = await context.newPage();
-    const downloads: Download[] = [];
 
-    agentPage.on('download', download => downloads.push(download));
     await agentPage.goto(`${fixture.url}/page`);
 
     const grants = grant(fixture.url);
@@ -239,15 +240,7 @@ test('a download that lands after the click is reported on the next call, and th
 
     await session.callTool('browser_navigate', { url: `${fixture.url}/page` }, grants);
 
-    const snapshot = await session.callTool('browser_snapshot', {}, grants);
-    const target =
-      snapshot.kind === 'result'
-        ? /link "Download slow report" \[ref=(e\d+)\]/u.exec(snapshot.text)?.[1]
-        : undefined;
-
-    if (target === undefined) {
-      throw new Error(`no delayed download link in the snapshot:\n${snapshot.kind}`);
-    }
+    const target = await controlRef(session, grants, /link "Download slow report" \[ref=(e\d+)\]/u);
 
     // 1. Call N: the click. The route holds its response, so the download cannot exist until the test releases it,
     // Which is only after this call has answered.
@@ -263,8 +256,7 @@ test('a download that lands after the click is reported on the next call, and th
     await fixture.waitForLate(1);
     fixture.releaseLate();
     // The browser created the download after the call answered, and the guard's late window stopped it.
-    await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(1);
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+    await expectNothingSaved(downloadsPath);
 
     // 2. Call N+1 — any tool at all — answers with the need, and names the step that started the file.
     const reported = await session.callTool('browser_snapshot', {}, grants);
@@ -280,7 +272,7 @@ test('a download that lands after the click is reported on the next call, and th
     const token = reported.kind === 'error' ? (reported.stepToken ?? '') : '';
 
     expect(token).not.toBe('');
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+    await expectNothingSaved(downloadsPath);
 
     // 3. Repeating the click with the token keeps exactly one file, even though it lands after the call.
     const approved = await session.callTool(
@@ -293,7 +285,7 @@ test('a download that lands after the click is reported on the next call, and th
     expect(approved).toMatchObject({ isError: false, kind: 'result' });
     await fixture.waitForLate(2);
     fixture.releaseLate();
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+    await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
 
     // 4. The token is burned: the identical click is guarded again, and the folder keeps its one file. The held route
     // Answers only after the click, so this call cannot stop the file itself — the next call reports it, as in step 1.
@@ -309,8 +301,9 @@ test('a download that lands after the click is reported on the next call, and th
     fixture.releaseLate();
     // Each slow click reaches the browser as a download: the third one is cancelled in the late window, so its file
     // Never lands, and the folder keeps the approved file alone.
-    await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(3);
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+    await expect
+      .poll(() => downloadFiles(downloadsPath), { timeout: 20_000 })
+      .toStrictEqual([DOWNLOAD_FILENAME]);
     expect(fixture.lateHits()).toBeGreaterThanOrEqual(3);
 
     // The third file is reported, so the model is asked again with a fresh token: the burned one bought it nothing.
@@ -326,25 +319,22 @@ test('a download that lands after the click is reported on the next call, and th
     );
     expect(reToken).not.toBe('');
     expect(reToken).not.toBe(token);
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+    await expect
+      .poll(() => downloadFiles(downloadsPath), { timeout: 20_000 })
+      .toStrictEqual([DOWNLOAD_FILENAME]);
   } finally {
-    await context.close();
+    await launch.close();
     await hub.close();
     await fixture.close();
-    await rm(downloadsPath, { force: true, recursive: true });
-    await rm(userDataDir, { force: true, recursive: true });
   }
 });
 
 test('a navigate to an attachment asks first, then keeps the file once approved', async () => {
   test.setTimeout(120_000);
-  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
-  const { context, extensionId, userDataDir } = await launchExtensionContext({
-    downloadsPath,
-    grantPermissions: ['downloads'],
-  });
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
   await mockKiloApi(context, {});
   await context.addInitScript({
     content:
@@ -354,9 +344,7 @@ test('a navigate to an attachment asks first, then keeps the file once approved'
   try {
     const sidePanel = await context.newPage();
     const agentPage = await context.newPage();
-    const downloads: Download[] = [];
 
-    agentPage.on('download', download => downloads.push(download));
     await agentPage.goto(`${fixture.url}/page`);
 
     const origin = fixture.url;
@@ -384,8 +372,9 @@ test('a navigate to an attachment asks first, then keeps the file once approved'
       .array(permissionItemSchema)
       .parse(guarded.kind === 'error' ? guarded.items : []);
     expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
-    await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toStrictEqual([]);
-    await expect.poll(() => downloads.length, { timeout: 15_000 }).toBe(1);
+    // The navigation reached the fixture: the file was requested, and the guard stopped the item it would write.
+    expect(fixture.hits()).toBeGreaterThan(0);
+    await expectNothingSaved(downloadsPath);
 
     const approved = await session.callTool(
       'browser_navigate',
@@ -399,30 +388,15 @@ test('a navigate to an attachment asks first, then keeps the file once approved'
     expect(approved.kind === 'result' ? approved.text : '').toContain(
       'The file was downloaded; the page did not change.'
     );
-    await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toHaveLength(1);
-    const download = downloads.at(-1);
-
-    if (download === undefined) {
-      throw new Error('the approved navigate produced no download');
-    }
-
-    expect(download.suggestedFilename()).toBe(DOWNLOAD_FILENAME);
-    const saved = await download.path();
-
-    if (saved === null) {
-      throw new Error('the approved download has no file on disk');
-    }
-
-    expect(await readFile(saved, 'utf8')).toBe(DOWNLOAD_BODY);
-    // The success text names the file the browser wrote, which Playwright stores under its own name here.
-    expect(approved.kind === 'result' ? approved.text : '').toContain(basename(saved));
+    await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
+    expect(await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME)).toBe(DOWNLOAD_BODY);
+    // The success text names the file the browser wrote, which is the page's own name on this launch.
+    expect(approved.kind === 'result' ? approved.text : '').toContain(DOWNLOAD_FILENAME);
     expect(approved.kind === 'result' ? approved.isError : true).toBe(false);
   } finally {
-    await context.close();
+    await launch.close();
     await hub.close();
     await fixture.close();
-    await rm(downloadsPath, { force: true, recursive: true });
-    await rm(userDataDir, { force: true, recursive: true });
   }
 });
 
@@ -518,10 +492,10 @@ const openEmptyAgentSession = async ({
 
 test('a session\u2019s first navigate to an attachment asks first and keeps one file after approval', async () => {
   test.setTimeout(120_000);
-  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
-  const { context, extensionId, userDataDir } = await launchExtensionContext({ downloadsPath });
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
   await mockKiloApi(context, {});
   await context.addInitScript({
     content:
@@ -530,9 +504,6 @@ test('a session\u2019s first navigate to an attachment asks first and keeps one 
 
   try {
     const sidePanel = await context.newPage();
-    const downloads: Download[] = [];
-
-    context.on('page', page => page.on('download', download => downloads.push(download)));
 
     const grants = grant(fixture.url);
     // No tab is shared: the session's first call opens one, and an attachment never loads a document.
@@ -553,7 +524,7 @@ test('a session\u2019s first navigate to an attachment asks first and keeps one 
     const guarded = await navigate();
 
     expect(guarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+    await expectNothingSaved(downloadsPath);
 
     const approved = await navigate([guarded.kind === 'error' ? (guarded.stepToken ?? '') : '']);
 
@@ -561,31 +532,28 @@ test('a session\u2019s first navigate to an attachment asks first and keeps one 
     expect(approved.kind === 'result' ? approved.text : '').toContain(
       'The file was downloaded; the page did not change.'
     );
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+    await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
 
     // The token is burned: the same call again is guarded, and no second file appears.
     const again = await navigate([guarded.kind === 'error' ? (guarded.stepToken ?? '') : '']);
 
     expect(again).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+    await expect
+      .poll(() => downloadFiles(downloadsPath), { timeout: 20_000 })
+      .toStrictEqual([DOWNLOAD_FILENAME]);
   } finally {
-    await context.close();
+    await launch.close();
     await hub.close();
     await fixture.close();
-    await rm(downloadsPath, { force: true, recursive: true });
-    await rm(userDataDir, { force: true, recursive: true });
   }
 });
 
 test('a first browser_tabs new to an attachment asks first, and its approved repeat keeps one file in its tab', async () => {
   test.setTimeout(120_000);
-  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
-  const { context, extensionId, userDataDir } = await launchExtensionContext({
-    downloadsPath,
-    grantPermissions: ['downloads'],
-  });
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
   await mockKiloApi(context, {});
   await context.addInitScript({
     content:
@@ -595,10 +563,7 @@ test('a first browser_tabs new to an attachment asks first, and its approved rep
   try {
     const sidePanel = await context.newPage();
     const agentPage = await context.newPage();
-    const downloads: Download[] = [];
 
-    // The file lands in the tab the call opens, so every page the browser creates reports its own downloads.
-    context.on('page', page => page.on('download', download => downloads.push(download)));
     await agentPage.goto(`${fixture.url}/page`);
 
     const grants = grant(fixture.url);
@@ -632,12 +597,10 @@ test('a first browser_tabs new to an attachment asks first, and its approved rep
       throw new Error('the refusal carried no step token');
     }
 
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+    await expectNothingSaved(downloadsPath);
 
     // The refused call already opened its tab; the repeat must not open another.
-    const tabsAfterGuard = listedTabCount(
-      await session.callTool('browser_tabs', { action: 'list' }, { authorized: grants })
-    );
+    const tabsAfterGuard = await openTabIds(sidePanel);
 
     // The CLI repeats the `browser_tabs` call with the token: the runtime drives the tab that step opened.
     const approved = await session.callTool('browser_tabs', params, {
@@ -645,51 +608,124 @@ test('a first browser_tabs new to an attachment asks first, and its approved rep
       sensitive: [token],
     });
 
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+    await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
 
-    // The browser stores an accepted download under its own name here; the report names that file.
-    const kept = downloads.at(-1);
-
-    if (kept === undefined) {
-      throw new Error('the approved repeat produced no download');
-    }
-
-    const keptPath = await kept.path();
     const text = approved.kind === 'result' ? approved.text : '';
 
     expect({
       isError: approved.kind === 'result' ? approved.isError : true,
       keptReport: text.includes('The file was downloaded; the page did not change.'),
-      named: text.includes(basename(keptPath ?? '')),
-      suggested: kept.suggestedFilename(),
-      tabs: listedTabCount(
-        await session.callTool('browser_tabs', { action: 'list' }, { authorized: grants })
-      ),
-    }).toStrictEqual({
-      isError: false,
-      keptReport: true,
-      named: true,
-      suggested: DOWNLOAD_FILENAME,
-      tabs: tabsAfterGuard,
-    });
+      named: text.includes(DOWNLOAD_FILENAME),
+      tabs: await openTabIds(sidePanel),
+    }).toStrictEqual({ isError: false, keptReport: true, named: true, tabs: tabsAfterGuard });
   } finally {
-    await context.close();
+    await launch.close();
     await hub.close();
     await fixture.close();
-    await rm(downloadsPath, { force: true, recursive: true });
-    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('an approved repeat of a browser_tabs new download reports where its navigation settled', async () => {
+  test.setTimeout(120_000);
+  const fixture = await startDownloadFixture();
+  // A second loopback server is where the repeat's request redirects: it is not named in the grants.
+  const landing = await startFakeHub();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const grants = grant(fixture.url);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Tabs-new repeat download E2E session',
+    });
+
+    await session.callTool('browser_navigate', { url: `${fixture.url}/page` }, grants);
+
+    const landingOrigin = `http://127.0.0.1:${String(landing.port)}`;
+    // The same `browser_tabs` call, twice: the route serves the attachment to the first request and redirects every
+    // Later one to the landing server, so the repeat loads a page and the tab settles on the landing origin.
+    const url = `${fixture.url}${ONCE_DOWNLOAD_PATH}?next=${encodeURIComponent(landing.pageUrl)}`;
+    const params = { action: 'new', url };
+    const call = (id: number, sensitive?: readonly string[]) =>
+      sendAgentRpc(hub, session.controllerId, id, 'tools.call', {
+        arguments: params,
+        authorized: grants,
+        name: 'browser_tabs',
+        ...(sensitive === undefined ? {} : { sensitive }),
+        sessionHandle: session.sessionHandle,
+      });
+
+    // 1. Guarded: the first request is an attachment, its download is refused, and its step token is issued.
+    const guarded = await call(900);
+
+    const guardedError = z
+      .object({ code: z.number(), data: z.record(z.string(), z.unknown()), message: z.string() })
+      .parse(guarded.error);
+
+    expect(guardedError.code).toBe(LOCAL_AGENT_ERROR_CODES.needsPermission);
+    expect(guardedError.data['afterAction']).toBe(true);
+    expect(guardedError.data['step']).toStrictEqual({
+      argumentsHash: hashBrowserToolArguments(params),
+      tool: 'browser_tabs',
+    });
+    expect(z.array(permissionItemSchema).parse(guardedError.data['items'])).toStrictEqual([
+      { class: 'sensitive', origin: fixture.url, reason: 'downloading a file' },
+    ]);
+    await expectNothingSaved(downloadsPath);
+
+    const token = z.string().parse(guardedError.data['stepToken']);
+    // The refused call opened the tab its repeat runs on, so a second tab would be a second download.
+    const tabsAfterGuard = await openTabIds(sidePanel);
+
+    // 2. The human approved: the identical call with the token requests the route again, which answers a redirect.
+    const approved = await call(901, [token]);
+
+    const changed = z
+      .object({ code: z.number(), data: z.record(z.string(), z.unknown()) })
+      .parse(approved.error);
+
+    // The tab settled on the landing origin, so the answer names both origins the navigation involved.
+    expect([changed.code, changed.data]).toStrictEqual([
+      LOCAL_AGENT_ERROR_CODES.originChanged,
+      { from: fixture.url, to: landingOrigin },
+    ]);
+
+    // The repeat reached the route and got the redirect, kept no file, and opened no second tab.
+    expect(fixture.onceHits()).toBe(2);
+    await expectNothingSaved(downloadsPath);
+    expect(await openTabIds(sidePanel)).toStrictEqual(tabsAfterGuard);
+  } finally {
+    await launch.close();
+    await hub.close();
+    await landing.close();
+    await fixture.close();
   }
 });
 
 test('a browser_tabs new to an attachment on a session that has a tab is guarded, and keeps no file', async () => {
   test.setTimeout(120_000);
-  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
-  const { context, extensionId, userDataDir } = await launchExtensionContext({
-    downloadsPath,
-    grantPermissions: ['downloads'],
-  });
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
   await mockKiloApi(context, {});
   await context.addInitScript({
     content:
@@ -729,14 +765,191 @@ test('a browser_tabs new to an attachment on a session that has a tab is guarded
       guarded.kind === 'error' ? guarded.step?.tool : undefined,
     ]).toStrictEqual([-32_010, true, 'browser_tabs']);
 
-    // The file was cancelled before it could be written: the folder stays empty and nothing is named as saved.
-    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+    // The file was refused before it could be written: the folder stays empty and nothing is named as saved.
+    await expectNothingSaved(downloadsPath);
     expect(guarded.kind === 'error' ? guarded.message.includes('already saved') : true).toBe(false);
   } finally {
-    await context.close();
+    await launch.close();
     await hub.close();
     await fixture.close();
-    await rm(downloadsPath, { force: true, recursive: true });
-    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('one click that starts two files: the guarded call keeps none, and the approved repeat keeps only its own', async () => {
+  test.setTimeout(180_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  // Chrome's own multiple-downloads limiter refuses the second file this one gesture starts, which is not what this
+  // Spec measures: the hold's answer for two files. Only this spec allows it.
+  const launch = await launchRealDownloadBrowser({ automaticDownloads: true });
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}${TWO_DOWNLOADS_PAGE_PATH}`);
+
+    const grants = grant(fixture.url);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, fixture.url);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Two downloads E2E session',
+    });
+
+    await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${TWO_DOWNLOADS_PAGE_PATH}` },
+      grants
+    );
+
+    const target = await controlRef(
+      session,
+      grants,
+      /button "Download both reports" \[ref=(e\d+)\]/u
+    );
+
+    // 1. One click, two attachments: the guard decides each item, and neither may finish.
+    const guarded = await session.callTool(
+      'browser_click',
+      { element: 'Download both reports', target },
+      grants
+    );
+
+    expect(guarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    expect(fixture.hits()).toBeGreaterThan(0);
+    expect(fixture.secondHits()).toBeGreaterThan(0);
+    await expectNothingSaved(downloadsPath);
+
+    const token = guarded.kind === 'error' ? (guarded.stepToken ?? '') : '';
+
+    expect(token).not.toBe('');
+
+    // 2. The approved repeat is the step's own file only: report.txt lands, second.txt is refused and reported.
+    const approved = await session.callTool(
+      'browser_click',
+      { element: 'Download both reports', target },
+      grants,
+      [token]
+    );
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
+    expect(await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME)).toBe(DOWNLOAD_BODY);
+    expect(await downloadFiles(downloadsPath)).not.toContain(SECOND_DOWNLOAD_FILENAME);
+
+    // The file the approval did not cover is reported — on this call, or the next one that carries the news.
+    const approvedText = approved.kind === 'result' ? approved.text : '';
+    const next = await session.callTool('browser_snapshot', {}, grants);
+    const nextText = next.kind === 'error' ? next.message : next.text;
+
+    expect(`${approvedText}\n${nextText}`).toContain(SECOND_DOWNLOAD_FILENAME);
+    // The report never turns into a second file, and the approved one is untouched.
+    await expect
+      .poll(() => downloadFiles(downloadsPath), { timeout: 20_000 })
+      .toStrictEqual([DOWNLOAD_FILENAME]);
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+  }
+});
+
+test("the user's own download in another tab lands during an approved call and is never reported", async () => {
+  test.setTimeout(180_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+    // A page with no agent attached: the session never shares it, so its download is the user's own.
+    const userPage = await context.newPage();
+
+    await userPage.goto(`${fixture.url}${USER_PAGE_PATH}`);
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const grants = grant(fixture.url);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'User download E2E session',
+    });
+
+    await session.callTool('browser_navigate', { url: `${fixture.url}/page` }, grants);
+
+    const target = await downloadRef(session, grants);
+    const guarded = await session.callTool(
+      'browser_click',
+      { element: 'Download report', target },
+      grants
+    );
+
+    expect(guarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    await expectNothingSaved(downloadsPath);
+
+    const token = guarded.kind === 'error' ? (guarded.stepToken ?? '') : '';
+
+    if (token === '') {
+      throw new Error('the refusal carried no step token');
+    }
+
+    // The approved call runs while the user starts their own download in a tab no agent holds. A page opened
+    // Over CDP is a background tab, and Playwright's actionability waits for an animation frame a hidden tab
+    // Never runs: the user's click would hang for the whole test. A user clicking their own tab fronts it first.
+    await userPage.bringToFront();
+
+    const [approved] = await Promise.all([
+      session.callTool('browser_click', { element: 'Download report', target }, grants, [token]),
+      (async () => {
+        await userPage.click(`a[href="${USER_DOWNLOAD_PATH}"]`);
+      })(),
+    ]);
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    // Both files finished under their own names: the agent's, and the user's.
+    await expect
+      .poll(() => downloadFiles(downloadsPath), { timeout: 20_000 })
+      .toStrictEqual(
+        [DOWNLOAD_FILENAME, USER_DOWNLOAD_FILENAME].toSorted((left, right) =>
+          left.localeCompare(right)
+        )
+      );
+    expect(fixture.userHits()).toBeGreaterThan(0);
+
+    // The user's file is never reported; the next call is an ordinary answer, not a permission refusal.
+    const approvedText = approved.kind === 'result' ? approved.text : '';
+    const next = await session.callTool('browser_snapshot', {}, grants);
+    const nextText = next.kind === 'error' ? next.message : next.text;
+
+    expect(approvedText).not.toContain(USER_DOWNLOAD_FILENAME);
+    expect(nextText).not.toContain(USER_DOWNLOAD_FILENAME);
+    expect(await downloadFiles(downloadsPath)).toContain(USER_DOWNLOAD_FILENAME);
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
   }
 });

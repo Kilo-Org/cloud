@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatShortModelDisplayName, resolveCatalogModelName } from './model-display-name';
+import {
+  formatShortModelDisplayName,
+  modelReferenceLabel,
+  resolveCatalogModelName,
+} from './model-display-name';
 
 describe('formatShortModelDisplayName', () => {
   it('drops the vendor prefix the catalog repeats in the display name', () => {
@@ -21,6 +25,28 @@ describe('formatShortModelDisplayName', () => {
 
   it('keeps an empty name empty', () => {
     expect(formatShortModelDisplayName('')).toBe('');
+  });
+});
+
+describe('modelReferenceLabel', () => {
+  it('shows the readable last segment of a vendor-scoped id', () => {
+    expect(modelReferenceLabel('deepseek/deepseek-v4.1-flash-1017')).toBe(
+      'deepseek v4.1 flash 1017'
+    );
+  });
+
+  it('drops the latest-alias marker with the path', () => {
+    expect(modelReferenceLabel('~deepseek/deepseek-v4-flash-latest')).toBe(
+      'deepseek v4 flash latest'
+    );
+  });
+
+  it('keeps a value that carries no slash, since it is already a name', () => {
+    expect(modelReferenceLabel('custom-model-id')).toBe('custom-model-id');
+  });
+
+  it('keeps an empty reference empty', () => {
+    expect(modelReferenceLabel('')).toBe('');
   });
 });
 

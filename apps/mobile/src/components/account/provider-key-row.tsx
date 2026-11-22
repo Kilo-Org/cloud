@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { providerKeyName } from '@/lib/byok/provider-key-name';
 
 export type ProviderKey = inferRouterOutputs<MobileRouter>['byok']['list'][number];
 
@@ -38,13 +39,14 @@ export function ProviderKeyRow({
   const managed = providerKey.management_source === 'coding_plan';
   const editable = canEdit && !managed;
   const busy = testing || toggling || deleting;
+  const name = providerKeyName(providerKey.provider_id, providerKey.provider_name);
 
   return (
     <Card>
       <View className="flex-row items-center gap-3">
         <View className="min-w-0 flex-1 gap-1">
           <Text variant="small" numberOfLines={1}>
-            {providerKey.provider_name}
+            {name}
           </Text>
           {/*
             Only a managed row keeps a line: its switch is disabled, so it cannot
@@ -62,7 +64,7 @@ export function ProviderKeyRow({
           disabled: !editable || busy,
           onValueChange: onToggle,
           accessibilityLabel: t('profile.providerKeys.enableKey', {
-            provider: providerKey.provider_name,
+            provider: name,
           }),
         })}
       </View>

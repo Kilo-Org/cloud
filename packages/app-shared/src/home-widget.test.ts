@@ -326,6 +326,87 @@ describe('Home-only widget policy', () => {
     });
   });
 
+  it('withholds Approve and its key from a terminal snapshot that still carries an approvable permission row', () => {
+    const approvalKey = 'a'.repeat(64);
+    // A built terminal payload has empty details, so the gate is only reachable by
+    // forcing the status on a payload whose counts and key survived.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey }],
+    });
+    expect(data.snapshot.needsApproval).toBe(1);
+    expect(data.snapshot.needsInput).toBe(1);
+    expect(data.details.approvalKey).toBe(approvalKey);
+    expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+      canApprove: true,
+      approvalKey,
+    });
+    for (const status of ['signed_out', 'privacy'] as const) {
+      data.snapshot.status = status;
+      expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+        status,
+        canApprove: false,
+        approvalKey: null,
+      });
+      // The details survive; only the presentation gate drops them.
+      expect(data.details.approvalKey).toBe(approvalKey);
+    }
+  });
+
+  it('offers Approve only from a permission row and keeps the count key-independent', () => {
+    const questionKey = 'a'.repeat(64);
+    // Both rows need input, only the permission row can be approved. The
+    // question row carries the only key, so it ranks first and owns the title.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'question', title: 'Pick a branch', approvalKey: questionKey },
+        { status: 'permission', title: 'Approve deploy' },
+      ],
+    });
+    expect(data.snapshot.needsApproval).toBe(1);
+    expect(data.snapshot.needsInput).toBe(2);
+    expect(data.details.approvalKey).toBeNull();
+    const home = buildHomeWidgetPresentation(data, now);
+    expect(home.approvalKey).toBeNull();
+    expect(home.canApprove).toBe(false);
+    expect(home.waitingAgents).toEqual([
+      { title: 'Pick a branch', kind: 'question' },
+      { title: 'Approve deploy', kind: 'permission' },
+    ]);
+    expect(data.details.primaryTitle).toBe('Pick a branch');
+
+    // With a key on both rows the rank still answers only "carries a key", so
+    // the older question row leads while Approve takes the permission key.
+    const permissionKey = 'b'.repeat(64);
+    const bothKeyed = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        {
+          status: 'question',
+          title: 'Pick a branch',
+          approvalKey: questionKey,
+          statusUpdatedAt: '2026-10-09T09:00:00Z',
+        },
+        {
+          status: 'permission',
+          title: 'Approve deploy',
+          approvalKey: permissionKey,
+          statusUpdatedAt: '2026-10-09T09:30:00Z',
+        },
+      ],
+    });
+    expect(bothKeyed.details.approvalKey).toBe(permissionKey);
+    const bothKeyedHome = buildHomeWidgetPresentation(bothKeyed, now);
+    expect(bothKeyedHome.approvalKey).toBe(permissionKey);
+    expect(bothKeyedHome.canApprove).toBe(true);
+    expect(bothKeyedHome.waitingAgents).toEqual([
+      { title: 'Pick a branch', kind: 'question' },
+      { title: 'Approve deploy', kind: 'permission' },
+    ]);
+    expect(bothKeyed.details.primaryTitle).toBe('Pick a branch');
+  });
+
   it('hides a title whose kind no longer matches the presented kind', () => {
     const data = buildHomeWidgetData({
       ...scope,
@@ -492,6 +573,17 @@ describe('Home-only widget policy', () => {
       expect(homeWidgetRefreshAt(data, now)).toBe(now + 30 * 60 * 1000);
     }
   });
+
+  it('keeps a terminal snapshot quiet and unstale even when its counts survive', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Private' }],
+    });
+    data.snapshot.status = 'signed_out';
+    expect(homeWidgetRefreshAt(data, now)).toBe(now + 2 * 60 * 60 * 1000);
+    expect(buildHomeWidgetPresentation(data, now).stale).toBe(false);
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([now]);
+  });
 });
 
 describe('native Home presentation timeline', () => {
@@ -524,6 +616,41 @@ describe('native Home presentation timeline', () => {
     expect(buildHomeWidgetPresentationTimeline(data, now + GLANCEABLE_STALE_MS)).toHaveLength(2);
     data.snapshot.status = 'privacy';
     expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(1);
+  });
+
+  it('publishes one wake and its strictly later retry, never a duplicate instant', () => {
+    // The retry is the wake plus the scheduler floor, so it cannot equal the
+    // wake. Publish both and assert the ordering the timeline relies on
+    // instead of a dedupe comparison that could never be false.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T10:05:00Z' }],
+    });
+    const wake = now + 5 * 60 * 1000;
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([
+      now,
+      wake,
+      wake + 15 * 60 * 1000,
+      now + GLANCEABLE_STALE_MS,
+    ]);
+  });
+
+  it('drops the retry when it lands on the stale instant', () => {
+    // A wake fifteen minutes after the snapshot write puts the retry on the
+    // stale deadline exactly (active cadence is thirty minutes), so the two
+    // boundaries coincide and the timeline publishes the instant once.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'scheduled', scheduledAt: new Date(now + 15 * 60 * 1000).toISOString() },
+      ],
+    });
+    const wake = now + 15 * 60 * 1000;
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([
+      now,
+      wake,
+      now + GLANCEABLE_STALE_MS,
+    ]);
   });
 
   it('keeps every built timeline inside the response schema the client parses', () => {

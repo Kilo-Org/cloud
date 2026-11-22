@@ -8,7 +8,7 @@ import type * as AdmissionTypes from '@/lib/auth/admission';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 const authMock = vi.hoisted(() => ({ signIn: vi.fn() }));
 
@@ -447,8 +447,11 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
 
     expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
-      'That code is incorrect. Please try again.'
+      "That code is incorrect or expired. Try again or use 'Resend code'."
     );
+    // A retryable/wrong code keeps the user on the step they can still finish,
+    // so it never exposes the terminal browser action.
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.onBrowserSignIn).toBeUndefined();
 
     // Editing the code retires the refusal message.
     act(() => {
@@ -536,7 +539,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
 
     expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
-      'We could not verify this device. Check your connection and try again.'
+      i18n.t('authErrors.retryableAdmission')
     );
     expect(mockPostAuth).not.toHaveBeenCalled();
     expect(authMock.signIn).not.toHaveBeenCalled();
@@ -548,6 +551,69 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     await act(() => {
       (otpForm.props.onVerify as (code: string) => void)('123456');
     });
+    expect(authMock.signIn).toHaveBeenCalledExactlyOnceWith('at', 'rt', 3600);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers the browser sign-in the admission refusal names and starts that flow', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+    const start = vi.fn<StartFn>().mockResolvedValue(undefined);
+    const renderer = await mountIdleAuth({ start });
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('blocked@example.com');
+    });
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      ssoOrganizationId: undefined,
+      httpStatus: 403,
+    });
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const refused = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!refused) {
+      throw new Error('EmailOtpForm not found');
+    }
+    expect(refused.props.error).toBe(
+      "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
+    );
+    const onBrowserSignIn = refused.props.onBrowserSignIn as (() => void) | undefined;
+    if (!onBrowserSignIn) {
+      throw new Error('browser sign-in action not rendered');
+    }
+
+    await act(async () => {
+      onBrowserSignIn();
+      await Promise.resolve();
+    });
+    expect(start).toHaveBeenCalledWith('signin', undefined, undefined);
+    expect(authMock.signIn).not.toHaveBeenCalled();
+
     act(() => {
       renderer.unmount();
     });
@@ -616,6 +682,69 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
     const refused = findAll(renderer.root, 'EmailOtpForm')[0];
     expect(refused?.props.error).toBe('Too many sign-in attempts. Please wait and try again.');
     expect(refused?.props.busy).toBeUndefined();
+    // A retryable resend refusal never offers the terminal browser action.
+    expect(refused?.props.onBrowserSignIn).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('signs in through the browser with the pending link token after an admission refusal', async () => {
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const start = vi.fn<StartFn>().mockResolvedValue(undefined);
+    const renderer = await mountIdleAuth({
+      start,
+      pendingLink: offer,
+      onPendingLink: vi.fn<(link: PendingLinkOffer) => void>(),
+    });
+
+    const send = findAll(renderer.root, 'Button').find(
+      b => b.props.accessibilityLabel === 'Email me a sign-in code'
+    );
+    if (!send) {
+      throw new Error('Email me a sign-in code button not found');
+    }
+    await act(async () => {
+      (send.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      ssoOrganizationId: undefined,
+      httpStatus: 403,
+    });
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const refused = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!refused) {
+      throw new Error('EmailOtpForm not found');
+    }
+    expect(refused.props.error).toBe(
+      "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
+    );
+    const onBrowserSignIn = refused.props.onBrowserSignIn as (() => void) | undefined;
+    if (!onBrowserSignIn) {
+      throw new Error('browser sign-in action not rendered');
+    }
+    await act(async () => {
+      onBrowserSignIn();
+      await Promise.resolve();
+    });
+    expect(start).toHaveBeenCalledWith('signin', undefined, 'link-token');
 
     act(() => {
       renderer.unmount();

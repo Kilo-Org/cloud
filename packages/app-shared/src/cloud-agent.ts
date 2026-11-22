@@ -22,11 +22,33 @@ export type CloudAgentAttachments = {
  * the workspace root, so strip that form too.
  */
 const CONTAINER_WORKSPACE_ROOT = /^\/workspace\/app(?=\/|$)/;
+// This segment names a Kilo session, and every writer that produces one mints or
+// validates the `ses_` prefix, so only that family reaches here. The private
+// roots below name a workspace directory instead, which can carry any of the
+// control plane's id families.
 const PUBLIC_CLOUD_AGENT_ROOT = /^\/cloud-agent\/sessions\/ses_[^/]+(?=\/|$)/;
-const ABSOLUTE_CLOUD_AGENT_ROOT =
-  /^.*\/workspace\/(?:[^/]+\/)?[^/]+\/(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/]+(?=\/|$)/;
-const RELATIVE_CLOUD_AGENT_ROOT =
-  /^(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/]+(?=\/|$)/;
+/** The two directory kinds a Cloud Agent workspace root can end with. */
+const WORKSPACE_KIND = String.raw`sessions|worktrees`;
+/** The session, worktree, and retired control plane id prefixes. */
+const WORKSPACE_ID_PREFIX = String.raw`(?:ses_|sess_|agent_|workspace_|worktree_)`;
+/** Every root pattern ends at a path separator or the end of the string. */
+const ROOT_BOUNDARY = String.raw`(?=\/|$)`;
+const ABSOLUTE_CLOUD_AGENT_ROOT = new RegExp(
+  String.raw`^.*\/workspace\/(?:[^/]+\/)?[^/]+\/(?:` +
+    WORKSPACE_KIND +
+    String.raw`)\/` +
+    WORKSPACE_ID_PREFIX +
+    String.raw`[^/]+` +
+    ROOT_BOUNDARY
+);
+const RELATIVE_CLOUD_AGENT_ROOT = new RegExp(
+  String.raw`^(?:` +
+    WORKSPACE_KIND +
+    String.raw`)\/` +
+    WORKSPACE_ID_PREFIX +
+    String.raw`[^/]+` +
+    ROOT_BOUNDARY
+);
 
 /** The repo-relative label for a path from a Cloud Agent workspace. */
 export function cloudAgentFileLabel(path: string): string {

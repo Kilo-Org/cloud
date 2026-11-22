@@ -33,6 +33,7 @@ vi.hoisted(() => {
 type ConfirmRequest = { readonly confirmLabel: string; readonly onConfirm: () => void };
 
 const {
+  insets,
   announcement,
   confirmRequests,
   connectivity,
@@ -44,6 +45,7 @@ const {
   pendingReview,
   termsStatus,
 } = vi.hoisted(() => ({
+  insets: { left: 0, right: 0 },
   announcement: { announce: vi.fn() },
   confirmRequests: [] as ConfirmRequest[],
   connectivity: { value: 'online' },
@@ -59,8 +61,12 @@ const {
   termsStatus: { accept: vi.fn<() => Promise<unknown>>() },
 }));
 
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: insets.left, right: insets.right }),
+}));
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
@@ -303,7 +309,7 @@ describe('PrReviewCommentComposer submit phase', () => {
 
     act(() => {
       press(renderer, 'Comment now');
-      press(renderer, 'Cancel');
+      press(renderer, 'Discard');
     });
 
     await act(async () => {
@@ -326,19 +332,19 @@ describe('PrReviewCommentComposer submit phase', () => {
     act(() => {
       press(renderer, 'Comment now');
     });
-    press(renderer, 'Cancel');
+    press(renderer, 'Discard');
     act(() => {
       press(renderer, 'Comment now');
     });
 
     // The abandoned attempt's gate resolves: it writes nothing, and the
-    // successor's slot survives so Cancel still reaches the newer attempt.
+    // successor's slot survives so Discard still reaches the newer attempt.
     await act(async () => {
       abandoned.resolve({ accepted: true, currentVersion: 'v1' });
       await Promise.resolve();
     });
     expect(confirmRequests).toHaveLength(1);
-    press(renderer, 'Cancel');
+    press(renderer, 'Discard');
     expect(confirmRequests).toHaveLength(2);
 
     await act(async () => {
@@ -411,5 +417,43 @@ describe('PrReviewCommentComposer suggestion availability', () => {
     expect(button?.props.accessibilityHint).toBeUndefined();
     expect(hasCopy(renderer, SUGGESTIONS_ADDED_LINES)).toBe(false);
     expect(hasCopy(renderer, TAP_DIFF_LINE)).toBe(false);
+  });
+});
+
+describe('PrReviewCommentComposer body side insets', () => {
+  const LANDSCAPE_LEFT = 51;
+
+  beforeEach(() => {
+    insets.left = 0;
+    insets.right = 0;
+  });
+
+  /** Every `View` that carries the shared helper's inline side padding. */
+  function paddedViews(renderer: ReactTestRenderer) {
+    return renderer.root.findAll(node => {
+      if (String(node.type) !== 'View') {
+        return false;
+      }
+      const style: unknown = node.props.style;
+      return typeof style === 'object' && style !== null && 'paddingLeft' in style;
+    });
+  }
+
+  it('clears the landscape cutout on the body and leaves the footer to its own bar', async () => {
+    insets.left = LANDSCAPE_LEFT;
+    const renderer = await mountComposer(baseProps);
+
+    // One wrapper, around the body only: the trailing footer clears the same
+    // insets on `ScreenFooter`'s own bar, and a second padding here would put
+    // the composer's two CTAs a cutout width inside the page column.
+    expect(paddedViews(renderer).map(node => node.props.style)).toEqual([
+      { paddingLeft: LANDSCAPE_LEFT, paddingRight: 8 },
+    ]);
+  });
+
+  it('leaves the portrait body without an inset style', async () => {
+    const renderer = await mountComposer(baseProps);
+
+    expect(paddedViews(renderer)).toHaveLength(0);
   });
 });

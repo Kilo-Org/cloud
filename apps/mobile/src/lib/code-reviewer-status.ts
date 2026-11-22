@@ -196,7 +196,11 @@ export function classifyPermission(input: {
   if (input.isLoading) {
     return { status: 'loading' };
   }
-  if (input.isError) {
+  // A refetch over cached memberships can fail while the cached role is still
+  // the best answer, as when an offline device refetches with `networkMode:
+  // 'always'`. That holds only when the cache carries a role for this scope; a
+  // cached list without this scope leaves the screen on its retryable error.
+  if (input.isError && (!input.hasData || input.role === undefined)) {
     return { status: 'error', refetch: input.refetch, isRetrying: input.isFetching };
   }
   // A paused query (offline or unknown connectivity, empty cache) is pending but

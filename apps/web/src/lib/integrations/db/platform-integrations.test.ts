@@ -5,6 +5,8 @@ import {
   kilocode_users,
   organizations,
   github_app_installations,
+  cloud_agent_code_review_attempts,
+  cloud_agent_code_reviews,
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import {
@@ -25,8 +27,14 @@ import {
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
+import { isPlatformIntegrationActive } from '../core/health';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { disconnectGitHubInstallation } from './github-installations';
+import {
+  createCodeReview,
+  createCodeReviewAttempt,
+  updateCodeReviewStatus,
+} from '@/lib/code-reviews/db/code-reviews';
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;
 
@@ -1063,6 +1071,146 @@ describe('upsertPlatformIntegrationForOwner', () => {
       );
     });
 
+    test("deleteGitHubInstallationRecords cancels each association's active review work before deleting the rows", async () => {
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_user_id: userId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '1000',
+          platform_account_login: 'user-standard',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+        {
+          owned_by_organization_id: orgId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '3000',
+          platform_account_login: 'org-standard',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+        {
+          owned_by_organization_id: otherOrgId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: siblingInstallId,
+          platform_account_id: '4000',
+          platform_account_login: 'org-unrelated-standard',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+      ]);
+
+      const seeded = await db
+        .select({
+          id: platform_integrations.id,
+          login: platform_integrations.platform_account_login,
+        })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.platform_installation_id, destructiveInstallId));
+      const userAssociationId = seeded.find(row => row.login === 'user-standard')?.id;
+      const orgAssociationId = seeded.find(row => row.login === 'org-standard')?.id;
+      const [unrelatedAssociation] = await db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.platform_installation_id, siblingInstallId));
+      if (!userAssociationId || !orgAssociationId) throw new Error('Expected seeded associations');
+
+      async function seedQueuedReview(
+        owner: { type: 'user' | 'org'; id: string; userId: string },
+        platformIntegrationId: string,
+        repoFullName: string
+      ) {
+        const reviewId = await createCodeReview({
+          owner,
+          platformIntegrationId,
+          repoFullName,
+          prNumber: 1,
+          prUrl: `https://github.com/${repoFullName}/pull/1`,
+          prTitle: 'delete installation review cleanup',
+          prAuthor: 'octocat',
+          baseRef: 'main',
+          headRef: 'feature/delete-installation-review-cleanup',
+          headSha: `${repoFullName}-head-sha`,
+          platform: 'github',
+          triggerSource: 'manual',
+        });
+        await updateCodeReviewStatus(reviewId, 'queued');
+        const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+        await db
+          .update(cloud_agent_code_reviews)
+          .set({ dispatch_reservation_id: crypto.randomUUID() })
+          .where(eq(cloud_agent_code_reviews.id, reviewId));
+        return { reviewId, attemptId: attempt.id };
+      }
+
+      const userReview = await seedQueuedReview(
+        { type: 'user', id: userId, userId },
+        userAssociationId,
+        'acme/delete-installation-user-review'
+      );
+      const orgReview = await seedQueuedReview(
+        { type: 'org', id: orgId, userId },
+        orgAssociationId,
+        'acme/delete-installation-org-review'
+      );
+      const unrelatedReview = await seedQueuedReview(
+        { type: 'org', id: otherOrgId, userId },
+        unrelatedAssociation.id,
+        'acme/delete-installation-unrelated-review'
+      );
+
+      await deleteGitHubInstallationRecords(destructiveInstallId, 'standard');
+
+      // ON DELETE SET NULL: the cancelled reviews survive the association
+      // delete, unlinked, while the unrelated association is untouched.
+      expect(await getRowsByInstallId()).toEqual([]);
+
+      for (const cancelledReview of [
+        { reviewId: userReview.reviewId, attemptId: userReview.attemptId },
+        { reviewId: orgReview.reviewId, attemptId: orgReview.attemptId },
+      ]) {
+        const [reviewRow] = await db
+          .select({
+            status: cloud_agent_code_reviews.status,
+            dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+            terminalReason: cloud_agent_code_reviews.terminal_reason,
+          })
+          .from(cloud_agent_code_reviews)
+          .where(eq(cloud_agent_code_reviews.id, cancelledReview.reviewId));
+        expect(reviewRow).toMatchObject({
+          status: 'cancelled',
+          dispatchReservationId: null,
+          terminalReason: 'user_cancelled',
+        });
+
+        const [attemptRow] = await db
+          .select({ status: cloud_agent_code_review_attempts.status })
+          .from(cloud_agent_code_review_attempts)
+          .where(eq(cloud_agent_code_review_attempts.id, cancelledReview.attemptId));
+        expect(attemptRow?.status).toBe('cancelled');
+      }
+
+      const [unrelatedReviewRow] = await db
+        .select({
+          status: cloud_agent_code_reviews.status,
+          platformIntegrationId: cloud_agent_code_reviews.platform_integration_id,
+        })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, unrelatedReview.reviewId));
+      expect(unrelatedReviewRow).toEqual({
+        status: 'queued',
+        platformIntegrationId: unrelatedAssociation.id,
+      });
+    });
+
     test('suspendIntegration with app type leaves the owner sibling app-type row active', async () => {
       await seedOrgSiblings();
 
@@ -1680,5 +1828,98 @@ describe('findGitLabIntegrationByWebhookToken', () => {
     await insertGitLabIntegration({ metadata: { auth_type: 'oauth' } });
 
     expect(await findGitLabIntegrationByWebhookToken('secret-known')).toBeNull();
+  });
+});
+
+describe('activation writes of an existing association', () => {
+  afterEach(cleanupDbForTest);
+
+  test('a non-GitHub connect records an active association without a suspension', async () => {
+    const userId = (await insertTestUser()).id;
+    const owner: Owner = { type: 'user', id: userId };
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: userId,
+        platform: 'linear',
+        integration_type: 'oauth',
+        platform_installation_id: 'linear-org-1',
+        integration_status: 'suspended',
+        suspended_at: '2026-11-20T00:00:00.000Z',
+        suspended_by: 'integration-operator',
+        auth_invalid_at: '2026-11-20T00:00:00.000Z',
+        auth_invalid_reason: 'authorizing_user_deleted',
+      })
+      .returning({ id: platform_integrations.id });
+
+    const result = await upsertPlatformIntegrationForOwner(owner, {
+      platform: 'linear',
+      integrationType: 'oauth',
+      platformInstallationId: 'linear-org-1',
+      platformAccountId: 'linear-org-1',
+      platformAccountLogin: 'linear-workspace',
+      repositoryAccess: 'all',
+    });
+
+    expect(result).toEqual({ ok: true });
+    const [updated] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, row.id));
+    expect(updated).toMatchObject({
+      integration_status: 'active',
+      suspended_at: null,
+      suspended_by: null,
+      auth_invalid_at: null,
+      auth_invalid_reason: null,
+    });
+    expect(isPlatformIntegrationActive(updated)).toBe(true);
+  });
+
+  test('a locally disconnected GitHub association keeps its recorded state', async () => {
+    const userId = (await insertTestUser()).id;
+    const owner: Owner = { type: 'user', id: userId };
+    const installationId = `reactivation-${Date.now()}`;
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: userId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        github_connection_role: 'workflow',
+        integration_status: 'suspended',
+        suspended_at: '2026-11-20T00:00:00.000Z',
+        suspended_by: 'local_disconnect',
+        github_disconnected_at: '2026-11-20T00:00:00.000Z',
+      })
+      .returning({ id: platform_integrations.id });
+
+    const result = await upsertPlatformIntegrationForOwner(owner, {
+      platform: 'github',
+      integrationType: 'app',
+      platformInstallationId: installationId,
+      platformAccountId: '12345',
+      platformAccountLogin: 'test-owner',
+      permissions: null,
+      scopes: [],
+      repositoryAccess: 'all',
+      repositories: null,
+      installedAt: new Date().toISOString(),
+      githubAppType: 'standard',
+    });
+
+    expect(result).toEqual({ ok: true });
+    const [updated] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, row.id));
+    expect(updated).toMatchObject({
+      integration_status: 'suspended',
+      suspended_by: 'local_disconnect',
+    });
+    expect(updated.suspended_at).not.toBeNull();
+    expect(updated.github_disconnected_at).not.toBeNull();
   });
 });

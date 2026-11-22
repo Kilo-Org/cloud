@@ -260,6 +260,41 @@ describe('processDiscordBotMessage session start authorization', () => {
   }
 
   it.each([
+    { label: 'a suspended status', state: { integration_status: 'suspended' as const } },
+    {
+      label: 'a suspension marker on an active status',
+      state: { integration_status: 'active' as const, suspended_at: new Date().toISOString() },
+    },
+  ])('refuses a message for an installation with $label', async ({ state }) => {
+    await db
+      .update(platform_integrations)
+      .set(state)
+      .where(
+        and(
+          eq(platform_integrations.owned_by_user_id, installationOwner.id),
+          eq(platform_integrations.platform, 'discord')
+        )
+      );
+    const discordUserId = nextSnowflake();
+    await linkDiscordAccount(installationOwner.id, discordUserId);
+
+    const result = await processDiscordBotMessage(
+      `Change something in ${CONNECTED_REPOSITORY}`,
+      guildId,
+      eventContext(discordUserId)
+    );
+
+    expect(mockRunBot).not.toHaveBeenCalled();
+    expect(mockRunSessionToCompletion).not.toHaveBeenCalled();
+    expect(result.error).toBe('installation_not_active');
+    expect(result.response).toBe('');
+    expect(result.modelUsed).toBe('');
+    expect(result.toolCallsMade).toEqual([]);
+    expect(result.cloudAgentSessionId).toBeUndefined();
+    expect(result.installation?.platform_installation_id).toBe(guildId);
+  });
+
+  it.each([
     { label: 'a blocked account', state: { blocked_at: new Date().toISOString() } },
     { label: 'a disabled personal account', state: { personal_account_disabled: true } },
   ])('keeps the account state out of the public reply for $label', async ({ state }) => {

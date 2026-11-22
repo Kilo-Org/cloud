@@ -6,12 +6,13 @@ import type {
   AzureCredentials,
   BedrockCredentials,
   VertexCredentials,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/app-shared/byok-credentials';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
-// Base types for OpenRouter API that don't depend on other lib files
-// This breaks circular dependencies with mistral.ts, minimax.ts, etc.
+// Imports here must be type-only, and this file never imports the provider modules that import it
+// (for example mistral.ts, openai.ts and reflection.ts), which is what keeps the cycle broken. Its
+// own `reasoning-details` and `byok-credentials` imports are the permitted kind: types only.
 
 export type OpenRouterProviderConfig = {
   order?: string[];
@@ -94,7 +95,9 @@ export type SharedGatewayRequestProperties = {
   provider?: OpenRouterProviderConfig;
   providerOptions?: VercelProviderConfig;
 
-  // Forwarded as providerOptions.gateway.models on the Vercel path
+  // Fallback models. Not supported on any route: `removeModelsFallback` drops
+  // `models` and `fallbacks` before a provider setting is built, so a fallback
+  // can never be served unpaid.
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
 

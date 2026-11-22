@@ -15,6 +15,7 @@ import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { parseSessionAttachMcpServers } from '../../mcp-config.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import { controlPlaneSandboxSelectionSchema } from './sandbox-selection.js';
 
 function generateKeyPair() {
@@ -1389,5 +1390,38 @@ describe('continuation marker projection', () => {
   it('omits the marker for a normal session', () => {
     const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
     expect(spec.continuation).toBeUndefined();
+  });
+});
+
+describe('stored runtime skill projection', () => {
+  const storedSkills = [
+    {
+      name: 'review',
+      rawMarkdown: 'Review',
+      files: { 'legacy/./notes.md': 'legacy', 'scripts/run.sh': 'echo ok' },
+    },
+  ];
+
+  it('keeps the accepted companion entries when a stored route spec is parsed', () => {
+    const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
+    const parsed = controlPlaneRouteSpecSchema.parse(
+      projectStoredRouteSpec({ ...spec, runtimeSkills: storedSkills })
+    );
+    expect(parsed.runtimeSkills).toEqual([
+      { name: 'review', rawMarkdown: 'Review', files: { 'scripts/run.sh': 'echo ok' } },
+    ]);
+  });
+
+  it('keeps the wire schemas strict for the same skills', () => {
+    const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
+    expect(
+      controlPlaneRouteSpecSchema.safeParse({ ...spec, runtimeSkills: storedSkills }).success
+    ).toBe(false);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({
+        spec: { ...spec, runtimeSkills: storedSkills },
+        credentials: buildControlPlaneSessionRegistration(metadata(), selection).credentials,
+      }).success
+    ).toBe(false);
   });
 });

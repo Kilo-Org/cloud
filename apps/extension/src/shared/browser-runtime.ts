@@ -2,25 +2,57 @@
 import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
+  alsoStoppedDownloadsText,
   canStartDownload,
   createStepTokenStore,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
+  DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
   DOWNLOAD_STEP_TAB_GONE_ERROR,
+  downloadStoppedWithoutPermissionError,
+  downloadTierOf,
   hashBrowserToolArguments,
+  isOriginGranted,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
   parseToolArguments,
   SENSITIVE_REASON,
+  STEP_TOKEN_TTL_MS,
+  toBrowserOrigin,
 } from './browser-agent-checks';
 import type {
   BrowserGrant,
+  BrowserOriginChanged,
   BrowserPermissionItem,
+  DownloadTier,
   StepTokenNeed,
   StepTokenStore,
   StepTokenTake,
 } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
 import type { BrowserSensitiveStep } from './browser-agent-gate';
+import { ATTRIBUTION_WAIT_MS, targetOf } from './browser-download-hold';
+import type {
+  DownloadHold,
+  DownloadHoldNavigation,
+  DownloadSettle,
+  DownloadSign,
+  DownloadStep,
+  DownloadTarget,
+} from './browser-download-hold';
+import {
+  DOWNLOAD_FAIL_REASON,
+  DOWNLOAD_RESPONSE_PATTERNS,
+  downloadResponseName,
+  downloadResponsePause,
+  INTERCEPT_POLL_MS,
+  interceptWait,
+  isDownloadResponse,
+} from './browser-download-intercept';
+import type {
+  DownloadResponsePause,
+  InterceptWaitReading,
+  InterceptWaitState,
+} from './browser-download-intercept';
 import {
   createAgentFrameReader,
   enableAgentFrameAutoAttach,
@@ -41,15 +73,24 @@ import type {
 import { browserCallerKey, TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import { clearBrowserToolResize } from './browser-tool-page-actions';
+import {
+  BrowserToolDialogOpenError,
+  dialogRefusalText,
+  isHandleDialogTool,
+  modalStateText,
+  watchForDialog,
+  withModalState,
+} from './browser-tool-dialog';
 import { runKiloBrowserTool } from './browser-tool-dispatch';
 import type { BrowserToolDispatchOptions } from './browser-tool-dispatch';
 import { createBrowserToolSession } from './browser-tool-session';
 import type {
+  BrowserToolDialog,
   BrowserToolDownload,
   BrowserToolSession,
   BrowserToolTabsApi,
 } from './browser-tool-session';
-import type { TabLeaseHolder, TabLeaseRegistry } from './browser-tab-leases';
+import type { TabLeaseRegistry, TabSessionOwner } from './browser-tab-leases';
 import { getInspectableTab, isInspectablePageUrl } from './tab-debugger';
 import type {
   BrowserScriptingApi,
@@ -81,14 +122,20 @@ export interface BrowserToolRunInput {
   readonly tabId: number;
   /** A panel sets this only after its take-over confirmation. */
   readonly takeOver?: boolean;
+  /**
+   * The caller's mode, when it has one: safe mode exposes only the read-only
+   * tools, so a modal state must not name an answer it cannot call. Absent for a
+   * CLI agent, whose tool set always has `browser_handle_dialog`.
+   */
+  readonly safeMode?: boolean;
   readonly title?: string;
   readonly toolName: string;
 }
 
 export type BrowserToolRunOutcome =
   | {
-      readonly holder: TabLeaseHolder;
       readonly kind: 'needs_take_over';
+      readonly owner: TabSessionOwner;
     }
   | {
       readonly kind: 'result';
@@ -112,6 +159,11 @@ export type BrowserToolRunOutcome =
       readonly kind: 'origin_changed';
       readonly result: EvalTabResult;
       readonly to: string;
+    }
+  // The transport maps this onto JSON-RPC -32005: this browser has no way to run the tool at all.
+  | {
+      readonly kind: 'unsupported';
+      readonly result: EvalTabResult;
     };
 
 export interface BrowserEvalRunInput {
@@ -176,6 +228,12 @@ export interface BrowserRuntimeDeps {
    * rather than captured when the runtime was built.
    */
   readonly downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
+  /**
+   * The hold that decides a download before its file exists, where the browser
+   * has `onDeterminingFilename`. Absent on Firefox, which has no event that
+   * holds a download: there the legacy guard cancels a file after it starts.
+   */
+  readonly downloadHold?: DownloadHold | undefined;
   readonly leases: TabLeaseRegistry;
   /** The clock sensitive step tokens expire against; defaults to `Date.now`. */
   readonly now?: (() => number) | undefined;
@@ -239,6 +297,11 @@ export interface BrowserRuntime {
   ) => Promise<{ readonly title: string; readonly url: string } | undefined>;
   /** Ends the caller's tab leases. Its refs survive, so the next turn can click by an earlier ref. */
   readonly releaseCaller: (caller: BrowserCaller) => number;
+  /**
+   * Brings back the sessions an earlier service worker stored, once, without
+   * the tabs that closed while no worker ran. Agent calls await it first.
+   */
+  readonly restoreSessions: () => Promise<void>;
   /** Drops this caller's lease on one tab only: one finished call must not free its session's other tabs. */
   readonly releaseTab: (input: { readonly caller: BrowserCaller; readonly tabId: number }) => void;
   readonly runTool: (input: BrowserToolRunInput) => Promise<BrowserToolRunOutcome>;
@@ -254,14 +317,16 @@ const TAB_COMMIT_POLL_MS = 50;
  * How long the guard keeps listening after a call that started no download.
  * A click or a page load whose response headers arrive a moment later still
  * gets its file deleted, but the call itself does not wait for a download it
- * never started.
+ * never started. Only a browser without `onDeterminingFilename` runs this
+ * guard: where the hold exists it decides every item before its file exists.
  */
 const DOWNLOAD_GUARD_LINGER_MS = 2000;
 
 /**
- * How many calls may find an overdue stop still unknowable — the optional permission gone, or a search that throws —
- * before its record names the file as kept: a browser that cannot answer must not leave the record waiting forever,
- * and a file nobody could look for is reported, never passed off as stopped.
+ * How many calls may find an overdue stop still unknowable before its record
+ * names the file as kept: a browser that cannot answer must not leave the
+ * record waiting forever, and a file nobody could look for is reported, never
+ * passed off as stopped.
  */
 const OVERDUE_STOP_ATTEMPTS = 3;
 
@@ -314,9 +379,21 @@ const DOWNLOAD_OBSERVE_POLLS = 10;
  * bounded.
  */
 const DOWNLOAD_START_GRACE_MS = 40;
+/**
+ * How long a call that saw a sign of a download waits for the browser to create the item it announced. Chrome
+ * creates it a moment after the announcement, and a loaded machine can take a few hundred milliseconds.
+ */
+const DOWNLOAD_ITEM_WAIT_MS = 1500;
 const DOWNLOAD_ANNOUNCE_GRACE_MS = 250;
 const DOWNLOAD_ANNOUNCE_POLL_MS = 10;
 const DOWNLOAD_ANNOUNCE_POLLS = 120;
+
+/**
+ * How long a call waits for the hold's decision on its own download. The item is
+ * created a moment after the command returns, and its decision is a cancel and
+ * one read: this covers both, and stays far inside Chrome's 15 s hold release.
+ */
+const DOWNLOAD_HOLD_SETTLE_MS = 2000;
 
 /**
  * One download this call stopped: its file is gone, still being written, or
@@ -329,8 +406,9 @@ type DiscardOutcome =
   | { readonly kind: 'pending'; readonly filename: string }
   | { readonly kind: 'removed'; readonly filename: string };
 
-/** One download a guard stopped, by the tab and url that name the file it would have opened. */
+/** One download a guard stopped, by the tab and url that name the file it would have opened, and its file name. */
 interface StoppedDownload {
+  readonly filename?: string | undefined;
   readonly tabId?: number | undefined;
   readonly url?: string | undefined;
 }
@@ -341,6 +419,11 @@ interface GuardSettlement {
   readonly stopped: number;
   /** Every download this guard stopped or announced, in order: the first names the file an approval buys. */
   readonly stoppedItems?: readonly StoppedDownload[] | undefined;
+  /**
+   * The files the approval let through: the one file it bought. Empty when the call was not an approved repeat,
+   * and empty for an approved repeat the browser never created an item for — Chrome's own limiter can refuse it.
+   */
+  readonly allowed?: readonly string[] | undefined;
 }
 
 /**
@@ -424,6 +507,27 @@ const argumentText = (value: unknown): string | undefined => {
 
   return parsed.success ? parsed.data : undefined;
 };
+
+/**
+ * The origin a dialog's answer is judged by, and whose grant decides whether
+ * its message is readable: the frame's own recorded origin, which the browser
+ * computes (so an `about:blank` child of a cross-origin frame carries that
+ * frame's origin, not the tab's). A dialog whose frame the browser never named
+ * or whose origin was never reported names none, and no grant can cover it.
+ */
+const dialogOriginOf = (dialog: BrowserToolDialog): string =>
+  dialog.origin === undefined ? 'opaque:null' : (toBrowserOrigin(dialog.origin) ?? 'opaque:null');
+
+/**
+ * Whether a caller may read a dialog's message. A panel reads every page; an
+ * agent reads the message only from an origin it holds a `read` grant for, as a
+ * snapshot shows only those frames — judged by the same origin its answer acts in.
+ */
+const dialogMessageReadable = (
+  dialog: BrowserToolDialog,
+  agent: BrowserAgentCallContext | undefined
+): boolean =>
+  agent === undefined || isOriginGranted(agent.authorized, 'read', dialogOriginOf(dialog));
 
 /** The tab a guard attributes a download to: its id and the page url a referrer is compared with. */
 const guardTabOf = async (
@@ -678,22 +782,6 @@ interface DownloadAttribution {
 }
 
 /**
- * The step a download belongs to, captured before the guard runs: the exact
- * binding a step token is issued against, and the words a report repeats back.
- */
-interface DownloadStep {
-  readonly argumentHash: string;
-  /** How a report names the step: `click on 'Download report'`, `navigation to https://…`. */
-  readonly description: string;
-  /** The noun a report tells the model to repeat: `click`, `navigation`. */
-  readonly noun: string;
-  readonly origin: string;
-  readonly session: string;
-  readonly tabId: number;
-  readonly toolName: string;
-}
-
-/**
  * How a refused download names the step that started it, so the model repeats
  * that step instead of the call that happened to carry the report.
  */
@@ -835,6 +923,133 @@ type DownloadClaim =
   /** The item is already being stopped by whoever owns it: nothing left for this guard to do. */
   | 'handled';
 
+/** What the response interceptor stopped: the file's name, and where it was going. */
+interface InterceptSettlement {
+  /** The downloads this call failed before any byte was written, in the order they were paused. */
+  readonly stopped: readonly { readonly filename: string; readonly url: string }[];
+}
+
+/** One armed response interceptor: the only answer a paused response gets, and the way out at call end. */
+interface ResponseInterceptor {
+  /**
+   * The settle's own wait: `settle` owns which pauses it has answered, and the caller only says what the tab started.
+   */
+  readonly settle: (
+    reading: () => Omit<InterceptWaitReading, 'answeredIds'>
+  ) => Promise<InterceptSettlement>;
+}
+
+/**
+ * The guard a Chrome call runs when the optional `downloads` permission is not
+ * granted: `onDeterminingFilename` does not exist, so the item cannot be held
+ * or cancelled, but the response that would become a file can still be failed.
+ *
+ * The pattern is `Document` only. Every stoppable download measured on real
+ * Chrome is a document load — a navigate, a link click, or a hidden iframe —
+ * and a catch-all would pause every image, script and font on the tab, which
+ * costs a user who declined the permission the speed of every page.
+ *
+ * A pause nobody answers holds the page forever, so every paused response is
+ * answered: `failRequest` for a download, `continueResponse` for everything
+ * else. `undefined` when the tab cannot intercept, so the caller reports the
+ * announcement honestly instead of pretending a guard exists.
+ *
+ * The pause outlives the tool by the call's own settle. A link click's attachment
+ * response arrives just after the click returns (measured 9 ms on real Chrome),
+ * so a guard that released its pause with the call would continue the response
+ * nobody had answered and the file would land unguarded. The settle therefore
+ * keeps the pause armed while a Document the call started still owes a pause,
+ * and releases as soon as every one of them is answered — a plain click starts
+ * no Document and pays one poll.
+ */
+const armResponseInterceptor = async (
+  session: BrowserToolSession
+): Promise<ResponseInterceptor | undefined> => {
+  if (session.backend !== 'debugger') {
+    return undefined;
+  }
+
+  const stopped: { readonly filename: string; readonly url: string }[] = [];
+  /** The answer sent per request, so a response paused twice is answered once. */
+  const answers = new Map<string, Promise<void>>();
+  const answer = async (pause: DownloadResponsePause): Promise<void> => {
+    const failed = isDownloadResponse(pause);
+
+    if (failed) {
+      stopped.push({ filename: downloadResponseName(pause), url: pause.url });
+    }
+
+    try {
+      await session.send(failed ? 'Fetch.failRequest' : 'Fetch.continueResponse', {
+        requestId: pause.requestId,
+        ...(failed ? { errorReason: DOWNLOAD_FAIL_REASON } : {}),
+      });
+    } catch {
+      // The response is already gone — its tab closed, its load cancelled — so there is nothing left to answer.
+    }
+  };
+  const stopWatching = session.watchFetchPauses(params => {
+    const pause = downloadResponsePause(params);
+
+    if (pause === undefined || answers.has(pause.requestId)) {
+      return;
+    }
+
+    const sent = answer(pause);
+
+    answers.set(pause.requestId, sent);
+  });
+
+  try {
+    await session.send('Fetch.enable', { patterns: [...DOWNLOAD_RESPONSE_PATTERNS] });
+  } catch {
+    // A target that refuses the pause has no interceptor: the caller reports what the tab announces instead.
+    stopWatching();
+
+    return undefined;
+  }
+
+  return {
+    settle: async readingSupplier => {
+      // The pause stays armed while this call's own Documents still owe one: the response that becomes a file is
+      // Delivered after the tool answered, and releasing here would continue it unread. The map above is the ledger of
+      // What has been answered, so the state reads it rather than a count that another poll could move underneath.
+      let state: InterceptWaitState = { kind: 'entered', since: Date.now() };
+
+      for (;;) {
+        // eslint-disable-next-line no-await-in-loop -- one bounded poll, then the state decides again
+        const reading = readingSupplier();
+
+        const { state: nextState, step } = interceptWait(state, {
+          ...reading,
+          answeredIds: new Set(answers.keys()),
+        });
+
+        if (step === 'release') {
+          break;
+        }
+
+        state = nextState;
+
+        // eslint-disable-next-line no-await-in-loop -- one bounded poll for the pause this call is owed
+        await after(INTERCEPT_POLL_MS);
+      }
+
+      // From here nothing new is paused; every answer already sent is awaited before the pause is released.
+      stopWatching();
+      await Promise.all(answers.values());
+
+      try {
+        await session.send('Fetch.disable');
+      } catch {
+        // A target that is gone has nothing left to release.
+      }
+
+      return { stopped: [...stopped] };
+    },
+  };
+};
+
 /** What a guard tells the runtime about the downloads it sees, and what the runtime says back. */
 interface DownloadLedger {
   /** The browser announced a download before creating it: open its record, or leave the one an earlier attempt opened to that attempt. */
@@ -916,6 +1131,70 @@ const lateDownloadError = (files: readonly DownloadReport[]): string => {
     : '';
 
   return `${head} started a download of ${names}, which was stopped: downloading a file needs your approval. ${repeat}${saved}`;
+};
+
+/**
+ * The file a refusal is about: the step's own download — the one whose page this call asked the browser for first —
+ * and never whichever file the browser stopped first. A gesture that starts two downloads stops them in the
+ * browser's own order: in the measured two-download click the script's `second.txt` was refused 8 ms before the
+ * link's `report.txt`, so a refusal built from that order promised the human one file and then kept the other.
+ *
+ * `asked` is the pages of this call's own requests, in the order it made them: the click's own link navigation is
+ * issued first, and the files a page script starts beside it follow. Both files of the measured gesture are
+ * `Document` requests, so the set they form says nothing about which one the step named; the order does.
+ *
+ * `scope` is what the approval may cover. A file this call's requests named is the step's own, so its page is what the
+ * repeat buys — a page that regenerates its link on every click downloads the same file. No request named any stopped
+ * file (a `blob:`, or a file Chrome named only once it was saved), so the step's own file is unknown: the first
+ * stopped file stands for it, every file is named, and only that exact url may pass on the repeat.
+ */
+const ownDownloadOf = <File extends { readonly url?: string | undefined }>(
+  files: readonly File[],
+  asked: readonly string[]
+): { readonly file: File; readonly scope: 'exact' | 'page' } | undefined => {
+  // The step's own file is the one whose page this call asked for first; a file no request named ranks -1.
+  const ranked = files
+    .map(file => {
+      const page = pageOf(file.url);
+
+      return { file, rank: page === undefined ? -1 : asked.indexOf(page) };
+    })
+    .filter(entry => entry.rank >= 0)
+    .toSorted((left, right) => left.rank - right.rank);
+  const [own] = ranked;
+
+  if (own !== undefined) {
+    return { file: own.file, scope: 'page' };
+  }
+
+  const [first] = files;
+
+  if (first === undefined) {
+    return undefined;
+  }
+
+  // One file alone is the step's own by being the only one it started: a page that regenerates its link on the
+  // Repeat (`?click=2`) still downloads it. Only among siblings is the step's own file unknown, and then only the
+  // File the browser named may pass.
+  return { file: first, scope: files.length === 1 ? 'page' : 'exact' };
+};
+
+/** Every stopped file but the one a refusal is about: each is named as a file the approval does not cover. */
+const otherFilesOf = <File extends { readonly url?: string | undefined }>(
+  files: readonly File[],
+  own: File
+): readonly File[] => {
+  let skipped = false;
+
+  return files.filter(file => {
+    if (!skipped && file === own) {
+      skipped = true;
+
+      return false;
+    }
+
+    return true;
+  });
 };
 
 /**
@@ -1088,6 +1367,14 @@ const armDownloadGuard = (
   let announced = 0;
   /** Every download this guard stopped or announced: the first with a url names the file an approval would buy. */
   const stoppedSeen: StoppedDownload[] = [];
+  /** The files the approval let through: exactly the one item it bought, named as the browser wrote it. */
+  const allowed: string[] = [];
+  /** Remembers the approved file once: the announcement and the item are the same file, and it is named once. */
+  const noteAllowed = (filename: string): void => {
+    if (allowed.length === 0) {
+      allowed.push(filename);
+    }
+  };
 
   /** What the ledger needs to open or find this guard's one record for a download. */
   const sighting = (input: {
@@ -1116,7 +1403,11 @@ const armDownloadGuard = (
     const url = download.url === undefined || download.url === '' ? undefined : download.url;
 
     // The approved call's own file is announced too, and it is nobody's stop: the human already approved it.
+    // The announcement names the file before its item exists, and it is the name both the refusal and the
+    // Success use, so the model is told one name for the one file it may look for.
     if (url !== undefined && exemptUrl?.(url, tab.tabId) === true) {
+      noteAllowed(download.suggestedFilename ?? url.split('/').pop() ?? 'the downloaded file');
+
       return;
     }
 
@@ -1124,7 +1415,7 @@ const armDownloadGuard = (
 
     if (ledger.announced(sighting({ filename, guid: download.guid, url })) === 'own') {
       announced += 1;
-      stoppedSeen.push({ tabId: tab.tabId, url });
+      stoppedSeen.push({ filename, tabId: tab.tabId, url });
     }
   };
 
@@ -1143,6 +1434,9 @@ const armDownloadGuard = (
   const stop = (item: BrowserDownloadItem): void => {
     // The file the human approved is the approved call's: it is the only download of that call left alone.
     if (exempt !== undefined && exempt(item)) {
+      // The approval bought exactly this item: its name is what the success text names.
+      noteAllowed(fileNameOf(item));
+
       return;
     }
 
@@ -1163,7 +1457,7 @@ const armDownloadGuard = (
 
     if (!closed && (claim === 'own' || claim === 'linked')) {
       // Exactly the stops this call reports: an item another record owns, or one after the report, is not its file.
-      stoppedSeen.push({ tabId: item.tabId, url });
+      stoppedSeen.push({ filename: fileNameOf(item), tabId: item.tabId, url });
       stops.set(item.id, discarded);
     }
 
@@ -1218,6 +1512,7 @@ const armDownloadGuard = (
     const outcomes = await Promise.all(stops.values());
 
     return {
+      allowed: [...allowed],
       kept: outcomes.flatMap(outcome => (outcome.kind === 'kept' ? [outcome.filename] : [])),
       // A download whose file is still being written counts as stopped too: the guard is deleting whatever lands.
       stopped: outcomes.filter(outcome => outcome.kind !== 'kept').length,
@@ -1315,7 +1610,7 @@ const armDownloadGuard = (
       if (stops.size === 0 && announced === 0) {
         lingerOn();
 
-        return { kept: [], stopped: 0 };
+        return { allowed: [...allowed], kept: [], stopped: 0 };
       }
 
       const settlement = await report();
@@ -1375,6 +1670,7 @@ const disposeBrowserToolSession = async (
  */
 export const createBrowserRuntime = ({
   debuggerApi,
+  downloadHold,
   downloadsApi,
   leases,
   now,
@@ -1416,6 +1712,12 @@ export const createBrowserRuntime = ({
   const openWatches = new Map<number, OpenWatch>();
   /** One record per download a session still owes a report for: the only bookkeeping a file that outlived its call has. */
   const downloadRecords = new Map<string, Map<string, DownloadRecord>>();
+  /**
+   * Downloads the browser announced where nothing could hold or cancel them — no optional `downloads`
+   * permission, so no `onDeterminingFilename` — queued per session as possibly saved. Each is reported
+   * once, by the next call of its own session.
+   */
+  const unguardedDownloads = new Map<string, DownloadReport[]>();
   /** Session handles that ended: no call can report for one again, so a lingering guard must not open a record for it. */
   const closedSessions = new Set<string>();
   /** Names one guard attempt; a record is counted by the attempt that opened it and by no other. */
@@ -1425,10 +1727,7 @@ export const createBrowserRuntime = ({
    * covers that file alone — a second download during the approved call, on another tab or another url, is
    * Guarded as usual — so the need is bound to the first item the browser creates for that tab and url.
    */
-  const approvedNeeds = new Map<
-    string,
-    { itemId: number | undefined; readonly tabId: number; readonly url: string }
-  >();
+  const approvedNeeds = new Map<string, StepTokenNeed & { itemId: number | undefined }>();
 
   /** Whether this item is the one file the session's approval bought; the first item for its tab and url is it. */
   const approvedItem = (
@@ -1445,10 +1744,9 @@ export const createBrowserRuntime = ({
       return need.itemId === item.id;
     }
 
-    if (
-      (item.tabId !== undefined && item.tabId !== need.tabId) ||
-      !sameFileUrl(need.url, item.url)
-    ) {
+    const named = need.kind === 'exact' ? item.url === need.url : sameFileUrl(need.url, item.url);
+
+    if ((item.tabId !== undefined && item.tabId !== need.tabId) || !named) {
       return false;
     }
 
@@ -1470,7 +1768,11 @@ export const createBrowserRuntime = ({
   const approvedNeedUrl = (session: string, url: string, tabId: number): boolean => {
     const need = approvedNeeds.get(session);
 
-    return need !== undefined && need.tabId === tabId && sameFileUrl(need.url, url);
+    if (need === undefined || need.tabId !== tabId) {
+      return false;
+    }
+
+    return need.kind === 'exact' ? url === need.url : sameFileUrl(need.url, url);
   };
 
   /**
@@ -1566,6 +1868,7 @@ export const createBrowserRuntime = ({
   /** A session that ends owes no approval, and its stopped files stay unreported: there is no model left to tell. */
   const closeSessionRecords = (session: string): void => {
     downloadRecords.delete(session);
+    unguardedDownloads.delete(session);
     approvedNeeds.delete(session);
     lastApprovedAt.delete(session);
 
@@ -1588,6 +1891,40 @@ export const createBrowserRuntime = ({
 
       closedSessions.delete(oldest);
     }
+  };
+
+  /** Ends a session's downloads with it: a closed session owes no approval and has no model to report to. */
+  const closeDownloads = (session: string): void => {
+    closeSessionRecords(session);
+    // The hold's approval dies with the session, and its reports have nobody to read them.
+    downloadHold?.closeSession(session);
+  };
+
+  /**
+   * Queues one download the browser announced where nothing could hold or cancel it: no finished file can be
+   * Ruled out, so the model is told it may have been saved and that granting Downloads would guard it.
+   */
+  const noteUnguardedDownload = (
+    session: string,
+    download: { readonly suggestedFilename?: string; readonly tabId: number; readonly url?: string }
+  ): void => {
+    const existing = unguardedDownloads.get(session) ?? [];
+    const filename = download.suggestedFilename ?? 'the downloaded file';
+
+    if (existing.some(file => file.filename === filename && file.tabId === download.tabId)) {
+      return;
+    }
+
+    unguardedDownloads.set(session, [
+      ...existing,
+      {
+        filename,
+        kept: true,
+        step: undefined,
+        tabId: download.tabId,
+        url: download.url,
+      },
+    ]);
   };
 
   const recordsFor = (session: string): Map<string, DownloadRecord> => {
@@ -2192,6 +2529,8 @@ export const createBrowserRuntime = ({
     inFlight.delete(tabId);
     // A closed tab has no next call, so its linger is over and nothing will report what it left: both go with it.
     takeOverDownloads(tabId);
+    // A tab the browser closed cannot start a download, and its announcements belong to no page any more.
+    downloadHold?.tab({ detach: tabId });
     autoAttachedTabs.delete(tabId);
     sessionOwnedTabs.delete(tabId);
     groups.noteTabRemoved(tabId);
@@ -2476,6 +2815,29 @@ export const createBrowserRuntime = ({
     return withheldFramesOf(frames, readable).map(frame => frame.origin);
   };
 
+  /**
+   * The frames a dialog answer is judged by. The page cannot report them while
+   * its dialog is open, but the session recorded the frame that opened the
+   * dialog and the security origin the browser computed for that frame — an
+   * `about:blank` child of a cross-origin frame inherits that frame's origin,
+   * not the tab's. That origin is what the answer acts in. When the event named
+   * no frame or its origin was never reported, the dialog is attributed to no
+   * frame at all (`opaque:null`), which fails closed.
+   */
+  const dialogFrameInventory = async (
+    tabId: number,
+    dialog: BrowserToolDialog
+  ): Promise<AgentFrameInventory> => {
+    const tab = await tabsApi.get?.(tabId);
+    const url = dialog.url ?? tab?.url ?? '';
+
+    return {
+      childSessions: new Map(),
+      complete: false,
+      frames: [{ id: 'main', origin: dialogOriginOf(dialog), url }],
+    };
+  };
+
   /** The refusal every sensitive step shares: the items to approve, and what the call already did. */
   const needsPermissionOutcome = (
     items: readonly BrowserPermissionItem[],
@@ -2510,6 +2872,91 @@ export const createBrowserRuntime = ({
   };
 
   /**
+   * The one download a refusal's token buys. `page` is the file's page, which a repeat that regenerates its link still
+   * matches; `exact` is the url alone, for a refusal whose step's own file this call's requests never named.
+   */
+  const needOfUrl = (tabId: number, url: string, scope: 'exact' | 'page'): StepTokenNeed =>
+    scope === 'page' ? { kind: 'page', tabId, url } : { kind: 'exact', tabId, url };
+
+  /** What a need arms on the hold: the file's page, or its exact url when the step's own file is unknown. */
+  const targetOfNeed = (need: StepTokenNeed): DownloadTarget =>
+    need.kind === 'page' ? targetOf(need.url) : { kind: 'exact', url: need.url };
+
+  /**
+   * The refusal for a download the hold decided during this call: the step the
+   * model repeats, and the one file its token then buys. The text says what
+   * became of the file, so a browser that may have saved it is never reported
+   * as "nothing was written".
+   */
+  const downloadRefusal = (
+    file: DownloadReport,
+    context: {
+      readonly keptFiles: readonly string[];
+      readonly origin: string;
+      /** The files the same call stopped besides this one: one click can start several, and each needs its own. */
+      readonly alsoStopped?: readonly DownloadReport[];
+      /** What this approval may cover: the file's page, or its exact url when the step's own file is unknown. */
+      readonly scope?: 'exact' | 'page';
+      /** The file was announced where nothing could hold it: the text names the permission that would. */
+      readonly unguarded?: boolean;
+    },
+    runTabId: number
+  ): BrowserToolRunOutcome => {
+    const { step } = file;
+    const { keptFiles, origin } = context;
+    const also = context.alsoStopped ?? [];
+    const alsoText =
+      also.length === 0 ? '' : ` ${alsoStoppedDownloadsText(also.map(one => one.filename))}`;
+
+    if (context.unguarded === true) {
+      return needsPermissionOutcome(
+        [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
+        {
+          afterAction: true,
+          error: `${file.filename}: ${DOWNLOAD_PERMISSION_MISSING_ERROR}${alsoText}`,
+          keptFiles,
+        }
+      );
+    }
+
+    const reason = SENSITIVE_REASON.download;
+    const stepToken =
+      step === undefined
+        ? undefined
+        : tokens.issue({
+            argumentHash: step.argumentHash,
+            ...(file.url === undefined
+              ? {}
+              : { need: needOfUrl(file.tabId, file.url, context.scope ?? 'page') }),
+            origin: step.origin,
+            reason,
+            session: step.session,
+            tabId: step.tabId,
+            toolName: step.toolName,
+          });
+
+    // The tab this step opened, for the one repeat its token buys: sending `browser_tabs new` again would open
+    // A second tab and download the file twice instead of receiving the one the human approved.
+    if (step !== undefined) {
+      rememberStepTab(step, runTabId);
+    }
+
+    return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
+      afterAction: true,
+      error: `${
+        file.kept
+          ? `${file.filename} may have been saved: the browser had written it before the download could be stopped. Downloading a file needs your approval.`
+          : `The download of ${file.filename} was stopped before it was saved: downloading a file needs your approval. Repeat that ${step?.noun ?? 'step'} after the download is approved to receive the file.`
+      }${alsoText}`,
+      keptFiles,
+      ...(step === undefined
+        ? {}
+        : { step: { argumentsHash: step.argumentHash, tool: step.toolName } }),
+      ...(stepToken === undefined ? {} : { stepToken }),
+    });
+  };
+
+  /**
    * The refusal that carries a download an already answered call's linger
    * stopped. Its step token binds the step that started the file — that is the
    * call the model has to repeat — and the text says so, because this call is
@@ -2534,7 +2981,7 @@ export const createBrowserRuntime = ({
     // The repeat keeps the one file this report is about: the tab the download belongs to and the url it was named
     // By. Without it the repeat would run with no guard and every file it starts would be kept and never reported.
     const need: StepTokenNeed | undefined =
-      started?.url === undefined ? undefined : { tabId: started.tabId, url: started.url };
+      started?.url === undefined ? undefined : needOfUrl(started.tabId, started.url, 'page');
     const stepToken =
       step === undefined
         ? undefined
@@ -2564,7 +3011,6 @@ export const createBrowserRuntime = ({
 
   const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
     // The handover runs before the acquire, in one message.
-    // Only a panel may hand a lease over: its take-over asymmetry is the design's only one.
     // An agent's tab is never freed for someone else without a confirmation.
     if (from?.kind === 'panel') {
       leases.release(tabId, from);
@@ -2575,34 +3021,71 @@ export const createBrowserRuntime = ({
     return lease.kind === 'granted';
   };
 
+  const liveSessionOwner = (tabId: number): TabSessionOwner | undefined => {
+    const sessionHandle = groups.sessionForTab(tabId);
+
+    if (sessionHandle === undefined) {
+      return undefined;
+    }
+
+    const title = groups
+      .listSessions()
+      .find(session => session.sessionHandle === sessionHandle)
+      ?.title.trim();
+
+    // A blank title names nobody: the card falls back to its generic session name.
+    return { sessionHandle, ...(title === undefined || title === '' ? {} : { title }) };
+  };
+
   const runTool = async ({
     agent,
     arguments: toolArguments,
     caller,
     options,
+    safeMode,
     step: stepInput,
     tabId,
     takeOver,
     title,
     toolName,
   }: BrowserToolRunInput): Promise<BrowserToolRunOutcome> => {
+    // A safe-mode caller has only the read-only tools, so its modal state says the dialog is the user's to answer.
+    const dialogReading = (
+      dialog: BrowserToolDialog,
+      context: BrowserAgentCallContext | undefined
+    ) => ({
+      answerable: safeMode !== true,
+      messageReadable: dialogMessageReadable(dialog, context),
+    });
     // An agent reaches only its own session's tabs; the group is the boundary (D9).
     // A session with nothing shared yet is refused too: no group means no reach.
     if (caller.kind === 'agent' && !groups.isTabAllowed(caller.sessionHandle, tabId)) {
       return { kind: 'result', result: { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false } };
     }
 
+    // A tool the platform cannot express is answered before any lease, grant or permission: nothing could run it.
+    const unavailable = sessionFor(tabId).getToolUnavailableError(toolName);
+
+    if (unavailable !== undefined) {
+      return { kind: 'unsupported', result: { error: unavailable, ok: false } };
+    }
+
     const lease = await leases.acquire(tabId, caller, {
+      owner: liveSessionOwner(tabId),
       ...(takeOver === undefined ? {} : { takeOver }),
       ...(title === undefined ? {} : { title }),
     });
 
     if (lease.kind === 'needs_take_over') {
-      return { holder: lease.holder, kind: 'needs_take_over' };
+      return { kind: 'needs_take_over', owner: lease.owner };
     }
 
     if (lease.kind === 'busy') {
       return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
+    }
+
+    if (lease.kind === 'taken') {
+      return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
     }
 
     // Only a confirmed take-over ends the agent's in-flight call; a holder re-entering its own lease ends nothing.
@@ -2641,6 +3124,20 @@ export const createBrowserRuntime = ({
       let dispatched = false;
       /** The tab this call opened for its step, if any, so a refusal after the open can close it again. */
       let stepOpenedTab: number | null = null;
+      /**
+       * The file the browser announced during this call, if it announced one: the item the settle waits for.
+       * Written by the sign watch below and read through {@link signedDownload}: the outer flow sees no
+       * assignment of its own, and would otherwise narrow the value to `null`.
+       */
+      let signedFile: { readonly filename: string; readonly url: string | undefined } | null = null;
+      const signedDownload = (): {
+        readonly filename: string;
+        readonly url: string | undefined;
+      } | null => signedFile;
+      /** A load the browser answered as a file, when this call's step was a navigation. */
+      let navigatedToFile = false;
+      /** How the hold's settle ended, when the hold decided this call's downloads. */
+      let settleState: DownloadSettle | null = null;
       const drivenChain = Promise.withResolvers<void>();
 
       const callerHook = (): void => {
@@ -2662,6 +3159,20 @@ export const createBrowserRuntime = ({
 
       try {
         const agentContext = caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined;
+        // An open dialog blocks the page: until it is answered, no tool but its answer can run on this tab.
+        const openDialog = session.pendingDialog();
+        const dialogRefusal = (dialog: BrowserToolDialog): BrowserToolRunOutcome => ({
+          kind: 'result',
+          result: {
+            error: dialogRefusalText(dialog, toolName, dialogReading(dialog, agentContext)),
+            ok: false,
+          },
+        });
+
+        if (openDialog !== undefined && !isHandleDialogTool(toolName)) {
+          return dialogRefusal(openDialog);
+        }
+
         const argsRecord = parseToolArguments(toolArguments);
         // Every step token is bound to the calling session, the tab, the tool and the exact arguments.
         const sessionKey = caller.kind === 'agent' ? caller.sessionHandle : '';
@@ -2689,10 +3200,67 @@ export const createBrowserRuntime = ({
             toolName: stepToolName,
           });
 
+        /**
+         * The refusal for an approved call the browser named no item for: Chrome's multiple-downloads limiter refuses
+         * the file a repeat already bought, and a plain success would hide it, while a spent approval would ask a
+         * human again for a file the browser swallowed. The approval stays unspent and the same step token is issued
+         * again, so the repeat needs no second decision once the site is allowed.
+         */
+        const browserBlockedRefusal = ({
+          need,
+          origin,
+          step,
+          tokenTabId,
+        }: {
+          readonly need: StepTokenNeed | undefined;
+          readonly origin: string;
+          readonly step: DownloadStep | undefined;
+          readonly tokenTabId: number;
+        }): BrowserToolRunOutcome => {
+          const token = issueSensitiveToken(
+            { origin, reason: SENSITIVE_REASON.download },
+            tokenTabId,
+            need
+          );
+
+          return needsPermissionOutcome(
+            [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
+            {
+              afterAction: true,
+              error: DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
+              ...(step === undefined
+                ? {}
+                : { step: { argumentsHash: step.argumentHash, tool: step.toolName } }),
+              stepToken: token,
+            }
+          );
+        };
+
         if (agentContext !== undefined) {
           // Only downloads this call starts may be reported: events left by an earlier call are stale.
-          takeStartedDownloads(session);
-          await ensureFrameAutoAttach(session, tabId);
+          const stale = takeStartedDownloads(session);
+
+          if (downloadHold !== undefined && downloadsApi?.() !== undefined) {
+            // An announcement names the file before its item exists, and it is the only tab-exact attribution
+            // A download has: the hold claims it, and reports a file none of them claimed as possibly saved.
+            // Without the permission the hold's event does not exist, so nothing would ever claim it.
+            for (const download of stale) {
+              downloadHold.announce({ ...download, tabId });
+            }
+          } else if (downloadsApi?.() === undefined) {
+            // Nothing can hold the item and no permission could cancel it, so this announcement is the last thing
+            // Anything sees of the file: it is queued as possibly saved, never silently kept.
+            for (const download of stale) {
+              noteUnguardedDownload(sessionKey, { ...download, tabId });
+            }
+          }
+          // With the permission granted, the item stream is the record of what became of each file: a stale
+          // Announcement is the earlier call's, and its own ledger entry already names it.
+
+          // The page cannot answer the auto-attach while its dialog is open; the next call after the answer turns it on.
+          if (openDialog === undefined) {
+            await ensureFrameAutoAttach(session, tabId);
+          }
         }
 
         const preflight =
@@ -2702,12 +3270,23 @@ export const createBrowserRuntime = ({
                 args: argsRecord,
                 authorized: agentContext.authorized,
                 consumeStepToken: (token, binding) => tokens.consume(token, binding),
+                // The page cannot report its frames while a dialog blocks it, so the answer is judged against the frame that opened the dialog: its handler resumes there.
+                ...(openDialog === undefined
+                  ? {}
+                  : { readFrames: () => dialogFrameInventory(tabId, openDialog) }),
                 session,
                 sessionHandle: sessionKey,
                 stepTokens: agentContext.sensitive ?? [],
                 tabId,
                 toolName,
               });
+        const openedDuringPreflight = session.pendingDialog();
+
+        // A dialog that opened while the preflight read the page blocked those reads.
+        // The call is refused for the dialog, not for whatever the reads could not see.
+        if (openedDuringPreflight !== undefined && !isHandleDialogTool(toolName)) {
+          return dialogRefusal(openedDuringPreflight);
+        }
 
         if (preflight !== undefined && !preflight.ok) {
           if (preflight.failure.kind === 'blocked') {
@@ -2801,6 +3380,11 @@ export const createBrowserRuntime = ({
         }
 
         const downloadApproved = approval.ok;
+        /** The approval's one file, armed on the hold once this call's step is known. */
+        let approvedFile: {
+          readonly need: StepTokenNeed;
+          readonly session: string;
+        } | null = null;
 
         // The approval buys exactly one file: the one the refused step started, the same tab and url. Any other
         // Download during this call — another url, another tab — is guarded as usual and reported with its own token.
@@ -2811,6 +3395,7 @@ export const createBrowserRuntime = ({
 
           if (need !== undefined) {
             approvedNeeds.set(sessionKey, { itemId: undefined, ...need });
+            approvedFile = { need, session: sessionKey };
           }
         }
 
@@ -2824,16 +3409,15 @@ export const createBrowserRuntime = ({
             (preflight !== undefined &&
               (preflight.class === 'act' || preflight.class === 'navigate')));
 
-        // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
-        // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
-        // An approved call guards nothing when its approval names no file: without a url there is nothing to exempt,
-        // And a guard that cannot tell the approved file from the rest would cancel it.
-        const guardDownloads =
+        // Whether this call is one a guard applies to at all: an agent call that its step token does not already
+        // Cover, whose page action can start a download. Which guard that is — hold, intercept or legacy — is chosen
+        // Once, after the tab exists, from the live permission and the browser, because either can change while the
+        // Call runs (`browser_tabs new` opens its tab before the guard is armed).
+        const couldGuard =
           agentContext !== undefined &&
           downloadCapable &&
           preflight !== undefined &&
-          preflight.sensitiveToken === undefined &&
-          (!downloadApproved || approvedNeeds.get(sessionKey) !== undefined);
+          preflight.sensitiveToken === undefined;
 
         // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
         // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
@@ -2856,16 +3440,10 @@ export const createBrowserRuntime = ({
         // Guard: a tab opened at the destination lets the browser start the download before any guard exists, and
         // The file is then kept with no approval. This is the one path that must not reach the tool as written.
         // An approved repeat already owns the tab its step opened: opening a second one would download the file twice.
+        // Without the optional `downloads` permission nothing can stop the file, so the step still runs and the
+        // Announcement it produces is reported as possibly saved: a blank tab costs less than refusing every call.
         const opensGuardedTab =
-          guardDownloads && !downloadApproved && toolName === 'browser_tabs' && stepOpensTab;
-        // The permission is read before any tab exists: a refusal must not leave a blank tab in the session's
-        // Group, where it would become the next call's target.
-        if (opensGuardedTab && downloadsApi?.() === undefined) {
-          return {
-            kind: 'result',
-            result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
-          };
-        }
+          couldGuard && !downloadApproved && toolName === 'browser_tabs' && stepOpensTab;
 
         // A take-over may have arrived while this call resolved its step: opening a tab for a call that is already
         // Over would leave it behind.
@@ -2990,21 +3568,74 @@ export const createBrowserRuntime = ({
         const runIsTranslation = reusedTab !== undefined || openedForStep !== undefined;
         const runToolName = runIsTranslation ? 'browser_navigate' : toolName;
         const runArguments = runIsTranslation ? { url: stepUrl ?? '' } : toolArguments;
+        /**
+         * The origin this call's navigation was approved for, or `undefined` when the call sent none: a
+         * `browser_navigate` call, or a `browser_tabs new` the runtime ran as one on the tab it opened or reused. The
+         * gate answers the destination's origin for both spellings, so a redirect away from it is judged against the
+         * origin the call really asked to open, never against the tab it happened to start on.
+         */
+        const navigatedOrigin =
+          preflight !== undefined &&
+          preflight.ok &&
+          (runIsTranslation || preflight.class === 'navigate')
+            ? preflight.origin
+            : undefined;
+        /**
+         * The navigation result this call answers with, when the tab it drove settled on an origin the call may not open or
+         * read. One spelling for every call whose answer is about the navigation it sent, whichever tool carried it.
+         */
+        const stepNavigationResult = (): Promise<BrowserOriginChanged | undefined> | undefined =>
+          agentContext === undefined || navigatedOrigin === undefined
+            ? undefined
+            : postAgentNavigate(runSession, navigatedOrigin, agentContext.authorized);
 
         if (downloadCapable) {
           takeOverDownloads(tabId);
         }
 
+        // The one guard this call runs, chosen once here — after the tab exists and before the tool runs — from the
+        // Live permission and the browser. A `browser_tabs new` opens its tab first, so reading the permission now
+        // Is what makes a revoke or grant during that open land on the guard that actually arms.
+        const downloadsPermission = downloadsApi?.();
+        const downloadTier: DownloadTier = downloadTierOf({
+          approved: downloadApproved,
+          canDownload: couldGuard,
+          canIntercept: debuggerApi !== undefined,
+          hasHold: downloadHold !== undefined,
+          hasPermission: downloadsPermission !== undefined,
+          needsTheFile: approvedNeeds.get(sessionKey) !== undefined,
+          sensitiveToken: false,
+        });
+        // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
+        // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
+        const guardDownloads = downloadTier === 'legacy';
+        // The hold decides every download of the profile; the tab its step runs on has to be known before it runs.
+        const holdGuards = downloadTier === 'hold';
+        // Without the optional `downloads` permission the response that would become a file can still be failed.
+        const interceptGuards = downloadTier === 'intercept';
+
         // A file is about to start in the tab the step opened: that tab's earlier linger has to end too.
         if (runTabId !== tabId) {
           takeOverDownloads(runTabId);
-          takeStartedDownloads(runSession);
+
+          for (const download of takeStartedDownloads(runSession)) {
+            if (downloadHold !== undefined && downloadsPermission !== undefined) {
+              downloadHold.announce({ ...download, tabId: runTabId });
+            } else if (downloadsPermission === undefined) {
+              noteUnguardedDownload(sessionKey, { ...download, tabId: runTabId });
+            }
+          }
+
           await ensureFrameAutoAttach(runSession, runTabId);
         }
 
         // Read the optional permission at call time: it can be granted or revoked while this worker lives.
         const guardApi = downloadsApi?.();
         const guardTab = guardDownloads ? await guardTabOf(tabsApi, runTabId) : undefined;
+        // The hold attributes a download to a tab by the page it is on, read for the same reason and at the same moment.
+        const holdTab = holdGuards ? await guardTabOf(tabsApi, runTabId) : undefined;
+        const holdPage = holdTab?.url;
+
         // The tabs this call owns: its own plus any it opens (`browser_tabs new`, a link with a target).
         // The session's other tabs belong to the user or to another call, so a download there is not this call's.
         const callTabs = new Set<number>([runTabId]);
@@ -3019,6 +3650,17 @@ export const createBrowserRuntime = ({
         }): void => {
           if (opened.id !== undefined) {
             noteOwnedTab(opened.id, opened.openerTabId);
+
+            if (downloadHold !== undefined && holdGuards && sessionKey !== '') {
+              // A tab this call opened is this call's: a download it starts is announced on this tab,
+              // And the hold has to know the tab to attribute it.
+              downloadHold.tab({
+                page: '',
+                session: sessionKey,
+                step: downloadStep,
+                tabId: opened.id,
+              });
+            }
           }
         };
 
@@ -3027,14 +3669,20 @@ export const createBrowserRuntime = ({
         // A navigate names the document it asked for, so a download that starts after the call returns can still be found.
         const destination =
           preflight?.class === 'navigate' || runIsTranslation ? stepUrl : undefined;
-        // The requests this call can be charged with: everything the tab starts from here on.
-        // A download needs one, so a call that starts none never waits for a file.
+        // The requests this call can be charged with: everything the tab starts from here on. Read for every
+        // Download-capable call, not only the guarded ones: the document a step asks for is how the hold's and the
+        // Guard's reports tell the step's own file from a second one the same gesture started.
         const requestsBefore = new Set(
-          guardDownloads ? runSession.networkRequests().map(request => request.requestId) : []
+          runSession.networkRequests().map(request => request.requestId)
         );
         // The step this call is: what a download it starts is reported against, and what the token then binds.
+        // The moment the guard is armed, which its settle window is measured from and a navigate expectation covers.
+        const guardArmedAt = Date.now();
+        // The hold decides every download of the profile, so it learns the tab and the step of any agent call that
+        // Can start one — whatever extra guard the tier picks, and even when the call's own approval covers it.
+        // Without that, the file such a call starts is attributed to its tab's older step, or to nothing at all.
         const downloadStep: DownloadStep | undefined =
-          guardDownloads && preflight?.ok
+          agentContext !== undefined && downloadCapable && preflight?.ok
             ? {
                 argumentHash: stepHash,
                 ...downloadStepText(stepToolName, stepArgumentsRecord),
@@ -3045,6 +3693,53 @@ export const createBrowserRuntime = ({
                 toolName: stepToolName,
               }
             : undefined;
+        /** The navigation this call sent, when it sent one: its expectation is re-dated at the settle's entry. */
+        let navigateExpectation: DownloadHoldNavigation | null = null;
+
+        if (downloadHold !== undefined && downloadStep !== undefined) {
+          // The tab's page and step go with the call, before the tool runs: a download it starts is
+          // Attributed to this tab by its announcement, and the refusal names the step the model repeats.
+          downloadHold.tab({
+            page: holdPage ?? '',
+            session: sessionKey,
+            step: downloadStep,
+            tabId: runTabId,
+          });
+
+          // A navigation this runtime sends is the one call whose download Chrome reports with no referrer and,
+          // On real Chrome, no announcement either: the call's own expectation is then the only tie to the tab.
+          // It is registered now so the file is claimed while the tool runs, and extended when the tool returns
+          // Below: a slow navigation still produces its file inside its own settle window, never after a fixed span.
+          if (
+            stepToolName === 'browser_navigate' ||
+            stepToolName === 'browser_navigate_back' ||
+            stepToolName === 'browser_reload' ||
+            (stepToolName === 'browser_tabs' && stepArgumentsRecord['action'] === 'new')
+          ) {
+            navigateExpectation = {
+              attempt: `call-${String(guardArmedAt)}-${String(runTabId)}`,
+              session: sessionKey,
+              tabId: runTabId,
+              until: guardArmedAt + DOWNLOAD_HOLD_SETTLE_MS + ATTRIBUTION_WAIT_MS,
+              url: destination ?? '',
+            };
+            downloadHold.navigate(navigateExpectation);
+          }
+        }
+
+        // The approval the repeat redeemed is the one file the hold lets through, and the item is held while the
+        // Tool runs: it has to be armed before the tool starts, whatever step the call is.
+        if (downloadHold !== undefined && approvedFile !== null) {
+          downloadHold.arm({
+            expiresAt: Date.now() + STEP_TOKEN_TTL_MS,
+            kind: 'armed',
+            session: approvedFile.session,
+            step: downloadStep,
+            tabId: approvedFile.need.tabId,
+            target: targetOfNeed(approvedFile.need),
+          });
+        }
+
         const downloadGuard =
           guardTab === undefined || guardApi === undefined
             ? undefined
@@ -3093,19 +3788,45 @@ export const createBrowserRuntime = ({
                   : {}
               );
 
-        // No guard without the optional permission: no file may be started, so the call is refused instead of run unguarded.
-        if (guardDownloads && downloadGuard === undefined) {
-          // The permission was revoked between the check and this point: the tab this call opened is not the next
-          // Call's to inherit.
-          if (openedForStep !== undefined) {
-            await closeOpenedTab(openedForStep.tabId);
-          }
+        // Without an item guard nothing can hold or cancel a download: the pause on the tab's own session fails
+        // The response that would become a file, and every other response is continued untouched. Decided here,
+        // After the permission was read for the item guard, so a revoke mid-call falls back to the pause.
+        // The Documents the tab already had are not this call's, so the settle reads only what it starts.
+        const interceptBefore = new Set(
+          interceptGuards ? runSession.networkRequests().map(request => request.requestId) : []
+        );
+        const responseInterceptor =
+          interceptGuards && downloadGuard === undefined
+            ? await armResponseInterceptor(runSession)
+            : undefined;
 
-          return {
-            kind: 'result',
-            result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
-          };
-        }
+        // A download no network response carries — a `blob:`, a `data:`, an `<a download>` — is announced and
+        // Saved before anything can stop it. Without the optional permission no item can be held or cancelled, so
+        // The announcement is the only thing that names the file: it is queued as possibly saved, never silently kept.
+        const stopUnguardedWatch =
+          downloadTier === 'intercept'
+            ? runSession.watchDownloads(download => {
+                noteUnguardedDownload(sessionKey, { ...download, tabId: runTabId });
+              })
+            : undefined;
+
+        // The sign that a download started, which the hold cannot see before its item exists: the browser's own
+        // Announcement on this call's tab. It is what makes a signed call wait for its item instead of answering,
+        // And what attributes a `no-referrer` item: the hold's own map is filled by the start-of-call drain, which
+        // Is empty for the call that actually starts the file, so the announcement has to reach it as it arrives.
+        const stopSignWatch =
+          holdGuards && agentContext !== undefined
+            ? runSession.watchDownloads(download => {
+                signedFile ??= {
+                  filename:
+                    download.suggestedFilename ??
+                    requestedFileName(download.url ?? '') ??
+                    'the downloaded file',
+                  url: download.url,
+                };
+                downloadHold?.announce({ ...download, tabId: runTabId });
+              })
+            : undefined;
 
         if (downloadGuard !== undefined) {
           // The guard reports the tabs this call opened, so its listener lives exactly as long as the guard does.
@@ -3122,6 +3843,65 @@ export const createBrowserRuntime = ({
 
         let result: EvalTabResult | null = null;
         let settlement: GuardSettlement = { kept: [], stopped: 0 };
+        let intercepted: InterceptSettlement = { stopped: [] };
+
+        // A Document this call started that the browser has not answered yet: it may still become a file. Hoisted
+        // Because both the settle's sign and the blocked answer below need the same reading.
+        const hasUnansweredDocument = (): boolean =>
+          runSession
+            .networkRequests()
+            .some(
+              request =>
+                !requestsBefore.has(request.requestId) &&
+                request.resourceType === 'Document' &&
+                request.status === undefined &&
+                request.finishedAt === undefined &&
+                request.failure === undefined
+            );
+
+        /**
+         * The hold's settle for this call, plus the navigation expectation re-dated to it. Both windows are measured
+         * from the tool's answer rather than the call's start, so a slow tool keeps the full budget it needs.
+         */
+        const settleHoldCall = async (settleSession: string): Promise<DownloadSettle | null> => {
+          // The tool answered, so the window a download of this call may land in starts now: a navigation that
+          // Took longer than the expectation's first span still produces its file inside the settle it owns.
+          const settleEnteredAt = Date.now();
+
+          if (downloadHold !== undefined && navigateExpectation !== null) {
+            navigateExpectation = {
+              ...navigateExpectation,
+              until: settleEnteredAt + DOWNLOAD_HOLD_SETTLE_MS + ATTRIBUTION_WAIT_MS,
+            };
+            downloadHold.navigate(navigateExpectation);
+          }
+
+          // A call with no sign of a download answers after the short grace; one that saw its tab announce a file
+          // (or a load the browser answered as one) waits the bounded item wait for the hold's decision.
+          return (
+            (await downloadHold?.settle(settleSession, {
+              graceMs: DOWNLOAD_START_GRACE_MS,
+              sign: (): DownloadSign => {
+                if (signedDownload() !== null || navigatedToFile) {
+                  return 'download';
+                }
+
+                // A Document this call started that the browser has not answered can still become a file: the
+                // Item it would produce arrives after the announcement, so the call may not answer "nothing" yet.
+                return hasUnansweredDocument() ? 'pending' : 'none';
+              },
+              since: callStartedAt,
+              // An approved call waits for the one file its approval bought: the browser creates its item a moment
+              // After the command returns, and a re-download of a delayed attachment was measured 13 ms past the
+              // Announcement bound. Every other call pays the shorter bound.
+              timeoutMs: downloadApproved ? DOWNLOAD_HOLD_SETTLE_MS : DOWNLOAD_ITEM_WAIT_MS,
+            })) ?? null
+          );
+        };
+
+        // The page action that opens a dialog is not answered until the dialog is closed.
+        // The call returns when the dialog opens; the action finishes on its own once the dialog is answered.
+        const dialogWatch = watchForDialog(runSession.watchDialogs);
 
         try {
           dispatched = true;
@@ -3173,7 +3953,19 @@ export const createBrowserRuntime = ({
             toolName: runToolName,
           });
 
-          result = await Promise.race([call, takenAway.then(() => null)]);
+          result = await Promise.race([
+            call,
+            takenAway.then(() => null),
+            dialogWatch.opened,
+          ]).finally(dialogWatch.stop);
+
+          // A load the browser answered as a file: the attachment never became a document, and its item follows.
+          navigatedToFile =
+            (runIsTranslation || preflight?.class === 'navigate') &&
+            destination !== undefined &&
+            result !== null &&
+            !result.ok &&
+            result.error.includes('ERR_ABORTED');
         } finally {
           // Every exit — a result, a take-over, a throw — disarms the guard, so no listener or interception outlives the call.
           if (guardDownloads && !downloadApproved) {
@@ -3184,6 +3976,36 @@ export const createBrowserRuntime = ({
             // A download the guard saw: the browser named it before the guard stopped and deleted its file.
             settlement = await downloadGuard.settle();
             tabsApi.onCreated?.removeListener?.(noteBrowserOpenedTab);
+          }
+
+          if (responseInterceptor !== undefined) {
+            // Every pause this call armed is answered and the interception is released before the call answers. The
+            // Pause outlives the tool while a Document this call started still owes one: a click's attachment
+            // Response arrives just after the click returned, and releasing here would continue it unread.
+            intercepted = await responseInterceptor.settle(() => ({
+              // The pause's own ledger is the interceptor's: the caller supplies only what the tab started.
+              documents: runSession
+                .networkRequests()
+                .filter(
+                  request =>
+                    !interceptBefore.has(request.requestId) && request.resourceType === 'Document'
+                ),
+              now: Date.now(),
+            }));
+          }
+
+          // The announcement for a file no response could stop is read before the watch goes: a blob that lands
+          // While the call is still answering is still this call's to report.
+          stopUnguardedWatch?.();
+
+          // The sign watch outlives the tool by the settle, which is the window it exists to cover: Chrome names a
+          // Download up to 25 ms after the command answered, so a watch stopped with the tool would drop that
+          // Announcement. The hold's map would stay empty, its 250 ms wait would expire, and a no-referrer file would
+          // Land unapproved. The `finally` releases it on every exit, including a settle that throws.
+          try {
+            settleState = holdGuards ? await settleHoldCall(sessionKey) : null;
+          } finally {
+            stopSignWatch?.();
           }
         }
 
@@ -3196,15 +4018,176 @@ export const createBrowserRuntime = ({
 
         // A download an earlier call's guard stopped while this one ran had no result to be reported on; this call
         // Reports it, so a deleted file is never silent. A panel call has no model to tell, so it leaves them.
-        const late = agentContext === undefined ? [] : drainDownloadReports(sessionKey);
-        const stoppedFiles = settlement.stopped;
+        // Where the hold decides downloads, its own reports are the account of what became of each file, and each
+        // Carries the moment of its decision: that is how this call tells its own refusal from an earlier one's.
+        let late: readonly (DownloadReport & { readonly since?: number })[] = [];
+
+        if (agentContext !== undefined) {
+          late =
+            downloadHold === undefined
+              ? drainDownloadReports(sessionKey)
+              : downloadHold.drain(sessionKey);
+        }
+        const ownLate = late.filter(file => (file.since ?? callStartedAt) >= callStartedAt);
+        const earlierLate = late.filter(file => (file.since ?? callStartedAt) < callStartedAt);
+        // The pages this call asked the browser for as a document: the url its own download comes from, which is
+        // What tells the file the model asked for from a second one the same gesture started.
+        const stepDocuments = [
+          ...new Set(
+            runSession
+              .networkRequests()
+              .filter(
+                request =>
+                  !requestsBefore.has(request.requestId) && request.resourceType === 'Document'
+              )
+              .map(request => pageOf(request.url) ?? '')
+              .filter(page => page !== '')
+          ),
+        ];
+        const stoppedFiles = downloadHold === undefined ? settlement.stopped : ownLate.length;
         // A file the guard could not delete is named, whichever call stopped it.
         const keptFiles = [
           ...settlement.kept,
           ...late.filter(file => file.kept).map(file => file.filename),
         ];
+        // The files this call started besides the one its approval bought: named on the success it earned.
+        let alsoStopped: readonly DownloadReport[] = [];
 
-        if (agentContext !== undefined && stoppedFiles + settlement.kept.length === 0) {
+        if (agentContext !== undefined && intercepted.stopped.length > 0) {
+          // The pause failed the response before any byte was written, so no file exists under these names. Without
+          // The optional permission no approval could be redeemed for a guard that does not exist, so the text asks
+          // For the grant instead of offering a token nobody could spend.
+          const [firstFile] = intercepted.stopped;
+
+          return needsPermissionOutcome(
+            [
+              {
+                class: 'sensitive',
+                origin: preflight?.ok ? preflight.origin : '',
+                reason: SENSITIVE_REASON.download,
+              },
+            ],
+            {
+              afterAction: true,
+              error: downloadStoppedWithoutPermissionError(
+                firstFile?.filename ?? 'the downloaded file'
+              ),
+              keptFiles: [],
+            }
+          );
+        }
+
+        if (agentContext !== undefined) {
+          // A download the browser announced where nothing could hold or cancel it: no finished file can be
+          // Ruled out, so it is named as possibly saved and the one fix that guards it is named too.
+          const unguarded = unguardedDownloads.get(sessionKey) ?? [];
+
+          unguardedDownloads.delete(sessionKey);
+
+          const [firstUnguarded] = unguarded;
+
+          if (firstUnguarded !== undefined) {
+            return downloadRefusal(
+              firstUnguarded,
+              {
+                keptFiles: unguarded.map(file => file.filename),
+                origin: preflight?.ok ? preflight.origin : '',
+                unguarded: true,
+              },
+              runTabId
+            );
+          }
+        }
+
+        if (downloadHold !== undefined && agentContext !== undefined) {
+          if (earlierLate.length > 0) {
+            // A file an earlier call started: its token binds that call's step, and the text names it.
+            const owed = lateDownloadRefusal(earlierLate);
+
+            if (owed !== undefined) {
+              return owed;
+            }
+          }
+
+          // An approved repeat is a call for exactly the one file its approval bought. When the call succeeded and
+          // Ends with that approval still unspent and no file of its own, the browser created no item for it —
+          // Chrome's own multiple-downloads limiter refuses it — so the answer says so instead of a success the human
+          // Cannot trust. A failed call is the tool's own failure, not the browser's: its missing element, its tab
+          // Error, its navigation refusal is what the model has to read, and the approval stays unspent for the retry.
+          // A Document this call started and the browser has not answered yet is not blocked either: its item can
+          // Still arrive, and calling it blocked would spend the human's approval on a file the browser is writing.
+          if (
+            downloadApproved &&
+            settled.ok &&
+            ownLate.length === 0 &&
+            settleState !== 'waiting_for_item' &&
+            !hasUnansweredDocument() &&
+            downloadHold.needOf(sessionKey)?.kind === 'armed'
+          ) {
+            const approvedNeed = approvedFile?.need;
+            const changed = await stepNavigationResult();
+
+            if (changed !== undefined) {
+              return {
+                from: changed.from,
+                kind: 'origin_changed',
+                result: settled,
+                to: changed.to,
+              };
+            }
+
+            return browserBlockedRefusal({
+              need:
+                approvedNeed === undefined
+                  ? undefined
+                  : { kind: 'page', tabId: approvedNeed.tabId, url: approvedNeed.url },
+              origin: preflight?.ok ? preflight.origin : '',
+              step: downloadStep,
+              tokenTabId: runTabId,
+            });
+          }
+
+          // A download started and nothing was decided inside the bound: the file may exist, and the model is told
+          // So instead of receiving "nothing happened" for a step that may have written one.
+          if (settleState === 'waiting_for_item' && ownLate.length === 0) {
+            const signed = signedDownload();
+
+            return downloadRefusal(
+              {
+                filename: signed?.filename ?? 'the downloaded file',
+                kept: true,
+                step: downloadStep,
+                tabId: runTabId,
+                url: signed?.url,
+              },
+              { keptFiles: [], origin: preflight?.ok ? preflight.origin : '' },
+              runTabId
+            );
+          }
+
+          // An approval that was spent bought its one file: the files the same gesture started besides it are
+          // Named on the success, because a refusal would say the call that did what was approved did nothing.
+          const bought = downloadApproved && downloadHold.needOf(sessionKey)?.kind === 'spent';
+
+          if (bought) {
+            alsoStopped = ownLate;
+          } else {
+            const own = ownDownloadOf(ownLate, stepDocuments);
+
+            if (own !== undefined) {
+              return downloadRefusal(
+                own.file,
+                {
+                  ...(ownLate.length === 1 ? {} : { alsoStopped: otherFilesOf(ownLate, own.file) }),
+                  keptFiles,
+                  origin: preflight?.ok ? preflight.origin : '',
+                  scope: own.scope,
+                },
+                runTabId
+              );
+            }
+          }
+        } else if (agentContext !== undefined && stoppedFiles + settlement.kept.length === 0) {
           // Nothing of this call's own was stopped: the report is about an earlier call's download, so its token
           // Binds that call's step and the text names it.
           const owed = lateDownloadRefusal(late);
@@ -3215,15 +4198,17 @@ export const createBrowserRuntime = ({
         } else if (agentContext !== undefined && stoppedFiles + settlement.kept.length > 0) {
           const origin = preflight?.ok ? preflight.origin : '';
           const reason = SENSITIVE_REASON.download;
-          // The refused file is what the approval will buy: a later step's download is a fresh approval of its own.
-          const refusedFile = settlement.stoppedItems?.find(item => item.url !== undefined);
+          // The refused file is what the approval will buy: the step's own download, never the first one the browser
+          // Stopped. A later step's download is a fresh approval of its own.
+          const own = ownDownloadOf(settlement.stoppedItems ?? [], stepDocuments);
+          const refusedFile = own?.file;
           const stepToken = preflight?.ok
             ? issueSensitiveToken(
                 { origin, reason },
                 runTabId,
                 refusedFile?.url === undefined
                   ? undefined
-                  : { tabId: refusedFile.tabId ?? runTabId, url: refusedFile.url }
+                  : needOfUrl(refusedFile.tabId ?? runTabId, refusedFile.url, own?.scope ?? 'page')
               )
             : undefined;
 
@@ -3235,8 +4220,15 @@ export const createBrowserRuntime = ({
           }
 
           // The click already ran and the download was cancelled. `afterAction` tells the CLI not to replay it.
+          // The text names the file, so the model knows which download the one approval buys.
+          const refusedMessage =
+            refusedFile === undefined || (refusedFile.filename ?? '') === ''
+              ? undefined
+              : `The download of ${refusedFile.filename} was stopped before it was saved: downloading a file needs your approval. Repeat that ${downloadStep?.noun ?? 'step'} after the download is approved to receive the file.`;
+
           return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
             afterAction: true,
+            ...(refusedMessage === undefined ? {} : { error: refusedMessage }),
             keptFiles,
             ...(downloadStep === undefined
               ? {}
@@ -3250,10 +4242,71 @@ export const createBrowserRuntime = ({
           });
         }
 
+        // A dialog the call left open holds the page: no frame or redirect read can run until it is answered,
+        // So the dialog is what the caller acts on next, ahead of the step's own text or the tab it opened.
+        const dialogAfterCall = runSession.pendingDialog();
+
+        if (dialogAfterCall !== undefined) {
+          const modalState = modalStateText(
+            dialogAfterCall,
+            toolName,
+            dialogReading(dialogAfterCall, agentContext)
+          );
+
+          // A guarded `browser_tabs new` names the tab it opened even when the dialog swallowed its answer:
+          // Its id and url are how the caller answers the dialog on that tab, and they were lost before.
+          const openedInfo = openedForStep === undefined ? undefined : await tabInfo(runTabId);
+          // `tabInfo` answers `''` for a tab it cannot read a url from, the same as the branch below treats it.
+          const openedUrl =
+            openedInfo?.url === undefined || openedInfo.url === '' ? undefined : openedInfo.url;
+          const openedNote =
+            openedForStep === undefined
+              ? ''
+              : `\n\nThe call opened tab ${String(runTabId)} (${openedUrl ?? openedForStep.url}).`;
+
+          return {
+            kind: 'result',
+            result: withModalState(settled, `${modalState}${openedNote}`),
+          };
+        }
+
         // A guarded `browser_tabs new` answers with what the tool itself would: the tab it opened, at its new url.
         if (openedForStep !== undefined) {
+          if (intercepted.stopped.length > 0) {
+            // The document the tab loaded was a file, and the pause failed it: that is a refusal, not a tab answer.
+            return needsPermissionOutcome(
+              [
+                {
+                  class: 'sensitive',
+                  origin: preflight?.ok ? preflight.origin : '',
+                  reason: SENSITIVE_REASON.download,
+                },
+              ],
+              {
+                afterAction: true,
+                error: downloadStoppedWithoutPermissionError(
+                  intercepted.stopped[0]?.filename ?? 'the downloaded file'
+                ),
+                keptFiles: [],
+              }
+            );
+          }
+
           if (!settled.ok) {
             return { kind: 'result', result: settled };
+          }
+
+          // The navigation this call sent is the one the check is about, whichever tool carried it: a redirect that
+          // Left the tab on an origin this call may not open or read is reported before the tab is answered as opened.
+          const changed = await stepNavigationResult();
+
+          if (changed !== undefined) {
+            return {
+              from: changed.from,
+              kind: 'origin_changed',
+              result: settled,
+              to: changed.to,
+            };
           }
 
           const info = await tabInfo(runTabId);
@@ -3289,18 +4342,76 @@ export const createBrowserRuntime = ({
             ? await keptDownloadText(guardApi, destination, callStartedAt)
             : undefined;
 
+        // The file the approval let through is named on the success too: the model must be able to point at what
+        // Landed, and the same name is what the refusal that asked for the approval carried.
+        const approvedName =
+          downloadApproved && (settled.ok || keptText !== undefined)
+            ? settlement.allowed?.[0]
+            : undefined;
+        const successText =
+          (approvedName === undefined
+            ? undefined
+            : `${approvedName}: The file was downloaded; the page did not change.`) ?? keptText;
+
+        // An approved repeat is a call for exactly one file. When the call succeeded and the browser named no item
+        // For it, Chrome's own multiple-downloads limiter has refused the file: a plain success would hide it, and a
+        // Spent approval would ask a human again for a file the browser swallowed. The approval stays unspent, and
+        // The same step token is issued again so the repeat needs no second decision once the site is allowed.
+        if (
+          downloadApproved &&
+          // Only the item-level guard can tell "no file was created" from "another guard owns the decision".
+          downloadGuard !== undefined &&
+          successText === undefined &&
+          settled.ok &&
+          settlement.stopped === 0 &&
+          intercepted.stopped.length === 0
+        ) {
+          const approvedUrl =
+            approvedFile?.need.url ??
+            settlement.stoppedItems?.find(item => item.url !== undefined)?.url;
+          const changed = await stepNavigationResult();
+
+          if (changed !== undefined) {
+            return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };
+          }
+
+          return browserBlockedRefusal({
+            need:
+              approvedUrl === undefined
+                ? undefined
+                : {
+                    kind: approvedFile?.need.kind ?? 'page',
+                    tabId: approvedFile?.need.tabId ?? runTabId,
+                    url: approvedUrl,
+                  },
+            origin: preflight?.ok ? preflight.origin : '',
+            step: downloadStep,
+            tokenTabId: runTabId,
+          });
+        }
+
         // A download is not a document, so a navigate that became one never moved the tab.
         // An opaque or older origin there is the file's answer, not the redirect this check looks for.
-        if (preflight !== undefined && preflight.class === 'navigate' && keptText === undefined) {
-          const changed = await postAgentNavigate(runSession, preflight.origin);
+        if (successText === undefined) {
+          const changed = await stepNavigationResult();
 
           if (changed !== undefined) {
             return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };
           }
         }
 
+        const alsoText =
+          alsoStopped.length === 0 || (!settled.ok && successText === undefined)
+            ? undefined
+            : alsoStoppedDownloadsText(alsoStopped.map(file => file.filename));
+        const resultText =
+          alsoText === undefined
+            ? successText
+            : [successText, alsoText]
+                .filter((part): part is string => part !== undefined)
+                .join(' ');
         const finalResult: EvalTabResult =
-          keptText === undefined ? settled : { ok: true, value: keptText };
+          resultText === undefined ? settled : { ok: true, value: resultText };
 
         if (agentContext === undefined) {
           return { kind: 'result', result: finalResult };
@@ -3319,6 +4430,27 @@ export const createBrowserRuntime = ({
         // A throw before the tool ran leaves the tab this call opened unused: close it rather than orphan it.
         if (!dispatched && stepOpenedTab !== null) {
           await closeOpenedTab(stepOpenedTab);
+        }
+
+        // A dialog that opened while the call's checks read the page stopped those reads.
+        // The caller is told to answer the dialog, not handed a transport failure.
+        const blocking = session.pendingDialog();
+
+        if (error instanceof BrowserToolDialogOpenError && blocking !== undefined) {
+          return {
+            kind: 'result',
+            result: {
+              error: dialogRefusalText(
+                blocking,
+                toolName,
+                dialogReading(
+                  blocking,
+                  caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined
+                )
+              ),
+              ok: false,
+            },
+          };
         }
 
         throw error;
@@ -3380,7 +4512,7 @@ export const createBrowserRuntime = ({
     if (caller.kind === 'agent') {
       // The session is over: its downloads are settled with no report, because there is no model left to tell,
       // And a later session must never be asked to redeem a token bound to this one.
-      closeSessionRecords(caller.sessionHandle);
+      closeDownloads(caller.sessionHandle);
 
       for (const [tabId, watch] of openWatches) {
         if (watch.session === caller.sessionHandle) {
@@ -3477,12 +4609,60 @@ export const createBrowserRuntime = ({
     return tab === undefined ? undefined : { title: tab.title ?? '', url: tab.url ?? '' };
   };
 
+  /** False when the tab is known to exist, or when this browser cannot say. */
+  const tabGone = async (tabId: number): Promise<boolean> => {
+    const get = tabsApi.get?.bind(tabsApi);
+
+    if (get === undefined) {
+      return false;
+    }
+
+    try {
+      return (await get(tabId)) === undefined;
+    } catch {
+      return true;
+    }
+  };
+
+  let restoring: Promise<void> | undefined = undefined;
+
+  /**
+   * The stored sessions, without the tabs closed while no worker ran: the
+   * `tabs.onRemoved` of those closes reached nobody, so the stored copy still
+   * names them.
+   */
+  const restoreSessions = (): Promise<void> => {
+    restoring ??= (async () => {
+      try {
+        if (!(await groups.restore())) {
+          // Storage could not be read: the next session operation reads it again.
+          restoring = undefined;
+          return;
+        }
+
+        const stored = new Set(groups.listSessions().flatMap(session => session.tabs));
+
+        await Promise.all(
+          [...stored].map(async tabId => {
+            if (await tabGone(tabId)) {
+              await disposeTab(tabId);
+            }
+          })
+        );
+      } catch (error) {
+        console.warn('Failed to restore browser agent sessions:', error);
+      }
+    })();
+
+    return restoring;
+  };
+
   return {
     adoptEnded: input => groups.adoptEnded(input),
     claimTab,
     closeSession: async input => {
       // A closed session owes no approval: whatever it left stopped is settled here, not handed to the next one.
-      closeSessionRecords(input.sessionHandle);
+      closeDownloads(input.sessionHandle);
       await groups.closeSession(input);
     },
     disposeCaller,
@@ -3502,6 +4682,7 @@ export const createBrowserRuntime = ({
     releaseTab: ({ caller, tabId }) => {
       leases.release(tabId, caller);
     },
+    restoreSessions,
     runTool,
     shareActiveTab: input => groups.shareActiveTab(input),
     tabInfo,

@@ -18,6 +18,7 @@ import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete-re
 import {
   BOUNCER_CREDIT_EVENT_OUTBOX_INITIAL_RETRY_BACKOFF_MS,
   BOUNCER_CREDIT_EVENT_OUTBOX_MAX_ATTEMPTS,
+  claimBouncerCreditEventByEventId,
   claimDueBouncerCreditEvents,
   enqueueBouncerCreditEvent,
   markBouncerCreditEventDelivered,
@@ -410,5 +411,82 @@ describe('bouncer credit-event outbox (integration)', () => {
 
     const rows = await db.select().from(bouncer_credit_event_outbox);
     expect(rows.map(row => row.event_id)).toEqual(['evt-recent-delivered']);
+  });
+
+  it('claims a backoff-waiting row by event id while the drainer holds it', async () => {
+    await insertOutboxRow({
+      event_id: 'evt-backoff-waiting',
+      event_type: 'charge.failed',
+      user_id: 'user-1',
+      payload: { type: 'charge.failed' },
+      next_attempt_at: new Date(Date.now() + HOUR_MS).toISOString(),
+    });
+
+    // The drainer honours the retry deadline, so a backoff-waiting row is not due.
+    const due = await claimDueBouncerCreditEvents(db, 10);
+    expect(due).toHaveLength(0);
+
+    // The webhook's immediate delivery is not a retry attempt, so it claims the row anyway.
+    const claimed = await claimBouncerCreditEventByEventId(db, 'evt-backoff-waiting');
+    expect(claimed?.event_id).toBe('evt-backoff-waiting');
+    expect(claimed?.status).toBe('sending');
+    expect(claimed?.claimed_at).not.toBeNull();
+  });
+
+  it('claims only one row when an event id has several event types', async () => {
+    const createdAt = new Date().toISOString();
+    await insertOutboxRow({
+      event_id: 'evt-two-types',
+      event_type: 'charge.failed',
+      user_id: 'user-1',
+      payload: { type: 'charge.failed' },
+      created_at: createdAt,
+    });
+    await insertOutboxRow({
+      event_id: 'evt-two-types',
+      event_type: 'charge.refunded',
+      user_id: 'user-1',
+      payload: { type: 'charge.refunded' },
+      created_at: createdAt,
+    });
+
+    const claimed = await claimBouncerCreditEventByEventId(db, 'evt-two-types');
+    expect(claimed?.status).toBe('sending');
+
+    // The sibling must stay claimable by the drainer, not be stamped `sending` and delivered by
+    // nobody until the stale-claim window reclaims it.
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows.filter(row => row.status === 'sending')).toHaveLength(1);
+    expect(rows.filter(row => row.status === 'pending')).toHaveLength(1);
+  });
+
+  it('does not reclaim a fresh claim when the caller clock runs ahead', async () => {
+    const now = Date.now();
+    await insertOutboxRow({
+      event_id: 'evt-claimed-recently',
+      event_type: 'charge.failed',
+      user_id: 'user-1',
+      payload: { type: 'charge.failed' },
+      status: 'sending',
+      claimed_at: new Date(now - 60 * 1000).toISOString(),
+    });
+    await insertOutboxRow({
+      event_id: 'evt-claimed-long-ago',
+      event_type: 'charge.failed',
+      user_id: 'user-1',
+      payload: { type: 'charge.failed' },
+      status: 'sending',
+      claimed_at: new Date(now - 6 * 60 * 1000).toISOString(),
+    });
+
+    // The stale window is measured on the database clock, so a host clock running ahead cannot
+    // widen it.
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now + HOUR_MS);
+    try {
+      const reclaimed = await reclaimStaleBouncerCreditEvents(db, 10);
+      expect(reclaimed.map(row => row.event_id)).toEqual(['evt-claimed-long-ago']);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });

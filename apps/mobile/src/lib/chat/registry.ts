@@ -46,6 +46,7 @@ import { answerParts } from './answer-parts';
 import { countSessionUsage } from './chat-usage';
 import {
   ensureKiloMcp,
+  forgetMcpEnabled,
   mcpChoiceFor,
   mcpEnabledFor,
   moveMcpEnabled,
@@ -58,7 +59,9 @@ import { questionSearches } from './web-search-budget';
 import {
   type Asked,
   askedIn,
+  firstQuestionIn,
   forgetAsked,
+  forgetQuestions,
   keptIn,
   migrateAsked,
   moveQuestions,
@@ -71,6 +74,7 @@ import {
 } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
+  forgetWebSearchEnabled,
   moveWebSearchEnabled,
   setWebSearchEnabled as persistWebSearchEnabled,
   webSearchChoiceFor,
@@ -80,6 +84,7 @@ import { waitForChatBackends } from './backend-store';
 import { targetSupportsTools } from './backend-capabilities';
 import { backendFailureKey } from './backend-target';
 import {
+  deleteChat,
   effortOfSession,
   forgetSession,
   modelOfSession,
@@ -324,6 +329,44 @@ async function discoverServers(place: ChatPlace, kiloEnabled: boolean): Promise<
 }
 
 /**
+ * Runs a step that gives something back, and lets it fail on its own.
+ *
+ * These run while a failure is already being reported, and often against the
+ * very database or store that failed: one refused undo must not hide the reason
+ * the work did not finish, nor skip the other undos.
+ */
+async function bestEffort(work: () => Promise<void> | void): Promise<void> {
+  try {
+    await work();
+  } catch {
+    /* Nothing is left to report it to: the caller is already failing. */
+  }
+}
+
+/**
+ * Gives back a session a start opened and could not install.
+ *
+ * The scope closes first: its finalizers are what tell the store to write down
+ * the conversation it still holds, and a row deleted before that would be
+ * written again by the close. What the start wrote is removed after it, each
+ * removal on its own, because the database may be the very thing that failed
+ * and one refused delete must not hide the reason the start did.
+ */
+async function abandonStart(
+  runtime: ChatRuntime,
+  sessionId: string,
+  scope: Scope.Closeable
+): Promise<void> {
+  await bestEffort(() => runtime.runPromise(Scope.close(scope, Exit.void)));
+  /* A preference is only ever written by a start that turns the tools off, so
+     removing it costs nothing on the path that wrote no preference. */
+  await bestEffort(() => forgetMcpEnabled([sessionId]));
+  await bestEffort(async () => {
+    deleteChat(await open(), sessionId);
+  });
+}
+
+/**
  * Starts a chat: a session of its own, and a row so the list has it.
  *
  * A new chat has the Kilo MCP on unless the caller says otherwise, because the
@@ -359,31 +402,46 @@ export async function startChat(
         : [],
     })
   );
-  const database = await open();
-  rememberChat(database, { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
-  if (!mcpEnabled) {
-    /* The chat was opened without the tools, so its setting says so: a chat
-       that never had them is still a chat a person can turn them on for. */
-    await persistMcpEnabled(handle.id, false);
+  /* The session is open, and from here every step can fail. Nothing but this
+     map reaches a close, so a step that fails between the open and the install
+     leaves a live session nobody can end: the whole tail is guarded, and its
+     failure gives the session back rather than reporting only the reason. */
+  try {
+    const database = await open();
+    if (!mcpEnabled) {
+      /* The chat was opened without the tools, so its setting says so: a chat
+         that never had them is still a chat a person can turn them on for. */
+      await persistMcpEnabled(handle.id, false);
+    }
+    /* The row is written last, immediately before the install: a failure in the
+       setting above then leaves a session the list never named. */
+    rememberChat(database, { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
+    /* Read before the install, because it is a database read and can throw: the
+       rollback is only ever for a start that installed nothing, so a chat left
+       in the map is never one holding a scope that was already closed. */
+    const record = recordOfChat(database, handle.id);
+    chats.set(handle.id, {
+      handle,
+      scope,
+      answering: undefined,
+      waiting: [],
+      tools: { kind: 'none' },
+      counted: new Map(),
+      closing: false,
+      ...place,
+    });
+    change(handle.id, {
+      ...NOTHING,
+      model,
+      effort,
+      status: 'idle',
+      record,
+    });
+    return handle.id;
+  } catch (error) {
+    await abandonStart(runtime, handle.id, scope);
+    throw error;
   }
-  chats.set(handle.id, {
-    handle,
-    scope,
-    answering: undefined,
-    waiting: [],
-    tools: { kind: 'none' },
-    counted: new Map(),
-    closing: false,
-    ...place,
-  });
-  change(handle.id, {
-    ...NOTHING,
-    model,
-    effort,
-    status: 'idle',
-    record: recordOfChat(database, handle.id),
-  });
-  return handle.id;
 }
 
 /**
@@ -1514,27 +1572,116 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
     model,
   });
   const database = await open();
-  moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
-  await moveQuestions(sessionId, handle.id);
-  await moveMcpEnabled(sessionId, handle.id);
-  await moveWebSearchEnabled(sessionId, handle.id);
-  const turns = await runtime.runPromise(handle.history);
-  chats.delete(sessionId);
-  chats.set(
-    handle.id,
-    chat === undefined
-      ? {
-          handle,
-          scope,
-          answering: undefined,
-          waiting: [],
-          tools: { kind: 'none' },
-          counted: new Map(),
-          closing: false,
-          ...place,
+  /* Read before the first durable write: a copy whose history cannot be read
+     costs the copy and nothing else, so the copy is given back here rather than
+     moved halfway onto the chat. */
+  const turns = await runtime.runPromise(handle.history).catch(async (error: unknown) => {
+    await bestEffort(() => runtime.runPromise(Scope.close(scope, Exit.void)));
+    /* The copy wrote its rows as the clone was made, and no row of the list
+       names it, so nothing else ever reaches them: a sign-out that wipes the
+       chats list would leave a copy of the conversation behind. */
+    await bestEffort(() => {
+      deleteChat(database, handle.id);
+    });
+    throw error;
+  });
+  /* Each restore that puts the session the chat stays on back as it was,
+     registered before its forward step runs, so a step refused halfway is
+     repaired too. */
+  const restores: (() => Promise<void>)[] = [];
+  const carry = async (restore: () => Promise<void>, on: () => Promise<void>) => {
+    restores.push(restore);
+    await on();
+  };
+  try {
+    /* What the session the chat stays on held before the first record moved.
+       The moves are not atomic — each removes from the source and then writes
+       the destination — so a half-applied step is undone by putting this back
+       rather than by moving the copy's records in reverse. That reverse is what
+       the moves do without it: the source's value is gone by the time the undo
+       runs, so the move back carries the copy's and the person's explicit
+       choice is lost. Read inside the guard because it can fail, and a copy
+       left running with nothing reaching it is a session nobody can end. */
+    const [askedBefore, keptBefore, nameBefore, mcpBefore, webSearchBefore] = await Promise.all([
+      askedIn(sessionId),
+      keptIn(sessionId),
+      firstQuestionIn(sessionId),
+      mcpChoiceFor(sessionId),
+      webSearchChoiceFor(sessionId),
+    ]);
+    await carry(
+      async () => {
+        await forgetQuestions(sessionId);
+        if (askedBefore !== null) {
+          await rememberAsked(sessionId, askedBefore);
         }
-      : { ...chat, handle, scope, answering: undefined, counted: new Map(), closing: false }
-  );
+        if (keptBefore.length > 0) {
+          await replaceKept(sessionId, keptBefore);
+        }
+        if (nameBefore !== null) {
+          await rememberFirstQuestion(sessionId, nameBefore);
+        }
+      },
+      () => moveQuestions(sessionId, handle.id)
+    );
+    await carry(
+      async () => {
+        if (mcpBefore === null) {
+          await forgetMcpEnabled([sessionId]);
+          return;
+        }
+        await persistMcpEnabled(sessionId, mcpBefore);
+      },
+      () => moveMcpEnabled(sessionId, handle.id)
+    );
+    await carry(
+      async () => {
+        if (webSearchBefore === null) {
+          await forgetWebSearchEnabled([sessionId]);
+          return;
+        }
+        await persistWebSearchEnabled(sessionId, webSearchBefore);
+      },
+      () => moveWebSearchEnabled(sessionId, handle.id)
+    );
+    /* The row is the last durable write, and nothing between it and the map can
+       throw, so a failure elsewhere never leaves the row naming a session the
+       map does not hold. */
+    moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
+    chats.delete(sessionId);
+    chats.set(
+      handle.id,
+      chat === undefined
+        ? {
+            handle,
+            scope,
+            answering: undefined,
+            waiting: [],
+            tools: { kind: 'none' },
+            counted: new Map(),
+            closing: false,
+            ...place,
+          }
+        : { ...chat, handle, scope, answering: undefined, counted: new Map(), closing: false }
+    );
+  } catch (error) {
+    /* The copy is live and nothing reaches it: its scope closes first, so the
+       store writes down what it still holds, and only then is the row under it
+       deleted. What moved off the source goes back before the copy is cleaned
+       up, because the copy may hold records the source no longer does. */
+    await bestEffort(() => runtime.runPromise(Scope.close(scope, Exit.void)));
+    for (const restore of restores) {
+      // eslint-disable-next-line no-await-in-loop -- the records go back one at a time: they share one database and no lock
+      await bestEffort(restore);
+    }
+    await bestEffort(() => forgetQuestions(handle.id));
+    await bestEffort(() => forgetMcpEnabled([handle.id]));
+    await bestEffort(() => forgetWebSearchEnabled([handle.id]));
+    await bestEffort(() => {
+      deleteChat(database, handle.id);
+    });
+    throw error;
+  }
   /* The record describes the session the chat is now, and the move changed its
      effort: carrying the one it moved off would make the details sheet report
      the effort of a session the conversation is no longer on. */
@@ -1981,6 +2128,11 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
  * The question stays remembered, with the words the answer had reached under
  * it: the person is left with what they asked, what they already read, and a
  * Retry, rather than with a message that vanished.
+ *
+ * What the session counted before the Stop is billed, so it is counted now, as
+ * a failed answer's is in `settle`: a summary, or a round whose end the reading
+ * had not passed on yet. The round the Stop cut off reported no usage, so it
+ * adds nothing.
  */
 export async function stopChat(sessionId: string): Promise<void> {
   const chat = chats.get(sessionId);
@@ -1990,6 +2142,8 @@ export async function stopChat(sessionId: string): Promise<void> {
   const stopped = await halt(sessionId, chat);
   if (stopped !== null) {
     await keepPartialAnswer(sessionId, stopped);
+    const runtime = await runtimeFor(chat);
+    await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
     await drain(sessionId, chat, false);
   }
 }
@@ -2067,9 +2221,15 @@ async function endChat(sessionId: string, chat: Chat): Promise<void> {
      round on a session whose scope is closing under it. */
   chat.waiting.length = 0;
   const runtime = await runtimeFor(chat);
-  await runtime.runPromise(Scope.close(chat.scope, Exit.void));
-  forgetTurn(sessionId);
-  forgetState(sessionId);
+  try {
+    await runtime.runPromise(Scope.close(chat.scope, Exit.void));
+  } finally {
+    /* The chat has left the live ones, and nothing reaches this again: a queue
+       or a state left behind would never be retired. A refused close still
+       reports itself; what it forgot is not the caller's to see. */
+    forgetTurn(sessionId);
+    forgetState(sessionId);
+  }
 }
 
 /**
@@ -2094,22 +2254,44 @@ export async function releaseChat(sessionId: string): Promise<void> {
   });
 }
 
-/** Ends every chat, which is what signing out does before the wipe. */
+/**
+ * Ends every chat, which is what signing out does before the wipe.
+ *
+ * Each chat and each runtime is let go on its own, because sign-out runs what
+ * comes next: a store that refuses one close must not leave every later chat
+ * live, nor the runtimes undisposed, nor reach the caller as a failed sign-out
+ * that never wipes the chats — the sessions the wipe is meant to outlive.
+ */
 async function closeAccountChats(): Promise<void> {
   for (const sessionId of chats.keys()) {
-    // eslint-disable-next-line no-await-in-loop -- one scope closes after another: the store has no lock, and two closes at once would write over each other
-    await releaseChat(sessionId);
+    try {
+      // eslint-disable-next-line no-await-in-loop -- one scope closes after another: the store has no lock, and two closes at once would write over each other
+      await releaseChat(sessionId);
+    } catch (error) {
+      // eslint-disable-next-line no-console -- sign-out runs with no screen left to report a refused close on
+      console.warn(`[chats] ${sessionId} could not be closed: ${reason(error)}`);
+    }
   }
   /* A chat with a queued flag write but no live session is drained too: the
      preferences are deleted after this returns, and a write that landed after
      that would restore a choice the sign-out just removed. */
   for (const sessionId of chatTurns.keys()) {
-    // eslint-disable-next-line no-await-in-loop -- each chat's queue finishes before the next is waited on: their writes share one database
-    await releaseChat(sessionId);
+    try {
+      // eslint-disable-next-line no-await-in-loop -- each chat's queue finishes before the next is waited on: their writes share one database
+      await releaseChat(sessionId);
+    } catch (error) {
+      // eslint-disable-next-line no-console -- sign-out runs with no screen left to report a refused close on
+      console.warn(`[chats] ${sessionId} could not be closed: ${reason(error)}`);
+    }
   }
   for (const runtime of runtimes.values()) {
-    // eslint-disable-next-line no-await-in-loop -- close each runtime after all of its sessions
-    await runtime.dispose();
+    try {
+      // eslint-disable-next-line no-await-in-loop -- close each runtime after all of its sessions
+      await runtime.dispose();
+    } catch (error) {
+      // eslint-disable-next-line no-console -- sign-out runs with no screen left to report a refused dispose on
+      console.warn(`[chats] a runtime could not be disposed: ${reason(error)}`);
+    }
   }
   runtimes.clear();
 }

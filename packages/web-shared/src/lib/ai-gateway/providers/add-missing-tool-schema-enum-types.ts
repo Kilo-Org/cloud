@@ -3,6 +3,7 @@ import {
   isRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { forEachToolSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/tool-schema-walk';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const SCALAR_TYPES = new Set(['string', 'integer', 'number', 'boolean']);
@@ -31,7 +32,7 @@ function inferEnumType(values: unknown[]): string | string[] | undefined {
   return nullable ? [type, 'null'] : type;
 }
 
-type EnumTypeCounts = { typedEnums: number; untypedEnums: number };
+export type EnumTypeCounts = { typedEnums: number; untypedEnums: number };
 
 /**
  * Adds the `type` implied by the values of every `enum` that has no `type`.
@@ -68,23 +69,7 @@ export function addMissingToolSchemaEnumTypes(request: GatewayRequest): void {
     }
   };
 
-  switch (request.kind) {
-    case 'chat_completions':
-      for (const tool of request.body.tools ?? []) {
-        if (tool.type === 'function') update(tool.function.name, tool.function.parameters);
-      }
-      break;
-    case 'responses':
-      for (const tool of request.body.tools ?? []) {
-        if (tool.type === 'function') update(tool.name, tool.parameters);
-      }
-      break;
-    case 'messages':
-      for (const tool of request.body.tools ?? []) {
-        if ('input_schema' in tool) update(tool.name, tool.input_schema);
-      }
-      break;
-  }
+  forEachToolSchema(request, update);
 
   if (affectedTools.length > 0) {
     warnExceptInTest('[addMissingToolSchemaEnumTypes] found tool schema enums without a type', {

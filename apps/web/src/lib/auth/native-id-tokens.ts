@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import type jwt from 'jsonwebtoken';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, type Certificates } from 'google-auth-library';
 import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
 import {
   APPLE_APP_BUNDLE_ID,
@@ -77,13 +77,38 @@ function hasResponse(error: unknown): boolean {
 export type VerifiedAppleIdToken = { sub: string; email: string };
 
 /**
- * Lifetime of an acceptance record: as long as the identity token it binds,
- * bounded by the longest Apple ID-token lifetime.
+ * Lifetime of a single-use acceptance record: as long as the identity token it
+ * binds, clamped to [1, capSeconds]. Both providers share this rule.
  */
-function recordTtlSeconds(exp: number | undefined): number {
-  if (typeof exp !== 'number') return NONCE_TTL_CAP_SECONDS;
+function recordTtlSeconds(exp: number | undefined, capSeconds: number): number {
+  if (typeof exp !== 'number') return capSeconds;
   const remaining = Math.floor(exp - Date.now() / 1000);
-  return Math.max(1, Math.min(remaining, NONCE_TTL_CAP_SECONDS));
+  return Math.max(1, Math.min(remaining, capSeconds));
+}
+
+/**
+ * Consume one single-use record so its token is accepted exactly once. A store
+ * write that cannot complete refuses the request with the retryable error, so
+ * the acceptance rule never depends on the store being reachable.
+ */
+async function recordSingleUseToken(params: {
+  recordKey: string;
+  ttlSeconds: number;
+  storeUnavailableMessage: string;
+  alreadyUsedMessage: string;
+}): Promise<void> {
+  let recorded: string | null = null;
+  try {
+    recorded = await redisClient.set(params.recordKey, '1', {
+      nx: true,
+      ex: params.ttlSeconds,
+    });
+  } catch {
+    throw new NonceStoreUnavailableError(params.storeUnavailableMessage);
+  }
+  if (recorded !== 'OK') {
+    throw new NativeIdTokenError(params.alreadyUsedMessage);
+  }
 }
 
 /** The claims every native Apple path requires from a verified identity token. */
@@ -112,18 +137,12 @@ function appleTokenRecordKey(idToken: string): string {
  * never depends on the store being reachable.
  */
 async function recordSingleUseAppleToken(idToken: string, exp: number | undefined): Promise<void> {
-  let recorded: string | null = null;
-  try {
-    recorded = await redisClient.set(appleTokenRecordKey(idToken), '1', {
-      nx: true,
-      ex: recordTtlSeconds(exp),
-    });
-  } catch {
-    throw new NonceStoreUnavailableError('Apple token record unavailable');
-  }
-  if (recorded !== 'OK') {
-    throw new NativeIdTokenError('Apple ID token already used');
-  }
+  await recordSingleUseToken({
+    recordKey: appleTokenRecordKey(idToken),
+    ttlSeconds: recordTtlSeconds(exp, NONCE_TTL_CAP_SECONDS),
+    storeUnavailableMessage: 'Apple token record unavailable',
+    alreadyUsedMessage: 'Apple ID token already used',
+  });
 }
 
 /**
@@ -137,7 +156,7 @@ async function recordSingleUseAppleNonceAcceptance(
   idToken: string,
   exp: number | undefined
 ): Promise<void> {
-  const ex = recordTtlSeconds(exp);
+  const ex = recordTtlSeconds(exp, NONCE_TTL_CAP_SECONDS);
   let results: [string | null, string | null] = [null, null];
   try {
     results = (await redisClient
@@ -229,24 +248,12 @@ async function recordSingleUseGoogleToken(
   idToken: string,
   expiresAt: number | undefined
 ): Promise<void> {
-  const digest = createHash('sha256').update(idToken).digest('hex');
-  const ttlSeconds = (() => {
-    if (typeof expiresAt !== 'number') return GOOGLE_TOKEN_TTL_CAP_SECONDS;
-    const remaining = Math.floor(expiresAt - Date.now() / 1000);
-    return Math.max(1, Math.min(remaining, GOOGLE_TOKEN_TTL_CAP_SECONDS));
-  })();
-  let recorded: string | null = null;
-  try {
-    recorded = await redisClient.set(`auth:google-signin-token:${digest}`, '1', {
-      nx: true,
-      ex: ttlSeconds,
-    });
-  } catch {
-    throw new NonceStoreUnavailableError('Google token record unavailable');
-  }
-  if (recorded !== 'OK') {
-    throw new NativeIdTokenError('Google ID token already used');
-  }
+  await recordSingleUseToken({
+    recordKey: `auth:google-signin-token:${createHash('sha256').update(idToken).digest('hex')}`,
+    ttlSeconds: recordTtlSeconds(expiresAt, GOOGLE_TOKEN_TTL_CAP_SECONDS),
+    storeUnavailableMessage: 'Google token record unavailable',
+    alreadyUsedMessage: 'Google ID token already used',
+  });
 }
 
 type GoogleVerificationMessages = {
@@ -263,18 +270,28 @@ type GoogleVerificationMessages = {
  *
  * The certificate fetch stays outside the try so provider or network failures
  * propagate as server errors (5xx); only a rejected token becomes a
- * NativeIdTokenError (401).
+ * NativeIdTokenError (401). A caller that must not spend a single-use
+ * credential before the certificates exist fetches them first and passes them
+ * in as `certs`, so that one fetch is the only one for the request.
  */
 async function verifyGoogleIdTokenWith(
   client: OAuth2Client,
   idToken: string,
   audience: string[],
-  messages: GoogleVerificationMessages
+  messages: GoogleVerificationMessages,
+  certs?: Certificates
 ): Promise<VerifiedGoogleIdToken> {
-  const { certs } = await client.getFederatedSignonCertsAsync();
+  // Outside the try on purpose: a certificate/network fault must surface as a
+  // server error (5xx), not as a rejected token (401).
+  const signingCerts = certs ?? (await client.getFederatedSignonCertsAsync()).certs;
   let ticket;
   try {
-    ticket = await client.verifySignedJwtWithCertsAsync(idToken, certs, audience, GOOGLE_ISSUERS);
+    ticket = await client.verifySignedJwtWithCertsAsync(
+      idToken,
+      signingCerts,
+      audience,
+      GOOGLE_ISSUERS
+    );
   } catch (error) {
     throw new NativeIdTokenError(messages.verificationFailed, { cause: error });
   }
@@ -327,6 +344,17 @@ export async function exchangeNativeGoogleAuthCode(
 
   const client = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
 
+  // Fetch the signing certificates BEFORE the code is redeemed. The code is
+  // single-use: if a certificate fetch happened after `getToken`, a transient
+  // signer/network fault would arrive with the code already spent, and the
+  // client's retry would re-submit a spent code and get a 401 instead of the
+  // retryable 5xx. Fetched here, the same fault throws while the code is still
+  // unspent, and the set fetched here is the set verification uses, so no
+  // fetch can follow the redemption. The shared client keeps the set only for
+  // as long as the certificate response allows, so treat this as one fetch
+  // per request, not a cache the next request can rely on.
+  const certs = (await getGoogleClient().getFederatedSignonCertsAsync()).certs;
+
   let tokenResponse;
   try {
     tokenResponse = await client.getToken(serverAuthCode);
@@ -346,11 +374,17 @@ export async function exchangeNativeGoogleAuthCode(
   }
 
   // Verify the returned ID token against the web client audience through the
-  // shared helper, so both Google paths apply the same payload checks. The
-  // helper fetches the certificates outside its try: cert/network failures
-  // surface as 5xx; invalid tokens surface as 401.
-  return verifyGoogleIdTokenWith(client, idToken, [GOOGLE_CLIENT_ID], {
-    verificationFailed: 'Google ID token verification failed after code exchange',
-    invalidPayload: 'Invalid Google ID token payload from code exchange',
-  });
+  // shared helper, so both Google paths apply the same payload checks, reusing
+  // the certificate set fetched before the exchange. Cert/network failures
+  // already surfaced above as 5xx; invalid tokens surface as 401.
+  return verifyGoogleIdTokenWith(
+    client,
+    idToken,
+    [GOOGLE_CLIENT_ID],
+    {
+      verificationFailed: 'Google ID token verification failed after code exchange',
+      invalidPayload: 'Invalid Google ID token payload from code exchange',
+    },
+    certs
+  );
 }

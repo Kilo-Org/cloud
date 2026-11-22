@@ -14,7 +14,11 @@ import type { LocalAgentConnectionState } from './connection-state';
 import { createLocalAgentDispatcher } from './dispatcher';
 import type { LocalAgentBrowserBridge } from './browser-bridge';
 import { createUnavailableBrowserBridge } from './browser-bridge';
-import { loadLocalAgentEndpoints, saveLocalAgentEndpoint } from './endpoints';
+import {
+  pruneLocalAgentEndpoints,
+  saveLocalAgentEndpoint,
+  touchLocalAgentEndpoint,
+} from './endpoints';
 import { createLocalAgentHello } from './environment';
 import type { LocalAgentApiAvailability } from './environment';
 import type {
@@ -34,7 +38,7 @@ import { createLoopbackDial } from './loopback-transport';
 import type { LoopbackSocketConnect } from './loopback-transport';
 import { createNativeDial } from './native-transport';
 import type { NativeMessagingRuntime } from './native-transport';
-import { parsePairingUrl } from './pairing';
+import { isBrokenPairingUrl, parsePairingUrl } from './pairing';
 import { savePairingNotice } from './pairing-notice';
 import { redeemPairingKey } from './redeem';
 import type { LocalAgentFetch } from './redeem';
@@ -62,8 +66,6 @@ import { connectLoopbackSocket } from './websocket';
 
 const WATCHDOG_PERIOD_MINUTES = 0.5;
 const NATIVE_ENDPOINT_ID = 'native';
-/** Enough stopped handles to answer a CLI that raced its own revoke, and nothing more. */
-const STOPPED_SESSION_LIMIT = 256;
 const sessionHandleParamSchema = z.string().min(1);
 
 export type LocalAgentAlarmsApi = {
@@ -82,6 +84,7 @@ export type LocalAgentTabsApi = {
       ) => void
     ): void;
   };
+  get(tabId: number): Promise<{ url?: string }>;
   remove(tabId: number): Promise<void> | void;
 };
 
@@ -152,7 +155,16 @@ const isTrustedPanelSender = (sender: unknown, runtimeId: string | undefined): b
   return url.startsWith('chrome-extension://') || url.startsWith('moz-extension://');
 };
 
-const errorResponse = (id: string | number, error: unknown) => {
+/** Enough of an unexpected error's own text to say what failed, without a page's worth of it. */
+const UNEXPECTED_DETAIL_LIMIT = 300;
+
+/**
+ * The methods whose failure can leave a page step half done. Only a tool call runs one: `tools.list` is an
+ * in-memory contract read, and every other method's own failure is compensated before it answers.
+ */
+const PAGE_STEP_METHOD = 'tools.call';
+
+const errorResponse = (id: string | number, error: unknown, method: string) => {
   if (error instanceof LocalAgentRpcError) {
     const frame = buildErrorMessage({
       code: error.code,
@@ -166,10 +178,21 @@ const errorResponse = (id: string | number, error: unknown) => {
       : { ...frame, error: { ...frame.error, data: error.data } };
   }
 
+  // The model reads this text: it names what failed, never the transport, and says what to do next (SPEC).
+  const detail =
+    error instanceof Error && error.message.trim() !== ''
+      ? error.message.trim().slice(0, UNEXPECTED_DETAIL_LIMIT).replace(/\.$/u, '')
+      : 'an unexpected error';
+  // Only a call that ran a page step may have changed the page; advice to re-read it elsewhere is a wasted turn.
+  const advice =
+    method === PAGE_STEP_METHOD
+      ? 'Part of it may have run; take a new page snapshot before retrying.'
+      : 'Nothing on the page changed; retrying the call is safe.';
+
   return buildErrorMessage({
     code: LOCAL_AGENT_ERROR_CODES.internalError,
     id,
-    message: 'Local agent request failed.',
+    message: `The browser could not finish the call: ${detail}. ${advice}`,
   });
 };
 
@@ -208,14 +231,22 @@ export const readLocalAgentsHostApis = (): LocalAgentsHostApis => {
   };
 };
 
-const statusOf = (connections: Map<string, LocalAgentConnection>): LocalAgentEndpointStatus[] => {
+const statusOf = (
+  connections: Map<string, LocalAgentConnection>,
+  lastConnectedAt: Map<string, number>
+): LocalAgentEndpointStatus[] => {
   const statuses: LocalAgentEndpointStatus[] = [];
 
   for (const connection of connections.values()) {
     if (connection.endpoint.transport === 'loopback') {
+      const seen = lastConnectedAt.get(connection.endpoint.hubId);
+
       statuses.push({
+        // Stored socket URLs passed `parseLoopbackSocketUrl`, so they always parse.
+        address: new URL(connection.endpoint.ws).host,
         endpointId: connection.endpoint.endpointId,
         hubId: connection.endpoint.hubId,
+        ...(seen === undefined ? {} : { lastConnectedAt: seen }),
         state: connection.state(),
         transport: 'loopback',
       });
@@ -251,6 +282,8 @@ export const startLocalAgentsHost = (
 
   const connections = new Map<string, LocalAgentConnection>();
   const controllerConnections = new Map<string, LocalAgentConnection>();
+  /* Per loopback hub, the last time it was reachable, for the settings section's reconnecting/unreachable split. */
+  const lastConnectedAt = new Map<string, number>();
   const cleanup: (() => void)[] = [];
   const publish = createSerialTaskQueue();
   /* Pairing navigations can arrive before the first settings read answers. */
@@ -262,28 +295,13 @@ export const startLocalAgentsHost = (
   /* Fragment key per connection attempt, so only the connection that proved it can consume it. */
   const pairingKeysByConnection = new WeakMap<LocalAgentConnection, string>();
   const ready = Promise.withResolvers<void>();
-  /* Handles a stop, a switch-off or a disconnect ended: a late call answers `user_stopped`, not `unknown handle`. */
-  const stoppedSessions = new Set<string>();
   let enabled = false;
   let settingsLoaded = false;
   let stopped = false;
 
-  /** Bounded: the last few hundred stopped handles are enough for a CLI that raced the revoke. */
-  const rememberStopped = (sessions: readonly { readonly sessionHandle: string }[]): void => {
-    for (const session of sessions) {
-      stoppedSessions.add(session.sessionHandle);
-
-      const [oldest] = stoppedSessions;
-
-      if (stoppedSessions.size > STOPPED_SESSION_LIMIT && oldest !== undefined) {
-        stoppedSessions.delete(oldest);
-      }
-    }
-  };
-
   const publishStatus = (): Promise<void> =>
     publish(async () => {
-      await saveLocalAgentStatus(storage, statusOf(connections));
+      await saveLocalAgentStatus(storage, statusOf(connections, lastConnectedAt));
     });
 
   /** Connection-driven bookkeeping must never surface as an unhandled rejection. */
@@ -298,6 +316,7 @@ export const startLocalAgentsHost = (
     })();
   };
 
+  /** A controller the user disconnected stays out of the registry; its `session.open` answers `user_stopped`. */
   const ensureController = async (
     connection: LocalAgentConnection,
     controllerId: string
@@ -307,13 +326,15 @@ export const startLocalAgentsHost = (
     }
 
     const transport: LocalAgentTransport = connection.endpoint.transport;
-
-    await registry.registerController({
+    const registered = await registry.registerController({
       controllerId,
       transport,
       ...(connection.endpoint.transport === 'loopback' ? { hubId: connection.endpoint.hubId } : {}),
     });
-    controllerConnections.set(controllerId, connection);
+
+    if (registered) {
+      controllerConnections.set(controllerId, connection);
+    }
   };
 
   const handleRpc = async (
@@ -327,10 +348,10 @@ export const startLocalAgentsHost = (
     }
 
     try {
-      // A handle the user stopped answers `user_stopped` even before the dispatcher looks for its row.
+      // A handle the user stopped answers `user_stopped` even before the dispatcher looks for its row, and after a worker restart.
       const stoppedParam = sessionHandleParamSchema.safeParse(message.params['sessionHandle']);
 
-      if (stoppedParam.success && stoppedSessions.has(stoppedParam.data)) {
+      if (stoppedParam.success && (await registry.wasStopped(stoppedParam.data))) {
         throw new LocalAgentRpcError(
           LOCAL_AGENT_ERROR_CODES.userStopped,
           'The user stopped this agent session.'
@@ -341,7 +362,7 @@ export const startLocalAgentsHost = (
 
       connection.send(controllerId, buildResultMessage(message.id, result));
     } catch (error) {
-      connection.send(controllerId, errorResponse(message.id, error));
+      connection.send(controllerId, errorResponse(message.id, error, message.method));
     }
   };
 
@@ -349,6 +370,11 @@ export const startLocalAgentsHost = (
     connection: LocalAgentConnection,
     envelope: LocalAgentIncomingEnvelope
   ): void => {
+    // Its arrival already reset Chrome's idle timer for this worker; there is nothing to do.
+    if (envelope.type === 'hub.keepalive') {
+      return;
+    }
+
     if (envelope.type === 'controller.connected') {
       runTask(async () => {
         await ensureController(connection, envelope.controllerId);
@@ -373,8 +399,9 @@ export const startLocalAgentsHost = (
   };
 
   /**
-   * A dropped connection ends its controllers' sessions: the hub assigns a new
-   * controllerId per CLI socket, so the old rows can never be resumed.
+   * A dropped connection ends its controllers' sessions: the hub may come back
+   * with new controllerIds, so the old rows could never be resumed. A CLI that
+   * is still there gets `session_lost` for the old handle and opens a new session.
    */
   const forgetControllersOf = async (connection: LocalAgentConnection): Promise<void> => {
     const controllerIds: string[] = [];
@@ -390,8 +417,7 @@ export const startLocalAgentsHost = (
         controllerConnections.delete(controllerId);
         const removed = await registry.removeController(controllerId);
 
-        // A dropped connection's sessions cannot resume: their groups end like a Stop all.
-        rememberStopped(removed?.sessions ?? []);
+        // A dropped connection's sessions cannot resume: their groups end like a Stop all, but the user did not stop them.
         await bridge.endSessions(
           (removed?.sessions ?? []).map(session => ({
             controllerId,
@@ -423,12 +449,24 @@ export const startLocalAgentsHost = (
         handleEnvelope(connection, envelope);
       },
       onStateChange: next => {
-        if (lastState.kind === 'connected' && next.kind !== 'connected') {
+        const wasConnected = lastState.kind === 'connected';
+
+        if (wasConnected && next.kind !== 'connected') {
           void forgetControllersOf(connection);
         }
 
         if (next.kind === 'connected' && endpoint.transport === 'loopback') {
           consumeIfConnected(connection);
+        }
+
+        noteUnreachablePairing(connection, next);
+
+        // Entering or leaving `connected` proves the hub was reachable just now.
+        if (endpoint.transport === 'loopback' && wasConnected !== (next.kind === 'connected')) {
+          const at = now();
+
+          lastConnectedAt.set(endpoint.hubId, at);
+          runTask(() => touchLocalAgentEndpoint(storage, endpoint.hubId, at));
         }
 
         lastState = next;
@@ -450,45 +488,53 @@ export const startLocalAgentsHost = (
   const closeConnection = (connection: LocalAgentConnection): void => {
     connection.close();
     connections.delete(connection.endpoint.endpointId);
+
+    if (connection.endpoint.transport === 'loopback') {
+      lastConnectedAt.delete(connection.endpoint.hubId);
+    }
   };
 
   const revokeAll = async (reason: 'switch_off' | 'user_stop'): Promise<void> => {
     const revoked = await registry.takeAllSessions();
 
     // Every stopped session ends in the runtime too: its group turns grey (D12) and its leases are released.
-    rememberStopped(revoked);
-    await bridge.endSessions(revoked);
+    try {
+      await bridge.endSessions(revoked);
+    } finally {
+      // The rows are already gone, so a CLI that is not told now never learns its session stopped.
+      for (const { controllerId, sessionHandle } of revoked) {
+        controllerConnections
+          .get(controllerId)
+          ?.send(controllerId, buildNotification('session.revoked', { reason, sessionHandle }));
+      }
 
-    for (const { controllerId, sessionHandle } of revoked) {
-      controllerConnections
-        .get(controllerId)
-        ?.send(controllerId, buildNotification('session.revoked', { reason, sessionHandle }));
+      controllerConnections.clear();
     }
-
-    controllerConnections.clear();
   };
 
   const disconnectController = async (controllerId: string): Promise<void> => {
-    const removed = await registry.removeController(controllerId);
     const connection = controllerConnections.get(controllerId);
 
+    // Unmapped before the registry write: a call racing the click asks the registry, which refuses it.
     controllerConnections.delete(controllerId);
-    rememberStopped(removed?.sessions ?? []);
-    await bridge.endSessions(
-      (removed?.sessions ?? []).map(session => ({
-        controllerId,
-        sessionHandle: session.sessionHandle,
-      }))
-    );
+    // The registry remembers the ended handles as stopped by the user: a late call answers `user_stopped`, also after a restart.
+    const removed = await registry.revokeController(controllerId);
+    const sessions = removed?.sessions ?? [];
 
-    for (const session of removed?.sessions ?? []) {
-      connection?.send(
-        controllerId,
-        buildNotification('session.revoked', {
-          reason: 'disconnect',
-          sessionHandle: session.sessionHandle,
-        })
+    try {
+      await bridge.endSessions(
+        sessions.map(session => ({ controllerId, sessionHandle: session.sessionHandle }))
       );
+    } finally {
+      for (const session of sessions) {
+        connection?.send(
+          controllerId,
+          buildNotification('session.revoked', {
+            reason: 'disconnect',
+            sessionHandle: session.sessionHandle,
+          })
+        );
+      }
     }
   };
 
@@ -497,7 +543,10 @@ export const startLocalAgentsHost = (
       return;
     }
 
-    const endpoints = await loadLocalAgentEndpoints(storage);
+    const endpoints = await pruneLocalAgentEndpoints(storage, {
+      isConnected: hubId => connections.get(hubId)?.state().kind === 'connected',
+      now: now(),
+    });
 
     // The switch can turn off while the endpoint list loads; a late close must not resurrect it.
     if (!enabled || stopped) {
@@ -518,6 +567,12 @@ export const startLocalAgentsHost = (
       ) {
         closeConnection(existing);
       }
+
+      // A stamp taken while the list loaded is newer than the stored one.
+      lastConnectedAt.set(
+        endpoint.hubId,
+        Math.max(endpoint.lastConnectedAt, lastConnectedAt.get(endpoint.hubId) ?? 0)
+      );
 
       if (!connections.has(endpoint.hubId)) {
         addConnection(
@@ -577,6 +632,20 @@ export const startLocalAgentsHost = (
     `${endpoint.hubId}|${endpoint.token}|${endpoint.ws}`;
 
   /**
+   * A fragment whose token was redeemed but whose socket keeps failing would
+   * otherwise leave the panel on "waiting" with no hint; the dial backing off
+   * means the hub was not reachable on the socket the CLI handed out.
+   */
+  const noteUnreachablePairing = (
+    connection: LocalAgentConnection,
+    state: LocalAgentConnectionState
+  ): void => {
+    if (state.kind === 'backoff' && pairingKeysByConnection.has(connection)) {
+      void savePairingNotice(storage, 'unreachable');
+    }
+  };
+
+  /**
    * Marks a fragment used once the connection whose key came from that fragment
    * reports `connected`. Another connection for the same hub proves only its own
    * key, so it must not consume a fragment it never proved. A fragment seen while
@@ -591,6 +660,7 @@ export const startLocalAgentsHost = (
 
     consumedPairings.add(key);
     pairingKeysByConnection.delete(connection);
+    void savePairingNotice(storage, null);
   };
 
   const acceptPairing = async (
@@ -623,7 +693,7 @@ export const startLocalAgentsHost = (
         return;
       }
 
-      await saveLocalAgentEndpoint(storage, redeemed.endpoint);
+      await saveLocalAgentEndpoint(storage, redeemed.endpoint, now());
       await reconcile();
 
       const connection = connections.get(endpoint.hubId);
@@ -638,6 +708,7 @@ export const startLocalAgentsHost = (
       ) {
         pairingKeysByConnection.set(connection, fragmentKey);
         consumeIfConnected(connection);
+        noteUnreachablePairing(connection, connection.state());
       }
     } finally {
       inFlightPairings.delete(fragmentKey);
@@ -651,6 +722,35 @@ export const startLocalAgentsHost = (
         await acceptPairing(endpoint, tabId, key);
       } catch {
         inFlightPairings.delete(key);
+      }
+    })();
+  };
+
+  /** A pairing link this extension cannot read: its tab closes and the notice says the link is invalid. */
+  const rejectBrokenPairing = (tabId: number, url: string): void => {
+    void (async (): Promise<void> => {
+      // The switch value is unknown until the first settings read answers.
+      await ready.promise;
+
+      if (!enabled || stopped) {
+        return;
+      }
+
+      try {
+        // The tab may have moved on while the settings read was pending; only the broken page is closed.
+        const current = await tabs?.get(tabId);
+
+        if (current?.url === url) {
+          await tabs?.remove(tabId);
+        }
+      } catch {
+        // Already gone (the user closed it) — nothing to do.
+      }
+
+      try {
+        await savePairingNotice(storage, 'invalid');
+      } catch {
+        // The next pairing attempt writes its own notice.
       }
     })();
   };
@@ -712,14 +812,19 @@ export const startLocalAgentsHost = (
     }
 
     // Only a committed navigation counts; a tab carrying an older fragment does not pair.
-    const endpoint = parsePairingUrl(changeInfo.url ?? '');
-
-    if (endpoint === null) {
-      return;
-    }
+    const url = changeInfo.url ?? '';
+    const endpoint = parsePairingUrl(url);
 
     // A page can open this URL itself; the CLI opens a fresh tab without an opener.
     if (tab.openerTabId !== undefined) {
+      return;
+    }
+
+    if (endpoint === null) {
+      if (isBrokenPairingUrl(url)) {
+        rejectBrokenPairing(tabId, url);
+      }
+
       return;
     }
 

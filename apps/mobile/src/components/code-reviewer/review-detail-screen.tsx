@@ -9,31 +9,31 @@ import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import {
-  isCancellableReviewStatus,
-  isRetriggerableReviewStatus,
-} from '@kilocode/app-shared/code-review';
+import { canRetriggerReview, isCancellableReviewStatus } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-rows';
 import {
   findingsEmptyCopyKey,
   flattenCouncilFindings,
-  reviewCancellationLabel,
-  reviewFailureLabel,
+  reviewCancellationCopy,
+  reviewFailureCopy,
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
+import { ReviewStatusBadge } from '@/components/code-reviewer/review-status-badge';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import {
   CouncilSection,
   FindingCard,
   GateSection,
 } from '@/components/code-reviewer/review-detail-sections';
+import { StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
+import { RotateCcw, Settings } from '@/components/ui/icons';
 import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
@@ -95,13 +95,14 @@ export function ReviewDetailScreen({
   // review, without an effect that would also fire on a plain re-render.
   const [transcriptReviewId, setTranscriptReviewId] = useState<string | null>(null);
   const loadedReview = data?.success ? data.review : undefined;
-  // Only a retriggerable automatic review needs the reviewer config. Bitbucket
-  // is org-only, and a personal Bitbucket query would throw in toPersonalPlatform.
+  // Only a retriggerable automatic review needs the reviewer config, and a
+  // review a newer commit replaced can never be retried. Bitbucket is org-only,
+  // and a personal Bitbucket query would throw in toPersonalPlatform.
   const reviewPlatform = loadedReview?.platform ?? 'github';
   const configQueryEnabled =
     loadedReview != null &&
     loadedReview.manual_config == null &&
-    isRetriggerableReviewStatus(loadedReview.status) &&
+    canRetriggerReview(loadedReview) &&
     !(isPersonal(scope) && reviewPlatform === 'bitbucket');
   const reviewConfig = useReviewConfig(scope, reviewPlatform, { enabled: configQueryEnabled });
 
@@ -166,6 +167,9 @@ export function ReviewDetailScreen({
       subtitlePlaceholder={
         !loadedReview && isLoading ? <Skeleton className="h-3.5 w-28 rounded-full" /> : undefined
       }
+      // The outcome word rides the title line, the way the list row and the web
+      // detail page both state it, so no block in the body has to label it.
+      titleAccessory={loadedReview ? <ReviewStatusBadge status={loadedReview.status} /> : undefined}
     />
   );
 
@@ -218,7 +222,7 @@ export function ReviewDetailScreen({
   const { review, tokenUsage } = data;
   const meta = statusMeta(review.status);
   const canCancel = isCancellableReviewStatus(review.status);
-  const retryAction = isRetriggerableReviewStatus(review.status)
+  const retryAction = canRetriggerReview(review)
     ? selectRetryAction({
         hasManualConfig: review.manual_config != null,
         configPending: configQueryEnabled && reviewConfig.isPending,
@@ -237,19 +241,26 @@ export function ReviewDetailScreen({
   )?.agentConfig?.gate_threshold;
   // A cancelled or interrupted row explains its outcome in the reader's own
   // words; only a failure or an unmapped diagnostic keeps the raw message.
-  const cancellationLabel = reviewCancellationLabel(t, {
+  const cancellationCopy = reviewCancellationCopy(t, {
     status: review.status,
     errorMessage: review.error_message,
     terminalReason: review.terminal_reason,
     platformLabel: reviewerPlatformLabel(review.platform),
   });
+  const cancellationLabel = cancellationCopy?.message;
   // The single message the conclusion block renders: the cancellation sentence,
-  // the failure copy, or a diagnostic we have no copy for.
-  const reviewMessage =
-    cancellationLabel ??
-    (review.status === 'failed'
-      ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
-      : review.error_message);
+  // the failure copy, or a diagnostic we have no copy for. `namesRecovery` says
+  // whether that sentence already ends with its own next step, so the card never
+  // prints a second instruction under it. Only the sentences that carry their own
+  // instruction set it; a raw diagnostic and a missing sentence name nothing, so
+  // they get the caller's own line.
+  const failureCopy =
+    review.status === 'failed'
+      ? reviewFailureCopy(t, review.error_message, review.terminal_reason)
+      : undefined;
+  const reviewMessage = cancellationLabel ?? failureCopy?.message ?? review.error_message;
+  const messageNamesRecovery =
+    cancellationCopy?.namesRecovery === true || failureCopy?.namesRecovery === true;
 
   return (
     <View className="flex-1 bg-background">
@@ -281,36 +292,93 @@ export function ReviewDetailScreen({
               author: review.pr_author,
             })}
           </Text>
-        </Animated.View>
-
-        {/* Conclusion: the outcome leads — status first, then the reason. */}
-        <View className="gap-2">
-          <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
-          {reviewMessage ? (
+          {/* The conclusion's reason belongs to the title it describes. As its
+              own block at the body's section gap it floated equidistant from
+              the PR title above it and FINDINGS below. The outcome word rides
+              the header's badge, so this block carries only the reason. */}
+          {reviewMessage || retryAction ? (
             // A failure keeps the danger tile under it: the red ink alone on
             // the card surface read as ordinary copy, and the tint is the
-            // palette's own danger token, not a hand-built card fill.
-            <Card className={cancellationLabel ? undefined : 'bg-danger-tile-bg'}>
-              <Text
-                variant={cancellationLabel ? 'muted' : undefined}
-                className={cn('text-xs', !cancellationLabel && 'text-destructive')}
-                numberOfLines={4}
-              >
-                {reviewMessage}
-              </Text>
+            // palette's own danger token, not a hand-built card fill. The tint
+            // belongs to that sentence, so a card that carries only a recovery
+            // control (a terminal review with no stored explanation) stays
+            // neutral instead of dressing a way out as a failure.
+            //
+            // The sentence and its way out are one block: nothing below the
+            // fold is the only exit. A failed review's recovery control sits
+            // under its own explanation, at the card's gap-3, so the person
+            // reads why it failed and what they can do without leaving the
+            // conclusion. A retry opens the same confirmation as before; the
+            // other way out is the settings link when the server would refuse a
+            // retry. `namesRecovery` raises the settings line only when the
+            // sentence above does not already say it.
+            <Card
+              className={cn('mt-2', reviewMessage && !cancellationLabel && 'bg-danger-tile-bg')}
+            >
+              {reviewMessage ? (
+                <Text
+                  variant={cancellationLabel ? 'muted' : undefined}
+                  className={cn('text-xs', !cancellationLabel && 'text-destructive')}
+                  numberOfLines={4}
+                >
+                  {reviewMessage}
+                </Text>
+              ) : null}
+              {retryAction === 'retry' ? (
+                <View className="self-start">
+                  {/* A recovery control is secondary: `Open pull request` in the
+                      actions block is the screen's one primary action, so this
+                      takes the quiet outline face instead of a second brand fill. */}
+                  <StateAction
+                    testID="review-detail-retry"
+                    label={t('codeReviewer.reviewDetail.retryReview')}
+                    icon={RotateCcw}
+                    emphasis="quiet"
+                    loading={retriggerReview.isPending}
+                    onPress={() => {
+                      if (retriggerReview.isPending) {
+                        return;
+                      }
+                      confirmRetry(requestRetry);
+                    }}
+                  />
+                </View>
+              ) : null}
+              {retryAction === 'fix-settings' ? (
+                <>
+                  {messageNamesRecovery ? null : (
+                    <Text variant="muted" className="text-xs">
+                      {t('codeReviewer.reviewDetail.retryNeedsSettings')}
+                    </Text>
+                  )}
+                  <View className="self-start">
+                    <StateAction
+                      testID="review-detail-fix-settings"
+                      label={t('codeReviewer.reviewDetail.fixSettings')}
+                      icon={Settings}
+                      emphasis="quiet"
+                      onPress={() => {
+                        pushOnce(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
+                      }}
+                    />
+                  </View>
+                </>
+              ) : null}
+              {/* A superseded review has no head to re-review and a review still
+                  loading its config is not known to be retryable, so both get no
+                  control here: the sentence above makes no promise to keep. */}
             </Card>
           ) : null}
-        </View>
+        </Animated.View>
 
         {/* Findings: flattened from the council result, paginated in memory. */}
         <Section label={t('common.findings')}>
           {visibleFindings.length === 0 ? (
             // The empty result sits in the same card as every other section's
             // body, so an ended review reads as a filled section, not a caption.
+            // Its line takes the muted body size the GATE card's rows read at.
             <Card>
-              <Text variant="muted" className="text-xs">
-                {t(findingsEmptyCopyKey(review.status))}
-              </Text>
+              <Text variant="muted">{t(findingsEmptyCopyKey(review.status))}</Text>
             </Card>
           ) : (
             <View className="gap-3">
@@ -458,38 +526,8 @@ export function ReviewDetailScreen({
               <Text>{t('codeReviewer.reviewDetail.cancelReview')}</Text>
             </Button>
           ) : null}
-
-          {retryAction === 'retry' ? (
-            <Button
-              variant="secondary"
-              loading={retriggerReview.isPending}
-              disabled={retriggerReview.isPending}
-              onPress={() => {
-                if (retriggerReview.isPending) {
-                  return;
-                }
-                confirmRetry(requestRetry);
-              }}
-            >
-              <Text>{t('codeReviewer.reviewDetail.retryReview')}</Text>
-            </Button>
-          ) : null}
-
-          {retryAction === 'fix-settings' ? (
-            <View className="gap-2">
-              <Text variant="muted" className="text-xs">
-                {t('codeReviewer.reviewDetail.retryNeedsSettings')}
-              </Text>
-              <Button
-                variant="secondary"
-                onPress={() => {
-                  pushOnce(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
-                }}
-              >
-                <Text>{t('codeReviewer.reviewDetail.fixSettings')}</Text>
-              </Button>
-            </View>
-          ) : null}
+          {/* The retry and settings links live in the conclusion card above, so
+              this block keeps only the actions that are not a failure's way out. */}
         </View>
       </TabScreenScrollView>
       {dialog}

@@ -1,7 +1,7 @@
 import { describe, test, expect } from '@jest/globals';
 import { selectAutoFreeCandidate } from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
-import { getRandomNumber } from './getRandomNumber';
+import { hashSeedToIndex } from './hashSeedToIndex';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -41,12 +41,12 @@ describe('isFreeModel', () => {
         { model: 'other/model', weight: 1, reasoning: { enabled: true } },
       ];
       const randomSeed = Array.from({ length: 100 }, (_, index) => `weight-test-${index}`).find(
-        seed => getRandomNumber(seed, 4) === 1
+        seed => hashSeedToIndex(seed, 4) === 1
       );
       expect(randomSeed).toBeDefined();
       if (!randomSeed) return;
 
-      expect(getRandomNumber(randomSeed, 4)).toBe(1);
+      expect(hashSeedToIndex(randomSeed, 4)).toBe(1);
       expect(selectAutoFreeCandidate(candidates, randomSeed)).toBe(candidates[0]);
     });
   });
@@ -102,6 +102,13 @@ describe('isFreeModel', () => {
       expect(isFreeModel(' openrouter/free')).toBe(false);
       expect(isFreeModel('openrouter/free ')).toBe(false);
     });
+  });
+});
+
+describe('hashSeedToIndex', () => {
+  test('rejects a max that is not a positive integer', () => {
+    expect(() => hashSeedToIndex('seed', 0)).toThrow(RangeError);
+    expect(() => hashSeedToIndex('seed', 1.5)).toThrow(RangeError);
   });
 });
 

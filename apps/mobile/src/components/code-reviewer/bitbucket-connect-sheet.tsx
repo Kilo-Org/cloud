@@ -6,12 +6,14 @@ import { View } from 'react-native';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
+import { StateAction } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
+import { RotateCcw } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -60,6 +62,29 @@ export function BitbucketConnectSheet({ scope }: Readonly<{ scope: string | unde
   );
 }
 
+/**
+ * A denial's description as one paragraph per reason. A lone paragraph stays
+ * the bare string, so a sentence that already names the organization reads as
+ * one sentence; two or more become separate muted paragraphs in the same body
+ * token, one paragraph gap apart, so the reader sees two reasons rather than
+ * one cramped paragraph at a different size.
+ */
+function denialParagraphs(paragraphs: readonly string[]): ReactNode {
+  const [only] = paragraphs;
+  if (paragraphs.length === 1 && only !== undefined) {
+    return only;
+  }
+  return (
+    <View className="items-center gap-2">
+      {paragraphs.map((paragraph, index) => (
+        <Text key={index} variant="muted" className="text-center">
+          {paragraph}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -70,7 +95,14 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // !connectLanded)`), so a running connect has already disarmed the guard, and
   // a landed one closes the sheet through `leaveWithoutAsking`.
   const guard = useMetadataLeaveGuard({ enabled: true, saving: false });
-  const { role, org, isResolving, isError } = useOrgBoundary(scope);
+  const {
+    role,
+    org,
+    isResolving,
+    isError,
+    isFetching: isOrgFetching,
+    refetch,
+  } = useOrgBoundary(scope);
   const readiness = useBitbucketReadiness(scope);
   // The readiness read describes workspace access tokens only, so this is what
   // tells a Bitbucket OAuth connection apart from a workspace with none.
@@ -95,16 +127,11 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !(readiness.isError && readiness.data == null) &&
     !(status.isError && status.data == null);
   let title = t('agentChat.repoPicker.platformBitbucket');
-  let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
-  if (readsSettled) {
-    if (managesExisting) {
-      deniedDescription = t('integrations.managedByOwner');
-    } else if (integrationId === null) {
-      title = t('common.connectBitbucket');
-      deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
-    } else {
-      title = t('prReview.connect.reconnectTitleBitbucket');
-    }
+  if (readsSettled && !managesExisting) {
+    title =
+      integrationId === null
+        ? t('common.connectBitbucket')
+        : t('prReview.connect.reconnectTitleBitbucket');
   }
 
   // One body per state, so the guard's confirmation renders beside all of them:
@@ -142,7 +169,10 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (status.isError && status.data == null) {
       return isPermissionDeniedError(status.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.adminOnlyConnectDescription')}
+          description={denialParagraphs([
+            t('prReview.connect.contextLine', { organization: org.organizationName }),
+            t('prReview.connect.bitbucketAdminOnlyDescription'),
+          ])}
           showBack={false}
         />
       ) : (
@@ -158,7 +188,10 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (readiness.isError && readiness.data == null) {
       return isPermissionDeniedError(readiness.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.adminOnlyConnectDescription')}
+          description={denialParagraphs([
+            t('prReview.connect.contextLine', { organization: org.organizationName }),
+            t('prReview.connect.bitbucketAdminOnlyDescription'),
+          ])}
           showBack={false}
         />
       ) : (
@@ -172,7 +205,68 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     }
 
     if (!canManage) {
-      return <PermissionDenied description={deniedDescription} showBack={false} />;
+      // The repair this sheet would offer decides which trio can make it: an
+      // OAuth connection is an owner's to change, a stored token needs anyone
+      // who may reconnect it, and a first connect asks for whoever holds the
+      // permission. The reconnect and owner sentences name the organization
+      // whose rule refused, so a person in several of them reads which one this
+      // is. The first connect sentence is the shared ask the composer's
+      // Bitbucket card states beside the same restriction, and it leaves the
+      // organization implicit, so it is stated under the organization line.
+      let deniedDescription = t('prReview.connect.bitbucketAdminOnlyDescription');
+      if (managesExisting) {
+        deniedDescription = t('codeReviewer.bitbucketConnect.deniedManagedByOwner', {
+          organization: org.organizationName,
+        });
+      } else if (integrationId !== null) {
+        deniedDescription = t('codeReviewer.bitbucketConnect.deniedReconnectRole', {
+          organization: org.organizationName,
+        });
+      }
+      // The same organization's lapsed plan refuses every organization change,
+      // so a member must not read the role as the only blocker: the plan line
+      // under the role names the owner and the billing step that unblocks it.
+      // It is this sheet's own key because the retry below carries the step the
+      // shared ended-plan sentence keeps for the surfaces that have no control.
+      const deniedPlanLine =
+        !managesExisting && integrationId === null && org.isTrialExpiredForEnforcement
+          ? t('codeReviewer.bitbucket.notConnectedReadOnlyPlan')
+          : undefined;
+      // The denial's way out, offered only with the plan line: a retry here
+      // re-reads the three answers the page was decided from.
+      const deniedAction =
+        deniedPlanLine === undefined ? undefined : (
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
+            loading={readiness.isFetching || status.isFetching || isOrgFetching}
+            onPress={() => {
+              void refetch();
+              void readiness.refetch();
+              void status.refetch();
+            }}
+          />
+        );
+      // The organization line leads the shared ask sentence, because that
+      // sentence leaves the organization implicit and the header names only the
+      // platform; the owner and reconnect sentences already name it, so they
+      // stay the one paragraph. The plan line closes the first-connect list when
+      // the plan blocks too.
+      const deniedParagraphs =
+        managesExisting || integrationId !== null
+          ? [deniedDescription]
+          : [
+              t('prReview.connect.contextLine', { organization: org.organizationName }),
+              deniedDescription,
+              ...(deniedPlanLine === undefined ? [] : [deniedPlanLine]),
+            ];
+      return (
+        <PermissionDenied
+          description={denialParagraphs(deniedParagraphs)}
+          showBack={false}
+          action={deniedAction}
+        />
+      );
     }
 
     // The connect mutation refuses a second Bitbucket integration for the same

@@ -125,7 +125,6 @@ describe('ProviderKeyCredentialForm secret inputs', () => {
     const key = field(root, 'profile.providerKeys.apiKeyLabel');
 
     expect(key.props.secureTextEntry).toBe(true);
-    expect(key.props.multiline).toBe(false);
     expect(key.props.keyboardType).toBeUndefined();
     expectNoLearning(key.props);
 
@@ -151,17 +150,15 @@ describe('ProviderKeyCredentialForm secret inputs', () => {
     expect(field(keyMode, 'profile.providerKeys.apiKeyLabel').props.secureTextEntry).toBe(true);
   });
 
-  it('masks the Vertex private key and keeps it suggestion-free', async () => {
+  it('masks the Vertex private key as a single line and keeps it suggestion-free', async () => {
     const root = await mount('vertex', 'apiKey');
     const privateKey = field(root, 'profile.providerKeys.privateKey');
 
-    // Neither platform masks a multiline input. Android takes no soft-keyboard
-    // input for it at all; iOS opens its keyboard because that prop is
-    // Android-only, so the PEM is visible there while typed and the rest of the
-    // props are what keep the keyboard from suggesting or learning it.
-    expect(privateKey.props.multiline).toBe(true);
+    // A secret is never multiline: React Native masks a single-line input on
+    // both platforms and cannot mask a multiline one, so the private key has to
+    // be single-line for its value to stay out of the accessibility tree.
+    expect(privateKey.props.multiline).toBeUndefined();
     expect(privateKey.props.secureTextEntry).toBe(true);
-    expect(privateKey.props.showSoftInputOnFocus).toBe(false);
     expect(privateKey.props.placeholder).toBe('profile.providerKeys.apiKeyPlaceholder');
     expectNoLearning(privateKey.props);
 

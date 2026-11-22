@@ -244,7 +244,11 @@ import {
   type AgentStackState,
   openComposerWithOutcome,
 } from '@/components/agents/new-session-navigation-outcome';
-import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import {
+  useBackToAgentsSessions,
+  useSessionHeaderBack,
+} from '@/lib/navigation/back-to-agents-sessions';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -349,6 +353,11 @@ export function SessionDetailContent({
   // A Back that lands while one of the composer's pickers is still opening is
   // delivered to this screen by the native stack; it closes the picker instead.
   usePickerAboveLeaveGuard();
+  // The terminal card's way back: it truncates the stack to the sessions list,
+  // and takes this route's place when it is the stack's only route.
+  const handleBackToSessions = useBackToAgentsSessions();
+  // The header's Back answers the same way: history first, then the list.
+  const sessionHeaderBack = useSessionHeaderBack();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
@@ -749,11 +758,11 @@ export function SessionDetailContent({
   const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { condenseToolCalls } = useCondenseToolCallsPreference();
-  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
-    organizationId,
-    'member',
-    { enabled: sessionDataLoaded }
-  );
+  const {
+    models: catalogModels,
+    isLoading: gatewayCatalogLoading,
+    refetch: refetchCatalog,
+  } = useAvailableModels(organizationId, 'member', { enabled: sessionDataLoaded });
   // The picker lists models only once the session's scope is resolved. Until
   // then it holds its loading state, so it never presents a model list for a
   // scope the screen has not settled.
@@ -1913,12 +1922,20 @@ export function SessionDetailContent({
     }
   }, [manager, t]);
 
-  const handleBackToSessions = useCallback(() => {
-    // POP_TO reuses the `(tabs)` route under this screen and truncates every
-    // `agent-chat` route above it, so a composer still on the stack under a
-    // missing session is gone with it.
-    router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
-  }, [router]);
+  // The chip's Retry for an empty catalog. The chip lists whichever catalog its
+  // source projects: a v1 CLI answer is re-asked through the connection, and a
+  // legacy session's rows come from the gateway catalog, which the CLI cannot
+  // refresh.
+  const handleRetryModels = useCallback(() => {
+    if (
+      sessionModels.source === 'remote-cli-catalog' ||
+      sessionModels.source === 'remote-unavailable'
+    ) {
+      manager.retryRemoteModels();
+    } else {
+      void refetchCatalog();
+    }
+  }, [manager, refetchCatalog, sessionModels.source]);
 
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
@@ -2982,14 +2999,13 @@ export function SessionDetailContent({
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback={AGENTS_SESSIONS_HREF}
+            onBack={sessionHeaderBack}
             headerRight={headerRight}
             headerRightShrinks
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
-                  onTitlePressAccessibilityHint: t('agentChat.session.renameAccessibility', {
-                    title: rename.title,
-                  }),
+                  onTitlePressAccessibilityHint: t('agentChat.session.renameSession'),
                 }
               : {})}
           />
@@ -3401,6 +3417,8 @@ export function SessionDetailContent({
                 modelOptions={modelOptionsForToolbar}
                 modelLocked={modelLocked}
                 modelLockLabel={pinned.agentName}
+                isLoadingModels={sessionModels.isLoading}
+                onRetryModels={handleRetryModels}
                 onModelSelect={handleModelSelect}
                 organizationId={organizationId}
                 attachmentsEnabled={supportsAttachments}

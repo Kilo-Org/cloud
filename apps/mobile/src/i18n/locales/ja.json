@@ -19,7 +19,9 @@
     "presenceStatus": "ホスト：{{connection}}",
     "commandStatus": "コマンドの配信：{{status}}",
     "delivered": "配信済み",
-    "expired": "期限切れ"
+    "expired": "期限切れ",
+    "recoveryGaps_one": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。",
+    "recoveryGaps_other": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。"
   },
   "common": {
     "manageOnWeb": "Webで管理",
@@ -138,6 +140,7 @@
     "keepRunning": "実行を続ける",
     "newSession": "新しいセッション",
     "noModelsAvailable": "利用可能なモデルはありません",
+    "modelRetires": "{{date}}に廃止",
     "notFound": "見つかりません。",
     "online": "オンライン",
     "open": "{{name}}を開く",
@@ -172,6 +175,7 @@
     "generating": "生成中…",
     "working": "作業中",
     "yourOwnRepositories": "自分のリポジトリ",
+    "organizationRepositories": "組織のリポジトリ",
     "dismissed": "却下済み",
     "agent": "エージェント",
     "durationMinuteShort": "min",
@@ -180,7 +184,32 @@
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
     "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
-    "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。"
+    "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
+    "organizationTrialEndedBillingAtKiloAi": "組織のトライアルは終了し、有効なプランがありません。kilo.ai で請求情報を更新してから、もう一度お試しください。",
+    "viewOnGitHub": "GitHubでPRを表示",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "箇条書きの項目",
+        "nestedBulletPoint": "ネストされた箇条書きの項目",
+        "orderedItem": "リスト項目 {n}",
+        "nestedOrderedItem": "ネストされたリスト項目 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "ネストされた引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数式：{latex}"
+      },
+      "rotor": {
+        "headings": "見出し",
+        "links": "リンク",
+        "images": "画像"
+      }
+    }
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -274,9 +303,13 @@
     "credits": "クレジット",
     "failedToLoadBalance": "残高を読み込めませんでした。タップして再試行してください。",
     "balanceLoadFailed": "残高を読み込めませんでした",
+    "balanceUnreachable": "サーバーに接続できませんでした。もう一度お試しください。",
+    "balanceAccessDenied": "この残高を表示する権限がありません。",
+    "balanceUnavailable": "残高を読み込めませんでした。",
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
+    "availableToSpendInOrganization": "この組織で支出できる金額",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",
@@ -418,6 +451,17 @@
       "location": "Vertexロケーション",
       "clientEmail": "サービスアカウントのメールアドレス",
       "privateKey": "サービスアカウントの秘密鍵",
+      "privateKeyBlockRequired": "BEGINの行からENDの行まで、キーブロック全体を貼り付けてください。",
+      "privateKeyEncrypted": "このキーブロックはパスフレーズで保護されています。パスフレーズが設定されていないサービスアカウントの秘密鍵を貼り付けてください。",
+      "names": {
+        "codestral": "レガシーCodestral専用",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（ChatGPTでサインイン）",
+        "xiaomi": "Xiaomi（従量課金）",
+        "zai": "Z.ai（従量課金）",
+        "bedrockByok": "Amazon Bedrock（直接）",
+        "vertexByok": "Google Vertex AI（直接）"
+      },
       "modelMappings": "モデルマッピング",
       "modelMappingsDescription": "ゲートウェイモデルをカスタムのデプロイ名にルーティングします。",
       "mappingTitle": "マッピング{{number}}",
@@ -478,13 +522,14 @@
       "receiptLabel": "受付",
       "copyReceiptId": "受付IDをコピー",
       "appealLabel": "異議申し立て",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "受付済み",
       "triageOpen": "審査中",
       "triageActioned": "認められました",
       "triageRejected": "認められませんでした",
       "appealNone": "未提出",
-      "appealSubmitted": "審査中",
-      "appealAccepted": "認められました",
+      "appealSubmitted": "異議申し立てを審査中",
+      "appealAccepted": "異議申し立てが認められました",
       "appealRejected": "却下されました",
       "appeal": "この決定に異議を申し立てる",
       "appealTitle": "この決定に異議を申し立てますか？",
@@ -495,7 +540,25 @@
       "nextStepInReview": "結果はこの画面に表示され、決定後は異議を申し立てられます。",
       "nextStepAppeal": "異議申し立ての結果はこの画面に表示されます。",
       "nextStepFinal": "異議申し立ての決定は確定しました。これ以上異議を申し立てることはできません。",
-      "viewReceipt": "受付確認を表示"
+      "viewReceipt": "受付確認を表示",
+      "targetLabel": "通報対象",
+      "reasonLabel": "通報理由",
+      "targetMessage": "AIの応答",
+      "targetComment": "プルリクエストのコメント",
+      "targetUser": "ユーザー",
+      "reasonHarmful": "有害なコンテンツ",
+      "reasonIllegal": "違法なコンテンツ",
+      "reasonHarassment": "ハラスメント",
+      "reasonSpam": "スパム",
+      "reasonOther": "その他の理由"
+    },
+    "reportReceipts": {
+      "title": "通報一覧",
+      "rowSubtitle": "通報した内容とその結果",
+      "emptyTitle": "通報はまだありません",
+      "emptyDescription": "プルリクエストのディスカッションのコメント、またはエージェントのセッションでのAIの応答から通報した内容が、その結果とともにここに表示されます。",
+      "couldNotLoad": "通報を読み込めませんでした",
+      "capped": "最新の通報を表示しています。"
     },
     "changelog": "新着情報",
     "changelogVersionPending": "バージョン{{version}}のリリースノートは、次回のアプリアップデートで届きます。",
@@ -504,7 +567,10 @@
     "changelogFixesPolish": "アプリ全体の修正と改善を行いました。",
     "changelogAreas": {
       "signIn": "サインイン",
-      "profileOrganizations": "プロフィールと組織"
+      "profileOrganizations": "プロフィールと組織",
+      "chat": "チャット",
+      "notifications": "通知",
+      "integrations": "連携"
     }
   },
   "preferences": {
@@ -598,6 +664,8 @@
       "emptyTitle": "通知はまだありません",
       "emptyCategoryTitle": "このカテゴリの通知はありません",
       "emptyBody": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
+      "emptyBody_one": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
+      "emptyBody_other": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
       "capped": "最新の通知を表示しています。",
       "loadError": "通知履歴を読み込めませんでした。",
       "openFailed": "この通知はもうどこからも開けません。"
@@ -669,7 +737,7 @@
     },
     "instructions": {
       "title": "カスタム指示",
-      "deprecation": "カスタム指示は廃止予定です。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
+      "deprecation": "カスタム指示は削除されます。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
       "placeholder": "例：エラー処理の規則に従っているか確認…",
       "clearTitle": "カスタム指示を削除しますか？",
       "clearMessage": "空のフィールドを保存すると、このレビュアーに保存されているカスタム指示が削除されます。"
@@ -678,6 +746,7 @@
       "manageAccess": "アクセス権を管理",
       "bitbucketNoRepositoriesDescription": "このBitbucketワークスペースに利用可能なリポジトリはありません。",
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
+      "githubNoRepositoriesDescription": "KiloのGitHubアプリがリポジトリにアクセスできるか確認してから、一覧を更新してください。",
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
       "repositoryAccess": "リポジトリへのアクセス権",
@@ -694,12 +763,19 @@
     },
     "autoReviews": "自動レビュー",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。"
+      "notConnectedReadOnlyPlan": "組織のトライアルは終了したため、オーナーが kilo.ai で請求情報を更新する必要があります。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
+      "deniedManagedByOwner": "変更できない接続については、{{organization}}のオーナーに変更を依頼してください。",
+      "deniedConnectRole": "接続できるのは{{organization}}のオーナー、管理者、請求管理者のみです。",
+      "deniedReconnectRole": "{{organization}}のオーナー、管理者、または請求管理者に再接続を依頼してください。",
+      "managedOnWebTitle": "Webで管理されています",
+      "managedOnWebShort": "この接続は、パソコンからWebで管理されています。",
+      "managedOnWebRepositories": "{{organization}}のリポジトリを、パソコンからWebで選択してください。",
       "description": "{{organization}}用のワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "descriptionReconnect": "{{organization}}用の新しいワークスペースアクセストークンを作成し、下に貼り付けてください。",
+      "descriptionOverview": "ワークスペースアクセストークンを作成し、次の画面で貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
       "tokenPlaceholder": "ワークスペースアクセストークン",
       "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
@@ -735,6 +811,7 @@
     "platformList": {
       "activity": "アクティビティ",
       "checking": "確認中…",
+      "needsAttention": "要対応",
       "platforms": "プラットフォーム",
       "statusUnavailable": "状態を確認できません"
     },
@@ -760,11 +837,11 @@
       "gateHidden": "非表示",
       "gateNone": "なし",
       "noFindings": "指摘はありません。",
-      "findingsUnavailable": "このレビューが失敗したため、結果を表示できません。",
+      "findingsUnavailable": "結果を表示できません。",
       "findingsInProgress": "このレビューはまだ進行中です。完了すると、ここに指摘が表示されます。",
       "findingsEndedWithoutResults": "このレビューは、指摘が生成される前に終了しました。",
       "serviceUnavailable": "コードレビューサービスに接続できませんでした。サービスが利用可能になったら、レビューを再試行してください。",
-      "reviewFailed": "レビューに失敗しました。もう一度お試しください。",
+      "reviewFailed": "レビューに失敗しました。",
       "retryMessage": "コードレビューをもう一度実行します。",
       "retryReview": "レビューを再試行",
       "retryNeedsSettings": "コードレビュアーがオフになっているか、設定の確認が必要です。設定を修正してから、このレビューを再試行してください。",
@@ -965,7 +1042,9 @@
       "unavailablePersonallySwitchAction": "組織を切り替え",
       "unavailableOrganizationTitle": "合議レビューはご利用いただけません",
       "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織には現在それがありません。",
-      "unavailableForOrganizationNeutral": "この組織では現在、合議レビューはご利用いただけません。後でもう一度お試しください。",
+      "unavailablePlanCheck": "合議レビューはこの組織のプランを確認できませんでした。再試行して、もう一度確認してください。",
+      "unavailableFlagRollout": "合議レビューは、この組織ではまだご利用いただけません。ご利用いただくには、アプリを最新バージョンに更新してください。",
+      "unavailableForOrganizationMember": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。組織のオーナーはプランを変更できます。",
       "unavailableOnBitbucket": "合議レビューは Bitbucket リポジトリでは利用できません。",
       "noRepositories": "リポジトリがまだ選択されていません。先にリポジトリ設定で選択してください。",
       "specialists": "スペシャリスト",
@@ -1264,7 +1343,7 @@
       "couldNotLoad": "検出結果を読み込めませんでした。",
       "couldNotLoadMore": "検出結果を追加で読み込めませんでした。",
       "emptyDescription": "現在、対応が必要な未解決の検出結果はありません。",
-      "emptyTitle": "未解決の検出結果はありません",
+      "emptyTitle": "オープンな検出結果はありません",
       "noMatchesDescription": "フィルター条件を変更するか、解除してください。",
       "noMatchesTitle": "フィルター条件に一致する検出結果はありません"
     },
@@ -1467,7 +1546,7 @@
     "remediationUnavailable": {
       "findingNotFound": "このセキュリティの検出結果は存在しません。",
       "approvalRequired": "自動修復には承認が必要です。手動で修復を開始して承認してください。",
-      "findingNotOpen": "この検出結果は未解決の状態ではなくなりました。",
+      "findingNotOpen": "この検出結果はオープンではなくなりました。",
       "repoNotInScope": "このリポジトリはセキュリティエージェントの監視対象に選択されていません。",
       "analysisRequired": "修正を開始する前に、コードベースの分析を実行してください。",
       "staleAnalysis": "分析後に検出結果が変わりました。修復を開始する前に分析を再実行してください。",
@@ -1535,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 件のセッション",
       "sectionAccessibility": "{{title}}：{{displayCount}} 件のセッション",
       "live": "ライブ",
-      "updating": "更新中"
+      "updating": "更新中",
+      "retentionLimit": "最新のセッションを表示しています。"
     },
     "sessionRow": {
       "deleteTitle": "セッションを削除しますか？",
@@ -1605,7 +1685,6 @@
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "emptyReadOnlyTitle": "このセッションにメッセージはありません",
-      "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "historyTooLarge": "このセッションの履歴は大きすぎて読み込めません。",
@@ -1848,8 +1927,8 @@
       "updatedFileCount_other": "{{displayCount}}件のファイルを更新しました。"
     },
     "toolCard": {
-      "accessibility": "{{label}}ツール、{{status}}",
-      "accessibilityLabel": "{{name}}ツール、{{status}}",
+      "accessibility": "{{label}}、ツール、{{status}}",
+      "accessibilityLabel": "{{name}}、ツール、{{status}}",
       "noTasks": "タスクはありません。",
       "toolRead": "読み取り",
       "toolEdit": "編集",
@@ -1940,8 +2019,7 @@
       "searchPlaceholder": "リポジトリを検索",
       "noMatches": "一致する項目はありません",
       "noRepositories": "利用可能なリポジトリはありません",
-      "noRepositoriesDescription": "このアカウントにはリポジトリが連携されていません。",
-      "loading": "読み込み中…",
+      "noRepositoriesDescription": "リポジトリを読み込むには、GitHubまたはGitLabを連携してください。",
       "accessibility": "リポジトリ：{{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2225,6 +2303,8 @@
     "modelPicker": {
       "title": "モデルの選択",
       "noModelsDescription": "選択できるモデルはありません。",
+      "allUnavailableTitle": "使用できるモデルはありません",
+      "allUnavailableDescription": "プロバイダーキーを追加してから、もう一度お試しください。",
       "favorites": "お気に入り"
     },
     "modelSelector": {
@@ -2453,6 +2533,12 @@
     "retryLoadingAccount": "アカウントの読み込みを再試行",
     "retryLoadingPrivacy": "プライバシー設定の読み込みを再試行"
   },
+  "accountBlocked": {
+    "title": "アカウントがブロックされています",
+    "description": "Kiloはこのアカウントをブロックしており、再度サインインしてもブロックは解除されません。サポートはご要望に応じてブロックを確認できます。",
+    "domainDescription": "Kiloはこのメールドメインのアカウントをブロックしており、再度サインインしてもブロックは解除されません。サポートはご要望に応じてドメインを確認できます。",
+    "contactSupport": "サポートに連絡"
+  },
   "addCredits": {
     "cta": "クレジットを追加",
     "billingPage": "請求ページ"
@@ -2525,8 +2611,7 @@
     "timeoutDescription": "リクエストが完了する前にタイムアウトしました。もう一度お試しください。"
   },
   "screenHeader": {
-    "openMenu": "メニューを開く",
-    "openMenuFor": "{{title}}のメニューを開く"
+    "openMenu": "メニューを開く"
   },
   "picker": {
     "optionsExpired": "選択肢の有効期限が切れました",
@@ -2629,6 +2714,8 @@
     "retryHint": "Kilo Passの状態の取得を再試行します。",
     "endedOn": "{{date}}に終了しました",
     "notAvailableInApp": "Kilo Passはアプリでは利用できません。",
+    "notAvailableTitle": "Kilo Passはアプリでは提供されていません",
+    "noPassDescription": "このアカウントにはKilo Passがありません。",
     "statusActive": "有効",
     "statusTrialing": "トライアル中",
     "statusPastDue": "支払い延滞",
@@ -2771,7 +2858,6 @@
       "skipped_one": "{{displayCount}}件スキップ",
       "skipped_other": "{{displayCount}}件スキップ",
       "title": "チェック",
-      "viewOnGitHub": "GitHubでPRを表示",
       "checkDetails": "チェックの詳細"
     },
     "composer": {
@@ -2810,8 +2896,9 @@
       "checkActiveConnection": "接続は有効ですが、この項目はまだ読み込めません。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
-      "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
+      "reconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
+      "bitbucketAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に接続を依頼してください。",
       "adminOnlyConnectDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
@@ -2832,6 +2919,9 @@
       "commentActions": "コメントの操作",
       "comment": "{{displayCount}}件のコメント",
       "comment_other": "{{displayCount}}件のコメント",
+      "conversationTruncated": "最初の{{displayCount}}件のコメントのみを表示しています。",
+      "conversationTruncated_other": "最初の{{displayCount}}件のコメントのみを表示しています。",
+      "conversationTruncated_one": "最初の{{displayCount}}件のコメントのみを表示しています。",
       "couldNotLoad": "ディスカッションを読み込めませんでした。",
       "couldNotLoadMore": "追加のコメントを読み込めませんでした。",
       "loadMoreComments": "さらにコメントを読み込む",
@@ -3226,6 +3316,8 @@
       "partialPostedStale_one": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "partialPostedStale_other": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitCountOfTotal_one": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitCountOfTotal_other": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信",
       "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",
       "blockedComment": "コメントとしてレビューを投稿するには、総評を入力するか、コメントを1件以上追加してください。"
@@ -3238,6 +3330,9 @@
     },
     "tabs": {
       "discussion": "ディスカッション",
+      "discussionAccessibility": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_one": "{{title}}：1件のコメント",
       "files": "ファイル",
       "overview": "概要"
     },
@@ -3376,7 +3471,7 @@
       "manageOnWeb": "Webでの請求設定",
       "changePlan": "プランを変更",
       "buySeats": "シートを購入",
-      "managedOnWeb": "プラン、シート数、自動チャージはWebで管理されています。",
+      "managedOnWeb": "プラン、シート数、自動チャージはkilo.ai で管理されています。",
       "setupAutoTopUp": "自動チャージを設定",
       "manageAutoTopUp": "自動チャージを管理",
       "opensOnWeb": "Webで開きます"
@@ -3426,14 +3521,13 @@
     "hub": {
       "balance": "残高",
       "lowBalanceBelow": "{{amount}}未満",
-      "organizationSeats": "組織のシート数",
-      "plan": "組織のプラン",
+      "plan": "プラン",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 終了",
       "planEnded": "組織のトライアルは終了し、有効なプランがありません。",
       "manageBilling": "請求を管理",
-      "renamePlaceholder": "組織名",
+      "renamePlaceholder": "組織名を入力してください",
       "renameTitle": "組織名を変更"
     },
     "inviteMember": {
@@ -3470,7 +3564,7 @@
       "retentionLimit": "最新の請求書を表示しています。"
     },
     "lowBalanceAlert": {
-      "enableA11y": "残高アラートを有効にする",
+      "subtitle": "この組織の残高が設定した金額を下回ったときに、指定したメールアドレスにアラートを送信します。",
       "notifyEmailsLabel": "通知先メールアドレス",
       "permissionDenied": "請求アラートを管理する権限がありません。",
       "separateEmailsHint": "複数のメールアドレスはカンマで区切ってください。",
@@ -3571,13 +3665,14 @@
       "identifierLabel": "識別子",
       "identifierRequired": "識別子を入力してください。",
       "identifierTaken": "この識別子は別のモードで既に使用されています。",
+      "identifierTooLong": "識別子は{{max}}文字以内にしてください。",
       "nameLabel": "モード名",
       "nameRequired": "モード名を入力してください。",
       "notFound": "このモードは存在しません。",
-      "restrictionHint": "このパターンに一致するファイルのみ編集できます。空欄にするとすべてのファイルを許可します。",
-      "restrictionInvalid": "有効なパターンを入力してください。",
+      "restrictionHint": "正規表現はこのモードが編集できるファイルを選択します。たとえば `\\.md$` はマークダウンファイルのみを対象にします。空欄にするとすべてのファイルを許可します。",
+      "restrictionInvalid": "有効な正規表現を入力してください。",
       "restrictionLabel": "制限ラベル",
-      "restrictionPattern": "ファイルパターン",
+      "restrictionPattern": "ファイル制限",
       "roleLabel": "ロール定義",
       "roleRequired": "このモードの役割を説明してください。",
       "tool": {
@@ -3647,7 +3742,8 @@
     "signupStepUp": "アカウントの作成を完了するには、「$t(login.moreSignInOptions)」を選択してください。",
     "signupStepUpApple": "アカウントの作成を完了するには、「$t(login.signInWithApple)」を選択してください。",
     "signupStepUpGoogle": "アカウントの作成を完了するには、「$t(login.signInWithGoogle)」を選択してください。",
-    "invalidCode": "そのコードは正しくありません。もう一度お試しください。",
+    "signupStepUpBack": "アカウントの作成を完了するには、前の画面に戻って「$t(login.moreSignInOptions)」を選択してください。",
+    "invalidCode": "そのコードは正しくないか、有効期限が切れています。もう一度お試しいただくか、「$t(login.resendCode)」を選択してください。",
     "codeInProgress": "コードを処理中です。しばらく待ってからもう一度お試しください。",
     "tooManyAttempts": "試行回数が多すぎます。新しいコードをリクエストしてください。",
     "invalidToken": "サインインに失敗しました。もう一度お試しください。",
@@ -3656,7 +3752,7 @@
     "emailDeliveryFailed": "現在、メールを送信できません。しばらくしてからもう一度お試しください。",
     "admissionRequired": "このデバイスを確認できません。「$t(login.moreSignInOptions)」を選択し、別のデバイスまたはウェブからサインインしてください。",
     "default": "問題が発生しました。もう一度お試しください。",
-    "retryableAdmission": "このデバイスを確認できませんでした。接続を確認して、もう一度お試しください。",
+    "retryableAdmission": "このデバイスを確認できませんでした。もう一度お試しください。",
     "startSignInFailed": "サインインを開始できませんでした。もう一度お試しください。",
     "couldNotOpenBrowser": "ブラウザーを開けませんでした。もう一度お試しください。",
     "signInTimedOut": "サインインがタイムアウトしました。もう一度お試しください。",
@@ -3728,6 +3824,34 @@
     "nextScheduled": "次の予定",
     "answerNeeded": "回答が必要",
     "waitingToRetry": "再試行待ち",
+    "countNoun": {
+      "needsInput_one": "入力が必要",
+      "needsInput_other": "入力が必要",
+      "running_one": "作業中",
+      "running_other": "作業中",
+      "scheduled_one": "予定",
+      "scheduled_other": "予定",
+      "idle_one": "待機中",
+      "idle_other": "待機中"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 入力が必要",
+      "needsInput_other": "{{displayCount}} 入力が必要",
+      "running_one": "{{displayCount}} 作業中",
+      "running_other": "{{displayCount}} 作業中",
+      "scheduled_one": "{{displayCount}} 予定",
+      "scheduled_other": "{{displayCount}} 予定",
+      "idle_one": "{{displayCount}} 待機中",
+      "idle_other": "{{displayCount}} 待機中"
+    },
+    "footer": {
+      "checked": "最終確認 {{time}}",
+      "lastKnown": "最終記録 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "次回実行 {{time}}",
+      "wasDue": "予定でした {{time}}"
+    },
     "step": {
       "editing": "編集",
       "reading": "読み取り",
@@ -3916,6 +4040,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection)では、選択したプロトコルとモデルを使用して、このエンドポイントに短い推論リクエストを送信します。プロバイダーから料金が請求される場合があります。",
       "connectionSucceeded": "モデルはこのプロトコルでリクエストを完了しました。",
       "connectionFailed": "モデルはリクエストを完了できませんでした。APIルートURL、プロトコル、認証情報、モデルIDを確認してください。",
+      "requestTimedOut": "エンドポイントが時間内に応答しませんでした。APIルートURLと接続を確認して、もう一度お試しください。",
+      "requestUnauthorized": "エンドポイントが認証情報を拒否しました。APIキーとカスタムヘッダーを確認して、もう一度お試しください。",
+      "requestNotFound": "エンドポイントまたはモデルが見つかりませんでした。APIルートURLとモデルIDを確認してください。",
+      "requestRateLimited": "エンドポイントがリクエストを制限しています。しばらく待ってからもう一度お試しください。",
+      "requestUnavailable": "エンドポイントは現在利用できません。しばらくしてからもう一度お試しください。",
+      "requestUnreachable": "エンドポイントに到達できませんでした。APIルートURLと接続を確認してください。",
+      "requestInvalidResponse": "エンドポイントから期待される形式ではない応答が返されました。APIルートURLとプロトコルがサーバーと一致しているか確認し、もう一度お試しください。",
+      "discoveryNoModels": "エンドポイントにモデルが一覧にありませんでした。モデルを手動で入力してください。",
+      "connectionIncomplete": "モデルは応答しましたが、完了しませんでした。もう一度お試しいただくか、モデルIDとプロトコルを確認してください。",
       "invalidInput": "バックエンド名、有効なヘッダー、および一意のIDと名前を持つモデルを少なくとも1つ入力してください。トークン数の上限には正の整数を指定してください。",
       "invalidUrl": "認証情報、クエリ、フラグメントを含まないHTTPまたはHTTPSのAPIルートURLを入力してください。",
       "publicHttp": "公開HTTPエンドポイントは許可されません。HTTPSまたは非公開のローカルエンドポイントを使用してください。",
@@ -3964,7 +4097,8 @@
         "space": "このモデルに必要な空き容量が足りません。空き容量を増やして、もう一度お試しください。",
         "network": "ダウンロードが完了しませんでした。接続を確認して、もう一度お試しください。",
         "invalidFile": "ダウンロードしたファイルはこのアプリで実行できるモデルではないため、削除されました。",
-        "checksum": "ダウンロードしたファイルが公開されているチェックサムと一致しないため、削除されました。もう一度ダウンロードしてください。"
+        "checksum": "ダウンロードしたファイルが公開されているチェックサムと一致しないため、削除されました。もう一度ダウンロードしてください。",
+        "writeFailed": "このデバイスではモデルを保存できませんでした。もう一度ダウンロードしてください。"
       }
     },
     "catalog": {
@@ -4054,10 +4188,20 @@
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
     },
-    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。"
+    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。",
+    "providerKeyRefused": "プロバイダーが認証情報を拒否しました。そのAPIキーを確認して、再送信してください。",
+    "providerModelMissing": "このバックエンドではこのモデルを提供していません。別のものを選択してください。",
+    "providerRateLimited": "プロバイダーがリクエストを制限しています。しばらく待ってから再送信してください。",
+    "providerUnavailable": "プロバイダーは現在利用できません。しばらくしてから再送信してください。"
   },
   "settingsTools": {
-    "confirmTitle": "この変更を確認しますか？"
+    "confirmTitle": "この変更を確認しますか？",
+    "guarded": {
+      "spendAlertsOff": "支出アラートをオフにしますか？支出しきい値の超過や1時間あたりの急増に関する通知が届かなくなります。",
+      "balanceAlertsOff": "残高アラートをオフにしますか？クレジットが少なくなったときの通知が届かなくなります。",
+      "securityFindingsOff": "セキュリティ検出をオフにしますか？新しいセキュリティ検出に関する通知が届かなくなります。",
+      "hideBalanceOn": "残高を非表示にしますか？クレジット残高がプロフィール画面と組織ハブに表示されなくなります。"
+    }
   },
   "appActions": {
     "start": {
@@ -4132,7 +4276,7 @@
     "personalDefaultDescription": "リポジトリに固定プロフィールがない場合に自動ロードされます。",
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
-    "saveFailed": "プロフィールを保存できませんでした",
+    "saveFailed": "プロフィールを保存できませんでした。もう一度お試しください。",
     "organizationRoleRequired": "組織のプロフィールを変更できるのは組織のオーナーと管理者のみです。",
     "deleteTitle": "プロフィールの削除",
     "deleteMessage": "これにより、プロフィールとその設定が完全に削除されます。これを元に戻すことはできません。",
@@ -4281,6 +4425,7 @@
       "promptPlaceholder": "あなたは…",
       "tools": "ツール",
       "wholeToolRule": "このエージェントは、すべてのツールに一度に1つのルールを適用します：{{rule}}。これらのスイッチは読み取り専用です。",
+      "toolRule": "保存されたルール：{{rule}}",
       "visibility": "可視性",
       "visibilityPrimary": "プライマリ — ピッカーに表示されます",
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
@@ -4390,19 +4535,34 @@
       "deductionFallback": "クレジットの差し引き",
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
+      "expiredGrant": "期限切れ: {{description}}",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
         "balanceNeutral": "残高変動なし",
         "deduction": "差し引き",
         "grant": "クレジット付与",
+        "promotionalCredits": "プロモーションクレジット",
+        "welcomeCredits": "ウェルカムクレジット",
         "purchase": "購入"
+      },
+      "program": {
+        "adminBulkGrant": "管理者クレジット付与",
+        "contributorChampion": "コントリビューターチャンピオンクレジット",
+        "feedback": "フィードバッククレジット",
+        "influencer": "インフルエンサークレジット",
+        "ossMonthlyReset": "OSS支援のリセット",
+        "ossSponsorship": "OSS支援クレジット",
+        "pullRequest": "プルリクエストクレジット",
+        "usageIssue": "利用問題クレジット",
+        "vibeDay": "Vibe dayクレジット"
       },
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。",
-      "retentionLimit": "最新のクレジット履歴を表示しています。"
+      "retentionLimit": "最新のクレジット履歴を表示しています。",
+      "voidedGrant": "無効化済み: {{description}}"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
@@ -4429,6 +4589,7 @@
     "pickPackToBuyAgain": "新しい購入を開始するには、上のパックを選択してください。",
     "purchasePending": "ストアでこのお支払いを処理中です。請求が承認されると、クレジットが付与されます。",
     "buyAgain": "もう一度購入",
+    "checkPurchase": "購入を確認",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   },
@@ -4522,7 +4683,9 @@
     },
     "saveSheet": {
       "title": "リストに保存",
-      "saved": "{{list}}に保存しました"
+      "saved": "{{list}}に保存しました",
+      "saveFailed": "タスクを保存できませんでした。接続を確認して、もう一度お試しください。",
+      "saveRefused": "このリストにタスクを保存できませんでした。別のリストを選択してください。"
     }
   },
   "agentBriefing": {
@@ -4534,6 +4697,7 @@
     "empty": "このブリーフ期間中のアクティビティはありません",
     "emptyHint": "スケジュールされたブリーフにアクティビティがあると、クラウドとCLIのコーディングセッションがここに表示されます。",
     "loadError": "ブリーフィングを読み込めませんでした",
+    "estimateLoadError": "推定を読み込めませんでした。",
     "view": "ブリーフィングを読む",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}、$t(agentBriefing.snapshotPullRequests) {{pullRequests}}、$t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4542,6 +4706,7 @@
     "contextAll": "すべてのコンテキスト",
     "dismiss": "ブリーフィングを非表示にする",
     "dismissFailed": "このブリーフィングはまだ非表示にできませんでした。バックグラウンドで再試行されます。",
+    "readMarkFailed": "このブリーフィングを既読にできませんでした。再読み込み時に再試行します。",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みブリーフィング · 更新できません",
     "summary": "AI要約",
@@ -4647,6 +4812,8 @@
     "connectedTo": "{{account}} に接続済み",
     "disconnected": "{{provider}} の接続を解除しました",
     "disconnectFailed": "{{provider}} の接続を解除できませんでした",
+    "disconnectRetry": "Slack が接続の解除を確認できませんでした。もう一度お試しください。",
+    "disconnectNeedsSupport": "Kilo はこの接続用に保存された Slack へのアクセスを読み取れませんでした。接続の解除を完了するには、サポートに連絡してください。",
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
     "managedByOwner": "変更できない接続については、組織のオーナーに変更を依頼してください。",
@@ -4732,6 +4899,9 @@
       "runAsCreator": "自分として実行",
       "runAsCreatorDescription": "すべての実行があなたのアカウントを使用するため、シークレットヘッダーが必要です。",
       "saveFailedTitle": "トリガーを保存できませんでした",
+      "nameTaken": "「{{name}}」という名前のトリガーは既に存在します。",
+      "saveFailedRetry": "サーバーに接続できませんでした。接続を確認して再試行してください。",
+      "saveFailedCheck": "フォームの値を確認して再試行してください。",
       "deleteTitle": "このトリガーを削除しますか？",
       "deleteMessage": "{{name}}への呼び出しは失敗します。この操作は元に戻せません。",
       "deleteMessageScheduled": "{{name}}の予定された実行は停止します。この操作は元に戻せません。",
@@ -4801,7 +4971,7 @@
   },
   "organizationGuardrails": {
     "title": "AIガードレール",
-    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。",
+    "permissionDenied": "AIガードレールを管理できるのは組織のオーナーと管理者のみです。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AIガードレールは有効になっていません",
     "unavailable": "Kiloは、リクエストに応じて組織のAIガードレールを有効にします。{{supportEmail}} までお問い合わせください。Kiloチームがお使いの組織に対して有効にします。",
     "contactSupport": "サポートに連絡",
@@ -4813,12 +4983,15 @@
     "inputDescription": "Enkrypt AIで、ツールの結果を含むすべての入力をスキャンします。Enkryptが利用できない場合、リクエストは拒否されず、スキャンされないまま送信されます。",
     "outputTitle": "出力ガードレール",
     "outputDescription": "メンバーが受け取る前に、Enkrypt AIで応答をスキャンします。オンにしない限りオフです。",
+    "outputUnavailable": "Kiloはこの組織の出力スキャンを有効にしていないため、応答は検査されず、ここで設定する項目はありません。有効化を希望する場合は {{supportEmail}} までご連絡ください。",
     "detectorsHint": "ブロックは、フラグが付いたリクエストを拒否します。ログのみは、リクエストを遅延させずに記録だけを行います。",
     "detectorsHintOutput": "ブロックは、フラグが付いた応答を失敗させます。ログのみは、応答を遅延させずに記録だけを行います。",
     "choiceLog": "ログのみ",
     "applyTo": "適用先",
     "applyToAllMembers": "すべてのメンバー",
     "applyKiloDefault": "Kiloのデフォルトを適用",
+    "applyKiloDefaultEnglishNote": "Kiloのデフォルトポリシーのテキストは英語です。Kilo Gatewayが書かれたとおりにそのまま適用するためです。",
+    "applyKiloDefaultReplaceMessage": "Kiloのデフォルトポリシーは英語で書かれており、ポリシー違反で設定した内容を置き換えます。ポリシーテキスト欄に入力したテキストは復元できません。",
     "invalidSavedTitle": "保存された入力検出器の設定を読み取れません",
     "invalidSavedBody": "入力検出器が再度保存されるまで、リクエストはブロックされます。以下の検出器はKiloのデフォルトから開始します。",
     "invalidSavedOutputTitle": "保存された出力検出器の設定を読み取れません",
@@ -4939,8 +5112,8 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "エンタープライズ機能",
-    "enterpriseOnly": "これはエンタープライズ限定の機能です。",
-    "readOnly": "これらの設定を変更できるのは組織の所有者と管理者のみです。",
+    "enterpriseOnly": "プロバイダーとモデルは Enterprise プランで利用できます。",
+    "readOnly": "これらの設定を変更できるのは組織のオーナーと管理者のみです。",
     "loadError": "プロバイダーとモデルを読み込めませんでした",
     "tabModels": "モデル",
     "tabProviders": "プロバイダー",
@@ -4953,6 +5126,8 @@
     "providersDescription": "プロバイダーをオフにすると、この組織でKiloがそのプロバイダーへルーティングするのを停止します。",
     "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
     "providersEmpty": "この検索に一致するプロバイダーはありません。",
+    "providersNone": "この組織で利用できるプロバイダーはありません。",
+    "providersUnavailable": "プロバイダー一覧を読み込めませんでした",
     "allowAllShown": "表示されているすべてを許可",
     "denyAllShown": "表示されているすべてを拒否",
     "gatewaysDescription": "KiloはモデルリクエストをVercel AI GatewayまたはOpenRouter経由でルーティングします。無効なゲートウェイはそれらのリクエストを失敗させます。",
@@ -4971,6 +5146,20 @@
       "eu": "欧州連合",
       "au": "オーストラリア",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "設定を検索",
+    "noMatches": "該当する設定がありません",
+    "emptyDescription": "別の設定名やキーワードで検索してください。",
+    "resultsStatus": "見つかった設定：{{resultCount}}件",
+    "keywords": {
+      "signOut": "サインアウト|ログアウト",
+      "appearance": "テーマ|配色",
+      "appUnlock": "生体認証|顔認証|指紋認証",
+      "language": "言語|翻訳",
+      "notifications": "通知|プッシュ通知",
+      "privacy": "データ分析|トラッキング|プライバシー"
     }
   }
 }

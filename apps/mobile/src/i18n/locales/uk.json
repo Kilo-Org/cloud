@@ -19,7 +19,11 @@
     "presenceStatus": "Хости: {{connection}}",
     "commandStatus": "Доставка команди: {{status}}",
     "delivered": "Доставлено",
-    "expired": "Термін дії минув"
+    "expired": "Термін дії минув",
+    "recoveryGaps_one": "Відсутня {{displayCount}} частина цього транскрипту.",
+    "recoveryGaps_few": "Відсутні {{displayCount}} частини цього транскрипту.",
+    "recoveryGaps_many": "Відсутня {{displayCount}} частин цього транскрипту.",
+    "recoveryGaps_other": "Відсутні {{displayCount}} частини цього транскрипту."
   },
   "common": {
     "manageOnWeb": "Керувати у вебверсії",
@@ -138,10 +142,12 @@
     "keepRunning": "Продовжити виконання",
     "newSession": "Новий сеанс",
     "noModelsAvailable": "Немає доступних моделей",
+    "modelRetires": "Виводиться {{date}}",
     "notFound": "Не знайдено.",
     "online": "У мережі",
     "open": "Відкрити {{name}}",
     "openPullRequest": "Відкрити запит на злиття",
+    "viewOnGitHub": "Переглянути PR на GitHub",
     "completed": "Завершено",
     "pending": "Очікує",
     "running": "Виконується",
@@ -172,6 +178,7 @@
     "generating": "Генерування…",
     "working": "У роботі",
     "yourOwnRepositories": "Власні репозиторії",
+    "organizationRepositories": "Репозиторії організації",
     "dismissed": "Відхилено",
     "agent": "Агент",
     "durationMinuteShort": "хв",
@@ -180,7 +187,31 @@
     "organizationTrialEnded": "Пробний період організації завершився, і вона не має активного плану. Власник організації може оновити платіжні дані на kilo.ai, а потім спробувати ще раз.",
     "privateRepositoryA11y": "{{name}}, приватний репозиторій",
     "legalDocumentEnglishOnly": "Цей документ доступний лише англійською мовою.",
-    "organizationTrialEndedBilling": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити оплату, а потім спробувати ще раз."
+    "organizationTrialEndedBilling": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити оплату, а потім спробувати ще раз.",
+    "organizationTrialEndedBillingAtKiloAi": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити платіжні дані на kilo.ai, а потім спробувати ще раз.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Маркер списку",
+        "nestedBulletPoint": "Вкладений маркер списку",
+        "orderedItem": "Елемент списку {n}",
+        "nestedOrderedItem": "Вкладений елемент списку {n}"
+      },
+      "blockquote": {
+        "quote": "Цитата",
+        "nestedQuote": "Вкладена цитата"
+      },
+      "table": {
+        "row": "Рядок {n}: {content}"
+      },
+      "math": {
+        "equation": "Математика: {latex}"
+      },
+      "rotor": {
+        "headings": "Заголовки",
+        "links": "Посилання",
+        "images": "Зображення"
+      }
+    }
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -274,9 +305,13 @@
     "credits": "Кредити",
     "failedToLoadBalance": "Не вдалося завантажити баланс. Торкніться, щоб повторити.",
     "balanceLoadFailed": "Не вдалося завантажити баланс",
+    "balanceUnreachable": "Не вдалося зв'язатися із сервером. Спробуйте ще раз.",
+    "balanceAccessDenied": "У вас немає дозволу переглядати цей баланс.",
+    "balanceUnavailable": "Не вдалося завантажити баланс.",
     "hideBalance": "Приховати баланс",
     "showBalance": "Показати баланс",
     "balanceHidden": "Баланс приховано",
+    "availableToSpendInOrganization": "Доступно для витрат у цій організації",
     "signOutTitle": "Вийти?",
     "signOutMessage": "Щоб отримати доступ до робочого простору, потрібно буде ввійти знову.",
     "deleteAccountTitle": "Видалити обліковий запис?",
@@ -418,6 +453,17 @@
       "location": "Розташування Vertex",
       "clientEmail": "Електронна пошта сервісного облікового запису",
       "privateKey": "Закритий ключ сервісного облікового запису",
+      "privateKeyBlockRequired": "Вставте весь блок ключа, від рядка BEGIN до рядка END.",
+      "privateKeyEncrypted": "Цей блок ключа захищено парольною фразою. Вставте ключ сервісного облікового запису без парольної фрази.",
+      "names": {
+        "codestral": "Застарілий лише для Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Увійти через ChatGPT)",
+        "xiaomi": "Xiaomi (оплата за використання)",
+        "zai": "Z.ai (оплата за використання)",
+        "bedrockByok": "Amazon Bedrock (напряму)",
+        "vertexByok": "Google Vertex AI (напряму)"
+      },
       "modelMappings": "Зіставлення моделей",
       "modelMappingsDescription": "Спрямовуйте модель шлюзу на власну назву розгортання.",
       "mappingTitle": "Зіставлення {{number}}",
@@ -478,13 +524,14 @@
       "receiptLabel": "Підтвердження",
       "copyReceiptId": "Копіювати ідентифікатор підтвердження",
       "appealLabel": "Оскарження",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Отримано",
       "triageOpen": "На розгляді",
       "triageActioned": "Задоволено",
       "triageRejected": "Не задоволено",
       "appealNone": "Не подано",
-      "appealSubmitted": "На розгляді",
-      "appealAccepted": "Задоволено",
+      "appealSubmitted": "Оскарження на розгляді",
+      "appealAccepted": "Оскарження задоволено",
       "appealRejected": "Відхилено",
       "appeal": "Оскаржити це рішення",
       "appealTitle": "Оскаржити це рішення?",
@@ -495,7 +542,25 @@
       "nextStepInReview": "Результат з'явиться на цьому екрані, а оскарження можна буде подати після рішення.",
       "nextStepAppeal": "Результат оскарження з'явиться на цьому екрані.",
       "nextStepFinal": "Рішення щодо оскарження остаточне. Подальше оскарження неможливе.",
-      "viewReceipt": "Переглянути підтвердження"
+      "viewReceipt": "Переглянути підтвердження",
+      "targetLabel": "Об'єкт скарги",
+      "reasonLabel": "Причина скарги",
+      "targetMessage": "Відповідь ШІ",
+      "targetComment": "Коментар до запиту",
+      "targetUser": "Користувач",
+      "reasonHarmful": "Шкідливий вміст",
+      "reasonIllegal": "Незаконний вміст",
+      "reasonHarassment": "Цькування",
+      "reasonSpam": "Небажана реклама",
+      "reasonOther": "Інша причина"
+    },
+    "reportReceipts": {
+      "title": "Скарги",
+      "rowSubtitle": "Подані вами скарги та їхні результати",
+      "emptyTitle": "Скарг ще немає",
+      "emptyDescription": "Скарги, подані з коментаря в обговоренні pull request або з відповіді ШІ в сеансі агента, з'являтимуться тут разом із результатом.",
+      "couldNotLoad": "Не вдалося завантажити ваші скарги",
+      "capped": "Показано ваші останні скарги."
     },
     "changelog": "Що нового",
     "changelogVersionPending": "Примітки до версії {{version}} з’являться з наступним оновленням застосунку.",
@@ -503,8 +568,11 @@
     "changelogFixesIn": "Виправлення та покращення в розділах: {{areas}}.",
     "changelogFixesPolish": "Виправлення та покращення в усьому застосунку.",
     "changelogAreas": {
-      "signIn": "Вхід",
-      "profileOrganizations": "Профіль і організації"
+      "signIn": "вхід",
+      "profileOrganizations": "профіль та організації",
+      "chat": "чат",
+      "notifications": "сповіщення",
+      "integrations": "інтеграції"
     }
   },
   "preferences": {
@@ -598,6 +666,10 @@
       "emptyTitle": "Поки що немає сповіщень",
       "emptyCategoryTitle": "У цій категорії немає сповіщень",
       "emptyBody": "Сповіщення, які отримує цей акаунт, з'являються тут. Вони зберігаються протягом {{days}} днів.",
+      "emptyBody_one": "Сповіщення, які отримує цей акаунт, з'являються тут. Вони зберігаються протягом {{days}} днів.",
+      "emptyBody_few": "Сповіщення, які отримує цей акаунт, з'являються тут. Вони зберігаються протягом {{days}} днів.",
+      "emptyBody_many": "Сповіщення, які отримує цей акаунт, з'являються тут. Вони зберігаються протягом {{days}} днів.",
+      "emptyBody_other": "Сповіщення, які отримує цей акаунт, з'являються тут. Вони зберігаються протягом {{days}} днів.",
       "capped": "Показано найновіші сповіщення.",
       "loadError": "Не вдалося завантажити історію сповіщень.",
       "openFailed": "Це сповіщення більше ніде не відкривається."
@@ -669,7 +741,7 @@
     },
     "instructions": {
       "title": "Власні інструкції",
-      "deprecation": "Підтримку власних інструкцій планують припинити. Перенесіть ці настанови у файл REVIEW.md у своєму репозиторії.",
+      "deprecation": "Власні інструкції буде видалено. Перенесіть ці настанови у файл REVIEW.md у своєму репозиторії.",
       "placeholder": "наприклад: дотримуватися наших правил обробки помилок…",
       "clearTitle": "Видалити власні інструкції?",
       "clearMessage": "Збереження порожнього поля видалить власні інструкції, збережені для цього рецензента."
@@ -678,6 +750,7 @@
       "manageAccess": "Керувати доступом",
       "bitbucketNoRepositoriesDescription": "У цьому робочому просторі Bitbucket немає доступних репозиторіїв.",
       "gitlabNoRepositoriesDescription": "Можливо, потрібно надати доступ до більшої кількості груп або проєктів у GitLab.",
+      "githubNoRepositoriesDescription": "Перевірте доступ застосунку Kilo до репозиторіїв GitHub, а потім оновіть список.",
       "installGithubApp": "Установіть застосунок GitHub для репозиторіїв",
       "installGithubAppDescription": "Надайте застосунку Kilo для GitHub доступ до репозиторіїв, які потрібно перевіряти.",
       "repositoryAccess": "доступ до репозиторію",
@@ -694,12 +767,19 @@
     },
     "autoReviews": "Автоматичні перевірки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати."
+      "notConnectedReadOnlyPlan": "Пробний період організації завершився, тож власник має оновити платіжні дані на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Підключенням Bitbucket для {{organization}} можна керувати лише у вебверсії з комп'ютера.",
+      "deniedManagedByOwner": "Попросіть власника {{organization}} змінити підключення, яке ви не можете змінити.",
+      "deniedConnectRole": "Підключити його можуть лише власники, адміністратори та менеджери з оплати {{organization}}.",
+      "deniedReconnectRole": "Попросіть власника, адміністратора або менеджера з оплати {{organization}} повторно підключити його.",
+      "managedOnWebTitle": "Керується у вебверсії",
+      "managedOnWebShort": "Це підключення керується у вебверсії з комп'ютера.",
+      "managedOnWebRepositories": "Виберіть репозиторії для {{organization}} у вебверсії з комп'ютера.",
       "description": "Створіть токен доступу до робочого простору для {{organization}} та вставте його нижче.",
       "descriptionReconnect": "Створіть новий токен доступу до робочого простору для {{organization}} та вставте його нижче.",
+      "descriptionOverview": "Створіть токен доступу до робочого простору та вставте його на наступному екрані.",
       "scopes": "Обліковий запис: читання · Репозиторії: читання/запис · Запити на злиття: читання · Вебхуки: читання/запис",
       "tokenPlaceholder": "Токен доступу до робочого простору",
       "tokenRefused": "Bitbucket не прийняв цей токен доступу до робочого простору. Перевірте, чи він має наведені вище дозволи, а потім спробуйте ще раз."
@@ -735,14 +815,15 @@
     "platformList": {
       "activity": "Активність",
       "checking": "Перевіряємо…",
+      "needsAttention": "Потребує уваги",
       "platforms": "Платформи",
       "statusUnavailable": "Стан недоступний"
     },
     "providerConnect": {
       "description": "Підключіть {{label}} до Kilo, щоб автоматично перевіряти запити на злиття.",
-      "githubApp": "Застосунок GitHub",
+      "githubApp": "застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
-      "gitlabAccount": "Обліковий запис GitLab",
+      "gitlabAccount": "обліковий запис GitLab",
       "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз."
     },
     "reviewDetail": {
@@ -760,11 +841,11 @@
       "gateHidden": "Приховано",
       "gateNone": "Немає",
       "noFindings": "Зауважень немає.",
-      "findingsUnavailable": "Результати недоступні, оскільки ця перевірка завершилася з помилкою.",
+      "findingsUnavailable": "Результати недоступні.",
       "findingsInProgress": "Ця перевірка ще триває. Зауваження з'являться тут після її завершення.",
       "findingsEndedWithoutResults": "Ця перевірка завершилася, не встигнувши надати жодних зауважень.",
       "serviceUnavailable": "Не вдалося підключитися до сервісу перевірки коду. Повторіть перевірку, коли сервіс буде доступний.",
-      "reviewFailed": "Перевірка завершилася з помилкою. Спробуйте ще раз.",
+      "reviewFailed": "Перевірка завершилася з помилкою.",
       "retryMessage": "Це повторно запустить перевірку коду.",
       "retryReview": "Повторити перевірку",
       "retryNeedsSettings": "Агент перевірки коду вимкнено, або його налаштування потребують уваги. Виправте налаштування, а потім повторіть цю перевірку.",
@@ -969,7 +1050,9 @@
       "unavailablePersonallySwitchAction": "Змінити організацію",
       "unavailableOrganizationTitle": "Колегіальна перевірка наразі недоступна",
       "unavailableForOrganization": "Колегіальна перевірка потребує план Enterprise з активною підпискою або пробним періодом. Наразі ця організація його не має.",
-      "unavailableForOrganizationNeutral": "Колегіальна перевірка наразі недоступна для цієї організації. Спробуйте пізніше.",
+      "unavailablePlanCheck": "Колегіальна перевірка не змогла перевірити план цієї організації. Повторіть, щоб перевірити ще раз.",
+      "unavailableFlagRollout": "Колегіальна перевірка ще недоступна для цієї організації. Оновіть застосунок до останньої версії, щоб отримати її.",
+      "unavailableForOrganizationMember": "Колегіальна перевірка потребує план Enterprise з активною підпискою або пробним періодом. Власник організації може змінити план.",
       "unavailableOnBitbucket": "Колегіальна перевірка недоступна для репозиторіїв Bitbucket.",
       "noRepositories": "Ще не вибрано жодного репозиторію. Спочатку виберіть репозиторії в налаштуваннях репозиторіїв.",
       "specialists": "Спеціалісти",
@@ -1241,7 +1324,7 @@
       "dueThisWeekDetail_many": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "dueThisWeekDetail_other": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",
-      "reviewSlaAssignment": "Перевірити встановлені терміни за SLA",
+      "reviewSlaAssignment": "Перевірити призначення термінів за SLA",
       "allOpenFindingsTracked": "Усі відкриті проблеми відстежуються"
     },
     "dismiss": {
@@ -1450,7 +1533,7 @@
       "failedDescription": "Агент безпеки не зміг завершити аналіз.",
       "extractionFailedDescription": "Технічний звіт не вдалося перетворити на структурований результат.",
       "exploitableDescription": "У коді застосунку є шлях до вразливої функції.",
-      "notExploitable": "Недосяжний код",
+      "notExploitable": "Недосяжний шлях",
       "notExploitableDescription": "У цьому репозиторії не знайдено шляху виконання до вразливої функції.",
       "unknown": "Потребує перевірки",
       "unknownDescription": "Не вдалося підтвердити, чи є в коді шлях до вразливої функції.",
@@ -1573,7 +1656,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сеансу",
       "sectionAccessibility": "{{title}}: {{displayCount}} сеансу",
       "live": "НАЖИВО",
-      "updating": "Оновлення"
+      "updating": "Оновлення",
+      "retentionLimit": "Показано ваші найновіші сеанси."
     },
     "sessionRow": {
       "deleteTitle": "Видалити сеанс?",
@@ -1647,7 +1731,6 @@
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
       "emptyReadOnlyTitle": "У цьому сеансі немає повідомлень",
-      "renameAccessibility": "Перейменувати сеанс: {{title}}",
       "cloningSession": "Клонування сеансу",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс.",
       "historyTooLarge": "Транскрипт цього сеанса завеликий для завантаження.",
@@ -1990,8 +2073,7 @@
       "searchPlaceholder": "Пошук репозиторіїв",
       "noMatches": "Немає збігів",
       "noRepositories": "Немає доступних репозиторіїв",
-      "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
-      "loading": "Завантаження…",
+      "noRepositoriesDescription": "Щоб завантажити репозиторії, підключіть GitHub або GitLab.",
       "accessibility": "Репозиторій: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2277,6 +2359,8 @@
     "modelPicker": {
       "title": "Вибір моделі",
       "noModelsDescription": "Немає доступних моделей.",
+      "allUnavailableTitle": "Жодну модель не можна використати",
+      "allUnavailableDescription": "Додайте ключ постачальника, а потім спробуйте ще раз.",
       "favorites": "Обране"
     },
     "modelSelector": {
@@ -2519,6 +2603,12 @@
     "retryLoadingAccount": "Повторити завантаження облікового запису",
     "retryLoadingPrivacy": "Повторити завантаження налаштувань конфіденційності"
   },
+  "accountBlocked": {
+    "title": "Акаунт заблоковано",
+    "description": "Kilo заблокував цей акаунт, і повторний вхід не зніме блокування. Підтримка може переглянути блокування на запит.",
+    "domainDescription": "Kilo заблокував акаунти на цьому домені електронної пошти, і повторний вхід не зніме блокування. Підтримка може переглянути домен на запит.",
+    "contactSupport": "Звернутися до підтримки"
+  },
   "addCredits": {
     "cta": "Поповнити баланс",
     "billingPage": "сторінка оплати"
@@ -2591,8 +2681,7 @@
     "timeoutDescription": "Час очікування запиту минув, і він не завершився. Спробуйте ще раз."
   },
   "screenHeader": {
-    "openMenu": "Відкрити меню",
-    "openMenuFor": "Відкрити меню для {{title}}"
+    "openMenu": "Відкрити меню"
   },
   "picker": {
     "optionsExpired": "Варіанти застаріли",
@@ -2699,6 +2788,8 @@
     "retryHint": "Повторно перевіряє стан Kilo Pass.",
     "endedOn": "Завершено {{date}}",
     "notAvailableInApp": "Kilo Pass недоступний у застосунку.",
+    "notAvailableTitle": "Kilo Pass немає в застосунку",
+    "noPassDescription": "У цього облікового запису немає Kilo Pass.",
     "statusActive": "Активний",
     "statusTrialing": "Пробний період",
     "statusPastDue": "Прострочений платіж",
@@ -2849,7 +2940,6 @@
       "skipped_few": "пропущено: {{displayCount}}",
       "skipped_many": "пропущено: {{displayCount}}",
       "title": "Перевірки",
-      "viewOnGitHub": "Переглянути PR на GitHub",
       "checkDetails": "відомості про перевірку"
     },
     "composer": {
@@ -2888,8 +2978,9 @@
       "checkActiveConnection": "Підключення активне, але цей елемент досі не вдається завантажити.",
       "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Цей обліковий запис ще не має організацій. Запити на злиття Bitbucket можна переглядати після того, як ви створите організацію або приєднаєтеся до неї.",
-      "gitlabReconnectAdminOnlyDescription": "Попросіть власника організації, адміністратора або менеджера з оплати підключити його.",
+      "reconnectAdminOnlyDescription": "Попросіть власника організації, адміністратора або менеджера з оплати підключити його.",
       "bitbucketNotConnectedTitle": "Bitbucket не підключено",
+      "bitbucketAdminOnlyDescription": "Попросіть власника організації, адміністратора або менеджера з оплати підключити його.",
       "adminOnlyConnectDescription": "Підключити його можуть лише власники організації, адміністратори та менеджери з оплати.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для особистого простору"
@@ -2913,6 +3004,11 @@
       "couldNotLoad": "Не вдалося завантажити обговорення.",
       "couldNotLoadMore": "Не вдалося завантажити наступні коментарі.",
       "loadMoreComments": "Завантажити ще коментарі",
+      "conversationTruncated": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_one": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_other": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_few": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_many": "Показано лише перші {{displayCount}} коментарів.",
       "loading": "Завантаження обговорення",
       "moderation": {
         "block": {
@@ -3338,6 +3434,10 @@
       "partialPostedStale_many": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "partialPostedStale_other": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "submitCountOfTotal": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_one": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_few": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_many": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_other": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
       "submitReview": "Надіслати результати перевірки",
       "pendingComment_few": "ненадіслані коментарі",
       "pendingComment_many": "ненадісланих коментарів",
@@ -3352,6 +3452,11 @@
     },
     "tabs": {
       "discussion": "Обговорення",
+      "discussionAccessibility": "{{title}}: Коментарів: {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Коментарів: {{displayCount}}",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} коментар",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} коментарі",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} коментарів",
       "files": "Файли",
       "overview": "Огляд"
     },
@@ -3492,7 +3597,7 @@
       "manageOnWeb": "Налаштування оплати у вебверсії",
       "changePlan": "Змінити план",
       "buySeats": "Купити місця",
-      "managedOnWeb": "Планом, місцями та автопоповненням керують у вебверсії.",
+      "managedOnWeb": "Планом, місцями та автопоповненням керують на kilo.ai.",
       "setupAutoTopUp": "Налаштувати автопоповнення",
       "manageAutoTopUp": "Керувати автопоповненням",
       "opensOnWeb": "Відкривається у вебверсії"
@@ -3542,14 +3647,13 @@
     "hub": {
       "balance": "Баланс",
       "lowBalanceBelow": "Менше ніж {{amount}}",
-      "organizationSeats": "Місця в організації",
-      "plan": "План організації",
+      "plan": "План",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Завершився",
       "planEnded": "Пробний період організації завершився, і вона не має активного плану.",
       "manageBilling": "Керувати оплатою",
-      "renamePlaceholder": "Назва організації",
+      "renamePlaceholder": "Введіть назву організації",
       "renameTitle": "Перейменувати організацію"
     },
     "inviteMember": {
@@ -3586,7 +3690,7 @@
       "retentionLimit": "Показано найновіші рахунки."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Увімкнути сповіщення про низький баланс",
+      "subtitle": "Надсилати сповіщення електронною поштою на вказані адреси, коли баланс цієї організації опускається нижче встановленої суми.",
       "notifyEmailsLabel": "Адреси для сповіщень",
       "permissionDenied": "У вас немає дозволу керувати сповіщеннями про оплату.",
       "separateEmailsHint": "Якщо вводите кілька адрес електронної пошти, розділяйте їх комами.",
@@ -3687,13 +3791,14 @@
       "identifierLabel": "Ідентифікатор",
       "identifierRequired": "Введіть ідентифікатор.",
       "identifierTaken": "Інший режим уже використовує цей ідентифікатор.",
+      "identifierTooLong": "Обмежте ідентифікатор до {{max}} символів або менше.",
       "nameLabel": "Назва режиму",
       "nameRequired": "Введіть назву режиму.",
       "notFound": "Цього режиму більше не існує.",
-      "restrictionHint": "Редагувати можна лише файли, що відповідають цьому шаблону. Залиште поле порожнім, щоб дозволити всі файли.",
-      "restrictionInvalid": "Введіть коректний шаблон.",
+      "restrictionHint": "Регулярний вираз вибирає, які файли цей режим може редагувати, наприклад `\\.md$` лише для файлів markdown. Залиште поле порожнім, щоб дозволити всі файли.",
+      "restrictionInvalid": "Введіть коректний регулярний вираз.",
       "restrictionLabel": "Назва обмеження",
-      "restrictionPattern": "Шаблон файлів",
+      "restrictionPattern": "Обмеження файлів",
       "roleLabel": "Визначення ролі",
       "roleRequired": "Опишіть, що робить цей режим.",
       "tool": {
@@ -3767,7 +3872,8 @@
     "signupStepUp": "Щоб завершити створення облікового запису, виберіть «$t(login.moreSignInOptions)».",
     "signupStepUpApple": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithGoogle)».",
-    "invalidCode": "Код неправильний. Спробуйте ще раз.",
+    "signupStepUpBack": "Щоб завершити створення облікового запису, поверніться назад і виберіть «$t(login.moreSignInOptions)».",
+    "invalidCode": "Код неправильний або термін його дії минув. Спробуйте ще раз або натисніть «$t(login.resendCode)».",
     "codeInProgress": "Ваш код опрацьовується. Зачекайте трохи та спробуйте ще раз.",
     "tooManyAttempts": "Забагато спроб. Надішліть запит на новий код.",
     "invalidToken": "Не вдалося ввійти. Спробуй ще раз.",
@@ -3776,7 +3882,7 @@
     "emailDeliveryFailed": "Надсилання листів тимчасово недоступне. Спробуйте ще раз пізніше.",
     "admissionRequired": "Неможливо перевірити ваш пристрій. Виберіть «$t(login.moreSignInOptions)», щоб увійти на іншому пристрої або у вебверсії.",
     "default": "Сталася помилка. Спробуй ще раз.",
-    "retryableAdmission": "Не вдалося перевірити цей пристрій. Перевірте з'єднання та спробуйте ще раз.",
+    "retryableAdmission": "Не вдалося перевірити цей пристрій. Спробуйте ще раз.",
     "startSignInFailed": "Не вдалося розпочати вхід. Спробуйте ще раз.",
     "couldNotOpenBrowser": "Не вдалося відкрити браузер. Спробуйте ще раз.",
     "signInTimedOut": "Час очікування входу минув. Спробуйте ще раз.",
@@ -3848,6 +3954,50 @@
     "nextScheduled": "Наступні заплановані",
     "answerNeeded": "Очікує відповіді",
     "waitingToRetry": "Очікує повторної спроби",
+    "countNoun": {
+      "needsInput_one": "Очікує відповіді",
+      "needsInput_other": "Очікує відповіді",
+      "needsInput_few": "Очікує відповіді",
+      "needsInput_many": "Очікує відповіді",
+      "running_one": "У роботі",
+      "running_other": "У роботі",
+      "running_few": "У роботі",
+      "running_many": "У роботі",
+      "scheduled_one": "Заплановано",
+      "scheduled_other": "Заплановано",
+      "scheduled_few": "Заплановано",
+      "scheduled_many": "Заплановано",
+      "idle_one": "Очікування",
+      "idle_other": "Очікування",
+      "idle_few": "Очікування",
+      "idle_many": "Очікувань"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Очікує відповіді",
+      "needsInput_other": "{{displayCount}} Очікує відповіді",
+      "needsInput_few": "{{displayCount}} Очікує відповіді",
+      "needsInput_many": "{{displayCount}} Очікує відповіді",
+      "running_one": "{{displayCount}} У роботі",
+      "running_other": "{{displayCount}} У роботі",
+      "running_few": "{{displayCount}} У роботі",
+      "running_many": "{{displayCount}} У роботі",
+      "scheduled_one": "{{displayCount}} Заплановано",
+      "scheduled_other": "{{displayCount}} Заплановано",
+      "scheduled_few": "{{displayCount}} Заплановано",
+      "scheduled_many": "{{displayCount}} Заплановано",
+      "idle_one": "{{displayCount}} Очікування",
+      "idle_other": "{{displayCount}} Очікування",
+      "idle_few": "{{displayCount}} Очікування",
+      "idle_many": "{{displayCount}} Очікувань"
+    },
+    "footer": {
+      "checked": "Перевірено {{time}}",
+      "lastKnown": "Останній відомий стан · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Наступний запуск {{time}}",
+      "wasDue": "Очікувалося {{time}}"
+    },
     "step": {
       "editing": "Редагування",
       "reading": "Читання",
@@ -4038,6 +4188,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) надсилає короткий запит на генерування до цієї кінцевої точки з використанням вибраного протоколу та моделі. Постачальник може стягнути за це плату.",
       "connectionSucceeded": "Модель виконала запит із використанням цього протоколу.",
       "connectionFailed": "Модель не змогла виконати запит. Перевірте базову URL-адресу API, протокол, облікові дані та ідентифікатор моделі.",
+      "requestTimedOut": "Кінцева точка не відповіла вчасно. Перевірте базову URL-адресу API і з’єднання, потім спробуйте ще раз.",
+      "requestUnauthorized": "Кінцева точка відхилила облікові дані. Перевірте ключ API і власні заголовки, потім спробуйте ще раз.",
+      "requestNotFound": "Кінцеву точку або модель не знайдено. Перевірте базову URL-адресу API та ідентифікатор моделі.",
+      "requestRateLimited": "Кінцева точка обмежує запити. Зачекайте мить і спробуйте ще раз.",
+      "requestUnavailable": "Кінцева точка зараз недоступна. Спробуйте ще раз за мить.",
+      "requestUnreachable": "Не вдалося з’єднатися з кінцевою точкою. Перевірте базову URL-адресу API і з’єднання.",
+      "requestInvalidResponse": "Кінцева точка відповіла не в очікуваному форматі. Перевірте, чи базова URL-адреса API та протокол відповідають серверу, потім повторіть спробу.",
+      "discoveryNoModels": "Кінцева точка не показала жодної моделі. Додайте моделі вручну.",
+      "connectionIncomplete": "Модель відповіла, але не завершила. Спробуйте ще раз або перевірте ідентифікатор моделі та протокол.",
       "invalidInput": "Введіть назву сервера, дійсні заголовки та додайте принаймні одну модель з унікальним ідентифікатором і назвою. Обмеження кількості токенів мають бути додатними цілими числами.",
       "invalidUrl": "Введіть базову URL-адресу API з HTTP або HTTPS без облікових даних, параметрів запиту чи фрагмента.",
       "publicHttp": "Публічні кінцеві точки HTTP не дозволені. Використовуйте HTTPS або приватну локальну кінцеву точку.",
@@ -4086,7 +4245,8 @@
         "space": "Недостатньо вільного місця для цієї моделі. Звільніть місце й спробуйте знову.",
         "network": "Завантаження не завершилося. Перевірте з'єднання й спробуйте знову.",
         "invalidFile": "Завантажений файл не є моделлю, яку цей застосунок може запустити, тому його видалено.",
-        "checksum": "Завантажений файл не відповідає опублікованій контрольній сумі, тому його видалено. Спробуйте завантажити його ще раз."
+        "checksum": "Завантажений файл не відповідає опублікованій контрольній сумі, тому його видалено. Спробуйте завантажити його ще раз.",
+        "writeFailed": "Цей пристрій не зміг зберегти модель. Спробуйте завантажити її ще раз."
       }
     },
     "catalog": {
@@ -4176,10 +4336,20 @@
     "reasoningEffort": {
       "modelFlag": "Ця модель підтримує рівень міркування"
     },
-    "creditsRequired": "Недостатньо кредитів, щоб надіслати це повідомлення."
+    "creditsRequired": "Недостатньо кредитів, щоб надіслати це повідомлення.",
+    "providerKeyRefused": "Постачальник відхилив облікові дані. Перевірте його ключ API, потім надішліть ще раз.",
+    "providerModelMissing": "Цей бекенд більше не надає цю модель. Виберіть іншу.",
+    "providerRateLimited": "Постачальник обмежує запити. Зачекайте мить і надішліть ще раз.",
+    "providerUnavailable": "Постачальник зараз недоступний. Надішліть ще раз незабаром."
   },
   "settingsTools": {
-    "confirmTitle": "Підтвердити цю зміну?"
+    "confirmTitle": "Підтвердити цю зміну?",
+    "guarded": {
+      "spendAlertsOff": "Вимкнути сповіщення про витрати? Ви перестанете отримувати сповіщення про перевищення порогів витрат і погодинні сплески.",
+      "balanceAlertsOff": "Вимкнути сповіщення про баланс? Ви перестанете отримувати сповіщення, коли ваші кредити закінчуються.",
+      "securityFindingsOff": "Вимкнути сповіщення про проблеми безпеки? Ви перестанете отримувати сповіщення про нові проблеми безпеки.",
+      "hideBalanceOn": "Приховати ваші баланси? Баланси кредитів більше не відображатимуться на екранах профілю та в центрі організації."
+    }
   },
   "appActions": {
     "start": {
@@ -4264,7 +4434,7 @@
     "personalDefaultDescription": "Автоматично завантажується, якщо жодне сховище не має закріпленого профілю.",
     "organizationDefaultDescription": "Автоматично завантажується для учасників, які не мають особистого значення за умовчанням.",
     "setAsDefault": "Встановити за умовчанням",
-    "saveFailed": "Не вдалося зберегти профіль",
+    "saveFailed": "Не вдалося зберегти профіль. Спробуйте ще раз.",
     "organizationRoleRequired": "Змінити профілі організації можуть лише власники та адміністратори організації.",
     "deleteTitle": "Видалити профіль",
     "deleteMessage": "Це назавжди видаляє профіль і його налаштування. Це неможливо скасувати.",
@@ -4415,6 +4585,7 @@
       "promptPlaceholder": "Ви…",
       "tools": "Інструменти",
       "wholeToolRule": "Цей агент застосовує одне правило до кожного інструмента одночасно: {{rule}}. Ці перемикачі доступні лише для читання.",
+      "toolRule": "Збережене правило: {{rule}}",
       "visibility": "Видимість",
       "visibilityPrimary": "Основний — відображається в панелі вибору",
       "visibilitySubagent": "Субагент — тільки для виклику від інших",
@@ -4524,19 +4695,34 @@
       "deductionFallback": "Списання кредитів",
       "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",
       "emptyTitle": "Історії кредитів немає",
+      "expiredGrant": "Термін дії минув: {{description}}",
       "googlePlayReceipt": "Квитанція в Google Play",
       "kind": {
         "adjustment": "Коригування",
         "balanceNeutral": "Без зміни балансу",
         "deduction": "Списання",
         "grant": "Нарахування кредитів",
+        "promotionalCredits": "Промокредити",
+        "welcomeCredits": "Вітальні кредити",
         "purchase": "Покупка"
+      },
+      "program": {
+        "adminBulkGrant": "Нарахування кредитів адміністратором",
+        "contributorChampion": "Кредит для найкращого учасника",
+        "feedback": "Кредит за відгук",
+        "influencer": "Кредит для інфлюенсера",
+        "ossMonthlyReset": "Поновлення підтримки проєктів із відкритим кодом",
+        "ossSponsorship": "Кредит підтримки проєктів із відкритим кодом",
+        "pullRequest": "Кредит за запит на злиття",
+        "usageIssue": "Кредит за проблему з використанням",
+        "vibeDay": "Кредит Vibe day"
       },
       "purchaseFallback": "Покупка кредитів",
       "receipt": "Квитанція",
       "receiptA11y": "Відкрити квитанцію для {{description}}, {{amount}}, від {{date}}",
       "receiptUnavailable": "Квитанція для цієї покупки недоступна.",
-      "retentionLimit": "Показано найновішу історію кредитів."
+      "retentionLimit": "Показано найновішу історію кредитів.",
+      "voidedGrant": "Анульовано: {{description}}"
     },
     "title": "Купити кредити",
     "description": "Кредити — це разова покупка, яка додається на ваш баланс Kilo для запуску AI-сесій кодування в Kilo App. Магазин списує кошти з вашого акаунта, і кредити нараховуються після підтвердження оплати магазином.",
@@ -4563,6 +4749,7 @@
     "pickPackToBuyAgain": "Виберіть пакет вище, щоб почати нову покупку.",
     "purchasePending": "Магазин досі обробляє цей платіж. Кредити надійдуть, щойно він схвалить списання.",
     "buyAgain": "Купити знову",
+    "checkPurchase": "Перевірити покупку",
     "purchaseOwnedByAnotherAccount": "Кредити в цьому Apple Account належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися.",
     "purchaseOwnedByAnotherAccountPlay": "Кредити в цьому обліковому записі Google Play належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися."
   },
@@ -4664,7 +4851,9 @@
     },
     "saveSheet": {
       "title": "Зберегти до списку",
-      "saved": "Збережено до списку {{list}}"
+      "saved": "Збережено до списку {{list}}",
+      "saveFailed": "Не вдалося зберегти завдання. Перевірте з’єднання та спробуйте ще раз.",
+      "saveRefused": "Не вдалося зберегти завдання до цього списку. Виберіть інший список."
     }
   },
   "agentBriefing": {
@@ -4676,6 +4865,7 @@
     "empty": "Немає активності за цей період звіту",
     "emptyHint": "Ваші хмарні та CLI-сесії програмування з’являться тут, коли запланований звіт має активність.",
     "loadError": "Не вдалося завантажити звіти",
+    "estimateLoadError": "Не вдалося завантажити оцінку.",
     "view": "Читати звіт",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4684,6 +4874,7 @@
     "contextAll": "Усі контексти",
     "dismiss": "Відхилити звіт",
     "dismissFailed": "Наразі не вдалося відхилити цей звіт. Спроба повторюватиметься у фоновому режимі.",
+    "readMarkFailed": "Наразі не вдалося позначити цей звіт як прочитаний. Спроба повториться, коли звіт завантажиться знову.",
     "offline": "Офлайн · збережений звіт",
     "cached": "Збережений звіт · оновлення недоступне",
     "summary": "Підсумок AI",
@@ -4797,6 +4988,8 @@
     "connectedTo": "Підключено до {{account}}",
     "disconnected": "{{provider}} відключено",
     "disconnectFailed": "Не вдалося відключити {{provider}}",
+    "disconnectRetry": "Не вдалося підтвердити відключення Slack. Спробуйте ще раз.",
+    "disconnectNeedsSupport": "Kilo не вдалося прочитати збережений доступ до Slack для цього підключення. Щоб завершити відключення, зверніться до підтримки.",
     "couldNotLoad": "Не вдалося завантажити інтеграції",
     "permissionDenied": "У вас немає дозволу на керування цими інтеграціями.",
     "managedByOwner": "Попросіть власника організації змінити підключення, яке ви не можете змінити.",
@@ -4882,6 +5075,9 @@
       "runAsCreator": "Запускати від мого імені",
       "runAsCreatorDescription": "Кожен запуск використовує ваш обліковий запис, тому секретний заголовок обов’язковий.",
       "saveFailedTitle": "Не вдалося зберегти тригер",
+      "nameTaken": "Тригер із назвою «{{name}}» вже існує.",
+      "saveFailedRetry": "Не вдалося зв’язатися із сервером. Перевірте з’єднання та спробуйте знову.",
+      "saveFailedCheck": "Перевірте значення у формі та спробуйте знову.",
       "deleteTitle": "Видалити цей тригер?",
       "deleteMessage": "Виклики до {{name}} завершуватимуться помилкою. Цю дію не можна скасувати.",
       "deleteMessageScheduled": "Заплановані запуски {{name}} зупиняться. Цю дію не можна скасувати.",
@@ -4951,7 +5147,7 @@
   },
   "organizationGuardrails": {
     "title": "Захисні механізми ШІ",
-    "permissionDenied": "Керувати захисними механізмами ШІ можуть лише власники та адміністратори організації.",
+    "permissionDenied": "Керувати захисними механізмами ШІ можуть лише власники та адміністратори організації. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Захисні механізми ШІ не ввімкнено",
     "unavailable": "Kilo вмикає захисні механізми ШІ для організації на запит. Зв'яжіться з {{supportEmail}}, і команда Kilo вмикає їх для вашої організації.",
     "contactSupport": "Звернутися до підтримки",
@@ -4963,12 +5159,15 @@
     "inputDescription": "Сканує кожні вхідні дані за допомогою Enkrypt AI, включно з результатами роботи інструментів. Якщо Enkrypt недоступний, запити надсилаються без сканування, а не відхиляються.",
     "outputTitle": "Захисні механізми вихідних даних",
     "outputDescription": "Сканує відповіді за допомогою Enkrypt AI, перш ніж учасники їх отримають. Вимкнено, доки ви не ввімкнете.",
+    "outputUnavailable": "Kilo не ввімкнув сканування вихідних даних для цієї організації, тому відповіді не перевіряються і тут нема чого налаштовувати. Зв'яжіться з {{supportEmail}}, щоб подати запит.",
     "detectorsHint": "Блокування відхиляє позначений запит. Лише журналювання фіксує його, не затримуючи запит.",
     "detectorsHintOutput": "Блокування відхиляє позначену відповідь. Лише журналювання фіксує її, не затримуючи відповідь.",
     "choiceLog": "Лише журналювання",
     "applyTo": "Застосувати до",
     "applyToAllMembers": "Усі учасники",
     "applyKiloDefault": "Застосувати стандартні налаштування Kilo",
+    "applyKiloDefaultEnglishNote": "Текст стандартної політики Kilo — англійською, бо Kilo Gateway застосовує його точно так, як він написаний.",
+    "applyKiloDefaultReplaceMessage": "Стандартна політика Kilo написана англійською і замінює те, що задано в розділі Порушення політики. Текст, введений у полі тексту політики, відновити неможливо.",
     "invalidSavedTitle": "Не вдалося прочитати збережені налаштування детекторів вхідних даних",
     "invalidSavedBody": "Запити блокуються, доки детектори вхідних даних не буде збережено знову. Наведені нижче детектори починають зі стандартних налаштувань Kilo.",
     "invalidSavedOutputTitle": "Не вдалося прочитати збережені налаштування детекторів вихідних даних",
@@ -5089,7 +5288,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Корпоративна функція",
-    "enterpriseOnly": "Це функція, доступна лише для підприємств.",
+    "enterpriseOnly": "Провайдери і моделі доступні на плані Enterprise.",
     "readOnly": "Лише власники та адміністратори організації можуть змінювати ці налаштування.",
     "loadError": "Не вдалося завантажити провайдерів і моделі",
     "tabModels": "Моделі",
@@ -5103,6 +5302,8 @@
     "providersDescription": "Вимкніть провайдера, щоб Kilo більше не маршрутизував до нього запити для цієї організації.",
     "providersNeedCatalog": "Перемикачі провайдерів доступні лише для читання, доки не завантажиться повний каталог моделей. Щоб змінити їх, натисніть Повторити вище.",
     "providersEmpty": "Жоден провайдер не відповідає цьому пошуку.",
+    "providersNone": "Для цієї організації немає доступних провайдерів.",
+    "providersUnavailable": "Не вдалося завантажити список провайдерів.",
     "allowAllShown": "Дозволити всі показані",
     "denyAllShown": "Заборонити всі показані",
     "gatewaysDescription": "Kilo спрямовує запити до моделей через Vercel AI Gateway або OpenRouter. Вимкнений шлюз відхиляє такі запити.",
@@ -5121,6 +5322,20 @@
       "eu": "Європейський Союз",
       "au": "Австралія",
       "jp": "Японія"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Пошук налаштувань",
+    "noMatches": "Відповідних налаштувань не знайдено",
+    "emptyDescription": "Спробуйте іншу назву налаштування або ключове слово.",
+    "resultsStatus": "Знайдено налаштувань: {{resultCount}}",
+    "keywords": {
+      "signOut": "вийти|вихід|вихід з облікового запису",
+      "appearance": "тема|колірна схема",
+      "appUnlock": "біометрія|обличчя|відбиток пальця",
+      "language": "мова|переклад",
+      "notifications": "сповіщення|пуш-сповіщення",
+      "privacy": "аналітика|відстеження"
     }
   }
 }

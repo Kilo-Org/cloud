@@ -89,10 +89,11 @@ export function SettingsOverviewScreen({
     (recovery.isRetrying ||
       config.isError ||
       (config.fetchStatus === 'paused' && isConnectivityKnown));
+  // The capability read comes through the hook that owns the shared options,
+  // so it settles offline instead of pausing: a failure is the only unresolved
+  // state that names a connection.
   const capabilityUnavailable =
-    capability.status === 'error' ||
-    (capability.status === 'loading' &&
-      (recovery.isRetrying || (capability.fetchStatus === 'paused' && isConnectivityKnown)));
+    capability.status === 'error' || (capability.status === 'loading' && recovery.isRetrying);
   const repositoriesLoading = repositories.isLoading || recovery.isRetrying;
   const repositoriesError =
     repositories.isError ||
@@ -122,7 +123,7 @@ export function SettingsOverviewScreen({
   const settledVariantRef = useRef<'offline' | 'server' | null>(null);
   if (config.isError || (config.fetchStatus === 'paused' && isConnectivityKnown)) {
     settledVariantRef.current = settledFailure(config.error, config.fetchStatus);
-  } else if (capability.isError || (capability.fetchStatus === 'paused' && isConnectivityKnown)) {
+  } else if (capability.isError) {
     settledVariantRef.current = settledFailure(capability.error, capability.fetchStatus);
   }
   const variant = settledVariantRef.current ?? 'server';
@@ -249,51 +250,54 @@ export function SettingsOverviewScreen({
         headerRight={auditAction}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
-        <RowGroup leadingTile>
-          {capability.canManage ? (
-            <PreferenceRow
-              icon={ShieldCheck}
-              title={t('common.securityAgent')}
-              value={data.isEnabled}
-              disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
-              onValueChange={handleToggle}
-            />
-          ) : (
-            <KvRow
-              label={t('common.securityAgent')}
-              value={data.isEnabled ? t('common.enabled') : t('common.disabled')}
-              valueFace="text"
-              valueTone="muted"
-            />
-          )}
-        </RowGroup>
+        {/* The disabled hint is a footnote of the switch card: 7 dp keeps it
+            under the card it explains, and the body's 21 dp section gap then
+            separates it from the card below. */}
+        <View className="gap-2">
+          <RowGroup leadingTile>
+            {capability.canManage ? (
+              <PreferenceRow
+                icon={ShieldCheck}
+                title={t('common.securityAgent')}
+                value={data.isEnabled}
+                disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
+                onValueChange={handleToggle}
+              />
+            ) : (
+              <KvRow
+                label={t('common.securityAgent')}
+                value={data.isEnabled ? t('common.enabled') : t('common.disabled')}
+                valueFace="text"
+                valueTone="muted"
+              />
+            )}
+          </RowGroup>
+          {!data.isEnabled || repositoriesLoading || recoveryError
+            ? renderRepositoryStatus()
+            : null}
+        </View>
 
-        {(!data.isEnabled || repositoriesLoading || recoveryError) && (
-          <View className="gap-3">
-            {renderRepositoryStatus()}
-            {showRepoCta ? (
-              <RowGroup leadingTile>
-                <ConfigureRow
-                  icon={FolderGit2}
-                  title={t('common.selectRepositories')}
-                  // No count subtitle: this row renders only without an
-                  // effective selection, so a saved count would always read
-                  // zero. A settled empty grant is the one state that names the
-                  // real next step instead — there is nothing to select, so
-                  // widening the GitHub App grant is the only way out.
-                  subtitle={
-                    repositoriesSettledEmpty
-                      ? t('securityAgent.repositories.noRepositoriesDescription')
-                      : undefined
-                  }
-                  onPress={() => {
-                    pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-                  }}
-                />
-              </RowGroup>
-            ) : null}
-          </View>
-        )}
+        {showRepoCta ? (
+          <RowGroup leadingTile>
+            <ConfigureRow
+              icon={FolderGit2}
+              title={t('common.selectRepositories')}
+              // No count subtitle: this row renders only without an
+              // effective selection, so a saved count would always read
+              // zero. A settled empty grant is the one state that names the
+              // real next step instead — there is nothing to select, so
+              // widening the GitHub App grant is the only way out.
+              subtitle={
+                repositoriesSettledEmpty
+                  ? t('securityAgent.repositories.noRepositoriesDescription')
+                  : undefined
+              }
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+              }}
+            />
+          </RowGroup>
+        ) : null}
 
         {data.isEnabled && (
           <RowGroup leadingTile>

@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ImageIcon,
+  Lock,
   Star,
   Wrench,
 } from '@/components/ui/icons';
@@ -27,7 +28,7 @@ import {
   FIELD_TRIGGER_FRAME_CLASS,
 } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
-import { formatList } from '@/lib/format';
+import { formatDate, formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -60,6 +61,8 @@ type ModelSelectorProps = {
   isLoading?: boolean;
   /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
   lockLabel?: string;
+  /** Refetches the model catalog; the picker's empty state offers it as Retry. */
+  onRetryModels?: () => void;
   /**
    * `chip` is the composer's inline pill, beside the mode chip. `field` is the
    * form's picker: a label above the 48pt select box, on the field-label
@@ -131,6 +134,8 @@ export function openModelPicker(
     acceptsVariant: boolean;
     onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
     selectionScope?: ModelPickerSelectionScopeContextValue;
+    /** Refetches the catalog the picker lists; the picker's empty state offers it as Retry. */
+    onRetryModels?: () => void;
   }
 ) {
   const {
@@ -140,6 +145,7 @@ export function openModelPicker(
     acceptsVariant,
     onSelect,
     selectionScope = UNFENCED_SELECTION_CONTEXT,
+    onRetryModels,
   } = params;
   const routeKey = selectionScope.selectionScope.sessionId;
   modelPickerSlot.set(routeKey, {
@@ -152,6 +158,7 @@ export function openModelPicker(
     onSelect: selection => {
       onSelect(selection.option.id, selection.variant, selection);
     },
+    retryCatalog: onRetryModels,
   });
   // The sheet anchors over the keyboard only at its first layout and never
   // re-anchors when the keyboard hides afterwards: opened while the composer
@@ -172,6 +179,7 @@ export function ModelSelector({
   disabled = false,
   isLoading = false,
   lockLabel,
+  onRetryModels,
   presentation = 'chip',
 }: Readonly<ModelSelectorProps>) {
   const pushOnce = useSinglePushRoute();
@@ -194,14 +202,17 @@ export function ModelSelector({
       >
         {/* The bar stands in for the label line and takes that line's own box:
             `text-sm` sets one 17.5 dp line, which is the scale's `h-5`, so the
-            pill is the height it will have once the model arrives. Its width is
-            the nearest spacing step rather than the arriving label's measured
-            width: that width belongs to the label, and a pinned bar would be a
-            pixel value the contract does not allow. `bg-muted-soft` for the
-            reason recorded on the repository loading row: the default
-            `bg-skeleton-fill` equals this pill's `bg-secondary` in the light
-            palette and would paint nothing. The wrapper keeps the busy label for
-            assistive tech without a text node that reads as a resolved value. */}
+            pill is the height it will have once the model arrives. The field
+            presentation's value line is `text-base`, and the bar sits inside
+            the fixed `FIELD_TRIGGER_BODY_CLASS` 48 dp box, so the arriving line
+            cannot move that box. Its width is the nearest spacing step rather
+            than the arriving label's measured width: that width belongs to the
+            label, and a pinned bar would be a pixel value the contract does not
+            allow. It fills with `bg-muted-soft` for the reason recorded on the
+            repository loading row: the default `bg-skeleton-fill` equals this
+            pill's `bg-secondary` in the light palette and would paint nothing.
+            The wrapper keeps the busy label for assistive tech without a text
+            node that reads as a resolved value. */}
         <Skeleton className="h-5 w-20 bg-muted-soft" />
         <View className="opacity-50">
           <ChevronDown size={presentation === 'field' ? 16 : 14} color={colors.mutedForeground} />
@@ -228,7 +239,7 @@ export function ModelSelector({
   );
   // A matched option can be one of Kilo's own Auto models, whose backend name no
   // catalog translates, so resolve its label first and let the helper fall back
-  // to the short name (or the generic label) for a stored reference the catalog
+  // to the readable reference (or `unknown`) for a stored model the catalog
   // does not carry.
   const label = resolveModelSelectorLabel({
     selectedName: selectedModel
@@ -236,7 +247,7 @@ export function ModelSelector({
       : undefined,
     value,
     providerAware,
-    fallbackLabel: t('common.model'),
+    unknownLabel: t('common.unknown'),
     notSelectedLabel: t('common.notSelected'),
   });
   // With no model chosen the label is a placeholder, so it takes the muted ink
@@ -245,14 +256,25 @@ export function ModelSelector({
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
+  const catalogEmpty = pickerOptions.length === 0;
+  // The pill names the model it still has: a session keeps its stored model
+  // while the catalog read fails, so only a pill with nothing chosen states the
+  // empty catalog in the value slot. The empty state rides the spoken name and
+  // the sheet for a named model.
+  const shownLabel = catalogEmpty && nothingChosen ? t('common.noModelsAvailable') : label;
   const chipParts = [
-    label,
+    shownLabel,
     collectsData ? freeModelDataLabel() : undefined,
     byok ? BYOK_MODEL_LABEL : undefined,
   ].filter((part): part is string => part !== undefined);
   const modelLabel = formatList(chipParts, i18n.language);
+  // A pinned variant is meaningful even when the locked option carries a single
+  // variant, so surface the badge whenever a lock label is present.
+  const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
+  // The spoken name follows the drawn badge: the effort is announced exactly
+  // when the chip draws it, so the one state never contradicts the other.
   const spokenModel =
-    hasVariants && variantLabel
+    showVariantBadge && variantLabel
       ? t('agentChat.modelSelector.thinkingEffortWithModel', {
           model: modelLabel,
           variant: variantLabel,
@@ -261,14 +283,19 @@ export function ModelSelector({
   // The chip names one model, so it states that model's state. Every option
   // being unavailable is therefore not what decides the announcement.
   const selectedUnavailable = selectedModel?.unavailable === true;
-  // An empty catalog has nothing to choose, so the chip stays disabled instead
-  // of opening a sheet with no rows; an unavailable catalog keeps its press so
-  // the picker can explain each model.
-  const chipDisabled = disabled || pickerOptions.length === 0;
+  // An empty catalog keeps the press only when the sheet has a Retry behind
+  // it, so a composer disabled by that same failed read still reaches it; a
+  // locked chip, or one whose caller offers no retry, keeps refusing.
+  const retryBehindEmptyCatalog = catalogEmpty && onRetryModels !== undefined;
+  const chipDisabled = disabled && !(retryBehindEmptyCatalog && lockLabel === undefined);
   const accessibilityLabel = [
     // "Not selected" alone would not say what is not selected.
     nothingChosen ? t('common.model') : undefined,
     spokenModel,
+    // The pill names the model it still has, so an empty catalog is spoken here
+    // rather than drawn over that name. A pill with nothing chosen already
+    // draws the words, so it does not say them twice.
+    catalogEmpty && !nothingChosen ? t('common.noModelsAvailable') : undefined,
     selectedUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
     lockLabel && disabled
       ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel })
@@ -276,9 +303,6 @@ export function ModelSelector({
   ]
     .filter((part): part is string => part !== undefined)
     .join(t('common.sentenceJoiner'));
-  // A pinned variant is meaningful even when the locked option carries a single
-  // variant, so surface the badge whenever a lock label is present.
-  const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
     if (chipDisabled) {
@@ -292,20 +316,40 @@ export function ModelSelector({
       acceptsVariant,
       onSelect,
       selectionScope: selectionContext,
+      onRetryModels,
     });
   }
 
   const selectorBody = (
     <View className="min-w-0 shrink flex-row items-center gap-1.5">
+      {/* The field presentation renders the value at the shared field-select
+          size, so the model line matches the other pickers in the form. The
+          chip keeps its own `text-sm` line. */}
       <Text
         className={cn(
-          'shrink text-sm font-medium',
-          nothingChosen ? 'text-muted-foreground' : 'text-foreground'
+          'shrink font-medium',
+          presentation === 'field' ? 'text-base' : 'text-sm',
+          nothingChosen || catalogEmpty ? 'text-muted-foreground' : 'text-foreground'
         )}
         numberOfLines={1}
       >
-        {label}
+        {shownLabel}
       </Text>
+      {/* These markers exist because every state the chip announces must also
+       * be drawn: the lock reason and the unavailable model each have a spoken
+       * part, and the pill shows a sighted reader the same state. They follow
+       * the value, so the model name keeps the chip's start and no marker can
+       * push it off its line. */}
+      {lockLabel && disabled ? <Lock size={12} color={colors.mutedForeground} /> : null}
+      {selectedUnavailable ? (
+        <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
+          {/* Text on the badge surface, so it keeps full theme contrast for the
+           * same reason the effort label below does (D2). */}
+          <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+            {t('agentChat.modelSelector.unavailable')}
+          </Text>
+        </View>
+      ) : null}
       {byok ? (
         <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-700">
           <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
@@ -412,7 +456,23 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData, tools, images } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
+  // The retirement note states a fact about the model beside its name, worded
+  // in the app language from `retires_on`, and is absent when the entry carries
+  // no date. It renders on its own muted line under the id: kept out of the
+  // name, the name stays the row's primary text and an RTL reading order never
+  // moves the localized sentence ahead of the Latin name. The chip's
+  // selected-model label stays without it: the picker row is where the fact
+  // matters.
   const name = autoModelLabel(option.displayId, option.name);
+  const retirementNote = option.retires_on
+    ? t('common.modelRetires', {
+        date: formatDate(new Date(`${option.retires_on}T00:00:00Z`), i18n.language, {
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        }),
+      })
+    : undefined;
   // The name may already state the fact ("… (free)", "Auto Free" in every
   // locale), so the badge and its accessibility phrase only render when it
   // does not. The free Auto model is decided by id too: nine catalogs name it
@@ -422,6 +482,7 @@ export function ModelPickerOptionRow({
     [
       option.provider?.name,
       name,
+      retirementNote,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       showFreeBadge ? freeModelFreeLabel() : undefined,
@@ -487,6 +548,9 @@ export function ModelPickerOptionRow({
                 {option.displayId}
               </Text>
             ) : null}
+            {retirementNote ? (
+              <Text className="text-xs text-muted-foreground">{retirementNote}</Text>
+            ) : null}
             {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
             {option.unavailable ? (
               <Text className="mt-1 text-xs text-muted-foreground">
@@ -523,6 +587,9 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
+        {/* The selected row always draws its muted check, including in the
+         * all-unavailable sheet: the row's spoken state says selected too. The
+         * column stays reserved so nothing moves. */}
         <View className="items-center justify-center" style={{ width: CHECK_COLUMN_DP }}>
           {selected ? (
             <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />

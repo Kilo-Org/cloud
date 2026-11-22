@@ -11,7 +11,12 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { renderRowTrailing, type RowTrailingSpec } from '@/components/ui/row-trailing';
+import {
+  renderRowTrailing,
+  type RowTrailingSpec,
+  TEXT_ACTION_PENDING_BAND_CLASS,
+  TEXT_ACTION_SKELETON_CLASS,
+} from '@/components/ui/row-trailing';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type IntegrationRow } from '@/lib/integrations/integration-rows';
@@ -84,9 +89,12 @@ export function IntegrationProviderRow({
     role,
     action: 'disconnect',
   });
-  let subtitle = t('common.connected');
+  // A row that offers Connect already says it is not connected, so it carries
+  // no subtitle that repeats the action. A row the viewer cannot connect keeps
+  // "Not connected", because nothing else on it names the state.
+  let subtitle: string | undefined = t('common.connected');
   if (!row.installed) {
-    subtitle = t('common.notConnected');
+    subtitle = canConnect ? undefined : t('common.notConnected');
   } else if (row.accountLabel) {
     subtitle = t('integrations.connectedTo', { account: row.accountLabel });
   }
@@ -101,12 +109,34 @@ export function IntegrationProviderRow({
   let action: RowTrailingSpec | undefined = undefined;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
-    // not landed, so the row holds the button's space instead of guessing.
-    action = { kind: 'node', node: <Skeleton className="h-9 w-24 rounded-md" /> };
+    // not landed, so the row holds the settled cell's space instead of guessing.
+    // Where a cell will land, the placeholder holds the compact button's own
+    // 36pt frame, which is what the settled cell lays out, and marks the line
+    // for the target: a stacked row must host the cell at the platform target,
+    // and a stacked line sized to the compact frame alone would not deliver its
+    // touches. The flat frame ignores the mark, so the row's own padding still
+    // holds where the row does not stack. Every settled branch is gated on the
+    // same permission, so a viewer who cannot disconnect settles with no cell
+    // at all: that placeholder takes the row's 27pt content band instead, and
+    // the row neither grows while pending nor shrinks when the read lands.
+    action = {
+      kind: 'node',
+      target: canDisconnect,
+      node: (
+        <Skeleton
+          className={canDisconnect ? TEXT_ACTION_SKELETON_CLASS : TEXT_ACTION_PENDING_BAND_CLASS}
+        />
+      ),
+    };
   } else if (row.installed && row.webManaged) {
     action = canDisconnect
       ? {
           kind: 'node',
+          // The cell keeps the base's compact label-sized frame; its reach is
+          // the compact button's own `hitSlop`. The mark stays because a
+          // stacked row must host the cell at the target for Android to deliver
+          // its touches instead of clipping them to the row's line.
+          target: true,
           node: (
             <Button
               size="sm"
@@ -123,6 +153,9 @@ export function IntegrationProviderRow({
     action = canDisconnect
       ? {
           kind: 'node',
+          // Compact like the web-managed cell, and marked for the same reason:
+          // a stacked frame hosts it at the target.
+          target: true,
           node: (
             <Button
               size="sm"
@@ -143,6 +176,8 @@ export function IntegrationProviderRow({
     action = canDisconnect
       ? {
           kind: 'node',
+          // Compact like the other two cells, and marked for the same reason.
+          target: true,
           node: (
             <Button
               size="sm"
@@ -193,6 +228,13 @@ export function IntegrationProviderRow({
       subtitle={subtitle}
       subtitleNumberOfLines={1}
       trailing={action === undefined ? undefined : renderRowTrailing(action)}
+      // The cell must reach the platform target in a stacked row, so a stacked
+      // frame must host it there: an outline cell reaches it through its
+      // compact button's `hitSlop`, a text action (Connect) through its own
+      // pressable, and the pending placeholder reserves that same line.
+      trailingIsTarget={
+        action?.kind === 'action' || (action?.kind === 'node' && action.target === true)
+      }
       onPress={opensProviderPage ? onOpenOnWeb : undefined}
       accessibilityLabel={opensProviderPage ? blockedRowName : undefined}
     />

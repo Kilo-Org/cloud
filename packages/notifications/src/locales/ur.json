@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "نیا سیکیورٹی معاملہ ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "سنگین",
+      "high": "زیادہ",
+      "medium": "درمیانی",
+      "low": "کم"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA انتباہ"
     },

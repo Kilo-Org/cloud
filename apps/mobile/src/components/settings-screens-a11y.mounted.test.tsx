@@ -78,6 +78,7 @@ vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Cpu: 'Cpu',
   FileText: 'FileText',
+  Flag: 'Flag',
   Globe: 'Globe',
   History: 'History',
   KeyRound: 'KeyRound',
@@ -100,6 +101,16 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // reached at import time; the node environment cannot load the native module.
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
+// The row skeleton's shimmer is a Reanimated clock, and the node environment
+// cannot load that native module; the screens only render skeletons while loading.
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+// Both screens mount with the account read resolved, so no error state renders;
+// the surface's button chain is what cannot load here.
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/offline-banner-space', () => ({ useOfflineBannerSpace: () => false }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => themeColors }));
 vi.mock('@/lib/hooks/use-theme-preference', () => ({

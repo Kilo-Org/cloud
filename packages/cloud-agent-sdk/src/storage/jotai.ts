@@ -213,12 +213,16 @@ function createJotaiStorage(
       flushPendingDeltas();
       const arr = partsMap.get(messageId) ?? [];
       const nextArr = upsertPartDroppingStaleSyntheticParts(
+        messageId,
         arr,
         part,
         eventTime,
         partEvidence,
         authoritative
       );
+      // A rejected update (a stale lifecycle or a preview of a stored tool)
+      // hands back the caller's own array: nothing changed, so publish nothing.
+      if (nextArr === arr) return;
       partsMap.set(messageId, nextArr);
       bumpPartsRevision();
       publishPartsChanged(partsSnapshot, subscribers, messageId);

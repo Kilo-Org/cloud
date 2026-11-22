@@ -1,13 +1,21 @@
+/* eslint-disable max-lines -- the sheet draws the whole-body load, permission, paused and terminal failure states beside the form from one draft */
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
+import { DismissSheetFrame } from '@/components/security-agent/dismiss-sheet-frame';
+import {
+  DISMISS_REASONS,
+  type DismissReason,
+  isDismissReason,
+} from '@/components/security-agent/dismissal-reasons';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { RefusalStatus } from '@/components/refusal-status';
 import { SheetHeader } from '@/components/sheet-header';
+import { SheetScrollView } from '@/components/tab-screen';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { DismissFindingSkeleton } from '@/components/security-agent/dismiss-finding-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
@@ -27,56 +35,26 @@ import {
   securityMutationCopyKey,
 } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
-import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
+import {
+  useDismissSecurityFinding,
+  useRetrySecurityFinding,
+  useSecurityFinding,
+} from '@/lib/hooks/use-security-findings';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { useSideInsetMarginStyle } from '@/lib/screen-insets';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import {
+  classifyReadFailureKind,
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
-
-// The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
-// (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
-// pairs from the task brief, matching web's dismissal reason picker.
-const DISMISS_REASONS = [
-  { value: 'fix_started', labelKey: 'securityAgent.dismiss.reasonFixStarted' },
-  { value: 'no_bandwidth', labelKey: 'securityAgent.dismiss.reasonNoBandwidth' },
-  { value: 'tolerable_risk', labelKey: 'securityAgent.dismiss.reasonTolerableRisk' },
-  { value: 'inaccurate', labelKey: 'securityAgent.dismiss.reasonInaccurate' },
-  { value: 'not_used', labelKey: 'securityAgent.dismiss.reasonNotUsed' },
-] as const;
-
-type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
-
-function isDismissReason(value: string): value is DismissReason {
-  return DISMISS_REASONS.some(reason => reason.value === value);
-}
 
 type DismissFindingScreenProps = {
   scope: string;
   findingId: string;
 };
-
-/**
- * The chrome the states without a form share: the sheet's title and its close
- * button, over one of the body states below.
- */
-function DismissSheetFrame({ children }: Readonly<{ children: ReactNode }>) {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const headerTopInset = useFormSheetHeaderTopInset();
-  return (
-    <View className="flex-1 bg-background">
-      <SheetHeader
-        title={t('securityAgent.dismiss.title')}
-        variant="close"
-        topInset={headerTopInset}
-        onDone={() => {
-          router.back();
-        }}
-      />
-      {children}
-    </View>
-  );
-}
 
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
@@ -85,9 +63,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   // settles a status-bar inset below the window top and the header reserves no
   // clearance of its own (`useFormSheetHeaderTopInset`).
   const headerTopInset = useFormSheetHeaderTopInset();
-  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
+  const findingRetry = useRetrySecurityFinding(scope, findingId);
   const [reason, setReason] = useState<DismissReason | null>(null);
   const commentRef = useRef('');
   const dismissFinding = useDismissSecurityFinding(scope);
@@ -98,6 +76,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   // reader while `useBillingAction` offers the step from the same predicate.
   const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   // Restore the reason and comment from the stored draft once, so a retry
   // reopens the form with the user's last intent. The form renders only after
@@ -184,31 +163,69 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   if (findingQuery.isError && !findingQuery.data) {
+    // The title names what failed; the variant supplies the cause and next step.
     return (
       <DismissSheetFrame>
         <QueryError
-          message={t('securityAgent.dismiss.couldNotLoad')}
+          variant={classifyReadFailureVariant({
+            errors: [findingQuery.error],
+            isPaused: findingQuery.fetchStatus === 'paused',
+            connectivity,
+          })}
+          title={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
       </DismissSheetFrame>
     );
   }
 
-  if (capability.status === 'error') {
+  // A paused first read never reaches the loading gate: name the connection
+  // and offer Retry. A deliberate retry retires the paused promise a plain
+  // `refetch` would only join. The capability read comes through the hook that
+  // owns the shared organizations options, so it never pauses: it settles into
+  // the failure branch below instead.
+  const findingPaused = isReadPausedBeforeData({ ...findingQuery, connectivity });
+  if (findingPaused) {
     return (
       <DismissSheetFrame>
         <QueryError
+          variant="offline"
+          message={t('securityAgent.dismiss.couldNotLoad')}
+          onRetry={() => {
+            void findingRetry.retry();
+          }}
+          isRetrying={findingRetry.isRetrying}
+        />
+      </DismissSheetFrame>
+    );
+  }
+
+  if (capability.status === 'error') {
+    // The capability read settles instead of pausing, so its own error names
+    // the cause: a failure that never reached the server is the connection's,
+    // and the deadline keeps its own wording.
+    const kind = classifyReadFailureKind({
+      errors: capability.error ? [capability.error] : [],
+      isPaused: false,
+      connectivity,
+    });
+    return (
+      <DismissSheetFrame>
+        <QueryError
+          variant={readFailureKindVariant(kind)}
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
         />
       </DismissSheetFrame>
     );
   }
-
+  // `capability.isLoading` is `isPending && isFetching`, so the gate reads
+  // `status` instead: the hook reports 'loading' for every capability read
+  // without data, whether it is still in flight or has not started.
   if (
     findingQuery.isLoading ||
     !findingQuery.data ||
-    capability.isLoading ||
+    capability.status === 'loading' ||
     !dismissDraft.hydrated
   ) {
     return <DismissFindingSkeleton />;
@@ -272,9 +289,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         doneDisabled={!reason || dismissBlocked}
         doneBusy={dismissFinding.isPending}
       />
-      <ScrollView
+      {/* SheetScrollView keeps the iOS native keyboard inset and, on Android
+          where that inset does nothing, ends the frame at the keyboard's top
+          so the focused comment field scrolls clear of it. It also applies
+          the side insets. */}
+      <SheetScrollView
         className="flex-1"
-        style={sideInsetMarginStyle}
         contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
@@ -346,7 +366,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
               className="text-sm"
             />
           ))}
-      </ScrollView>
+      </SheetScrollView>
     </View>
   );
 }

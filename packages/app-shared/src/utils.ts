@@ -86,16 +86,21 @@ export function firstNonEmpty(...values: (string | null | undefined)[]): string 
   return '';
 }
 
-export function fromMicrodollars(microdollars: number): number {
-  return microdollars / 1000000;
+export const MICRODOLLARS_PER_DOLLAR = 1_000_000;
+
+export function toMicrodollars(amount: number): number {
+  return Math.round(amount * MICRODOLLARS_PER_DOLLAR);
 }
 
-// en-US USD covers nearly every call (formatDollars and the default formatCents
-// argument), so it gets a direct module-level instance; other currencies are
-// memoized by code. Construction is deferred to the first call: mobile bundles
-// import this module before their Intl polyfill warm-up, and the native Intl
-// that exists at import time must not own the cached formatter.
-let usdNumberFormatValue: Intl.NumberFormat | null = null;
+export function fromMicrodollars(microdollars: number): number {
+  return microdollars / MICRODOLLARS_PER_DOLLAR;
+}
+
+// Every currency, USD included, is memoized by its uppercase code, so one
+// construction site owns the en-US currency presentation. Construction is
+// deferred to the first call: mobile bundles import this module before their
+// Intl polyfill warm-up, and the native Intl that exists at import time must
+// not own the cached formatter.
 const currencyNumberFormats = new Map<string, Intl.NumberFormat>();
 
 function currencyNumberFormat(currency: string): Intl.NumberFormat {
@@ -116,12 +121,5 @@ export function formatDollars(amount: number): string {
 }
 
 export function formatCents(amount: number, currency: string = 'USD') {
-  let format: Intl.NumberFormat;
-  if (currency.toUpperCase() === 'USD') {
-    usdNumberFormatValue ??= new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-    format = usdNumberFormatValue;
-  } else {
-    format = currencyNumberFormat(currency);
-  }
-  return format.format(amount / 100);
+  return currencyNumberFormat(currency).format(amount / 100);
 }

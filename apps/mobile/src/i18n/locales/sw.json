@@ -19,7 +19,9 @@
     "presenceStatus": "Vizio: {{connection}}",
     "commandStatus": "Uwasilishaji wa amri: {{status}}",
     "delivered": "Imewasilishwa",
-    "expired": "Muda wake umeisha"
+    "expired": "Muda wake umeisha",
+    "recoveryGaps_one": "Sehemu {{displayCount}} ya nakala hii haipo.",
+    "recoveryGaps_other": "Sehemu {{displayCount}} za nakala hii hazipo."
   },
   "common": {
     "manageOnWeb": "Dhibiti kwenye wavuti",
@@ -138,10 +140,12 @@
     "keepRunning": "Acha iendelee",
     "newSession": "Kikao kipya",
     "noModelsAvailable": "Hakuna modeli zinazopatikana",
+    "modelRetires": "Itastaafu {{date}}",
     "notFound": "Haikupatikana.",
     "online": "Mtandaoni",
     "open": "Fungua {{name}}",
     "openPullRequest": "Fungua ombi la kuunganisha",
+    "viewOnGitHub": "Angalia PR kwenye GitHub",
     "completed": "Imekamilika",
     "pending": "Inasubiri",
     "running": "Inaendelea",
@@ -172,6 +176,7 @@
     "generating": "Inatengeneza…",
     "working": "Inafanya kazi",
     "yourOwnRepositories": "Hazina zako mwenyewe",
+    "organizationRepositories": "Hazina za shirika",
     "dismissed": "Imepuuzwa",
     "agent": "Wakala",
     "durationMinuteShort": "dk",
@@ -180,7 +185,31 @@
     "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
     "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
     "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
-    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena."
+    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena.",
+    "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Nukta ya orodha",
+        "nestedBulletPoint": "Nukta ya orodha ya ndani",
+        "orderedItem": "Kipengee cha orodha {n}",
+        "nestedOrderedItem": "Kipengee cha orodha ya ndani {n}"
+      },
+      "blockquote": {
+        "quote": "Nukuu",
+        "nestedQuote": "Nukuu ya ndani"
+      },
+      "table": {
+        "row": "Safu {n}: {content}"
+      },
+      "math": {
+        "equation": "Hesabu: {latex}"
+      },
+      "rotor": {
+        "headings": "Vichwa",
+        "links": "Viungo",
+        "images": "Picha"
+      }
+    }
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -274,9 +303,13 @@
     "credits": "Salio",
     "failedToLoadBalance": "Imeshindikana kupakia salio. Gusa ili ujaribu tena.",
     "balanceLoadFailed": "Imeshindikana kupakia salio",
+    "balanceUnreachable": "Imeshindwa kufikia seva. Jaribu tena.",
+    "balanceAccessDenied": "Huna ruhusa kuona salio hili.",
+    "balanceUnavailable": "Salio halikuweza kupakiwa.",
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
+    "availableToSpendInOrganization": "Inapatikana kwa matumizi katika shirika hili",
     "signOutTitle": "Ungependa kutoka kwenye akaunti?",
     "signOutMessage": "Utahitaji kuingia tena ili kufikia eneo lako la kazi.",
     "deleteAccountTitle": "Ungependa kufuta akaunti?",
@@ -418,6 +451,17 @@
       "location": "Eneo la Vertex",
       "clientEmail": "Barua pepe ya akaunti ya huduma",
       "privateKey": "Ufunguo binafsi wa akaunti ya huduma",
+      "privateKeyBlockRequired": "Bandika kizuizi kizima cha ufunguo, kutoka mstari wa BEGIN hadi mstari wa END.",
+      "privateKeyEncrypted": "Kizuizi hiki cha ufunguo kinalindwa kwa kaulisiri. Bandika ufunguo wa akaunti ya huduma ambao hauna kaulisiri.",
+      "names": {
+        "codestral": "Codestral ya zamani pekee",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Ingia na ChatGPT)",
+        "xiaomi": "Xiaomi (malipo kwa matumizi)",
+        "zai": "Z.ai (malipo kwa matumizi)",
+        "bedrockByok": "Amazon Bedrock (moja kwa moja)",
+        "vertexByok": "Google Vertex AI (moja kwa moja)"
+      },
       "modelMappings": "Ulinganishaji wa modeli",
       "modelMappingsDescription": "Elekeza modeli ya gateway kwenye jina maalum la deployment.",
       "mappingTitle": "Ulinganishaji {{number}}",
@@ -478,13 +522,14 @@
       "receiptLabel": "Risiti",
       "copyReceiptId": "Nakili kitambulisho cha risiti",
       "appealLabel": "Rufaa",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Imepokelewa",
       "triageOpen": "Inakaguliwa",
       "triageActioned": "Imekubaliwa",
       "triageRejected": "Haijakubaliwa",
       "appealNone": "Hakuna iliyowasilishwa",
-      "appealSubmitted": "Inakaguliwa",
-      "appealAccepted": "Imekubaliwa",
+      "appealSubmitted": "Rufaa inakaguliwa",
+      "appealAccepted": "Rufaa imekubaliwa",
       "appealRejected": "Imekataliwa",
       "appeal": "Kata rufaa dhidi ya uamuzi huu",
       "appealTitle": "Ungependa kukata rufaa dhidi ya uamuzi huu?",
@@ -495,7 +540,25 @@
       "nextStepInReview": "Matokeo yataonekana kwenye skrini hii, na unaweza kukata rufaa baada ya uamuzi.",
       "nextStepAppeal": "Matokeo ya rufaa yataonekana kwenye skrini hii.",
       "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
-      "viewReceipt": "Angalia risiti"
+      "viewReceipt": "Angalia risiti",
+      "targetLabel": "Kitu kilichoripotiwa",
+      "reasonLabel": "Sababu ya ripoti",
+      "targetMessage": "Jibu la AI",
+      "targetComment": "Maoni ya PR",
+      "targetUser": "Mtumiaji",
+      "reasonHarmful": "Maudhui hatarishi",
+      "reasonIllegal": "Maudhui haramu",
+      "reasonHarassment": "Unyanyasaji",
+      "reasonSpam": "Barua taka",
+      "reasonOther": "Sababu nyingine"
+    },
+    "reportReceipts": {
+      "title": "Ripoti",
+      "rowSubtitle": "Ripoti ulizowasilisha na matokeo yake",
+      "emptyTitle": "Hakuna ripoti bado",
+      "emptyDescription": "Ripoti unazowasilisha kutoka kwa maoni katika mjadala wa pull request, au kutoka kwa jibu la AI katika kikao cha wakala, zinaonekana hapa pamoja na matokeo yake.",
+      "couldNotLoad": "Imeshindwa kupakia ripoti zako",
+      "capped": "Inaonyesha ripoti zako za hivi karibuni."
     },
     "changelog": "Mapya",
     "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
@@ -503,8 +566,11 @@
     "changelogFixesIn": "Marekebisho na maboresho katika {{areas}}.",
     "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
     "changelogAreas": {
-      "signIn": "Kuingia",
-      "profileOrganizations": "Wasifu na mashirika"
+      "signIn": "kuingia",
+      "profileOrganizations": "wasifu & mashirika",
+      "chat": "mazungumzo",
+      "notifications": "arifa",
+      "integrations": "miunganisho"
     }
   },
   "preferences": {
@@ -749,6 +815,9 @@
       "couldNotLoadMore": "Imeshindikana kupakia maoni zaidi.",
       "retryLoadingMore": "Jaribu tena kupakia maoni zaidi",
       "loadMoreComments": "Pakia maoni zaidi",
+      "conversationTruncated": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
+      "conversationTruncated_one": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
+      "conversationTruncated_other": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
       "addReaction": "Ongeza mwitikio",
       "reactionPill": "mwitikio wa {{emoji}}, {{countLabel}} {{displayCount}}",
       "reaction_one": "mwitikio",
@@ -878,7 +947,6 @@
       "noAccess": "Huna ruhusa ya kuona vipimo vya hazina hii ya msimbo.",
       "couldNotLoad": "Imeshindikana kupakia vipimo.",
       "retryChecks": "Jaribu vipimo tena",
-      "viewOnGitHub": "Angalia PR kwenye GitHub",
       "noChecksReported": "Hakuna vipimo vilivyoripotiwa",
       "passed": "{{displayCount}} vimefaulu",
       "passed_one": "{{displayCount}} vimefaulu",
@@ -943,8 +1011,9 @@
       "checkActiveConnection": "Muunganisho uko hai, lakini kipengee hiki bado hakiwezi kupakiwa.",
       "bitbucketOrgOnlyDescription": "Badilisha akaunti iliyo juu kuwa shirika ili kukagua maombi yake ya kuunganisha kwenye Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
-      "gitlabReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
+      "reconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
       "bitbucketNotConnectedTitle": "Bitbucket haijaunganishwa",
+      "bitbucketAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe.",
       "adminOnlyConnectDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "contextLine": "Kwa {{organization}}",
       "contextLinePersonal": "Kwa akaunti yako binafsi"
@@ -962,6 +1031,8 @@
       "pendingComment": "maoni yanayosubiri kutumwa",
       "pendingComment_other": "maoni yanayosubiri kutumwa",
       "submitCountOfTotal": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
       "submitReview": "Wasilisha ukaguzi",
       "partialPostedFresh": "Maoni {{displayFreshCount}} yamechapishwa. ",
       "partialPostedFresh_one": "Maoni {{displayFreshCount}} yamechapishwa. ",
@@ -1026,7 +1097,10 @@
     "tabs": {
       "overview": "Muhtasari",
       "files": "Faili",
-      "discussion": "Mazungumzo"
+      "discussion": "Mazungumzo",
+      "discussionAccessibility_one": "{{title}}: maoni 1",
+      "discussionAccessibility": "{{title}}: Maoni {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Maoni {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Imebadilishwa",
@@ -1152,6 +1226,8 @@
       "emptyTitle": "Hakuna arifa bado",
       "emptyCategoryTitle": "Hakuna arifa katika kundi hili",
       "emptyBody": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
+      "emptyBody_one": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
+      "emptyBody_other": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
       "capped": "Inaonyesha arifa za hivi karibuni.",
       "loadError": "Imeshindikana kupakia historia ya arifa.",
       "openFailed": "Arifa hii haifunguki tena popote."
@@ -1223,7 +1299,7 @@
     },
     "instructions": {
       "title": "Maagizo maalum",
-      "deprecation": "Kipengele cha maagizo maalumu kimepangiwa kuondolewa. Badala yake, hamishia miongozo hii kwenye faili ya REVIEW.md katika hazina yako.",
+      "deprecation": "Maagizo maalumu yataondolewa. Badala yake, hamishia miongozo hii kwenye faili ya REVIEW.md katika hazina yako.",
       "placeholder": "mfano: Hakikisha kanuni zetu za kushughulikia hitilafu zinafuatwa…",
       "clearTitle": "Ondoa maagizo maalum?",
       "clearMessage": "Kuhifadhi sehemu tupu hufuta maagizo maalum yaliyohifadhiwa kwa mkaguzi huyu."
@@ -1232,6 +1308,7 @@
       "manageAccess": "Simamia ufikiaji",
       "bitbucketNoRepositoriesDescription": "Hakuna hazina zinazopatikana katika nafasi hii ya kazi ya Bitbucket.",
       "gitlabNoRepositoriesDescription": "Huenda unahitaji kutoa ufikiaji kwa vikundi au miradi zaidi kwenye GitLab.",
+      "githubNoRepositoriesDescription": "Angalia ruhusa za programu ya Kilo kwenye GitHub kufikia hazina, kisha pakia upya orodha.",
       "installGithubApp": "Sakinisha programu ya GitHub kwenye hazina",
       "installGithubAppDescription": "Ipe programu ya Kilo ya GitHub ruhusa ya kufikia hazina unazotaka zikaguliwe.",
       "repositoryAccess": "ufikiaji wa hazina",
@@ -1261,11 +1338,11 @@
       "couldNotGetLatest": "Imeshindikana kupata taarifa za hivi karibuni.",
       "byline": "#{{number}} na {{author}}",
       "noFindings": "Hakuna matatizo yaliyopatikana.",
-      "findingsUnavailable": "Matokeo hayapatikani kwa sababu ukaguzi huu umeshindikana.",
+      "findingsUnavailable": "Matokeo hayapatikani.",
       "findingsInProgress": "Ukaguzi huu bado unaendelea. Matokeo yataonekana hapa ukaguzi ukikamilika.",
       "findingsEndedWithoutResults": "Ukaguzi huu uliisha kabla ya kutoa matokeo yoyote.",
       "serviceUnavailable": "Imeshindikana kuunganishwa na huduma ya ukaguzi wa msimbo. Jaribu ukaguzi tena huduma itakapopatikana.",
-      "reviewFailed": "Ukaguzi umeshindikana. Tafadhali jaribu tena.",
+      "reviewFailed": "Ukaguzi umeshindikana.",
       "showMore": "Onyesha zaidi",
       "created": "Uliundwa",
       "started": "Ulianza",
@@ -1383,12 +1460,19 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha."
+      "notConnectedReadOnlyPlan": "Kipindi cha majaribio cha shirika kimeisha, kwa hivyo mmiliki anapaswa kusasisha malipo kwenye kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "deniedManagedByOwner": "Mwombe mmiliki wa {{organization}} abadilishe muunganisho ambao huwezi kubadilisha.",
+      "deniedConnectRole": "Wamiliki, wasimamizi, na wasimamizi wa bili wa {{organization}} pekee wanaweza kuiunganisha.",
+      "deniedReconnectRole": "Omba mmiliki wa {{organization}}, msimamizi, au msimamizi wa bili aiunganishe upya.",
+      "managedOnWebTitle": "Inasimamiwa kwenye wavuti",
+      "managedOnWebShort": "Muunganisho huu unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "managedOnWebRepositories": "Chagua hazina za {{organization}} kwenye wavuti ukitumia kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
+      "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kisha uibandike kwenye skrini inayofuata.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
       "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
       "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
@@ -1409,13 +1493,14 @@
     "platformList": {
       "checking": "Inaangalia…",
       "statusUnavailable": "Hali haipatikani",
+      "needsAttention": "Inahitaji uangalizi",
       "platforms": "Majukwaa",
       "activity": "Shughuli"
     },
     "providerConnect": {
-      "githubApp": "Programu ya GitHub",
+      "githubApp": "programu ya GitHub",
       "githubError": "Imeshindikana kufungua usanidi wa GitHub. Tafadhali jaribu tena.",
-      "gitlabAccount": "Akaunti ya GitLab",
+      "gitlabAccount": "akaunti ya GitLab",
       "gitlabError": "Imeshindikana kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
       "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki."
     },
@@ -1519,7 +1604,9 @@
       "unavailablePersonallySwitchAction": "Badilisha shirika",
       "unavailableOrganizationTitle": "Ukaguzi wa baraza haupatikani",
       "unavailableForOrganization": "Ukaguzi wa baraza unahitaji mpango wa Enterprise unaofanya kazi na usajili au kipindi cha majaribio. Shirika hili halina hiyo kwa sasa.",
-      "unavailableForOrganizationNeutral": "Ukaguzi wa baraza haupatikani kwa shirika hili kwa sasa. Jaribu tena baadaye.",
+      "unavailablePlanCheck": "Ukaguzi wa baraza haukuweza kukagua mpango wa shirika hili. Jaribu tena ili ukague tena.",
+      "unavailableFlagRollout": "Ukaguzi wa baraza haupatikani kwa shirika hili bado. Sasisha app kwenye toleo jipya zaidi ili kuupata.",
+      "unavailableForOrganizationMember": "Ukaguzi wa baraza unahitaji mpango wa Enterprise wenye usajili au kipindi cha majaribio kinachofanya kazi. Mmiliki wa shirika anaweza kubadilisha mpango.",
       "unavailableOnBitbucket": "Ukaguzi wa baraza haupatikani kwa hazina za Bitbucket.",
       "noRepositories": "Hakuna hazina zilizochaguliwa bado. Chagua hazina katika mipangilio ya hazina kwanza.",
       "specialists": "Wataalamu",
@@ -2089,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} vikao",
       "sectionAccessibility": "{{title}}: {{displayCount}} vikao",
       "live": "MOJA KWA MOJA",
-      "updating": "Inasasisha"
+      "updating": "Inasasisha",
+      "retentionLimit": "Inaonyesha vikao vyako vya hivi karibuni."
     },
     "sessionRow": {
       "deleteTitle": "Ungependa kufuta kikao?",
@@ -2159,7 +2247,6 @@
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
       "emptyReadOnlyTitle": "Hakuna ujumbe katika kikao hiki",
-      "renameAccessibility": "Badilisha jina la kikao: {{title}}",
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
       "historyTooLarge": "Andiko la kikao hiki ni kikubwa mno kupakia.",
@@ -2494,8 +2581,7 @@
       "searchPlaceholder": "Tafuta hazina",
       "noMatches": "Hakuna matokeo yanayolingana",
       "noRepositories": "Hakuna hazina zinazopatikana",
-      "noRepositoriesDescription": "Hakuna hazina zilizounganishwa kwenye akaunti yako.",
-      "loading": "Inapakia…",
+      "noRepositoriesDescription": "Ili kupakia hazina, unganisha GitHub au GitLab.",
       "accessibility": "Hazina: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2779,6 +2865,8 @@
     "modelPicker": {
       "title": "Chagua modeli",
       "noModelsDescription": "Hakuna modeli zinazopatikana za kuchagua.",
+      "allUnavailableTitle": "Hakuna modeli zinazoweza kutumika",
+      "allUnavailableDescription": "Ongeza ufunguo wa mtoa huduma na ujaribu tena.",
       "favorites": "Vipendwa"
     },
     "modelSelector": {
@@ -3007,6 +3095,12 @@
     "retryLoadingAccount": "Jaribu tena kupakia akaunti",
     "retryLoadingPrivacy": "Jaribu tena kupakia chaguo za faragha"
   },
+  "accountBlocked": {
+    "title": "Akaunti imezuiwa",
+    "description": "Kilo imezuia akaunti hii, na kuingia tena hakutazuia zuio hilo. Timu ya usaidizi inaweza kukagua zuio hilo ikiombwa.",
+    "domainDescription": "Kilo imezuia akaunti zinazotumia kikoa hiki cha barua pepe, na kuingia tena hakutabadilisha hilo. Timu ya usaidizi inaweza kukagua kikoa hiki ikiombwa.",
+    "contactSupport": "Wasiliana na timu ya usaidizi"
+  },
   "addCredits": {
     "cta": "Ongeza salio",
     "billingPage": "ukurasa wa malipo"
@@ -3079,8 +3173,7 @@
     "timeoutDescription": "Ombi limeisha muda kabla ya kutimizwa. Tafadhali jaribu tena."
   },
   "screenHeader": {
-    "openMenu": "Fungua menyu",
-    "openMenuFor": "Fungua menyu ya {{title}}"
+    "openMenu": "Fungua menyu"
   },
   "picker": {
     "optionsExpired": "Muda wa chaguo umeisha",
@@ -3183,6 +3276,8 @@
     "retryHint": "Hujaribu kupakia hali ya Kilo Pass tena.",
     "endedOn": "Imekwisha {{date}}",
     "notAvailableInApp": "Kilo Pass haipatikani kwenye programu.",
+    "notAvailableTitle": "Kilo Pass haipo kwenye programu",
+    "noPassDescription": "Akaunti hii haina Kilo Pass.",
     "statusActive": "Inatumika",
     "statusTrialing": "Inajaribiwa",
     "statusPastDue": "Malipo yamechelewa",
@@ -3384,7 +3479,7 @@
       "manageOnWeb": "Mipangilio ya malipo kwenye wavuti",
       "changePlan": "Badilisha mpango",
       "buySeats": "Nunua nafasi",
-      "managedOnWeb": "Mpango, nafasi na kuongeza salio kiotomatiki vinasimamiwa kwenye wavuti.",
+      "managedOnWeb": "Mpango, nafasi na kuongeza salio kiotomatiki vinasimamiwa kwenye kilo.ai.",
       "setupAutoTopUp": "Weka uongezaji salio kiotomatiki",
       "manageAutoTopUp": "Dhibiti uongezaji salio kiotomatiki",
       "opensOnWeb": "Hufunguka kwenye wavuti"
@@ -3465,7 +3560,7 @@
       "retentionLimit": "Inaonyesha ankara za hivi karibuni."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Washa arifa ya salio la chini",
+      "subtitle": "Tuma arifa kwa barua pepe kwa anwani utakazoorodhesha salio la shirika hili linaposhuka chini ya kiasi ulichoweka.",
       "notifyEmailsLabel": "Anwani za kupokea arifa",
       "permissionDenied": "Huna ruhusa ya kusimamia arifa za bili.",
       "separateEmailsHint": "Tenganisha anwani za barua pepe kwa koma.",
@@ -3566,13 +3661,14 @@
       "identifierLabel": "Kitambulisho",
       "identifierRequired": "Weka kitambulisho.",
       "identifierTaken": "Hali nyingine tayari inatumia kitambulisho hiki.",
+      "identifierTooLong": "Weka kitambulisho kuwa herufi {{max}} au chache.",
       "nameLabel": "Jina la hali",
       "nameRequired": "Weka jina la hali.",
       "notFound": "Hali hii haipo tena.",
-      "restrictionHint": "Faili zinazolingana na muundo huu pekee zinaweza kuhaririwa. Iache wazi ili kuruhusu kila faili.",
-      "restrictionInvalid": "Weka muundo sahihi.",
+      "restrictionHint": "Usemi wa kawaida huchagua faili ambazo hali hii inaweza kuhariri, kwa mfano `\\.md$` kwa faili za markdown pekee. Iache wazi ili kuruhusu kila faili.",
+      "restrictionInvalid": "Weka usemi wa kawaida sahihi.",
       "restrictionLabel": "Lebo ya kizuizi",
-      "restrictionPattern": "Muundo wa faili",
+      "restrictionPattern": "Kizuizi cha faili",
       "roleLabel": "Ufafanuzi wa jukumu",
       "roleRequired": "Eleza kazi ya hali hii.",
       "tool": {
@@ -3610,10 +3706,9 @@
     },
     "hub": {
       "renameTitle": "Badilisha jina la shirika",
-      "renamePlaceholder": "Jina la shirika",
+      "renamePlaceholder": "Weka jina la shirika",
       "balance": "Salio",
-      "organizationSeats": "Nafasi za shirika",
-      "plan": "Mpango wa shirika",
+      "plan": "Mpango",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Umeisha",
@@ -3647,7 +3742,8 @@
     "signupStepUp": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Msimbo huo si sahihi. Tafadhali jaribu tena.",
+    "signupStepUpBack": "Ili kukamilisha kuunda akaunti yako, rudi nyuma kisha utumie '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Msimbo huo si sahihi au muda wake umeisha. Tafadhali jaribu tena au tumia '$t(login.resendCode)'.",
     "codeInProgress": "Msimbo wako unachakatwa. Subiri kidogo kisha ujaribu tena.",
     "tooManyAttempts": "Majaribio mengi mno. Tafadhali omba msimbo mpya.",
     "invalidToken": "Kuingia kumeshindikana. Tafadhali jaribu tena.",
@@ -3656,7 +3752,7 @@
     "emailDeliveryFailed": "Huduma ya kutuma barua pepe haipatikani kwa muda. Tafadhali jaribu tena baadaye.",
     "admissionRequired": "Kifaa chako hakiwezi kuthibitishwa. Tumia '$t(login.moreSignInOptions)' ili uingie kwenye kifaa kingine au kupitia wavuti.",
     "default": "Hitilafu imetokea. Tafadhali jaribu tena.",
-    "retryableAdmission": "Hatukuweza kuthibitisha kifaa hiki. Angalia muunganisho wako kisha ujaribu tena.",
+    "retryableAdmission": "Imeshindikana kuthibitisha kifaa hiki. Jaribu tena.",
     "startSignInFailed": "Imeshindikana kuanzisha mchakato wa kuingia. Tafadhali jaribu tena.",
     "couldNotOpenBrowser": "Imeshindikana kufungua kivinjari. Tafadhali jaribu tena.",
     "signInTimedOut": "Muda wa kusubiri kuingia umeisha. Tafadhali jaribu tena.",
@@ -3728,6 +3824,34 @@
     "nextScheduled": "Zilizopangwa zinazofuata",
     "answerNeeded": "Inasubiri jibu",
     "waitingToRetry": "Inasubiri kujaribu tena",
+    "countNoun": {
+      "needsInput_one": "Inasubiri jibu",
+      "needsInput_other": "Inasubiri jibu",
+      "running_one": "Inafanya kazi",
+      "running_other": "Inafanya kazi",
+      "scheduled_one": "Imepangwa",
+      "scheduled_other": "Imepangwa",
+      "idle_one": "Bila kazi",
+      "idle_other": "Bila kazi"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Inasubiri jibu",
+      "needsInput_other": "{{displayCount}} Inasubiri jibu",
+      "running_one": "{{displayCount}} Inafanya kazi",
+      "running_other": "{{displayCount}} Inafanya kazi",
+      "scheduled_one": "{{displayCount}} Imepangwa",
+      "scheduled_other": "{{displayCount}} Imepangwa",
+      "idle_one": "{{displayCount}} Bila kazi",
+      "idle_other": "{{displayCount}} Bila kazi"
+    },
+    "footer": {
+      "checked": "Imethibitishwa {{time}}",
+      "lastKnown": "Hali ya mwisho iliyojulikana · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Utekelezaji unaofuata {{time}}",
+      "wasDue": "Ilitarajiwa {{time}}"
+    },
     "step": {
       "editing": "Kuhariri",
       "reading": "Kusoma",
@@ -3916,6 +4040,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) hutuma ombi fupi la uzalishaji wa jibu kwenye sehemu hii ya muunganisho kwa kutumia itifaki na modeli zilizochaguliwa. Mtoa huduma anaweza kutoza ada kwa ombi hilo.",
       "connectionSucceeded": "Modeli imekamilisha ombi kwa kutumia itifaki hii.",
       "connectionFailed": "Modeli haikuweza kukamilisha ombi. Angalia URL ya msingi ya API, itifaki, taarifa za uthibitishaji na kitambulisho cha modeli.",
+      "requestTimedOut": "Sehemu ya muunganisho haikujibu kwa wakati. Angalia URL ya msingi ya API na muunganisho wako, kisha ujaribu tena.",
+      "requestUnauthorized": "Sehemu ya muunganisho imekataa taarifa za uthibitishaji. Angalia ufunguo wa API na vichwa maalum, kisha ujaribu tena.",
+      "requestNotFound": "Sehemu ya muunganisho au modeli haijapatikana. Angalia URL ya msingi ya API na kitambulisho cha modeli.",
+      "requestRateLimited": "Sehemu ya muunganisho inaweka kikomo kwa maombi. Subiri kidogo kisha ujaribu tena.",
+      "requestUnavailable": "Sehemu ya muunganisho haipatikani kwa sasa. Jaribu tena baada ya muda mfupi.",
+      "requestUnreachable": "Sehemu ya muunganisho haikuweza kufikiwa. Angalia URL ya msingi ya API na muunganisho wako.",
+      "requestInvalidResponse": "Sehemu ya muunganisho ilijibu kwa muundo ambao haukutarajiwa. Angalia kwamba URL ya msingi ya API na itifaki zinaoana na seva, kisha ujaribu tena.",
+      "discoveryNoModels": "Sehemu ya muunganisho haikuorodhesha modeli yoyote. Ingiza modeli mwenyewe.",
+      "connectionIncomplete": "Modeli ilijibu lakini haikukamilisha. Jaribu tena, au angalia kitambulisho cha modeli na itifaki.",
       "invalidInput": "Weka jina la huduma, vichwa halali na angalau modeli moja yenye kitambulisho na jina la kipekee. Vikomo vya tokeni lazima viwe namba kamili kubwa kuliko sifuri.",
       "invalidUrl": "Weka URL ya msingi ya API inayotumia HTTP au HTTPS bila taarifa za uthibitishaji, hoja ya utafutaji au kipande cha URL.",
       "publicHttp": "Sehemu za muunganisho za HTTP za umma haziruhusiwi. Tumia HTTPS au sehemu ya muunganisho ya ndani ya mtandao binafsi.",
@@ -3964,7 +4097,8 @@
         "space": "Hakuna nafasi ya kutosha ya kuhifadhi kwa modeli hii. Toa nafasi na ujaribu tena.",
         "network": "Upakuaji haukukamilika. Angalia muunganisho wako na ujaribu tena.",
         "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa.",
-        "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena."
+        "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena.",
+        "writeFailed": "Kifaa hiki hakikuweza kuhifadhi modeli. Jaribu kupakua tena."
       }
     },
     "catalog": {
@@ -4054,10 +4188,20 @@
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     },
-    "creditsRequired": "Salio halitoshi kutuma ujumbe huu."
+    "creditsRequired": "Salio halitoshi kutuma ujumbe huu.",
+    "providerKeyRefused": "Mtoa huduma amekataa taarifa za uthibitishaji. Angalia ufunguo wake wa API, kisha utume tena.",
+    "providerModelMissing": "Backend hii haitoi modeli hii tena. Chagua nyingine.",
+    "providerRateLimited": "Mtoa huduma anaweka kikomo kwa maombi. Subiri kidogo kisha utume tena.",
+    "providerUnavailable": "Mtoa huduma hapatikani kwa sasa. Tuma tena baada ya muda mfupi."
   },
   "settingsTools": {
-    "confirmTitle": "Thibitisha mabadiliko haya?"
+    "confirmTitle": "Thibitisha mabadiliko haya?",
+    "guarded": {
+      "spendAlertsOff": "Zima arifa za matumizi? Utaacha kupokea arifa kuhusu kuvuka vizingiti vya matumizi na miongezeko ya ghafla ya kila saa.",
+      "balanceAlertsOff": "Zima arifa za salio? Utaacha kupokea arifa salio lako la krediti linapopungua.",
+      "securityFindingsOff": "Zima matokeo ya usalama? Utaacha kupokea arifa kuhusu matokeo mapya ya usalama.",
+      "hideBalanceOn": "Ficha salio lako? Salio la krediti halitaonekana tena kwenye skrini za wasifu na kitovu cha shirika."
+    }
   },
   "appActions": {
     "start": {
@@ -4132,7 +4276,7 @@
     "personalDefaultDescription": "Imepakia kiotomatiki wakati hakuna hazina iliyo na wasifu uliobandikwa.",
     "organizationDefaultDescription": "Imepakiwa kiotomatiki kwa wanachama ambao hawana chaguo-msingi la kibinafsi.",
     "setAsDefault": "Weka kama chaguomsingi",
-    "saveFailed": "Haikuweza kuhifadhi wasifu",
+    "saveFailed": "Haikuweza kuhifadhi wasifu. Jaribu tena.",
     "organizationRoleRequired": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha wasifu wa shirika.",
     "deleteTitle": "Futa wasifu",
     "deleteMessage": "Hii huondoa kabisa wasifu na mipangilio yake. Hili haliwezi kutenduliwa.",
@@ -4281,6 +4425,7 @@
       "promptPlaceholder": "Wewe ni…",
       "tools": "Zana",
       "wholeToolRule": "Wakala huyu hutumia kanuni moja kwa kila zana kwa wakati mmoja: {{rule}}. Swichi hizi ni za kusoma tu.",
+      "toolRule": "Kanuni iliyohifadhiwa: {{rule}}",
       "visibility": "Mwonekano",
       "visibilityPrimary": "Msingi — imeonyeshwa kwenye kiteua",
       "visibilitySubagent": "Subagent — inaitwa tu kutoka kwa wengine",
@@ -4390,19 +4535,34 @@
       "deductionFallback": "Makato ya salio",
       "emptyDescription": "Ununuzi wa salio, risiti na matumizi vitaonekana hapa.",
       "emptyTitle": "Hakuna historia ya salio",
+      "expiredGrant": "Muda wake umeisha: {{description}}",
       "googlePlayReceipt": "Risiti kutoka Google Play",
       "kind": {
         "adjustment": "Marekebisho",
         "balanceNeutral": "Haibadilishi salio",
         "deduction": "Makato",
         "grant": "Salio la bure",
+        "promotionalCredits": "Salio la promosheni",
+        "welcomeCredits": "Salio la kukaribisha",
         "purchase": "Ununuzi"
+      },
+      "program": {
+        "adminBulkGrant": "Salio la bure kutoka kwa msimamizi",
+        "contributorChampion": "Salio la bingwa wa wachangiaji",
+        "feedback": "Salio la maoni",
+        "influencer": "Salio la mshawishi",
+        "ossMonthlyReset": "Uwekaji upya wa kila mwezi wa OSS",
+        "ossSponsorship": "Salio la udhamini wa OSS",
+        "pullRequest": "Salio la ombi la kuunganisha",
+        "usageIssue": "Salio la tatizo la matumizi",
+        "vibeDay": "Salio la Vibe Day"
       },
       "purchaseFallback": "Ununuzi wa salio",
       "receipt": "Risiti",
       "receiptA11y": "Fungua risiti ya {{description}}, {{amount}}, kutoka {{date}}",
       "receiptUnavailable": "Hakuna risiti ya ununuzi huu.",
-      "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni."
+      "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni.",
+      "voidedGrant": "Imebatilishwa: {{description}}"
     },
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
@@ -4429,6 +4589,7 @@
     "pickPackToBuyAgain": "Chagua kifurushi hapo juu ili kuanza ununuzi mpya.",
     "purchasePending": "Duka bado linashughulikia malipo haya. Krediti zako zitafika mara litakapoidhinisha malipo.",
     "buyAgain": "Nunua tena",
+    "checkPurchase": "Angalia ununuzi",
     "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
     "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."
   },
@@ -4522,7 +4683,9 @@
     },
     "saveSheet": {
       "title": "Hifadhi kwenye orodha",
-      "saved": "Imehifadhiwa kwenye {{list}}"
+      "saved": "Imehifadhiwa kwenye {{list}}",
+      "saveFailed": "Imeshindikana kuhifadhi kazi. Angalia muunganisho wako kisha ujaribu tena.",
+      "saveRefused": "Imeshindikana kuhifadhi kazi kwenye orodha hii. Chagua orodha nyingine."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4697,7 @@
     "empty": "Hakuna shughuli katika kipindi hiki cha ripoti",
     "emptyHint": "Vipindi vyako vya uandishi wa msimbo vya wingu na CLI huonekana hapa wakati ripoti iliyoratibiwa ina shughuli.",
     "loadError": "Imeshindwa kupakia ripoti",
+    "estimateLoadError": "Imeshindwa kupakia makadirio.",
     "view": "Soma ripoti",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4542,6 +4706,7 @@
     "contextAll": "Miktadha yote",
     "dismiss": "Puuza ripoti",
     "dismissFailed": "Ripoti hii bado haiwezi kupuuzwa. Inajaribu tena katika usuli.",
+    "readMarkFailed": "Imeshindwa kuweka ripoti hii kama imesomwa. Itajaribu tena ripoti inapopakiwa upya.",
     "offline": "Nje ya mtandao · ripoti iliyohifadhiwa",
     "cached": "Ripoti iliyohifadhiwa · haiwezi kuonyeshwa upya",
     "summary": "Muhtasari wa AI",
@@ -4647,6 +4812,8 @@
     "connectedTo": "Imeunganishwa na {{account}}",
     "disconnected": "{{provider}} imetenganishwa",
     "disconnectFailed": "Imeshindwa kutenganisha {{provider}}",
+    "disconnectRetry": "Slack haikuweza kuthibitisha kutenganisha. Jaribu tena.",
+    "disconnectNeedsSupport": "Kilo haikuweza kusoma ufikiaji wa Slack uliohifadhiwa kwa muunganisho huu. Wasiliana na timu ya usaidizi ili kukamilisha kutenganisha.",
     "couldNotLoad": "Imeshindwa kupakia miunganisho",
     "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
     "managedByOwner": "Mwombe mmiliki wa shirika abadilishe muunganisho ambao huwezi kubadilisha.",
@@ -4732,6 +4899,9 @@
       "runAsCreator": "Tekeleza kama mimi",
       "runAsCreatorDescription": "Kila utekelezaji hutumia akaunti yako, kwa hiyo kichwa cha siri kinahitajika.",
       "saveFailedTitle": "Imeshindwa kuhifadhi kichocheo",
+      "nameTaken": "Kichocheo kinachoitwa “{{name}}” tayari kipo.",
+      "saveFailedRetry": "Imeshindwa kufikia seva. Angalia muunganisho wako na ujaribu tena.",
+      "saveFailedCheck": "Angalia thamani kwenye fomu na ujaribu tena.",
       "deleteTitle": "Futa kichocheo hiki?",
       "deleteMessage": "Miito kwa {{name}} itashindikana. Hili haliwezi kutenduliwa.",
       "deleteMessageScheduled": "Utekelezaji uliopangwa wa {{name}} utasimama. Hili haliwezi kutenduliwa.",
@@ -4801,7 +4971,7 @@
   },
   "organizationGuardrails": {
     "title": "Vizuizi vya Akili Bandia",
-    "permissionDenied": "Wamiliki na wasimamizi wa shirika pekee wanaweza kudhibiti Vizuizi vya Akili Bandia.",
+    "permissionDenied": "Wamiliki na wasimamizi wa shirika pekee wanaweza kudhibiti Vizuizi vya Akili Bandia. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Vizuizi vya Akili Bandia havijawashwa",
     "unavailable": "Kilo huwasha Vizuizi vya Akili Bandia kwa shirika kwa ombi. Wasiliana na {{supportEmail}}, na timu ya Kilo itaziwasha kwa shirika lako.",
     "contactSupport": "Wasiliana na timu ya usaidizi",
@@ -4813,12 +4983,15 @@
     "inputDescription": "Huchunguza kila ingizo kwa Enkrypt AI, ikiwa ni pamoja na matokeo ya zana. Enkrypt haipopatikana, maombi hutumwa bila kuchunguzwa badala ya kukataliwa.",
     "outputTitle": "Vizuizi vya matokeo",
     "outputDescription": "Huchunguza majibu kwa Enkrypt AI kabla wanachama hawajayapokea. Imezimwa isipokuwa uwashe.",
+    "outputUnavailable": "Kilo haijawasha uchunguzi wa matokeo kwa shirika hili, kwa hivyo majibu hayachunguzwi na hakuna cha kusanidi hapa. Wasiliana na {{supportEmail}} ili kuomba hilo.",
     "detectorsHint": "Zuia hukataa ombi lililoalamishwa. Rekodi tu huliandika bila kuchelewesha ombi.",
     "detectorsHintOutput": "Zuia hufanya jibu lililoalamishwa lishindwe. Rekodi tu huliandika bila kuchelewesha jibu.",
     "choiceLog": "Rekodi tu",
     "applyTo": "Tumia kwa",
     "applyToAllMembers": "Wanachama wote",
     "applyKiloDefault": "Tumia Chaguo-msingi la Kilo",
+    "applyKiloDefaultEnglishNote": "Maandishi ya sera chaguo-msingi ya Kilo yako kwa Kiingereza, kwa sababu Kilo Gateway huitekeleza kama yalivyoandikwa.",
+    "applyKiloDefaultReplaceMessage": "Sera chaguo-msingi ya Kilo imeandikwa kwa Kiingereza na inabadilisha ulichoweka katika Ukiukaji wa sera. Maandishi uliyoweka katika sehemu ya maandishi ya sera hayawezi kurejeshwa.",
     "invalidSavedTitle": "Mipangilio ya vigunduzi vya maingizo iliyohifadhiwa haiwezi kusomwa",
     "invalidSavedBody": "Maombi yanazuiwa hadi vigunduzi vya maingizo vihifadhiwe tena. Vigunduzi vilivyo hapa chini huanza kutoka Chaguo-msingi la Kilo.",
     "invalidSavedOutputTitle": "Mipangilio ya vigunduzi vya matokeo iliyohifadhiwa haiwezi kusomwa",
@@ -4939,7 +5112,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Kipengele cha biashara",
-    "enterpriseOnly": "Hiki ni kipengele cha biashara pekee.",
+    "enterpriseOnly": "Watoa huduma na modeli wanapatikana kwenye mpango wa Enterprise.",
     "readOnly": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha mipangilio hii.",
     "loadError": "Watoa huduma na modeli hawakuweza kupakiwa",
     "tabModels": "Modeli",
@@ -4953,6 +5126,8 @@
     "providersDescription": "Zima mtoa huduma ili kuzuia Kilo kupeleka maombi kwake kwa shirika hili.",
     "providersNeedCatalog": "Swichi za watoa huduma zitabaki za kusoma tu hadi orodha kamili ya miundo ipakie. Gusa Jaribu tena hapo juu ili kuzihariri.",
     "providersEmpty": "Hakuna watoa huduma wanaolingana na utafutaji huu.",
+    "providersNone": "Hakuna watoa huduma wanaopatikana kwa shirika hili.",
+    "providersUnavailable": "Orodha ya watoa huduma haikuweza kupakiwa.",
     "allowAllShown": "Ruhusu vitu vyote vinavyoonyeshwa",
     "denyAllShown": "Kataza vitu vyote vinavyoonyeshwa",
     "gatewaysDescription": "Kilo hupeleka maombi ya modeli kupitia Vercel AI Gateway au OpenRouter. Lango lililozimwa hufanya maombi hayo kushindwa.",
@@ -4971,6 +5146,20 @@
       "eu": "Umoja wa Ulaya",
       "au": "Australia",
       "jp": "Japani"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Utafutaji wa mapendeleo",
+    "noMatches": "Hakuna mapendeleo yanayolingana",
+    "emptyDescription": "Jaribu jina jingine la pendeleo au neno kuu.",
+    "resultsStatus": "Mapendeleo yaliyopatikana: {{resultCount}}",
+    "keywords": {
+      "signOut": "toka|ondoka",
+      "appearance": "mandhari|rangi",
+      "appUnlock": "bayometriki|utambuzi wa uso|alama ya kidole",
+      "language": "lugha|tafsiri",
+      "notifications": "arifa|tahadhari",
+      "privacy": "uchanganuzi|ufuatiliaji"
     }
   }
 }

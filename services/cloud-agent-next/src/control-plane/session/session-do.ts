@@ -4,6 +4,7 @@ import {
   type WorkspaceSnapshotIdentity,
 } from '../sandbox/workspace-snapshot.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -28,6 +29,7 @@ import {
   nativeSessionTitle,
   TRANSCRIPT_EVENT_TYPES,
 } from './list-status.js';
+import { createNativeLiveSummary, type NativeLiveSummary } from './native-live-summary.js';
 import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
 import {
   cloudAgentWorktreeIdSchema,
@@ -137,6 +139,7 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import {
   worktreeBranchOperationResultSchema,
   type ControlPlaneWorktreeGitInput,
@@ -464,6 +467,18 @@ export const controlPlaneSessionRegistrationSchema = z
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
 
+/**
+ * A registration read back from storage carries the runtime skills written
+ * under an earlier path rule and runtime agents whose slug the CLI owns; it
+ * keeps the entries the current rules accept so the session still loads its
+ * identity and spec. The registration that arrives from the Worker is parsed
+ * with the strict schema above.
+ */
+const storedControlPlaneSessionRegistrationSchema = z.preprocess(raw => {
+  if (typeof raw !== 'object' || raw === null || !('spec' in raw)) return raw;
+  return { ...raw, spec: projectStoredRouteSpec(raw.spec) };
+}, controlPlaneSessionRegistrationSchema);
+
 function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
   return registration === null
     ? null
@@ -557,12 +572,17 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    /** The platform-added sandbox egress proof, when the request carried one. */
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
   /**
    * Asks the Sandbox DO to serve the handle on behalf of a surviving member of
    * the scope when this Session DO cannot resolve it locally.
    */
-  resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution>;
+  resolveScopeHandle(input: {
+    handle: string;
+    originProof?: string;
+  }): Promise<ScopeHandleResolution>;
   /** The locator a wiped issuer uses to keep resolving through a survivor. */
   getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
     scopeId: string;
@@ -793,6 +813,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  /** The Kilo v2 root's session card summary, published with the list status. */
+  private readonly nativeLiveSummary: NativeLiveSummary;
   private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
@@ -843,6 +865,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
     });
+    this.nativeLiveSummary = createNativeLiveSummary(ctx.storage);
     this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
       storage: ctx.storage,
       record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
@@ -1238,7 +1261,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await migrate(this.db, migrations);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
-    const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
+    const parsed = storedControlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
     const rawMetadata = await this.ctx.storage.get<unknown>(SESSION_METADATA_KEY);
     if (rawMetadata === undefined) {
@@ -1515,7 +1538,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * proxy endpoint. The handle is minted and bound by the Sandbox DO when it
    * sends `session.prepare` on a connected socket (R1).
    */
-  async resolveRuntimeCredentialProxyGrant(handle: string): Promise<{
+  async resolveRuntimeCredentialProxyGrant(
+    handle: string,
+    originProof?: string
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1555,6 +1581,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               kiloSessionId,
               directory,
               handle,
+              originProof,
             },
             correlation: { sessionId: metadata.identity.sessionId, kiloSessionId, sandboxId },
           });
@@ -1565,13 +1592,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       });
     } catch (error) {
       const fenceOutcome = classifyRuntimeProxyFenceError(error);
-      // A stale accepted handle is a 401 denial; never serve the scope view or
-      // fall back. A fence transport failure rethrows the retryable 503.
+      // A stale accepted handle denies. A fence transport failure, and every
+      // other outcome, rethrows so the facade answers its retryable 503.
       if (fenceOutcome === 'deny') return null;
       if (fenceOutcome === 'retry') throw error;
-      // A revoked/expired authorization threw. Fall through to scope resolution
-      // so a surviving member can still serve; if none can, the original outcome
-      // (a 503) is preserved below.
+      // A revoked or expired local runtime authorization is the one outcome
+      // that scope resolution serves, through a surviving member.
       localError = error;
     }
     if (local)
@@ -1582,7 +1608,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (localError !== null) throw localError;
       return null;
     }
-    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle);
+    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle, originProof);
     if (fromScope) return fromScope;
     if (localError !== null) throw localError;
     return null;
@@ -1602,7 +1628,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * any failure to reach a decision within the total bound throws so the facade
    * returns its existing retryable 503 `Credential unavailable`.
    */
-  private async resolveRuntimeCredentialProxyGrantFromScope(handle: string): Promise<{
+  private async resolveRuntimeCredentialProxyGrantFromScope(
+    handle: string,
+    originProof: string | undefined
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1615,7 +1644,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       outcome = await withTimeout(
         withDORetry(
           () => this.scopeResolutionPeer() ?? peer,
-          current => current.resolveScopeHandle({ handle }),
+          current => current.resolveScopeHandle({ handle, originProof }),
           'resolveScopeHandle'
         ),
         this.sessionTimers().scopeResolutionMs,
@@ -1807,6 +1836,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameHostedGitHubRepositories(
+        existing.hostedGitHubRepositories,
+        metadata.hostedGitHubRepositories
+      ) &&
+      (existing.hostedGitHubRepositories === undefined ||
+        existing.workspace?.generatedBranchName === metadata.workspace?.generatedBranchName) &&
       sameSandboxProviderBinding(
         getSandboxProviderBinding(existing),
         getSandboxProviderBinding(metadata)
@@ -2464,6 +2499,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               queries: this.eventQueries,
               partText: this.partText,
             });
+            if (persisted !== null && persisted.id !== 0 && this.registration !== null)
+              this.nativeLiveSummary.observe(event, this.registration.spec.kiloSessionId);
             if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
             return persisted;
           })
@@ -2643,6 +2680,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         // Registration alone is not a transition. Native work may start without
         // a Cloud message, so do not gate those updates on message admission.
         if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          const liveSummary = this.nativeLiveSummary.settled(status);
           this.listStatusOutbox.record(
             {
               sessionId: this.registration.spec.kiloSessionId,
@@ -2651,7 +2689,21 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             },
             status,
             Date.now(),
-            { activityAt: this.transcriptActivityAt, title: this.pendingRootRename }
+            {
+              activityAt: this.transcriptActivityAt,
+              title: this.pendingRootRename,
+              // Kilo v1 reports its summary and cost through its own ingest client.
+              transcript:
+                liveSummary === undefined
+                  ? undefined
+                  : {
+                      liveSummary,
+                      totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
+                        this.sessionId,
+                        this.registration.spec.kiloSessionId
+                      ),
+                    },
+            }
           );
           this.pendingRootRename = undefined;
         }

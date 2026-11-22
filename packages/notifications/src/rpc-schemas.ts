@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { securityLifecyclePayloadShape } from './notification-events';
+import { securityFindingPayloadShape, securityLifecyclePayloadShape } from './notification-events';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { pushDataSchema, cloudAgentSessionRaiseShape } from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
@@ -156,13 +156,12 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 // Aggregate refreshes carry identity only; the server reads current status and scope.
 
 /**
- * The shape both the schema and the subset rule below read, so dropping or
- * renaming a hint list fails to compile in the rule instead of silently
- * turning it into a no-op.
+ * The refresh hint lists, declared once so the input schema and the subset
+ * rule below read the same set. The rule derives its field list from these
+ * keys, so a new hint list is subset-checked without a second edit and a
+ * dropped or renamed one cannot leave the rule checking a stale name.
  */
-const refreshGlanceableSessionsInputShape = z.object({
-  userId: nonEmptyStringSchema,
-  cliSessionIds: z.array(nonEmptyStringSchema).min(1),
+const refreshGlanceableSessionsHintShape = {
   /**
    * The subset of `cliSessionIds` whose change moved a session into or out of
    * the `permission` status. `needsApproval` gates the Approve control on the
@@ -183,6 +182,19 @@ const refreshGlanceableSessionsInputShape = z.object({
    * followed. Omitting the field keeps the previous behavior.
    */
   cardFollowSessionIds: z.array(nonEmptyStringSchema).optional(),
+};
+
+/** The hint lists' own keys, so the rule below reads the same declaration. */
+type RefreshHintField = keyof typeof refreshGlanceableSessionsHintShape;
+const REFRESH_HINT_FIELDS = Object.keys(
+  refreshGlanceableSessionsHintShape
+) as readonly RefreshHintField[];
+
+/** The aggregate refresh request: identity plus the hint lists above. */
+const refreshGlanceableSessionsInputShape = z.object({
+  userId: nonEmptyStringSchema,
+  cliSessionIds: z.array(nonEmptyStringSchema).min(1),
+  ...refreshGlanceableSessionsHintShape,
 });
 
 /**
@@ -198,8 +210,7 @@ function refineRefreshSessionSubset(
   ctx: z.RefinementCtx
 ): void {
   const batch = new Set(data.cliSessionIds);
-  const hintFields = ['approvalChangedSessionIds', 'cardFollowSessionIds'] as const;
-  for (const field of hintFields) {
+  for (const field of REFRESH_HINT_FIELDS) {
     const ids = data[field];
     if (!ids) continue;
     ids.forEach((id, index) => {
@@ -341,11 +352,18 @@ export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
  * plus `delivered`, and nothing else. The builder above catches a reason
  * renamed in the tuples; this catches one dropped from or added to the union,
  * so the hand-written member list above cannot drift from that vocabulary.
+ *
+ * The check is an ambient declaration, so it compiles away: it emits no
+ * runtime value and adds nothing to the exported type. It stays module-local,
+ * so it never reaches the published schema entry, and it is still "used" for
+ * `noUnusedLocals` in the `apps/extension` program, which reaches this file
+ * through `@kilocode/trpc`'s published `.d.ts` and
+ * `@kilocode/notifications/schemas`.
  */
 type SameUnion<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type AssertTrue<T extends true> = T;
-export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
+declare const _dispatchPushOutcomeVocabularyChecked: AssertTrue<
   SameUnion<
     DispatchPushOutcome['kind'],
     | 'delivered'
@@ -399,8 +417,7 @@ export const internalDispatchSecurityFindingRequestSchema = z.object({
   kind: z.literal('security_finding'),
   recipientUserId: nonEmptyStringSchema,
   notificationId: nonEmptyStringSchema,
-  findingId: nonEmptyStringSchema,
-  scope: nonEmptyStringSchema,
+  ...securityFindingPayloadShape,
   notificationKind: z.enum(['new_finding', 'sla_warning', 'sla_breach']),
   severity: nonEmptyStringSchema,
   repoFullName: nonEmptyStringSchema,

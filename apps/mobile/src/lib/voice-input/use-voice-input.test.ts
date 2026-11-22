@@ -143,6 +143,8 @@ type ActionHarness = {
   onDraftChange: ReturnType<typeof vi.fn>;
   openTranscriptionModelPicker: ReturnType<typeof vi.fn>;
   owner: string;
+  setOwnerAlive: (alive: boolean) => void;
+  setUserId: (next: string | undefined) => void;
 };
 
 function buildActions(
@@ -158,7 +160,10 @@ function buildActions(
   const draft = vi.fn<() => string>(() => overrides.draft ?? 'draft text');
   const onDraftChange = vi.fn<(nextDraft: string) => void>();
   const disabled = vi.fn<() => boolean>(() => overrides.disabled ?? false);
-  const userId = vi.fn<() => string | undefined>(() => overrides.userId);
+  // Mutable so a test can change the account while an alert is open.
+  const account = { current: overrides.userId };
+  const userId = vi.fn<() => string | undefined>(() => account.current);
+  const ownerAlive = { current: true };
   const openTranscriptionModelPicker = vi.fn<() => void>();
   const languageTag = overrides.languageTag;
 
@@ -170,10 +175,24 @@ function buildActions(
     getOnDraftChange: () => onDraftChange,
     getOwner: () => owner,
     getUserId: userId,
+    isOwnerAlive: () => ownerAlive.current,
     openTranscriptionModelPicker,
   });
 
-  return { actions, disabled, draft, onDraftChange, openTranscriptionModelPicker, owner };
+  return {
+    actions,
+    disabled,
+    draft,
+    onDraftChange,
+    openTranscriptionModelPicker,
+    owner,
+    setOwnerAlive: (alive: boolean) => {
+      ownerAlive.current = alive;
+    },
+    setUserId: (next: string | undefined) => {
+      account.current = next;
+    },
+  };
 }
 
 async function flushPendingTasks(): Promise<void> {
@@ -661,6 +680,93 @@ describe('useVoiceInput integration', () => {
           'user-1',
           'declined'
         );
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('records consent only for the account that raised the disclosure', async () => {
+        const { actions, setUserId } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        setUserId('user-2');
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const allow = buttons?.find(button => button.text === 'Allow');
+        allow?.onPress?.();
+        await flushPendingTasks();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).not.toHaveBeenCalled();
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('records a decline only for the account that raised the disclosure', async () => {
+        const { actions, setUserId } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        setUserId('user-2');
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const notNow = buttons?.find(button => button.text === 'Not now');
+        notNow?.onPress?.();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).not.toHaveBeenCalled();
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('acts only while the surface that raised the disclosure is mounted', async () => {
+        const { actions, setOwnerAlive } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        setOwnerAlive(false);
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const allow = buttons?.find(button => button.text === 'Allow');
+        allow?.onPress?.();
+        await flushPendingTasks();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).not.toHaveBeenCalled();
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('binds the granted write and the start to the account that raised the disclosure', async () => {
+        const { actions, setUserId } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+        const { promise: writeSettled, resolve: settleWrite } = Promise.withResolvers<boolean>();
+        voiceNetworkConsentMock.writeVoiceNetworkConsent.mockReturnValueOnce(writeSettled);
+
+        await actions.toggle();
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const allow = buttons?.find(button => button.text === 'Allow');
+        allow?.onPress?.();
+        // The write is pending when the account changes.
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith(
+          'user-1',
+          'granted'
+        );
+        setUserId('user-2');
+        settleWrite(true);
+        await flushPendingTasks();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledTimes(1);
         expect(mockController.start).not.toHaveBeenCalled();
       });
 

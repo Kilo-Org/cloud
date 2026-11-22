@@ -6,6 +6,8 @@ import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-q
 import { useCallback, useState } from 'react';
 
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { retryPausedRead, usePausedReadRetry } from '@/lib/query/retry-paused-read';
 import {
   getSecurityAnalysisCapacityState,
   SECURITY_ANALYSIS_CAPACITY_POLL_MS,
@@ -100,25 +102,7 @@ export function useRetrySecurityAgentSettings(scope: string) {
         ];
     const attempts = await Promise.allSettled(
       keys.map(async queryKey => {
-        const query = queryClient.getQueryCache().find({ queryKey, exact: true });
-        if (!query) {
-          return;
-        }
-        const options = query.options;
-        // An uncached refetch reuses its paused promise, even with cancelRefetch.
-        // Cancel first, then bypass NetInfo for this deliberate attempt only.
-        await queryClient.cancelQueries({ queryKey, exact: true });
-        try {
-          await queryClient.query({
-            ...options,
-            queryKey,
-            networkMode: 'always',
-            retry: false,
-            staleTime: 0,
-          });
-        } finally {
-          query.setOptions(options);
-        }
+        await retryPausedRead(queryClient, queryKey);
       })
     );
     // Each query retains its own error; wait for every request to settle before
@@ -130,6 +114,26 @@ export function useRetrySecurityAgentSettings(scope: string) {
     setLastAttemptFailed(false);
   }, []);
   return { retry, isRetrying, lastAttemptFailed, clearLastAttemptFailed };
+}
+
+// Per-read retry for the one paused surface: the settings config read, vs the
+// settings-wide attempt above. It mirrors the query key that read uses.
+export function useRetrySecurityAgentConfig(scope: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getConfig.queryKey()
+    : trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope });
+  return usePausedReadRetry(queryKey);
+}
+
+// Per-read retry for the one query the repository picker's banner waits on, vs
+// the settings-wide attempt above. It mirrors the query key that read uses.
+export function useRetrySecurityAgentRepositories(scope: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getRepositories.queryKey()
+    : trpc.organizations.securityAgent.getRepositories.queryKey({ organizationId: scope });
+  return usePausedReadRetry(queryKey);
 }
 
 export function useSecurityAgentDashboardStats(scope: string, repoFullName?: string) {
@@ -173,13 +177,15 @@ export function useSecurityAgentLastSyncTime(scope: string, repoFullName?: strin
 // `undefined` role as "still loading" and "genuinely unauthorized", which
 // callers used to read as permission-denied. `useSecurityAgentCapability`
 // below tells those apart; it's the only exported consumer of this query.
+//
+// This read comes through the hook that owns the `organizations.list` options.
+// One cache entry serves every consumer, and React Query keeps the last
+// observer's options for all of them. An observer with defaulted options would
+// therefore drop the offline settle for every other consumer while it is
+// mounted, and leave their reads paused with no data.
 function useSecurityAgentOrgRoleQuery(scope: string) {
-  const trpc = useTRPC();
   const isPersonal = isPersonalSecurityScope(scope);
-  const query = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: !isPersonal,
-  });
+  const query = useOrganizationsList({ enabled: !isPersonal });
   if (isPersonal) {
     // The org list is irrelevant to the personal scope, but even a disabled
     // observer surfaces the SHARED cache entry's error state (populated
@@ -219,18 +225,22 @@ export function useSecurityAgentCapability(scope: string) {
   const { role, error, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
     useSecurityAgentOrgRoleQuery(scope);
   const canManage = canManageSecurityAgent(scope, role);
-
   let status: SecurityAgentCapabilityStatus = 'loading';
   if (isPersonalSecurityScope(scope)) {
     status = 'allowed';
+  } else if (isError && (!hasData || role === undefined)) {
+    // Mirrors `classifyPermission`: a settled role stays authoritative, but
+    // only a role for THIS scope. A cached list that cannot answer for this
+    // scope plus a failed refetch is a retryable failure, not "no access" — a
+    // denial would disable the controls with no Retry offered.
+    status = 'error';
   } else if (hasData) {
     // A settled role stays authoritative: a failed background refetch must
     // never demote an already-resolved capability to 'error'.
     status = canManage ? 'allowed' : 'denied';
-  } else if (isError) {
-    status = 'error';
   } else if (isPending) {
-    // Covers an offline-paused cold launch: pending with no data yet.
+    // Covers a cold launch whose read is still in flight: pending with no
+    // data yet.
     status = 'loading';
   }
   // Any other unresolved combination keeps the initial 'loading'.
@@ -243,6 +253,8 @@ export function useSecurityAgentCapability(scope: string) {
     isLoading,
     isError,
     isFetching,
+    /** A role read with no data yet: in flight, or not started. */
+    isPending,
     refetch,
     fetchStatus,
   };

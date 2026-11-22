@@ -103,10 +103,16 @@ describe('publishCloudAgentSessionStatus', () => {
   const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
   const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } };
 
-  it('forwards only the validated status projection and rename with an immutable runtime-owner fence', async () => {
+  it('forwards only the validated status projection, rename and live summary with an immutable runtime-owner fence', async () => {
     const rpc = new SessionIngestRPC(ctx, env as never);
     const rename = { title: 'Renamed by the agent', transitionId: input.transitionId };
-    await rpc.publishCloudAgentSessionStatus({ ...input, rename });
+    const liveSummary = {
+      step: { verb: 'editing', target: 'index.ts' },
+      plan: null,
+      changes: null,
+      failure: null,
+    } as const;
+    await rpc.publishCloudAgentSessionStatus({ ...input, rename, liveSummary });
     expect(applyMetadataChanges).toHaveBeenCalledWith(
       env,
       input.kiloUserId,
@@ -118,7 +124,7 @@ describe('publishCloudAgentSessionStatus', () => {
       ]),
       ctx,
       input.cloudAgentSessionId,
-      rename
+      { rename, liveSummary }
     );
   });
 
@@ -127,6 +133,16 @@ describe('publishCloudAgentSessionStatus', () => {
     { transitionId: 'invalid' },
     { occurredAt: 'not-a-date' },
     { transcript: 'not metadata' },
+    { totalCostMicrodollars: -1 },
+    { totalCostMicrodollars: 1.5 },
+    {
+      liveSummary: {
+        step: { verb: 'dancing', target: null },
+        plan: null,
+        changes: null,
+        failure: null,
+      },
+    },
   ])('rejects invalid publication %j', async invalid => {
     const rpc = new SessionIngestRPC(ctx, env as never);
     await expect(
@@ -2848,8 +2864,16 @@ describe('deleteSessionForCloudAgent clone rollback', () => {
 });
 
 describe('Kilo SDK persisted identity schemas', () => {
-  it('accepts generated message IDs and rejects non-message, slash-bearing, or NUL-bearing IDs', () => {
+  it('accepts every stored message id family and rejects non-message, slash-bearing, or NUL-bearing IDs', () => {
+    // The stored rule checks the shared stem, not the canonical shape: a row the
+    // store already holds keeps the id its sender supplied. Tightening this to
+    // MESSAGE_ID_PATTERN would fail the whole stored page for these ids.
+    expect(messageIdSchema.safeParse('msg_8bcfe5680000ABZa012ABCDEFp').success).toBe(true);
     expect(messageIdSchema.safeParse('msg_storage').success).toBe(true);
+    expect(messageIdSchema.safeParse('msgsynthetic1').success).toBe(true);
+    expect(messageIdSchema.safeParse('msg_1b4e28ba-2fa1-11d2-883f-0016d3cca427').success).toBe(
+      true
+    );
     expect(messageIdSchema.safeParse('other_storage').success).toBe(false);
     expect(messageIdSchema.safeParse('msg_storage/child').success).toBe(false);
     expect(messageIdSchema.safeParse('msg_storage\u0000child').success).toBe(false);

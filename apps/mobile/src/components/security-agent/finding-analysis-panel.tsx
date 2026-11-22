@@ -2,6 +2,7 @@
 import {
   getSecurityAnalysisDetailPresentation,
   getSecurityFindingAnalysisState,
+  remediationNeedsAnalysisRefresh,
 } from '@kilocode/app-shared/security-agent';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
 import { View } from 'react-native';
@@ -36,11 +37,16 @@ import { formatNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
-import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
+import {
+  useRetrySecurityAnalysis,
+  useStartSecurityAnalysis,
+} from '@/lib/hooks/use-security-findings';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
-import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
+import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
+import { type SecurityAnalysis } from '@/lib/security-agent';
 import {
   getAnalysisCapacityBlockedHint,
   getSecurityAnalysisDetailDescription,
@@ -54,6 +60,9 @@ type FindingAnalysisPanelProps = {
   analysis: SecurityAnalysis | undefined;
   isLoading: boolean;
   isError: boolean;
+  isPending: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  connectivity: 'online' | 'offline' | 'unknown';
   onRetry: () => void;
 };
 
@@ -76,10 +85,14 @@ export function FindingAnalysisPanel({
   analysis,
   isLoading,
   isError,
+  isPending,
+  fetchStatus,
+  connectivity,
   onRetry,
 }: Readonly<FindingAnalysisPanelProps>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const mutedDisabledInk = useMutedDisabledInk();
   const { i18n, t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -89,14 +102,34 @@ export function FindingAnalysisPanel({
   // render's `canStartAnalysis` below, so the two cannot disagree.
   const capacity = useSecurityAnalysisCapacity(scope, offersAnalysisStart(analysis));
   const startAnalysis = useStartSecurityAnalysis(scope);
+  const analysisRetry = useRetrySecurityAnalysis(scope, findingId);
   const now = useRelativeTimeNow();
+
+  // A paused first read never reaches the loading gate: name the connection and
+  // offer the deliberate retry, which retires the paused promise a plain
+  // `refetch` would only join.
+  if (!analysis && isReadPausedBeforeData({ isPending, fetchStatus, connectivity })) {
+    return (
+      <>
+        <QueryError
+          variant="offline"
+          message={t('securityAgent.analysis.couldNotLoad')}
+          onRetry={() => void analysisRetry.retry()}
+          isRetrying={analysisRetry.isRetrying}
+        />
+        {dialog}
+      </>
+    );
+  }
 
   if (isLoading && !analysis) {
     return (
-      <View className={SCREEN_BODY_CLASS}>
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <Skeleton className="h-32 w-full rounded-xl" />
-        {dialog}
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_BODY_CLASS}>
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          {dialog}
+        </View>
       </View>
     );
   }

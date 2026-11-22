@@ -25,10 +25,22 @@ const toolsSchema = z.array(z.string());
 /** What SQLite takes as a bound value here. Chats hold text and numbers. */
 type SqlValue = string | number;
 
-/** The part of an Expo database this file uses, so a test can supply one. */
+/**
+ * The part of an Expo database this file uses, so a test can supply one.
+ *
+ * These are the members taken from the `SQLiteDatabase` that
+ * `encryptedDatabase()` hands back. `withTransactionSync` runs its work between
+ * a `BEGIN` and a `COMMIT` of its own; `isInTransactionSync` says whether a unit
+ * is already open, which is what this connection can be asked because the
+ * harness SDK's store keeps the conversations here and holds units of its own
+ * across awaits. Both are required, so a handle that cannot answer the question
+ * fails to compile rather than turning the wait below into a no-op.
+ */
 export type ChatDatabase = {
   readonly getAllSync: <T>(source: string, params: SqlValue[]) => T[];
   readonly runSync: (source: string, params: SqlValue[]) => void;
+  readonly withTransactionSync: (work: () => void) => void;
+  readonly isInTransactionSync: () => boolean;
 };
 
 /** One row of the chat list. */
@@ -279,6 +291,39 @@ export function deleteChat(db: ChatDatabase, sessionId: string): void {
 }
 
 /**
+ * How long the wipe lets the store finish a unit it left open, in milliseconds.
+ *
+ * That unit belongs to a write whose answer was interrupted: its promise chain
+ * keeps running and reaches its own `COMMIT` or `ROLLBACK` on the next turns of
+ * the loop. A sign-out happens once, so waiting is free; a store locked past
+ * this bound is a database that is not finishing anything, and the wipe throws
+ * rather than deleting inside a unit it does not own.
+ */
+const STORE_UNIT_WAIT_MS = 5_000;
+
+/** One turn of the loop, which is what lets an interrupted write reach its end. */
+const turn = (): Promise<void> => {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setTimeout(resolve, 0);
+  return promise;
+};
+
+/**
+ * Answers once no unit is open on this connection, or throws when the store is
+ * still inside one after the wait.
+ */
+async function ownUnit(db: ChatDatabase): Promise<void> {
+  const until = Date.now() + STORE_UNIT_WAIT_MS;
+  while (db.isInTransactionSync() && Date.now() < until) {
+    // eslint-disable-next-line no-await-in-loop -- each turn lets the write that holds the unit run on
+    await turn();
+  }
+  if (db.isInTransactionSync()) {
+    throw new Error('the store did not finish its write, so the chats were not wiped');
+  }
+}
+
+/**
  * Forgets every chat of one account, which is what signing out does.
  *
  * A conversation is the most personal thing this app keeps on the device, so it
@@ -292,16 +337,46 @@ export function deleteChat(db: ChatDatabase, sessionId: string): void {
  * The identifiers are answered back so the settings kept beside each chat — the
  * per-chat MCP preference — go with the rows rather than being left behind for
  * a session that no longer exists.
+ *
+ * One transaction of its own, and one statement per table rather than one delete
+ * per chat: signing out must not block the thread in proportion to how much
+ * history the account has, and a refusal halfway through must not leave the list
+ * pointing at conversations whose turns are already gone. Rolled back, the whole
+ * account is still there and the next sign-out retries it.
+ *
+ * The unit is this call's own because the rows have to be gone from the file,
+ * not only from this connection's view: a delete joined to the SDK store's unit
+ * would live or die with that write. That store keeps the conversations here and
+ * holds a unit across awaits, so the wipe waits for it to close first — an
+ * interrupted answer leaves one standing, and its own chain finishes it.
+ *
+ * The identifiers are read inside that unit, not before the wait: a chat started
+ * while the store was finishing its write would otherwise be deleted by the
+ * subquery and missing from the answer, which leaves its pending question and
+ * its settings behind for a session that no longer exists.
  */
-export function wipeChats(db: ChatDatabase, userId: string | null): readonly string[] {
-  const rows =
+export async function wipeChats(
+  db: ChatDatabase,
+  userId: string | null
+): Promise<readonly string[]> {
+  const account =
     userId === null
-      ? db.getAllSync<{ session_id: string }>('select session_id from chats', [])
-      : db.getAllSync<{ session_id: string }>('select session_id from chats where scope like ?', [
-          `${userId}:%`,
-        ]);
-  for (const { session_id: sessionId } of rows) {
-    deleteChat(db, sessionId);
-  }
-  return rows.map(row => row.session_id);
+      ? { where: '', args: [] as SqlValue[] }
+      : { where: 'where scope like ?', args: [`${userId}:%`] as SqlValue[] };
+  await ownUnit(db);
+  const owned = `(select session_id from chats ${account.where})`;
+  let stored: readonly string[] = [];
+  db.withTransactionSync(() => {
+    stored = db
+      .getAllSync<{ session_id: string }>(
+        `select session_id from chats ${account.where}`,
+        account.args
+      )
+      .map(row => row.session_id);
+    db.runSync(`delete from parts where session_id in ${owned}`, account.args);
+    db.runSync(`delete from turns where session_id in ${owned}`, account.args);
+    db.runSync(`delete from sessions where id in ${owned}`, account.args);
+    db.runSync(`delete from chats ${account.where}`, account.args);
+  });
+  return stored;
 }

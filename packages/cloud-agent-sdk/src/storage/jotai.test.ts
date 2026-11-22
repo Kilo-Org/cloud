@@ -18,6 +18,26 @@ function makePart(id: string, messageId: string, text = ''): Part {
   return { id, sessionID: 'ses-1', messageID: messageId, type: 'text', text } as Part;
 }
 
+function makeToolPart(
+  id: string,
+  status: 'running' | 'completed',
+  time: { start: number; end?: number },
+  messageID = 'msg-1'
+): Part {
+  return {
+    id,
+    sessionID: 'ses-1',
+    messageID,
+    type: 'tool',
+    callID: `call-${id}`,
+    tool: 'task',
+    state:
+      status === 'running'
+        ? { status, input: {}, raw: '', time }
+        : { status, input: {}, raw: '', output: 'done', title: 'task', metadata: {}, time },
+  } as unknown as Part;
+}
+
 describe('createJotaiStorage', () => {
   let store: ReturnType<typeof createStore>;
   let s: ReturnType<typeof createJotaiStorage>;
@@ -101,6 +121,80 @@ describe('createJotaiStorage', () => {
       const parts = s.getParts('msg-1');
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual(expect.objectContaining({ id: 'prt-real', text: 'hello' }));
+    });
+
+    test('forgets ordering evidence under the message bucket when the part is deleted', () => {
+      // The bucket and the part's own label disagree. The backend records the
+      // ordering evidence under the bucket, so deleting the part from that
+      // bucket takes the evidence with it. Keyed by the label instead, the
+      // delete would miss it and the orphan would hold back this terminal.
+      s.upsertPart('msg-A', makeToolPart('p-1', 'running', { start: 1 }, 'msg-B'), 200);
+      s.deletePart('msg-A', 'p-1');
+      // A replay re-delivers the run with no event time, which records no new
+      // evidence.
+      s.upsertPart('msg-A', makeToolPart('p-1', 'running', { start: 1 }, 'msg-B'));
+      // The terminal postdates the run's start, so it applies: the deleted
+      // part's event time of 200 must no longer make it look stale.
+      s.upsertPart('msg-A', makeToolPart('p-1', 'completed', { start: 1, end: 150 }, 'msg-B'), 150);
+
+      const parts = s.getParts('msg-A');
+      const part = parts.find(p => p.id === 'p-1');
+      expect(part?.type === 'tool' ? part.state.status : undefined).toBe('completed');
+    });
+
+    test('a rejected stale lifecycle update writes and publishes nothing', () => {
+      s.upsertPart('msg-1', makeToolPart('p-1', 'running', { start: 2000 }), 200);
+      const before = s.getParts('msg-1');
+      const rev = store.get(s.atoms.partsRevision);
+      const cb = jest.fn();
+      s.subscribe('parts:msg-1', cb);
+
+      // A terminal whose event time predates the stored running update is
+      // dropped, so the revision, the parts channel and the cached snapshot
+      // must all stay untouched.
+      s.upsertPart('msg-1', makeToolPart('p-1', 'completed', { start: 1000, end: 1500 }), 150);
+
+      expect(store.get(s.atoms.partsRevision)).toBe(rev);
+      expect(cb).not.toHaveBeenCalled();
+      expect(s.getParts('msg-1')).toBe(before);
+
+      // Control: an accepted update still publishes exactly once.
+      s.upsertPart('msg-1', makeToolPart('p-2', 'running', { start: 300 }), 300);
+      expect(store.get(s.atoms.partsRevision)).toBe(rev + 1);
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    test('a bounded preview of a stored tool publishes nothing', () => {
+      s.upsertPart('msg-1', makeToolPart('p-1', 'completed', { start: 1, end: 2 }), 200);
+      const before = s.getParts('msg-1');
+      const rev = store.get(s.atoms.partsRevision);
+      const cb = jest.fn();
+      s.subscribe('parts:msg-1', cb);
+
+      // The same settled call, carrying only a bounded preview marker. Its
+      // event time postdates the stored one, so only the preview guard can
+      // reject it, and a rejection must stay invisible to readers.
+      const preview = {
+        ...makeToolPart('p-1', 'completed', { start: 1, end: 2 }),
+        cloudDetail: {
+          version: 1,
+          revision: 1,
+          omitted: ['state.output'],
+          omittedCount: 1,
+          omittedBytes: 64,
+        },
+      } as unknown as Part;
+      s.upsertPart('msg-1', preview, 300);
+
+      expect(store.get(s.atoms.partsRevision)).toBe(rev);
+      expect(cb).not.toHaveBeenCalled();
+      expect(s.getParts('msg-1')).toBe(before);
+      expect(Reflect.get(s.getPart('msg-1', 'p-1') ?? {}, 'cloudDetail')).toBeUndefined();
+
+      // Control: an accepted update still publishes exactly once.
+      s.upsertPart('msg-1', makeToolPart('p-2', 'running', { start: 300 }), 300);
+      expect(store.get(s.atoms.partsRevision)).toBe(rev + 1);
+      expect(cb).toHaveBeenCalledTimes(1);
     });
   });
 

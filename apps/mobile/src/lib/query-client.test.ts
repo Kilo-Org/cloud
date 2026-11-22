@@ -1,5 +1,5 @@
 /* oxlint-disable max-lines -- one query-client suite; the cache-behavior and app-error-reporting cases share the client scaffold */
-import { CancelledError, QueryObserver } from '@tanstack/react-query';
+import { CancelledError, type QueryClient, QueryObserver } from '@tanstack/react-query';
 
 import {
   deferred,
@@ -16,6 +16,12 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
+import {
+  isBlockedAccountActive,
+  setBlockedAccountExplanation,
+} from '@/lib/auth/blocked-account-state';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { tagDispatchSession } from '@/lib/auth/dispatch-epoch';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 describe('createKiloAppQueryClient', () => {
@@ -38,6 +44,132 @@ describe('createKiloAppQueryClient', () => {
     await expect(mutation.execute(undefined)).rejects.toBe(error);
     expect(signedIn).toBe(false);
     clear();
+  });
+
+  it.each([
+    {
+      label: 'query',
+      fail: async (client: QueryClient) => {
+        const refusal = Object.assign(new Error('Access denied'), {
+          data: { code: 'FORBIDDEN', accountBlocked: true },
+        });
+        // The link tags the error at dispatch; the raise requires it.
+        tagDispatchSession(refusal);
+        try {
+          await client
+            .getQueryCache()
+            .build(client, {
+              queryKey: ['blocked', 'probe'],
+              queryFn: () => Promise.reject(refusal),
+            })
+            .fetch();
+        } catch {
+          // The refusal is the input; the rejection is expected.
+        }
+      },
+    },
+    {
+      label: 'mutation',
+      fail: async (client: QueryClient) => {
+        const refusal = Object.assign(new Error('Access denied'), {
+          data: { code: 'FORBIDDEN', accountBlocked: true },
+        });
+        tagDispatchSession(refusal);
+        try {
+          await client
+            .getMutationCache()
+            .build(client, {
+              mutationFn: async () => {
+                await Promise.resolve();
+                throw refusal;
+              },
+            })
+            .execute(undefined);
+        } catch {
+          // The refusal is the input; the rejection is expected.
+        }
+      },
+    },
+  ])('raises the blocked-account explanation from a failed $label refusal', async ({ fail }) => {
+    setBlockedAccountExplanation(null);
+    const client = createKiloAppQueryClient();
+    await fail(client);
+
+    expect(isBlockedAccountActive()).toBe(true);
+    setBlockedAccountExplanation(null);
+  });
+
+  it.each([
+    {
+      label: 'query',
+      fail: async (client: QueryClient, refusal: Error) => {
+        try {
+          await client
+            .getQueryCache()
+            .build(client, {
+              queryKey: ['blocked', 'probe-stale'],
+              queryFn: () => Promise.reject(refusal),
+            })
+            .fetch();
+        } catch {
+          // The refusal is the input; the rejection is expected.
+        }
+      },
+    },
+    {
+      label: 'mutation',
+      fail: async (client: QueryClient, refusal: Error) => {
+        try {
+          await client
+            .getMutationCache()
+            .build(client, {
+              mutationFn: async () => {
+                await Promise.resolve();
+                throw refusal;
+              },
+            })
+            .execute(undefined);
+        } catch {
+          // The refusal is the input; the rejection is expected.
+        }
+      },
+    },
+  ])(
+    'does not raise the explanation from a $label refusal dispatched by a previous session',
+    async ({ fail }) => {
+      setBlockedAccountExplanation(null);
+      const client = createKiloAppQueryClient();
+      const refusal = Object.assign(new Error('Access denied'), {
+        data: { code: 'FORBIDDEN', accountBlocked: true },
+      });
+      // Tagged by the session that dispatched the call; the sign-in that follows
+      // bumps the epoch and opens both boolean fences before the refusal settles.
+      tagDispatchSession(refusal);
+      bumpAuthEpoch();
+
+      await fail(client, refusal);
+
+      expect(isBlockedAccountActive()).toBe(false);
+      setBlockedAccountExplanation(null);
+    }
+  );
+
+  it('does not raise the explanation for an unrelated failure', async () => {
+    setBlockedAccountExplanation(null);
+    const client = createKiloAppQueryClient();
+    try {
+      await client
+        .getQueryCache()
+        .build(client, {
+          queryKey: ['blocked', 'probe-other'],
+          queryFn: () => Promise.reject(new Error('network')),
+        })
+        .fetch();
+    } catch {
+      // The failure is the input; the rejection is expected.
+    }
+
+    expect(isBlockedAccountActive()).toBe(false);
   });
 });
 

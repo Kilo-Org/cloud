@@ -8,6 +8,7 @@ import {
   GATE_THRESHOLDS,
   REVIEW_STYLES,
 } from '@kilocode/app-shared/code-review';
+import { RESERVED_AGENT_SLUGS } from '@kilocode/app-shared/agent-profile';
 import * as z from 'zod';
 
 export const watchPrPolicySchema = z
@@ -1735,20 +1736,13 @@ export type OrganizationGroupAgentPermissionsPolicy = {
   };
 };
 
-export type OrganizationGroupClientAccessPolicy = {
-  type: 'client_access';
-  data: { schema_version: 1 } & (
-    | { mode: 'allowlist'; clients: { feature: string; min_version?: string }[] }
-    | { mode: 'blocklist'; clients: { feature: string }[] }
-  );
-};
-
 export type OrganizationGroupPolicy =
   | OrganizationGroupModelAccessPolicy
-  | OrganizationGroupAgentPermissionsPolicy
-  | OrganizationGroupClientAccessPolicy;
+  | OrganizationGroupAgentPermissionsPolicy;
 export type OrganizationGroupPolicyType = OrganizationGroupPolicy['type'];
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
+
+export type NamedOrganizationPolicyKind = 'agent_permissions' | 'client_configuration';
 
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);
 
@@ -1921,6 +1915,7 @@ export const AuditLogAction = z.enum([
   'organization.group.default_policy.remove',
   'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
   'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
+  'organization.named_policy.change',
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
@@ -2216,20 +2211,11 @@ export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRAT
 // A specialist id doubles as the cloud-agent-next `runtimeAgents[].slug` (single-session
 // execution) AND the manifest correlation key, so it must satisfy the runtime-agent slug
 // contract: start with a lowercase letter, only lowercase letters/digits/hyphens, max 50
-// chars, and not collide with a built-in agent mode. Keep this in lockstep with
-// cloud-agent-next's `RuntimeAgentSchema.slug` + `AgentModes` (services/cloud-agent-next/src/schema.ts).
-// This must list EVERY built-in `AgentModes` value; a stale/partial copy lets a council id
-// pass web validation but fail cloud-agent-next session preparation.
-const RESERVED_AGENT_SLUGS = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
+// chars, and it uses an id of its own. `RESERVED_AGENT_SLUGS` in
+// @kilocode/app-shared/agent-profile holds the CLI ids: every built-in `AgentModes` value
+// plus the CLI's own agents, shared with `RuntimeAgentSchema.slug` and the web-side
+// profile service, so one set of ids holds everywhere a specialist id is used.
+const RESERVED_COUNCIL_SPECIALIST_SLUGS: ReadonlySet<string> = new Set(RESERVED_AGENT_SLUGS);
 
 // Cloud-agent-next caps a runtime-agent model slug at this many chars
 // (`Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH`). Keep the per-specialist model constraint in
@@ -2248,7 +2234,7 @@ export const CouncilSpecialistSchema = z.object({
       'Specialist id must be a runtime-agent slug (start with a lowercase letter; lowercase letters, digits, or hyphens; max 50 chars)'
     )
     .refine(
-      id => !RESERVED_AGENT_SLUGS.has(id),
+      id => !RESERVED_COUNCIL_SPECIALIST_SLUGS.has(id),
       'Specialist id must not collide with a built-in agent mode'
     ),
   role: z.enum(COUNCIL_SPECIALIST_ROLES),
@@ -3061,6 +3047,18 @@ const CustomLlmRemoveFromBodyPathSchema = z.string().superRefine((path, ctx) => 
   }
 });
 
+/**
+ * Replaces each reasoning effort a request names with the effort the upstream receives, for
+ * example `{ "xhigh": "high", "max": "high" }`. It rewrites only effort fields, so a disable sent
+ * another way, such as `reasoning.enabled: false`, is unaffected.
+ */
+export const ReasoningEffortMapSchema = z.partialRecord(
+  ReasoningEffortSchema,
+  ReasoningEffortSchema
+);
+
+export type ReasoningEffortMap = z.infer<typeof ReasoningEffortMapSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
   /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
@@ -3074,6 +3072,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(CustomLlmRemoveFromBodyPathSchema).optional(),
   reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
+  reasoning_effort_map: ReasoningEffortMapSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -3198,7 +3197,7 @@ export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
  * partner first and fall back to the regular route when it answers with an
  * unsuccessful status. User BYOK keys and other user-paid routes are unaffected. When the
  * definition declares `opencode_settings.reasoning_options`, a request for a reasoning effort
- * outside them skips the partner up front.
+ * outside them, after `reasoning_effort_map` applies, skips the partner up front.
  */
 export const CustomLlmPartnerSchema = z.object({
   /** The provider slug the partner serves the model as. Organization provider allow

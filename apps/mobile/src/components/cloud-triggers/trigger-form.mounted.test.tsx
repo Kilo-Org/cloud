@@ -83,6 +83,7 @@ vi.mock('@/lib/cloud-triggers/use-trigger-options', () => ({
     repositories: [],
     isLoading: false,
     isError: false,
+    error: undefined,
     refetch: vi.fn(),
   }),
   useTriggerEnvironments: () => ({

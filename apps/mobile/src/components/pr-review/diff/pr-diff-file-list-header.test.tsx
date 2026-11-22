@@ -13,6 +13,7 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Pressable: 'Pressable',
   View: 'View',
 }));

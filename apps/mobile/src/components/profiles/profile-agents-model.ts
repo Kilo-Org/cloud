@@ -12,24 +12,9 @@
  * preserved except for the tools the user explicitly switches off.
  */
 
-import { type AgentProfileDetail } from '@/lib/hooks/agent-profile-types';
+import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
 
-/**
- * Built-in agent slugs reserved by cloud-agent-next. Mirrors
- * `BUILTIN_AGENT_SLUGS` in `@kilocode/cloud-agent-profile`; the mobile app does
- * not depend on that server package, so the set is repeated here. The server
- * rejects a create or rename that collides, so the form refuses it first.
- */
-const BUILTIN_AGENT_SLUGS = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
+import { type AgentProfileDetail } from '@/lib/hooks/agent-profile-types';
 
 /**
  * Tools the UI exposes as disableable per agent. Cloud sessions allow every
@@ -165,6 +150,55 @@ export function readDisabledTools(permission: AgentPermissionMap): string[] {
   return PERMISSION_TOOLS.filter(tool => map[tool] === 'deny');
 }
 
+/** The three actions a per-pattern rule can hold, in the CLI's spelling. */
+const RULE_ACTIONS = ['allow', 'ask', 'deny'] as const;
+
+/** Whether a stored pattern value holds an action, which a `null` sentinel does not. */
+function isRuleAction(value: unknown): value is (typeof RULE_ACTIONS)[number] {
+  return RULE_ACTIONS.some(action => action === value);
+}
+
+/** Whether a stored tool value is a per-pattern map rather than one action string. */
+function isRuleMap(value: unknown): value is Record<string, unknown> {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- a stored tool value is the CLI's decoded union of one action string and a per-pattern record, and no discriminant field separates them
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * The stored rule of every listed tool that the switches alone cannot show.
+ *
+ * A switch can only say "off", which the editor emits as `deny`, so a stored
+ * per-tool `ask` or per-pattern map would otherwise render as an enabled switch
+ * with nothing indicating the restriction. This projects that restriction into
+ * the note the row shows: `ask` for a per-tool prompt, and for a per-pattern map
+ * every action-valued entry as `pattern: action` in the map's own order. A
+ * `null` entry carries no rule and is skipped; a map left with no action-valued
+ * entry has nothing to say. `allow`, `deny`, an absent tool and a whole-agent
+ * action produce no note: a whole-agent action already renders read-only
+ * switches with its own sentence.
+ */
+export function readToolRules(permission: AgentPermissionMap): ReadonlyMap<string, string> {
+  const map = permissionMapOf(permission);
+  const rules = new Map<string, string>();
+  for (const tool of PERMISSION_TOOLS) {
+    const value = map[tool];
+    if (value === 'ask') {
+      rules.set(tool, 'ask');
+    } else if (isRuleMap(value)) {
+      const parts: string[] = [];
+      for (const [pattern, action] of Object.entries(value)) {
+        if (isRuleAction(action)) {
+          parts.push(`${pattern}: ${action}`);
+        }
+      }
+      if (parts.length > 0) {
+        rules.set(tool, parts.join(' · '));
+      }
+    }
+  }
+  return rules;
+}
+
 /**
  * Apply the UI's disable toggles onto the existing permission map.
  *
@@ -295,7 +329,7 @@ export function validateAgentForm(
   if (slug.length > AGENT_SLUG_MAX_LENGTH || !AGENT_SLUG_PATTERN.test(slug)) {
     return 'slug-invalid';
   }
-  if (BUILTIN_AGENT_SLUGS.has(slug) || otherSlugs.some(item => item.toLowerCase() === slug)) {
+  if (isReservedAgentSlug(slug) || otherSlugs.some(item => item.toLowerCase() === slug)) {
     return 'slug-conflict';
   }
   const name = state.name.trim();

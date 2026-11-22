@@ -39,8 +39,17 @@ const preventRemoveMock = vi.hoisted(() => ({
 
 const confirmMock = vi.hoisted(() => ({ requests: [] as ConfirmRequest[] }));
 
+// The three reads the denial's retry re-runs, so a case can press the action
+// and read which answers it asked for again.
+const refetchMock = vi.hoisted(() => ({
+  org: vi.fn(),
+  readiness: vi.fn(),
+  status: vi.fn(),
+}));
+
 const state = vi.hoisted(() => ({
   role: 'owner' as string | undefined,
+  isTrialExpiredForEnforcement: false,
   readiness: {
     connected: false,
     ready: false,
@@ -55,6 +64,8 @@ const state = vi.hoisted(() => ({
     isError: false,
     error: undefined as unknown,
   },
+  /** The readiness read's failure, which replaces the data with a denial. */
+  readinessError: undefined as unknown,
 }));
 
 /**
@@ -129,9 +140,15 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.f
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
     role: state.role,
-    org: { organizationId: 'org-1', organizationName: 'Acme' },
+    org: {
+      organizationId: 'org-1',
+      organizationName: 'Acme',
+      isTrialExpiredForEnforcement: state.isTrialExpiredForEnforcement,
+    },
     isResolving: false,
     isError: false,
+    isFetching: false,
+    refetch: refetchMock.org,
   }),
 }));
 vi.mock('@/lib/hooks/use-bitbucket', async () => {
@@ -140,12 +157,12 @@ vi.mock('@/lib/hooks/use-bitbucket', async () => {
   const { useSyncExternalStore } = await import('react');
   return {
     useBitbucketReadiness: () => ({
-      data: state.readiness,
+      data: state.readinessError === undefined ? state.readiness : undefined,
       isPending: false,
-      isError: false,
+      isError: state.readinessError !== undefined,
       isFetching: false,
-      error: undefined,
-      refetch: vi.fn(),
+      error: state.readinessError,
+      refetch: refetchMock.readiness,
     }),
     useBitbucketIntegrationStatus: () => {
       useSyncExternalStore(
@@ -158,7 +175,7 @@ vi.mock('@/lib/hooks/use-bitbucket', async () => {
         isError: state.status.isError,
         error: state.status.error,
         isFetching: false,
-        refetch: vi.fn(),
+        refetch: refetchMock.status,
       };
     },
   };
@@ -179,6 +196,9 @@ vi.mock('@/components/organization/organization-boundary', () => ({
 vi.mock('@/components/organization/permission-denied', () => ({
   PermissionDenied: 'PermissionDenied',
 }));
+// The denial's action is the shared state control: its own suite covers the
+// button, and this suite reads the label the sheet handed it.
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/code-reviewer/bitbucket-connect-form', async () => {
   const { createElement: h } = await import('react');
@@ -258,8 +278,10 @@ export async function reportDirty(root: ReactTestRenderer['root'], dirty: boolea
 /** The state every case starts from, plus the mock logs a case reads. */
 export function resetSheetMocks(): void {
   state.role = 'owner';
+  state.isTrialExpiredForEnforcement = false;
   platformMock.OS = 'ios';
   state.readiness.integrationId = null;
+  state.readinessError = undefined;
   state.status.data = undefined;
   state.status.isPending = false;
   state.status.isError = false;
@@ -268,6 +290,9 @@ export function resetSheetMocks(): void {
   preventRemoveMock.prevent = false;
   preventRemoveMock.handler = undefined;
   confirmMock.requests.length = 0;
+  refetchMock.org.mockClear();
+  refetchMock.readiness.mockClear();
+  refetchMock.status.mockClear();
 }
 
-export { confirmMock, preventRemoveMock, routerMock, state, statusStore };
+export { confirmMock, preventRemoveMock, refetchMock, routerMock, state, statusStore };

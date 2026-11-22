@@ -16,7 +16,11 @@ import {
   type SessionLiveStep,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 
-import { LIVE_ACTIVITY_RELEVANCE, LIVE_ACTIVITY_TIE_BREAK_LIMIT } from './push-presentation';
+import {
+  agentNotificationKindForGlanceableSnapshot,
+  LIVE_ACTIVITY_RELEVANCE,
+  LIVE_ACTIVITY_TIE_BREAK_LIMIT,
+} from './push-presentation';
 import {
   isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,
@@ -72,14 +76,18 @@ export type SessionLiveActivityBuildOptions = {
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
 
-/** The larger of the stored and the new cost, so a local update never lowers it. */
+/**
+ * The larger of the new and the stored cost, so a local update never lowers
+ * it. The arguments take the order of `carried` below: the row's own value
+ * first and the remembered one second.
+ */
 function maxCost(
-  previous: number | null | undefined,
-  next: number | null | undefined
+  next: number | null | undefined,
+  previous: number | null | undefined
 ): number | null {
   if (next === null || next === undefined) return previous ?? null;
   if (previous === null || previous === undefined) return next;
-  return Math.max(previous, next);
+  return Math.max(next, previous);
 }
 
 /**
@@ -172,7 +180,7 @@ export function buildSessionLiveActivityContentState(
       approvalKey === null ? null : sessionLiveText(command, SESSION_LIVE_COMMAND_LIMIT),
     changes,
     lastActivityAt: timestampToIso(row.lastActivityAt) ?? previous?.lastActivityAt ?? null,
-    costMicrodollars: maxCost(previous?.costMicrodollars, row.costMicrodollars),
+    costMicrodollars: maxCost(row.costMicrodollars, previous?.costMicrodollars),
     outcome: finished ? { kind: outcomeKind(row, changes, previous?.outcome?.kind) } : null,
     failure: failure === null || statusKind !== 'failed' ? null : { kind: failure },
     startedAt: timestampToIso(row.startedAt) ?? previous?.startedAt ?? null,
@@ -248,13 +256,15 @@ export function sessionLiveActivityRelevance(
 /**
  * The aggregate card relevance score: the needs-input band while unfollowed
  * work waits, then a newer `changedAt` (the newest agent state change) first.
+ * The band comes from `agentNotificationKindForGlanceableSnapshot`, not a local
+ * retest, so the card order and the notification kind cannot disagree.
  */
 export function aggregateLiveActivityRelevance(
   needsInput: number,
   changedAt: string | null
 ): number {
   const band =
-    needsInput > 0
+    agentNotificationKindForGlanceableSnapshot({ needsInput }) === 'needs-input'
       ? LIVE_ACTIVITY_RELEVANCE.aggregateNeedsInput
       : LIVE_ACTIVITY_RELEVANCE.aggregate;
   return band + recencyTerm(changedAt);

@@ -13,10 +13,12 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SEGMENTED_FRAME_HEIGHT_CLASS } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -153,39 +155,35 @@ export function MergeSheetFormSkeleton(props: {
   showTitle: boolean;
   showDeleteBranchToggle: boolean;
 }): ReactNode {
+  const sideInsetStyle = useSideInsetStyle();
   return (
     <>
-      <View className={SCREEN_BODY_CLASS}>
-        <View className="gap-1.5">
-          <Skeleton className="h-5 w-16" />
-          {props.methodOptions.length === 0 ? (
-            <Skeleton className="h-11 rounded-md" />
-          ) : (
-            <View className="flex-row flex-wrap gap-2">
-              {props.methodOptions.map(option => (
-                <Skeleton
-                  key={option.value}
-                  className={cn(TOUCH_TARGET_CLASS, 'w-20 rounded-full')}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-        {props.showTitle ? (
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_BODY_CLASS}>
           <View className="gap-1.5">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className={TOUCH_TARGET_CLASS} />
+            <Skeleton className="h-5 w-16" />
+            {props.methodOptions.length === 0 ? (
+              <Skeleton className="h-11 rounded-md" />
+            ) : (
+              <Skeleton className={cn(SEGMENTED_FRAME_HEIGHT_CLASS, 'rounded-lg')} />
+            )}
           </View>
-        ) : null}
-        <View className="gap-1.5">
-          <Skeleton className="h-5 w-28" />
-          <Skeleton className="h-24" />
+          {props.showTitle ? (
+            <View className="gap-1.5">
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className={TOUCH_TARGET_CLASS} />
+            </View>
+          ) : null}
+          <View className="gap-1.5">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-24" />
+          </View>
+          {props.showDeleteBranchToggle ? (
+            <RowGroup>
+              <RowSkeleton trailing="switch" />
+            </RowGroup>
+          ) : null}
         </View>
-        {props.showDeleteBranchToggle ? (
-          <RowGroup>
-            <RowSkeleton trailing="switch" />
-          </RowGroup>
-        ) : null}
       </View>
       <PrFormSheetFooter>
         <Skeleton className="h-11" />
@@ -247,59 +245,62 @@ export function MergeSheetFormBody(props: {
   } = props;
 
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
 
   return (
     <>
-      <View className={SCREEN_BODY_CLASS}>
-        {noMethodsAllowed ? (
-          <Card className="gap-2">
-            <AccessibleStatus
-              message={t('prReview.merge.noEnabledMethods')}
-              tone="status"
-              className="text-sm"
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_BODY_CLASS}>
+          {noMethodsAllowed ? (
+            <Card className="gap-2">
+              <AccessibleStatus
+                message={t('prReview.merge.noEnabledMethods')}
+                tone="status"
+                className="text-sm"
+              />
+            </Card>
+          ) : (
+            <MethodPicker
+              methodOptions={methodOptions}
+              method={method}
+              isDisabled={isMutating}
+              onChange={onMethodChange}
             />
-          </Card>
-        ) : (
-          <MethodPicker
-            methodOptions={methodOptions}
-            method={method}
+          )}
+          {showTitle ? (
+            <CommitTitleField
+              titleRef={titleRef}
+              inputRef={titleInputRef}
+              placeholder={titlePlaceholder}
+              isDisabled={isMutating}
+            />
+          ) : null}
+          <CommitMessageField
+            messageRef={messageRef}
+            inputRef={messageInputRef}
             isDisabled={isMutating}
-            onChange={onMethodChange}
+            compact={isHalfDetent}
           />
-        )}
-        {showTitle ? (
-          <CommitTitleField
-            titleRef={titleRef}
-            inputRef={titleInputRef}
-            placeholder={titlePlaceholder}
-            isDisabled={isMutating}
-          />
-        ) : null}
-        <CommitMessageField
-          messageRef={messageRef}
-          inputRef={messageInputRef}
-          isDisabled={isMutating}
-          compact={isHalfDetent}
-        />
-        {showDeleteBranchToggle ? (
-          <DeleteBranchToggle
-            value={deleteBranch}
-            onChange={onDeleteBranchChange}
-            isDisabled={isMutating}
-            hidden={isHalfDetent}
-          />
-        ) : null}
-        {inlineError && inlineErrorKind !== 'reconnect' ? (
-          <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
-            <Text className="text-xs text-destructive">{inlineError}</Text>
-          </View>
-        ) : null}
-        {inlineErrorKind === 'reconnect' ? (
-          <>
-            <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
-            <PrReviewReconnectNotice />
-          </>
-        ) : null}
+          {showDeleteBranchToggle ? (
+            <DeleteBranchToggle
+              value={deleteBranch}
+              onChange={onDeleteBranchChange}
+              isDisabled={isMutating}
+              hidden={isHalfDetent}
+            />
+          ) : null}
+          {inlineError && inlineErrorKind !== 'reconnect' ? (
+            <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
+              <Text className="text-xs text-destructive">{inlineError}</Text>
+            </View>
+          ) : null}
+          {inlineErrorKind === 'reconnect' ? (
+            <>
+              <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
+              <PrReviewReconnectNotice />
+            </>
+          ) : null}
+        </View>
       </View>
 
       <PrFormSheetFooter>
@@ -320,9 +321,9 @@ export function MergeSheetFormBody(props: {
           onPress={onDismiss}
           disabled={isMutating}
           className="mt-2"
-          accessibilityLabel={t('common.cancel')}
+          accessibilityLabel={t('common.discard')}
         >
-          <Text>{t('common.cancel')}</Text>
+          <Text>{t('common.discard')}</Text>
         </Button>
       </PrFormSheetFooter>
     </>

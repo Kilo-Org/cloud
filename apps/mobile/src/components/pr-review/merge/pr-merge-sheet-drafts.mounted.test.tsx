@@ -178,7 +178,7 @@ describe('PrMergeSheet durable drafts', () => {
     expect(storedDraft()?.message).toBe('Background message');
   });
 
-  it('explicit Cancel clears both stored and pending edits, even after unmount', async () => {
+  it('explicit Discard clears both stored and pending edits, even after unmount', async () => {
     seedDraft('u1', draftKey, {
       title: 'Stored title',
       message: 'Stored message',
@@ -187,7 +187,7 @@ describe('PrMergeSheet durable drafts', () => {
     const renderer = await mount();
     expect(chipChecked(renderer, 'Rebase and merge')).toBe(true);
     await edit(renderer, 'Commit message', 'Pending replacement');
-    await press(renderer, 'Cancel');
+    await press(renderer, 'Discard');
     await unmount(renderer);
     expect(storedDraft()).toBeNull();
     expect(baseProps.onDismiss).toHaveBeenCalledOnce();

@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import {
   ai_gateway_config,
   device_sessions,
@@ -367,6 +368,31 @@ test('distinguishes enabled-empty and disabled at the same revision', async () =
   expect(requireTag(disabled)).not.toBe(tag);
 });
 
+test('ignores retired stored policy and does not renew a tag for its old representation', async () => {
+  await setPermissionPolicyFlag([organizationId]);
+  const token = generateApiToken(user);
+  const retired = { schema_version: 1, mode: 'allowlist', clients: [] };
+  await db.insert(organization_group_policy_settings).values({
+    organization_id: organizationId,
+    policy_revision: 5,
+    default_policies: sql`${JSON.stringify([{ type: 'client_access', data: retired }])}::jsonb`,
+  });
+
+  const initial = await request({ token });
+  expect(initial.status).toBe(200);
+  const revised = await initial.json();
+  expect(revised).toMatchObject({ managed: true, revision: 5 });
+  expect(revised.policy).toEqual({});
+  const digest = createHmac('sha256', NEXTAUTH_SECRET)
+    .update(JSON.stringify(['organization-permission-policy', user.id, organizationId]))
+    .update(JSON.stringify({ ...revised, policy: { client_access: { layers: [retired] } } }))
+    .digest('base64url');
+  const stale = await request({ token, tag: `"${digest}"` });
+  expect(stale.status).toBe(200);
+  expect(await stale.json()).toEqual(revised);
+  expect((await request({ token, tag: requireTag(stale) })).status).toBe(304);
+});
+
 test('serves only anonymous applicable policy layers and invalidates a tag after a same-revision policy change', async () => {
   await setPermissionPolicyFlag([organizationId]);
   const token = generateApiToken(user);
@@ -406,7 +432,10 @@ test('fails closed instead of renewing an authorized tag when stored policy or f
   await setPermissionPolicyFlag([organizationId]);
   const token = generateApiToken(user);
   const tag = requireTag(await request({ token }));
-  const futurePolicy = [{ type: 'agent_permissions', data: { schema_version: 2, tools: {} } }];
+  const futurePolicy = [
+    { type: 'client_access', data: { schema_version: 1, mode: 'allowlist', clients: [] } },
+    { type: 'agent_permissions', data: { schema_version: 2, tools: {} } },
+  ];
   await db.insert(organization_group_policy_settings).values({
     organization_id: organizationId,
     default_policies: sql`${JSON.stringify(futurePolicy)}::jsonb`,

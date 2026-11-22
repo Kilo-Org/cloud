@@ -1,4 +1,5 @@
 import type { ToolDisplayMode } from './tool-detail-marker';
+import type { AgentBoardState } from './agent-board';
 import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
@@ -40,7 +41,7 @@ import {
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
 import { removePendingRequest, upsertByRequestId } from './pending-requests';
-import { replayStoredMessages } from './snapshot-page';
+import { replayStoredMessages, sessionSnapshotFailureMessage } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { SessionStorage } from './storage/types';
@@ -360,7 +361,10 @@ type SessionManagerConfig = {
   getTicket: (
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
-  fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot: (
+    kiloSessionId: KiloSessionId,
+    options?: { signal?: AbortSignal }
+  ) => Promise<SessionSnapshot>;
   /**
    * Page-aware root snapshot fetch. Called by transports for the initial
    * bounded load and by the manager for `loadOlderMessages`. Optional so the
@@ -372,7 +376,7 @@ type SessionManagerConfig = {
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,
-    options: { cursor?: string }
+    options: { cursor?: string; signal?: AbortSignal }
   ) => Promise<SessionSnapshotPageOutcome | null>;
   fetchCloudSession?: (sessionId: CloudAgentSessionId) => Promise<CloudSessionMetadata>;
   fetchCloudSnapshotPage?: (
@@ -576,6 +580,7 @@ type SessionManagerAtoms = {
   /** Every pending question, oldest first. `activeQuestion` is the head. */
   pendingQuestions: W<readonly StandaloneQuestion[]>;
   backgroundActivity: W<BackgroundActivityState>;
+  agentBoard: W<AgentBoardState>;
   /** Every pending permission, oldest first. `activePermission` is the head. */
   pendingPermissions: W<readonly StandalonePermission[]>;
   /**
@@ -1298,6 +1303,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const pendingQuestionsAtom = atom<readonly StandaloneQuestion[]>([]);
   const backgroundActivityAtom = atom<BackgroundActivityState>({ status: 'inactive' });
+  const agentBoardAtom = atom<AgentBoardState>({ status: 'inactive' });
   const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
   const unreadablePermissionsAtom = atom<readonly UnreadablePermissionState[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
@@ -1810,6 +1816,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activePermissionAtom, null);
     store.set(pendingQuestionsAtom, []);
     store.set(backgroundActivityAtom, { status: 'inactive' });
+    store.set(agentBoardAtom, { status: 'inactive' });
     store.set(pendingPermissionsAtom, []);
     store.set(unreadablePermissionsAtom, []);
     store.set(suggestionAtom, null);
@@ -1945,7 +1952,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     storage: SessionStorage,
     messages: SessionSnapshot['messages'],
     updateCursor?: number
-  ): void {
+  ): string[] {
     const chatProcessor = createChatProcessor(storage, {
       onToolAttachment: config.onToolAttachment,
       onFilePart: config.onFilePart,
@@ -1954,7 +1961,20 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activeCloudSessionId && updateCursor !== undefined
         ? { sourceId: activeCloudSessionId, cursor: updateCursor }
         : undefined;
-    replayStoredMessages(messages, event => chatProcessor.process(event), version);
+    // Same boundary as the live sink in `session.ts`: a stored page reaches the
+    // processor unvalidated, so one row it cannot apply must not take the rows
+    // after it. Report the row and keep replaying the rest of the page.
+    return replayStoredMessages(
+      messages,
+      event => {
+        try {
+          chatProcessor.process(event);
+        } catch (error) {
+          console.error(`[SessionManager] Failed to replay ${event.type}:`, error);
+        }
+      },
+      version
+    );
   }
 
   /**
@@ -1977,8 +1997,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   /**
    * Fetch one child-session page through the active session's source: the
    * Cloud Agent paged endpoint when the root is a cloud session, else the
-   * root `fetchSnapshotPage`. Throws the Cloud Agent requirement/mismatch
-   * errors so each caller classifies them with its own try/catch.
+   * root `fetchSnapshotPage`. A page the transcript contract cannot describe —
+   * a schema failure or another child's page — comes back as the terminal
+   * `invalid_data` outcome; only a transport failure throws, so each caller's
+   * try/catch retries it.
    */
   async function fetchChildPage(args: {
     childSessionId: KiloSessionId;
@@ -1990,16 +2012,27 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (!config.fetchCloudSnapshotPage) {
         throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
       }
-      const page = cloudSessionMessagesPageSchema.parse(
-        await config.fetchCloudSnapshotPage(
-          cloudSessionId,
-          cursor === undefined
-            ? { kiloSessionId: childSessionId }
-            : { kiloSessionId: childSessionId, cursor }
-        )
+      const cloudPage = await config.fetchCloudSnapshotPage(
+        cloudSessionId,
+        cursor === undefined
+          ? { kiloSessionId: childSessionId }
+          : { kiloSessionId: childSessionId, cursor }
       );
+      // A page the transcript contract cannot describe is terminal for this
+      // child, matching the root transcript's older-page read: retrying
+      // re-reads the same persisted page. The schema's transform can also
+      // throw (a session-identity mismatch), and safeParse does not convert a
+      // transform throw into a failure.
+      let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
+      try {
+        parsed = cloudSessionMessagesPageSchema.safeParse(cloudPage);
+      } catch {
+        parsed = { success: false };
+      }
+      if (!parsed.success) return { kind: 'invalid_data' };
+      const page = parsed.data;
       if (page?.kind === 'success' && page.info.id !== childSessionId) {
-        throw new Error('Cloud Agent child session mismatch');
+        return { kind: 'invalid_data' };
       }
       return page;
     }
@@ -2049,7 +2082,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             return;
           }
           if (page.kind !== 'success') {
-            storeChildHydrationFailure(storage, childSessionId, formatError(page));
+            // A retryable read keeps the generic retry copy the apps already
+            // classify as transient. The terminal kinds store the history copy
+            // instead of a connection error, so a surface that classifies the
+            // message (the mobile child sheet) neither offers nor claims a
+            // retry; a surface that always draws a retry still shows honest
+            // copy for a page a retry re-reads unchanged.
+            storeChildHydrationFailure(
+              storage,
+              childSessionId,
+              page.kind === 'retryable_failure'
+                ? formatError(page)
+                : sessionSnapshotFailureMessage(page.kind).message
+            );
             return;
           }
 
@@ -2155,7 +2200,26 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
 
     if (outcome.kind === 'success') {
-      replayChildMessages(storage, outcome.messages, outcome.updateCursor);
+      // The replay isolates a row it cannot apply; a page it cannot iterate at
+      // all still throws. Keep the cursor and report a retryable older error so
+      // the sheet shows its retry instead of a loader that never ends.
+      try {
+        replayChildMessages(storage, outcome.messages, outcome.updateCursor);
+      } catch (error) {
+        if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+        console.error(
+          `[SessionManager] Failed to apply an older child page for ${childSessionId}:`,
+          error
+        );
+        const latest = store.get(childSessionHydrationStatesAtom).get(childSessionId);
+        if (!latest || latest.status !== 'ready') return;
+        setChildSessionHydrationState(childSessionId, {
+          ...latest,
+          isLoadingOlder: false,
+          olderError: { kind: 'retryable' },
+        });
+        return;
+      }
       setChildSessionHydrationState(childSessionId, {
         ...current,
         cursor: outcome.nextCursor,
@@ -2499,9 +2563,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     });
   }
 
-  // Replay a `SessionSnapshotPageOutcome` into the active storage. Returns
-  // whether the page was applied (so the caller can also persist the cursor
-  // and atom updates). Generation-aware: a stale caller's result is
+  // Replay a `SessionSnapshotPageOutcome` into the active storage. Returns the
+  // ids of the rows the replay stored, or `null` when the page was not applied
+  // (a stale caller, a non-success outcome, or a page that does not belong to
+  // this session), so the caller can also persist the cursor and atom updates
+  // and name the stored rows. Generation-aware: a stale caller's result is
   // discarded silently. Used by both `switchSession` (initial page) and
   // `loadOlderMessages` (subsequent pages).
   //
@@ -2513,9 +2579,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     outcome: SessionSnapshotPageOutcome,
     expectedGeneration: number,
     initialPage = false
-  ): boolean {
-    if (expectedGeneration !== loadOlderGeneration) return false;
-    if (outcome.kind !== 'success') return false;
+  ): string[] | null {
+    if (expectedGeneration !== loadOlderGeneration) return null;
+    if (outcome.kind !== 'success') return null;
 
     // Defense-in-depth: a stale or mismatched page must not overwrite the
     // active session's messages or cursor. This catches races where a
@@ -2525,12 +2591,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activeSessionId === null ||
       outcome.info.id !== (activeCloudSessionId ? store.get(rootSessionIdAtom) : activeSessionId)
     )
-      return false;
+      return null;
 
     const storage = store.get(sessionStorageAtom);
-    if (!storage) return false;
+    if (!storage) return null;
 
-    replayMessagesIntoStorage(storage, outcome.messages, outcome.updateCursor);
+    const storedMessageIds = replayMessagesIntoStorage(
+      storage,
+      outcome.messages,
+      outcome.updateCursor
+    );
 
     if (activeCloudSessionId && outcome.totalCostMicrodollars !== undefined) {
       const data = store.get(fetchedSessionDataAtom);
@@ -2554,7 +2624,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       initialPageOmittedItemCount = outcome.omittedItemCount;
     }
     store.set(olderMessagesErrorAtom, null);
-    return true;
+    return storedMessageIds;
   }
 
   async function loadOlderMessages(): Promise<void> {
@@ -2579,79 +2649,92 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const loadPromise = (async (): Promise<void> => {
       store.set(isLoadingOlderMessagesAtom, true);
-      let outcome: SessionSnapshotPageOutcome | null = null;
-      let cloudPage: unknown;
-      let cloudRead = false;
       try {
-        if (cloudSessionId) {
-          if (!config.fetchCloudSnapshotPage) {
-            throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+        let outcome: SessionSnapshotPageOutcome | null = null;
+        let cloudPage: unknown;
+        let cloudRead = false;
+        try {
+          if (cloudSessionId) {
+            if (!config.fetchCloudSnapshotPage) {
+              throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+            }
+            cloudPage = await config.fetchCloudSnapshotPage(cloudSessionId, { cursor });
+            cloudRead = true;
+          } else if (fetchSnapshotPage) {
+            outcome = await fetchSnapshotPage(kiloSessionId, { cursor });
+          } else {
+            return;
           }
-          cloudPage = await config.fetchCloudSnapshotPage(cloudSessionId, { cursor });
-          cloudRead = true;
-        } else if (fetchSnapshotPage) {
-          outcome = await fetchSnapshotPage(kiloSessionId, { cursor });
-        } else {
+        } catch {
+          // Network/transport-level failures map to a retryable outcome so
+          // the UI exposes a Retry CTA. The cursor is preserved.
+          if (expectedGeneration !== loadOlderGeneration) return;
+          store.set(olderMessagesErrorAtom, { kind: 'retryable' });
           return;
         }
-      } catch {
-        // Network/transport-level failures map to a retryable outcome so
-        // the UI exposes a Retry CTA. The cursor is preserved.
+        if (cloudRead) {
+          // A page that fails the schema is terminal, matching the transport's
+          // snapshot read: retrying re-reads the same persisted page. The
+          // schema's transform can also throw (a session-identity mismatch),
+          // and safeParse does not convert a transform throw into a failure.
+          let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
+          try {
+            parsed = cloudSessionMessagesPageSchema.safeParse(cloudPage);
+          } catch {
+            parsed = { success: false };
+          }
+          outcome = parsed.success ? parsed.data : { kind: 'invalid_data' };
+        }
         if (expectedGeneration !== loadOlderGeneration) return;
-        store.set(olderMessagesErrorAtom, { kind: 'retryable' });
-        store.set(isLoadingOlderMessagesAtom, false);
-        return;
-      }
-      if (cloudRead) {
-        // A page that fails the schema is terminal, matching the transport's
-        // snapshot read: retrying re-reads the same persisted page. The
-        // schema's transform can also throw (a session-identity mismatch),
-        // and safeParse does not convert a transform throw into a failure.
-        let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
-        try {
-          parsed = cloudSessionMessagesPageSchema.safeParse(cloudPage);
-        } catch {
-          parsed = { success: false };
-        }
-        outcome = parsed.success ? parsed.data : { kind: 'invalid_data' };
-      }
-      if (expectedGeneration !== loadOlderGeneration) return;
 
-      if (outcome === null) {
-        // Access-not-found (worker 404). Treat as terminal; the session
-        // is no longer readable.
+        if (outcome === null) {
+          // Access-not-found (worker 404). Treat as terminal; the session
+          // is no longer readable.
+          olderMessagesTerminal = true;
+          store.set(olderMessagesErrorAtom, { kind: 'invalid_data' });
+          store.set(hasOlderMessagesAtom, false);
+          return;
+        }
+
+        if (outcome.kind === 'success') {
+          // `applyPage` returns the ids of the rows it stored, and it is the
+          // last thing here that can fail: a throw leaves the cursor where it
+          // was, so Retry loads this same page. Naming the rows from the page
+          // instead would also read the rows the replay skipped.
+          try {
+            const storedMessageIds = applyPage(outcome, expectedGeneration);
+            if (storedMessageIds) {
+              retainedHistoryStack.push({ cursorBefore: cursor, messageIds: storedMessageIds });
+            }
+          } catch (error) {
+            if (expectedGeneration !== loadOlderGeneration) return;
+            console.error('[SessionManager] Failed to apply an older page:', error);
+            store.set(olderMessagesErrorAtom, { kind: 'retryable' });
+          }
+          return;
+        }
+
+        if (outcome.kind === 'retryable_failure') {
+          store.set(olderMessagesErrorAtom, { kind: 'retryable' });
+          // Keep the cursor so a subsequent retry continues from here.
+          return;
+        }
+
+        // `invalid_data` and `too_large` are non-retryable terminal states:
+        // don't auto-hide the older loader (the user may want to see the
+        // banner), and don't accept further loads for this session.
         olderMessagesTerminal = true;
-        store.set(olderMessagesErrorAtom, { kind: 'invalid_data' });
+        store.set(olderMessagesErrorAtom, { kind: outcome.kind });
         store.set(hasOlderMessagesAtom, false);
-        store.set(isLoadingOlderMessagesAtom, false);
-        return;
-      }
-
-      if (outcome.kind === 'success') {
-        if (applyPage(outcome, expectedGeneration)) {
-          retainedHistoryStack.push({
-            cursorBefore: cursor,
-            messageIds: outcome.messages.map(m => m.info.id),
-          });
+      } finally {
+        // Reset the loader on every outcome: a latched flag would refuse every
+        // later load and leave the spinner that never ends. A session switch
+        // or `/clear` owns the atom once the generation has moved on; it
+        // already cleared the flag for the session that is now active.
+        if (expectedGeneration === loadOlderGeneration) {
+          store.set(isLoadingOlderMessagesAtom, false);
         }
-        store.set(isLoadingOlderMessagesAtom, false);
-        return;
       }
-
-      if (outcome.kind === 'retryable_failure') {
-        store.set(olderMessagesErrorAtom, { kind: 'retryable' });
-        // Keep the cursor so a subsequent retry continues from here.
-        store.set(isLoadingOlderMessagesAtom, false);
-        return;
-      }
-
-      // `invalid_data` and `too_large` are non-retryable terminal states:
-      // don't auto-hide the older loader (the user may want to see the
-      // banner), and don't accept further loads for this session.
-      olderMessagesTerminal = true;
-      store.set(olderMessagesErrorAtom, { kind: outcome.kind });
-      store.set(hasOlderMessagesAtom, false);
-      store.set(isLoadingOlderMessagesAtom, false);
     })();
 
     olderMessagesInFlight = loadPromise;
@@ -3252,7 +3335,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (!cachedPage || !open.acceptCachedPage || open.expectedGeneration !== switchGeneration) {
         return;
       }
-      if (!applyPage({ ...cachedPage, kind: 'success' }, open.initialPageGeneration, true)) return;
+      if (applyPage({ ...cachedPage, kind: 'success' }, open.initialPageGeneration, true) === null)
+        return;
       store.set(cachedTranscriptSessionIdAtom, open.kiloSessionId);
       transcriptRows.restore(cachedPage);
       // Settings are cached only for Cloud Agent sessions, so the composer can show
@@ -3317,7 +3401,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
               if (read.kind !== 'page' || !open.acceptCachedPage) return;
               if (open.initialPageGeneration !== loadOlderGeneration) return;
               store.set(rootSessionIdAtom, read.page.info.id);
-              if (!applyPage({ ...read.page, kind: 'success' }, open.initialPageGeneration, true))
+              if (
+                applyPage({ ...read.page, kind: 'success' }, open.initialPageGeneration, true) ===
+                null
+              )
                 return;
               open.initialPageApplied = read.page;
               store.set(cachedTranscriptSessionIdAtom, open.kiloSessionId);
@@ -3664,6 +3751,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           store.set(backgroundActivityAtom, event.state);
           return;
         }
+        if (event.type === 'agent-board.state') {
+          store.set(agentBoardAtom, event.state);
+          return;
+        }
         if (
           event.type === 'cloud.message.queued' ||
           event.type === 'cloud.message.sent' ||
@@ -3922,7 +4013,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         return;
       }
       if (activeCloudSessionId) store.set(rootSessionIdAtom, page.info.id);
-      if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
+      if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true) !== null) {
         // The stream replays these rows later; show them with the page's messages.
         transcriptRows.restore(page);
         // A bounded page can lag the stream; omissions are not deletion evidence.
@@ -4680,6 +4771,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activePermission: activePermissionAtom,
       pendingQuestions: pendingQuestionsAtom,
       backgroundActivity: backgroundActivityAtom,
+      agentBoard: agentBoardAtom,
       pendingPermissions: pendingPermissionsAtom,
       unreadablePermissions: unreadablePermissionsAtom,
       suggestion: suggestionAtom,

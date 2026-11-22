@@ -8,10 +8,11 @@ const primaryButtonClass =
   'type-label h-8 rounded-md bg-brand-primary px-3 text-brand-primary-foreground transition hover:bg-brand-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
 
 /**
- * The side-panel half of tab take-over (D10): a panel call that hit an
- * agent-held tab waits for this answer, and only "Take over" lets the panel
- * claim the tab. The agent's in-flight call then ends with a retryable
- * `tab_taken` error instead of finishing against a page the panel now drives.
+ * The side-panel half of tab take-over (D10): a panel call on a tab a live
+ * agent session owns waits for this answer, and only "Take over" lets the
+ * panel claim the tab. The agent's in-flight call, or its next call when none
+ * is running, then ends with a retryable `tab_taken` error instead of acting on
+ * a page the panel now drives. Stopping the turn takes the card away unanswered.
  */
 export const BrowserTabTakeOverCard = (): JSX.Element | null => {
   const prompt = useTabTakeOver();

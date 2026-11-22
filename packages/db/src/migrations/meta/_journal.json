@@ -2605,6 +2605,27 @@
       "when": 1795103892816,
       "tag": "0371_melodic_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 372,
+      "version": "7",
+      "when": 1795114240575,
+      "tag": "0372_webhook_events_partitioned",
+      "breakpoints": true
+    },
+    {
+      "idx": 373,
+      "version": "7",
+      "when": 1795171985676,
+      "tag": "0373_cloud_agent_network_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 374,
+      "version": "7",
+      "when": 1795211305804,
+      "tag": "0374_organization_named_policies",
+      "breakpoints": true
     }
   ]
 }

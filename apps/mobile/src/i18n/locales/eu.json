@@ -19,7 +19,9 @@
     "presenceStatus": "Ostalariak: {{connection}}",
     "commandStatus": "Komandoen bidalketa: {{status}}",
     "delivered": "Entregatuta",
-    "expired": "Iraungita"
+    "expired": "Iraungita",
+    "recoveryGaps_one": "{{displayCount}} zati falta da transkripzio honetatik.",
+    "recoveryGaps_other": "{{displayCount}} zati falta dira transkripzio honetatik."
   },
   "common": {
     "manageOnWeb": "Kudeatu webean",
@@ -138,6 +140,7 @@
     "keepRunning": "Jarraitu exekutatzen",
     "newSession": "Saio berria",
     "noModelsAvailable": "Ez dago eredurik eskuragarri",
+    "modelRetires": "Erretiratzea: {{date}}",
     "notFound": "Ez da aurkitu.",
     "online": "Konektatuta",
     "open": "Ireki {{name}}",
@@ -172,6 +175,7 @@
     "generating": "Sortzen…",
     "working": "Lanean",
     "yourOwnRepositories": "Zure biltegiak",
+    "organizationRepositories": "Erakundearen biltegiak",
     "dismissed": "Baztertuta",
     "agent": "Agentea",
     "durationMinuteShort": "min",
@@ -180,7 +184,32 @@
     "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
     "privateRepositoryA11y": "{{name}}, biltegi pribatua",
     "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
-    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu."
+    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu.",
+    "organizationTrialEndedBillingAtKiloAi": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa kilo.ai-n egunera dezakezu, eta gero berriro saiatu.",
+    "viewOnGitHub": "Ikusi PR-a GitHub-en",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Buleta",
+        "nestedBulletPoint": "Buleta habiaratua",
+        "orderedItem": "Zerrendako elementua {n}",
+        "nestedOrderedItem": "Zerrendako elementu habiaratua {n}"
+      },
+      "blockquote": {
+        "quote": "Aipua",
+        "nestedQuote": "Aipu habiaratua"
+      },
+      "table": {
+        "row": "Lerroa {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Izenburuak",
+        "links": "Estekak",
+        "images": "Irudiak"
+      }
+    }
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -274,9 +303,13 @@
     "credits": "Kredituak",
     "failedToLoadBalance": "Ezin izan da saldoa kargatu. Sakatu berriro saiatzeko.",
     "balanceLoadFailed": "Ezin izan da saldoa kargatu",
+    "balanceUnreachable": "Ezin izan da zerbitzariarekin konektatu. Saiatu berriro.",
+    "balanceAccessDenied": "Ez duzu saldo hau ikusteko baimenik.",
+    "balanceUnavailable": "Ezin izan da saldoa kargatu.",
     "hideBalance": "Ezkutatu saldoa",
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
+    "availableToSpendInOrganization": "Erakunde honetan gastatzeko eskuragarri",
     "signOutTitle": "Itxi saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "deleteAccountTitle": "Ezabatu kontua?",
@@ -418,6 +451,17 @@
       "location": "Vertex kokapena",
       "clientEmail": "Zerbitzu-kontuaren helbide elektronikoa",
       "privateKey": "Zerbitzu-kontuaren gako pribatua",
+      "privateKeyBlockRequired": "Itsatsi gako-bloke osoa, BEGIN lerrotik END lerroa arte.",
+      "privateKeyEncrypted": "Gako-bloke hau pasahitz batekin babestuta dago. Itsatsi pasahitzik ez duen zerbitzu-kontuaren gako bat.",
+      "names": {
+        "codestral": "Codestral zaharra soilik",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Hasi saioa ChatGPT-rekin)",
+        "xiaomi": "Xiaomi (erabileraren araberako fakturazioa)",
+        "zai": "Z.ai (erabileraren araberako fakturazioa)",
+        "bedrockByok": "Amazon Bedrock (zuzenean)",
+        "vertexByok": "Google Vertex AI (zuzenean)"
+      },
       "modelMappings": "Eredu-esleipenak",
       "modelMappingsDescription": "Bideratu atebideko eredu bat inplementazio-izen pertsonalizatu batera.",
       "mappingTitle": "{{number}}. esleipena",
@@ -478,6 +522,7 @@
       "receiptLabel": "Agiria",
       "copyReceiptId": "Kopiatu agiriaren IDa",
       "appealLabel": "Helegitea",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Jasota",
       "triageOpen": "Berrikusten",
       "triageActioned": "Baietsita",
@@ -495,7 +540,25 @@
       "nextStepInReview": "Emaitza pantaila honetan agertuko da, eta erabakia hartu ondoren helegitea aurkez dezakezu.",
       "nextStepAppeal": "Helegitearen emaitza pantaila honetan agertuko da.",
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
-      "viewReceipt": "Ikusi agiria"
+      "viewReceipt": "Ikusi agiria",
+      "targetLabel": "Salatutakoa",
+      "reasonLabel": "Salaketaren arrazoia",
+      "targetMessage": "AIaren erantzuna",
+      "targetComment": "Bateratze-eskaerako iruzkina",
+      "targetUser": "Erabiltzailea",
+      "reasonHarmful": "Eduki kaltegarria",
+      "reasonIllegal": "Eduki legez kanpokoa",
+      "reasonHarassment": "Jazarpena",
+      "reasonSpam": "Zabor-posta",
+      "reasonOther": "Beste arrazoi bat"
+    },
+    "reportReceipts": {
+      "title": "Salaketak",
+      "rowSubtitle": "Aurkeztu zenituen salaketak eta horien emaitzak",
+      "emptyTitle": "Oraindik ez dago salaketarik",
+      "emptyDescription": "Pull request eztabaida bateko iruzkin batetik edo agentearen saio bateko AIaren erantzun batetik aurkezten dituzun salaketak beren emaitzarekin agertzen dira hemen.",
+      "couldNotLoad": "Ezin izan dira zure salaketak kargatu",
+      "capped": "Zure azken salaketak erakusten ari gara."
     },
     "changelog": "Berritasunak",
     "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
@@ -503,8 +566,11 @@
     "changelogFixesIn": "Zuzenketak eta hobekuntzak atal hauetan: {{areas}}.",
     "changelogFixesPolish": "Zuzenketak eta hobekuntzak aplikazio osoan.",
     "changelogAreas": {
-      "signIn": "Saioa hastea",
-      "profileOrganizations": "Profila eta erakundeak"
+      "signIn": "saioa hastea",
+      "profileOrganizations": "profila zein erakundeak",
+      "chat": "txata",
+      "notifications": "jakinarazpenak",
+      "integrations": "integrazioak"
     }
   },
   "preferences": {
@@ -749,6 +815,9 @@
       "couldNotLoadMore": "Ezin izan dira iruzkin gehiago kargatu.",
       "retryLoadingMore": "Saiatu iruzkin gehiago berriro kargatzen",
       "loadMoreComments": "Kargatu iruzkin gehiago",
+      "conversationTruncated": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
+      "conversationTruncated_one": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
+      "conversationTruncated_other": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
       "addReaction": "Gehitu erreakzioa",
       "reactionPill": "{{emoji}} erreakzioa, {{displayCount}} {{countLabel}}",
       "reaction_one": "erreakzio",
@@ -878,7 +947,6 @@
       "noAccess": "Ez duzu sarbiderik biltegi honen egiaztapenetara.",
       "couldNotLoad": "Ezin izan dira egiaztapenak kargatu.",
       "retryChecks": "Saiatu egiaztapenak berriro kargatzen",
-      "viewOnGitHub": "Ikusi PR-a GitHub-en",
       "noChecksReported": "Ez da egiaztapenik jakinarazi",
       "passed": "{{displayCount}} gaindituta",
       "passed_one": "{{displayCount}} gaindituta",
@@ -943,8 +1011,9 @@
       "checkActiveConnection": "Konexioa aktibo dago, baina elementu hau oraindik ezin da kargatu.",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
-      "gitlabReconnectAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
+      "reconnectAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
       "bitbucketNotConnectedTitle": "Bitbucket ez dago konektatuta",
+      "bitbucketAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari konekta dezan.",
       "adminOnlyConnectDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
@@ -962,6 +1031,8 @@
       "pendingComment": "iruzkin bidaltzeko zain",
       "pendingComment_other": "iruzkin bidaltzeko zain",
       "submitCountOfTotal": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
+      "submitCountOfTotal_one": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
+      "submitCountOfTotal_other": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
       "submitReview": "Bidali berrikuspena",
       "partialPostedFresh": "{{displayFreshCount}} iruzkin argitaratu dira. ",
       "partialPostedFresh_one": "{{displayFreshCount}} iruzkin argitaratu dira. ",
@@ -1026,7 +1097,10 @@
     "tabs": {
       "overview": "Ikuspegi orokorra",
       "files": "Fitxategiak",
-      "discussion": "Eztabaida"
+      "discussion": "Eztabaida",
+      "discussionAccessibility_one": "{{title}}: 1 iruzkin",
+      "discussionAccessibility": "{{title}}: {{displayCount}} iruzkin",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} iruzkin"
     },
     "fileStatus": {
       "modified": "Aldatuta",
@@ -1152,6 +1226,8 @@
       "emptyTitle": "Oraindik ez dago jakinarazpenik",
       "emptyCategoryTitle": "Kategoria honetan ez dago jakinarazpenik",
       "emptyBody": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
+      "emptyBody_one": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
+      "emptyBody_other": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
       "capped": "Azken jakinarazpenak erakusten dira.",
       "loadError": "Ezin izan da jakinarazpenen historia kargatu.",
       "openFailed": "Jakinarazpen hau jada ez da inon irekitzen."
@@ -1223,7 +1299,7 @@
     },
     "instructions": {
       "title": "Pertsonalizatutako argibideak",
-      "deprecation": "Argibide pertsonalizatuen aukera kentzea aurreikusten da. Eraman jarraibide hauek zure biltegiko REVIEW.md fitxategi batera.",
+      "deprecation": "Argibide pertsonalizatuen aukera kendu egingo da. Eraman jarraibide hauek zure biltegiko REVIEW.md fitxategi batera.",
       "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…",
       "clearTitle": "Kendu pertsonalizatutako argibideak?",
       "clearMessage": "Eremu huts bat gordetzen baduzu, berrikusle honentzat gordetako argibide pertsonalizatuak ezabatzen dira."
@@ -1232,6 +1308,7 @@
       "manageAccess": "Kudeatu sarbidea",
       "bitbucketNoRepositoriesDescription": "Ez dago biltegirik erabilgarri Bitbucket-eko lan-eremu honetan.",
       "gitlabNoRepositoriesDescription": "Baliteke GitLab-eko talde edo proiektu gehiagorako sarbidea eman behar izatea.",
+      "githubNoRepositoriesDescription": "Egiaztatu Kilo-ren GitHub aplikazioak biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
       "installGithubApp": "Instalatu GitHub aplikazioa biltegietan",
       "installGithubAppDescription": "Eman Kiloren GitHub aplikazioari berrikusi nahi dituzun biltegietarako sarbidea.",
       "repositoryAccess": "biltegietarako sarbidea",
@@ -1261,11 +1338,11 @@
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
       "byline": "#{{number}} · Egilea: {{author}}",
       "noFindings": "Ez dago aurkikuntzarik.",
-      "findingsUnavailable": "Emaitzak ez daude erabilgarri, berrikuspen honek huts egin duelako.",
+      "findingsUnavailable": "Emaitzak ez daude erabilgarri.",
       "findingsInProgress": "Berrikuspen hau oraindik abian da. Aurkikuntzak hemen agertuko dira amaitzean.",
       "findingsEndedWithoutResults": "Berrikuspena amaitu egin da aurkikuntzarik sortu gabe.",
       "serviceUnavailable": "Ezin izan da kodea berrikusteko zerbitzuarekin konektatu. Egin berrikuspena berriro zerbitzua erabilgarri dagoenean.",
-      "reviewFailed": "Berrikuspenak huts egin du. Saiatu berriro, mesedez.",
+      "reviewFailed": "Berrikuspenak huts egin du.",
       "showMore": "Erakutsi gehiago",
       "created": "Sortuta",
       "started": "Hasita",
@@ -1383,12 +1460,19 @@
     "followReviewMd": "Bete REVIEW.md fitxategiko jarraibideak",
     "followReviewMdSubtitle": "Bete biltegi bakoitzeko REVIEW.md fitxategiko jarraibideak",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete."
+      "notConnectedReadOnlyPlan": "Erakundearen probaldia amaitu da, beraz jabe batek fakturazioa eguneratu behar du kilo.ai-n."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
+      "deniedManagedByOwner": "Eskatu {{organization}}-ren jabe bati aldatu ezin duzun konexioa alda dezan.",
+      "deniedConnectRole": "{{organization}}-ko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+      "deniedReconnectRole": "Eskatu {{organization}}-ko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
+      "managedOnWebTitle": "Webean kudeatzen da",
+      "managedOnWebShort": "Konexio hau webean kudeatzen da, ordenagailu batetik.",
+      "managedOnWebRepositories": "Aukeratu {{organization}}-ren biltegiak webean, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi behean.",
       "descriptionReconnect": "Sortu lan-eremurako sarbide-token berri bat {{organization}}-rako eta itsatsi behean.",
+      "descriptionOverview": "Sortu lan-eremurako sarbide-token bat eta itsatsi hurrengo pantailan.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
       "tokenPlaceholder": "Lan-eremurako sarbide-tokena",
       "tokenRefused": "Bitbucketek ez du lan-eremurako sarbide-token hau onartu. Egiaztatu goiko baimenak dituela, eta saiatu berriro."
@@ -1409,6 +1493,7 @@
     "platformList": {
       "checking": "Egiaztatzen…",
       "statusUnavailable": "Egoera ez dago erabilgarri",
+      "needsAttention": "Esku-hartze beharra",
       "platforms": "Plataformak",
       "activity": "Jarduera"
     },
@@ -1519,7 +1604,9 @@
       "unavailablePersonallySwitchAction": "Aldatu erakundea",
       "unavailableOrganizationTitle": "Kontseilu-berrikuspena ez dago erabilgarri",
       "unavailableForOrganization": "Kontseilu-berrikuspenak Enterprise plana behar du, harpidetza edo probaldi aktibo batekin. Erakunde honek ez du hura orain.",
-      "unavailableForOrganizationNeutral": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honentzat orain. Saiatu berriro geroago.",
+      "unavailablePlanCheck": "Kontseilu-berrikuspenak ezin izan du erakunde honen plana egiaztatu. Saiatu berriro, berriz egiaztatzeko.",
+      "unavailableFlagRollout": "Kontseilu-berrikuspena oraindik ez dago erabilgarri erakunde honentzat. Eguneratu aplikazioa azken bertsiora, hura eskuratzeko.",
+      "unavailableForOrganizationMember": "Kontseilu-berrikuspenak Enterprise plana behar du, harpidetza edo probaldi aktibo batekin. Erakundearen jabe batek plana alda dezake.",
       "unavailableOnBitbucket": "Kontseilu-berrikuspena ez dago erabilgarri Bitbucket biltegietarako.",
       "noRepositories": "Oraindik ez da biltegirik hautatu. Lehenik, aukeratu biltegiak biltegien ezarpenetan.",
       "specialists": "Espezialistak",
@@ -2089,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} saio",
       "sectionAccessibility": "{{title}}: {{displayCount}} saio",
       "live": "ZUZENEAN",
-      "updating": "Eguneratzen"
+      "updating": "Eguneratzen",
+      "retentionLimit": "Azken saioak erakusten dira."
     },
     "sessionRow": {
       "deleteTitle": "Ezabatu saioa?",
@@ -2159,7 +2247,6 @@
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
       "emptyReadOnlyTitle": "Saio honetan ez dago mezurik",
-      "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
       "historyTooLarge": "Saio honen transkripzioa kargatzeko handiegia da.",
@@ -2494,8 +2581,7 @@
       "searchPlaceholder": "Biltegien bilaketa",
       "noMatches": "Ez dago bat etortzerik",
       "noRepositories": "Ez dago biltegi erabilgarririk",
-      "noRepositoriesDescription": "Ez dago biltegirik zure kontuarekin konektatuta.",
-      "loading": "Kargatzen…",
+      "noRepositoriesDescription": "Biltegiak kargatzeko, konektatu GitHub edo GitLab.",
       "accessibility": "Biltegia: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2779,6 +2865,8 @@
     "modelPicker": {
       "title": "Hautatu modeloa",
       "noModelsDescription": "Ez dago hautatzeko moduko modelorik.",
+      "allUnavailableTitle": "Ezin da modelorik erabili",
+      "allUnavailableDescription": "Gehitu hornitzailearen gako bat eta saiatu berriro.",
       "favorites": "Gogokoak"
     },
     "modelSelector": {
@@ -3007,6 +3095,12 @@
     "retryLoadingAccount": "Saiatu kontua berriro kargatzen",
     "retryLoadingPrivacy": "Saiatu pribatutasun-aukerak berriro kargatzen"
   },
+  "accountBlocked": {
+    "title": "Kontua blokeatuta",
+    "description": "Kilok kontu hau blokeatu du, eta berriro saioa hasita ez da blokeoa kenduko. Laguntza-taldeak blokeoa berrikusi dezake eskatuz gero.",
+    "domainDescription": "Kilok e-posta domeinu honetako kontuak blokeatzen ditu, eta berriro saioa hasita ez da blokeoa aldatuko. Laguntza-taldeak domeinua berrikusi dezake eskatuz gero.",
+    "contactSupport": "Jarri harremanetan laguntza-taldearekin"
+  },
   "addCredits": {
     "cta": "Gehitu kredituak",
     "billingPage": "fakturazio-orria"
@@ -3079,8 +3173,7 @@
     "timeoutDescription": "Eskaera amaitu aurretik iraungi da. Saiatu berriro."
   },
   "screenHeader": {
-    "openMenu": "Ireki menua",
-    "openMenuFor": "Ireki {{title}}-ren menua"
+    "openMenu": "Ireki menua"
   },
   "picker": {
     "optionsExpired": "Aukerak iraungita",
@@ -3183,6 +3276,8 @@
     "retryHint": "Kilo Pass-en egoera berriro kargatzen saiatzen da.",
     "endedOn": "Amaituta {{date}}",
     "notAvailableInApp": "Kilo Pass ez dago aplikazioan erabilgarri.",
+    "notAvailableTitle": "Kilo Pass ez da aplikazioan eskaintzen",
+    "noPassDescription": "Kontu honek ez du Kilo Pass-ik.",
     "statusActive": "Aktibo",
     "statusTrialing": "Proba-aldian",
     "statusPastDue": "Ordainketa atzeratuta",
@@ -3384,7 +3479,7 @@
       "manageOnWeb": "Fakturazio-ezarpenak webean",
       "changePlan": "Aldatu plana",
       "buySeats": "Erosi lizentziak",
-      "managedOnWeb": "Plana, lizentziak eta birkarga automatikoa webean kudeatzen dira.",
+      "managedOnWeb": "Plana, lizentziak eta birkarga automatikoa kilo.ai-n kudeatzen dira.",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
       "opensOnWeb": "Webean irekitzen da"
@@ -3465,7 +3560,7 @@
       "retentionLimit": "Azken fakturak erakusten dira."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Gaitu saldo baxuko alerta",
+      "subtitle": "Bidali alerta bat posta elektronikoz zerrendatzen dituzun helbideetara, erakunde honen saldoa ezartzen duzun zenbatekoaren azpitik jaisten denean.",
       "notifyEmailsLabel": "Jakinarazpenak jasotzeko helbide elektronikoak",
       "permissionDenied": "Ez duzu fakturazio-alertak kudeatzeko baimenik.",
       "separateEmailsHint": "Bereizi helbide elektronikoak komaz.",
@@ -3566,13 +3661,14 @@
       "identifierLabel": "Identifikatzailea",
       "identifierRequired": "Sartu identifikatzaile bat.",
       "identifierTaken": "Beste modu batek dagoeneko identifikatzaile hau erabiltzen du.",
+      "identifierTooLong": "Eduki identifikatzailea {{max}} karaktere edo gutxiagotan.",
       "nameLabel": "Moduaren izena",
       "nameRequired": "Sartu moduaren izena.",
       "notFound": "Modu hau ez da jada existitzen.",
-      "restrictionHint": "Eredu honekin bat datozen fitxategiak soilik editatu daitezke. Utzi hutsik fitxategi guztiak onartzeko.",
-      "restrictionInvalid": "Sartu baliozko eredu bat.",
+      "restrictionHint": "Adierazpen erregular batek hautatzen du zein fitxategi edita ditzakeen modu honek, adibidez `\\.md$` markdown fitxategietarako soilik. Utzi hutsik fitxategi guztiak onartzeko.",
+      "restrictionInvalid": "Sartu baliozko adierazpen erregular bat.",
       "restrictionLabel": "Murrizketaren etiketa",
-      "restrictionPattern": "Fitxategi-eredua",
+      "restrictionPattern": "Fitxategi-murrizketa",
       "roleLabel": "Rolaren definizioa",
       "roleRequired": "Deskribatu modu honek zer egiten duen.",
       "tool": {
@@ -3610,10 +3706,9 @@
     },
     "hub": {
       "renameTitle": "Berrizendatu erakundea",
-      "renamePlaceholder": "Erakundearen izena",
+      "renamePlaceholder": "Idatzi erakundearen izen bat",
       "balance": "Saldoa",
-      "organizationSeats": "Erakundearen lizentziak",
-      "plan": "Erakundearen plana",
+      "plan": "Plana",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Amaitua",
@@ -3647,7 +3742,8 @@
     "signupStepUp": "Kontua sortzen amaitzeko, erabili '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Kode hori okerra da. Saiatu berriro.",
+    "signupStepUpBack": "Kontua sortzen amaitzeko, itzuli atzera eta erabili '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Kode hori okerra da edo iraungita dago. Saiatu berriro edo erabili '$t(login.resendCode)'.",
     "codeInProgress": "Zure kodea prozesatzen ari da. Itxaron une bat eta saiatu berriro.",
     "tooManyAttempts": "Saiakera gehiegi. Eskatu kode berri bat.",
     "invalidToken": "Saioa hasteak huts egin du. Saiatu berriro.",
@@ -3656,7 +3752,7 @@
     "emailDeliveryFailed": "Une honetan ezin da mezu elektronikorik bidali. Saiatu berriro geroago.",
     "admissionRequired": "Zure gailua ezin da egiaztatu. Erabili '$t(login.moreSignInOptions)' beste gailu batean edo webgunearen bidez saioa hasteko.",
     "default": "Zerbait gaizki joan da. Saiatu berriro.",
-    "retryableAdmission": "Ezin izan dugu gailu hau egiaztatu. Egiaztatu zure konexioa eta saiatu berriro.",
+    "retryableAdmission": "Ezin izan da gailu hau egiaztatu. Saiatu berriro.",
     "startSignInFailed": "Ezin izan da saioa hasteko prozesua abiarazi. Saiatu berriro.",
     "couldNotOpenBrowser": "Ezin izan da nabigatzailea ireki. Saiatu berriro.",
     "signInTimedOut": "Saioa hasteko denbora agortu da. Saiatu berriro.",
@@ -3728,6 +3824,34 @@
     "nextScheduled": "Hurrengo programatuak",
     "answerNeeded": "Zure erantzunaren zain",
     "waitingToRetry": "Berriro saiatzeko zain",
+    "countNoun": {
+      "needsInput_one": "Zure erantzunaren zain",
+      "needsInput_other": "Zure erantzunaren zain",
+      "running_one": "Lanean",
+      "running_other": "Lanean",
+      "scheduled_one": "Programatuta",
+      "scheduled_other": "Programatuta",
+      "idle_one": "Geldirik",
+      "idle_other": "Geldirik"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Zure erantzunaren zain",
+      "needsInput_other": "{{displayCount}} Zure erantzunaren zain",
+      "running_one": "{{displayCount}} Lanean",
+      "running_other": "{{displayCount}} Lanean",
+      "scheduled_one": "{{displayCount}} Programatuta",
+      "scheduled_other": "{{displayCount}} Programatuta",
+      "idle_one": "{{displayCount}} Geldirik",
+      "idle_other": "{{displayCount}} Geldirik"
+    },
+    "footer": {
+      "checked": "Egiaztatuta {{time}}",
+      "lastKnown": "Azken egoera ezaguna · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Hurrengo exekuzioa {{time}}",
+      "wasDue": "Espero zen {{time}}"
+    },
     "step": {
       "editing": "Editatzen",
       "reading": "Irakurtzen",
@@ -3916,6 +4040,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) aukerak inferentzia-eskaera labur bat bidaltzen du amaierako puntu honetara, hautatutako protokoloa eta modeloa erabiliz. Hornitzaileak hori kobratu dezake.",
       "connectionSucceeded": "Modeloak eskaera bat osatu du protokolo hau erabiliz.",
       "connectionFailed": "Modeloak ezin izan du eskaera bat osatu. Egiaztatu APIaren erroa, protokoloa, kredentzialak eta modeloaren IDa.",
+      "requestTimedOut": "Amaiera-puntuak ez du garaiz erantzun. Egiaztatu APIaren erroa eta zure konexioa, eta saiatu berriro.",
+      "requestUnauthorized": "Amaiera-puntuak kredentzialak baztertu ditu. Egiaztatu APIaren gakoa eta goiburu pertsonalizatuak, eta saiatu berriro.",
+      "requestNotFound": "Ez da amaiera-puntua edo modeloa aurkitu. Egiaztatu APIaren erroa eta modeloaren IDa.",
+      "requestRateLimited": "Amaiera-puntua eskaerak mugatzen ari da. Itxaron une bat eta saiatu berriro.",
+      "requestUnavailable": "Amaiera-puntua ez dago erabilgarri une honetan. Saiatu berriro une bat barru.",
+      "requestUnreachable": "Ezin izan da amaiera-puntura iritsi. Egiaztatu APIaren erroa eta zure konexioa.",
+      "requestInvalidResponse": "Amaiera-puntuak erantzun du, baina ez espero zen formatuan. Egiaztatu APIaren erroa eta protokoloa zerbitzariarekin bat datozela, eta saiatu berriro.",
+      "discoveryNoModels": "Amaiera-puntuak ez du modelorik zerrendatu. Sartu modeloak eskuz.",
+      "connectionIncomplete": "Modeloak erantzun du, baina ez du amaitu. Saiatu berriro, edo egiaztatu modeloaren IDa eta protokoloa.",
       "invalidInput": "Sartu atzeko zerbitzuaren izena, baliozko goiburuak eta gutxienez ID eta izen bakarrak dituen modelo bat. Tokenen mugek zenbaki oso positiboak izan behar dute.",
       "invalidUrl": "Sartu HTTP edo HTTPS APIaren erro bat, kredentzialik, kontsultarik edo zatirik gabe.",
       "publicHttp": "Ez dira onartzen HTTP amaierako puntu publikoak. Erabili HTTPS edo tokiko amaierako puntu pribatu bat.",
@@ -3964,7 +4097,8 @@
         "space": "Ez dago nahikoa biltegiratze libre modelo honetarako. Askatu lekua eta saiatu berriro.",
         "network": "Deskarga ez da amaitu. Egiaztatu zure konexioa eta saiatu berriro.",
         "invalidFile": "Deskargatutako fitxategia ez da aplikazio honek exekutatu dezakeen modeloa, beraz, kendu egin da.",
-        "checksum": "Deskargatutako fitxategia ez dator bat argitaratutako kontrol-baturarekin, beraz, kendu egin da. Saiatu berriro deskargatzen."
+        "checksum": "Deskargatutako fitxategia ez dator bat argitaratutako kontrol-baturarekin, beraz, kendu egin da. Saiatu berriro deskargatzen.",
+        "writeFailed": "Gailu honek ezin izan du modeloa gorde. Saiatu berriro deskargatzen."
       }
     },
     "catalog": {
@@ -4054,10 +4188,20 @@
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
     },
-    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko."
+    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko.",
+    "providerKeyRefused": "Hornitzaileak kredentzialak baztertu ditu. Egiaztatu bere APIaren gakoa, eta bidali berriro.",
+    "providerModelMissing": "Atzeko zerbitzu honek jada ez du modelo hau eskaintzen. Aukeratu beste bat.",
+    "providerRateLimited": "Hornitzailea eskaerak mugatzen ari da. Itxaron une bat eta bidali berriro.",
+    "providerUnavailable": "Hornitzailea ez dago erabilgarri une honetan. Bidali berriro laster."
   },
   "settingsTools": {
-    "confirmTitle": "Aldaketa hau berretsi?"
+    "confirmTitle": "Aldaketa hau berretsi?",
+    "guarded": {
+      "spendAlertsOff": "Desaktibatu gastu-alertak? Gastu-atalaseak gainditzean eta orduko gorakadetan ez zenuke jakinarazpenik jasoko.",
+      "balanceAlertsOff": "Desaktibatu saldo-alertak? Zure kredituak gutxitzen direnean ez zenuke jakinarazpenik jasoko.",
+      "securityFindingsOff": "Desaktibatu segurtasun-aurkikuntzak? Segurtasun-aurkikuntza berriei buruzko jakinarazpenik ez zenuke jasoko.",
+      "hideBalanceOn": "Ezkutatu zure saldoak? Kreditu-saldoak jada ez lirateke agertuko profileko pantailetan eta erakundearen atarian."
+    }
   },
   "appActions": {
     "start": {
@@ -4132,7 +4276,7 @@
     "personalDefaultDescription": "Automatikoki kargatzen da biltegirik ez dagoenean ainguratuta dagoen profilik.",
     "organizationDefaultDescription": "Lehenetsi pertsonalik ez duten kideentzat automatikoki kargatu da.",
     "setAsDefault": "Ezarri lehenetsi gisa",
-    "saveFailed": "Ezin izan da profila gorde",
+    "saveFailed": "Ezin izan da profila gorde. Saiatu berriro.",
     "organizationRoleRequired": "Erakundeko jabeek eta administratzaileek soilik alda dezakete erakundearen profila.",
     "deleteTitle": "Ezabatu profila",
     "deleteMessage": "Honek profila eta bere ezarpenak betiko kentzen ditu. Hau ezin da desegin.",
@@ -4281,6 +4425,7 @@
       "promptPlaceholder": "bat zara…",
       "tools": "Tresnak",
       "wholeToolRule": "Agente honek arau bakar bat aplikatzen die tresna guztiei aldi berean: {{rule}}. Etengailu hauek irakurtzeko soilik dira.",
+      "toolRule": "Gordetako araua: {{rule}}",
       "visibility": "Ikusgarritasuna",
       "visibilityPrimary": "Lehen mailakoa — hautatzailean agertzen da",
       "visibilitySubagent": "Azpi-agentea — besteengandik bakarrik dei daiteke",
@@ -4390,19 +4535,34 @@
       "deductionFallback": "Kreditu-kenketa",
       "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",
       "emptyTitle": "Ez dago kredituen historiarik",
+      "expiredGrant": "Iraungita: {{description}}",
       "googlePlayReceipt": "Google Play-ko ordainagiria",
       "kind": {
         "adjustment": "Doikuntza",
         "balanceNeutral": "Saldoan eraginik gabe",
         "deduction": "Kenketa",
         "grant": "Kreditu-emakida",
+        "promotionalCredits": "Kreditu promozionalak",
+        "welcomeCredits": "Ongietorri kredituak",
         "purchase": "Erosketa"
+      },
+      "program": {
+        "adminBulkGrant": "Administratzaileak emandako kreditua",
+        "contributorChampion": "Laguntzaile txapeldunaren kreditua",
+        "feedback": "Iritzi-kreditua",
+        "influencer": "Eragile-kreditua",
+        "ossMonthlyReset": "Kode irekiko babesaren hileko berrezarpena",
+        "ossSponsorship": "Kode irekiko babes-kreditua",
+        "pullRequest": "Bateratze-eskaeraren kreditua",
+        "usageIssue": "Erabilera-arazoko kreditua",
+        "vibeDay": "Vibe eguneko kreditua"
       },
       "purchaseFallback": "Kreditu-erosketa",
       "receipt": "Ordainagiria",
       "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
       "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako.",
-      "retentionLimit": "Azken kreditu-historia erakusten da."
+      "retentionLimit": "Azken kreditu-historia erakusten da.",
+      "voidedGrant": "Baliogabetua: {{description}}"
     },
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
@@ -4429,6 +4589,7 @@
     "pickPackToBuyAgain": "Aukeratu goiko pakete bat erosketa berri bat hasteko.",
     "purchasePending": "Dendak oraindik ordainketa hau prozesatzen ari da. Zure kredituak kobrantza onartzen duenean iritsiko dira.",
     "buyAgain": "Erosi berriro",
+    "checkPurchase": "Egiaztatu erosketa",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
   },
@@ -4522,7 +4683,9 @@
     },
     "saveSheet": {
       "title": "Gorde zerrendan",
-      "saved": "{{list}} zerrendan gordeta"
+      "saved": "{{list}} zerrendan gordeta",
+      "saveFailed": "Ezin izan da zeregina gorde. Egiaztatu zure konexioa eta saiatu berriro.",
+      "saveRefused": "Ezin izan da zeregina zerrenda honetan gorde. Aukeratu beste zerrenda bat."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4697,7 @@
     "empty": "Ez dago jarduerarik txosten-tarte honetan",
     "emptyHint": "Zure hodeiko eta CLIko kodetze-saioak hemen agertuko dira programatutako txosten batek jarduera duenean.",
     "loadError": "Ezin izan dira txostenak kargatu",
+    "estimateLoadError": "Ezin izan da estimazioa kargatu.",
     "view": "Irakurri txostena",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4542,6 +4706,7 @@
     "contextAll": "Testuinguru guztiak",
     "dismiss": "Baztertu txostena",
     "dismissFailed": "Oraindik ezin izan da txosten hau baztertu. Atzeko planoan berriro saiatuko da.",
+    "readMarkFailed": "Ezin izan da txosten hau irakurritzat markatu. Berriro saiatuko da txostena hurrengoan kargatzean.",
     "offline": "Lineaz kanpo · gordetako txostena",
     "cached": "Gordetako txostena · ezin da freskatu",
     "summary": "AI laburpena",
@@ -4647,6 +4812,8 @@
     "connectedTo": "Konektatuta: {{account}}",
     "disconnected": "{{provider}} deskonektatu da",
     "disconnectFailed": "Ezin izan da {{provider}} deskonektatu",
+    "disconnectRetry": "Slack-ek ezin izan du deskonexioa berretsi. Saiatu berriro.",
+    "disconnectNeedsSupport": "Kilok ezin izan du konexio honetarako gordetako Slack sarbidea irakurri. Jarri harremanetan laguntza-taldearekin deskonexioa amaitzeko.",
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
     "managedByOwner": "Eskatu erakundearen jabe bati aldatu ezin duzun konexio bat alda dezan.",
@@ -4732,6 +4899,9 @@
       "runAsCreator": "Exekutatu nire izenean",
       "runAsCreatorDescription": "Exekuzio bakoitzak zure kontua erabiltzen du, beraz, goiburu sekretua derrigorrezkoa da.",
       "saveFailedTitle": "Ezin izan da abiarazlea gorde",
+      "nameTaken": "«{{name}}» izeneko abiarazle bat badago jada.",
+      "saveFailedRetry": "Ezin izan da zerbitzarira iritsi. Egiaztatu zure konexioa eta saiatu berriro.",
+      "saveFailedCheck": "Egiaztatu inprimakiko balioak eta saiatu berriro.",
       "deleteTitle": "Abiarazle hau ezabatu?",
       "deleteMessage": "{{name}}(e)rako deiak huts egingo dute. Hau ezin da desegin.",
       "deleteMessageScheduled": "{{name}}(r)en exekuzio programatuak geldituko dira. Hau ezin da desegin.",
@@ -4801,7 +4971,7 @@
   },
   "organizationGuardrails": {
     "title": "AA babes-mugak",
-    "permissionDenied": "Erakundearen jabeek eta administratzaileek soilik kudea ditzakete AA babes-mugak.",
+    "permissionDenied": "Erakundearen jabeek eta administratzaileek soilik kudea ditzakete AA babes-mugak. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AA babes-mugak ez daude gaituta",
     "unavailable": "Kilok eskaeraren arabera gaitzen dizkio AA babes-mugak erakunde bati. Jarri harremanetan {{supportEmail}}, eta Kilo taldeak zure erakundearentzako gaituko ditu.",
     "contactSupport": "Jarri harremanetan laguntza-taldearekin",
@@ -4813,12 +4983,15 @@
     "inputDescription": "Sarrera guztiak Enkrypt AI-rekin eskaneatzen ditu, tresnen emaitzak barne. Enkrypt erabilgarri ez dagoenean, eskaerak eskaneatu gabe bidaltzen dira, baztertu beharrean.",
     "outputTitle": "Irteerako babes-mugak",
     "outputDescription": "Erantzunak Enkrypt AI-rekin eskaneatzen ditu kideek jaso aurretik. Desaktibatuta dago zuk aktibatu arte.",
+    "outputUnavailable": "Kilok ez du erakunde honetarako irteera eskaneatzea gaitu, beraz erantzunak ez dira egiaztatzen eta hemen ez dago ezer ezartzeko. Horren eskaera egiteko, jarri harremanetan {{supportEmail}}-rekin.",
     "detectorsHint": "Blokeatu aukerak markatutako eskaera baztertzen du. Erregistratu soilik aukerak erregistratu egiten du, eskaera atzeratu gabe.",
     "detectorsHintOutput": "Blokeatu aukerarekin, markatutako erantzunak huts egiten du. Erregistratu soilik aukerak erregistratu egiten du, erantzuna atzeratu gabe.",
     "choiceLog": "Erregistratu soilik",
     "applyTo": "Aplikatu hauei",
     "applyToAllMembers": "Kide guztiak",
     "applyKiloDefault": "Aplikatu Kiloren balio lehenetsiak",
+    "applyKiloDefaultEnglishNote": "Kiloren politika lehenetsiaren testua ingelesez dago, Kilo Gateway-k idatzita dagoen bezala aplikatzen duelako.",
+    "applyKiloDefaultReplaceMessage": "Kiloren politika lehenetsia ingelesez dago idatzita eta Politika-urraketa atalean ezarri duzuna ordezkatzen du. Politikaren testu-eremuan idatzi duzun testua ezin da berreskuratu.",
     "invalidSavedTitle": "Ezin dira irakurri gordetako sarrera-detektatzaileen ezarpenak",
     "invalidSavedBody": "Eskaerak blokeatuta daude sarrera-detektatzaileak berriro gorde arte. Beheko detektatzaileak Kiloren balio lehenetsietatik abiatzen dira.",
     "invalidSavedOutputTitle": "Ezin dira irakurri gordetako irteera-detektatzaileen ezarpenak",
@@ -4939,7 +5112,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise eginbidea",
-    "enterpriseOnly": "Enterprise planerako soilik den eginbidea da hau.",
+    "enterpriseOnly": "Hornitzaileak eta ereduak Enterprise planean daude erabilgarri.",
     "readOnly": "Erakundearen jabeek eta administratzaileek soilik alda ditzakete ezarpen hauek.",
     "loadError": "Ezin izan dira kargatu hornitzaileak eta ereduak",
     "tabModels": "Ereduak",
@@ -4953,6 +5126,8 @@
     "providersDescription": "Desaktibatu hornitzaile bat, Kilok erakunde honen eskaerak harengana bidera ez ditzan.",
     "providersNeedCatalog": "Hornitzaileen etengailuak irakurtzeko soilik egongo dira ereduen katalogo osoa kargatu arte. Editatzeko, sakatu goiko Saiatu berriro.",
     "providersEmpty": "Ez dago bilaketa honekin bat datorren hornitzailerik.",
+    "providersNone": "Ez dago erakunde honetarako hornitzailerik eskuragarri.",
+    "providersUnavailable": "Ezin izan da hornitzaileen zerrenda kargatu.",
     "allowAllShown": "Baimendu erakutsitako guztiak",
     "denyAllShown": "Ukatu erakutsitako guztiak",
     "gatewaysDescription": "Kilok ereduen eskaerak Vercel AI Gateway edo OpenRouter bidez bideratzen ditu. Atebide bat desgaituta badago, eskaera horiek huts egiten dute.",
@@ -4971,6 +5146,20 @@
       "eu": "Europar Batasuna",
       "au": "Australia",
       "jp": "Japonia"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hobespenen bilaketa",
+    "noMatches": "Ez dago bat datorren hobespenik",
+    "emptyDescription": "Saiatu beste hobespen-izen edo gako-hitz batekin.",
+    "resultsStatus": "Aurkitutako hobespenak: {{resultCount}}",
+    "keywords": {
+      "signOut": "saioa amaitu|saioa itxi|irten",
+      "appearance": "gaia|koloreak|modu iluna",
+      "appUnlock": "biometria|aurpegia|hatz-marka",
+      "language": "hizkuntza|itzulpena",
+      "notifications": "alertak|jakinarazpenak|abisuak",
+      "privacy": "estatistikak|jarraipena|pribatutasuna"
     }
   }
 }

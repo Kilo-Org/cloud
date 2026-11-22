@@ -15,9 +15,16 @@
 
 import { createHash } from 'node:crypto';
 
+import {
+  LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
+  LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS,
+  type LocalFakeTranscriptionModelId,
+} from '@kilocode/app-shared/local-fake-llm';
+
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
 import { backgroundActivityScenario } from './fake-llm-background-activity.js';
+import { agentBoardChildScenario, agentBoardScenario } from './fake-llm-agent-board.js';
 import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
@@ -65,6 +72,7 @@ export type Directive = {
  *   file:write:<opTag>:<path>:<contents>       literal contents; real write call
  *   file:seed:<opTag>:<path>:<bytes>:<nonce>   fake-generated fixture; real write call
  *   file:read:<opTag>:<path>                   real read call; echo the parsed result
+ *   file-read-pair:<tag>:<path1>:<path2>       read both paths in one turn; echo both results
  *
  * `opTag` is `[A-Za-z0-9_-]+` and is the attribution key: `directiveTag` returns
  * it, never the op. The scenario mints a fresh `opTag` per turn, so a reused
@@ -736,6 +744,7 @@ function directiveTag(directive: Directive | null): string | undefined {
       'write-then-gate',
       'read-edit-then-gate',
       'read-then-write',
+      'file-read-pair',
       'tool-stream',
       'question',
       'first-token',
@@ -973,7 +982,7 @@ function readFileContents(result: string): string {
  * this model as `kilo/fake-deterministic` (provider prefix + bare id).
  */
 const FAKE_MODEL = {
-  id: 'fake-deterministic',
+  id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
   name: 'Fake Deterministic',
   description: 'Deterministic fake model for cloud-agent E2E harness.',
   context_length: 200000,
@@ -997,30 +1006,35 @@ function modelsCatalogue(): { data: Array<typeof FAKE_MODEL> } {
 
 /**
  * Speech-to-text catalogue served for `GET /api/openrouter/models` with
- * `output_modalities=transcription`. Two ids: the happy path the mobile e2e
- * scenarios address, and a broken one whose transcription request 404s so the
- * non-retryable unhappy state is provable without an upstream key.
+ * `output_modalities=transcription`. The ids come from the shared list the web
+ * gateway routes to this fake, so a rename cannot leave a stale copy here; the
+ * metadata record below must name every shared id, and only those.
+ *
+ * Field order matches the previously served bytes: `name` and `description`
+ * are taken by name because the shared record holds them without `created`
+ * between them.
  */
-const TRANSCRIPTION_MODELS = [
-  {
-    id: 'fake-transcribe',
+const TRANSCRIPTION_MODEL_METADATA: Record<
+  LocalFakeTranscriptionModelId,
+  { name: string; description: string }
+> = {
+  'fake-transcribe': {
     name: 'Fake Transcribe',
-    created: 0,
     description: 'Deterministic fake speech-to-text model for cloud-agent E2E harness.',
-    architecture: {
-      input_modalities: ['audio'],
-      output_modalities: ['text'],
-      tokenizer: 'fake',
-    },
-    top_provider: { is_moderated: false, context_length: 128000 },
-    context_length: 128000,
-    pricing: { prompt: '0', completion: '0' },
   },
-  {
-    id: 'fake-transcribe-broken',
+  'fake-transcribe-broken': {
     name: 'Broken Transcriber',
-    created: 0,
     description: 'Fake speech-to-text model whose transcription request 404s.',
+  },
+};
+
+const TRANSCRIPTION_MODELS = LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS.map(id => {
+  const metadata = TRANSCRIPTION_MODEL_METADATA[id];
+  return {
+    id,
+    name: metadata.name,
+    created: 0,
+    description: metadata.description,
     architecture: {
       input_modalities: ['audio'],
       output_modalities: ['text'],
@@ -1029,8 +1043,11 @@ const TRANSCRIPTION_MODELS = [
     top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
-  },
-];
+  };
+});
+
+/** The shared id whose transcription request 404s. */
+const BROKEN_TRANSCRIPTION_MODEL_ID: LocalFakeTranscriptionModelId = 'fake-transcribe-broken';
 
 type ToolCallDelta = {
   index: number;
@@ -1391,6 +1408,23 @@ function runToolScenario(
   writeToolCall(ctx, tag, kind, resolved);
 }
 
+function readToolResultBody(
+  result: ToolResult,
+  path: string
+): { ok: true; body: string } | { ok: false; message: string } {
+  const normalization = normalizeToolResult(result.content);
+  if (!normalization.ok) return normalization;
+  const normalized = normalization.result;
+  const resultPath = readResultPath(normalized);
+  if (!resultPath.ok || normalized.error || !readResultMatchesRequest(resultPath.path, path)) {
+    return { ok: false, message: 'read tool did not return file contents for the requested path' };
+  }
+  const body = stripPromptContext(readFileContents(normalized.output));
+  return body === ''
+    ? { ok: false, message: 'read tool did not return file contents' }
+    : { ok: true, body };
+}
+
 /**
  * Scenario registry. Each handler writes SSE chunks through `ctx.emit` and is
  * responsible for closing the response (or leaving it open for `hang`/`gate`).
@@ -1651,6 +1685,44 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     parkGate(ctx, tag, `done-${tag}`);
   },
 
+  'file-read-pair'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(
+      /^([A-Za-z0-9_-]+):([^:\n]+):([^:\n]+)$/
+    );
+    if (!parsed || parsed[2] === parsed[3]) {
+      writeJsonError(
+        ctx.emit,
+        402,
+        'file-read-pair requires a tag and two distinct paths',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, firstPath, secondPath] = parsed;
+    const bodies: string[] = [];
+    for (const [index, path] of [firstPath, secondPath].entries()) {
+      const readTag = `${tag}-${index + 1}`;
+      const status = scenarioStatus(ctx.state, readTag);
+      const result =
+        status.toolCalls.read > 0
+          ? toolResults(ctx.body, readTag, ctx.state).find(
+              entry => entry.id === toolCallId(readTag, 'read')
+            )
+          : undefined;
+      if (!result) {
+        runToolScenario(ctx, readTag, 'read', { path });
+        return;
+      }
+      const read = readToolResultBody(result, path);
+      if (!read.ok) {
+        writeJsonError(ctx.emit, 422, read.message, 'invalid_tool_result');
+        return;
+      }
+      bodies.push(read.body.trim());
+    }
+    writeAssistantResponse(ctx, `file-read-pair:${JSON.stringify(bodies)}`);
+  },
+
   /**
    * `file:<op>:<opTag>:...` — one real tool turn per request, attributed to the
    * fresh per-turn `opTag`. `toolResults()` matches `(tag, kind)` across the
@@ -1726,38 +1798,13 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       return;
     }
 
-    const normalization = normalizeToolResult(toolResultContent(result.content));
-    if (!normalization.ok) {
-      writeJsonError(ctx.emit, 422, normalization.message, 'invalid_tool_result');
-      return;
-    }
-    const normalized = normalization.result;
-    const resultPath = readResultPath(normalized);
-    if (
-      !resultPath.ok ||
-      normalized.error ||
-      !readResultMatchesRequest(resultPath.path, directive.path)
-    ) {
-      writeJsonError(
-        ctx.emit,
-        422,
-        'read tool did not return file contents for the requested path',
-        'invalid_tool_result'
-      );
-      return;
-    }
-    const body = stripPromptContext(readFileContents(normalized.output));
-    if (body === '') {
-      writeJsonError(
-        ctx.emit,
-        422,
-        'read tool did not return file contents',
-        'invalid_tool_result'
-      );
+    const read = readToolResultBody(result, directive.path);
+    if (!read.ok) {
+      writeJsonError(ctx.emit, 422, read.message, 'invalid_tool_result');
       return;
     }
     status.fileCompleted = true;
-    writeAssistantResponse(ctx, `file-read:${directive.path}\n${body}`);
+    writeAssistantResponse(ctx, `file-read:${directive.path}\n${read.body}`);
   },
 
   'tool-stream'(args, ctx) {
@@ -1899,6 +1946,8 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     runChildTask(args, ctx, true);
   },
   'background-activity': backgroundActivityScenario,
+  board: agentBoardScenario,
+  'board-child': agentBoardChildScenario,
 
   cron(args, ctx) {
     runSchedule(
@@ -2182,7 +2231,7 @@ async function handleAudioTranscriptions(
     fail(400, 'model field is required', 'invalid_request', 'missing-model');
     return;
   }
-  if (model === 'fake-transcribe-broken') {
+  if (model === BROKEN_TRANSCRIPTION_MODEL_ID) {
     fail(404, `model not found: ${model}`, 'model_not_found', 'model-not-found');
     return;
   }

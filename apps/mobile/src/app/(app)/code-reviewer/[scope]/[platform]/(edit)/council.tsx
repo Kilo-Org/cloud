@@ -4,7 +4,6 @@ import {
   COUNCIL_MIN_SPECIALISTS,
   COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
 } from '@kilocode/app-shared/code-review';
-import { useQuery } from '@tanstack/react-query';
 import { type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -47,6 +46,7 @@ import {
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
 import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import {
   defaultCouncilConfig,
   enabledSpecialistCount,
@@ -55,7 +55,7 @@ import {
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { useTRPC } from '@/lib/trpc';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 export default function CouncilRoute() {
   const params = useReviewerRouteParams();
@@ -71,7 +71,6 @@ function CouncilScreen({
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { t } = useTranslation();
   const scopeTitle = useReviewerScopeTitle(scope);
-  const trpc = useTRPC();
   // The same gate as the web page: an entitled organization behind the rollout
   // flag. A personal scope, an unentitled org, or a build older than the flag
   // never reaches the rows below. Bitbucket has no council on either client.
@@ -83,10 +82,7 @@ function CouncilScreen({
   // it: the reviewer permission hook already runs this same read for an
   // organization scope, so that path stays cache-served. It must sit above the
   // early return below, with every other hook of this screen.
-  const orgs = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: isPersonal(scope),
-  });
+  const orgs = useOrganizationsList({ enabled: isPersonal(scope) });
   let membershipState: 'none' | 'some' | 'unsettled' = 'unsettled';
   if (orgs.data !== undefined) {
     membershipState = orgs.data.length > 0 ? 'some' : 'none';
@@ -138,9 +134,10 @@ function CouncilScreen({
     // An in-flight entitlement read keeps the surface blank rather than telling
     // an entitled organization that council is unavailable while it resolves.
     // A settled refusal names the reason the reader can act on: a personal
-    // account never carries council, an organization's plan can lack it, and
-    // Bitbucket has no council on either client. The personal scope offers the
-    // one step that changes the answer: creating the organization.
+    // account never carries council, an organization's plan can lack it, a
+    // plan check can have failed (the surface offers the retry), and Bitbucket
+    // has no council on either client. The personal scope offers the one step
+    // that changes the answer: creating the organization.
     const refusalReason = gate.refusalReason ?? 'flagUnavailable';
     return (
       <View className="flex-1 bg-background">
@@ -151,6 +148,8 @@ function CouncilScreen({
             platformSupportsCouncil={capabilities.council}
             refusalReason={refusalReason}
             membershipState={membershipState}
+            retryEntitlement={gate.retryEntitlement}
+            entitlementFetching={gate.entitlementFetching}
           />
         ) : (
           <View className={SCREEN_BODY_CLASS}>
@@ -310,6 +309,10 @@ function CouncilScreen({
         <Section label={t('codeReviewer.council.labels')}>
           <Input
             value={labelsText}
+            // A save/refetch rewrites the field's controlled value, so the
+            // framework suggestion popup stays off — it crashes against
+            // rewritten text (see REWRITTEN_INPUT_AUTO_CORRECT).
+            autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
             editable={!disabled}
             accessibilityLabel={t('codeReviewer.council.labels')}
             placeholder={t('codeReviewer.council.labelsPlaceholder')}

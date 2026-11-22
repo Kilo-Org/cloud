@@ -5,7 +5,6 @@ import { type TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { BriefingScorecard } from './briefing-card';
 import { BriefingMetadataRows } from './briefing-metadata-rows';
@@ -21,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   BRIEFING_PATH,
   type BriefingReport,
@@ -28,7 +28,11 @@ import {
   useBriefingDismissals,
   useBriefingInvalidation,
 } from '@/lib/agent-briefing';
-import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
+import {
+  briefingAccessDenied,
+  briefingReportMissing,
+  selectBriefingDetailPhase,
+} from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -110,23 +114,42 @@ export function BriefingDetailScreen() {
     access.canRead(query.data.context.organizationId)
       ? query.data
       : undefined;
+  const announcedFailureFor = useRef<string | null>(null);
   const read = useMutation(
     trpc.agentBriefing.read.mutationOptions({
-      onError: () => {
-        toast.error(t('common.somethingWentWrong'));
+      onError: (_error, variables) => {
+        // The mark retries on a later payload, so a brief whose summary is still
+        // generating polls and can fail more than once; the person hears the
+        // failure once per report in this visit.
+        if (announcedFailureFor.current === variables.reportId) {
+          return;
+        }
+        announcedFailureFor.current = variables.reportId;
+        announcingToast.error(t('agentBriefing.readMarkFailed'));
       },
     })
   );
-  const marked = useRef<string | null>(null);
+  // One attempt per fetched payload. A keyed-by-report-id attempt made a failure
+  // sticky for the rest of the visit; keying by the payload generation tries the
+  // mark again on the next fetch or the next visit, without a retry timer or a
+  // counter that could loop. The failure itself is announced once per report, so
+  // a poll while the summary is still generating does not repeat it.
+  const attemptedAt = useRef<number | null>(null);
   useEffect(() => {
-    if (!report || offline || report.readAt || marked.current === report.id) {
+    if (!report || offline || report.readAt || attemptedAt.current === query.dataUpdatedAt) {
       return;
     }
-    marked.current = report.id;
+    attemptedAt.current = query.dataUpdatedAt;
     read.mutate({ reportId: report.id });
-  }, [offline, read, report]);
-  const loading = !report && !missing && query.isPending && !offline;
-  const failure = !report && !loading;
+  }, [offline, query.dataUpdatedAt, read, report]);
+  const phase = selectBriefingDetailPhase({
+    hasReport: report !== undefined,
+    offline,
+    isPending: query.isPending,
+    isError: query.isError,
+    accessDenied: briefingAccessDenied(query.error),
+    missing,
+  });
 
   return (
     <View className="flex-1 bg-background">
@@ -135,23 +158,30 @@ export function BriefingDetailScreen() {
         showBackButton
         backFallback={BRIEFING_PATH as Href}
       />
-      {loading && (
+      {phase === 'loading' && (
         <View className={SCREEN_BODY_CLASS}>
           <Skeleton className="h-48 rounded-xl" />
           <Skeleton className="h-64 rounded-xl" />
         </View>
       )}
-      {failure && missing && <QueryError variant="not-found" />}
-      {failure && !missing && (
+      {/* The report aged out, was deleted, or lost its sources: the copy says so
+          and offers no retry that the server would answer with the same NOT_FOUND. */}
+      {phase === 'missing' && <QueryError variant="not-found" />}
+      {/* Connectivity pauses the first fetch instead of failing it, so the screen
+          says what it is waiting for and leaves recovery to the reconnect. */}
+      {phase === 'offline' && <QueryError variant="offline" title={t('offline.noInternet')} />}
+      {/* The server rejected this account's access, which no retry can change. */}
+      {phase === 'denied' && <QueryError variant="permission" />}
+      {phase === 'failed' && (
         <QueryError
           title={t('agentBriefing.loadError')}
-          variant={briefingAccessDenied(query.error) ? 'permission' : 'neutral'}
+          variant="neutral"
           onRetry={() => {
             void query.refetch();
           }}
         />
       )}
-      {report && (
+      {phase === 'ready' && report && (
         <ScrollView
           automaticallyAdjustKeyboardInsets
           contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-12')}

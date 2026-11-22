@@ -4,9 +4,12 @@ export function isKimiModel(model: string) {
   return model.includes('kimi');
 }
 
+/**
+ * Runs for Kimi models only; the caller gates on `isKimiModel`. Moonshot rejects the temperature
+ * parameter, so it is deleted. `top_p` is dropped rather than forwarded because Kimi accepts no value
+ * other than 0.95, and any other value fails the request with a 400.
+ */
 export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
-  // Moonshot models don't support the temperature parameter
   delete requestToMutate.body.temperature;
-  // Kimi models only accept top_p=0.95; any other value causes a 400 error
   delete requestToMutate.body.top_p;
 }

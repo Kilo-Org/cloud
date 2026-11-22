@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nouvo rezilta sekirite ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritik",
+      "high": "Wo",
+      "medium": "Mwayen",
+      "low": "Ba"
+    },
     "securityFindingSlaWarning": {
       "title": "Avètisman SLA"
     },

@@ -22,7 +22,9 @@ import {
   collectDynamicCountedCalls,
   DYNAMIC_COUNTED_KEYS,
   findCountlessFamilies,
+  findOrphanedNoAgreementEntries,
   findUnlistedDynamicCalls,
+  NO_AGREEMENT,
   readAuditedCatalog,
   readEnglishCatalog,
 } from './check-plurals.mjs';
@@ -30,7 +32,13 @@ import {
 // The checker parses with oxc through the shared scanner, so the command
 // fixtures link the repository's dependency tree at their own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_MODULES = [
+  'ast.mjs',
+  'catalogs.mjs',
+  'entry-point.mjs',
+  'fs-entries.mjs',
+  'source-files.mjs',
+];
 // The checker the command fixtures run, read once so a copy is always the text
 // this suite's assertions were written against.
 const CHECKER_SOURCE = readFileSync(new URL('./check-plurals.mjs', import.meta.url), 'utf8');
@@ -120,15 +128,36 @@ function renderDeclaration([name, keys]) {
 const DECLARATIONS = declarationFiles();
 
 /**
+ * One counted call for every `NO_AGREEMENT` key, generated from the table the
+ * checker reviews against. The reverse check reports an entry whose counted call
+ * the source no longer has, so a synthetic tree must produce each one or every
+ * entry would read as an orphan. `omit` drops the call for one key, which is the
+ * stale entry the check is meant to catch.
+ */
+function noAgreementCalls({ omit = null } = {}) {
+  return [...NO_AGREEMENT.keys()]
+    .filter(key => key !== omit)
+    .map(key => `t('${key}', { count: 1 });`)
+    .join('\n');
+}
+
+/**
  * The standard fixture files. `broken` replaces `mcp-settings-state.ts` with
  * text the parser refuses, which is the failure both reads of the declaration
- * modules used to report once each.
+ * modules used to report once each. `omitNoAgreementCall` drops the counted call
+ * of one `NO_AGREEMENT` key, leaving its review entry orphaned.
  */
-function standardFiles({ source = '', english = {}, broken = false } = {}) {
+function standardFiles({
+  source = '',
+  english = {},
+  broken = false,
+  omitNoAgreementCall = null,
+} = {}) {
   return {
     ...DECLARATIONS,
     'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
     'apps/mobile/src/example.ts': source,
+    'apps/mobile/src/no-agreement.ts': noAgreementCalls({ omit: omitNoAgreementCall }),
     ...(broken ? { 'apps/mobile/src/components/chat/mcp-settings-state.ts': 'const a = ;\n' } : {}),
   };
 }
@@ -363,16 +392,19 @@ test('still reports a renamed declaration as absent', () => {
 });
 
 test('projects one scan into sorted keys, unlisted calls and countless families', () => {
-  const root = fixture(
-    standardFiles({
+  const root = fixture({
+    // The projection assertions below are exact lists over the whole tree, so
+    // the generated `NO_AGREEMENT` calls stand aside here.
+    ...standardFiles({
       source: [
         `t('zeta.count', { count: 1 });`,
         `t('alpha.count', { count: 1 });`,
         `t(zetaKey, { count: 1 });`,
         `t(alphaKey, { count: 1 });`,
       ].join('\n'),
-    })
-  );
+    }),
+    'apps/mobile/src/no-agreement.ts': '',
+  });
   const scan = auditCountedCalls(root);
   assert.deepEqual(collectCountedKeys(scan), ['alpha.count', 'zeta.count']);
   assert.deepEqual(collectDynamicCountedCalls(scan), ['alphaKey', 'zetaKey']);
@@ -390,4 +422,50 @@ test('projects one scan into sorted keys, unlisted calls and countless families'
     ),
     ['zeta.count']
   );
+});
+
+/** A scan as `auditCountedCalls` builds one, from the literal keys given. */
+function scanOf(keys) {
+  return { calls: keys.map(key => ({ key })), problems: [] };
+}
+
+test('reports no orphan when every NO_AGREEMENT entry still has its counted call', () => {
+  // A review entry is only stale once its counted call is gone, so a scan that
+  // produces every listed key is healthy — including the extra counted keys the
+  // reverse check does not look at.
+  const scan = scanOf([...NO_AGREEMENT.keys(), 'agents.liveCount']);
+  assert.deepEqual(findOrphanedNoAgreementEntries(scan), []);
+});
+
+test('reports one orphan naming the entry whose counted call is gone', () => {
+  const [missing] = [...NO_AGREEMENT.keys()].sort();
+  const scan = scanOf([...NO_AGREEMENT.keys()].filter(key => key !== missing));
+  assert.deepEqual(findOrphanedNoAgreementEntries(scan), [missing]);
+});
+
+test('names no orphan from a scan that could not read or parse every file', () => {
+  // A refused file's counted calls are invisible, so an entry whose call lives
+  // in it would read as stale. The scan's own problem line says why the tree is
+  // incomplete, and naming the entry would send a reviewer to delete a review it
+  // still needs; the sibling declaration check drops its per-key lines for the
+  // same reason.
+  const scan = {
+    calls: [],
+    problems: ['apps/mobile/src/example.ts:1: cannot parse: Unexpected token'],
+  };
+  assert.deepEqual(findOrphanedNoAgreementEntries(scan), []);
+});
+
+test('reports an orphaned NO_AGREEMENT entry through the command', () => {
+  const missing = 'profiles.counts.mcp';
+  const root = cliFixture(standardFiles({ omitNoAgreementCall: missing }));
+  const result = cli(root);
+  assert.equal(result.status, 1, result.stderr);
+  const orphanLines = result.stderr.split('\n').filter(line => /NO_AGREEMENT lists /.test(line));
+  assert.equal(orphanLines.length, 1, `expected one orphan line, got:\n${result.stderr}`);
+  assert.equal(
+    orphanLines[0],
+    `en: NO_AGREEMENT lists "${missing}", but no counted call produces it; remove the entry or restore its call site`
+  );
+  assert.match(result.stderr, /check-plurals: 1 problem\(s\)/);
 });

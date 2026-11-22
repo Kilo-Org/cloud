@@ -2,13 +2,87 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerBridge } from '@/lib/picker-bridge';
 import { modelPickerSlot } from '@/lib/route-registry';
 
-// Development-only remote CLI catalog: kiloapp:///dev/model-picker-fixture/multiple-providers.
+// Development-only remote CLI catalog, on the picker fixture's own dev link.
+// The same link carries `unavailable=1`, which serves the all-unavailable
+// projection (one dead row, the session's current selection) instead of the
+// multi-provider catalog, and `empty=1`, which serves a catalog the session's
+// refetch has not filled yet. Both ride this path rather than paths of their
+// own because the design gate must open the same route on the merge base,
+// whose fixture only knows this path.
 export function modelPickerFixtureRoute(path: string): string | null {
   if (!/(?:^|\/)dev\/model-picker-fixture\/multiple-providers\/?(?:[?#].*)?$/.test(path)) {
     return null;
   }
 
   const routeKey = 'model-picker-fixture';
+
+  if (/[?&]empty=1(?:[&#]|$)/.test(path)) {
+    // The composer's chip opens the picker with the catalog it holds. When that
+    // catalog is empty the session can still refetch it, and the sheet offers
+    // that as its one action. The fixture records the ask instead of reaching a
+    // backend the picker cannot, so the action and its close are provable on a
+    // device without a live catalog.
+    const emptyScope: ModelPickerBridge['selectionScope'] = {
+      sessionId: routeKey,
+      ownerConnectionId: 'fixture-remote-cli',
+      protocol: 'v1',
+      catalogGenerationIdentity: {},
+    };
+    const emptyBridge: ModelPickerBridge = {
+      options: [],
+      currentValue: '',
+      currentVariant: '',
+      acceptsVariant: true,
+      selectionScope: emptyScope,
+      isSelectionCurrent: () => true,
+      onSelect: () => undefined,
+      retryCatalog: () => {
+        // eslint-disable-next-line no-console -- dev-only fixture feedback in the Metro log
+        console.info('[model-picker-fixture] catalog retry requested');
+      },
+    };
+    modelPickerSlot.set(routeKey, emptyBridge);
+    return `/(app)/agent-chat/model-picker?routeKey=${routeKey}`;
+  }
+
+  if (/[?&]unavailable=1(?:[&#]|$)/.test(path)) {
+    // `buildUnavailableRemoteOptions` in `use-session-model-options` projects a
+    // remote session whose CLI reports no models as this one row, carrying the
+    // session's current selection with `unavailable: true`; the picker then has
+    // rows but nothing selectable.
+    const unavailableOption: SessionModelOption = {
+      id: 'remote-unavailable-model',
+      name: 'DeepSeek V4.1 Flash',
+      displayId: 'deepseek/deepseek-v4.1-flash',
+      variants: [],
+      isPreferred: false,
+      provider: { id: 'deepseek', name: 'deepseek' },
+      modelRef: { providerID: 'deepseek', modelID: 'deepseek-v4.1-flash' },
+      showGatewayMetadata: false,
+      unavailable: true,
+    };
+    const allUnavailableScope: ModelPickerBridge['selectionScope'] = {
+      sessionId: routeKey,
+      ownerConnectionId: 'fixture-remote-cli',
+      protocol: 'v1',
+      catalogGenerationIdentity: {},
+    };
+    const allUnavailableBridge: ModelPickerBridge = {
+      options: [unavailableOption],
+      currentValue: unavailableOption.id,
+      currentVariant: '',
+      acceptsVariant: true,
+      selectionScope: allUnavailableScope,
+      isSelectionCurrent: () => true,
+      onSelect: selection => {
+        allUnavailableBridge.currentValue = selection.option.id;
+        allUnavailableBridge.currentVariant = selection.variant;
+      },
+    };
+    modelPickerSlot.set(routeKey, allUnavailableBridge);
+    return `/(app)/agent-chat/model-picker?routeKey=${routeKey}`;
+  }
+
   // The Kilo Auto tiers, shaped as `createGatewayOption` shapes them: the
   // catalog id is the display id and the model ref, so each row renders the
   // catalog's own tier label instead of the gateway's English name.

@@ -52,6 +52,18 @@ describe('PrReviewInboxList states', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
   });
 
+  // D5: an inbox read that never reached the server blamed it ("Something went
+  // wrong on our end"). The connection now names itself, with Retry.
+  it('names the connection for an offline inbox read instead of the server', () => {
+    inboxState.items = [];
+    inboxState.firstPageErrorState = { kind: 'offline' };
+    const bodies = mountInboxList().root.findAll(n => String(n.type) === 'QueryError');
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.props.variant).toBe('offline');
+    expect(bodies[0]?.props.title).toBe('queryError.offlineTitle');
+    expect(bodies[0]?.props.onRetry).toBeTypeOf('function');
+  });
+
   // A pending first read that is not fetching (offline, paused, cancelled)
   // never settles on its own: it takes the retryable body so the user can
   // restart the read, never the skeleton and never a false empty state.

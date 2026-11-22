@@ -232,6 +232,31 @@ describe('Cloud Agent authority contract', () => {
       validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', launch, now + 3600)
     ).toEqual(launch);
   });
+  it.each(['   ', '\n\t '])(
+    'rejects a blank launch prompt %j while sendMessage shares the same rule',
+    prompt => {
+      expect(() =>
+        validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', {
+          ...launch,
+          prompt,
+        })
+      ).toThrow();
+      // Both procedures accept a first-user-instruction prompt through one schema.
+      expect(() =>
+        validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.sendMessage', {
+          cloudAgentSessionId: 'workspace_33333333-3333-4333-8333-333333333333',
+          messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          payload: { type: 'prompt', prompt, mode: 'code', model: 'provider/model' },
+        })
+      ).toThrow();
+    }
+  );
+  it('passes a real launch prompt through unchanged', () => {
+    const request = { ...launch, prompt: 'Implement the child task' };
+    expect(
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
+    ).toEqual(request);
+  });
   it('accepts only the workspace callback destinations without widening spawn authority', () => {
     for (const target of [
       { url: 'workspace:new-chat' },

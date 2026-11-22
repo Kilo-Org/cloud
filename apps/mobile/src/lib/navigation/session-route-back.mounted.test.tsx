@@ -2,7 +2,7 @@ import { createElement, useEffect } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { useSessionRouteBack } from './session-route-back';
 
 // React Native's BackHandler as a set of live subscriptions: a test can press
@@ -23,7 +23,8 @@ const backPress = vi.hoisted(() => {
 const routerState = vi.hoisted(() => ({
   canGoBack: false,
   back: vi.fn(),
-  dismissTo: vi.fn(),
+  push: vi.fn(),
+  currentIndex: 0,
 }));
 
 vi.mock('react-native', () => ({
@@ -33,16 +34,24 @@ vi.mock('react-native', () => ({
   },
 }));
 // `useFocusEffect` runs its effect while the route is focused, which is the
-// lifetime the listener has.
+// lifetime the listener has. The stack the route sits in answers the exit rule:
+// with a route beneath, the listener leaves the press to the navigator.
 vi.mock('expo-router', () => ({
   useFocusEffect: (effect: () => undefined | (() => void)) => {
     useEffect(effect, [effect]);
   },
+  useNavigation: () => ({
+    getState: () => ({ index: routerState.currentIndex, routes: [{ key: 'only' }] }),
+    addListener: () => () => undefined,
+  }),
   useRouter: () => ({
     canGoBack: () => routerState.canGoBack,
     back: routerState.back,
-    dismissTo: routerState.dismissTo,
   }),
+}));
+// The fallback's push-then-retire mechanics are their own suite's.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: routerState.push }),
 }));
 
 function SessionRoute(): null {
@@ -65,7 +74,7 @@ beforeEach(() => {
   backPress.listeners.clear();
   routerState.canGoBack = false;
   routerState.back.mockReset();
-  routerState.dismissTo.mockReset();
+  routerState.push.mockReset();
 });
 
 describe('useSessionRouteBack', () => {
@@ -74,7 +83,7 @@ describe('useSessionRouteBack', () => {
     const renderer = mount();
 
     expect(backPress.press()).toBe(false);
-    expect(routerState.dismissTo).not.toHaveBeenCalled();
+    expect(routerState.push).not.toHaveBeenCalled();
     expect(routerState.back).not.toHaveBeenCalled();
     renderer.unmount();
   });
@@ -86,7 +95,7 @@ describe('useSessionRouteBack', () => {
     const renderer = mount();
 
     expect(backPress.press()).toBe(true);
-    expect(routerState.dismissTo).toHaveBeenCalledExactlyOnceWith(AGENTS_SESSIONS_HREF);
+    expect(routerState.push).toHaveBeenCalledExactlyOnceWith(AGENTS_SESSIONS_INDEX_HREF);
     renderer.unmount();
   });
 
@@ -107,7 +116,7 @@ describe('useSessionRouteBack', () => {
     backPress.addEventListener('hardwareBackPress', () => true);
 
     expect(backPress.press()).toBe(true);
-    expect(routerState.dismissTo).not.toHaveBeenCalled();
+    expect(routerState.push).not.toHaveBeenCalled();
     renderer.unmount();
   });
 });

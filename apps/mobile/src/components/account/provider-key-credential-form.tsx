@@ -86,15 +86,10 @@ export function ProviderKeyCredentialForm({
           required
           {...CREDENTIAL_INPUT_PROPS}
           secureTextEntry={field.secret}
-          multiline={field.multiline}
-          showSoftInputOnFocus={!field.multiline}
-          {...(field.multiline
-            ? {
-                numberOfLines: 4,
-                className: 'min-h-24',
-                placeholder: t('profile.providerKeys.apiKeyPlaceholder'),
-              }
-            : {})}
+          // Only a secret is pasted as a whole value; a project, a region or an
+          // email address is typed, and suggesting "Paste the key" there would
+          // describe the wrong field.
+          {...(field.secret ? { placeholder: t('profile.providerKeys.apiKeyPlaceholder') } : {})}
           disabled={disabled}
           error={errors[field.id]}
           onChangeText={value => {

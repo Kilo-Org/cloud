@@ -3,7 +3,7 @@ import 'server-only';
 import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
 import type { StripeSubscriptionStatus } from '@kilocode/db/schema-types';
 
-import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
 import {
   type KiloPassPaymentProvider,
@@ -15,9 +15,6 @@ import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/st
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { getOpenPauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { pickKiloPassSubscriptionForProjection } from '@kilocode/worker-utils/kilo-pass-bonus-projection';
-
-type Db = typeof defaultDb;
-type DbOrTx = Db | DrizzleTransaction;
 
 export type KiloPassSubscriptionState = {
   subscriptionId: string;
@@ -36,18 +33,8 @@ export type KiloPassSubscriptionState = {
   resumesAt: string | null;
 };
 
-type KiloPassSubscriptionRowForState = {
-  subscriptionId: string;
-  stripeSubscriptionId: string | null;
-  paymentProvider: KiloPassPaymentProvider;
-  providerSubscriptionId: string | null;
-  tier: KiloPassTier;
-  cadence: KiloPassCadence;
-  status: StripeSubscriptionStatus;
-  cancelAtPeriodEnd: boolean;
-  currentStreakMonths: number;
-  nextYearlyIssueAt: string | null;
-  startedAt: string | null;
+/** The columns `getKiloPassStateForUser` reads, keyed to the state they project into. */
+type KiloPassSubscriptionRowForState = Omit<KiloPassSubscriptionState, 'endedAt' | 'resumesAt'> & {
   endedAt: string | null;
   createdAt: string;
 };
@@ -56,7 +43,7 @@ function toKiloPassSubscriptionState(
   selected: KiloPassSubscriptionRowForState,
   overrides: Pick<KiloPassSubscriptionState, 'status' | 'cancelAtPeriodEnd' | 'resumesAt'> & {
     /** A date a caller derives instead of the stored one, such as a store expiry. */
-    endedAt?: string | null;
+    endedAt?: string;
   }
 ): KiloPassSubscriptionState {
   return {
@@ -102,7 +89,7 @@ function isExpiredAtOrBeforeNow(expiresAt: string | null, nowIso: string): boole
 }
 
 export async function getKiloPassStateForUser(
-  db: DbOrTx,
+  db: DrizzleConnection,
   kiloUserId: string,
   options: { forUpdate?: boolean } = {}
 ): Promise<KiloPassSubscriptionState | null> {
@@ -149,7 +136,7 @@ export async function getKiloPassStateForUser(
         cancelAtPeriodEnd: false,
         // A store pass ends when its last recorded purchase expires, so that
         // expiry is the date the pass ended.
-        endedAt: normalizeTimestampToIso(latestStorePurchase?.expires_at ?? null),
+        endedAt: normalizeTimestampToIso(latestStorePurchase?.expires_at ?? null) ?? undefined,
         resumesAt: null,
       });
     }

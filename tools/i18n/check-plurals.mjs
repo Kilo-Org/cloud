@@ -29,7 +29,8 @@
  * A counted message whose copy owns no word whose form the count changes — a
  * participle, a bare number in parentheses, a label — needs no family, because
  * there is nothing to inflect. Those are the reviewed `NO_AGREEMENT` entries
- * below, each with the reason it holds.
+ * below, each with the reason it holds. The check runs both ways, so an entry
+ * whose counted call is gone is reported too.
  *
  * The call sites come from the syntax tree oxc builds (tools/lib/ast.mjs): a
  * call is a call, its arguments are arguments, and an option is a property in
@@ -43,7 +44,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogTags,
   declaresPluralFamily,
@@ -69,16 +70,15 @@ const COUNTED_OPTIONS = ['count', 'displayCount', 'itemCount'];
  * Counted messages whose English copy has no word whose form the count
  * changes, so a plural family would be noise. Reviewed one by one: before
  * adding an entry, read the English copy and confirm every word reads the same
- * at 1 and at 5. If a word does change, declare the family instead.
+ * at 1 and at 5. If a word does change, declare the family instead. The list is
+ * checked in both directions: a counted key that is neither a family nor here is
+ * a problem, and so is an entry here whose counted call the source no longer
+ * has, so a removed call site cannot leave a stale exemption behind.
  */
 export const NO_AGREEMENT = new Map([
   [
     'agentChat.blockingCard.positionHint',
     'position, not agreement: "(1 of {{displayCount}})" names no inflected word',
-  ],
-  [
-    'agentChat.contextUsage.modelAccessibilityLabel',
-    'accessibility label: "{{name}}, {{provider}}, {{steps}}, {{cost}}" holds no counted noun',
   ],
   [
     'agentChat.preparation.setupCommandOf',
@@ -87,10 +87,6 @@ export const NO_AGREEMENT = new Map([
   [
     'agentChat.sessionChanges.reviewTitle',
     'bare count in parentheses: "Review ({{count}})" names no inflected word',
-  ],
-  [
-    'chat.reactions.accessibility',
-    'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],
   [
     'codeReviewer.repos.allModeCount',
@@ -121,24 +117,6 @@ export const NO_AGREEMENT = new Map([
     'securityAgent.settingsOverview.notificationsCount',
     'fixed total: "{{displayCount}} of 2 enabled" reads the same at every count',
   ],
-  [
-    'prReview.fileList.filesViewed',
-    'counts of a total, not a count of the noun: "Files · {{viewed}} of {{total}} viewed"',
-  ],
-  [
-    'prReview.fileNavigator.loadingFiles',
-    'progress read-out: "Loading {{loaded}} of {{total}}…" has no inflected word',
-  ],
-  ['prReview.hunkRows.loadingAllFiles', 'progress read-out: "Loading all files — {{loaded}}…"'],
-  [
-    'prReview.hunkRows.loadingAllFilesOf',
-    'progress read-out: "Loading all files — {{loaded}} of {{total}}…"',
-  ],
-  [
-    'prReview.hunkRows.loadingLines',
-    'progress read-out: "Loading {{loaded}} of {{total}} lines…" — "lines" counts loaded, and the row is a spinner',
-  ],
-  ['prReview.hunkRows.loadingContext', 'progress read-out: "Loading context…" has no count'],
   [
     'modelChat.mcp.available',
     'carried count, no inflected word: "Tools available: {{count}}" counts by number alone',
@@ -175,8 +153,9 @@ export const NO_AGREEMENT = new Map([
  * written the way the source writes it with its whitespace collapsed.
  */
 function countedKey(argument, text) {
-  if (argument.type === 'Literal' && typeof argument.value === 'string') {
-    return { key: argument.value };
+  const key = stringLiteralValue(argument);
+  if (key !== null) {
+    return { key };
   }
   if (argument.type === 'TemplateLiteral' && argument.expressions.length === 0) {
     const [chunk] = argument.quasis;
@@ -391,6 +370,36 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
     },
   ],
+  [
+    'GLANCEABLE_COUNT_NOUN_KEY[kind]',
+    {
+      keys: [
+        'glanceable.countNoun.needsInput',
+        'glanceable.countNoun.running',
+        'glanceable.countNoun.scheduled',
+        'glanceable.countNoun.idle',
+      ],
+      source: 'apps/mobile/src/lib/glanceable/presentation.ts',
+      declaration: 'GLANCEABLE_COUNT_NOUN_KEY',
+      reason:
+        'GLANCEABLE_COUNT_NOUN_KEY map in presentation.ts; the count noun inflects with its own number on the split layouts',
+    },
+  ],
+  [
+    'GLANCEABLE_COUNT_MESSAGE_KEY[kind]',
+    {
+      keys: [
+        'glanceable.count.needsInput',
+        'glanceable.count.running',
+        'glanceable.count.scheduled',
+        'glanceable.count.idle',
+      ],
+      source: 'apps/mobile/src/lib/glanceable/presentation.ts',
+      declaration: 'GLANCEABLE_COUNT_MESSAGE_KEY',
+      reason:
+        'GLANCEABLE_COUNT_MESSAGE_KEY map in presentation.ts; each whole count line inflects with its own count',
+    },
+  ],
 ]);
 
 /**
@@ -405,9 +414,9 @@ function typeKeys(typeNode) {
     if (node.type !== 'TSLiteralType') {
       return;
     }
-    const literal = unwrap(node.literal);
-    if (literal.type === 'Literal' && typeof literal.value === 'string') {
-      keys.push(literal.value);
+    const key = stringLiteralValue(node.literal);
+    if (key !== null) {
+      keys.push(key);
     }
   });
   return keys;
@@ -429,9 +438,9 @@ function objectKeys(initializer) {
     if (property.type !== 'Property') {
       continue;
     }
-    const value = unwrap(property.value);
-    if (value.type === 'Literal' && typeof value.value === 'string') {
-      keys.push(value.value);
+    const key = stringLiteralValue(property.value);
+    if (key !== null) {
+      keys.push(key);
     }
   }
   return keys;
@@ -440,7 +449,8 @@ function objectKeys(initializer) {
 /**
  * The noun phrase naming the initialiser shape `objectKeys` could not read.
  * `unwrap` already reads through the TypeScript wrappers, so the shape is the
- * node the check actually saw; spelling the node type as words keeps an
+ * node the check actually saw. One node type has a name the generic form would
+ * get wrong; every other node spells its own type as words, which keeps an
  * unlisted expression readable in the diagnostic.
  */
 function initializerShape(initializer) {
@@ -448,19 +458,8 @@ function initializerShape(initializer) {
     return 'no initializer';
   }
   const node = unwrap(initializer);
-  if (node.type === 'Identifier') {
-    return 'an identifier';
-  }
-  if (node.type === 'CallExpression') {
-    return 'a call expression';
-  }
-  if (node.type === 'TemplateLiteral') {
-    return 'a template literal';
-  }
-  if (node.type === 'MemberExpression') {
-    return 'a member expression';
-  }
   if (node.type === 'ArrayExpression') {
+    // It says "literal", where the generic formatter would say "array expression".
     return 'an array literal';
   }
   const words = node.type.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
@@ -667,6 +666,29 @@ export function findCountlessFamilies(scan, english) {
   );
 }
 
+/**
+ * The `NO_AGREEMENT` entries the scan no longer produces: a reviewed entry whose
+ * counted call is gone, sorted ascending. It is the reverse of
+ * `findCountlessFamilies`, which names a counted key with no review; this names
+ * a review with no counted key, so a removed call site cannot leave a stale
+ * exemption behind. `checkDynamicCountedKeySources` reports the same pairing for
+ * the dynamic lists. It projects a scan the caller made once with
+ * `auditCountedCalls`.
+ *
+ * A scan that could not read or parse every file cannot say which keys exist —
+ * a refused file's messages are invisible — so it proves no entry stale and
+ * names none. Its own problem lines already say why. This is the same reason
+ * `checkDynamicCountedKeySources` drops its per-key lines for a module it could
+ * not read.
+ */
+export function findOrphanedNoAgreementEntries(scan) {
+  if (scan.problems.length > 0) {
+    return [];
+  }
+  const keys = new Set(auditKeys(scan));
+  return [...NO_AGREEMENT.keys()].filter(key => !keys.has(key)).sort();
+}
+
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
@@ -692,6 +714,12 @@ function run() {
   for (const key of findCountlessFamilies(scan, english)) {
     problems.push(
       `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
+    );
+  }
+
+  for (const key of findOrphanedNoAgreementEntries(scan)) {
+    problems.push(
+      `en: NO_AGREEMENT lists "${key}", but no counted call produces it; remove the entry or restore its call site`
     );
   }
 
@@ -746,7 +774,10 @@ function run() {
       counts.push(`${report.length} language(s) with missing plural categories`);
     }
     console.error(`\ncheck-plurals: ${counts.join('; ')}`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   console.log(

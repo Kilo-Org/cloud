@@ -5,12 +5,26 @@ import {
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
 } from './cloud-agent-session-scope';
-import { storedSessionIdSchema } from './kilo-session-id';
+import {
+  KILO_SESSION_ID_LENGTH,
+  KILO_SESSION_ID_PREFIX,
+  storedSessionIdSchema,
+} from './kilo-session-id';
+import { storedMessageIdSchema } from './message-id';
 import { needsPartTextRepair } from './part-text';
+import { sessionLiveSummarySchema } from './session-live-summary';
+import { tokenUsageSchema } from './token-usage';
 
 export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
-export const sessionIdSchema = z.string().startsWith('ses_').length(30);
+/**
+ * A Kilo session id on the wire. Looser than `KILO_SESSION_ID_PATTERN` on the tail,
+ * so ids minted before the canonical shape stay readable.
+ */
+export const sessionIdSchema = z
+  .string()
+  .startsWith(KILO_SESSION_ID_PREFIX)
+  .length(KILO_SESSION_ID_LENGTH);
 
 export const sessionTitleSchema = z.string().trim().min(1).max(200);
 
@@ -18,13 +32,25 @@ const statusTransitionIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$
 
 /**
  * The Session DO's projection of a Cloud Agent session into its `cli_sessions_v2` row. Kilo v2
- * has no session-ingest client, so this is also how its transcript activity and native renames
- * reach the row: `lastActivityAt` only moves forward, and `rename` is present only while a
- * native rename is undelivered. A rename rides every publication from the first one that
- * carried it, named by `rename.transitionId`, until one is delivered. Ingest applies it only
- * while the stored status transition is older than `rename.transitionId`, so a late publication
- * and a repeat after delivery cannot replace a newer title. A first delivery that has not landed
- * still can, because a user rename carries no ordering signal.
+ * has no session-ingest client, so this is also how its transcript activity, native renames,
+ * session card summary and cost reach the row: `lastActivityAt` only moves forward, and
+ * `rename` is present only while a native rename is undelivered. A rename rides every
+ * publication from the first one that carried it, named by `rename.transitionId`, until one is
+ * delivered. Ingest applies it only while the stored status transition is older than
+ * `rename.transitionId`, so a late publication and a repeat after delivery cannot replace a newer
+ * title. A first delivery that has not landed still can, because a user rename carries no
+ * ordering signal.
+ *
+ * `liveSummary` and `totalCostMicrodollars` are present only for a Kilo v2 transcript; Kilo v1
+ * keeps reporting both through its ingest client. Ingest writes the summary with the status
+ * transition, so a late older publication cannot replace a newer summary, and moves the cost
+ * forward only, as it does for a Kilo v1 report. A publication whose `transitionId` is not newer
+ * than the stored one counts as stale and its summary is dropped, so every summary change must
+ * carry a new `transitionId`.
+ *
+ * The schema is strict: a receiver that predates a field rejects the whole publication, status
+ * included. Deploy a new field to the receiver before any sender sends it, and do not roll the
+ * receiver back past a sender that sends it.
  */
 export const publishCloudAgentSessionStatusSchema = z
   .object({
@@ -39,6 +65,8 @@ export const publishCloudAgentSessionStatusSchema = z
       .object({ title: sessionTitleSchema, transitionId: statusTransitionIdSchema })
       .strict()
       .optional(),
+    liveSummary: sessionLiveSummarySchema.optional(),
+    totalCostMicrodollars: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   })
   .strict();
 export type PublishCloudAgentSessionStatusParams = z.infer<
@@ -237,18 +265,16 @@ export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
   typeof canDestroyCloudAgentWorktreeSandboxResultSchema
 >;
 
-// Message and part ids become storage and item identities, so both refuse `/`
-// and U+0000.
-function createIdSchema(prefix: string, label: string) {
-  return z
-    .string()
-    .startsWith(prefix)
-    .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-      message: `${label} must not contain / or U+0000`,
-    });
-}
-export const messageIdSchema = createIdSchema('msg', 'message IDs');
-export const partIdSchema = createIdSchema('prt', 'part IDs');
+/** The boundary name for the stored message-id rule; see `storedMessageIdSchema`. */
+export const messageIdSchema = storedMessageIdSchema;
+
+// Part ids become storage and item identities, so they refuse `/` and U+0000.
+export const partIdSchema = z
+  .string()
+  .startsWith('prt')
+  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
+    message: 'part IDs must not contain / or U+0000',
+  });
 const sdkMetadataSchema = z.record(z.string(), z.unknown());
 
 export const createSessionForCloudAgentSchema = z.object({
@@ -409,13 +435,7 @@ const sdkSnapshotFileDiffBaseSchema = z.object({
   status: z.enum(['added', 'deleted', 'modified']).optional(),
 });
 
-const sdkTokenUsageSchema = z.object({
-  total: z.number().optional(),
-  input: z.number(),
-  output: z.number(),
-  reasoning: z.number(),
-  cache: z.object({ read: z.number(), write: z.number() }),
-});
+const sdkTokenUsageSchema = tokenUsageSchema.extend({ total: z.number().optional() });
 
 export const kiloSdkSessionInfoSchema = z.object({
   id: sessionIdSchema,

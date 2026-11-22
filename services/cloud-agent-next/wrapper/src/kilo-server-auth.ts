@@ -52,15 +52,24 @@ export function kiloClientConfig(
   };
 }
 
-/** A raw request to this server, resolved against its URL, with its credential. */
-export function fetchKiloServer(
+/**
+ * A raw request to this server, resolved against its URL, with its credential.
+ * The request goes only to this server's origin: a different origin is refused
+ * before any request is made, so the credential never leaves the server.
+ */
+export async function fetchKiloServer(
   server: KiloServer,
   input: URL | string,
   init: RequestInit = {}
 ): Promise<Response> {
+  const base = new URL(server.url);
+  const target = new URL(input, base);
+  if (target.origin !== base.origin) {
+    throw new Error(`Refusing a Kilo server request outside ${base.origin}`);
+  }
   const headers = new Headers(init.headers);
   for (const [name, value] of Object.entries(kiloServerHeaders(server))) {
     headers.set(name, value);
   }
-  return fetch(new URL(input, server.url), { ...init, headers });
+  return fetch(target, { ...init, headers });
 }

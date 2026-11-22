@@ -6,21 +6,24 @@ import {
   type GgufModelFile,
   type GgufModelRecord,
   type GgufStorage,
-  keepStoredModels,
   modelFileOf,
-  modelIndexFullyParsed,
   recordFileNames,
   removeQuietly,
   settled,
-  STORAGE_HEADROOM_BYTES,
 } from './gguf-records';
+import { loadSavedModels, writeSavedModels } from './gguf-model-index';
 import {
   type GgufActiveDownload as Active,
   activeDownload,
+  advanceTransfer,
+  clearPartials,
   currentTransfer,
   downloadProgress,
   expectedBytes,
+  fitsOnDevice,
+  markPaused,
   mayRetryTransfer,
+  openTransfer,
   requestPause,
   requestResume,
   transferResult,
@@ -29,6 +32,7 @@ import {
 } from './gguf-transfers';
 import { createProgressReporter } from './gguf-transfer-progress';
 import { verifyModel } from './gguf-verify';
+import { notifySubscribers } from './gguf-subscribers';
 
 /**
  * Downloaded GGUF models and the one download in progress. A download the
@@ -60,20 +64,21 @@ export function ggufDownloads({
   const listeners = new Set<() => void>();
 
   const publish = () => {
-    snapshot = {
-      models,
-      download: active === undefined ? null : downloadProgress(active),
-      failure,
-      loadFailed,
-    };
-    for (const listener of listeners) {
-      listener();
-    }
+    const download = active === undefined ? null : downloadProgress(active);
+    snapshot = { models, download, failure, loadFailed };
+    notifySubscribers(listeners);
   };
 
-  const save = (next: readonly GgufModelRecord[]) => {
+  /**
+   * Writes the list the device keeps, and only then makes it the current one:
+   * a list the device could not take is not a list it holds.
+   */
+  const save = (next: readonly GgufModelRecord[]): boolean => {
+    if (!writeSavedModels(storage, next)) {
+      return false;
+    }
     models = next;
-    storage.writeIndex(JSON.stringify(next));
+    return true;
   };
 
   const discard = (download: Active) => {
@@ -87,19 +92,35 @@ export function ggufDownloads({
     }
   };
 
+  /** Publishes a failure for a download row; the partial files go with it. */
   const fail = (download: Active, problem: GgufDownloadProblem) => {
     discard(download);
-    failure = { fileId: download.fileId, problem };
-    publish();
+    refuse(download.fileId, problem);
   };
 
-  /** Starts the transfer at the current step from zero. */
+  /** Publishes a refusal that no download row owns yet, and answers `start`. */
+  const refuse = (fileId: string, problem: GgufDownloadProblem): false => {
+    failure = { fileId, problem };
+    publish();
+    return false;
+  };
+
+  /**
+   * Opens the transfer at the current step. A device that refuses the call is
+   * the download's failure, not a rejection nobody awaits, and no row may be
+   * left asking to verify.
+   */
   const begin = (download: Active) => {
     const { url, part } = transferStart(download);
-    const progress = onProgress(() => download);
-    download.task = storage.createDownload(url, part, progress);
+    const report = onProgress(() => download);
+    const task = openTransfer(storage, { url, part }, report);
+    if (task === undefined) {
+      fail(download, 'writeFailed');
+      return;
+    }
+    download.task = task;
     publish();
-    void settle(download, download.task.downloadAsync());
+    void settle(download, task.downloadAsync());
   };
 
   /** Every file is whole, sized and hashed; llama.cpp has to read them before they are a model. */
@@ -112,8 +133,15 @@ export function ggufDownloads({
       fail(download, read.problem);
       return;
     }
+    // The record goes in before the download ends. A device that could not take
+    // it holds no model the saved list names, so the files go with the failure.
+    // A refused write is the same refusal the other steps report, so one refusal
+    // reads as one problem rather than as a verdict about free space.
+    if (!save([...models, read.model])) {
+      fail(download, 'writeFailed');
+      return;
+    }
     active = undefined;
-    save([...models, read.model]);
     publish();
   };
 
@@ -146,10 +174,7 @@ export function ggufDownloads({
       return;
     }
     if (!last) {
-      download.done += size;
-      download.step += 1;
-      download.restarted = false;
-      download.attempts = 1;
+      advanceTransfer(download, size);
       begin(download);
       return;
     }
@@ -159,11 +184,7 @@ export function ggufDownloads({
     await verify(download, download.done + size);
   };
 
-  const onProgress = createProgressReporter({
-    storage,
-    activeDownload: () => active,
-    publish,
-  });
+  const onProgress = createProgressReporter({ storage, activeDownload: () => active, publish });
 
   /** A resume the server refused: drop the partial file and download it again from zero. */
   const restart = (download: Active) => {
@@ -172,18 +193,30 @@ export function ggufDownloads({
     begin(download);
   };
 
+  /**
+   * Publishes what the task delivered. Never rejects: its callers start it and do
+   * not await it, and the row must reach a published end state either way.
+   */
   const settle = async (download: Active, operation: Promise<unknown>) => {
     const outcome = await settled(operation);
     if (active !== download) {
       return;
     }
+    // A stop that raced the pause wins: the task may report itself paused, but the
+    // download was already meant to end. A cancel leaves no row behind, and a
+    // low-space stop is the download's failure.
+    const ended = !outcome.ok || outcome.value === null;
+    if (ended && download.stop === 'cancel') {
+      discard(download);
+      publish();
+      return;
+    }
+    if (ended && download.stop === 'space') {
+      fail(download, 'space');
+      return;
+    }
     if (!outcome.ok) {
-      if (download.stop === 'cancel') {
-        discard(download);
-        publish();
-      } else if (download.stop === 'space') {
-        fail(download, 'space');
-      } else if (download.resuming && !download.restarted) {
+      if (download.resuming && !download.restarted) {
         restart(download);
       } else {
         fail(download, 'network');
@@ -191,58 +224,46 @@ export function ggufDownloads({
       return;
     }
     if (outcome.value === null) {
-      // A cancel or a low-space stop that raced the pause wins: the task reports
-      // itself paused, but the download was already meant to end, so it does.
-      if (download.stop === 'cancel') {
-        discard(download);
-        publish();
-        return;
-      }
-      if (download.stop === 'space') {
-        fail(download, 'space');
-        return;
-      }
-      download.phase = 'paused';
-      download.pausing = false;
+      markPaused(download);
       publish();
       return;
     }
-    await complete(download);
+    try {
+      await complete(download);
+    } catch {
+      // A storage call the OS refused at the last step (a size read, a move, a
+      // transfer it would not open) is the download's failure, not a rejection
+      // nobody awaits and a row left asking to verify, and not a verdict about
+      // free space: it reads as its own problem. `publish()` contains its
+      // listeners, so a finished download is never failed here.
+      fail(download, 'writeFailed');
+    }
   };
-
   return {
     load: (): boolean => {
-      try {
-        const index = storage.readIndex();
-        models = keepStoredModels({
-          storage,
-          index,
-          partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
-        });
-        if (modelIndexFullyParsed(index)) {
-          save(models);
-        }
-        if (loadFailed) {
-          loadFailed = false;
-        }
-        publish();
-        return true;
-      } catch {
-        // A storage the OS refused (permission, full disk, I/O) is a state the picker
-        // reports, not a crash: this store is read while rendering.
+      const saved = loadSavedModels({
+        storage,
+        partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
+      });
+      // A storage the OS refused (permission, full disk, I/O) is a state the picker
+      // reports, not a crash: this store is read while rendering. The list the store
+      // already had stays, and a repeat of the same failure publishes nothing new.
+      if (saved.failed) {
         if (!loadFailed) {
           loadFailed = true;
           publish();
         }
         return false;
       }
+      models = saved.models;
+      loadFailed = false;
+      publish();
+      return true;
     },
     snapshot: () => snapshot,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
+      return () => listeners.delete(listener);
     },
     model: (fileId: string) => models.find(model => model.fileId === fileId),
     /** The file of a downloaded model, or undefined when fileId names no stored model. */
@@ -262,27 +283,23 @@ export function ggufDownloads({
         return false;
       }
       const transfers = transfersOf(source, fileId);
-      const expected = expectedBytes(transfers);
       failure = null;
-      if (expected !== undefined && storage.freeBytes() < expected + STORAGE_HEADROOM_BYTES) {
-        failure = { fileId, problem: 'space' };
-        publish();
-        return false;
+      if (!fitsOnDevice(storage, expectedBytes(transfers))) {
+        return refuse(fileId, 'space');
       }
-      for (const transfer of transfers) {
-        // No partial file from an earlier attempt survives.
-        removeQuietly(storage, transfer.part);
-      }
+      // No partial file from an earlier attempt survives.
+      clearPartials(storage, transfers);
       const [first] = transfers;
       if (first === undefined) {
         return false;
       }
       let download: Active | undefined = undefined;
-      const task = storage.createDownload(
-        first.url,
-        first.part,
-        onProgress(() => download)
-      );
+      const report = onProgress(() => download);
+      const task = openTransfer(storage, first, report);
+      if (task === undefined) {
+        // A device that refused the transfer is a reported failure; no row starts.
+        return refuse(fileId, 'writeFailed');
+      }
       download = activeDownload({
         fileId,
         name: source.kind === 'catalog' ? source.model.name : source.name,
@@ -295,8 +312,7 @@ export function ggufDownloads({
       return true;
     },
     pause: (fileId: string) => {
-      const download = active;
-      if (download?.fileId === fileId && requestPause(download)) {
+      if (active?.fileId === fileId && requestPause(active)) {
         publish();
       }
     },
@@ -339,7 +355,12 @@ export function ggufDownloads({
       for (const name of recordFileNames(record)) {
         removeQuietly(storage, name);
       }
-      save(models.filter(model => model.fileId !== fileId));
+      const remaining = models.filter(model => model.fileId !== fileId);
+      if (!save(remaining)) {
+        // The files are gone, so the row goes with them. The saved list still
+        // names the entry, and the next load drops it and rewrites that list.
+        models = remaining;
+      }
       publish();
     },
   };

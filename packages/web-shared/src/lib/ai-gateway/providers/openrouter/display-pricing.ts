@@ -73,22 +73,14 @@ const TIER_FIELDS = [
 ] as const satisfies readonly (readonly [keyof EndpointPricing, PriceKey])[];
 
 function peakPricing(pricing: EndpointPricing, includeLongContext: boolean): EndpointPricing {
-  const {
-    overrides,
-    peak_pricing,
-    prompt_tiers,
-    completion_tiers,
-    input_cache_read_tiers,
-    input_cache_write_tiers,
-    ...prices
-  } = pricing;
-  const tiers = { prompt_tiers, completion_tiers, input_cache_read_tiers, input_cache_write_tiers };
+  const { overrides, peak_pricing, ...prices } = pricing;
   if (
     overrides === undefined &&
     peak_pricing === undefined &&
-    Object.values(tiers).every(tier => tier === undefined)
+    TIER_FIELDS.every(([tiersKey]) => pricing[tiersKey] === undefined)
   )
     return pricing;
+  for (const [tiersKey] of TIER_FIELDS) delete prices[tiersKey];
   let result: EndpointPricing = prices;
   for (const override of overrides ?? []) {
     if (!includeLongContext && isLongContextOverride(override)) continue;
@@ -102,7 +94,7 @@ function peakPricing(pricing: EndpointPricing, includeLongContext: boolean): End
   }
   if (includeLongContext) {
     for (const [tiersKey, priceKey] of TIER_FIELDS) {
-      for (const { cost } of tiers[tiersKey] ?? []) {
+      for (const { cost } of pricing[tiersKey] ?? []) {
         result = maxEndpointPricing(result, { [priceKey]: cost });
       }
     }

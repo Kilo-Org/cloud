@@ -18,7 +18,13 @@ import {
   readKilo2FileReferences,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
-import { NATIVE_SYNC_RETAINED_WORK_BYTES, NATIVE_SYNC_RETAINED_WORK_FRAMES } from './limits';
+import { NativeSnapshotBlobCache } from './native-snapshot-blobs';
+import {
+  NATIVE_SNAPSHOT_BLOB_CACHE_BYTES,
+  NATIVE_SYNC_RETAINED_WORK_BYTES,
+  NATIVE_SYNC_RETAINED_WORK_FRAMES,
+  NATIVE_SYNC_TICKET_MINT_DEADLINE_MS,
+} from './limits';
 
 const tenantSchema = z.object({ type: z.enum(['user', 'organization']), id: z.string() });
 const envelopeSchema = z.object({
@@ -33,6 +39,11 @@ const envelopeSchema = z.object({
 const ticketSchema = z.object({ ticket: z.string(), expiresAt: z.iso.datetime() });
 const grantSchema = z.object({ token: z.string(), expiresAt: z.iso.datetime() });
 const commandStatusSchema = z.enum(['queued', 'delivered', 'expired']);
+const commandStatusRank: Record<z.infer<typeof commandStatusSchema>, number> = {
+  queued: 0,
+  delivered: 1,
+  expired: 2,
+};
 const commandAckSchema = z.object({ commandID: z.string(), status: commandStatusSchema });
 const instanceSchema = z.object({
   instanceID: z.string(),
@@ -117,6 +128,8 @@ export type NativeSessionConnection = {
   rejectQuestion(requestID: string): Promise<string>;
   sendCommand(command: string, args?: string): Promise<string>;
   getCommandStatus(commandID: string): Promise<z.infer<typeof commandStatusSchema>>;
+  /** Retries missing transcript parts over the live socket without reconnecting. */
+  requestRecovery(): Promise<void>;
   clear(): void;
   /** Retry the transcript after a latched snapshot failure with one fresh read cycle. */
   refresh(): void;
@@ -380,6 +393,7 @@ export class NativeSyncClient {
   private readonly fetcher: typeof fetch;
   private readonly socketConstructor: NativeSocketConstructor;
   private readonly grants = new Map<string, Promise<z.infer<typeof grantSchema>>>();
+  private readonly snapshotBlobs = new NativeSnapshotBlobCache(NATIVE_SNAPSHOT_BLOB_CACHE_BYTES);
   constructor(private readonly options: NativeSyncOptions) {
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.socketConstructor = options.WebSocket ?? globalThis.WebSocket;
@@ -551,13 +565,14 @@ export class NativeSyncClient {
       socket.send(JSON.stringify(value));
       return true;
     };
-    const mint = async () =>
+    const mint = async ({ signal }: { signal?: AbortSignal } = {}) =>
       ticketSchema.parse(
         await this.request(
           ticketPath,
           {
             method: 'POST',
             body: JSON.stringify({ role: 'controller' }),
+            ...(signal ? { signal } : {}),
           },
           organizationID
         )
@@ -619,6 +634,9 @@ export class NativeSyncClient {
       let retainedBytes = 0;
       let retainedCount = 0;
       let draining = false;
+      // One `reauth_required` mint per connection; later frames join it instead of starting
+      // another POST or holding the queue.
+      let reauthMint: AbortController | undefined;
       const epoch: SocketEpoch = {
         signal: controller.signal,
         current: () => !stopped && current === generation && !controller.signal.aborted,
@@ -644,18 +662,61 @@ export class NativeSyncClient {
       retire = () => {
         for (const item of queue) epoch.release(item.bytes);
         queue.length = 0;
+        reauthMint?.abort();
         controller.abort();
       };
       greeted = false;
       onConnection('connecting');
       try {
-        const ticket = await mint();
+        const ticket = await mint({ signal: controller.signal });
         if (!epoch.current()) return;
         const url = new URL(path, this.options.baseUrl);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
         const next = new this.socketConstructor(url.href, [`kilo-session-ticket.${ticket.ticket}`]);
         socket = next;
         const sendCurrent = (value: unknown) => epoch.current() && send(value);
+        // Starts the one ticket mint this connection may have in flight and returns at once, so
+        // later queued frames keep draining. The mint races its own deadline because the fetcher
+        // may ignore the abort signal; `retire` cancels it together with the epoch.
+        const requestReauth = () => {
+          if (reauthMint) return;
+          const mintController = new AbortController();
+          reauthMint = mintController;
+          const failure = new NativeSyncError('live_ticket_timeout');
+          // ES2022/Hermes consumers do not provide Promise.withResolvers.
+          const ticket = new Promise<z.infer<typeof ticketSchema>>((resolve, reject) => {
+            const deadline = setTimeout(
+              () => mintController.abort(),
+              NATIVE_SYNC_TICKET_MINT_DEADLINE_MS
+            );
+            const abort = () => {
+              clearTimeout(deadline);
+              reject(failure);
+            };
+            mintController.signal.addEventListener('abort', abort, { once: true });
+            void mint({ signal: mintController.signal }).then(
+              value => {
+                clearTimeout(deadline);
+                mintController.signal.removeEventListener('abort', abort);
+                if (mintController.signal.aborted) reject(failure);
+                else resolve(value);
+              },
+              error => {
+                clearTimeout(deadline);
+                mintController.signal.removeEventListener('abort', abort);
+                reject(error);
+              }
+            );
+          }).finally(() => {
+            if (reauthMint === mintController) reauthMint = undefined;
+          });
+          void ticket.then(
+            value => sendCurrent({ type: 'reauth', ticket: value.ticket }),
+            (error: unknown) => {
+              if (epoch.current()) reconnect(error);
+            }
+          );
+        };
         const drain = async () => {
           if (draining) return;
           draining = true;
@@ -676,11 +737,7 @@ export class NativeSyncClient {
                   onConnection('connected');
                   scheduleRenewal(body);
                 }
-                if (frame.type === 'reauth_required') {
-                  const ticket = await mint();
-                  if (!epoch.current()) return;
-                  sendCurrent({ type: 'reauth', ticket: ticket.ticket });
-                }
+                if (frame.type === 'reauth_required') requestReauth();
                 if (frame.type === 'reauthorized') scheduleRenewal(body);
               }
               await onFrame(frame, sendCurrent, epoch, item.bytes);
@@ -841,7 +898,8 @@ export class NativeSyncClient {
       sessionID,
       signal,
       (route: string, advertisedBytes: number, init?: RequestInit) =>
-        this.requestAsset(route, advertisedBytes, init, organizationID)
+        this.requestAsset(route, advertisedBytes, init, organizationID),
+      this.snapshotBlobs
     );
   }
 
@@ -869,8 +927,11 @@ export class NativeSyncClient {
       requirements: Map<number, NativeRecoveryRequirement>;
       completed: boolean;
       cancel: () => void;
+      /** Settles when this run stops, whether it recovered or gave up. */
+      done: Promise<void>;
     };
     let recovery: Recovery | undefined;
+    let liveEpoch: SocketEpoch | undefined;
     let integrityError: string | undefined;
     let failureError: string | undefined;
     let snapshotFailures = 0;
@@ -889,11 +950,16 @@ export class NativeSyncClient {
       state = { ...state, ...patch, error };
       listener(state);
     };
+    // Status moves only forward: a late POST/poll answer must not regress a frame-reported delivery.
     const recordCommandStatus = (
       commandID: string,
       status: z.infer<typeof commandStatusSchema>
-    ) => {
+    ): z.infer<typeof commandStatusSchema> => {
+      const current = state.commands[commandID];
+      if (current !== undefined && commandStatusRank[current] >= commandStatusRank[status])
+        return current;
       publish({ commands: { ...state.commands, [commandID]: status } });
+      return status;
     };
     const visible = (messages: NativeSnapshotMessage[]) =>
       clearedIDs.size === 0 ? messages : messages.filter(item => !clearedIDs.has(item.message.id));
@@ -986,11 +1052,17 @@ export class NativeSyncClient {
     const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
       if (recovery || !epoch.current() || (!force && !transcriptHasGap(transcriptFacts()))) return;
       const controller = new AbortController();
+      // ES2022/Hermes consumers do not provide Promise.withResolvers.
+      let settle: () => void = () => {};
+      const done = new Promise<void>(resolve => {
+        settle = resolve;
+      });
       const current: Recovery = {
         attempt: 0,
         replay: [],
         requirements: new Map(),
         completed: false,
+        done,
         cancel: () => {
           if (current.replay.length > 0) markGap();
           dispose();
@@ -1007,6 +1079,8 @@ export class NativeSyncClient {
         current.replay.length = 0;
         current.requirements.clear();
         if (recovery === current) recovery = undefined;
+        // A cancelled run still answers its caller; settling twice is a no-op.
+        settle();
       };
       epoch.signal.addEventListener('abort', current.cancel, { once: true });
       void (async () => {
@@ -1132,6 +1206,7 @@ export class NativeSyncClient {
           epoch.signal.removeEventListener('abort', current.cancel);
           if (!current.completed && current.replay.length > 0 && epoch.current()) markGap();
           dispose();
+          settle();
         });
     };
     const connection = this.socket(
@@ -1139,6 +1214,7 @@ export class NativeSyncClient {
       `${path}/live-ticket`,
       organizationID,
       async (frame, send, epoch, bytes) => {
+        liveEpoch = epoch;
         const body = record(frame.body);
         if (frame.channel === 'control') {
           if (frame.type === 'hello') {
@@ -1411,8 +1487,24 @@ export class NativeSyncClient {
             organizationID
           )
         );
-        recordCommandStatus(result.commandID, result.status);
-        return result.status;
+        return recordCommandStatus(result.commandID, result.status);
+      },
+      requestRecovery: async () => {
+        if (closed) return;
+        // Already whole: nothing to fetch, so the retry resolves at once.
+        if (
+          state.session &&
+          !state.messages.some(
+            item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
+          ) &&
+          !state.pendingSnapshotMessageIDs?.length
+        )
+          return;
+        const epoch = liveEpoch;
+        if (!epoch?.current()) return;
+        // Re-enters the recovery loop over the live socket; the socket stays open.
+        recoverIncomplete(epoch, true);
+        await recovery?.done;
       },
       clear: () => {
         for (const item of state.messages) clearedIDs.add(item.message.id);
@@ -1440,6 +1532,9 @@ export class NativeSyncClient {
         closed = true;
         connection.close();
         recovery?.cancel();
+        // The closed session's snapshot history is gone, so its retained attachment bodies
+        // leave with it instead of occupying the shared budget.
+        this.snapshotBlobs.forgetSession(sessionID);
         state = {
           ...state,
           session: undefined,
@@ -1455,6 +1550,7 @@ export class NativeSyncClient {
         clearedIDs.clear();
         remoteState = undefined;
         identity = undefined;
+        liveEpoch = undefined;
       },
     };
   }

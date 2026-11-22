@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -15,16 +14,25 @@ import {
   ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { isContextPickerPresented } from '@/lib/picker-presentation';
 import { PR_PICKER } from '@/lib/picker-routes';
 import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
-import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
+
+/**
+ * The width, in dp, the inline control never gives up: its trailing glyph box
+ * (`size-5`, 17.5 dp at the 14 dp rem) and the row's `gap-1` (3.5 dp). The
+ * label truncates; this part cannot. A header that pins the control beside its
+ * title floors the slot by it (`ScreenHeader` `inlineActionsMinWidth`), so the
+ * chevron never paints outside the slot.
+ */
+export const CONTEXT_CONTROL_INLINE_MIN_DP = 21;
 
 /**
  * The caller supplies its cached memberships; the picker does not fetch data.
@@ -149,13 +157,9 @@ export function ContextControl({
 }>) {
   const context = useOrganization();
   const { token } = useAuth();
-  const trpc = useTRPC();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const organizations = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: token != null,
-  });
+  const organizations = useOrganizationsList();
   const orgs = organizations.data;
   const { openPicker } = useContextPicker(orgs, onSelectionChange, scope ? undefined : value);
   // A caller-supplied `value` (or a read-only scope) is the screen's own

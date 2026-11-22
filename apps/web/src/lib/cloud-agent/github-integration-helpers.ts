@@ -10,9 +10,11 @@ import {
   fetchGitHubRepositories,
   generateGitHubInstallationToken,
   checkExistingFork,
+} from '@/lib/integrations/platforms/github/adapter';
+import {
   GITHUB_LISTING_BUDGET_MESSAGE,
   GitHubListingBudgetExceededError,
-} from '@/lib/integrations/platforms/github/adapter';
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { DEMO_SOURCE_OWNER, DEMO_SOURCE_REPO_NAME } from '@/components/cloud-agent/demo-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {

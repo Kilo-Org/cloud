@@ -4,17 +4,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
 import { FindingDetailsPanel } from '@/components/security-agent/finding-details-panel';
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
+import {
+  type FindingDetailUndelivered,
+  FindingDetailUndeliveredBody,
+} from '@/components/security-agent/finding-detail-undelivered-body';
 import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { IconButton } from '@/components/ui/icon-button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Skeleton } from '@/components/ui/skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentCapability,
@@ -24,7 +26,13 @@ import {
   securityDismissFailureCopy,
   useSecurityDismissDraft,
 } from '@/lib/hooks/use-security-dismiss-draft';
-import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
+import {
+  useRetrySecurityFinding,
+  useSecurityAnalysis,
+  useSecurityFinding,
+} from '@/lib/hooks/use-security-findings';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
@@ -33,7 +41,6 @@ import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
-import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
 
@@ -72,6 +79,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // remediation panels read it — the details tab never does.
   const analysisActive = tab === 'analysis' || tab === 'remediation';
   const analysisQuery = useSecurityAnalysis(scope, findingId, analysisActive);
+  const connectivity = useCommittedConnectivityStatus();
+  const findingRetry = useRetrySecurityFinding(scope, findingId);
   // Bumped once the boundary's recovery refetch settles, so the boundary
   // remounts with clean state over the recovered payload. Bumping it in the
   // same tick would mount the fresh boundary against the still-cached
@@ -167,71 +176,51 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
-  // The not-found, load-failure and loading states share one header with its
-  // subtitle line reserved. The payload names the finding's repository on that
-  // line, and neither a not-found nor a failed read can be known before the
-  // first paint — the first frame is always the loading one — so dropping the
-  // line afterwards would pull the title up out of the position the loading
-  // frame gave it. Only a read that is still running paints the placeholder
-  // bar: a terminal answer, and a failure the retry surface holds, keep the
-  // same line blank so nothing pulses on a finishable screen.
-  const pendingHeader = (
-    <ScreenHeader
-      title={t('securityAgent.findingDetail.title')}
-      reserveSubtitle
-      subtitlePlaceholder={
-        findingQuery.isFetching && !notFound ? (
-          <Skeleton className="h-3.5 w-28 rounded-full" />
-        ) : undefined
-      }
-      showBackButton
-      onBack={handleBack}
-    />
-  );
-
+  // No payload on screen is one state, not four flags: a removed or refused
+  // finding, a first read the online manager paused, a failed read the retry
+  // surface holds, and a read still running. The paused face comes before the
+  // failure hold: a deliberate retry that fails while the connection is still
+  // down stamps that hold, and the plain `refetch` the failure face offers only
+  // re-pauses the read — so the hold must not keep the paused face, whose retry
+  // is the one that can run while the online manager is offline, off the screen.
+  let undelivered: FindingDetailUndelivered | null = null;
   if (notFound) {
+    undelivered = { kind: 'not-found' };
+  } else if (isReadPausedBeforeData({ ...findingQuery, connectivity })) {
+    undelivered = {
+      kind: 'paused',
+      isRetrying: findingRetry.isRetrying,
+      onRetry: () => void findingRetry.retry(),
+    };
+  } else if (showLoadFailure) {
+    undelivered = {
+      kind: 'failed',
+      isRetrying: findingQuery.isFetching,
+      onRetry: () => void findingQuery.refetch(),
+    };
+  }
+  // The loading frame keeps the header's placeholder bar while its read runs;
+  // every other face above holds the line blank.
+  const subtitleRunning = findingQuery.isFetching && !notFound;
+  if (undelivered) {
     return (
-      <View className="flex-1 bg-background">
-        {pendingHeader}
-        <QueryError
-          variant="not-found"
-          title={t('securityAgent.dismiss.notFoundTitle')}
-          message={t('securityAgent.dismiss.notFoundDescription')}
-        />
-      </View>
+      <FindingDetailUndeliveredBody
+        state={undelivered}
+        showSubtitlePlaceholder={subtitleRunning}
+        onBack={handleBack}
+      />
     );
   }
-
-  if (showLoadFailure) {
-    return (
-      <View className="flex-1 bg-background">
-        {pendingHeader}
-        <QueryError
-          message={t('securityAgent.dismiss.couldNotLoad')}
-          onRetry={() => void findingQuery.refetch()}
-          isRetrying={findingQuery.isFetching}
-        />
-      </View>
-    );
-  }
-
-  if (findingQuery.isLoading || !findingQuery.data) {
-    return (
-      <View className="flex-1 bg-background">
-        {pendingHeader}
-        <View className="flex-1" style={sideInsetStyle}>
-          <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
-            <Skeleton className="h-6 w-2/3 rounded" />
-            <Skeleton className="h-4 w-1/3 rounded" />
-            <Skeleton className="h-10 w-full rounded-xl" />
-            <Skeleton className="h-40 w-full rounded-xl" />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
   const finding = findingQuery.data;
+  if (!finding) {
+    return (
+      <FindingDetailUndeliveredBody
+        state={{ kind: 'loading' }}
+        showSubtitlePlaceholder={subtitleRunning}
+        onBack={handleBack}
+      />
+    );
+  }
   const canDismiss = finding.status === 'open' && capability.canManage;
 
   // A pre-accept dismissal failure (no command id) leaves a durable draft; the
@@ -296,12 +285,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         ) : null}
         {/* The three views are the app's one view switch: the shared segmented
             control, which owns the track, the selected pill, the 48pt floor and
-            the selection tick. Its accessible name is the screen's own, so a
-            reader hears the finding's views, not an unnamed radio group. */}
+            the selection tick. Each view swaps the body below it, so the strip
+            reads as tabs. Its accessible name is the screen's own, so a reader
+            hears the finding's views, not an unnamed tab list. */}
         <View className="px-4 pb-2 pt-1">
           <SegmentedControl
             options={viewOptions}
             value={tab}
+            semantics="tabs"
             accessibilityLabel={t('securityAgent.findingDetail.title')}
             onChange={setTab}
           />
@@ -324,6 +315,9 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             analysis={analysisQuery.data}
             isLoading={analysisQuery.isLoading}
             isError={analysisQuery.isError}
+            isPending={analysisQuery.isPending}
+            fetchStatus={analysisQuery.fetchStatus}
+            connectivity={connectivity}
             onRetry={() => void analysisQuery.refetch()}
           />
         </PanelErrorBoundary>
@@ -340,6 +334,9 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             analysis={analysisQuery.data}
             isLoading={analysisQuery.isLoading}
             isError={analysisQuery.isError}
+            isPending={analysisQuery.isPending}
+            fetchStatus={analysisQuery.fetchStatus}
+            connectivity={connectivity}
             onRetry={() => void analysisQuery.refetch()}
           />
         </PanelErrorBoundary>

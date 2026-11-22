@@ -29,6 +29,15 @@ const handoffUrlMock = vi.hoisted(() => vi.fn());
 const openAuthSessionMock = vi.hoisted(() => vi.fn());
 const openBrowserMock = vi.hoisted(() => vi.fn());
 const focusedRoute = vi.hoisted(() => ({ focused: true }));
+const routeParams = vi.hoisted(() => {
+  const params: Record<string, string | undefined> = {};
+  return { params };
+});
+// One object, like the real `useRouter`: a fresh one per render would change
+// the identity an effect keys on. Real `setParams` shallow-merges and cannot
+// delete a key, and the real `useLocalSearchParams` then hides an undefined
+// value, so the router suite's implementation writes the same merge below.
+const routeRouter = vi.hoisted(() => ({ setParams: vi.fn() }));
 const appStateListeners = vi.hoisted(() => new Set<(state: string) => void>());
 const activityKit = vi.hoisted(() => ({ denied: false, available: false, settingsOpen: false }));
 // The widget press sweep pulls the widget layout, expo-widgets, and the
@@ -72,6 +81,11 @@ vi.mock('expo-router', async () => {
       const focused = focusedRoute.focused;
       useEffect(() => (focused ? effect() : undefined), [effect, focused]);
     },
+    useLocalSearchParams: () =>
+      Object.fromEntries(
+        Object.entries(routeParams.params).filter(([, value]) => value !== undefined)
+      ),
+    useRouter: () => routeRouter,
   };
 });
 
@@ -426,6 +440,11 @@ describe('Agents tab header', () => {
     tabHeader.sessions = undefined;
     tabHeader.todos = undefined;
     tabHeader.onChange = undefined;
+    routeParams.params = {};
+    routeRouter.setParams.mockReset();
+    routeRouter.setParams.mockImplementation((params: Record<string, string | undefined>) => {
+      Object.assign(routeParams.params, params);
+    });
   });
 
   it('gives both views the same lightweight view switch', () => {
@@ -434,11 +453,99 @@ describe('Agents tab header', () => {
     expect(tabHeader.sessions).toBeDefined();
     expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
 
+    // A press changes the view the tab shows and nothing else: `view` stays
+    // off the route's params, so no later navigation to the tab inherits it.
     act(() => {
       tabHeader.onChange?.('todos');
     });
+    expect(routeRouter.setParams).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.update(createElement(AgentSessionList));
+    });
     expect(tabHeader.todos).toBeDefined();
     expect((tabHeader.todos as ReactElement<{ value: string }>).props.value).toBe('todos');
+
+    act(() => {
+      tabHeader.onChange?.('sessions');
+    });
+    act(() => {
+      renderer.update(createElement(AgentSessionList));
+    });
+    expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
+    expect(routeRouter.setParams).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens the To-dos list when the route names it, and clears the name', () => {
+    routeParams.params = { view: 'todos' };
+    const renderer = mountRoute();
+
+    expect(tabHeader.todos).toBeDefined();
+    expect((tabHeader.todos as ReactElement<{ value: string }>).props.value).toBe('todos');
+    expect(tabHeader.sessions).toBeUndefined();
+    // The link's name is consumed: it must not stay on the route for the next
+    // navigation to inherit.
+    expect(routeRouter.setParams).toHaveBeenCalledExactlyOnceWith({ view: undefined });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('applies a second link that arrives while the tab is mounted', () => {
+    routeParams.params = { view: 'todos' };
+    const renderer = mountRoute();
+    expect(tabHeader.todos).toBeDefined();
+
+    act(() => {
+      tabHeader.onChange?.('sessions');
+    });
+    act(() => {
+      renderer.update(createElement(AgentSessionList));
+    });
+    expect(tabHeader.sessions).toBeDefined();
+
+    // A new arrival carrying `view=todos` is a new answer, not the one the
+    // first link gave.
+    routeParams.params = { view: 'todos' };
+    act(() => {
+      renderer.update(createElement(AgentSessionList));
+    });
+    expect((tabHeader.todos as ReactElement<{ value: string }>).props.value).toBe('todos');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows the sessions list when a navigation leaves a stale view parameter', () => {
+    // The state a bare-string navigation used to inherit: the tab was left on
+    // To-dos and a `view` written by the segment was still on the route. The
+    // segment writes nothing now, so the arrival carries no name and the tab
+    // reads its own default.
+    routeParams.params = {};
+    const renderer = mountRoute();
+
+    expect(tabHeader.sessions).toBeDefined();
+    expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
+    expect(routeRouter.setParams).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens the Sessions list for a view it does not know', () => {
+    routeParams.params = { view: 'not-a-view' };
+    const renderer = mountRoute();
+
+    expect(tabHeader.sessions).toBeDefined();
+    expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
+    expect(tabHeader.todos).toBeUndefined();
 
     act(() => {
       renderer.unmount();

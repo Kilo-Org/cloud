@@ -18,8 +18,10 @@ const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+  connectivity: 'online' as string,
   query: {
     data: undefined as AgentSource[] | undefined,
+    error: undefined as unknown,
     isError: false,
     isPending: false,
     isRefetching: false,
@@ -41,6 +43,9 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => h.permission,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   View: 'View',
@@ -587,6 +592,69 @@ describe('ProfileAgentsScreen agent cap', () => {
     });
 
     expect(openSheet(renderer).props.saveFailure).toEqual({ kind: 'refused' });
+
+    unmount();
+  });
+});
+
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+
+describe('ProfileAgentsScreen load errors', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.permission = 'allowed';
+    h.connectivity = 'online';
+    Object.assign(h.query, {
+      data: undefined,
+      error: undefined,
+      isError: false,
+      isPending: false,
+      isRefetching: false,
+    });
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = nodesOfType(renderer, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('permission');
+    expect(queryError?.title).toBeUndefined();
+    expect(queryError?.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = nodesOfType(renderer, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('server');
+    expect(queryError?.title).toBe("Couldn't load profiles");
+    expect(typeof queryError?.onRetry).toBe('function');
+    act(() => {
+      queryError?.onRetry?.();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
     unmount();
   });

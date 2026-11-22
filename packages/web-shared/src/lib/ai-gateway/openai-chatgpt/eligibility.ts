@@ -1,7 +1,6 @@
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER, withTraceabilityMetadata } from './routing';
 import { isOpenAiModelServed } from './served-models';
-import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
+import { OPENAI_CHATGPT_API_URL, readOpenAiChatGptPartnerKey } from './upstream';
 
 /**
  * Detection for an account OpenAI refuses to share a plan for.
@@ -55,11 +54,11 @@ const PROBE_TIMEOUT_MS = 5_000;
  * check in the gateway still catches a refusal later.
  */
 export async function probeOpenAiChatGptEligibility(accessToken: string): Promise<boolean> {
-  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
-  if (apiKey.trim() === '') return true;
+  const apiKey = readOpenAiChatGptPartnerKey();
+  if (apiKey === null) return true;
 
   try {
-    if (!(await isOpenAiModelServed(apiKey, PROBE_MODEL))) return true;
+    if (!(await isOpenAiModelServed(PROBE_MODEL))) return true;
 
     const response = await fetch(`${OPENAI_CHATGPT_API_URL}/responses`, {
       method: 'POST',

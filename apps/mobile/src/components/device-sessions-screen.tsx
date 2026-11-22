@@ -13,6 +13,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowIconAction } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
@@ -27,6 +29,7 @@ import {
   sortDeviceSessions,
 } from '@/lib/device-sessions';
 import { formatDate } from '@/lib/format';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
@@ -130,6 +133,10 @@ export function DeviceSessionsScreen() {
     data,
   });
   const sessions = sortDeviceSessions(data ?? []);
+  // A session revoked elsewhere leaves this list stale until it refetches, so
+  // a pull asks the server again.
+  const [refreshing, onRefresh] = useManualRefresh(refetch, t('common.couldNotRefresh'));
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
 
   const revokeSession = useMutation(
     trpc.user.revokeDeviceSessionById.mutationOptions({
@@ -204,6 +211,7 @@ export function DeviceSessionsScreen() {
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
+        refreshControl={refreshControl}
       >
         {state === 'loading' ? (
           <RowGroup leadingTile>
@@ -238,6 +246,15 @@ export function DeviceSessionsScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.deviceSessions')} backFallback={PROFILE_TAB_HREF} />
+      {/* The pull's reduced-motion band sits above the scroller, never inside
+          it: the scroller's content container carries `SCREEN_BODY_CLASS`, whose
+          `gap-6` would push the first row down even with motion on, and a band
+          in flow would also scroll away with the rows. This column has no gap,
+          so under motion the band's empty box changes nothing. The error and
+          empty branches render no pull, and keep no band. */}
+      {state !== 'error' && state !== 'empty' ? (
+        <RefreshProgress refreshControl={refreshControl} />
+      ) : null}
       {body}
       {dialog}
     </View>

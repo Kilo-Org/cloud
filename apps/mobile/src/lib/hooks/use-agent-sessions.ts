@@ -16,7 +16,11 @@ import {
   filterActiveSessionsByOrganization,
   selectActiveExclusionIds,
 } from '@/lib/active-sessions-live';
-import { collectSearchPages, collectUnfilteredPages } from '@/lib/agent-session-pages';
+import {
+  collectSearchPages,
+  collectUnfilteredPages,
+  sessionPagesAtRetentionBound,
+} from '@/lib/agent-session-pages';
 import {
   buildAgentSessionSearchQueryOptions,
   buildStoredSessionsQueryOptions,
@@ -117,6 +121,9 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const query = useInfiniteQuery(buildAgentSessionSearchQueryOptions(trpc, options));
 
   const sessions = useMemo(() => collectSearchPages(query.data?.pages), [query.data]);
+  // The search list shares the stored history's guarded cursor, so the last
+  // page's own cursor says whether the bound cut it.
+  const isRetentionLimited = sessionPagesAtRetentionBound(query.data?.pages);
   // The sections are calendar days of the device's own zone, so they read the
   // same shared clock the row labels do (see `useRelativeTimeNow`): a heading
   // cannot outlive a zone change or a midnight the rows already followed. The
@@ -143,6 +150,7 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
     isError: query.isError,
     refetch: query.refetch,
     hasNextPage: query.hasNextPage,
+    isRetentionLimited,
     isFetchingNextPage: query.isFetchingNextPage,
     isFetchNextPageError: query.isFetchNextPageError,
     isPlaceholderData: query.isPlaceholderData,
@@ -217,6 +225,9 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // load (the cursor follows the selected sort field). Dedupe by session_id
   // using the shared collection helper.
   const storedSessions = useMemo(() => collectUnfilteredPages(stored.data?.pages), [stored.data]);
+  // `hasNextPage` folds the bound into the server's answer, so the last loaded
+  // page's own cursor is what tells a truncated history from a finished one.
+  const storedAtRetentionBound = sessionPagesAtRetentionBound(stored.data?.pages);
 
   // The server already filters by context; this covers the window where a WS
   // heartbeat has introduced a row the client has not enriched yet (see
@@ -289,11 +300,17 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     if (departedId) {
       scheduleCacheMaintenance(() => {
         if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-          void reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+          // Through the coordinator, like every other stored reconcile. Naming
+          // the entry directly joins whatever fetch is already in flight on
+          // the same infinite query instead of queueing behind it, so a page-one
+          // reconcile raised during a next-page fetch would never run and the
+          // just-terminated session would not reach history until a later
+          // refresh.
+          void storedReconcile();
         }
       });
     }
-  }, [active.canRead, activeSessionIds, queryClient, trpc]);
+  }, [active.canRead, activeSessionIds, storedReconcile]);
 
   // App-foreground edge. The native window-focus refetch is off (see the
   // builder), so the hook owns the OS-foreground refresh and reconciles page
@@ -362,6 +379,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // "nothing live" must treat paused as unknown, not as settled empty.
     activeIsPaused: active.isPaused,
     hasNextPage: stored.hasNextPage,
+    storedAtRetentionBound,
     isFetchingNextPage: stored.isFetchingNextPage,
     // The last next-page attempt failed. The loaded rows stay, so the footer
     // owns a Retry that calls `fetchNextPage`, and the end-reach gate must stop

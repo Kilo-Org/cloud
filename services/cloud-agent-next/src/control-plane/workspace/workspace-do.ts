@@ -44,6 +44,16 @@ const UNADOPTABLE_RECHECK_MS = 10 * 60_000;
 const CHILD_PREFIX = 'child:';
 
 const childSessionIdSchema = workspaceSessionIdSchema;
+
+/** A session id this Worker allocated; an RPC caller never chooses one. */
+function serverAllocatedSessionId(candidate: string): string {
+  const parsed = childSessionIdSchema.safeParse(candidate);
+  if (!parsed.success) {
+    throw new Error('Cloud Agent delegation requires a server-allocated session id');
+  }
+  return parsed.data;
+}
+
 const childEntrySchema = z
   .object({
     initialMessageId: z.string().min(1).optional(),
@@ -164,11 +174,12 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     childSessionId: string;
     stackOnWorktreeId?: string;
   }): Promise<{ token: string; seal: string }> {
+    const childSessionId = serverAllocatedSessionId(input.childSessionId);
     const record = (await this.liveAuthority(input.authority)).record;
     if (input.stackOnWorktreeId !== undefined) {
       await this.assertStackTarget(input.authority, input.stackOnWorktreeId);
     }
-    return this.delegate(record, input.childSessionId, input.authority);
+    return this.delegate(record, childSessionId, input.authority);
   }
 
   async assertStackTarget(authority: CloudAgentAuthority, worktreeId: string): Promise<void> {
@@ -214,12 +225,13 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     childSessionId: string;
     chatSessionId: string;
   }): Promise<{ token: string; seal: string }> {
+    const chatSessionId = serverAllocatedSessionId(input.chatSessionId);
     const { record } = await this.liveAuthority(input.authority);
     if (
       !(await this.readChildMetadata(input.authority, input.childSessionId))?.workspace?.worktreeId
     )
       throw denied();
-    return this.delegate(record, input.chatSessionId, input.authority);
+    return this.delegate(record, chatSessionId, input.authority);
   }
 
   /** Delegates the workspace authority to a new chat in this workspace (a callback chat). */
@@ -229,11 +241,12 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     worktreeId: string | null;
     organizationId: string | null;
   }> {
+    const chatSessionId = serverAllocatedSessionId(input.chatSessionId);
     const record = await this.record();
     if (record === undefined || workspaceAuthorityUnavailableReason(record, Date.now())) {
       throw denied();
     }
-    const delegated = await this.delegate(record, input.chatSessionId);
+    const delegated = await this.delegate(record, chatSessionId);
     return { ...delegated, worktreeId: record.worktreeId, organizationId: record.organizationId };
   }
 

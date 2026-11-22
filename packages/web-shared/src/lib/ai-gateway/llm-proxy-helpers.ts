@@ -38,6 +38,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
 import {
+  isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
@@ -620,12 +621,12 @@ export function chatGptReconnectResponse(message: string) {
 /**
  * Returned when the owner's Claude billing connection cannot bill. The request
  * was refused before any upstream call, and it must not be served on another
- * payer's allowance. The owner is told what happened and what an admin can do.
+ * payer's allowance. Each caller-supplied message owns its complete text,
+ * including any manage-connection pointer.
  */
 export function claudeBillingUnavailableResponse(message: string, retryable = false) {
-  const error = `${message} Manage the connection at ${APP_URL}/byok.`;
   return NextResponse.json(
-    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { error: message, error_type: ProxyErrorType.byok_error, message },
     { status: retryable ? 503 : 400, headers: retryable ? { 'Retry-After': '1' } : undefined }
   );
 }
@@ -795,6 +796,18 @@ export function storeAndPreviousResponseIdIsNotSupported() {
     { error, error_type: ProxyErrorType.unsupported_field, message: error },
     { status: 400 }
   );
+}
+
+/** The concrete model an auto model request was served by; absent on direct model responses. */
+export const RESOLVED_MODEL_HEADER = 'x-kilo-resolved-model';
+
+export function setResolvedModelHeader<T extends Response>(
+  response: T,
+  resolvedModel: string,
+  requestedModel: string
+): T {
+  if (isKiloAutoModel(requestedModel)) response.headers.set(RESOLVED_MODEL_HEADER, resolvedModel);
+  return response;
 }
 
 export function getOutputHeaders(response: Response) {

@@ -997,6 +997,63 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
+  it('inherits the hosted repository set and rejects a replaced member on reconciliation', async () => {
+    const metadata = sourceMetadataWithPreset('vercel-small');
+    const integrationId = '123e4567-e89b-42d3-a456-426614174022';
+    const hostedGitHubRepositories = {
+      integrationId,
+      primary: { id: 101, fullName: 'acme/repo' },
+      additional: [{ id: 102, fullName: 'acme/docs' }],
+    };
+    metadata.repository = {
+      type: 'github',
+      repo: 'Acme/Repo',
+      upstreamBranch: 'feature/shared',
+      githubIntegrationId: integrationId,
+    };
+    metadata.hostedGitHubRepositories = hostedGitHubRepositories;
+    metadata.workspace = { ...metadata.workspace, generatedBranchName: 'kilo/quiet-river-abc' };
+    const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+      ownershipResults: [[source], [source]],
+    });
+    destinationStub.registerSessionFromMetadata.mockRejectedValueOnce(
+      new Error('registration response lost')
+    );
+    await expect(caller.createWorktreeChat(input)).rejects.toThrow('registration response lost');
+    expect(destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0]?.metadata).toMatchObject({
+      hostedGitHubRepositories,
+      workspace: {
+        worktreeId: WORKTREE_ID,
+        branchName: 'feature/shared',
+        generatedBranchName: 'kilo/quiet-river-abc',
+      },
+    });
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    const registered = destinationMetadata(metadata);
+    registered.hostedGitHubRepositories = {
+      ...hostedGitHubRepositories,
+      additional: [{ id: 103, fullName: 'acme/docs' }],
+    };
+    destinationStub.getMetadata.mockResolvedValueOnce(registered);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        organization_id: ORGANIZATION_ID,
+        status: 'reconcile_pending',
+        canonical_result: progress,
+      }),
+    });
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
   it('refuses a ledger admission stored in another organization scope', async () => {
     const metadata = sourceMetadataWithPreset('vercel-small');
     const { caller, input, destinationStub } = fixture({

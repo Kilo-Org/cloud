@@ -4,7 +4,7 @@ import {
   organizationWorkflowGitHubConnectionSql,
   organizationWorkflowGitHubPreferenceSql,
 } from '@kilocode/db';
-import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
+import { eq, and, or, isNull, inArray, asc, desc, sql, ne } from 'drizzle-orm';
 import type {
   GitHubRequester,
   IntegrationPermissions,
@@ -18,11 +18,18 @@ import { isPlatformIntegrationHealthy, platformIntegrationHealthSql } from '../c
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 import { canOrganizationUseMultipleGitHubInstallations } from '../github/multiple-installations';
+import { ownerFromIntegration } from '../core/owner';
 import {
   effectiveAppTypeCondition,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from './predicates';
+import { lockGitHubInstallationIdentity } from './github-installations';
+import {
+  cancelActiveCodeReviewsForIntegration,
+  settleCancelledReviews,
+  type CancelledReviewRow,
+} from '@/lib/code-reviews/db/code-reviews';
 import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-errors';
 
 /**
@@ -369,12 +376,12 @@ export async function upsertPlatformIntegration(data: {
         platform_integrations.platform_installation_id,
       ],
       set: {
+        ...reactivatedIntegrationSetSql(),
         platform_account_id: sql`EXCLUDED.platform_account_id`,
         platform_account_login: sql`EXCLUDED.platform_account_login`,
         permissions: sql`EXCLUDED.permissions`,
         scopes: sql`EXCLUDED.scopes`,
         repository_access: sql`EXCLUDED.repository_access`,
-        integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN EXCLUDED.integration_status ELSE ${platform_integrations.integration_status} END`,
         repositories: sql`EXCLUDED.repositories`,
         auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
         auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
@@ -687,19 +694,61 @@ export async function deleteIntegration(
   );
 }
 
+/**
+ * Deletes every association of one GitHub installation and app type.
+ *
+ * The cancellation and the delete run in one transaction, under the
+ * installation advisory lock: the review foreign key is `ON DELETE SET NULL`,
+ * not cascade, so a queued or running review left behind would survive the
+ * delete with its dispatch reservation and never reach a terminal status. Every
+ * selected association is cancelled, including a disconnected one, where the
+ * cancellation matches nothing. The ledger settle waits for the commit — see
+ * the `settleCancelledReviews` doc comment for why.
+ */
 export async function deleteGitHubInstallationRecords(
   installationId: string,
   githubAppType: GitHubAppType
 ) {
-  await db
-    .delete(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.platform_installation_id, installationId),
-        effectiveAppTypeCondition(githubAppType)
-      )
-    );
+  const cancelledReviews = await db.transaction(async tx => {
+    await lockGitHubInstallationIdentity(tx, githubAppType, installationId);
+    const associations = await tx
+      .select({
+        id: platform_integrations.id,
+        owned_by_user_id: platform_integrations.owned_by_user_id,
+        owned_by_organization_id: platform_integrations.owned_by_organization_id,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.platform_installation_id, installationId),
+          effectiveAppTypeCondition(githubAppType)
+        )
+      );
+    const cancelled: CancelledReviewRow[] = [];
+    for (const association of associations) {
+      cancelled.push(
+        ...(await cancelActiveCodeReviewsForIntegration(
+          {
+            owner: ownerFromIntegration(association),
+            platform: PLATFORM.GITHUB,
+            integrationId: association.id,
+          },
+          tx
+        ))
+      );
+    }
+    if (associations.length > 0) {
+      await tx.delete(platform_integrations).where(
+        inArray(
+          platform_integrations.id,
+          associations.map(association => association.id)
+        )
+      );
+    }
+    return cancelled;
+  });
+  await settleCancelledReviews(cancelledReviews, 'user_cancelled');
 }
 
 /**
@@ -1034,6 +1083,8 @@ export async function autoCompleteInstallation(
         platform_account_login: installationData.account_login,
         repository_access: installationData.repository_selection,
         integration_status: INTEGRATION_STATUS.ACTIVE,
+        suspended_at: null,
+        suspended_by: null,
         permissions: installationData.permissions as IntegrationPermissions,
         scopes: installationData.events,
         installed_at: new Date(installationData.created_at).toISOString(),
@@ -1241,6 +1292,40 @@ export async function unsuspendIntegrationForOwner(
     .where(and(...conditions));
 }
 
+/**
+ * The status and suspension columns a writer stores on an existing association
+ * when it records a fresh authorization for it.
+ *
+ * An association is either active with no suspension recorded, or it is
+ * suspended; `isPlatformIntegrationSuspended` reads the status or `suspended_at`
+ * and the health predicates require both to agree. This expression writes the
+ * three columns as one state, so a row always answers the same question the same
+ * way.
+ *
+ * A writer that records a fresh authorization records the association as active
+ * with no suspension: `integration_status`, `suspended_at` and `suspended_by`
+ * move together, so a row that answers active never carries a suspension record.
+ * Slack, Linear and GitLab already record the same state on re-authorization,
+ * and one writer operation keeps every platform's answer identical.
+ *
+ * A locally disconnected association keeps its status and its suspension: that
+ * record is what marks the disconnect, and the connect path clears
+ * `github_disconnected_at` in the same write as it reactivates the association.
+ * For GitHub, the provider's own lifecycle is not carried here: it is recorded
+ * on the canonical installation row by `observeGitHubInstallationLifecycle`,
+ * runtime authorization reads it there as well, and
+ * `connectVerifiedGitHubInstallation` refuses to write while that installation is
+ * suspended.
+ */
+export function reactivatedIntegrationSetSql() {
+  const reactivated = sql`${platform_integrations.github_disconnected_at} IS NULL`;
+  return {
+    integration_status: sql`CASE WHEN ${reactivated} THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
+    suspended_at: sql`CASE WHEN ${reactivated} THEN NULL ELSE ${platform_integrations.suspended_at} END`,
+    suspended_by: sql`CASE WHEN ${reactivated} THEN NULL ELSE ${platform_integrations.suspended_by} END`,
+  };
+}
+
 export type UpsertPlatformIntegrationResult =
   | { ok: true }
   | {
@@ -1398,13 +1483,13 @@ export async function upsertPlatformIntegrationForOwner(
       await tx
         .update(platform_integrations)
         .set({
+          ...reactivatedIntegrationSetSql(),
           platform_account_id: values.platform_account_id,
           github_connection_role: existing.github_connection_role ?? 'workflow',
           platform_account_login: values.platform_account_login,
           permissions: values.permissions,
           scopes: values.scopes,
           repository_access: values.repository_access,
-          integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
           repositories: values.repositories,
           repositories_synced_at: values.repositories_synced_at,
           github_app_type: appType,
@@ -1438,12 +1523,12 @@ export async function upsertPlatformIntegrationForOwner(
     await db
       .update(platform_integrations)
       .set({
+        ...reactivatedIntegrationSetSql(),
         platform_account_id: values.platform_account_id,
         platform_account_login: values.platform_account_login,
         permissions: values.permissions,
         scopes: values.scopes,
         repository_access: values.repository_access,
-        integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
         repositories: values.repositories,
         repositories_synced_at: values.repositories_synced_at,
         github_app_type: appType,

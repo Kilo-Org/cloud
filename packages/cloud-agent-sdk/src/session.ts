@@ -173,7 +173,12 @@ type CloudAgentSessionTransport = {
     | undefined;
   api?: CloudAgentApi | undefined;
 
-  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
+  fetchSnapshot?:
+    | ((
+        kiloSessionId: KiloSessionId,
+        options?: { signal?: AbortSignal }
+      ) => Promise<SessionSnapshot>)
+    | undefined;
   /**
    * Page-aware root snapshot fetch. The transport uses this for its initial
    * bounded read and any reconnect snapshot replays. Once per attach, with the
@@ -182,12 +187,16 @@ type CloudAgentSessionTransport = {
    * fire that callback so the user's already-advanced older-messages cursor
    * isn't reset to the latest 50.
    *
+   * The live transport aborts `signal` once it stops gating live delivery on
+   * the read (deadline, teardown, or a full event buffer); a provider that
+   * ignores it still has its late result dropped.
+   *
    * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?:
     | ((
         kiloSessionId: KiloSessionId,
-        options: { cursor?: string }
+        options: { cursor?: string; signal?: AbortSignal }
       ) => Promise<SessionSnapshotPageOutcome | null>)
     | undefined;
   fetchCloudSnapshotPage?:

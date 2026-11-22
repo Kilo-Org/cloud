@@ -469,4 +469,36 @@ describe('Cloud Agent session scope v2 header codec', () => {
       })
     ).toEqual({ kind: 'invalid' });
   });
+
+  it('rejects more distinct member roots than the contract allows through the schema cap', () => {
+    const roots = Array.from({ length: 33 }, (_, index) => {
+      const suffix = index.toString(36).padStart(26, '0');
+      return index === 0 ? memberRootId : `ses_${suffix}`;
+    });
+    expect(new Set(roots).size).toBe(33);
+    expect(
+      parseCloudAgentSessionScopeV2Headers({
+        worktreeId,
+        expectedOrganization: organizationId,
+        memberRootKiloSessionIds: roots.join(','),
+      })
+    ).toEqual({ kind: 'invalid' });
+  });
+
+  it('accepts exactly the maximum distinct member roots', () => {
+    const roots = Array.from({ length: 32 }, (_, index) => {
+      const suffix = index.toString(36).padStart(26, '0');
+      return index === 0 ? memberRootId : `ses_${suffix}`;
+    });
+    expect(new Set(roots).size).toBe(32);
+    const parsed = parseCloudAgentSessionScopeV2Headers({
+      worktreeId,
+      expectedOrganization: organizationId,
+      memberRootKiloSessionIds: roots.join(','),
+    });
+    expect(parsed.kind).toBe('ok');
+    if (parsed.kind === 'ok') {
+      expect(parsed.scope.memberRootKiloSessionIds).toEqual(roots);
+    }
+  });
 });

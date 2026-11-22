@@ -556,6 +556,58 @@ describe('createNetworkErrorFetch', () => {
     expect(JSON.stringify(event?.fingerprint)).not.toContain('access_token');
   });
 
+  it('(d4) leaves a breadcrumb and no event for a 403 carrying the blocked-account marker', async () => {
+    // The blocked-account refusal is the state the app renders deliberately
+    // (the blocked-account explanation): before the dedicated error shape it
+    // answered 401, which EXPECTED_HTTP_STATUSES already exempted. A 403
+    // without the marker still reports — see (d6).
+    const response = Response.json(
+      {
+        error: {
+          code: -32_600,
+          data: { code: 'FORBIDDEN', httpStatus: 403, accountBlocked: true },
+        },
+      },
+      { status: 403, statusText: 'Forbidden' }
+    );
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      readResponseError: readTrpcResponseError,
+    });
+
+    const result = await wrapped('https://example.com/api/trpc/user.getMe');
+
+    expect(result).toBe(response);
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      category: 'network',
+      message: 'GET /api/trpc/user.getMe -> 403',
+    });
+  });
+
+  it('(d6) still reports a 403 whose body names no blocked-account marker', async () => {
+    const response = Response.json(
+      { error: { code: -32_600, data: { code: 'FORBIDDEN', httpStatus: 403 } } },
+      { status: 403, statusText: 'Forbidden' }
+    );
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      readResponseError: readTrpcResponseError,
+    });
+
+    await wrapped('https://example.com/api/trpc/session.list');
+
+    expect(events).toHaveLength(1);
+    expect(breadcrumbs).toHaveLength(0);
+    expect(reportedEvent()?.fingerprint).toEqual([
+      'network-error',
+      'trpc',
+      'session.list',
+      'http.403',
+    ]);
+  });
+
   it('(e) does not report a 200 response', async () => {
     const response = new Response('ok', { status: 200 });
     const wrapped = createNetworkErrorFetch(resolvingFetch(response));
@@ -1171,6 +1223,138 @@ describe('createNetworkErrorFetch status policy', () => {
       ['network-error', 'fetch', '/api/auth/native/exchange', 'http.400'],
     ]);
     expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('records one breadcrumb for repeated expected answers of one endpoint', async () => {
+    // A screen polling a refused endpoint gets the same answer on every
+    // request; only the first one leaves a breadcrumb. The wrapper is built
+    // once and called repeatedly, as a polling screen does.
+    const wrapped = createNetworkErrorFetch(resolvingFetch(new Response('', { status: 404 })));
+    await Promise.all(
+      Array.from({ length: 4 }, () =>
+        wrapped('https://example.com/api/trpc/user.getMe?batch=1', { method: 'POST' })
+      )
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]?.message).toBe('POST /api/trpc/user.getMe -> 404');
+  });
+
+  it('records a breadcrumb for each expected status of one endpoint', async () => {
+    // The status is part of the fingerprint, so a 429 and a 404 are two
+    // answers, not a repeat.
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      new Response('', { status: 429 })
+    );
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      new Response('', { status: 404 })
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/user.getMe -> 429',
+      'POST /api/trpc/user.getMe -> 404',
+    ]);
+  });
+
+  it('leaves the event claim unspent for an expected answer', async () => {
+    // The screen saw the 404 first; the later real failure for the same
+    // endpoint still files its event.
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 500 }));
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'user.getMe', 'http.500'],
+    ]);
+    expect(breadcrumbs).toHaveLength(1);
+  });
+
+  it('leaves the claim unspent when the expected answer shares its fingerprint with a later report', async () => {
+    // The 404 and the 500 above are different fingerprints, so they cannot show
+    // that the expected answer left the claim alone. Here both answers are one
+    // fingerprint: the same URL, source, status and outcome. A caller's own
+    // expected-answer rule marks the first; the same answer without that rule
+    // must still file the single event.
+    const url = 'https://example.com/mcp';
+    const wrappedExpected = createNetworkErrorFetch(
+      resolvingFetch(new Response('', { status: 405 })),
+      {
+        isExpectedAnswer: () => true,
+      }
+    );
+    await wrappedExpected(url, { method: 'GET' });
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+
+    // The same fingerprint, this time a real answer: the event must still file.
+    // This is the decisive step — a latch that spent the claim would record
+    // nothing here.
+    const wrappedReal = createNetworkErrorFetch(resolvingFetch(new Response('', { status: 405 })));
+    await wrappedReal(url, { method: 'GET' });
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'fetch', '/mcp', 'http.405'],
+    ]);
+    // The first report leaves no breadcrumb; the trail already holds the
+    // expected answer's one.
+    expect(breadcrumbs).toHaveLength(1);
+
+    // The next repeat leaves the single breadcrumb the report claim allows, and
+    // the one after that records nothing.
+    await wrappedReal(url, { method: 'GET' });
+    expect(breadcrumbs).toHaveLength(2);
+    await wrappedReal(url, { method: 'GET' });
+    expect(breadcrumbs).toHaveLength(2);
+  });
+
+  it('bounds the expected-answer latch and refreshes a fingerprint that keeps answering', async () => {
+    const answer = (index: number) =>
+      respond(`https://example.com/v1/files/${String(index)}`, new Response('', { status: 404 }));
+    const breadcrumbsFor = (index: number) =>
+      breadcrumbs.filter(
+        breadcrumb => breadcrumb.message === `POST /v1/files/${String(index)} -> 404`
+      ).length;
+
+    // A dynamic path segment forces one fingerprint per object id, as in the
+    // report claim; the latch remembers the 200 most recently answered ones.
+    // The calls must run in order because the order is what the cap evicts by,
+    // so they cannot be parallelised.
+    for (let index = 0; index < 200; index += 1) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the eviction order under test is the call order
+      await answer(index);
+    }
+    expect(breadcrumbs).toHaveLength(200);
+
+    // The still-answering fingerprint is refreshed, so the next new path
+    // releases another one instead of it.
+    await answer(0);
+    await answer(200);
+    await answer(0);
+
+    expect(breadcrumbs).toHaveLength(201);
+    expect(breadcrumbsFor(0)).toBe(1);
+    expect(breadcrumbs.at(-1)?.message).toBe('POST /v1/files/200 -> 404');
+
+    // A released fingerprint records once more instead of the map growing.
+    await answer(1);
+    expect(breadcrumbs).toHaveLength(202);
+    expect(breadcrumbs.at(-1)?.message).toBe('POST /v1/files/1 -> 404');
+  });
+
+  it('clears the expected-answer latch in `resetNetworkErrorReports`', async () => {
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+    resetNetworkErrorReports();
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+
+    expect(breadcrumbs).toHaveLength(2);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/user.getMe -> 404',
+      'POST /api/trpc/user.getMe -> 404',
+    ]);
   });
 });
 

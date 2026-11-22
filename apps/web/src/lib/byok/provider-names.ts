@@ -7,6 +7,10 @@ import {
   type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import {
+  OPENAI_CHATGPT_PROVIDER_ID,
+  OPENAI_CHATGPT_PROVIDER_NAME,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 
 // Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
 // clause forces new entries here whenever a provider is added to
@@ -101,7 +105,20 @@ export const ADD_BYOK_PROVIDERS: readonly ByokProviderOption[] = BYOK_PROVIDERS.
   provider => !isLegacyOnlyByokProviderId(provider.id)
 );
 
+/**
+ * Keys the table stores that no list offers. Their own surface owns them, so
+ * they never reach a picker, but a reader who is shown one must still get a
+ * name instead of the row's raw id.
+ */
+const STORED_ONLY_BYOK_PROVIDER_NAMES = new Map<string, string>([
+  [OPENAI_CHATGPT_PROVIDER_ID, OPENAI_CHATGPT_PROVIDER_NAME],
+]);
+
 export function getByokProviderDisplayName(providerId: string): string {
+  const storedOnlyName = STORED_ONLY_BYOK_PROVIDER_NAMES.get(providerId);
+  if (storedOnlyName !== undefined) {
+    return storedOnlyName;
+  }
   const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
   return provider?.name || providerId;
 }

@@ -123,6 +123,8 @@ vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
+  useRetrySecurityAgentConfig: () => ({ retry: vi.fn(), isRetrying: false }),
+  useRetrySecurityAgentSettings: () => ({ retry: vi.fn(), isRetrying: false }),
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));

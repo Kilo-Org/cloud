@@ -7,6 +7,8 @@ export * from './public-worktree-projection';
 export * from './session-share';
 export * from './message-id';
 export * from './kilo-session-id';
+export * from './token-usage';
 export * from './cloud-agent-billing';
 export * from './kilo2-conversation';
 export * from './background-activity';
+export * from './agent-board';

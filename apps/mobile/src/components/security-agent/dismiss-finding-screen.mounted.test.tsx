@@ -74,15 +74,23 @@ const capability = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
 }));
 const finding = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   error: null as unknown,
   data: undefined as MockedFinding | undefined,
   refetch: vi.fn(),
+}));
+const findingRetry = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
 }));
 const pillGroup = vi.hoisted(() => ({
   onChange: (() => undefined) as (value: string) => void,
@@ -97,6 +105,7 @@ const dismissDraft = vi.hoisted(() => ({
 // header props the screen passes instead of looking for an inline button.
 const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
+const keyboard = vi.hoisted(() => ({ height: 0 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -113,6 +122,11 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: sideInsets.left, right: sideInsets.right }),
 }));
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: (select: (state: { height: number }) => number) =>
+    select({ height: keyboard.height }),
+}));
+vi.mock('@/lib/tab-bar-clearance', () => ({ useEffectiveTabBarHeight: () => 0 }));
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
@@ -139,8 +153,15 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
 }));
+const connectivity = vi.hoisted(() => ({
+  committed: 'online' as 'online' | 'offline' | 'unknown',
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.committed,
+}));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => findingRetry,
   useDismissSecurityFinding: () => dismiss,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
@@ -157,7 +178,15 @@ vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
 }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (_props: {
+    variant?: string;
+    message?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+    placement?: string;
+  }) => 'QueryError',
+}));
 vi.mock('@/components/security-agent/settings-recovery-status', () => ({
   SettingsRecoveryStatus: 'SettingsRecoveryStatus',
 }));
@@ -250,6 +279,20 @@ function billingSteps(root: I): I[] {
   );
 }
 
+/** Every failure-body node the screen rendered, its props along. */
+function findAllFailures(root: I): I[] {
+  return root.findAll(n => n.type === QueryError);
+}
+
+/** The one load-failure surface the screen must show. */
+function renderFailure(tree: R): I {
+  const nodes = findAllFailures(tree.root);
+  if (nodes.length !== 1) {
+    throw new Error(`expected 1 load-failure surface, got ${nodes.length}`);
+  }
+  return nodes[0] as I;
+}
+
 describe('DismissFindingScreen dismissal CTA states', () => {
   beforeEach(() => {
     trialRole.role = undefined;
@@ -262,13 +305,20 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     capability.isLoading = false;
     capability.isFetching = false;
     capability.isError = false;
+    capability.isPending = false;
+    capability.fetchStatus = 'idle';
     capability.refetch.mockReset();
     finding.isLoading = false;
     finding.isFetching = false;
     finding.isError = false;
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
     finding.error = null;
+    connectivity.committed = 'online';
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
+    findingRetry.retry.mockClear();
+    findingRetry.isRetrying = false;
     dismissDraft.draft = null;
     dismissDraft.hydrated = true;
     dismissDraft.persist.mockClear();
@@ -310,10 +360,24 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.isLoading = false;
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     const loaded = renderScreen();
-    expect(loaded.root.findByType(ScrollView).props.style).toEqual({
-      marginLeft: 47,
-      marginRight: 59,
-    });
+    expect(loaded.root.findByType(ScrollView).props.style).toEqual([
+      undefined,
+      { marginBottom: 0, marginLeft: 47, marginRight: 59 },
+    ]);
+  });
+
+  it('ends the Android scroll frame at the keyboard top so the comment field can clear it', () => {
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    keyboard.height = 883;
+    try {
+      const tree = renderScreen();
+      expect(tree.root.findByType(ScrollView).props.style).toEqual([
+        undefined,
+        { marginBottom: 883 },
+      ]);
+    } finally {
+      keyboard.height = 0;
+    }
   });
 
   it.each(['finding', 'permissions'] as const)(
@@ -370,18 +434,119 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       query.isError = true;
       if (source === 'finding') {
         finding.data = undefined;
+        finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
       } else {
         capability.status = 'error';
       }
       const tree = renderScreen();
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
-      const error = tree.root.findByType(QueryError);
-      expect(error.props.placement).not.toBe('top');
+      const error = renderFailure(tree);
+      // Both failures name a server answer in this setup: the sheet's own
+      // title differs, the classified cause does not.
+      expect(error.props.variant).toBe('server');
+      if (source === 'finding') {
+        // The sheet's own failure keeps its screen title, and the description
+        // comes from the classified variant rather than a repeated message.
+        expect(error.props.title).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
+        expect(error.props.message).toBeUndefined();
+      }
       act(error.props.onRetry as () => void);
       expect(query.refetch).toHaveBeenCalledOnce();
     }
   );
+
+  it('names the connection and offers Retry for a paused finding read', () => {
+    // The finding read is the only read the form waits on that can pause: the
+    // capability read comes through the hook that owns the shared organizations
+    // options, which settle offline.
+    finding.data = undefined;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
+    const error = renderFailure(tree);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
+    // The paused branch offers the deliberate paused-read retry, not the plain
+    // query refetch.
+    expect(error.props.isRetrying).toBe(false);
+    act(error.props.onRetry as () => void);
+    expect(findingRetry.retry).toHaveBeenCalledOnce();
+    expect(capability.refetch).not.toHaveBeenCalled();
+    expect(finding.refetch).not.toHaveBeenCalled();
+  });
+
+  it('treats a paused capability read as the settled failure it can only be', () => {
+    // The capability read settles offline, so it never reaches the paused
+    // branch above: a failed role read names its own failure instead of the
+    // connection, and Retry re-reads that read.
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
+    capability.status = 'error';
+    capability.isError = true;
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    const tree = renderScreen();
+
+    const error = renderFailure(tree);
+    // Confirmed offline with no server answer: the failure names the
+    // connection rather than the default server wording.
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe(i18n.t('securityAgent.dismiss.couldNotCheckPermissions'));
+    act(error.props.onRetry as () => void);
+    expect(capability.refetch).toHaveBeenCalledOnce();
+    expect(findingRetry.retry).not.toHaveBeenCalled();
+  });
+
+  it('keeps the skeleton when the capability read has not resolved with the finding loaded', () => {
+    // The form's own read settled, then the capability read is still in flight
+    // with no data: not a failure yet, and no data can close it.
+    // `capability.isLoading` is `isPending && isFetching`, so the pre-fix gate
+    // fell through to the cannot-dismiss empty state; `status === 'loading'`
+    // is the state the hook reports for a read without data and holds the
+    // skeleton.
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.isFetching = true;
+    capability.fetchStatus = 'fetching';
+    capability.canManage = false;
+    connectivity.committed = 'unknown';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({ title: i18n.t('securityAgent.dismiss.cannotDismissTitle') })
+    ).toHaveLength(0);
+  });
+
+  it('keeps the skeleton for a pause while connectivity is unsettled', () => {
+    // The online manager also pauses on an unsettled NetInfo report, which is
+    // the normal cold-launch window: that is not a connection failure yet.
+    finding.data = undefined;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    connectivity.committed = 'unknown';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+  });
+
+  it('keeps the skeleton for a first finding read still in flight', () => {
+    finding.data = undefined;
+    finding.isLoading = true;
+    finding.fetchStatus = 'fetching';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+  });
 
   it.each([
     ['denied', 'open'],

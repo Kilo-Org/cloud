@@ -12,17 +12,8 @@ import {
   toneColor,
   type ToneKey,
 } from '@/lib/agent-color';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { isNarrowLayout } from '@/lib/narrow-layout';
-
-/**
- * At/above this Dynamic Type scale, ConfigureRow stacks the icon above the
- * title block so long labels never clip against the chevron in a side row.
- * Matches the tab-label wrap threshold used elsewhere in the shell. A window
- * narrower than `NARROW_LAYOUT_WIDTH` squeezes the same text block and takes
- * the same presentation.
- */
-const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
 type ConfigureRowProps = {
   icon: ComponentType<LucideProps>;
@@ -78,7 +69,31 @@ type ConfigureRowProps = {
    * visible text.
    */
   accessibilityLabel?: string;
+  /**
+   * Where the press lives. A row whose trailing node is a control of its own (a
+   * switch) passes `content`, so the trailing control owns its own touch and
+   * its own accessible node. The content press then needs
+   * `contentAccessibilityLabel` to stay reachable, because `RowFrame` hides a
+   * `content` press from assistive technology without it.
+   */
+  pressTarget?: 'row' | 'content';
+  /**
+   * The content press's spoken name. A `content` press is hidden from assistive
+   * technology without one, so a row that hands the press to its content names
+   * the surface that press opens.
+   */
+  contentAccessibilityLabel?: string;
+  contentAccessibilityHint?: string;
   trailing?: ReactNode;
+  /**
+   * The trailing cell must be delivered at the platform touch target in a
+   * stacked row: either a control that reaches it — through its own box or
+   * through a compact `hitSlop` — or the placeholder that reserves the same
+   * line so the row does not move when the real cell lands. A stacked frame
+   * must host it (see `rowTargetHostClass`), because a touch is delivered only
+   * inside an ancestor view; the flat frame needs nothing.
+   */
+  trailingIsTarget?: boolean;
   className?: string;
   /** Test handle for the row's own control, for native E2E scripts. */
   testID?: string;
@@ -99,18 +114,24 @@ export function ConfigureRow({
   onPress,
   disabled,
   accessibilityLabel,
+  pressTarget,
+  contentAccessibilityLabel,
+  contentAccessibilityHint,
   trailing,
+  trailingIsTarget,
   className,
   testID,
 }: Readonly<ConfigureRowProps>) {
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
-  // A narrow window squeezes the flexible text block between the fixed icon
-  // tile and the chevron exactly as a large font scale does, until a whole word
-  // no longer fits and Android breaks it mid-word ("Gene ral", 160 dp, e1,
-  // 2026-09-21). Both cases get the stacked presentation, which hands the
-  // title the row's full width.
-  const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
+  // At a large font scale the row stacks the icon above the title block so a
+  // long label never clips against the chevron in a side row. A narrow window
+  // squeezes the flexible text block between the fixed icon tile and the
+  // chevron exactly as a large font scale does, until a whole word no longer
+  // fits and Android breaks it mid-word ("Gene ral", 160 dp, e1, 2026-09-21).
+  // Both cases get the stacked presentation, which hands the title the row's
+  // full width.
+  const stack = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
   // A semantic tone outranks the curated destination hue, and a row carrying
   // neither keeps the shared neutral tile. A settings list is not a list of
   // agents: hashing each title into the agent hue ramp gave one list (Language
@@ -129,7 +150,11 @@ export function ConfigureRow({
   const showChevron = variant === 'navigation' && Boolean(onPress) && !disabled;
   let rowTrailing: RowTrailingSpec | undefined = undefined;
   if (trailing !== undefined) {
-    rowTrailing = { kind: 'node', node: trailing };
+    rowTrailing = {
+      kind: 'node',
+      node: trailing,
+      ...(trailingIsTarget === true ? { target: true } : {}),
+    };
   } else if (showChevron) {
     rowTrailing = { kind: 'chevron' };
   }
@@ -167,6 +192,9 @@ export function ConfigureRow({
       trailing={rowTrailing}
       stack={stack}
       onPress={onPress}
+      pressTarget={pressTarget}
+      contentAccessibilityLabel={contentAccessibilityLabel}
+      contentAccessibilityHint={contentAccessibilityHint}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       disabled={disabled}

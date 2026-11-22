@@ -16,10 +16,6 @@ const languageStore = createSecureStorePreference<string | null>({
   serialize: value => value ?? '',
 });
 
-// Warm the disk read at module scope so the settings row and the first toggle
-// see the persisted choice without waiting for a React mount.
-languageStore.preload();
-
 export function readVoiceInputLanguage(): string | null {
   return languageStore.getRequested();
 }

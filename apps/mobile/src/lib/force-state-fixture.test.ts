@@ -8,6 +8,7 @@ import {
   applyForceStatePath,
   getForcedMode,
   isForcedOffline,
+  isForcedProcedure,
   isForceStateHoldingReadCache,
   resetForceStateForTests,
   withForceState,
@@ -118,6 +119,62 @@ describe('force-state links', () => {
     expect(client.getQueryData(meKey)).toEqual(ME);
     expect(client.getQueryData(orgsKey)).toEqual([]);
     expect(client.getQueryData(appKey)).toBe('model');
+  });
+
+  it('forces only the procedures an only scope lists, and leaves the rest live', async () => {
+    force('kiloapp:///dev/force-state/permission?only=agentProfiles.list');
+
+    expect(isForcedProcedure('agentProfiles.list')).toBe(true);
+    expect(isForcedProcedure('agentProfiles.listCombined')).toBe(false);
+    expect(isForcedProcedure('codeReviews.listForUser')).toBe(false);
+    expect(trpcErrorVariant(await failure(trpc().agentProfiles.list.query({})))).toBe('permission');
+    expect(transport).not.toHaveBeenCalled();
+    await expect(
+      trpc().agentProfiles.listCombined.query({
+        organizationId: '00000000-0000-4000-8000-000000000001',
+      })
+    ).resolves.toEqual(ME);
+    expect(transport).toHaveBeenCalledOnce();
+  });
+
+  it('matches a scope prefix only at a procedure boundary', () => {
+    force('kiloapp:///dev/force-state/permission?only=agentProfiles.list');
+    expect(isForcedProcedure('agentProfiles.listCombined')).toBe(false);
+
+    force('kiloapp:///dev/force-state/permission?only=agentProfiles');
+    expect(isForcedProcedure('agentProfiles.listCombined')).toBe(true);
+    expect(isForcedProcedure('agentProfilesX.list')).toBe(false);
+  });
+
+  it('forces everything again when a later link has no only scope, and clear drops it', () => {
+    force('kiloapp:///dev/force-state/permission?only=agentProfiles.list');
+    expect(isForcedProcedure('codeReviews.listForUser')).toBe(false);
+
+    force('kiloapp:///dev/force-state/retryable');
+    expect(getForcedMode()).toBe('retryable');
+    expect(isForcedProcedure('agentProfiles.list')).toBe(true);
+    expect(isForcedProcedure('codeReviews.listForUser')).toBe(true);
+
+    force('kiloapp:///dev/force-state/permission?only=codeReviews.listForUser');
+    expect(isForcedProcedure('agentProfiles.list')).toBe(false);
+    force('kiloapp:///dev/force-state/clear');
+    expect(isForcedProcedure('codeReviews.listForUser')).toBe(false);
+  });
+
+  it('resets only the cached reads a scope holds, and clear resets all of them', () => {
+    const profilesKey = [['agentProfiles', 'list'], { type: 'query' }];
+    const combinedKey = [['agentProfiles', 'listCombined'], { type: 'query' }];
+    client.setQueryData(profilesKey, []);
+    client.setQueryData(combinedKey, []);
+
+    force('kiloapp:///dev/force-state/permission?only=agentProfiles.list');
+    expect(client.getQueryData(profilesKey)).toBeUndefined();
+    expect(client.getQueryData(combinedKey)).toEqual([]);
+
+    client.setQueryData(profilesKey, []);
+    force('kiloapp:///dev/force-state/clear');
+    expect(client.getQueryData(profilesKey)).toBeUndefined();
+    expect(client.getQueryData(combinedKey)).toBeUndefined();
   });
 });
 

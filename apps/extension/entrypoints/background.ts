@@ -5,9 +5,15 @@ import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
 import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
 import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
+import { startDownloadHold } from '@/src/shared/browser-download-hold-host';
+import type { DownloadHold } from '@/src/shared/browser-download-hold';
+import type { DownloadHoldPermissionsApi } from '@/src/shared/browser-download-hold-listener';
 import { createBrowserRuntime } from '@/src/shared/browser-runtime';
 import type { BrowserDownloadsApi, BrowserRuntime } from '@/src/shared/browser-runtime';
-import { createBrowserTabGroupController } from '@/src/shared/browser-tab-groups';
+import {
+  createBrowserTabGroupController,
+  createStorageSessionTabGroupPersistence,
+} from '@/src/shared/browser-tab-groups';
 import type { BrowserTabGroupsApi } from '@/src/shared/browser-tab-groups';
 import {
   createStorageSessionLeasePersistence,
@@ -74,6 +80,31 @@ interface ChromeRuntimeApi {
 }
 
 /*
+ * The download hold, built while this worker's module is evaluated: `onDeterminingFilename`
+ * only reaches an extension that was listening when the browser created the download, so the
+ * listener cannot wait for `defineBackground` to run or for the first message.
+ */
+const readChrome = (
+  globalThis as typeof globalThis & {
+    chrome?: {
+      downloads?: BrowserDownloadsApi;
+      permissions?: DownloadHoldPermissionsApi;
+      runtime?: { getURL?: (path: string) => string };
+    };
+  }
+).chrome;
+
+const profileDownloadHold = startDownloadHold({
+  downloads: () => readChrome?.downloads,
+  // `chrome-extension://` on Chrome, `moz-extension://` on Firefox: the one signal that separates a browser that
+  // Raises `onDeterminingFilename` from one that never can, before the optional permission decides anything.
+  extensionOrigin: () => readChrome?.runtime?.getURL?.(''),
+  permissions: () => readChrome?.permissions,
+  // `storage` is the whole area multiplexer; the record's key selects `session:`.
+  sessionStorage: () => storage,
+});
+
+/*
  * Trust boundary for the eval/debugger message path. Today only the extension's own pages (the
  * side panel) can reach this listener — there is no externally_connectable and no content script.
  * Accept only same-extension senders whose origin is an extension page, so adding a content script
@@ -128,12 +159,15 @@ type NativeTabsApi = BrowserTabsApi & Pick<BrowserTabGroupsApi, 'group'>;
 
 export const getBrowserRuntime = ({
   debuggerApi,
+  downloadHold: hold,
   downloadsApi,
   scriptingApi,
   tabGroupsApi,
   tabsApi,
 }: {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
+  /** The hold that decides a download before its file exists; absent on Firefox, which has no such event. */
+  readonly downloadHold?: DownloadHold | undefined;
   /** `chrome.downloads`, resolved per call: the optional permission can change while the worker lives. */
   readonly downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
   readonly scriptingApi: BrowserScriptingApi | undefined;
@@ -149,6 +183,7 @@ export const getBrowserRuntime = ({
 
   const runtime = createBrowserRuntime({
     debuggerApi,
+    ...(hold === undefined ? {} : { downloadHold: hold }),
     ...(downloadsApi === undefined ? {} : { downloadsApi }),
     leases: createTabLeaseRegistry({
       persistence: createStorageSessionLeasePersistence(storage),
@@ -156,11 +191,12 @@ export const getBrowserRuntime = ({
     scriptingApi,
     // Every session gets its group `Kilo · <title>`; an ended one collapses, greys and stays adoptable (D12).
     // `tabs.group` lives on the tabs API and the rest of the group surface on `chrome.tabGroups`.
-    ...(tabGroupsApi === undefined
-      ? {}
-      : {
-          tabGroups: createBrowserTabGroupController({
-            api: {
+    // Without the group API sessions track their tabs by id. Either way they outlive a worker restart in `storage.session`.
+    tabGroups: createBrowserTabGroupController({
+      api:
+        tabGroupsApi === undefined
+          ? { tabQuery: query => tabsApi.query(query) }
+          : {
               ...(tabsApi.group === undefined ? {} : { group: tabsApi.group.bind(tabsApi) }),
               tabGroupOf: async tabId => {
                 const tab = await tabsApi.get?.(tabId);
@@ -176,8 +212,8 @@ export const getBrowserRuntime = ({
                     },
                   }),
             },
-          }),
-        }),
+      persistence: createStorageSessionTabGroupPersistence(storage),
+    }),
     tabsApi,
   });
 
@@ -252,6 +288,7 @@ const webMcpDispatchOptions = (
 
 export const handleTabDebuggerRequest = async ({
   debuggerApi,
+  downloadHold,
   downloadsApi,
   request,
   scriptingApi,
@@ -259,15 +296,26 @@ export const handleTabDebuggerRequest = async ({
   tabsApi,
 }: {
   debuggerApi: ChromeDebuggerApi | undefined;
+  /** The one hold of the profile: passed here so the panel's first message cannot cache a runtime without it. */
+  downloadHold?: DownloadHold | undefined;
   downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
   request: TabDebuggerRequest;
   scriptingApi: BrowserScriptingApi | undefined;
   tabGroupsApi?: BrowserTabGroupsApi | undefined;
   tabsApi: NativeTabsApi | undefined;
 }): Promise<TabDebuggerResponse> => {
-  // One runtime per tabs API, and the same tab-group surface for the panel and the agent bridge.
+  // One runtime per tabs API, and the same tab-group surface for the panel and the agent bridge. The hold goes in
+  // On both paths: the cache is keyed by the tabs API alone, so a panel message that created the runtime without it
+  // Would leave the agent bridge reusing a runtime whose guard can only cancel a file after it starts.
   const runtimeFor = (tabs: NativeTabsApi): BrowserRuntime =>
-    getBrowserRuntime({ debuggerApi, downloadsApi, scriptingApi, tabGroupsApi, tabsApi: tabs });
+    getBrowserRuntime({
+      debuggerApi,
+      ...(downloadHold === undefined ? {} : { downloadHold }),
+      downloadsApi,
+      scriptingApi,
+      tabGroupsApi,
+      tabsApi: tabs,
+    });
 
   try {
     if (request.type === LIST_INSPECTABLE_TABS_MESSAGE) {
@@ -425,6 +473,7 @@ export const handleTabDebuggerRequest = async ({
         arguments: request.arguments,
         caller: request.caller,
         options: webMcpDispatchOptions(scriptingApi),
+        ...(request.safeMode === undefined ? {} : { safeMode: request.safeMode }),
         tabId: request.tabId,
         ...(request.takeOver === undefined ? {} : { takeOver: request.takeOver }),
         toolName: request.tool,
@@ -456,11 +505,15 @@ export const handleTabDebuggerRequest = async ({
           ok: true,
           takeOver: {
             holderKind: 'agent',
-            sessionTitle: outcome.holder.title ?? 'Kilo CLI session',
+            sessionTitle: outcome.owner.title ?? 'Kilo CLI session',
             tabId: request.tabId,
           },
           type: BROWSER_TOOL_MESSAGE,
         };
+      }
+
+      if (outcome.kind === 'unsupported') {
+        return { ok: true, result: outcome.result, type: BROWSER_TOOL_MESSAGE };
       }
 
       return {
@@ -566,6 +619,10 @@ export default defineBackground(() => {
   const debuggerApi = chromeApi?.debugger;
   const scriptingApi = chromeApi?.scripting;
   const tabGroupsApi = chromeApi?.tabGroups;
+
+  // The hold decides every download of the profile; its listener was installed when this module was
+  // Evaluated, so the first download of this worker already has an answer. Firefox has none: its guard
+  // Cancels a file after it starts, and the runtime arms that tier when it is given no hold.
   startLocalAgentsHost({
     ...readLocalAgentsHostApis(),
     ...(tabsApi === undefined
@@ -580,6 +637,7 @@ export default defineBackground(() => {
             runtime: () =>
               getBrowserRuntime({
                 debuggerApi,
+                ...(profileDownloadHold === undefined ? {} : { downloadHold: profileDownloadHold }),
                 downloadsApi: () => chromeApi?.downloads,
                 scriptingApi,
                 tabGroupsApi,
@@ -620,6 +678,7 @@ export default defineBackground(() => {
     void (async (): Promise<void> => {
       const response = await handleTabDebuggerRequest({
         debuggerApi: chromeApi.debugger,
+        ...(profileDownloadHold === undefined ? {} : { downloadHold: profileDownloadHold }),
         downloadsApi: () => chromeApi.downloads,
         request: message,
         scriptingApi: chromeApi.scripting,

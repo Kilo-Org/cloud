@@ -13,6 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -64,26 +65,14 @@ function InvoiceListSkeleton() {
 }
 
 type InvoiceListScreenProps = Readonly<{
-  /** The screen's own title: the personal and organization lists differ. */
+  /** The screen's own name, the same in both scopes. */
   title: string;
   /**
    * One muted context line under the title, the header's subtitle slot: what
    * the list covers when the title alone does not say it (the personal list's
-   * fixed one-year window).
+   * fixed one-year window, or the organization's name).
    */
   subtitle?: string;
-  /**
-   * The screen's own name when the title names a scope: the organization scope
-   * titles itself with the membership's name, so this list's name keeps the
-   * header's mono category line and a user-authored name never takes it.
-   */
-  eyebrow?: string;
-  /**
-   * Hold the eyebrow's line before a scope name resolves, so the header keeps
-   * one height while the membership read settles. A caller whose title is
-   * already this screen's name paints no eyebrow and leaves this off.
-   */
-  reserveEyebrow?: boolean;
   /** Where the header's Back lands when the list opens with no history to pop. */
   backFallback: Href;
   /** The scope's paged invoice read, flattened by its own hook. */
@@ -112,8 +101,6 @@ type InvoiceListScreenProps = Readonly<{
 export function InvoiceListScreen({
   title,
   subtitle,
-  eyebrow,
-  reserveEyebrow,
   backFallback,
   query,
   entries,
@@ -160,6 +147,16 @@ export function InvoiceListScreen({
   // `isError`: a failed background refetch of page 1 also raises `isError`,
   // and the inline Retry calls `fetchNextPage()`, which can never clear it.
   const isLaterPageError = query.isFetchNextPageError;
+  const isEmptyList = entries.length === 0 && !hasMore && !isLaterPageError;
+
+  // The populated list's reduced-motion band sits above the body, never inside
+  // it: under reduced motion it reserves its own row whether or not a pull is
+  // in flight, so in flow inside the scroller it would move the first row at
+  // rest and scroll away with the rows. This column carries no gap, so under
+  // motion the band's empty box changes nothing. The skeleton and
+  // first-page-error branches carry no pull, and the empty state's own centered
+  // scroller draws its band, so this one belongs to the list branch alone.
+  const showsRefreshBand = !isLoading && !isFirstPageError && !isEmptyList;
 
   let body: ReactNode = null;
   if (isLoading) {
@@ -184,7 +181,7 @@ export function InvoiceListScreen({
         />
       </Animated.View>
     );
-  } else if (entries.length === 0 && !hasMore && !isLaterPageError) {
+  } else if (isEmptyList) {
     body = (
       <EmptyState
         icon={FileText}
@@ -275,14 +272,9 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={title}
-        subtitle={subtitle}
-        eyebrow={eyebrow}
-        reserveEyebrow={reserveEyebrow}
-        backFallback={backFallback}
-      />
+      <ScreenHeader title={title} subtitle={subtitle} backFallback={backFallback} />
       <View className="flex-1" style={sideInsetStyle}>
+        {showsRefreshBand ? <RefreshProgress refreshControl={refreshControl} /> : null}
         {body}
       </View>
     </View>

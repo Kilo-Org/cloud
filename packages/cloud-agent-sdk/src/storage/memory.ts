@@ -92,10 +92,18 @@ function createMemoryStorage(): SessionStorage {
 
     upsertPart(messageId, part, eventTime, authoritative) {
       const arr = parts.get(messageId) ?? [];
-      parts.set(
+      const nextArr = upsertPartDroppingStaleSyntheticParts(
         messageId,
-        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence, authoritative)
+        arr,
+        part,
+        eventTime,
+        partEvidence,
+        authoritative
       );
+      // A rejected update (a stale lifecycle or a preview of a stored tool)
+      // hands back the caller's own array: nothing changed, so publish nothing.
+      if (nextArr === arr) return;
+      parts.set(messageId, nextArr);
       publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 

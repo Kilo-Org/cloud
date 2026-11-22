@@ -18,6 +18,7 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneWorkspaceFailureSubtype,
 } from '../../shared/control-plane-protocol.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import {
   SessionCredentialUpgradeRequiredError,
   type SessionCredentialGrant,
@@ -43,6 +44,7 @@ import {
   OrganizationMembershipUnavailableError,
 } from './organization-membership.js';
 import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
+import { NetworkSecretConfigurationError } from '../../network-secrets/errors.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
 
@@ -134,7 +136,7 @@ function parseRouteState(value: string): RouteState {
 export function routeFromRow(db: RouteDatabase, row: RouteRow): RouteRecord {
   return {
     sessionId: row.session_id,
-    spec: controlPlaneRouteSpecSchema.parse(JSON.parse(row.spec)),
+    spec: controlPlaneRouteSpecSchema.parse(projectStoredRouteSpec(JSON.parse(row.spec))),
     grant: row.grant === null ? null : readScopeGrant(db, row.grant),
     credentialSource:
       row.credential_source === null || row.credential_source === undefined
@@ -392,6 +394,12 @@ export function grantIssueFailure(
   error: unknown,
   fallbackStage: string
 ): { reason: ControlPlaneFailureReason; stage: string } {
+  if (error instanceof NetworkSecretConfigurationError) {
+    return {
+      reason: 'network_secret_configuration_invalid',
+      stage: 'network_secret_configuration_invalid',
+    };
+  }
   if (error instanceof OrganizationAccessRevokedError) {
     // The owner left the organization the session belongs to: the route cannot
     // run on organization authority, and no retry of the same attempt mints it.

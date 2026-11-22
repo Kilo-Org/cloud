@@ -7,7 +7,7 @@ import {
   MAX_ORGANIZATION_GROUP_POLICIES,
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
   OrganizationGroupMetadataSchema,
-  OrganizationGroupModelAccessPolicySchema,
+  OrganizationGroupModelAccessPolicyWriteSchema,
   type OrganizationGroupPolicies,
   type OrganizationGroupModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
@@ -49,7 +49,9 @@ import { getModelAccessPolicyEditorData } from '@kilocode/web-shared/lib/organiz
 const GroupIdInputSchema = OrganizationIdInputSchema.extend({ groupId: z.uuid() }).strict();
 
 const ModelPolicyTypeSchema = z.enum([ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE]);
-const ModelPolicySchema = z.discriminatedUnion('type', [OrganizationGroupModelAccessPolicySchema]);
+const ModelPolicySchema = z.discriminatedUnion('type', [
+  OrganizationGroupModelAccessPolicyWriteSchema,
+]);
 
 const CreateGroupInputSchema = OrganizationIdInputSchema.extend({
   ...OrganizationGroupMetadataSchema.shape,

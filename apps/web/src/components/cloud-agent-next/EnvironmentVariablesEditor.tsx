@@ -20,6 +20,10 @@ export function EnvironmentVariablesEditor({
   const id = useId();
   return (
     <div className="grid gap-2">
+      <p className="text-muted-foreground text-xs leading-5">
+        Commands in the workspace can read these values. For an API key or token, use Network
+        secrets.
+      </p>
       <Label htmlFor={id} className="sr-only">
         Environment variables
       </Label>
@@ -43,7 +47,7 @@ export function EnvironmentVariablesEditor({
       />
       <p id={`${id}-help`} className="text-muted-foreground text-xs leading-5">
         {readOnly ? (
-          'Secret values are hidden. Only their names are shown.'
+          'Saved values are hidden. Only their names are shown.'
         ) : (
           <>
             New and replaced values are encrypted. Keep <code>&lt;unchanged&gt;</code> to retain a

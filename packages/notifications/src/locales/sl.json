@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nova varnostna najdba ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritično",
+      "high": "Visoko",
+      "medium": "Srednje",
+      "low": "Nizko"
+    },
     "securityFindingSlaWarning": {
       "title": "Opozorilo SLA"
     },

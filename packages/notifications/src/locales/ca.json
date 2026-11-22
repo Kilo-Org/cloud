@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nova troballa de seguretat ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Crític",
+      "high": "Alt",
+      "medium": "Mitjà",
+      "low": "Baix"
+    },
     "securityFindingSlaWarning": {
       "title": "Avís d'SLA"
     },

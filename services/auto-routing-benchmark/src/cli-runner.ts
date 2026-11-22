@@ -1,8 +1,8 @@
 import { stripVTControlCharacters } from 'node:util';
 import type { PaidExecutionKey } from './scheduler';
-import { parseKiloRunEvents } from './kilo-events';
+import { parseKiloRunEvents, type ToolEvidence } from './kilo-events';
 import type { DeciderCase } from './datasets/decider-cases';
-import { materializeLongContext } from './datasets/long-context';
+import { taskPrompt } from './decider-prompt';
 
 export type CliRunResult = {
   text: string;
@@ -16,6 +16,7 @@ export type CliRunResult = {
   stderrTail: string;
   eventCount: number;
   lastEventTypes: string[];
+  tools: ToolEvidence;
   timedOut: boolean;
   unavailableModelId?: string;
 };
@@ -38,12 +39,6 @@ export function addPriorAttempt(result: CliRunResult, prior: AttemptUsage): void
 
 export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 
-// Appended to every decider prompt: the agent harness tends to wrap answers
-// in prose ("The output is: ..."), which strict mechanical checks reject.
-// One uniform instruction across all candidate models keeps grading fair.
-const FINAL_ANSWER_SUFFIX =
-  '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
-
 /**
  * The exact text `kilo run` sends to the model for a decider case: the container writes it
  * to the CLI's stdin, which the CLI uses verbatim. Long-context cases carry their generated
@@ -53,8 +48,21 @@ const FINAL_ANSWER_SUFFIX =
  * byte-identical prompts.
  */
 export function deciderCliPrompt(benchCase: DeciderCase): string {
-  const prompts = materializeLongContext(benchCase);
-  return `${prompts.systemPrompt}\n\n${prompts.userPrompt}${FINAL_ANSWER_SUFFIX}`;
+  return taskPrompt(benchCase);
+}
+
+// @cloudflare/containers returns these 500 bodies before it forwards the request to
+// server.mjs: "Failed to start container" when starting the instance or its port checks
+// fail, and the runtime's refusal to connect to an instance that is not running or has
+// just exited. Disconnects and other proxy errors can follow a delivered request, so
+// they stay ambiguous.
+const CONTAINER_NOT_REACHED_BODY =
+  /^(?:Failed to start container: |Error proxying request to container: The container (?:just exited|is not running, consider calling start\(\)))/;
+
+export const CONTAINER_NOT_REACHED_PREFIX = 'container not reached: ';
+
+export function isContainerNotReachedBody(body: string): boolean {
+  return CONTAINER_NOT_REACHED_BODY.test(body);
 }
 
 export function isRetryableContainerAvailabilityError(error: unknown): boolean {
@@ -170,6 +178,44 @@ export type ContainerRunResponse = {
   timedOut?: boolean;
 };
 
+type ContainerRunRequest = {
+  model: string;
+  benchCase: DeciderCase;
+  kiloToken: string;
+  kiloApiUrl: string;
+  orgId?: string | null;
+  variant?: string | null;
+  resultCallback?: {
+    url: string;
+    execution: PaidExecutionKey & {
+      retried?: boolean;
+      priorCostUsd?: number | null;
+      priorUsage?: Omit<AttemptUsage, 'costUsd'> | null;
+    };
+  };
+};
+
+/**
+ * The container `/run` body for one decider case. A case graded on its tool calls runs
+ * isolated in its own workspace; every other case keeps the body, and so the environment,
+ * its stored results were measured with.
+ */
+export function containerRunBody(request: ContainerRunRequest) {
+  const { model, benchCase, kiloToken, kiloApiUrl } = request;
+  const variant = request.variant ?? null;
+  return {
+    model,
+    prompt: deciderCliPrompt(benchCase),
+    kiloToken,
+    kiloApiUrl,
+    orgId: request.orgId ?? null,
+    timeoutMs: DECIDER_CLI_TIMEOUT_MS,
+    variant,
+    resultCallback: request.resultCallback ?? null,
+    ...(benchCase.requiredToolCalls !== undefined ? { isolated: true } : {}),
+  };
+}
+
 /**
  * Run one decider case through the `kilo` CLI inside a Cloudflare Container.
  *
@@ -178,51 +224,22 @@ export type ContainerRunResponse = {
  */
 export async function runDeciderCaseViaCli(
   env: Env,
-  params: {
+  params: ContainerRunRequest & {
     instanceName: string;
-    model: string;
-    benchCase: DeciderCase;
-    kiloToken: string;
-    kiloApiUrl: string;
-    orgId?: string | null;
-    /**
-     * Canonical catalog variant passed as the container body's `variant`
-     * field (unchanged body shape). Accepts the legacy `reasoningEffort`
-     * alias so existing call sites keep working.
-     */
-    variant?: string | null;
     /** @deprecated Prefer `variant`. Same value; kept for call-site compatibility. */
     reasoningEffort?: string | null;
-    resultCallback?: {
-      url: string;
-      execution: PaidExecutionKey & {
-        retried?: boolean;
-        priorCostUsd?: number | null;
-        priorUsage?: Omit<AttemptUsage, 'costUsd'> | null;
-      };
-    };
   }
 ): Promise<CliRunResult> {
-  const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId } = params;
+  const { instanceName, model } = params;
   const variant = params.variant !== undefined ? params.variant : (params.reasoningEffort ?? null);
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(instanceName));
-  const prompt = deciderCliPrompt(benchCase);
 
   const startedAt = Date.now();
   const response = await stub.fetch(
     new Request('http://container/run', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt,
-        kiloToken,
-        kiloApiUrl,
-        orgId: orgId ?? null,
-        timeoutMs: DECIDER_CLI_TIMEOUT_MS,
-        variant: variant ?? null,
-        resultCallback: params.resultCallback ?? null,
-      }),
+      body: JSON.stringify(containerRunBody({ ...params, variant })),
     })
   );
 
@@ -248,6 +265,7 @@ export function parseContainerRunResponse(
     reasoningTokens,
     eventCount,
     lastEventTypes,
+    tools,
   } = parseKiloRunEvents(body.stdoutLines ?? []);
   const providerThrottled = (body.stdoutLines ?? []).some(line => {
     try {
@@ -329,6 +347,7 @@ export function parseContainerRunResponse(
       : (body.stderrTail ?? ''),
     eventCount,
     lastEventTypes,
+    tools,
     timedOut: body.timedOut ?? false,
     ...(unavailableModelId ? { unavailableModelId } : {}),
   };

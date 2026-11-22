@@ -150,6 +150,7 @@ import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-p
 import type {
   OrganizationModeConfig,
   OrganizationGroupPolicies,
+  NamedOrganizationPolicyKind,
   OrganizationGuardrailConfig,
   OrganizationGuardrailSource,
   OrganizationMcpConnectDecision,
@@ -4217,6 +4218,121 @@ export const organization_group_policy_settings = pgTable(
 export type OrganizationGroupPolicySettings =
   typeof organization_group_policy_settings.$inferSelect;
 
+export const organization_named_policies = pgTable(
+  'organization_named_policies',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    name: text().notNull(),
+    schema_version: integer().notNull(),
+    document: jsonb().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_organization_named_policies_organization',
+    }).onDelete('cascade'),
+    unique('UQ_organization_named_policies_organization_kind_id').on(
+      table.organization_id,
+      table.kind,
+      table.id
+    ),
+    uniqueIndex('UQ_organization_named_policies_organization_id_canonical_name').on(
+      table.organization_id,
+      sql`lower(btrim(${table.name}))`
+    ),
+    check(
+      'organization_named_policies_kind_check',
+      sql`${table.kind} IN ('agent_permissions', 'client_configuration')`
+    ),
+    check(
+      'organization_named_policies_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 80`
+    ),
+    check('organization_named_policies_schema_version_check', sql`${table.schema_version} >= 1`),
+    check(
+      'organization_named_policies_document_check',
+      sql`jsonb_typeof(${table.document}) = 'object'`
+    ),
+  ]
+);
+
+export const organization_default_policy_links = pgTable(
+  'organization_default_policy_links',
+  {
+    organization_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    policy_id: uuid().notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.organization_id, table.kind],
+      name: 'PK_organization_default_policy_links',
+    }),
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_organization_default_policy_links_organization',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organization_id, table.kind, table.policy_id],
+      foreignColumns: [
+        organization_named_policies.organization_id,
+        organization_named_policies.kind,
+        organization_named_policies.id,
+      ],
+      name: 'FK_organization_default_policy_links_policy',
+    }).onDelete('no action'),
+    index('IDX_organization_default_policy_links_policy').on(
+      table.organization_id,
+      table.policy_id,
+      table.kind
+    ),
+  ]
+);
+
+export const organization_group_policy_links = pgTable(
+  'organization_group_policy_links',
+  {
+    organization_id: uuid().notNull(),
+    group_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    policy_id: uuid().notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.organization_id, table.group_id, table.kind],
+      name: 'PK_organization_group_policy_links',
+    }),
+    foreignKey({
+      columns: [table.organization_id, table.group_id],
+      foreignColumns: [organization_groups.organization_id, organization_groups.id],
+      name: 'FK_organization_group_policy_links_group',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organization_id, table.kind, table.policy_id],
+      foreignColumns: [
+        organization_named_policies.organization_id,
+        organization_named_policies.kind,
+        organization_named_policies.id,
+      ],
+      name: 'FK_organization_group_policy_links_policy',
+    }).onDelete('no action'),
+    index('IDX_organization_group_policy_links_policy').on(
+      table.organization_id,
+      table.policy_id,
+      table.kind
+    ),
+  ]
+);
+
 export const organization_membership_removals = pgTable(
   'organization_membership_removals',
   {
@@ -5354,6 +5470,72 @@ export const webhook_events = pgTable(
   ]
 );
 
+// Replaces `webhook_events`, which keeps serving reads until its rows age out.
+// Partitioned daily on created_at in the migration; Drizzle cannot express it.
+// `apps/web/src/lib/integrations/db/webhook-event-partitions.ts` creates future
+// partitions and drops ones past retention.
+//
+// No foreign keys to kilocode_users or organizations: creating, detaching or
+// dropping a partition of a table with those keys locks both referenced tables,
+// and the drop takes ACCESS EXCLUSIVE on them. User deletion removes these rows
+// explicitly, and retention bounds anything else.
+//
+// Deduplication lives in `webhook_event_signatures`: a unique key on a
+// partitioned table must include created_at, which a redelivery does not share.
+export const webhook_events_v2 = pgTable(
+  'webhook_events_v2',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    owned_by_organization_id: uuid(),
+    owned_by_user_id: text(),
+    platform: text().notNull(),
+    event_type: text().notNull(),
+    event_action: text(),
+    payload: jsonb().notNull(),
+    headers: jsonb().notNull(),
+    processed: boolean().notNull().default(false),
+    processed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    handlers_triggered: text().array().default([]).notNull(),
+    errors: jsonb(),
+    event_signature: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('IDX_webhook_events_v2_owned_by_org_id_created_at').on(
+      table.owned_by_organization_id,
+      table.created_at
+    ),
+    index('IDX_webhook_events_v2_owned_by_user_id_created_at').on(
+      table.owned_by_user_id,
+      table.created_at
+    ),
+    check(
+      'webhook_events_v2_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+// One row per accepted webhook delivery. Claiming the signature in the same
+// transaction as the event insert is how redeliveries are rejected. No foreign
+// key to webhook_events_v2, so its partitions can be dropped freely.
+export const webhook_event_signatures = pgTable(
+  'webhook_event_signatures',
+  {
+    event_signature: text().notNull().primaryKey(),
+    webhook_event_id: uuid().notNull(),
+    webhook_event_created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [index('IDX_webhook_event_signatures_created_at').on(table.created_at)]
+);
+
 // ============ WEBHOOK TRIGGERS ============
 // Registry for webhook triggers - PostgreSQL is listing/ownership index only
 // Authoritative config data lives in the worker's TriggerDO
@@ -5683,6 +5865,7 @@ export type SessionStepUpProof = typeof session_step_up_proofs.$inferSelect;
 export type NewSessionStepUpProof = typeof session_step_up_proofs.$inferInsert;
 
 export type WebhookEvent = typeof webhook_events.$inferSelect;
+export type WebhookEventV2 = typeof webhook_events_v2.$inferSelect;
 
 // ============ MODEL STATS ============
 // Cached model data from OpenRouter and external benchmarks
@@ -8938,6 +9121,11 @@ export const agent_environment_profile_vars = pgTable(
     key: text().notNull(),
     value: text().notNull(), // Plaintext if is_secret=false, encrypted if is_secret=true
     is_secret: boolean().notNull().default(false),
+    delivery: text({ enum: ['env', 'network'] })
+      .notNull()
+      .default('env'),
+    allowed_hosts: text().array(),
+    injection_locations: text().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -9141,6 +9329,11 @@ export const cloud_agent_environment_vars = pgTable(
     key: text().notNull(),
     value: text().notNull(), // Plaintext if is_secret=false, RSA+AES envelope JSON if is_secret=true
     is_secret: boolean().notNull().default(false),
+    delivery: text({ enum: ['env', 'network'] })
+      .notNull()
+      .default('env'),
+    allowed_hosts: text().array(),
+    injection_locations: text().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

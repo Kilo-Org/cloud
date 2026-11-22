@@ -13,23 +13,11 @@
  * dropping fields this walker isn't meant to know about. The scrubbers must
  * therefore accept and return opaque values. */
 
-/**
- * A URL authority's userinfo prefix, the part before the host.
- */
-const URL_USERINFO_PATTERN = /^([a-z][\da-z+.-]*:\/\/)[^/?#]*@/iu;
+import { stripQueryString } from '@/lib/telemetry/request-target';
 
-/**
- * Reduce a URL to its origin and path. Returns empty string for a non-string.
- * A plain string walk, since the React Native `URL` polyfill does not
- * implement every component.
- */
+/** {@link stripQueryString} for the opaque values a Sentry payload carries. */
 function stripQuery(url: unknown): string {
-  if (typeof url !== 'string') {
-    return '';
-  }
-  const cut = url.search(/[?#]/u);
-  const originAndPath = cut === -1 ? url : url.slice(0, cut);
-  return originAndPath.replace(URL_USERINFO_PATTERN, '$1');
+  return typeof url === 'string' ? stripQueryString(url) : '';
 }
 
 /**

@@ -94,6 +94,16 @@ describe('foldSessionLiveSummary', () => {
     ).toEqual({ verb: 'searching', target: 'docs.example.com' });
   });
 
+  it('maps a web fetch to its host, keeping a port and falling back to the text', () => {
+    expect(
+      run([part('webfetch', 'running', { url: ' https://localhost:8080/a/b?q=1#top ' })]).step
+    ).toEqual({ verb: 'searching', target: 'localhost:8080' });
+    expect(run([part('web_fetch', 'running', { url: 'docs.example.com/a' })]).step).toEqual({
+      verb: 'searching',
+      target: 'docs.example.com/a',
+    });
+  });
+
   it('maps unknown tools to other with no target', () => {
     expect(run([part('task', 'running', { description: 'do it' })]).step).toEqual({
       verb: 'other',
@@ -150,6 +160,31 @@ describe('foldSessionLiveSummary', () => {
       }),
     ]);
     expect(state.plan).toEqual({ done: 1, total: 3, current: 'second' });
+  });
+
+  it('counts a todo with an unknown status as an outstanding step', () => {
+    const state = run([
+      part('todowrite', 'running', {
+        todos: [
+          { content: 'one', status: 'completed' },
+          { content: 'two', status: 'in_progress' },
+          { content: 'queued', status: 'queued' },
+        ],
+      }),
+    ]);
+    expect(state.plan).toEqual({ done: 1, total: 3, current: 'two' });
+  });
+
+  it('keeps a plan of only unknown statuses and marks none done or current', () => {
+    const state = run([
+      part('todowrite', 'running', {
+        todos: [
+          { content: 'a', status: 'complete' },
+          { content: 'b', status: 'done' },
+        ],
+      }),
+    ]);
+    expect(state.plan).toEqual({ done: 0, total: 2, current: null });
   });
 
   it('drops the plan when every todo is cancelled', () => {

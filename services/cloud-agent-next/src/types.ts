@@ -383,7 +383,46 @@ type RedeemBitbucketSessionCapabilityResult =
         | 'source_unavailable';
     };
 
+type HostedGitHubRepositoryScope = {
+  userId: string;
+  organizationId: string;
+  integrationId: string;
+  primaryRepo: string;
+};
+
+type HostedGitHubRepositoryIdentity = { id: number; fullName: string };
+
+type HostedGitHubRepositoryFailure = {
+  success: false;
+  reason: HostedGitHubRepositoryFailureReason;
+};
+
+export type HostedGitHubRepositoryFailureReason =
+  | 'access_denied'
+  | 'repository_unavailable'
+  | 'temporarily_unavailable';
+
 export type GitTokenService = {
+  listHostedWorkspaceGitHubRepositories?(
+    params: HostedGitHubRepositoryScope & { page: number }
+  ): Promise<
+    | {
+        success: true;
+        repositories: (HostedGitHubRepositoryIdentity & { private: boolean })[];
+        nextPage?: number;
+      }
+    | HostedGitHubRepositoryFailure
+  >;
+  resolveHostedWorkspaceGitHubRepositories?(
+    params: HostedGitHubRepositoryScope & { additionalRepositoryIds: number[] }
+  ): Promise<
+    | {
+        success: true;
+        primary: HostedGitHubRepositoryIdentity;
+        additional: HostedGitHubRepositoryIdentity[];
+      }
+    | HostedGitHubRepositoryFailure
+  >;
   authorizeCloudAgentGitHubRepo?(
     params: Omit<ManagedGitHubAuthParams, 'allowUserAuthorization'>
   ): Promise<GitHubRepositoryAuthorizationResult>;

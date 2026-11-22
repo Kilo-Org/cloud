@@ -37,6 +37,7 @@ import {
   providerKeyScopeInput,
   providerKeysHref,
 } from '@/lib/byok/provider-key-scope';
+import { providerKeyName } from '@/lib/byok/provider-key-name';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -124,7 +125,14 @@ export function ProviderKeyNewScreen() {
   if (providers.isPending || providers.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
+        {/* The loaded header names the provider on its subtitle line, so the
+            pending header holds that line and the form does not move when the
+            provider list answers. */}
+        <ScreenHeader
+          title={title}
+          reserveSubtitle={providers.isPending}
+          backFallback={PROFILE_TAB_HREF}
+        />
         {providers.isError ? (
           <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
         ) : (
@@ -215,12 +223,26 @@ export function ProviderKeyNewScreen() {
     }
     if (credential.tag === 'incomplete-mapping' || credential.tag === 'refused') {
       // A half-filled mapping is on screen, so its number points at the row to
-      // fix; every other shape refusal names no value the reader can see.
-      const message =
-        credential.tag === 'incomplete-mapping'
-          ? t('profile.providerKeys.incompleteMapping', { number: credential.mapping })
-          : t('profile.providerKeys.invalidCredentials');
-      attempt.fail({ kind: 'refused', message });
+      // fix. A refused private key is masked, so the sentence naming what it
+      // wants sits under that field; every other refusal names no value the
+      // reader can see. The sentence follows the cause: a complete block a
+      // passphrase protects is already whole, so only the encrypted case names
+      // the passphrase.
+      if (credential.tag === 'refused' && credential.field === 'privateKey') {
+        setFieldErrors({
+          privateKey:
+            credential.cause === 'key-encrypted'
+              ? t('profile.providerKeys.privateKeyEncrypted')
+              : t('profile.providerKeys.privateKeyBlockRequired'),
+        });
+      }
+      attempt.fail({
+        kind: 'refused',
+        message:
+          credential.tag === 'incomplete-mapping'
+            ? t('profile.providerKeys.incompleteMapping', { number: credential.mapping })
+            : t('profile.providerKeys.invalidCredentials'),
+      });
       return;
     }
     try {
@@ -271,7 +293,13 @@ export function ProviderKeyNewScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
+      {/* The provider is the scope of the key, so it is the header's subtitle,
+          not a body line that read as a field label with no field. */}
+      <ScreenHeader
+        title={title}
+        subtitle={providerKeyName(provider.id, provider.name)}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}
@@ -280,7 +308,6 @@ export function ProviderKeyNewScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-1">
-          <Text variant="small">{provider.name}</Text>
           <Text variant="caption">
             {keyId === undefined
               ? t('profile.providerKeys.newKeyDescription')

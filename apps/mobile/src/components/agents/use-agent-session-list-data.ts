@@ -1,8 +1,9 @@
 import { useCallback, useMemo } from 'react';
 
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import {
   expandPlatformFilter,
-  formatGitUrlProject,
   normalisePlatformSelection,
   type SessionSection,
 } from '@/components/agents/session-list-helpers';
@@ -45,6 +46,7 @@ export function useAgentSessionListData(options: {
     storedIsPending,
     storedFetchedSinceMount,
     hasNextPage,
+    storedAtRetentionBound,
     isFetchingNextPage,
     isFetchNextPageError,
     fetchNextPage,
@@ -98,6 +100,13 @@ export function useAgentSessionListData(options: {
     isPending: search.isPending,
     searchQuery,
   });
+
+  // The footer describes the list actually rendered, so the bound follows
+  // `paging`: the search list while a committed search is effective, the
+  // stored history otherwise.
+  const isRetentionLimited = effectiveSearchQuery
+    ? search.isRetentionLimited
+    : storedAtRetentionBound;
 
   const paging = useMemo(
     () =>
@@ -168,6 +177,7 @@ export function useAgentSessionListData(options: {
     storedIsPending,
     storedFetchedSinceMount,
     paging,
+    isRetentionLimited,
     refetch,
     handleRetry,
     handleRefetch,

@@ -306,6 +306,12 @@ export async function signWorkspaceMcpGrant(input: {
 /**
  * A runtime authorization for a direct child or a new chat in this workspace.
  * It inherits the workspace's bindings and never outlives its delegation.
+ *
+ * `resourceId` must be a session id this service allocated (`workspace_` plus a
+ * UUID); the caller parses it with `workspaceSessionIdSchema` at the Durable
+ * Object RPC boundary before calling this function. The child registry entry
+ * that records parent lineage is written only after this authorization is
+ * issued, so this function cannot consult it.
  */
 export function deriveWorkspaceRuntimeAuthorization(
   record: WorkspaceAuthorityRecord,

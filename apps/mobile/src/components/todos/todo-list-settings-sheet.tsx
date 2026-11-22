@@ -48,7 +48,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
   const { create, update } = useTodoListMutations(organizationId, reportNothing);
   const scope = organizationId ?? undefined;
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
-  const { models, isLoading: isLoadingModels } = useAvailableModels(scope);
+  const { models, isLoading: isLoadingModels, refetch: catalogRefetch } = useAvailableModels(scope);
 
   const nameRef = useRef(list?.name ?? '');
   const emojiRef = useRef(list?.emoji ?? '');
@@ -239,6 +239,9 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             variant={variant ?? ''}
             options={models}
             isLoading={isLoadingModels}
+            onRetryModels={() => {
+              void catalogRefetch();
+            }}
             acceptsVariant
             onSelect={(modelId, nextVariant) => {
               setModel(modelId);

@@ -1,5 +1,8 @@
 /* eslint-disable max-lines -- the panel composes the status card, remediation controls, summary PR button, timeline, and attempt history; each is a small rendered surface that mirrors the shared remediation pattern. Splitting would re-encode the same hooks. */
-import { getRemediationStatusPresentation } from '@kilocode/app-shared/security-agent';
+import {
+  getRemediationStatusPresentation,
+  remediationNeedsAnalysisRefresh,
+} from '@kilocode/app-shared/security-agent';
 import { Wrench } from '@/components/ui/icons';
 import { useRouter } from 'expo-router';
 import { type TFunction } from 'i18next';
@@ -32,8 +35,11 @@ import {
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { useRetrySecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
+import { useSideInsetStyle } from '@/lib/screen-insets';
+import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
+import { type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { openFindingLink } from '@/lib/security-agent-link';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -44,6 +50,9 @@ type FindingRemediationPanelProps = {
   analysis: SecurityAnalysis | undefined;
   isLoading: boolean;
   isError: boolean;
+  isPending: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  connectivity: 'online' | 'offline' | 'unknown';
   onRetry: () => void;
 };
 
@@ -172,9 +181,13 @@ export function FindingRemediationPanel({
   analysis,
   isLoading,
   isError,
+  isPending,
+  fetchStatus,
+  connectivity,
   onRetry,
 }: Readonly<FindingRemediationPanelProps>) {
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const mutedDisabledInk = useMutedDisabledInk();
   const router = useRouter();
   const { t } = useTranslation();
@@ -183,17 +196,37 @@ export function FindingRemediationPanel({
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
   const cancelRemediation = useCancelSecurityRemediation(scope);
+  const analysisRetry = useRetrySecurityAnalysis(scope, findingId);
 
   const openPullRequest = (url: string) => {
     openFindingLink(router, url, t('common.pullRequest'));
   };
 
+  // A paused first read never reaches the loading gate: name the connection and
+  // offer the deliberate retry, which retires the paused promise a plain
+  // `refetch` would only join.
+  if (!analysis && isReadPausedBeforeData({ isPending, fetchStatus, connectivity })) {
+    return (
+      <>
+        <QueryError
+          variant="offline"
+          message={t('securityAgent.remediation.couldNotLoad')}
+          onRetry={() => void analysisRetry.retry()}
+          isRetrying={analysisRetry.isRetrying}
+        />
+        {dialog}
+      </>
+    );
+  }
+
   if (isLoading && !analysis) {
     return (
-      <View className={SCREEN_BODY_CLASS}>
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <Skeleton className="h-32 w-full rounded-xl" />
-        {dialog}
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_BODY_CLASS}>
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          {dialog}
+        </View>
       </View>
     );
   }

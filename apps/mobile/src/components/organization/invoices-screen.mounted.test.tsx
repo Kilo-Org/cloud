@@ -55,14 +55,14 @@ const boundaryState = vi.hoisted(() => ({
 // Props each header boundary was rendered with: the boundary's own header and
 // the shared list header, which the resolved screen paints.
 const boundaryProps = vi.hoisted(() => ({
-  rendered: [] as { title?: string; reserveEyebrow?: boolean }[],
+  rendered: [] as { title?: string; reserveSubtitle?: boolean }[],
 }));
 
 const screenHeaders = vi.hoisted(() => ({
   rendered: [] as {
     title?: string;
+    subtitle?: string;
     eyebrow?: string;
-    reserveEyebrow?: boolean;
   }[],
 }));
 
@@ -149,14 +149,14 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
-  OrganizationBoundary: (props: { title?: string; reserveEyebrow?: boolean }) => {
+  OrganizationBoundary: (props: { title?: string; reserveSubtitle?: boolean }) => {
     boundaryProps.rendered.push(props);
     return null;
   },
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
+  ScreenHeader: (props: { title?: string; subtitle?: string; eyebrow?: string }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -190,6 +190,14 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 // The pull control reaches the reduced-motion policy, which loads expo-battery;
 // the list's states are what this suite drives, not the gesture's indicator.
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+// The pull's reduced-motion band paints from the motion policy and the palette;
+// this suite drives the list's states, not the band.
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
+// The pull's hook reads the motion policy; the real module needs reanimated's
+// `useReducedMotion`, which this suite's partial reanimated stub does not carry.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+}));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
@@ -493,37 +501,36 @@ describe('OrganizationInvoicesScreen pagination', () => {
 });
 
 describe('OrganizationInvoicesScreen header', () => {
-  it('titles the loaded header with the organization name and keeps the screen name as its eyebrow', async () => {
+  it('titles the loaded header with the screen name and names the organization under it', async () => {
     pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
     pageHook.entries = [INVOICE];
 
     await renderScreen();
 
+    // The one two-line header the personal list uses too: the title is the
+    // screen's name and the subtitle names the scope.
     expect(screenHeaders.rendered).toHaveLength(1);
-    expect(screenHeaders.rendered[0]?.title).toBe('Acme Corp');
-    expect(screenHeaders.rendered[0]?.eyebrow).toBe(i18n.t('organization.invoices.title'));
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
+    expect(screenHeaders.rendered[0]?.subtitle).toBe('Acme Corp');
+    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
   });
 
-  it('reserves the eyebrow line on the boundary so the header keeps its height before the name arrives', async () => {
+  it('reserves the subtitle line on the boundary so the header keeps its height before the name arrives', async () => {
     boundaryState.isResolving = true;
 
     await renderScreen();
 
     // The list header is not painted yet: the boundary owns the header while the
-    // membership read resolves, and it reserves the eyebrow line for the label
+    // membership read resolves, and it reserves the subtitle line for the name
     // the resolved screen fills in.
     expect(screenHeaders.rendered).toHaveLength(0);
     expect(boundaryProps.rendered).toHaveLength(1);
     expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
-    expect(boundaryProps.rendered[0]?.reserveEyebrow).toBe(true);
-    // The reserve needs no label of its own: the eyebrow variant holds one line
-    // box for every script (`EYEBROW_LINE_HEIGHT_DP`), so the boundary hands the
-    // header its reserve alone and the swap cannot grow it.
-    expect(boundaryProps.rendered[0]).not.toHaveProperty('eyebrow');
+    expect(boundaryProps.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(boundaryProps.rendered[0]).not.toHaveProperty('subtitle');
   });
 
-  it('does not reserve the eyebrow line on a settled boundary state that never fills it', async () => {
+  it('does not reserve the subtitle line on a settled boundary state that never fills it', async () => {
     boundaryState.isResolving = false;
     boundaryState.organizationId = null;
     boundaryState.hasOrg = false;
@@ -531,12 +538,12 @@ describe('OrganizationInvoicesScreen header', () => {
     await renderScreen();
 
     // The boundary owns the header here too, but no resolved header will ever
-    // paint an eyebrow into the reserved line, so the state keeps its own
+    // paint a subtitle into the reserved line, so the state keeps its own
     // height instead of being permanently one line taller.
     expect(screenHeaders.rendered).toHaveLength(0);
     expect(boundaryProps.rendered).toHaveLength(1);
     expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
-    expect(boundaryProps.rendered[0]?.reserveEyebrow).not.toBe(true);
+    expect(boundaryProps.rendered[0]?.reserveSubtitle).not.toBe(true);
   });
 });
 

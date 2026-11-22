@@ -110,34 +110,37 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
     setBaseline(nextConfig);
   }, [configQuery.data]);
 
-  useEffect(() => {
+  // A stored repository selection or reasoning level that the current cache or
+  // model does not offer is surfaced as a notice. The draft keeps the stored
+  // value, so the form reports saved state until the user applies the change.
+  const listedRepositoryIds = useMemo(() => {
     const repositoryCache = readinessQuery.data?.repositoryCache;
-    if (!configQuery.data || repositoryCache?.status !== 'available') return;
-
-    const cachedRepositoryIds = new Set(
-      repositoryCache.repositories.map(repository => repository.id)
-    );
-    setDraft(current => {
-      const selectedRepositoryIds = current.selectedRepositoryIds.filter(repositoryId =>
-        cachedRepositoryIds.has(repositoryId)
-      );
-      return selectedRepositoryIds.length === current.selectedRepositoryIds.length
-        ? current
-        : { ...current, selectedRepositoryIds };
-    });
-  }, [configQuery.data, readinessQuery.data?.repositoryCache]);
-
-  const availableThinkingEfforts = useMemo(
-    () => modelOptions.find(model => model.id === draft.modelSlug)?.variants ?? [],
+    return new Set(repositoryCache?.repositories.map(repository => repository.id) ?? []);
+  }, [readinessQuery.data]);
+  const repositoryCacheStatus = readinessQuery.data?.repositoryCache.status;
+  const unavailableRepositoryIds = useMemo(
+    () =>
+      repositoryCacheStatus === 'available'
+        ? draft.selectedRepositoryIds.filter(repositoryId => !listedRepositoryIds.has(repositoryId))
+        : [],
+    [draft.selectedRepositoryIds, listedRepositoryIds, repositoryCacheStatus]
+  );
+  const listedSelectedRepositoryIds = useMemo(
+    () => draft.selectedRepositoryIds.filter(repositoryId => listedRepositoryIds.has(repositoryId)),
+    [draft.selectedRepositoryIds, listedRepositoryIds]
+  );
+  const selectedModel = useMemo(
+    () => modelOptions.find(model => model.id === draft.modelSlug),
     [draft.modelSlug, modelOptions]
   );
-
-  useEffect(() => {
-    if (isLoadingModels) return;
-    if (draft.thinkingEffort && !availableThinkingEfforts.includes(draft.thinkingEffort)) {
-      setDraft(current => ({ ...current, thinkingEffort: null }));
-    }
-  }, [availableThinkingEfforts, draft.thinkingEffort, isLoadingModels]);
+  const availableThinkingEfforts = useMemo(() => selectedModel?.variants ?? [], [selectedModel]);
+  const unavailableThinkingEffort =
+    draft.thinkingEffort !== null &&
+    !isLoadingModels &&
+    selectedModel !== undefined &&
+    !(selectedModel.variants ?? []).includes(draft.thinkingEffort)
+      ? draft.thinkingEffort
+      : null;
 
   const invalidateBitbucketQueries = async () => {
     await Promise.all([
@@ -261,7 +264,13 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
   const isEnabled = configQuery.data?.isEnabled ?? false;
   const isDirty = configFingerprint(draft) !== configFingerprint(baseline);
   const hasRepositories = draft.selectedRepositoryIds.length > 0;
-  const canEnable = readiness.canManage && readiness.ready && hasRepositories && !isDirty;
+  const hasUnavailableRepositories = unavailableRepositoryIds.length > 0;
+  const canEnable =
+    readiness.canManage &&
+    readiness.ready &&
+    hasRepositories &&
+    !hasUnavailableRepositories &&
+    !isDirty;
   const repositoryCache = readiness.repositoryCache;
   const repositories = repositoryCache.repositories.map(repository => ({
     id: repository.id,
@@ -275,6 +284,9 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
     enableHint = 'An organization owner or billing manager can change this setting.';
   } else if (!readiness.ready) {
     enableHint = 'Replace the Workspace Access Token with the required Code Reviewer permissions.';
+  } else if (hasUnavailableRepositories) {
+    enableHint =
+      'Remove the selected repositories that are no longer available before enabling Code Reviewer.';
   } else if (!hasRepositories) {
     enableHint = 'Select at least one repository and save changes before enabling.';
   } else if (isDirty) {
@@ -283,6 +295,12 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
 
   const handleSave = () => {
     setMutationError(null);
+    if (hasUnavailableRepositories) {
+      setValidationError(
+        'Remove the selected repositories that are no longer available before saving changes.'
+      );
+      return;
+    }
     if (!hasRepositories) {
       setValidationError('Select at least one repository before saving changes.');
       return;
@@ -390,12 +408,31 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
               label="AI model"
               models={modelOptions}
               value={draft.modelSlug}
-              onValueChange={modelSlug => setDraft(current => ({ ...current, modelSlug }))}
+              onValueChange={modelSlug =>
+                setDraft(current => {
+                  // Picking the model that is already selected is not a change:
+                  // a stored reasoning level the model does not list stays until
+                  // the user resets it. Switching model can drop it, and that
+                  // normalization rides the user's own edit so Save never posts
+                  // a pair the model does not offer.
+                  if (modelSlug === current.modelSlug) return current;
+                  const variants =
+                    modelOptions.find(model => model.id === modelSlug)?.variants ?? [];
+                  return {
+                    ...current,
+                    modelSlug,
+                    thinkingEffort:
+                      current.thinkingEffort === null || variants.includes(current.thinkingEffort)
+                        ? current.thinkingEffort
+                        : null,
+                  };
+                })
+              }
               isLoading={isLoadingModels}
               helperText="Choose the model used for Bitbucket pull request reviews."
             />
 
-            {availableThinkingEfforts.length > 0 && (
+            {(availableThinkingEfforts.length > 0 || unavailableThinkingEffort !== null) && (
               <div className="space-y-2">
                 <Label htmlFor="bitbucket-thinking-effort">Thinking effort</Label>
                 <Select
@@ -417,6 +454,11 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
                         {thinkingEffortLabel(effort)}
                       </SelectItem>
                     ))}
+                    {unavailableThinkingEffort !== null && (
+                      <SelectItem value={unavailableThinkingEffort} disabled>
+                        {thinkingEffortLabel(unavailableThinkingEffort)} (unavailable)
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 <p className="text-muted-foreground text-sm">
@@ -457,13 +499,56 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
                 )}
               </div>
 
+              {hasUnavailableRepositories && (
+                <Alert variant="warning">
+                  <AlertCircle />
+                  <AlertTitle>
+                    {unavailableRepositoryIds.length === 1
+                      ? '1 selected repository is no longer available'
+                      : `${unavailableRepositoryIds.length} selected repositories are no longer available`}
+                  </AlertTitle>
+                  <AlertDescription>
+                    <p>
+                      {unavailableRepositoryIds.length === 1
+                        ? 'The Workspace Access Token can no longer see this repository, so it cannot be reviewed. Remove it from the selection to save your changes.'
+                        : 'The Workspace Access Token can no longer see these repositories, so they cannot be reviewed. Remove them from the selection to save your changes.'}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="min-h-11"
+                      disabled={saveMutation.isPending}
+                      onClick={() => {
+                        setValidationError(null);
+                        setDraft(current => ({
+                          ...current,
+                          selectedRepositoryIds: current.selectedRepositoryIds.filter(
+                            repositoryId => listedRepositoryIds.has(repositoryId)
+                          ),
+                        }));
+                      }}
+                    >
+                      Remove unavailable repositories
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {repositoryCache.status === 'available' && repositories.length > 0 ? (
                 <RepositoryMultiSelect<string>
                   repositories={repositories}
-                  selectedIds={draft.selectedRepositoryIds}
+                  selectedIds={listedSelectedRepositoryIds}
                   onSelectionChange={selectedRepositoryIds => {
                     setValidationError(null);
-                    setDraft(current => ({ ...current, selectedRepositoryIds }));
+                    setDraft(current => ({
+                      ...current,
+                      selectedRepositoryIds: [
+                        ...selectedRepositoryIds,
+                        ...current.selectedRepositoryIds.filter(
+                          repositoryId => !listedRepositoryIds.has(repositoryId)
+                        ),
+                      ],
+                    }));
                   }}
                 />
               ) : (
@@ -582,7 +667,12 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
             <Button
               type="submit"
               className="min-h-11 w-full sm:min-h-9 sm:w-auto"
-              disabled={!isDirty || saveMutation.isPending || !readiness.canManage}
+              disabled={
+                !isDirty ||
+                saveMutation.isPending ||
+                !readiness.canManage ||
+                hasUnavailableRepositories
+              }
             >
               <Save />
               {saveMutation.isPending ? 'Saving changes...' : 'Save changes'}

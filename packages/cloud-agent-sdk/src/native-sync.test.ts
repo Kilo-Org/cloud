@@ -8,6 +8,7 @@ import {
 import { fetchNativeSnapshot, type NativeSnapshot } from './native-sync-snapshot';
 import type * as NativeSnapshotModule from './native-sync-snapshot';
 import { kilo2AssetKey } from './kilo2-source-messages';
+import { NATIVE_SYNC_TICKET_MINT_DEADLINE_MS } from './limits';
 import { readNativeConversation } from './native-conversation-source';
 import { z } from 'zod';
 
@@ -83,7 +84,7 @@ const hello = (runnerConnected = true) => ({
 async function flush() {
   for (let index = 0; index < 25; index++) await Promise.resolve();
 }
-function fixture() {
+function fixture(respond?: (path: string) => Promise<Response> | undefined) {
   const calls: {
     path: string;
     body: Record<string, unknown>;
@@ -104,6 +105,8 @@ function fixture() {
         ticket: 'private-ticket',
         expiresAt: new Date(Date.now() + 90_000).toISOString(),
       });
+    const overridden = await respond?.(path);
+    if (overridden) return overridden;
     return Response.json({ commandID: body.commandID ?? 'known', status: 'queued' });
   });
   const client = new NativeSyncClient({
@@ -267,6 +270,114 @@ test('reauthorizes proactively and exchanges an expired grant again', async () =
   connection.close();
 });
 
+/** A fetcher whose `reauth_required` ticket mint can be held open, to observe work beside it. */
+function heldTicketFixture() {
+  const calls: { path: string }[] = [];
+  let held: ((value: Response) => void) | undefined;
+  let stall = false;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    calls.push({ path });
+    if (path.endsWith('/exchange'))
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (path.endsWith('live-ticket')) {
+      if (!stall)
+        return Response.json({
+          ticket: 'private-ticket',
+          expiresAt: new Date(Date.now() + 90_000).toISOString(),
+        });
+      // ES2022/Hermes consumers do not provide Promise.withResolvers.
+      return new Promise<Response>(resolve => {
+        held = resolve;
+      });
+    }
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  return {
+    client,
+    stall: () => {
+      stall = true;
+    },
+    resume: () => {
+      stall = false;
+    },
+    release: (ticket: string) =>
+      held?.(Response.json({ ticket, expiresAt: new Date(Date.now() + 90_000).toISOString() })),
+    ticketPosts: () => calls.filter(call => call.path.endsWith('/live-ticket')).length,
+  };
+}
+
+test('a stalled reauth mint keeps draining the queue and reconnects at its deadline', async () => {
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const { client, stall, resume, ticketPosts } = heldTicketFixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  try {
+    await flush();
+    const socket = connectedSocket();
+    socket.frame('hello', hello(), 3);
+    await flush();
+    expect(ticketPosts()).toBe(1);
+    stall();
+    socket.frame('reauth_required', {}, 4);
+    socket.frame(
+      'session.status',
+      { syncPosition: 2, data: { data: { status: 'running' } } },
+      5,
+      'events'
+    );
+    await flush();
+    // The queued frame is projected while the mint is still outstanding.
+    expect(state?.events.some(event => event['seq'] === 5)).toBe(true);
+    expect(ticketPosts()).toBe(2);
+    expect(socket.sent.filter(value => value['type'] === 'reauth')).toEqual([]);
+    // The deadline retires the epoch instead of holding the queue until the mint settles.
+    await jest.advanceTimersByTimeAsync(NATIVE_SYNC_TICKET_MINT_DEADLINE_MS);
+    await flush();
+    expect(state?.connection).toBe('disconnected');
+    resume();
+    await jest.advanceTimersByTimeAsync(2000);
+    await flush();
+    expect(FakeSocket.sockets).toHaveLength(2);
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
+test('coalesces reauth_required frames onto one in-flight ticket mint', async () => {
+  const { client, stall, release, ticketPosts } = heldTicketFixture();
+  const connection = client.connectSession('ses_a', () => {});
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  stall();
+  socket.frame('reauth_required', {}, 4);
+  socket.frame('reauth_required', {}, 5);
+  await flush();
+  expect(ticketPosts()).toBe(2);
+  expect(socket.sent.filter(value => value['type'] === 'reauth')).toEqual([]);
+  release('second-ticket');
+  await flush();
+  expect(ticketPosts()).toBe(2);
+  expect(socket.sent.filter(value => value['type'] === 'reauth')).toEqual([
+    { type: 'reauth', ticket: 'second-ticket' },
+  ]);
+  connection.close();
+});
+
 test('rejects offline live-only commands and queues opt-in prompts with TTL and status reads', async () => {
   const { client, calls } = fixture();
   const connection = client.connectSession('ses_a', () => {});
@@ -287,6 +398,66 @@ test('rejects offline live-only commands and queues opt-in prompts with TTL and 
     type: 'send_message',
   });
   expect(await connection.getCommandStatus(commandID)).toBe('queued');
+  connection.close();
+});
+
+test('keeps the newest command status when a frame advances it before the POST answer settles', async () => {
+  let answer: (response: Response) => void = () => {
+    throw new Error('command POST answer was not requested');
+  };
+  const pending = new Promise<Response>(resolve => {
+    answer = resolve;
+  });
+  const { client, calls } = fixture(path => (path.endsWith('/commands') ? pending : undefined));
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  const sent = connection.sendMessage('queue me', { queueIfOffline: true });
+  await flush();
+  const posted = calls.find(call => call.path.endsWith('/commands'))?.body.commandID;
+  expect(typeof posted).toBe('string');
+  const commandID = posted as string;
+  socket.frame('command_status', { commandID, status: 'delivered' });
+  await flush();
+  expect(state?.commands[commandID]).toBe('delivered');
+  answer(Response.json({ commandID, status: 'queued' }));
+  await sent;
+  await flush();
+  expect(state?.commands[commandID]).toBe('delivered');
+  connection.close();
+});
+
+test('a late status poll answer does not regress a frame-reported expiry', async () => {
+  let answer: (response: Response) => void = () => {
+    throw new Error('status poll answer was not requested');
+  };
+  const pending = new Promise<Response>(resolve => {
+    answer = resolve;
+  });
+  const { client } = fixture(path =>
+    path.endsWith('/commands/cmd_expired') ? pending : undefined
+  );
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame('command_status', { commandID: 'cmd_expired', status: 'expired' });
+  await flush();
+  expect(state?.commands['cmd_expired']).toBe('expired');
+  const status = connection.getCommandStatus('cmd_expired');
+  await flush();
+  answer(Response.json({ commandID: 'cmd_expired', status: 'queued' }));
+  await expect(status).resolves.toBe('expired');
+  expect(state?.commands['cmd_expired']).toBe('expired');
   connection.close();
 });
 
@@ -540,6 +711,42 @@ test('unreadable pending inventory clears controls without blocking later ordere
   expect(state?.pending.permissions.map(item => item.id)).toEqual(['new']);
   expect(state?.connection).toBe('connected');
   expect(FakeSocket.sockets).toHaveLength(1);
+  connection.close();
+});
+
+test('a mixed pending inventory publishes readable cards and an unreadable notice together', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame(
+    'remote.state',
+    {
+      incarnation: 'runner',
+      runID: 'run',
+      pending: {
+        permissions: [
+          { requestID: 'readable', tool: 'edit', summary: 'file' },
+          { requestID: 'unreadable', tool: 'edit', summary: 7 },
+        ],
+        questions: [
+          { requestID: 'question', fields: [{ type: 'string', key: 'q', title: 'Which?' }] },
+        ],
+      },
+    },
+    1,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.permissions.map(item => item.id)).toEqual(['readable']);
+  expect(state?.pending.unreadablePermissions).toEqual([{ requestId: 'unreadable' }]);
+  expect(state?.pending.questions.map(item => item.id)).toEqual(['question']);
+  expect(state?.connection).toBe('connected');
   connection.close();
 });
 
@@ -2191,7 +2398,7 @@ test('session moves wait for a revision-pinned authoritative canonical message i
   expect(state?.messages).toEqual([]);
   expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
   if (!state) throw new Error('Missing native state');
-  expect(readNativeConversation(state).error).toContain('incomplete');
+  expect(readNativeConversation(state)).toMatchObject({ recoveryGaps: 1, error: undefined });
   await jest.advanceTimersByTimeAsync(250);
   await flush();
   expect(state.pendingSnapshotMessageIDs).toEqual(['msg_2']);
@@ -2412,6 +2619,76 @@ test('missing metadata recovery stops at its bound with a visible error, not a c
   connection.close();
 });
 
+test('requestRecovery retries missing parts over the live socket and resolves once they arrive', async () => {
+  const initial: NativeSnapshot = {
+    position: 1,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    messages: [],
+  };
+  snapshot.mockResolvedValue(initial);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  socket.frame(
+    'session.moved',
+    {
+      syncPosition: 1,
+      data: { data: { sessionID: 'ses_a', location: { directory: '/after' } } },
+    },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
+  // Let the automatic run reach its bound, so the retry below is the only recovery left.
+  await jest.advanceTimersByTimeAsync(3750);
+  await flush();
+  expect(state?.error).toContain('incomplete');
+  const sockets = FakeSocket.sockets.length;
+  const reads = snapshot.mock.calls.length;
+  snapshot.mockResolvedValue({
+    ...initial,
+    position: 2,
+    revision: 2,
+    messages: [
+      {
+        seq: 2,
+        message: {
+          id: 'msg_2',
+          type: 'location-switched',
+          time: { created: 2 },
+          location: { directory: '/after' },
+          previous: { location: { directory: '/before' } },
+        },
+      },
+    ],
+  });
+  const recovered = connection.requestRecovery();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  await recovered;
+  // The same socket carried the retry: no reconnect, no teardown.
+  expect(FakeSocket.sockets.length).toBe(sockets);
+  expect(snapshot.mock.calls.length).toBe(reads + 1);
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  expect(state?.error).toBeUndefined();
+  if (!state) throw new Error('Missing recovered state');
+  expect(readNativeConversation(state).recoveryGaps).toBe(0);
+  // Nothing is missing any more, so a later retry resolves without reading a snapshot.
+  const clean = snapshot.mock.calls.length;
+  await connection.requestRecovery();
+  expect(snapshot.mock.calls.length).toBe(clean);
+  connection.close();
+});
+
 test('binary snapshot assets share organization grants, renew a 401, and preserve cancellation', async () => {
   const { client, fetcher, calls } = fixture();
   const ordinary = fetcher.getMockImplementation();
@@ -2461,12 +2738,65 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
   expect(assetCalls).toBe(2);
 });
 
+/** One stored attachment page; `advertisedBytes` is what the mapping authorizes. */
+function assetSnapshotPage(advertisedBytes = 3) {
+  const hash = 'c'.repeat(64);
+  const reference = `media:${hash}`;
+  return {
+    hash,
+    reference,
+    page: {
+      version: 1,
+      sessionID: 'ses_a',
+      position: 1,
+      revision: 1,
+      next: null,
+      entities: [
+        { kind: 'session', id: 'ses_a', revision: 1, value: sessionMetadata },
+        {
+          kind: 'message',
+          id: 'msg_asset',
+          revision: 1,
+          value: {
+            seq: 0,
+            message: {
+              id: 'msg_asset',
+              type: 'user',
+              time: { created: 1 },
+              text: 'inspect',
+              files: [
+                {
+                  mime: 'image/png',
+                  name: 'image.png',
+                  uri: reference,
+                  source: { type: 'inline' },
+                },
+              ],
+            },
+          },
+        },
+        {
+          kind: 'asset',
+          id: 'asset_owned',
+          revision: 1,
+          value: {
+            entity: { kind: 'message', id: 'msg_asset' },
+            pointer: '/message/files/0',
+            reference,
+            mime: 'image/png',
+            blob: { hash, bytes: advertisedBytes },
+          },
+        },
+      ],
+    },
+  };
+}
+
 function assetSnapshotFixture(response: Response, advertisedBytes = 3) {
   const { client, fetcher } = fixture();
   const ordinary = fetcher.getMockImplementation();
   if (!ordinary) throw new Error('Missing fetch fixture');
-  const hash = 'c'.repeat(64);
-  const reference = `media:${hash}`;
+  const { hash, page: entitiesPage } = assetSnapshotPage(advertisedBytes);
   fetcher.mockImplementation(async (input, init) => {
     const path = new URL(String(input)).pathname;
     if (path.endsWith(`/blobs/${hash}`)) return response;
@@ -2479,52 +2809,7 @@ function assetSnapshotFixture(response: Response, advertisedBytes = 3) {
         revision: 1,
       });
     }
-    if (path === '/v1/sessions/ses_a/entities') {
-      return Response.json({
-        version: 1,
-        sessionID: 'ses_a',
-        position: 1,
-        revision: 1,
-        next: null,
-        entities: [
-          { kind: 'session', id: 'ses_a', revision: 1, value: sessionMetadata },
-          {
-            kind: 'message',
-            id: 'msg_asset',
-            revision: 1,
-            value: {
-              seq: 0,
-              message: {
-                id: 'msg_asset',
-                type: 'user',
-                time: { created: 1 },
-                text: 'inspect',
-                files: [
-                  {
-                    mime: 'image/png',
-                    name: 'image.png',
-                    uri: reference,
-                    source: { type: 'inline' },
-                  },
-                ],
-              },
-            },
-          },
-          {
-            kind: 'asset',
-            id: 'asset_owned',
-            revision: 1,
-            value: {
-              entity: { kind: 'message', id: 'msg_asset' },
-              pointer: '/message/files/0',
-              reference,
-              mime: 'image/png',
-              blob: { hash, bytes: advertisedBytes },
-            },
-          },
-        ],
-      });
-    }
+    if (path === '/v1/sessions/ses_a/entities') return Response.json(entitiesPage);
     return ordinary(input, init);
   });
   snapshot.mockImplementationOnce(
@@ -2615,6 +2900,60 @@ test('rejects an asset stream that ends before the advertised byte count', async
   await expect(client.getSnapshot('ses_a')).rejects.toMatchObject({
     code: 'blob_hash_mismatch',
   });
+});
+
+test('closing a live session drops its retained attachment bodies', async () => {
+  const { client, fetcher } = fixture();
+  const ordinary = fetcher.getMockImplementation();
+  if (!ordinary) throw new Error('Missing fetch fixture');
+  const { hash, page: entitiesPage } = assetSnapshotPage(3);
+  let blobReads = 0;
+  fetcher.mockImplementation(async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith(`/blobs/${hash}`)) {
+      blobReads++;
+      return new Response(new Uint8Array([1, 2, 3]).buffer);
+    }
+    if (path === '/v1/sessions/ses_a') {
+      return Response.json({
+        version: 1,
+        sessionID: 'ses_a',
+        deleted: false,
+        position: 1,
+        revision: 1,
+      });
+    }
+    if (path === '/v1/sessions/ses_a/entities') return Response.json(entitiesPage);
+    return ordinary(input, init);
+  });
+  const actual =
+    jest.requireActual<typeof NativeSnapshotModule>('./native-sync-snapshot').fetchNativeSnapshot;
+  snapshot
+    .mockImplementationOnce(actual)
+    .mockImplementationOnce(actual)
+    .mockImplementationOnce(actual);
+  const key = kilo2AssetKey('msg_asset_000001', `media:${hash}`, 'image/png');
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(), 1);
+  // Drain microtasks until the hello snapshot has published its resolved attachment.
+  for (let tick = 0; tick < 2000 && state?.assetURLs?.[key] === undefined; tick++)
+    await Promise.resolve();
+  expect(state?.assetURLs?.[key]).toBe('data:image/png;base64,AQID');
+  expect(blobReads).toBe(1);
+  // A second read answers from the retained body, which proves the body really was retained
+  // instead of the later count merely matching a body that was never kept.
+  const retained = await client.getSnapshot('ses_a');
+  expect(retained.assetURLs?.[key]).toBe('data:image/png;base64,AQID');
+  expect(blobReads).toBe(1);
+  connection.close();
+  await flush();
+  const reread = await client.getSnapshot('ses_a');
+  expect(reread.assetURLs?.[key]).toBe('data:image/png;base64,AQID');
+  expect(blobReads).toBe(2);
 });
 
 test('same-path live native tool files invalidate old bytes and resolve only through a newer authoritative snapshot', async () => {

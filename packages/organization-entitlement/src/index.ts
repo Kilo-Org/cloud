@@ -3,9 +3,12 @@ export {
   getDaysRemainingInTrial,
   getOrganizationTrialEndDate,
   getOrgTrialStatusFromDays,
+  isRunningTrialStage,
+  TRIAL_STAGE_RUNNING,
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
 } from './trial';
+export type { RunningTrialStage } from './trial';
 export {
   isKnownOrganizationSeatPurchaseSubscriptionStatus,
   isPaidOrganizationSeatSubscriptionStatus,

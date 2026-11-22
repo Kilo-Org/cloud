@@ -6,7 +6,7 @@
  * page-flattening without pulling in the native bridge.
  */
 
-import { hasRetentionBudget } from '@/lib/query/infinite-retention';
+import { hasRetentionBudget, stoppedAtRetentionBound } from '@/lib/query/infinite-retention';
 import { dedupeBy } from '@/lib/query/dedupe-by-id';
 
 /**
@@ -25,6 +25,10 @@ import { dedupeBy } from '@/lib/query/dedupe-by-id';
  * retained in the cache on `refetch()`. The foreground and refresh paths
  * reconcile page one instead, but the bound still caps the fan-out of any full
  * refetch and the memory the history holds.
+ *
+ * The bound is observable through `sessionPagesAtRetentionBound`, so a list
+ * that stopped here can say so. The cursor chain itself still closes at the
+ * same page as before, and page one still stays cached.
  */
 export const SESSION_HISTORY_MAX_PAGES = 20;
 
@@ -41,6 +45,28 @@ export function sessionNextPageParam<TCursor>(
     return undefined;
   }
   return lastPage.nextCursor ?? undefined;
+}
+
+/**
+ * True when the retention bound is what ended the list.
+ *
+ * The bound closes the cursor chain with the same `undefined` that means "no
+ * more rows", so `hasNextPage` alone cannot tell a truncated list from a
+ * complete one. The last loaded page's own `nextCursor` answers it: a
+ * newest-first list sits at the bound when the retained page count has reached
+ * `SESSION_HISTORY_MAX_PAGES` and that page still carries a cursor.
+ *
+ * Reads the page array only, so it also runs before React Query reports
+ * anything, and returns false before the first page lands.
+ */
+export function sessionPagesAtRetentionBound(
+  pages: readonly { nextCursor?: unknown }[] | undefined
+): boolean {
+  return stoppedAtRetentionBound(
+    pages?.length ?? 0,
+    pages?.at(-1)?.nextCursor != null,
+    SESSION_HISTORY_MAX_PAGES
+  );
 }
 
 /**

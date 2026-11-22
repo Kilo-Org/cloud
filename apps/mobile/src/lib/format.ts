@@ -37,23 +37,43 @@ export const UNMEASURED_VALUE = '—';
  * symbol (`-$5.00`, or the locale's own minus glyph). `options` pins the
  * fraction digits the surface needs, from none (`$49`) up to four below half a
  * cent.
+ *
+ * Amounts that round to zero display without a sign.
  */
 export function formatPrefixedUsd(
   amount: number,
   locale: string,
   options: Intl.NumberFormatOptions = {}
 ): string {
-  const parts = numberFormat(locale, { ...options, style: 'decimal' }).formatToParts(amount);
-  const sign = parts
-    .filter(candidate => candidate.type === 'minusSign')
-    .map(candidate => candidate.value)
-    .join('');
-  const digits = parts
-    .filter(candidate => candidate.type !== 'minusSign')
-    .map(candidate => candidate.value)
-    .join('');
+  return prefixMoney(amount, locale, { ...options, style: 'decimal', signDisplay: 'negative' });
+}
+
+/** The prefixed figure one formatter shape writes, its sign composed in front. */
+function prefixMoney(amount: number, locale: string, options: Intl.NumberFormatOptions): string {
+  const parts = numberFormat(locale, options).formatToParts(amount);
+  let sign = '';
+  let digits = '';
+  for (const part of parts) {
+    if (part.type === 'minusSign' || part.type === 'plusSign') {
+      sign += part.value;
+    } else {
+      digits += part.value;
+    }
+  }
   return `${sign}$${digits}`;
 }
+
+/** The two-decimal shape for balances and credit entries. */
+const MONEY_OPTIONS: Intl.NumberFormatOptions = {
+  style: 'decimal',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: 'negative',
+};
+const LEDGER_MONEY_OPTIONS: Intl.NumberFormatOptions = {
+  ...MONEY_OPTIONS,
+  signDisplay: 'exceptZero',
+};
 
 /**
  * A balance or a spend in the shape a reader compares between screens: two
@@ -68,10 +88,12 @@ export function formatPrefixedUsd(
  * number.
  */
 export function formatPrefixedMoney(amount: number, locale: string): string {
-  return formatPrefixedUsd(amount, locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return prefixMoney(amount, locale, MONEY_OPTIONS);
+}
+
+/** Sign nonzero credit entries. The caller isolates the amount in RTL text. */
+export function formatSignedPrefixedMoney(amount: number, locale: string): string {
+  return prefixMoney(amount, locale, LEDGER_MONEY_OPTIONS).replaceAll(BIDI_MARK, '');
 }
 
 /** Amounts below this render as a zero currency value at four fraction digits (50 µ$). */

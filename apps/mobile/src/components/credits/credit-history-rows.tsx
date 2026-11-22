@@ -18,7 +18,7 @@ import {
   type CreditPurchaseEntry,
 } from '@/lib/credits/credit-history';
 import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
-import { formatDate, formatPrefixedMoney } from '@/lib/format';
+import { formatDate, formatSignedPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
@@ -77,12 +77,8 @@ const GRANT_TITLE_KEYS = {
 
 /** A signed credit amount, kept in its own left-to-right run. */
 function creditAmountLabel(amountMicrodollars: number): string {
-  const isPositive = amountMicrodollars >= 0;
   return isolateLtrBidiText(
-    `${isPositive ? '+' : '-'}${formatPrefixedMoney(
-      Math.abs(fromMicrodollars(amountMicrodollars)),
-      i18n.language
-    )}`
+    formatSignedPrefixedMoney(fromMicrodollars(amountMicrodollars), i18n.language)
   );
 }
 

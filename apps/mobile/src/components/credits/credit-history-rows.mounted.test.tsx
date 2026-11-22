@@ -95,7 +95,7 @@ function paintedAmountAndDate(renderer: TestRenderer.ReactTestRenderer): {
   date: string;
 } {
   const painted = texts(renderer).map(text => readable(text));
-  const amountIndex = painted.findIndex(text => text.startsWith('+') || text.startsWith('-'));
+  const amountIndex = painted.findIndex(text => /^[+-]?\$/.test(text));
   const amount = painted[amountIndex];
   const date = painted[amountIndex + 1];
   if (amount === undefined || date === undefined) {
@@ -288,13 +288,11 @@ describe('GrantHistoryRow', () => {
     renderer.unmount();
   });
 
-  it('paints the amount as a positive run and the grant date under it', async () => {
-    const renderer = await renderGrantRow(grant({ amount_mUsd: 12_500_000 }));
+  it.each([12_500_000, -1_000])('paints the grant amount and date for %i', async amount_mUsd => {
+    const renderer = await renderGrantRow(grant({ amount_mUsd }));
 
     const { amount, date } = paintedAmountAndDate(renderer);
-    expect(amount).toBe('+$12.50');
-    // The grant's own date, not the deduction or purchase date the other rows
-    // prefer: this row has nothing else to print.
+    expect(amount).toBe(amount_mUsd < 0 ? '$0.00' : '+$12.50');
     expect(date).toBe('11/12/2026');
     renderer.unmount();
   });

@@ -22328,7 +22328,6 @@
             },
             "name": {
               "type": "string",
-              "minLength": 1,
               "maxLength": 80
             },
             "description": {
@@ -23186,7 +23185,6 @@
             },
             "name": {
               "type": "string",
-              "minLength": 1,
               "maxLength": 80
             },
             "description": {
@@ -23266,7 +23264,6 @@
             },
             "name": {
               "type": "string",
-              "minLength": 1,
               "maxLength": 80
             },
             "description": {

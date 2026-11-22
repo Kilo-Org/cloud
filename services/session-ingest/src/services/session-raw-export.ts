@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { storedSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import type { Env } from '../env';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
@@ -19,7 +19,9 @@ import { getSessionIngestDO } from '../dos/SessionIngestDO';
  */
 export const sessionRawExportRequestSchema = z.object({
   kiloUserId: z.string().min(1).max(255),
-  sessionId: sessionIdSchema,
+  // Every id a stored row can hold, not only the canonical `ses_…` shape: a
+  // session created earlier keeps its id, and its rows are addressed by it.
+  sessionId: storedSessionIdSchema,
   requireSessionRow: z.boolean().optional(),
 });
 

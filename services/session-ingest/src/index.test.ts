@@ -742,6 +742,29 @@ describe('internal session-rows export route', () => {
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
+  it('accepts a stored session id that predates the canonical shape', async () => {
+    const legacySessionId = 'legacy-session_1';
+    const stub = { exportSessionRowsStream: vi.fn(async () => new Response('').body!) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, sessionId: legacySessionId, requireSessionRow: false }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(200);
+    expect(getSessionIngestDO).toHaveBeenCalledWith(defaultEnv, {
+      kiloUserId: body.kiloUserId,
+      sessionId: legacySessionId,
+    });
+    expect(stub.exportSessionRowsStream).toHaveBeenCalledOnce();
+  });
+
   it('returns 404 without touching a Durable Object when the session row is absent', async () => {
     const { db } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);

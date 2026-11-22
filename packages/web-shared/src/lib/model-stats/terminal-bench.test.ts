@@ -6,6 +6,7 @@ import {
   terminalBenchFor,
 } from './terminal-bench';
 import { getModelStatsSnapshot } from './model-stats-cache';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type {
   ModelStatsCacheEntry,
   ModelStatsLoadClient,
@@ -16,7 +17,12 @@ jest.mock('./model-stats-cache', () => ({
   getModelStatsSnapshot: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: jest.fn(),
+}));
+
 const mockSnapshot = jest.mocked(getModelStatsSnapshot);
+const mockWarn = jest.mocked(warnExceptInTest);
 
 const summary = { overallScore: 0.551, avgAttemptCostUsd: 53.37 };
 
@@ -75,6 +81,7 @@ function snapshot(
 
 beforeEach(() => {
   mockSnapshot.mockReset();
+  mockWarn.mockReset();
 });
 
 describe('summarizeTerminalBench', () => {
@@ -152,10 +159,49 @@ describe('getTerminalBenchSummaries', () => {
     expect(mockSnapshot.mock.calls[0]?.[0]?.fromDb).toBe(replica);
   });
 
-  it('resolves an empty map when the snapshot load rejects', async () => {
-    mockSnapshot.mockRejectedValue(new Error('snapshot unavailable'));
+  it('computes the summaries once per snapshot, not once per call', async () => {
+    const shared = snapshot([row()]);
+    mockSnapshot.mockResolvedValue(shared);
+
+    const first = await getTerminalBenchSummaries();
+    const second = await getTerminalBenchSummaries();
+
+    expect(mockSnapshot).toHaveBeenCalledTimes(2);
+    expect(second).toBe(first);
+    expect(first).toEqual(new Map([['openai/model', summary]]));
+  });
+
+  it('builds a new map for a new snapshot after invalidation', async () => {
+    const before = snapshot([row()]);
+    const after = snapshot([
+      row({
+        openrouterId: 'anthropic/new-model',
+        benchmarks: benchmarks({ avgAttemptCostUsd: 12.5 }),
+      }),
+    ]);
+    mockSnapshot.mockResolvedValueOnce(before).mockResolvedValueOnce(after);
+
+    const first = await getTerminalBenchSummaries();
+    const second = await getTerminalBenchSummaries();
+
+    expect(second).not.toBe(first);
+    expect(first).toEqual(new Map([['openai/model', summary]]));
+    expect(second).toEqual(
+      new Map([
+        ['anthropic/new-model', { overallScore: summary.overallScore, avgAttemptCostUsd: 12.5 }],
+      ])
+    );
+  });
+
+  it('resolves an empty map and warns once when the snapshot load rejects', async () => {
+    mockSnapshot.mockRejectedValue(new Error('snapshot\n  unavailable'));
 
     await expect(getTerminalBenchSummaries()).resolves.toEqual(new Map());
+
+    expect(mockWarn).toHaveBeenCalledTimes(1);
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[model-stats] terminal-bench summaries unavailable: snapshot unavailable; serving no benchmark summaries'
+    );
   });
 });
 

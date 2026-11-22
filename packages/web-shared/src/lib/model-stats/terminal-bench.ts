@@ -1,8 +1,10 @@
 import { ModelStatsBenchmarksSchema } from '@kilocode/db/schema';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   getModelStatsSnapshot,
   type ModelStatsCacheEntry,
   type ModelStatsLoadClient,
+  type ModelStatsSnapshot,
 } from './model-stats-cache';
 import { lookupModelWithKiloGatewayFallback } from './model-id-lookup';
 
@@ -58,9 +60,33 @@ export function terminalBenchFor(
   return lookupModelWithKiloGatewayFallback(id, candidate => summaries.get(candidate));
 }
 
+/**
+ * The snapshot is cached and reused by identity, so one entry per snapshot object means the
+ * summaries are built once per snapshot load rather than once per caller. A new snapshot (after a
+ * TTL expiry or `invalidateModelStatsCache`) gets its own entry, and the WeakMap releases the old
+ * one with the snapshot.
+ */
+const summariesBySnapshot = new WeakMap<ModelStatsSnapshot, TerminalBenchSummaries>();
+
+function summariesOf(snapshot: ModelStatsSnapshot): TerminalBenchSummaries {
+  const cached = summariesBySnapshot.get(snapshot);
+  if (cached) return cached;
+  const summaries = summarizeTerminalBench(snapshot.entries, snapshot.customLlmIds);
+  summariesBySnapshot.set(snapshot, summaries);
+  return summaries;
+}
+
 export async function getTerminalBenchSummaries({
   fromDb,
 }: { fromDb?: ModelStatsLoadClient } = {}): Promise<TerminalBenchSummaries> {
-  const snapshot = await getModelStatsSnapshot({ fromDb }).catch(() => null);
-  return snapshot ? summarizeTerminalBench(snapshot.entries, snapshot.customLlmIds) : new Map();
+  const snapshot = await getModelStatsSnapshot({ fromDb }).catch((error: unknown) => {
+    const reason = (error instanceof Error ? error.message : String(error))
+      .replace(/\s+/g, ' ')
+      .trim();
+    warnExceptInTest(
+      `[model-stats] terminal-bench summaries unavailable: ${reason}; serving no benchmark summaries`
+    );
+    return null;
+  });
+  return snapshot ? summariesOf(snapshot) : new Map();
 }

@@ -25,7 +25,11 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  textActionTargetClass,
+} from '@/lib/a11y/tap-target';
 import { i18n } from '@/i18n';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
@@ -104,27 +108,29 @@ function TriggerRow({
       {showsInboundUrl ? (
         // The inbound URL is a value of its own rather than the row's subtitle:
         // it is copied, and a subtitle truncates it past the first line. The
-        // copy control is the shared compact box: a 32dp node below the row's
-        // 28dp floor, whose own height sets this line instead of a full-size
-        // 48dp icon target pulled back with a negative margin. That target
-        // reached 6.5dp into the row above and competed with its press; the
-        // compact box's `hitSlop` carries the reach to 48dp without adding a
-        // frame the neighbour can collide with.
+        // copy control is the shared compact box, which declares its reach
+        // through `hitSlop`. React Native clips that reach at the parent view,
+        // so the parent must be at least the platform target on both axes; this
+        // line's own content height is the compact box alone. The host carries
+        // that target, the box and its slop sit inside it, and the host is in
+        // flow with no negative margin, so nothing here overhangs the row above.
         <View className="flex-row items-center gap-2 px-4 pb-3">
           <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
             {trigger.inboundUrl}
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('common.copyLink')}
-            onPress={() => {
-              void copyWebhookUrl(trigger.inboundUrl);
-            }}
-            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-            className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
-          >
-            <Copy size={16} color={colors.mutedForeground} />
-          </Pressable>
+          <View className={cn('shrink-0 items-center justify-center', textActionTargetClass())}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('common.copyLink')}
+              onPress={() => {
+                void copyWebhookUrl(trigger.inboundUrl);
+              }}
+              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+              className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
+            >
+              <Copy size={16} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
         </View>
       ) : null}
     </View>

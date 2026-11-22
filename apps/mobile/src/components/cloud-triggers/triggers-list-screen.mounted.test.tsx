@@ -14,6 +14,7 @@ import { createElement, type ElementType } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { COMPACT_CONTROL_BOX_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
 import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -66,6 +67,8 @@ const setActive = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
+  // `textActionTargetClass` reads the platform to pick the shared frame.
+  Platform: { OS: 'android', select: (options: Record<string, unknown>) => options.android },
   useColorScheme: () => 'light',
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
@@ -170,8 +173,20 @@ describe('TriggersListScreen rows', () => {
     if (!copyButton) {
       throw new Error('missing copy control');
     }
-    // The control is the shared compact box: a full-size icon target in a
-    // text-height row overran the row above it.
+    // The control is the shared compact box, and it declares its reach as slop.
+    // React Native clips that reach at the parent view, so the control's parent
+    // must carry the platform target on both axes; the row's own content height
+    // is the box alone.
+    expect(String(copyButton.props.className).split(' ')).toEqual(
+      expect.arrayContaining(COMPACT_CONTROL_BOX_CLASS.split(' '))
+    );
+    const host = copyButton.parent;
+    if (!host) {
+      throw new Error('copy control has no host');
+    }
+    expect(String(host.props.className).split(' ')).toEqual(
+      expect.arrayContaining([...textActionTargetClass().split(' '), 'shrink-0'])
+    );
     act(() => {
       (copyButton.props.onPress as () => void)();
     });

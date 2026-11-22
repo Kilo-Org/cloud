@@ -9,7 +9,7 @@
  *     --owner <kilo user id> --slug <stored slug> [--org <uuid>]
  */
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   ai_gateway_metadata_cache,
   modelsByProvider,
@@ -99,7 +99,8 @@ await db
   .values({ url: CATALOGUE_URL, data: catalogue })
   .onConflictDoUpdate({ target: ai_gateway_metadata_cache.url, set: { data: catalogue } });
 
-await db.delete(modelsByProvider);
+// Keep exactly one fixture snapshot, so a re-run never leaves two rows behind.
+await db.delete(modelsByProvider).where(sql`true`);
 await db.insert(modelsByProvider).values({ data: snapshot });
 
 // `require_seats: false` bypasses trial enforcement, so the owner may write the

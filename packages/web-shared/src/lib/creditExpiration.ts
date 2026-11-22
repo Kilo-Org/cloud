@@ -32,8 +32,9 @@ const EXPIRED_CREDIT_CATEGORIES = [
   'orb_credit_voided',
 ] as const;
 
-// Organization lots are only closed by Kilo's own expiration row. Organizations do not use the
-// Orb closure categories, so this list stays narrower than EXPIRED_CREDIT_CATEGORIES on purpose.
+// The single-organization read accepts only Kilo's own expiration row: it keeps the narrower rule that
+// creditExpirationOrg.test.ts pins. The batch organization loader below and the reconciler in
+// @kilocode/db accept all three categories, so the two organization paths disagree until that is settled.
 const ORGANIZATION_EXPIRED_CREDIT_CATEGORIES = ['credits_expired'] as const;
 
 // Every credit-lot read needs the same columns to feed computeExpiration; a loader adds its own

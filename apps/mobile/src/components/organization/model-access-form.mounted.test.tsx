@@ -1063,5 +1063,22 @@ describe('ModelAccessForm durable draft', () => {
         modelDenyList: ['openai/gpt'],
       });
     });
+
+    it('shows the saved lists to a viewer who changes tab', () => {
+      // The tab control stays available to a viewer, so the read-only state has
+      // to hold across a tab change and a later return to a role that may edit:
+      // the lists come from the saved policy throughout.
+      draftStore.kind = 'ready';
+      draftStore.value = { providerAllowList: ['openai'], modelDenyList: [] };
+      const root = render(['anthropic'], { canEdit: false });
+
+      selectTab(root, 'providers');
+      const editorRoot = rerender(['anthropic'], { canEdit: true });
+
+      expect(list(editorRoot, 'ProviderAllowList').props.draft).toEqual({
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
+      });
+    });
   });
 });

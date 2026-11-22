@@ -422,6 +422,102 @@ describe('refresh rotation', () => {
     }
   });
 
+  // The server consumes the presented refresh token and issues the replacement
+  // once. A rotation whose later write fails must therefore keep the pair that
+  // landed: deleting it leaves the device with neither the old nor the new
+  // refresh credential, and the next refresh then has nothing to present.
+  it('keeps the pair the server issued when the expiry write rejects', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '1');
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return store.get(key) ?? null;
+    });
+    // The access-token and refresh-token writes commit; the expiry write then
+    // rejects, exactly as a keychain refusal between two items behaves.
+    vi.mocked(SecureStore.setItemAsync)
+      .mockImplementationOnce(async (key: string, value: string) => {
+        store.set(key, value);
+        await Promise.resolve();
+      })
+      .mockImplementationOnce(async (key: string, value: string) => {
+        store.set(key, value);
+        await Promise.resolve();
+      })
+      .mockImplementationOnce(async () => {
+        await Promise.resolve();
+        throw new Error('keychain write failed');
+      });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        Response.json({ token: 't3', refreshToken: 'r3', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await expect(performRefresh()).resolves.toEqual({ kind: 'transient' });
+
+      // The rotated-in pair survives the failed expiry write.
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('t2');
+      expect(store.get(REFRESH_TOKEN_KEY)).toBe('r2');
+      expect(store.get(TOKEN_EXPIRES_AT_KEY)).toBe('1');
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+
+      // The retry presents the preserved refresh token and rotates, instead of
+      // finding an empty set and answering unreadable.
+      await expect(performRefresh()).resolves.toMatchObject({ kind: 'ok' });
+      const retryInit = fetchMock.mock.calls[1]?.[1] as { body?: string } | undefined;
+      expect(JSON.parse(retryInit?.body ?? 'null')).toEqual({ refreshToken: 'r2' });
+      expect(store.get(REFRESH_TOKEN_KEY)).toBe('r3');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps the committed access token and the previous refresh token when the refresh-token write rejects', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '1');
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return store.get(key) ?? null;
+    });
+    // The access-token write commits; the refresh-token write then rejects.
+    vi.mocked(SecureStore.setItemAsync)
+      .mockImplementationOnce(async (key: string, value: string) => {
+        store.set(key, value);
+        await Promise.resolve();
+      })
+      .mockImplementationOnce(async () => {
+        await Promise.resolve();
+        throw new Error('keychain write failed');
+      });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await expect(performRefresh()).resolves.toEqual({ kind: 'transient' });
+
+      // The set stays coherent enough for the server's lost-rotation recovery:
+      // the previous refresh token is still the one stored.
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('t2');
+      expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
+      expect(store.get(TOKEN_EXPIRES_AT_KEY)).toBe('1');
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   // The defect this slice removes: a null refresh-token read used to be read
   // as "no session" and refused, which signed a healthy person out. It is a
   // reliable read of a set with no refresh token, which can never rotate.

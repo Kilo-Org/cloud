@@ -59,7 +59,11 @@ type RefreshRefused = {
    *  awaits, and signing out then would tear down the newer session. */
   sessionVersion: number;
 };
-/** Anything that leaves the stored pair untouched and worth retrying later. */
+/**
+ * A failure the next attempt can recover from: the stored set is untouched, or
+ * it advanced to the pair the server just issued for a rotation whose later key
+ * write failed. Either way a later refresh rotates instead of finding nothing.
+ */
 type RefreshTransient = {
   kind: 'transient';
   /** The server's own back-off from a 429/503 `Retry-After`, when it sent one. */
@@ -157,6 +161,23 @@ async function clearStoredCredentialsAtEpoch(epoch: number): Promise<void> {
 type PersistCredentialsOptions = {
   expiresIn?: number;
   expectedEpoch?: number;
+  /**
+   * What a keychain rejection leaves behind when an earlier key of this attempt
+   * already committed.
+   *
+   * `'clear'` (the default; sign-in and the legacy exchange) wipes the set. A
+   * sign-in introduces a session the device does not hold yet, so a surviving
+   * partial set could pair the new account's access token with the previous
+   * account's refresh token.
+   *
+   * `'preserve'` (the refresh rotation) keeps the keys that landed. The pair
+   * belongs to the session already stored, the server keeps the presented
+   * refresh token recoverable for a bounded window (`LOST_ROTATION_GRACE_MS` in
+   * the web app's `lib/auth/device-sessions`), and the replacement it issued is
+   * unusable if the device drops it. Whatever position the failure lands in, the
+   * next refresh then rotates instead of finding an empty set.
+   */
+  partialWrite?: 'clear' | 'preserve';
 };
 
 export async function persistSignInCredentialsAtEpoch(
@@ -180,9 +201,10 @@ export async function persistSignInCredentialsAtEpoch(
   };
 
   // Whether any credential key of this attempt reached the keychain. A later
-  // rejection then knows the store may hold a partial set and wipes it; a
-  // failure on the very first operation leaves the previous session untouched,
-  // so a transient keychain failure stays retryable instead of signing out.
+  // rejection then knows the store may hold a partial set: under `'clear'` it
+  // wipes it, and under `'preserve'` it keeps it. A failure on the very first
+  // operation leaves the previous session untouched, so a transient keychain
+  // failure stays retryable instead of signing out.
   let committedAny = false;
 
   // Fence one credential operation: skip it when the epoch moved before the
@@ -218,12 +240,14 @@ export async function persistSignInCredentialsAtEpoch(
         return;
       }
     } catch (error) {
-      // A later keychain operation rejected after an earlier one committed:
-      // the store now holds a partial credential set. Wipe it best-effort in
-      // the same serialized slot — so it cannot touch a newer sign-in's keys —
-      // then rethrow the original failure. A cleanup failure is swallowed so
-      // it cannot mask the write failure the caller owns.
-      if (committedAny) {
+      // A later keychain operation rejected. Under `'clear'` the store may hold
+      // a partial credential set that must not survive, so wipe it best-effort
+      // in the same serialized slot — so it cannot touch a newer sign-in's keys
+      // — then rethrow the original failure. A cleanup failure is swallowed so
+      // it cannot mask the write failure the caller owns. Under `'preserve'`
+      // the keys that landed are kept: the pair is the one the server just
+      // issued to this session, and the next attempt can rotate from it.
+      if (committedAny && options.partialWrite !== 'preserve') {
         try {
           await clearPartialCredentials();
         } catch {
@@ -436,6 +460,11 @@ async function doRefresh(): Promise<RefreshOutcome> {
     const published = await persistSignInCredentialsAtEpoch(parsed.token, parsed.refreshToken, {
       expiresIn: parsed.expiresIn,
       expectedEpoch: sessionVersion,
+      // The server already consumed the presented refresh token and issued this
+      // pair. If a later key write fails, keeping what landed is the only way
+      // the retry can rotate: the replacement is not re-issued, and the server
+      // recovers the presented token only inside its lost-rotation grace.
+      partialWrite: 'preserve',
     });
     if (!published) {
       return { kind: 'superseded' };

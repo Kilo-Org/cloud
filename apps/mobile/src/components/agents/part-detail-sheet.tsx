@@ -17,6 +17,7 @@ import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-tra
 import { MONO_SCROLL_TEXT_MODE_OPTIONS, type MonoScrollTextMode } from './mono-scroll-block-model';
 import { MonoScrollSheetProvider } from './mono-scroll-block';
 import { SessionPageSheet } from './session-page-sheet';
+import { SheetFocusSink } from './sheet-focus-sink';
 import {
   getPartDetailTitle,
   shouldAutoFollowPartDetail,
@@ -128,6 +129,7 @@ export function PartDetailSheet({
   const centered = shouldCenterPartDetail(part, attachmentUri !== undefined, imageFailed);
   const content = (
     <MonoScrollSheetProvider value={sheetContext}>
+      <SheetFocusSink />
       {part && isToolPart(part) ? (
         <ToolPartDetailBody
           part={part}

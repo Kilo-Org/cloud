@@ -8,6 +8,7 @@ import {
   computeExpiration,
   earliestUnexpiredExpiry,
   reconcileCreditExpirationsInTransaction,
+  type CreditOwner,
   type ExpiringTransaction,
   type EntityForExpiration,
 } from '@kilocode/db/credit-expiration';
@@ -21,6 +22,34 @@ export type CreditExpirationState = {
   microdollars_used: number;
   total_microdollars_acquired: number;
   next_credit_expiration_at: string | null;
+};
+
+// Categories that close a credit lot: a negative row with one of these categories and
+// `original_transaction_id` set means the original lot has already been expired or voided.
+const EXPIRED_CREDIT_CATEGORIES = [
+  'credits_expired',
+  'orb_credit_expired',
+  'orb_credit_voided',
+] as const;
+
+// Organization lots are only closed by Kilo's own expiration row. Organizations do not use the
+// Orb closure categories, so this list stays narrower than EXPIRED_CREDIT_CATEGORIES on purpose.
+const ORGANIZATION_EXPIRED_CREDIT_CATEGORIES = ['credits_expired'] as const;
+
+// Every credit-lot read needs the same columns to feed computeExpiration; a loader adds its own
+// owner column after the spread.
+const expiringLotColumns = {
+  id: creditTransactionsTable.id,
+  amount_microdollars: creditTransactionsTable.amount_microdollars,
+  expiration_baseline_microdollars_used:
+    creditTransactionsTable.expiration_baseline_microdollars_used,
+  consumed_microdollars: creditTransactionsTable.consumed_microdollars,
+  retired_microdollars: creditTransactionsTable.retired_microdollars,
+  paid_credit_policy: creditTransactionsTable.paid_credit_policy,
+  credit_source: creditTransactionsTable.credit_source,
+  expiry_date: creditTransactionsTable.expiry_date,
+  description: creditTransactionsTable.description,
+  is_free: creditTransactionsTable.is_free,
 };
 
 export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx = db) {
@@ -37,29 +66,13 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
     .limit(1)
     .as('expired_credits');
   return await fromDb
-    .select({
-      id: creditTransactionsTable.id,
-      amount_microdollars: creditTransactionsTable.amount_microdollars,
-      expiration_baseline_microdollars_used:
-        creditTransactionsTable.expiration_baseline_microdollars_used,
-      consumed_microdollars: creditTransactionsTable.consumed_microdollars,
-      retired_microdollars: creditTransactionsTable.retired_microdollars,
-      paid_credit_policy: creditTransactionsTable.paid_credit_policy,
-      credit_source: creditTransactionsTable.credit_source,
-      expiry_date: creditTransactionsTable.expiry_date,
-      description: creditTransactionsTable.description,
-      is_free: creditTransactionsTable.is_free,
-    })
+    .select(expiringLotColumns)
     .from(creditTransactionsTable)
     .leftJoinLateral(
       expiredCredits,
       and(
         eq(expiredCredits.kilo_user_id, userId),
-        inArray(expiredCredits.credit_category, [
-          'credits_expired',
-          'orb_credit_expired',
-          'orb_credit_voided',
-        ])
+        inArray(expiredCredits.credit_category, [...EXPIRED_CREDIT_CATEGORIES])
       )
     )
     .where(
@@ -73,14 +86,14 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
     );
 }
 
-export async function processLocalExpirations(
-  userId: string,
+async function reconcileForEntity(
+  entity: CreditOwner,
   now: Date,
-  options: { force?: boolean } = {}
+  options: { force?: boolean }
 ): Promise<CreditExpirationState> {
   return await db.transaction(async tx => {
     const state = await reconcileCreditExpirationsInTransaction(
-      { type: 'user', id: userId },
+      { type: entity.type, id: entity.id },
       tx,
       now,
       { onlyIfDue: !options.force }
@@ -91,6 +104,14 @@ export async function processLocalExpirations(
       next_credit_expiration_at: state.next_credit_expiration_at,
     };
   });
+}
+
+export async function processLocalExpirations(
+  userId: string,
+  now: Date,
+  options: { force?: boolean } = {}
+): Promise<CreditExpirationState> {
+  return await reconcileForEntity({ type: 'user', id: userId }, now, options);
 }
 
 /**
@@ -137,26 +158,13 @@ export async function fetchExpiringTransactionsForOrganization(
     .as('expired_credits');
 
   return await fromDb
-    .select({
-      id: creditTransactionsTable.id,
-      amount_microdollars: creditTransactionsTable.amount_microdollars,
-      expiration_baseline_microdollars_used:
-        creditTransactionsTable.expiration_baseline_microdollars_used,
-      consumed_microdollars: creditTransactionsTable.consumed_microdollars,
-      retired_microdollars: creditTransactionsTable.retired_microdollars,
-      paid_credit_policy: creditTransactionsTable.paid_credit_policy,
-      credit_source: creditTransactionsTable.credit_source,
-      expiry_date: creditTransactionsTable.expiry_date,
-      description: creditTransactionsTable.description,
-      is_free: creditTransactionsTable.is_free,
-      kilo_user_id: creditTransactionsTable.kilo_user_id,
-    })
+    .select({ ...expiringLotColumns, kilo_user_id: creditTransactionsTable.kilo_user_id })
     .from(creditTransactionsTable)
     .leftJoinLateral(
       expiredCredits,
       and(
         eq(expiredCredits.organization_id, organizationId),
-        eq(expiredCredits.credit_category, 'credits_expired')
+        inArray(expiredCredits.credit_category, [...ORGANIZATION_EXPIRED_CREDIT_CATEGORIES])
       )
     )
     .where(
@@ -194,28 +202,14 @@ async function fetchOpenCreditLotsForOrganizations(
   const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
   return await db
     .select({
-      id: creditTransactionsTable.id,
-      amount_microdollars: creditTransactionsTable.amount_microdollars,
-      expiration_baseline_microdollars_used:
-        creditTransactionsTable.expiration_baseline_microdollars_used,
-      consumed_microdollars: creditTransactionsTable.consumed_microdollars,
-      retired_microdollars: creditTransactionsTable.retired_microdollars,
-      paid_credit_policy: creditTransactionsTable.paid_credit_policy,
-      credit_source: creditTransactionsTable.credit_source,
-      expiry_date: creditTransactionsTable.expiry_date,
-      description: creditTransactionsTable.description,
-      is_free: creditTransactionsTable.is_free,
+      ...expiringLotColumns,
       organization_id: sql<string>`${creditTransactionsTable.organization_id}`,
     })
     .from(creditTransactionsTable)
     .leftJoin(
       expiredCredits,
       and(
-        inArray(expiredCredits.credit_category, [
-          'credits_expired',
-          'orb_credit_expired',
-          'orb_credit_voided',
-        ]),
+        inArray(expiredCredits.credit_category, [...EXPIRED_CREDIT_CATEGORIES]),
         eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
       )
     )
@@ -422,17 +416,5 @@ export async function processOrganizationExpirations(
   now: Date,
   options: { force?: boolean } = {}
 ): Promise<CreditExpirationState> {
-  return await db.transaction(async tx => {
-    const state = await reconcileCreditExpirationsInTransaction(
-      { type: 'organization', id: organizationId },
-      tx,
-      now,
-      { onlyIfDue: !options.force }
-    );
-    return {
-      microdollars_used: state.microdollars_used,
-      total_microdollars_acquired: state.total_microdollars_acquired,
-      next_credit_expiration_at: state.next_credit_expiration_at,
-    };
-  });
+  return await reconcileForEntity({ type: 'organization', id: organizationId }, now, options);
 }

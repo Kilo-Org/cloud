@@ -22,6 +22,10 @@ import {
   GitHubListingBudgetExceededError,
 } from '@/lib/integrations/platforms/github/adapter';
 import {
+  FORGE_FIXTURE_INSTALLATION_IDS_ENV,
+  GitHubAppInstallationProtectedError,
+} from '@/lib/integrations/platforms/github/protected-installation';
+import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
@@ -790,6 +794,35 @@ describe('uninstallApp', () => {
     }
   });
 
+  it('refuses a forge fixture installation with a CONFLICT and keeps the connection', async () => {
+    const installationId = installationNumber();
+    const { user, row } = await insertWorkflowIntegration(installationId);
+    const previous = process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV];
+    process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV] = ` ${installationId} `;
+
+    try {
+      await expect(
+        uninstallApp(
+          { type: 'user', id: user.id },
+          row.id,
+          'user-for-uninstall-test',
+          'user@example.com',
+          'Test User'
+        )
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: new GitHubAppInstallationProtectedError(installationId).message,
+      });
+      // The guard fires before any GitHub call, so the row stays connected.
+      expect(mockDeleteGitHubInstallation).not.toHaveBeenCalled();
+      expect(await readRow(row.id)).toEqual({ id: row.id });
+    } finally {
+      if (previous === undefined) delete process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV];
+      else process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV] = previous;
+      await cleanup(user.id, [installationId]);
+    }
+  });
+
   it('removes the connection when the provider answers that it is already gone', async () => {
     const installationId = installationNumber();
     const { user, row } = await insertWorkflowIntegration(installationId);
@@ -903,6 +936,30 @@ describe('listNativelyUninstallableIds', () => {
       expect([...ids]).toEqual([alone.row.id]);
     } finally {
       await cleanup([blocked.user.id, legacySibling.user.id, alone.user.id]);
+    }
+  });
+
+  it('counts a forge fixture installation as not natively uninstallable', async () => {
+    const protectedId = installationNumber();
+    const previous = process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV];
+    process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV] = `nope,${protectedId}`;
+    const fixture = await insertRow({
+      github_connection_role: 'workflow',
+      platform_installation_id: protectedId,
+    });
+    const ordinary = await insertRow({
+      github_connection_role: 'workflow',
+      platform_installation_id: installationNumber(),
+    });
+
+    try {
+      // The ordinary installation is alone, so only the fixture id is excluded.
+      const ids = await listNativelyUninstallableIds([fixture.row, ordinary.row]);
+      expect([...ids]).toEqual([ordinary.row.id]);
+    } finally {
+      if (previous === undefined) delete process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV];
+      else process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV] = previous;
+      await cleanup([fixture.user.id, ordinary.user.id]);
     }
   });
 

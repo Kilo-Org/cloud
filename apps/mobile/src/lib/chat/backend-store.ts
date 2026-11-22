@@ -256,7 +256,6 @@ const store = createSecureStorePreference<StoredChatBackend[]>({
   parse: parseChatBackends,
   serialize: value => JSON.stringify(value),
 });
-store.preload();
 
 export const listChatBackends = store.getRequested;
 export const subscribeChatBackends = store.subscribe;

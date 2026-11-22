@@ -68,6 +68,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useStartSecurityAnalysis: () => startAnalysis,
+  useRetrySecurityAnalysis: () => ({ retry: vi.fn(), isRetrying: false }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
@@ -149,6 +150,9 @@ function mountBoundary(
           analysis={analysis}
           isLoading={false}
           isError={false}
+          isPending={false}
+          fetchStatus="idle"
+          connectivity="online"
           onRetry={() => undefined}
         />
       </PanelErrorBoundary>
@@ -260,6 +264,9 @@ describe('PanelErrorBoundary with the real analysis panel', () => {
           analysis={query}
           isLoading={false}
           isError={false}
+          isPending={false}
+          fetchStatus="idle"
+          connectivity="online"
           onRetry={() => undefined}
         />
       </PanelErrorBoundary>

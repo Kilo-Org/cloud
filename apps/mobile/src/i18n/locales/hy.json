@@ -2565,7 +2565,7 @@
       "searchPlaceholder": "Որոնեք պահոցները…",
       "noMatches": "Համընկնումներ չկան",
       "noRepositories": "Հասանելի պահոցներ չկան",
-      "noRepositoriesDescription": "Ձեր հաշվին միացված պահոցներ չկան։",
+      "noRepositoriesDescription": "Պահոցները բեռնելու համար միացրու GitHub-ը կամ GitLab-ը։",
       "loading": "Բեռնվում է…",
       "accessibility": "Պահոց՝ {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Դու օգնական ես…",
       "tools": "Գործիքներ",
       "wholeToolRule": "Այս գործակալը միանգամից մեկ կանոն է կիրառում յուրաքանչյուր գործիքի վրա՝ {{rule}}։ Այս անջատիչները միայն ընթերցման համար են։",
+      "toolRule": "Պահպանված կանոն՝ {{rule}}",
       "visibility": "Տեսանելիություն",
       "visibilityPrimary": "Առաջնային — ցուցադրվում է ընտրիչում",
       "visibilitySubagent": "Ենթագործակալ — կարելի է կանչել միայն ուրիշներից",

@@ -3,7 +3,7 @@ import type {
   OpenRouterModel as SnapshotModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 /**
@@ -37,7 +37,7 @@ function isStandardVariant(model: SnapshotModel): boolean {
   return !variant || variant === 'standard';
 }
 
-function toVirtualSnapshotModel(model: CatalogModel): SnapshotModel {
+function toVirtualSnapshotModel(model: OpenRouterCatalogModel): SnapshotModel {
   const { prompt, completion } = model.pricing;
   const isFree = Number(prompt) === 0 && Number(completion) === 0;
   const slug = normalizeModelId(model.id);
@@ -70,7 +70,7 @@ function toVirtualSnapshotModel(model: CatalogModel): SnapshotModel {
  */
 export function injectVirtualModels(params: {
   providerModelData: ProviderModels;
-  catalogModels: CatalogModel[];
+  catalogModels: OpenRouterCatalogModel[];
   storedModels: GatewayModelMap;
   unavailableModelIds: ReadonlySet<string>;
 }): void {

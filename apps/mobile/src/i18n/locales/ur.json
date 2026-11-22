@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "ریپوزٹریز کی تلاش",
       "noMatches": "کوئی نتیجہ نہیں ملا",
       "noRepositories": "کوئی ریپوزٹری دستیاب نہیں",
-      "noRepositoriesDescription": "آپ کے اکاؤنٹ سے کوئی ریپوزٹری منسلک نہیں ہے۔",
+      "noRepositoriesDescription": "ریپوزٹریز لوڈ کرنے کے لیے GitHub یا GitLab کو منسلک کریں۔",
       "loading": "لوڈ ہو رہا ہے…",
       "accessibility": "ریپوزٹری: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "آپ ایک…",
       "tools": "اوزار",
       "wholeToolRule": "یہ ایجنٹ بیک وقت ہر اوزار پر ایک اصول لاگو کرتا ہے: {{rule}}۔ یہ سوئچز صرف پڑھنے کے لیے ہیں۔",
+      "toolRule": "محفوظ اصول: {{rule}}",
       "visibility": "مرئیت",
       "visibilityPrimary": "پرائمری — چننے والے میں دکھایا گیا ہے۔",
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",

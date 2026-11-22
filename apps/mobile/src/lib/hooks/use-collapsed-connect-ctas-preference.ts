@@ -43,11 +43,6 @@ const store = createSecureStorePreference<RepoPlatform[]>({
   mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
 });
 
-// Warm the store as soon as this module is imported: the new-session screen
-// waits for `hasLoaded` before it paints the repository cards, so the disk read
-// must start before that screen mounts (same reason as use-trusted-hosts).
-store.preload();
-
 export function useCollapsedConnectCtas() {
   const collapsedCtas = useSyncExternalStore(store.subscribe, store.get);
   const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);
@@ -55,9 +50,6 @@ export function useCollapsedConnectCtas() {
 }
 
 export function setConnectCtaCollapsed(platform: RepoPlatform, collapsed: boolean): void {
-  // Start the disk read if it has not run, so the write merges with the
-  // persisted list instead of replacing it with the empty default.
-  store.preload();
   const current = store.getRequested();
   const isCollapsed = current.includes(platform);
   // No membership change: skip the write, so useSyncExternalStore never loops

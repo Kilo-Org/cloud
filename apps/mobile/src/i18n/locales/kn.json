@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "ರೆಪೊಸಿಟರಿಗಳ ಹುಡುಕಾಟ",
       "noMatches": "ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಗಳಿಲ್ಲ",
       "noRepositories": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
-      "noRepositoriesDescription": "ನಿಮ್ಮ ಖಾತೆಗೆ ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ.",
+      "noRepositoriesDescription": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು GitHub ಅಥವಾ GitLab ಸಂಪರ್ಕಿಸಿ.",
       "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "accessibility": "ರೆಪೊಸಿಟರಿ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "ನೀವು ಒಂದು …",
       "tools": "ಪರಿಕರಗಳು",
       "wholeToolRule": "ಈ ಏಜೆಂಟ್ ಎಲ್ಲಾ ಪರಿಕರಗಳಿಗೆ ಏಕಕಾಲದಲ್ಲಿ ಒಂದೇ ನಿಯಮವನ್ನು ಅನ್ವಯಿಸುತ್ತದೆ: {{rule}}. ಈ ಸ್ವಿಚ್‌ಗಳು ಓದಲು-ಮಾತ್ರ.",
+      "toolRule": "ಸಂಗ್ರಹಿಸಿದ ನಿಯಮ: {{rule}}",
       "visibility": "ಗೋಚರತೆ",
       "visibilityPrimary": "ಪ್ರಾಥಮಿಕ — ಪಿಕ್ಕರ್‌ನಲ್ಲಿ ತೋರಿಸಲಾಗಿದೆ",
       "visibilitySubagent": "ಸಬ್ಜೆಂಟ್ — ಇತರರಿಂದ ಮಾತ್ರ ಕರೆಯಬಹುದು",

@@ -2,7 +2,7 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 import { toIsoTimestamp } from '@kilocode/web-shared/lib/service-fees/values';
 
@@ -46,7 +46,7 @@ export type ActiveOrganizationRef = {
  * optional transactional wrappers. Matches `db` / `tx.execute` / `tx.transaction`.
  */
 export type OrganizationExemptionExecutor = {
-  execute: (query: unknown) => Promise<unknown>;
+  execute: (query: SQL) => Promise<unknown>;
   transaction?: <T>(fn: (tx: OrganizationExemptionExecutor) => Promise<T>) => Promise<T>;
 };
 

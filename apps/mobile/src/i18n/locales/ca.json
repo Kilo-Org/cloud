@@ -2613,7 +2613,7 @@
       "searchPlaceholder": "Cerca de repositoris",
       "noMatches": "Cap coincidència",
       "noRepositories": "Cap repositori disponible",
-      "noRepositoriesDescription": "No hi ha cap repositori connectat al teu compte.",
+      "noRepositoriesDescription": "Connecta GitHub o GitLab per carregar repositoris.",
       "loading": "Carregant…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4480,6 +4480,7 @@
       "promptPlaceholder": "Ets un…",
       "tools": "Eines",
       "wholeToolRule": "Aquest agent aplica una regla a cada eina alhora: {{rule}}. Aquests interruptors són de només lectura.",
+      "toolRule": "Regla desada: {{rule}}",
       "visibility": "Visibilitat",
       "visibilityPrimary": "Principal — es mostra al selector",
       "visibilitySubagent": "Subagent — només es pot trucar des d'altres",

@@ -2000,7 +2000,7 @@
       "searchPlaceholder": "Code-Repositories suchen",
       "noMatches": "Keine Treffer",
       "noRepositories": "Keine Repositorys verfügbar",
-      "noRepositoriesDescription": "Mit deinem Konto sind keine Repositorys verbunden.",
+      "noRepositoriesDescription": "Verbinde GitHub oder GitLab, um Repositorys zu laden.",
       "loading": "Wird geladen…",
       "accessibility": "Code-Repository: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Du bist ein…",
       "tools": "Werkzeuge",
       "wholeToolRule": "Dieser Agent wendet eine Regel gleichzeitig auf jedes Werkzeug an: {{rule}}. Diese Schalter sind schreibgeschützt.",
+      "toolRule": "Gespeicherte Regel: {{rule}}",
       "visibility": "Sichtbarkeit",
       "visibilityPrimary": "Primär — wird im Picker angezeigt",
       "visibilitySubagent": "Subagent — nur von anderen aufrufbar",

@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "ຄົ້ນຫາຄັງໂຄ້ດ",
       "noMatches": "ບໍ່ພົບລາຍການທີ່ກົງກັນ",
       "noRepositories": "ບໍ່ມີຄັງໂຄດທີ່ໃຊ້ໄດ້",
-      "noRepositoriesDescription": "ຍັງບໍ່ມີຄັງໂຄດເຊື່ອມຕໍ່ກັບບັນຊີຂອງເຈົ້າ.",
+      "noRepositoriesDescription": "ເພື່ອໂຫຼດຄັງໂຄດ ໃຫ້ເຊື່ອມຕໍ່ GitHub ຫຼື GitLab.",
       "loading": "ກຳລັງໂຫຼດ…",
       "accessibility": "ຄັງໂຄດ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "ເຈົ້າເປັນ…",
       "tools": "ເຄື່ອງມື",
       "wholeToolRule": "ຕົວແທນນີ້ນຳໃຊ້ກົດໜຶ່ງກັບທຸກໆເຄື່ອງມືພ້ອມກັນ: {{rule}}. ສະວິດເຫຼົ່ານີ້ອ່ານໄດ້ຢ່າງດຽວ.",
+      "toolRule": "ກົດທີ່ບັນທຶກໄວ້: {{rule}}",
       "visibility": "ການເບິ່ງເຫັນ",
       "visibilityPrimary": "ປະຖົມ — ສະແດງໃຫ້ເຫັນຢູ່ໃນຕົວເລືອກ",
       "visibilitySubagent": "Subagent — ພຽງແຕ່ສາມາດໂທໄດ້ຈາກຄົນອື່ນ",

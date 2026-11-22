@@ -45,7 +45,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateApiToken, generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_routing_custom_routers } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -57,7 +57,7 @@ const { getEnhancedOpenRouterModels } = jest.requireMock(
 const deniedModel = 'test/denied-model';
 const allowedModel = 'test/allowed-model';
 
-function makeModel(id: string): OpenRouterModel {
+function makeModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,

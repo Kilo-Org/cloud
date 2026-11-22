@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "گەڕان لە کۆگاکان",
       "noMatches": "هیچ ئەنجامێکی گونجاو نییە",
       "noRepositories": "هیچ کۆگایەک بەردەست نییە",
-      "noRepositoriesDescription": "هیچ کۆگایەک بە هەژمارەکەتەوە نەبەستراوەتەوە.",
+      "noRepositoriesDescription": "بۆ بارکردنی کۆگاکان، GitHub یان GitLab ببەستەوە.",
       "loading": "بارکردن…",
       "accessibility": "کۆگا: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "تۆ کەسێکی …",
       "tools": "ئامرازەکان",
       "wholeToolRule": "ئەم بریکارە یەک یاسا بە یەکجار بەسەر هەموو ئامرازەکاندا جێبەجێ دەکات: {{rule}}. ئەم سویچانە تەنها خوێندنەوەن.",
+      "toolRule": "یاسای پاشەکەوتکراو: {{rule}}",
       "visibility": "بینین",
       "visibilityPrimary": "سەرەتایی — لە هەڵگرەکەدا نیشان دراوە",
       "visibilitySubagent": "Subagent — تەنها لە کەسانی ترەوە پەیوەندی پێوە دەکرێت",

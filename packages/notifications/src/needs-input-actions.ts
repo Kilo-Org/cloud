@@ -30,6 +30,10 @@ export type NeedsInputKind = (typeof NEEDS_INPUT_KINDS)[number];
 
 const NEEDS_INPUT_CATEGORY_PREFIX = 'kilo-needs-input';
 
+/** The per-raise category id: the prefix, the kind, and the `-pr` suffix when a pull request exists. */
+export type NeedsInputCategoryId =
+  `${typeof NEEDS_INPUT_CATEGORY_PREFIX}:${NeedsInputKind}${'' | '-pr'}`;
+
 /**
  * The per-raise category id. `hasPr` adds the `-pr` suffix so a raise that can
  * open a pull request gets a category carrying the Open PR button.
@@ -40,12 +44,12 @@ export function needsInputCategoryId({
 }: {
   kind: NeedsInputKind;
   hasPr: boolean;
-}): string {
+}): NeedsInputCategoryId {
   return `${NEEDS_INPUT_CATEGORY_PREFIX}:${kind}${hasPr ? '-pr' : ''}`;
 }
 
 export interface NeedsInputCategoryDescriptor {
-  readonly id: string;
+  readonly id: NeedsInputCategoryId;
   readonly actionIds: readonly NeedsInputActionId[];
 }
 

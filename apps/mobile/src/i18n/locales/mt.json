@@ -2717,7 +2717,7 @@
       "searchPlaceholder": "Tfittxija tar-repożitorji",
       "noMatches": "L-ebda riżultat",
       "noRepositories": "L-ebda repożitorju disponibbli",
-      "noRepositoriesDescription": "M'hemm l-ebda repożitorju mqabbad mal-kont tiegħek.",
+      "noRepositoriesDescription": "Biex ittella' r-repożitorji, qabbad kont GitHub jew GitLab.",
       "loading": "Qed jgħabbi…",
       "accessibility": "Repożitorju: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4638,6 +4638,7 @@
       "promptPlaceholder": "Int…",
       "tools": "Għodda",
       "wholeToolRule": "Dan l-aġent japplika regola waħda għal kull għodda fl-istess ħin: {{rule}}. Dawn l-iswiċċijiet huma biss għall-qari.",
+      "toolRule": "Regola maħżuna: {{rule}}",
       "visibility": "Viżibilità",
       "visibilityPrimary": "Primarja — muri fil-picker",
       "visibilitySubagent": "Subaġent — jissejjaħ biss minn oħrajn",

@@ -2769,7 +2769,7 @@
       "searchPlaceholder": "Chwilio am ystorfeydd",
       "noMatches": "Dim canlyniadau cyfatebol",
       "noRepositories": "Dim ystorfeydd ar gael",
-      "noRepositoriesDescription": "Nid oes ystorfeydd wedi'u cysylltu â'ch cyfrif.",
+      "noRepositoriesDescription": "I lwytho ystorfeydd, cysylltwch â GitHub neu GitLab.",
       "loading": "Yn llwytho…",
       "accessibility": "Ystorfa: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4717,6 +4717,7 @@
       "promptPlaceholder": "Rydych chi'n …",
       "tools": "Offer",
       "wholeToolRule": "Mae'r asiant hwn yn cymhwyso un rheol i bob offeryn ar unwaith: {{rule}}. Mae'r switshis hyn yn ddarllen yn unig.",
+      "toolRule": "Rheol wedi'i storio: {{rule}}",
       "visibility": "Gwelededd",
       "visibilityPrimary": "Cynradd — a ddangosir yn y codwr",
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",

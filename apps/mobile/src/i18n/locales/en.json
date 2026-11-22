@@ -3999,7 +3999,10 @@
     "list": {
       "loadFailed": "Could not load chat history.",
       "new": "New chat",
-      "deleteTitle": "Delete this chat?"
+      "deleteTitle": "Delete this chat?",
+      "resetNoticeTitle": "Local chats and drafts were cleared",
+      "resetNoticeBody": "Kilo could not open the chats saved on this device, so it removed them and their drafts. Your cloud sessions are not affected.",
+      "resetNoticeDismiss": "Dismiss notice"
     },
     "rename": {
       "title": "Rename chat",

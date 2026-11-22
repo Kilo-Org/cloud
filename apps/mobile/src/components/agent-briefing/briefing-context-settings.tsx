@@ -198,6 +198,9 @@ export function BriefingContextSettings({
         variant=""
         options={catalog.models}
         isLoading={catalog.isLoading}
+        onRetryModels={() => {
+          void catalog.refetch();
+        }}
         disabled={offline || update.isPending}
         // The brief's context stores a model slug only, so the picker must not
         // offer a thinking effort it would have to drop.

@@ -2317,7 +2317,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seisiún",
       "sectionAccessibility": "{{title}}: {{displayCount}} seisiún",
       "live": "BEO",
-      "updating": "Ag nuashonrú"
+      "updating": "Ag nuashonrú",
+      "retentionLimit": "Taispeántar do sheisiúin is déanaí."
     },
     "sessionRow": {
       "deleteTitle": "An scriosfar an seisiún?",
@@ -2393,7 +2394,6 @@
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
       "emptyReadOnlyTitle": "Níl aon teachtaireacht sa seisiún seo",
-      "renameAccessibility": "Athainmnigh seisiún: {{title}}",
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "historyTooLarge": "Tá tras-scríbhinn an tseisiúin seo rómhór le lódáil.",
@@ -3278,6 +3278,12 @@
     "retryLoadingAccount": "Bain triail as an gcuntas a lódáil arís",
     "retryLoadingPrivacy": "Bain triail as na roghanna príobháideachta a lódáil arís"
   },
+  "accountBlocked": {
+    "title": "Cuntas blocáilte",
+    "description": "Chuir Kilo bac ar an gcuntas seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an bac a athbhreithniú ar iarratas.",
+    "domainDescription": "Cuireann Kilo bac ar chuntais a bhaineann leis an bhfearann ríomhphoist seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an fearann a athbhreithniú ar iarratas.",
+    "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta"
+  },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",
     "billingPage": "leathanach billeála"
@@ -3350,8 +3356,7 @@
     "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },
   "screenHeader": {
-    "openMenu": "Oscail roghchlár",
-    "openMenuFor": "Oscail roghchlár do {{title}}"
+    "openMenu": "Oscail roghchlár"
   },
   "picker": {
     "optionsExpired": "Roghanna imithe in éag",
@@ -4953,6 +4958,7 @@
     "contextAll": "Gach comhthéacs",
     "dismiss": "Cuir an tuarascáil as an áireamh",
     "dismissFailed": "Ní féidir an túarascáil seo a chur as an áireamh go fóill. Déanfaidh sé iarracht arís sa chúlra.",
+    "readMarkFailed": "Níorbh fhéidir an túarascáil seo a mharcáil mar léite. Déanfaidh sé iarracht arís nuair a athlódálfar an túarascáil.",
     "offline": "As líne · tuarascáil shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
     "summary": "Achoimre AI",
@@ -4972,6 +4978,9 @@
     "morningEnd": "Tuarascáil ar fáil go dtí",
     "timeHint": "Athbhunaíonn cárta an Bhaile an stádas beo nuair a chríochnaíonn an fhuinneog tuarascála, fiú as líne.",
     "invalidSchedule": "Roghnaigh crios ama bailí agus fuinneog tuarascála nach bhfuil folamh.",
+    "scheduleEmptyNight": "Tá an fhuinneog tuarascála folamh. Roghnaigh am ullaimh níos déanaí ná tús na fuinneoige.",
+    "scheduleEmptyMorning": "Is ionann an t-am ullaimh agus an t-am ar fáil go dtí. Roghnaigh cé chomh fada a fhanann an tuarascáil ar fáil.",
+    "scheduleFullDay": "Clúdaíonn an dá fhuinneog lá iomlán. Fág cuid den lá lasmuigh den tuarascáil.",
     "notificationsHint": "Fógra ginearálta amháin in aghaidh gach tuarascála sceidealaithe. Neamhspleách ar achoimrí AI íoctha.",
     "notificationPermission": "Cumasaigh fógraí brú chun do thuarascáil a fháil.",
     "defaultModel": "Úsáid múnla réamhshocraithe Kilo",
@@ -4981,7 +4990,12 @@
     "estimate": "Meastachán {{estimate}} · uasmhéid {{maximum}}",
     "estimateUnavailable": "Níl achoimre íoctha ar fáil le haghaidh na socruithe seo. Athraigh an tsamhail nó na teorainneacha, nó déan iarracht eile ar ball.",
     "confirmPaid": "Cumasaigh achoimrí íoctha do {{context}}?",
-    "paidDisclosure": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméad. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_one": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméad. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_two": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_few": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_many": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure_other": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
+    "paidDisclosure": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméid. Gearrtar muirir fiú má theipeann ar an nginiúint.",
     "enable": "Cumasaigh achoimrí íoctha",
     "allContexts": "Coinnítear tuarascálacha pearsanta agus eagraíochta ar leith.",
     "emptyHistory": "Níl aon tuarascálacha sábháilte ann",
@@ -5036,7 +5050,7 @@
     "sourceActivity": "Gníomhaíocht gan teideal",
     "metadataFailureProvider": "earráid soláthraí",
     "metadataFailureTool": "earráid uirlise",
-    "metadataFailureCancelled": "Cealaithe",
+    "metadataStopped": "Stopadh an babhta deireanach",
     "metadataFailureOther": "earráid neamhshonraithe"
   },
   "systemSearch": {

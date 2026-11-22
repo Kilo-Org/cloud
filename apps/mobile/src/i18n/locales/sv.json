@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioner",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessioner",
       "live": "I REALTID",
-      "updating": "Uppdaterar"
+      "updating": "Uppdaterar",
+      "retentionLimit": "Visar de senaste sessionerna."
     },
     "sessionRow": {
       "deleteTitle": "Ta bort session?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
       "emptyReadOnlyTitle": "Inga meddelanden i den här sessionen",
-      "renameAccessibility": "Byt namn på sessionen: {{title}}",
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
       "historyTooLarge": "Den här sessionens logg är för stor för att läsas in.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Försök läsa in kontot igen",
     "retryLoadingPrivacy": "Försök läsa in dina sekretessval igen"
   },
+  "accountBlocked": {
+    "title": "Kontot blockerat",
+    "description": "Kilo har blockerat det här kontot och en ny inloggning häver inte blockeringen. Supporten kan granska blockeringen på begäran.",
+    "domainDescription": "Kilo tillåter inte konton på den här e-postdomänen och en ny inloggning ändrar inte det. Supporten kan granska domänen på begäran.",
+    "contactSupport": "Kontakta supporten"
+  },
   "addCredits": {
     "cta": "Fyll på krediter",
     "billingPage": "faktureringssidan"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Begäran tog för lång tid att slutföras. Försök igen."
   },
   "screenHeader": {
-    "openMenu": "Öppna menyn",
-    "openMenuFor": "Öppna menyn för {{title}}"
+    "openMenu": "Öppna menyn"
   },
   "picker": {
     "optionsExpired": "Alternativen har upphört att gälla",
@@ -4701,6 +4706,7 @@
     "contextAll": "Alla kontexter",
     "dismiss": "Avskriv rapport",
     "dismissFailed": "Det gick inte att avfärda den här rapporten ännu. Den försöker igen i bakgrunden.",
+    "readMarkFailed": "Det gick inte att markera den här rapporten som läst. Det görs ett nytt försök när rapporten läses in igen.",
     "offline": "Offline · sparad rapport",
     "cached": "Sparad rapport · kan inte uppdateras",
     "summary": "AI-sammanfattning",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Rapport tillgänglig till",
     "timeHint": "Hem-kortet återgår till livestatus när rapportperioden slutar, även offline.",
     "invalidSchedule": "Välj en giltig tidszon och en rapportperiod som inte är tom.",
+    "scheduleEmptyNight": "Rapportperioden är tom. Välj en tid då rapporten är klar som infaller senare än periodens början.",
+    "scheduleEmptyMorning": "Tiden då rapporten är klar och tiden den är tillgänglig till sammanfaller. Välj hur länge rapporten ska vara tillgänglig.",
+    "scheduleFullDay": "De två perioderna täcker ett helt dygn. Lämna en del av dygnet utanför rapporten.",
     "notificationsHint": "En allmän avisering per schemalagd rapport. Oberoende av betalda AI-sammanfattningar.",
     "notificationPermission": "Aktivera push-notiser för att få din rapport.",
     "defaultModel": "Använd Kilos standardmodell",
@@ -4729,7 +4738,9 @@
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar. Ändra modellen eller gränserna, eller försök igen senare.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
+    "paidDisclosure_one": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
     "paidDisclosure": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
+    "paidDisclosure_other": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
     "enable": "Aktivera betalda sammanfattningar",
     "allContexts": "Personliga rapporter och organisationsrapporter hålls åtskilda.",
     "emptyHistory": "Inga sparade rapporter",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Namnlös aktivitet",
     "metadataFailureProvider": "leverantörsfel",
     "metadataFailureTool": "verktygsfel",
-    "metadataFailureCancelled": "Avbruten",
+    "metadataStopped": "Förra omgången stoppades",
     "metadataFailureOther": "ospecificerat fel"
   },
   "systemSearch": {

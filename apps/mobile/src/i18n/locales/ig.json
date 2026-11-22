@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} nnọkọ",
       "sectionAccessibility": "{{title}}: {{displayCount}} nnọkọ",
       "live": "NA-AGA UGBU A",
-      "updating": "Na-emelite"
+      "updating": "Na-emelite",
+      "retentionLimit": "Na-egosi nnọkọ gị ndị kachasị ọhụrụ."
     },
     "sessionRow": {
       "deleteTitle": "Hichapụ nnọkọ?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Ozi adịbeghị",
       "emptyReadOnlyTitle": "Enweghị ozi na nnọkọ a",
-      "renameAccessibility": "Gbanwee aha nnọkọ: {{title}}",
       "cloningSession": "Na-emepụta oyiri nnọkọ",
       "couldNotLoadThisSession": "Enweghị ike ibudata nnọkọ a.",
       "historyTooLarge": "Ndebe nke okwu nnọkọ a buru ibu karịa ka a ga-ebugo ya.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Nwaa ibudata akaụntụ ọzọ",
     "retryLoadingPrivacy": "Nwaa ibudata nhọrọ nzuzo ọzọ"
   },
+  "accountBlocked": {
+    "title": "Akaụntụ e gbochiri",
+    "description": "Kilo egbochiri akaụntụ a, ma ịbanye ọzọ agaghị ewepụ ngbochi a. Ndị nkwado nwere ike nyochaa ngbochi a ma a rịọ ya.",
+    "domainDescription": "Kilo egbochiri akaụntụ dị na ngalaba email a, ma ịbanye ọzọ agaghị agbanwe ngbochi a. Ndị nkwado nwere ike nyochaa ngalaba a ma a rịọ ya.",
+    "contactSupport": "Kpọtụrụ ndị nkwado"
+  },
   "addCredits": {
     "cta": "Tinye ego ojiji",
     "billingPage": "ibe ịkwụ ụgwọ"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Arịrịọ ahụ enweghị ike imecha tupu oge ya agwụ. Biko nwaa ọzọ."
   },
   "screenHeader": {
-    "openMenu": "Mepee ndepụta nhọrọ",
-    "openMenuFor": "Mepee ndepụta nhọrọ maka {{title}}"
+    "openMenu": "Mepee ndepụta nhọrọ"
   },
   "picker": {
     "optionsExpired": "Oge nhọrọ agwụla",
@@ -4701,6 +4706,7 @@
     "contextAll": "Ọnọdụ niile",
     "dismiss": "Leghara akụkọ anya",
     "dismissFailed": "Enweghị ike ileghara akụkọ a anya ugbu a. Ọ na-anwa ọzọ n'azụ.",
+    "readMarkFailed": "Enweghị ike ịkpe akụkọ a akara dị ka agụrụ. Ọ ga-anwa ọzọ mgbe akụkọ a megharịrị.",
     "offline": "Enweghị ịntanetị · akụkọ echekwara",
     "cached": "Akụkọ echekwara · enweghị ike imegharị",
     "summary": "Nchịkọta AI",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Akụkọ dịnụ ruo",
     "timeHint": "Kaadị Home na-eweghachi ọnọdụ ugbu a mgbe oge akụkọ gwụrụ, ọbụna na-enweghị ịntanetị.",
     "invalidSchedule": "Họrọ mpaghara oge ziri ezi na oge akụkọ na-adịghị efu.",
+    "scheduleEmptyNight": "Oge akụkọ ahụ dị efu. Họrọ oge njikere ka oge mmalite gachara.",
+    "scheduleEmptyMorning": "Oge njikere na oge ọ na-adị ruo dakọtara. Họrọ ogologo oge akụkọ ahụ ga-adị.",
+    "scheduleFullDay": "Oge abụọ ahụ na-ekpuchi otu ụbọchị zuru ezu. Hapụ akụkụ ụbọchị ahụ n'èzí oge akụkọ.",
     "notificationsHint": "Otu ọkwa nkịtị maka akụkọ ọ bụla a haziri oge ya. Ọ nọ iche na nchịkọta AI akwụ ụgwọ.",
     "notificationPermission": "Kwado ọkwa push iji nata akụkọ gị.",
     "defaultModel": "Jiri ụdị ndabara Kilo",
@@ -4729,7 +4738,9 @@
     "estimate": "Atụmatụ {{estimate}} · kachasị {{maximum}}",
     "estimateUnavailable": "Nchịkọta a na-akwụ ụgwọ adịghị maka ntọala ndị a. Gbanwee ihe nlere ma ọ bụ oke ndị ahụ, ma ọ bụ nwaa ọzọ e mesịa.",
     "confirmPaid": "Kwado nchịkọta akwụ ụgwọ maka {{context}}?",
+    "paidDisclosure_other": "Atụmatụ {{estimate}}, ruo {{maximum}}, na oke nkeji {{minutes}}. A ga-akwụ ụgwọ ọbụna ma mmepụta daa.",
     "paidDisclosure": "Atụmatụ {{estimate}}, ruo {{maximum}}, na oke nkeji {{minutes}}. A ga-akwụ ụgwọ ọbụna ma mmepụta daa.",
+    "paidDisclosure_one": "Atụmatụ {{estimate}}, ruo {{maximum}}, na oke nkeji {{minutes}}. A ga-akwụ ụgwọ ọbụna ma mmepụta daa.",
     "enable": "Kwado nchịkọta akwụ ụgwọ",
     "allContexts": "Akụkọ onwe na nke nzukọ na-anọ iche.",
     "emptyHistory": "Enweghị akụkọ echekwara",
@@ -4768,7 +4779,7 @@
     "sourceActivity": "Ọrụ na-enweghị aha",
     "metadataFailureProvider": "njehie onye na-enye ọrụ",
     "metadataFailureTool": "njehie ngwa ọrụ",
-    "metadataFailureCancelled": "Akagbuola",
+    "metadataStopped": "A kwụsịrị ntụgharị ikpeazụ",
     "metadataFailureOther": "njehie a na-akọwaghị",
     "metadataPlan_one": "Atụmatụ: {{displayDone}} n'ime {{displayTotal}} nzọụkwụ emechara",
     "metadataFiles_one": "{{displayCount}} faịlụ gbanwere",

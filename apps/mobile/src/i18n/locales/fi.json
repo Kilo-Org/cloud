@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} istuntoa",
       "sectionAccessibility": "{{title}}: {{displayCount}} istuntoa",
       "live": "REAALIAJASSA",
-      "updating": "Päivitetään"
+      "updating": "Päivitetään",
+      "retentionLimit": "Näytetään uusimmat istunnot."
     },
     "sessionRow": {
       "deleteTitle": "Poistetaanko istunto?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei vielä viestejä",
       "emptyReadOnlyTitle": "Tässä istunnossa ei ole viestejä",
-      "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "historyTooLarge": "Tämän istunnon keskustelutallenne on liian suuri ladattavaksi.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Yritä ladata tili uudelleen",
     "retryLoadingPrivacy": "Yritä ladata yksityisyysasetukset uudelleen"
   },
+  "accountBlocked": {
+    "title": "Tili estetty",
+    "description": "Kilo esti tämän tilin, eikä uudelleenkirjautuminen poista estoa. Tuki voi tarkistaa eston pyynnöstä.",
+    "domainDescription": "Kilo estää tilit tällä sähköpostiverkkotunnuksella, eikä uudelleenkirjautuminen muuta sitä. Tuki voi tarkistaa sähköpostiverkkotunnuksen pyynnöstä.",
+    "contactSupport": "Ota yhteyttä tukeen"
+  },
   "addCredits": {
     "cta": "Lisää krediittejä",
     "billingPage": "laskutussivu"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Pyyntö ei valmistunut ajassa. Yritä uudelleen."
   },
   "screenHeader": {
-    "openMenu": "Avaa valikko",
-    "openMenuFor": "Avaa valikko: {{title}}"
+    "openMenu": "Avaa valikko"
   },
   "picker": {
     "optionsExpired": "Vaihtoehdot vanhentuneet",
@@ -4701,6 +4706,7 @@
     "contextAll": "Kaikki kontekstit",
     "dismiss": "Sivuuta katsaus",
     "dismissFailed": "Tätä katsausta ei voitu vielä sivuuttaa. Yritämme uudelleen taustalla.",
+    "readMarkFailed": "Tätä katsausta ei voitu merkitä luetuksi. Yritämme uudelleen, kun katsaus latautuu uudelleen.",
     "offline": "Offline · tallennettu katsaus",
     "cached": "Tallennettu katsaus · päivitys ei käytettävissä",
     "summary": "AI-yhteenveto",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Katsauksen saatavuus päättyy",
     "timeHint": "Kotikortti palauttaa reaaliaikaisen tilan, kun katsausikkuna päättyy, myös offline-tilassa.",
     "invalidSchedule": "Valitse kelvollinen aikavyöhyke ja ei-tyhjä katsausikkuna.",
+    "scheduleEmptyNight": "Katsausikkuna on tyhjä. Valitse valmiusaika, joka on ikkunan alkua myöhempi.",
+    "scheduleEmptyMorning": "Valmiusaika ja saatavuuden päättymisaika ovat samat. Valitse, kuinka kauan katsaus pysyy saatavilla.",
+    "scheduleFullDay": "Kaksi ikkunaa kattaa koko päivän. Jätä osa päivästä katsauksen ulkopuolelle.",
     "notificationsHint": "Yksi yleinen ilmoitus ajastettua katsausta kohden. Riippumaton maksullisista AI-yhteenvedoista.",
     "notificationPermission": "Ota push-ilmoitukset käyttöön saadaksesi katsauksesi.",
     "defaultModel": "Käytä Kilon oletusmallia",
@@ -4733,6 +4742,8 @@
     "estimateModelNotAllowed": "Tämä malli ei ole sallittu tässä kontekstissa. Valitse toinen malli.",
     "estimateSpendLimitTooLow": "Nosta kulurajaa salliaksesi tämän yhteenvedon.",
     "confirmPaid": "Otetaanko maksulliset yhteenvedot käyttöön kontekstissa {{context}}?",
+    "paidDisclosure_one": "Arvio {{estimate}}, enintään {{maximum}}, aikaraja {{minutes}} min. Veloitus tehdään, vaikka luonti epäonnistuisi.",
+    "paidDisclosure_other": "Arvio {{estimate}}, enintään {{maximum}}, aikaraja {{minutes}} min. Veloitus tehdään, vaikka luonti epäonnistuisi.",
     "paidDisclosure": "Arvio {{estimate}}, enintään {{maximum}}, aikaraja {{minutes}} min. Veloitus tehdään, vaikka luonti epäonnistuisi.",
     "enable": "Ota maksulliset yhteenvedot käyttöön",
     "allContexts": "Henkilökohtaiset ja organisaation katsaukset pidetään erillään.",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Nimetön aktiviteetti",
     "metadataFailureProvider": "palveluntarjoajan virhe",
     "metadataFailureTool": "työkalun virhe",
-    "metadataFailureCancelled": "Peruttu",
+    "metadataStopped": "Viimeisin vuoro pysäytettiin",
     "metadataFailureOther": "määrittämätön virhe"
   },
   "systemSearch": {

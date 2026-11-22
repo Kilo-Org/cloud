@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} oturum",
       "sectionAccessibility": "{{title}}: {{displayCount}} oturum",
       "live": "CANLI",
-      "updating": "Güncelleniyor"
+      "updating": "Güncelleniyor",
+      "retentionLimit": "En son oturumlar gösteriliyor."
     },
     "sessionRow": {
       "deleteTitle": "Oturum silinsin mi?",
@@ -1684,7 +1685,6 @@
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "emptyReadOnlyTitle": "Bu oturumda mesaj yok",
-      "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
@@ -2533,6 +2533,12 @@
     "retryLoadingAccount": "Hesabı yüklemeyi tekrar dene",
     "retryLoadingPrivacy": "Gizlilik tercihlerini yüklemeyi tekrar dene"
   },
+  "accountBlocked": {
+    "title": "Hesap engellendi",
+    "description": "Kilo bu hesabı engelledi ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine engeli inceleyebilir.",
+    "domainDescription": "Kilo bu e-posta alan adındaki hesapları engelliyor ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine alan adını inceleyebilir.",
+    "contactSupport": "Destekle iletişime geç"
+  },
   "addCredits": {
     "cta": "Kredi ekle",
     "billingPage": "faturalandırma sayfası"
@@ -2605,8 +2611,7 @@
     "timeoutDescription": "İstek tamamlanmadan zaman aşımına uğradı. Lütfen tekrar dene."
   },
   "screenHeader": {
-    "openMenu": "Menüyü aç",
-    "openMenuFor": "{{title}} için menüyü aç"
+    "openMenu": "Menüyü aç"
   },
   "picker": {
     "optionsExpired": "Seçeneklerin süresi doldu",
@@ -4701,6 +4706,7 @@
     "contextAll": "Tüm bağlamlar",
     "dismiss": "Raporu yok say",
     "dismissFailed": "Bu rapor henüz yok sayılamadı. Arka planda yeniden denenecek.",
+    "readMarkFailed": "Bu rapor okundu olarak işaretlenemedi. Rapor yeniden yüklendiğinde tekrar denenecek.",
     "offline": "Çevrimdışı · kayıtlı rapor",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
     "summary": "AI özeti",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Raporun kullanılabileceği son saat",
     "timeHint": "Ana sayfa kartı, rapor aralığı bittiğinde çevrimdışı olsa bile canlı duruma döner.",
     "invalidSchedule": "Geçerli bir saat dilimi ve boş olmayan bir rapor aralığı seçin.",
+    "scheduleEmptyNight": "Rapor aralığı boş. Rapor aralığı başlangıcından daha geç bir rapor hazır olma saati seçin.",
+    "scheduleEmptyMorning": "Rapor hazır olma saati ile raporun kullanılabileceği son saat aynı. Raporun ne kadar süre kullanılabilir kalacağını seçin.",
+    "scheduleFullDay": "İki rapor aralığı tam bir günü kapsıyor. Günün bir kısmını rapor aralığı dışında bırakın.",
     "notificationsHint": "Planlanmış her rapor için tek bir genel bildirim. Ücretli AI özetlerinden bağımsızdır.",
     "notificationPermission": "Raporunuzu almak için anlık bildirimleri açın.",
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
@@ -4729,7 +4738,9 @@
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
     "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil. Modeli veya sınırları değiştirin ya da daha sonra tekrar deneyin.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
+    "paidDisclosure_one": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
     "paidDisclosure": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
+    "paidDisclosure_other": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
     "enable": "Ücretli özetleri etkinleştir",
     "allContexts": "Kişisel ve kuruluş raporları ayrı tutulur.",
     "emptyHistory": "Kayıtlı rapor yok",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Adsız etkinlik",
     "metadataFailureProvider": "sağlayıcı hatası",
     "metadataFailureTool": "araç hatası",
-    "metadataFailureCancelled": "İptal edildi",
+    "metadataStopped": "Son tur durduruldu",
     "metadataFailureOther": "belirtilmemiş hata"
   },
   "systemSearch": {

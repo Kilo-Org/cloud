@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesyon",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesyon",
       "live": "AN DIRÈK",
-      "updating": "Ap mete ajou"
+      "updating": "Ap mete ajou",
+      "retentionLimit": "Sa yo se sesyon ki pi resan yo."
     },
     "sessionRow": {
       "deleteTitle": "Efase sesyon an?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
       "emptyReadOnlyTitle": "Pa gen mesaj nan sesyon sa a",
-      "renameAccessibility": "Chanje non sesyon an: {{title}}",
       "cloningSession": "Ap klone sesyon an",
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",
       "historyTooLarge": "Transksipsyon sesyon sa a twò gwo pou chaje.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Eseye chaje kont lan ankò",
     "retryLoadingPrivacy": "Eseye chaje chwa konfidansyalite yo ankò"
   },
+  "accountBlocked": {
+    "title": "Kont bloke",
+    "description": "Kilo bloke kont sa a, epi rekonekte p ap retire blokaj la. Ekip sipò a ka revize blokaj la sou demann.",
+    "domainDescription": "Kilo bloke kont ki sou domèn imèl sa a, epi rekonekte p ap chanje blokaj la. Ekip sipò a ka revize domèn nan sou demann.",
+    "contactSupport": "Kontakte ekip sipò a"
+  },
   "addCredits": {
     "cta": "Ajoute kredi",
     "billingPage": "paj faktirasyon an"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Demann lan te depase delè li. Tanpri eseye ankò."
   },
   "screenHeader": {
-    "openMenu": "Louvri meni an",
-    "openMenuFor": "Louvri meni pou {{title}}"
+    "openMenu": "Louvri meni an"
   },
   "picker": {
     "optionsExpired": "Opsyon ekspire",
@@ -4701,6 +4706,7 @@
     "contextAll": "Tout kontèks yo",
     "dismiss": "Rejte rapò a",
     "dismissFailed": "Pa reyisi rejte rapò sa a kounye a. Li ap eseye ankò nan pakoulè.",
+    "readMarkFailed": "Pa reyisi make rapò sa a kòm li. Li ap eseye ankò lè rapò a rechaje.",
     "offline": "Hò liy · rapò anrejistre",
     "cached": "Rapò anrejistre · pa ka rafrechi",
     "summary": "Rezime AI",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Rapò a disponib jiska",
     "timeHint": "Kat Akèy la remete estati an dirèk lè fenèt rapò a fini, menm hò liy.",
     "invalidSchedule": "Chwazi yon fizo orè valid ak yon fenèt rapò ki pa vid.",
+    "scheduleEmptyNight": "Fenèt rapò a vid. Chwazi yon lè pare ki pi ta pase kòmansman fenèt la.",
+    "scheduleEmptyMorning": "Lè pare a ak lè disponib jiska a egal. Chwazi konbyen tan rapò a rete disponib.",
+    "scheduleFullDay": "De fenèt yo kouvri yon jounen konplè. Kite yon pati nan jounen an deyò rapò a.",
     "notificationsHint": "Yon sèl notifikasyon jeneral pou chak rapò pwograme. Li pa depann de rezime AI peye yo.",
     "notificationPermission": "Aktive notifikasyon push pou w resevwa rapò ou.",
     "defaultModel": "Sèvi ak modèl Kilo pa defo a",
@@ -4729,6 +4738,8 @@
     "estimate": "Estime {{estimate}} · maksimòm {{maximum}}",
     "estimateUnavailable": "Pa gen rezime ki pou peye ki disponib pou paramèt sa yo. Chanje modèl la oswa limit yo, oswa eseye ankò pita.",
     "confirmPaid": "Aktive rezime peye pou {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estime, jiska {{maximum}}, ak yon limit {{minutes}} minit. Frè yo aplike menm si jenerasyon an echwe.",
+    "paidDisclosure_other": "{{estimate}} estime, jiska {{maximum}}, ak yon limit {{minutes}} minit. Frè yo aplike menm si jenerasyon an echwe.",
     "paidDisclosure": "{{estimate}} estime, jiska {{maximum}}, ak yon limit {{minutes}} minit. Frè yo aplike menm si jenerasyon an echwe.",
     "enable": "Aktive rezime peye",
     "allContexts": "Rapò pèsonèl ak rapò òganizasyon rete separe.",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Aktivite san tit",
     "metadataFailureProvider": "erè founisè",
     "metadataFailureTool": "erè zouti",
-    "metadataFailureCancelled": "Anile",
+    "metadataStopped": "Dènye tou a te kanpe",
     "metadataFailureOther": "erè ki pa presize"
   },
   "systemSearch": {

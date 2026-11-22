@@ -153,15 +153,26 @@ function writeManifest(root: Directory, manifest: ArtifactMirrorManifest): void 
 }
 
 function pruneStaleEntries(directory: Directory, liveNames: ReadonlySet<string>): boolean {
-  if (!directory.exists) {
-    return false;
-  }
   let pruned = false;
-  for (const entry of directory.list()) {
-    if (!liveNames.has(entry.name)) {
-      entry.delete();
-      pruned = true;
+  try {
+    if (!directory.exists) {
+      return false;
     }
+    for (const entry of directory.list()) {
+      if (!liveNames.has(entry.name)) {
+        try {
+          entry.delete();
+          pruned = true;
+        } catch {
+          // One entry the filesystem refuses to delete must not stop the index
+          // write, so it stays for the next run.
+        }
+      }
+    }
+  } catch {
+    // A folder the filesystem will not even list, or a path that is not one,
+    // must not hold the index back either: whatever sits there stays for the
+    // next run.
   }
   return pruned;
 }

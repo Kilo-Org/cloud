@@ -388,6 +388,10 @@ observable behavior is the same.
    record MUST be retired only after the newer card is posted. The record of an
    ask therefore carries the ask as well as the session, so preparing a newer
    card cannot rewrite the record of the request the surviving card shows.
+   A sweep of the records a crash left named MUST NOT retire the request the
+   card in the shade shows, nor the request the previous card showed: a repeat
+   of one request carries the same key, and cancelling it would leave that card
+   answering nothing.
 
 ### Android: updates and ending
 
@@ -436,6 +440,9 @@ observable behavior is the same.
   still in the shade. A post that does not land restores the facts of the card
   that is still posted and drops the record of the newer ask, and the
   superseded ask's record is retired only once the newer card is posted.
+- A sweep of the records a crash left named keeps the request the card in the
+  shade shows and the request the previous card showed, and a stored card entry
+  that cannot be read is ignored instead of failing the post.
 
 ### 2026-10-27 -- Android answers keep their own ask, and cards survive a failed write
 

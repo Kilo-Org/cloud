@@ -18,6 +18,7 @@ import {
   briefingPickerDate,
   briefingPickerTime,
   briefingScheduleProblems,
+  type BriefingTimeRefusal,
 } from '@/lib/agent-briefing-schedule';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { formatClockTime } from '@/lib/format';
@@ -25,6 +26,18 @@ import { dateTimeFormat } from '@/lib/intl-cache';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { useBriefingLocale } from './briefing-locale';
+
+/**
+ * The message each time refusal shows. An empty window names the window the
+ * person has to change; a malformed clock borrows the time zone field's wording,
+ * because the same save reported it.
+ */
+const TIME_REFUSAL_KEYS = {
+  format: 'agentBriefing.invalidSchedule',
+  emptyNight: 'agentBriefing.scheduleEmptyNight',
+  emptyMorning: 'agentBriefing.scheduleEmptyMorning',
+  fullDay: 'agentBriefing.scheduleFullDay',
+} as const satisfies Record<BriefingTimeRefusal, string>;
 
 export function ScheduleSettings({
   preferences,
@@ -52,7 +65,7 @@ export function ScheduleSettings({
   });
   const [activeTime, setActiveTime] = useState<keyof typeof times | null>(null);
   const [timezoneInvalid, setTimezoneInvalid] = useState(false);
-  const [timesInvalid, setTimesInvalid] = useState(false);
+  const [timeRefusal, setTimeRefusal] = useState<BriefingTimeRefusal | null>(null);
   const [timezoneInputKey, setTimezoneInputKey] = useState(0);
   const update = useMutation(
     trpc.agentBriefing.updatePreferences.mutationOptions({
@@ -90,7 +103,7 @@ export function ScheduleSettings({
     const next = draft.current;
     const problems = briefingScheduleProblems(next);
     setTimezoneInvalid(problems.timezone);
-    setTimesInvalid(problems.times);
+    setTimeRefusal(problems.times);
     if (problems.timezone || problems.times) {
       return;
     }
@@ -166,7 +179,7 @@ export function ScheduleSettings({
                     const next = briefingPickerTime(date);
                     draft.current[field.key] = next;
                     setTimes(current => ({ ...current, [field.key]: next }));
-                    setTimesInvalid(false);
+                    setTimeRefusal(null);
                     if (Platform.OS === 'android') {
                       setActiveTime(null);
                     }
@@ -188,7 +201,7 @@ export function ScheduleSettings({
         );
       })}
       <AccessibleStatus
-        message={timesInvalid ? t('agentBriefing.invalidSchedule') : null}
+        message={timeRefusal === null ? null : t(TIME_REFUSAL_KEYS[timeRefusal])}
         className="text-sm"
       />
       <Text variant="caption">{t('agentBriefing.timeHint')}</Text>

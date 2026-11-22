@@ -8,6 +8,7 @@ import {
   GATE_THRESHOLDS,
   REVIEW_STYLES,
 } from '@kilocode/app-shared/code-review';
+import { RESERVED_AGENT_SLUGS } from '@kilocode/app-shared/agent-profile';
 import * as z from 'zod';
 
 export const watchPrPolicySchema = z
@@ -2210,20 +2211,11 @@ export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRAT
 // A specialist id doubles as the cloud-agent-next `runtimeAgents[].slug` (single-session
 // execution) AND the manifest correlation key, so it must satisfy the runtime-agent slug
 // contract: start with a lowercase letter, only lowercase letters/digits/hyphens, max 50
-// chars, and not collide with a built-in agent mode. Keep this in lockstep with
-// cloud-agent-next's `RuntimeAgentSchema.slug` + `AgentModes` (services/cloud-agent-next/src/schema.ts).
-// This must list EVERY built-in `AgentModes` value; a stale/partial copy lets a council id
-// pass web validation but fail cloud-agent-next session preparation.
-const RESERVED_AGENT_SLUGS = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
+// chars, and it uses an id of its own. `RESERVED_AGENT_SLUGS` in
+// @kilocode/app-shared/agent-profile holds the CLI ids: every built-in `AgentModes` value
+// plus the CLI's own agents, shared with `RuntimeAgentSchema.slug` and the web-side
+// profile service, so one set of ids holds everywhere a specialist id is used.
+const RESERVED_COUNCIL_SPECIALIST_SLUGS: ReadonlySet<string> = new Set(RESERVED_AGENT_SLUGS);
 
 // Cloud-agent-next caps a runtime-agent model slug at this many chars
 // (`Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH`). Keep the per-specialist model constraint in
@@ -2242,7 +2234,7 @@ export const CouncilSpecialistSchema = z.object({
       'Specialist id must be a runtime-agent slug (start with a lowercase letter; lowercase letters, digits, or hyphens; max 50 chars)'
     )
     .refine(
-      id => !RESERVED_AGENT_SLUGS.has(id),
+      id => !RESERVED_COUNCIL_SPECIALIST_SLUGS.has(id),
       'Specialist id must not collide with a built-in agent mode'
     ),
   role: z.enum(COUNCIL_SPECIALIST_ROLES),

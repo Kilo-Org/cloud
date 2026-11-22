@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} saio",
       "sectionAccessibility": "{{title}}: {{displayCount}} saio",
       "live": "ZUZENEAN",
-      "updating": "Eguneratzen"
+      "updating": "Eguneratzen",
+      "retentionLimit": "Azken saioak erakusten dira."
     },
     "sessionRow": {
       "deleteTitle": "Ezabatu saioa?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
       "emptyReadOnlyTitle": "Saio honetan ez dago mezurik",
-      "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
       "historyTooLarge": "Saio honen transkripzioa kargatzeko handiegia da.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Saiatu kontua berriro kargatzen",
     "retryLoadingPrivacy": "Saiatu pribatutasun-aukerak berriro kargatzen"
   },
+  "accountBlocked": {
+    "title": "Kontua blokeatuta",
+    "description": "Kilok kontu hau blokeatu du, eta berriro saioa hasita ez da blokeoa kenduko. Laguntza-taldeak blokeoa berrikusi dezake eskatuz gero.",
+    "domainDescription": "Kilok e-posta domeinu honetako kontuak blokeatzen ditu, eta berriro saioa hasita ez da blokeoa aldatuko. Laguntza-taldeak domeinua berrikusi dezake eskatuz gero.",
+    "contactSupport": "Jarri harremanetan laguntza-taldearekin"
+  },
   "addCredits": {
     "cta": "Gehitu kredituak",
     "billingPage": "fakturazio-orria"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Eskaera amaitu aurretik iraungi da. Saiatu berriro."
   },
   "screenHeader": {
-    "openMenu": "Ireki menua",
-    "openMenuFor": "Ireki {{title}}-ren menua"
+    "openMenu": "Ireki menua"
   },
   "picker": {
     "optionsExpired": "Aukerak iraungita",
@@ -4701,6 +4706,7 @@
     "contextAll": "Testuinguru guztiak",
     "dismiss": "Baztertu txostena",
     "dismissFailed": "Oraindik ezin izan da txosten hau baztertu. Atzeko planoan berriro saiatuko da.",
+    "readMarkFailed": "Ezin izan da txosten hau irakurritzat markatu. Berriro saiatuko da txostena hurrengoan kargatzean.",
     "offline": "Lineaz kanpo · gordetako txostena",
     "cached": "Gordetako txostena · ezin da freskatu",
     "summary": "AI laburpena",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Txostena eskuragarri egoteko azken ordua",
     "timeHint": "Hasierako txartelak zuzeneko egoera berrezartzen du txosten-tartea amaitzean, lineaz kanpo ere bai.",
     "invalidSchedule": "Aukeratu ordu-zona baliodun bat eta txosten-tarte ez-huts bat.",
+    "scheduleEmptyNight": "Txosten-tartea hutsik dago. Aukeratu prest egoteko ordu bat tartearen hasiera baino beranduago.",
+    "scheduleEmptyMorning": "Prest egoteko ordua eta erabilgarri egongo den azken ordua bat datoz. Aukeratu txostena zenbat denbora egongo den erabilgarri.",
+    "scheduleFullDay": "Bi tarteek egun osoa hartzen dute. Utzi egunaren zati bat txosten-tartetik kanpo.",
     "notificationsHint": "Programatutako txosten bakoitzeko jakinarazpen orokor bat. Ordainpeko AI laburpenetatik independentea.",
     "notificationPermission": "Gaitu push jakinarazpenak zure txostena jasotzeko.",
     "defaultModel": "Erabili Kiloren eredu lehenetsia",
@@ -4733,6 +4742,8 @@
     "estimateModelNotAllowed": "Eredu hau ez da onartzen testuinguru honetan. Aukeratu beste eredu bat.",
     "estimateSpendLimitTooLow": "Igo gastu-muga laburpen hau sortu ahal izateko.",
     "confirmPaid": "Gaitu ordainpeko laburpenak {{context}}-(e)rako?",
+    "paidDisclosure_one": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
+    "paidDisclosure_other": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
     "paidDisclosure": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
     "enable": "Gaitu ordainpeko laburpenak",
     "allContexts": "Txosten pertsonalak eta erakundekoak bereizita daude.",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Izenbururik gabeko jarduera",
     "metadataFailureProvider": "hornitzailearen errorea",
     "metadataFailureTool": "tresnaren errorea",
-    "metadataFailureCancelled": "Ezeztatuta",
+    "metadataStopped": "Azken txanda gelditu egin da",
     "metadataFailureOther": "zehaztu gabeko errorea"
   },
   "systemSearch": {

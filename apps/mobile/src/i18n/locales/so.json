@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} kalfadhi",
       "sectionAccessibility": "{{title}}: {{displayCount}} kalfadhi",
       "live": "TOOS AH",
-      "updating": "Waa la cusboonaysiinayaa"
+      "updating": "Waa la cusboonaysiinayaa",
+      "retentionLimit": "Waxaa la muujinayaa kalfadhiyadaada ugu dambeeyay."
     },
     "sessionRow": {
       "deleteTitle": "Ma la tirtiraa kalfadhiga?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
       "emptyReadOnlyTitle": "Kalfadhigan farriimo kuma jiraan",
-      "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
       "historyTooLarge": "Qoralka kalfadhigan waa aad u weyn yahay si la soo shubo.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Mar kale isku day soo rarista akoonka",
     "retryLoadingPrivacy": "Mar kale isku day soo rarista doorashooyinka asturnaanta"
   },
+  "accountBlocked": {
+    "title": "Akoonka waa xanniban yahay",
+    "description": "Kilo waa xannibay akoonkan, oo mar kale soo galid ma tirtirto xannibaadda. Taageerada ayaa codsi ku eegi kartaa xannibaadda.",
+    "domainDescription": "Kilo ma ogola akoonno ku yaal domain-kan iimaylka, oo mar kale soo galid ma beddeli doonto. Taageerada ayaa codsi ku eegi kartaa domain-ka.",
+    "contactSupport": "La xiriir taageerada"
+  },
   "addCredits": {
     "cta": "Ku dar lacagta isticmaalka",
     "billingPage": "bogga biilasha"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Codsigu wuu waqtiga ka baxay ka hor inta uu dhammaado. Fadlan mar kale isku day."
   },
   "screenHeader": {
-    "openMenu": "Fur liiska",
-    "openMenuFor": "Fur liiska {{title}}"
+    "openMenu": "Fur liiska"
   },
   "picker": {
     "optionsExpired": "Waqtigii doorashooyinku wuu dhacay",
@@ -4701,6 +4706,7 @@
     "contextAll": "Dhammaan macnayaasha guud",
     "dismiss": "Iska dhaaf warbixinta",
     "dismissFailed": "Lama dhaafi karo warbixintan weli. Dib u dayntu gadaal ka socotaa.",
+    "readMarkFailed": "Lama awoodin in warbixintan loo calaamadiyo in la akhriyay. Waxay mar kale isku dayi doontaa marka warbixintu dib u soo rarto.",
     "offline": "Khadka ka maqan · warbixin la kaydiyay",
     "cached": "Warbixin la kaydiyay · cusboonaysiin lama heli karo",
     "summary": "Soo koobid AI",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Warbixinta la heli karo ilaa",
     "timeHint": "Kaarka Bogga Hore wuxuu soo celiyaa xaaladda tooska ah marka muddada warbixinta dhammaato, xitaa adigoo khadka ka maqan.",
     "invalidSchedule": "Dooro aag waqti sax ah iyo muddo warbixin ah oo ka dheer eber.",
+    "scheduleEmptyNight": "Muddada warbixinta waa madhan tahay. Dooro waqti diyaar ah oo ka dambeeya bilaabista muddada.",
+    "scheduleEmptyMorning": "Waqtiga diyaar iyo waqtiga la heli karo ilaa way isku mid yihiin. Dooro inta warbixinta la heli karo.",
+    "scheduleFullDay": "Labada muddo waxay daboolaan maalin buuxda. Ka tag qayb maalinta ah oo ka baxsan warbixinta.",
     "notificationsHint": "Hal ogeysiis guud warbixin kasta oo la jadwalay. Kuma xirna soo koobidda AI ee lacagta leh.",
     "notificationPermission": "Ka shid ogeysiisyada push si aad u hesho warbixintaada.",
     "defaultModel": "Isticmaal moodeelka caadiga ah ee Kilo",
@@ -4729,7 +4738,9 @@
     "estimate": "Qiimeyn {{estimate}} · ugu badnaan {{maximum}}",
     "estimateUnavailable": "Soo koobid lacag leh laguma heli karo dejimyadan. Beddel moodeelka ama xaddidaadaha, ama isku day mar dambe.",
     "confirmPaid": "Ma shidaysaa soo koobidda lacagta leh ee {{context}}?",
+    "paidDisclosure_one": "Qiyaas {{estimate}}, ilaa {{maximum}}, xad {{minutes}} daqiiqo ah. Lacagta waa la jarayaa xitaa haddii samayntu fashilanto.",
     "paidDisclosure": "Qiyaas {{estimate}}, ilaa {{maximum}}, xad {{minutes}} daqiiqo ah. Lacagta waa la jarayaa xitaa haddii samayntu fashilanto.",
+    "paidDisclosure_other": "Qiyaas {{estimate}}, ilaa {{maximum}}, xad {{minutes}} daqiiqo ah. Lacagta waa la jarayaa xitaa haddii samayntu fashilanto.",
     "enable": "Shid soo koobidda lacagta leh",
     "allContexts": "Warbixinnada shakhsiga iyo ururka way kala gooni yihiin.",
     "emptyHistory": "Ma jiraan warbixinno la kaydiyay",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Dhaqdhaqaaq aan cinwaan lahayn",
     "metadataFailureProvider": "khaladka bixiyaha",
     "metadataFailureTool": "khaladka qalabka",
-    "metadataFailureCancelled": "La joojiyay",
+    "metadataStopped": "Wareeggii ugu dambeeyay waa la joojiyay",
     "metadataFailureOther": "khalad aan la cayimin"
   },
   "systemSearch": {

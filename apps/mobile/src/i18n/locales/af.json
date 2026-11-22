@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessies",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessies",
       "live": "REGSTREEKS",
-      "updating": "Besig om op te dateer"
+      "updating": "Besig om op te dateer",
+      "retentionLimit": "Die mees onlangse sessies word gewys."
     },
     "sessionRow": {
       "deleteTitle": "Skrap sessie?",
@@ -2246,7 +2247,6 @@
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "emptyReadOnlyTitle": "Geen boodskappe in hierdie sessie nie",
-      "renameAccessibility": "Hernoem sessie: {{title}}",
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
       "historyTooLarge": "Hierdie sessie se transkripsie is te groot om te laai.",
@@ -3095,6 +3095,12 @@
     "retryLoadingAccount": "Probeer weer om die rekening te laai",
     "retryLoadingPrivacy": "Probeer weer om die privaatheidskeuses te laai"
   },
+  "accountBlocked": {
+    "title": "Rekening geblokkeer",
+    "description": "Kilo het hierdie rekening geblokkeer, en weer aanmeld sal dit nie ophef nie. Ondersteuning kan die blokkade op versoek hersien.",
+    "domainDescription": "Kilo blokkeer rekeninge op hierdie e-posdomein, en weer aanmeld sal dit nie verander nie. Ondersteuning kan die domein op versoek hersien.",
+    "contactSupport": "Kontak ondersteuning"
+  },
   "addCredits": {
     "cta": "Voeg krediete by",
     "billingPage": "faktureringsbladsy"
@@ -3167,8 +3173,7 @@
     "timeoutDescription": "Die versoek het uitgeval voordat dit voltooi kon word. Probeer asseblief weer."
   },
   "screenHeader": {
-    "openMenu": "Maak spyskaart oop",
-    "openMenuFor": "Maak spyskaart vir {{title}} oop"
+    "openMenu": "Maak spyskaart oop"
   },
   "picker": {
     "optionsExpired": "Opsies verval",
@@ -4701,6 +4706,7 @@
     "contextAll": "Alle kontekste",
     "dismiss": "Verwerp verslag",
     "dismissFailed": "Hierdie verslag kon nog nie verwerp word nie. Dit word op die agtergrond weer probeer.",
+    "readMarkFailed": "Kon nie hierdie verslag as gelees merk nie. Dit word weer probeer wanneer die verslag herlaai.",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfrissing nie beskikbaar nie",
     "summary": "AI-opsomming",
@@ -4720,6 +4726,9 @@
     "morningEnd": "Verslag beskikbaar tot",
     "timeHint": "Die Tuis-kaart herstel regstreekse status wanneer die verslagvenster eindig, selfs vanlyn.",
     "invalidSchedule": "Kies 'n geldige tydsone en 'n nie-leë verslagvenster.",
+    "scheduleEmptyNight": "Die verslagvenster is leeg. Kies 'n gereedheidstyd later as die begin van die venster.",
+    "scheduleEmptyMorning": "Die gereedheidstyd en die beskikbaar-tot-tyd stem ooreen. Kies hoe lank die verslag beskikbaar bly.",
+    "scheduleFullDay": "Die twee vensters dek 'n volle dag. Los 'n deel van die dag buite die verslag.",
     "notificationsHint": "Een algemene kennisgewing per geskeduleerde verslag. Onafhanklik van betaalde AI-opsommings.",
     "notificationPermission": "Skakel druk-kennisgewings aan om jou verslag te ontvang.",
     "defaultModel": "Gebruik Kilo se verstekmodel",
@@ -4729,6 +4738,8 @@
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie. Verander die model of die perke, of probeer later weer.",
     "confirmPaid": "Aktiveer betaalde opsommings vir {{context}}?",
+    "paidDisclosure_one": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
+    "paidDisclosure_other": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
     "paidDisclosure": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
     "enable": "Aktiveer betaalde opsommings",
     "allContexts": "Persoonlike en organisasieverslae bly apart.",
@@ -4772,7 +4783,7 @@
     "sourceActivity": "Aktiwiteit sonder titel",
     "metadataFailureProvider": "verskafferfout",
     "metadataFailureTool": "hulpmiddelfout",
-    "metadataFailureCancelled": "Gekanselleer",
+    "metadataStopped": "Laaste beurt is gestop",
     "metadataFailureOther": "ongespesifiseerde fout"
   },
   "systemSearch": {

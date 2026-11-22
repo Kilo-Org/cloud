@@ -12,6 +12,7 @@ import {
   readKilo2Messages,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
+import { NATIVE_SYNC_REQUEST_DEADLINE_MS } from './limits';
 import type { NativeSnapshotBlob, NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import type { SessionSnapshot } from './types';
 
@@ -594,7 +595,7 @@ export async function fetchNativeSnapshot(
       const requestTimeout = setTimeout(() => {
         failure = new Error('Native snapshot request timed out');
         controller.abort();
-      }, 15_000);
+      }, NATIVE_SYNC_REQUEST_DEADLINE_MS);
       const abort = () => {
         clearTimeout(requestTimeout);
         reject(failure);

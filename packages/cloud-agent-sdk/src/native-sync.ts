@@ -183,12 +183,14 @@ const isPermanent = (error: unknown) =>
 /**
  * Settles with `operation` unless the signal aborts first, then rejects with `failure()`.
  * The fetcher may ignore the abort signal, so the deadline must win the race; the operation
- * keeps a rejection handler so a late failure is never unhandled.
+ * keeps a rejection handler so a late failure is never unhandled. A value that arrives after
+ * the abort is handed to `discard`, so a late response can release its body.
  */
 function raceAbort<T>(
   signal: AbortSignal,
   failure: () => Error,
-  operation: () => Promise<T>
+  operation: () => Promise<T>,
+  discard?: (value: T) => void
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     if (signal.aborted) {
@@ -200,8 +202,10 @@ function raceAbort<T>(
     void operation().then(
       value => {
         signal.removeEventListener('abort', abort);
-        if (signal.aborted) reject(failure());
-        else resolve(value);
+        if (signal.aborted) {
+          discard?.(value);
+          reject(failure());
+        } else resolve(value);
       },
       error => {
         signal.removeEventListener('abort', abort);
@@ -463,6 +467,12 @@ function transcriptHasGap(facts: NativeTranscriptFacts): boolean {
 const projectedFrameGap =
   'Native live sync skipped an event it could not read and is restoring the transcript from a canonical snapshot.';
 
+/** A grant and the cached entry that answered it, so a caller can evict only what it used. */
+type NativeGrantEntry = {
+  entry: Promise<z.infer<typeof grantSchema>>;
+  grant: z.infer<typeof grantSchema>;
+};
+
 /** Native v2 only. The legacy session-ingest/cloud-agent transport is deliberately unchanged. */
 export class NativeSyncClient {
   private readonly fetcher: typeof fetch;
@@ -473,12 +483,12 @@ export class NativeSyncClient {
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.socketConstructor = options.WebSocket ?? globalThis.WebSocket;
   }
-  private async grant(organizationID?: string) {
+  private async grant(organizationID?: string): Promise<NativeGrantEntry> {
     const key = organizationID ?? '';
     const existing = this.grants.get(key);
     if (existing) {
       const grant = await existing;
-      if (Date.parse(grant.expiresAt) > Date.now() + 30_000) return grant;
+      if (Date.parse(grant.expiresAt) > Date.now() + 30_000) return { entry: existing, grant };
     }
     const pending = (async () => {
       const credential = await this.options.getCredential();
@@ -496,7 +506,7 @@ export class NativeSyncClient {
     })();
     this.grants.set(key, pending);
     try {
-      return await pending;
+      return { entry: pending, grant: await pending };
     } catch (error) {
       // Two callers can mint at once: both await the same expired entry, then each replaces it.
       // Delete only this exchange, so a newer cached grant survives its predecessor's failure.
@@ -530,7 +540,10 @@ export class NativeSyncClient {
             ...init,
             signal: controller.signal,
             headers: { 'Content-Type': 'application/json', ...init?.headers },
-          })
+          }),
+        // A fetcher that ignores the abort signal can still answer, so release its body now
+        // rather than at collection.
+        late => void late.body?.cancel().catch(() => undefined)
       );
       if (!response.ok) {
         const body = record(
@@ -570,7 +583,7 @@ export class NativeSyncClient {
   private async grantFor(
     organizationID: string | undefined,
     signal: AbortSignal | null | undefined
-  ) {
+  ): Promise<NativeGrantEntry> {
     if (!signal) return await this.grant(organizationID);
     return await raceAbort(
       signal,
@@ -584,23 +597,26 @@ export class NativeSyncClient {
     organizationID: string | undefined,
     read: (response: Response) => Promise<T>
   ): Promise<T> {
-    const grant = await this.grantFor(organizationID, init?.signal);
+    const used = await this.grantFor(organizationID, init?.signal);
     if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
     try {
       return await this.exchange(
         path,
-        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${grant.token}` } },
+        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${used.grant.token}` } },
         read
       );
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       if (!(error instanceof NativeSyncError) || error['status'] !== 401) throw error;
-      this.grants.delete(organizationID ?? '');
+      // A concurrent 401 may already have replaced the entry with an in-flight renewal, and
+      // deleting that would make both callers exchange again.
+      if (this.grants.get(organizationID ?? '') === used.entry)
+        this.grants.delete(organizationID ?? '');
       const renewed = await this.grantFor(organizationID, init?.signal);
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       return await this.exchange(
         path,
-        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${renewed.token}` } },
+        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${renewed.grant.token}` } },
         read
       );
     }

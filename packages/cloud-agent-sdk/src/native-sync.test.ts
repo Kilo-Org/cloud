@@ -3260,6 +3260,41 @@ test('a response whose body never arrives times out like a stalled connect', asy
   await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
 });
 
+test('a response that arrives after the deadline releases its body', async () => {
+  // A fetcher that ignores the abort signal still answers. The late body must be canceled then,
+  // not left open until the collector reclaims the stream.
+  const cancel = jest.fn(async () => {});
+  let release: (response: Response) => void = () => {};
+  const held = new Promise<Response>(resolve => {
+    release = resolve;
+  });
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange')
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    return held;
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  const call = client.listSessions();
+  const settled = trackOutcome(call);
+  await flush();
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(settled.code).toBe('request_timeout');
+  expect(cancel).not.toHaveBeenCalled();
+  release(new Response(new ReadableStream({ cancel })));
+  await flush();
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
+
 test('a stalled grant exchange times out, aborts its request, and is replaced on the next call', async () => {
   let exchanges = 0;
   let stallExchange = true;
@@ -3354,6 +3389,46 @@ test('two callers minting at once keep the newer grant when the older exchange f
   await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
   // The newer entry survived, so the shared cache answers without a fourth exchange.
   expect(exchanges).toBe(3);
+});
+
+test('two concurrent 401s renew the grant once', async () => {
+  // Both callers hold the same cached grant and both receive a 401. One caller's catch must not
+  // delete the renewal the other already installed, or both callers exchange again.
+  let exchanges = 0;
+  let rejections = 0;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      exchanges++;
+      return Response.json({
+        token: `grant-${exchanges}`,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    }
+    // The two requests made with the cached grant fail; the retries use the renewal.
+    if (rejections > 0) {
+      rejections--;
+      return Response.json({ error: { code: 'unauthorized' } }, { status: 401 });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(exchanges).toBe(1);
+  // Both concurrent requests are answered by the cached grant and both get a 401.
+  rejections = 2;
+  const first = trackOutcome(client.listSessions());
+  const second = trackOutcome(client.listSessions());
+  await flush();
+  expect(exchanges).toBe(2);
+  await flush();
+  expect(first.code).toBe('resolved');
+  expect(second.code).toBe('resolved');
 });
 
 test('a stalled ticket mint reaches the connect backoff', async () => {

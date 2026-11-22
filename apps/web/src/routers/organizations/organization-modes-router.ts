@@ -247,12 +247,7 @@ function modeUpdateFields(
   if (!auditConfig) {
     return fields;
   }
-  const proseFields = [
-    'roleDefinition',
-    'whenToUse',
-    'description',
-    'customInstructions',
-  ] as const;
+  const proseFields = ['roleDefinition', 'whenToUse', 'description', 'customInstructions'] as const;
   for (const field of proseFields) {
     const next = auditConfig[field];
     if (next === undefined) {

@@ -33,7 +33,8 @@ export function auditEntryDetail(
     t,
     isolated: isolateBidiText,
     list: (values: readonly string[]) => formatList(values, locale),
-    state: (enabled: boolean) => t(enabled ? 'organization.auditLog.detail.enabled' : 'organization.auditLog.detail.disabled'),
+    state: (enabled: boolean) =>
+      t(enabled ? 'organization.auditLog.detail.enabled' : 'organization.auditLog.detail.disabled'),
   });
   return render === undefined ? undefined : t(render.key, render.values);
 }
@@ -60,7 +61,9 @@ type Render = Readonly<{
  * type error and the compiler proves the list is complete.
  */
 type AuditTemplates = {
-  readonly [K in AuditDetail['id']]?: (detail: Extract<AuditDetail, { id: K }>) => Render | undefined;
+  readonly [K in AuditDetail['id']]?: (
+    detail: Extract<AuditDetail, { id: K }>
+  ) => Render | undefined;
 };
 
 type AuditRole = 'owner' | 'admin' | 'billing_manager' | 'member';
@@ -253,7 +256,10 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
     }),
     'guardrail.config': d =>
       d.group === undefined
-        ? { key: 'organization.auditLog.detail.guardrailConfig', values: { state: state(d.enabled) } }
+        ? {
+            key: 'organization.auditLog.detail.guardrailConfig',
+            values: { state: state(d.enabled) },
+          }
         : {
             key: 'organization.auditLog.detail.guardrailConfigGroup',
             values: { state: state(d.enabled), group: isolated(d.group) },
@@ -339,7 +345,11 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
     'setting.advancedPolicies': d => {
       const parts: string[] = [];
       if (d.openRouter !== undefined) {
-        parts.push(t('organization.auditLog.detail.settingAdvancedPoliciesOpenRouter', { state: state(d.openRouter) }));
+        parts.push(
+          t('organization.auditLog.detail.settingAdvancedPoliciesOpenRouter', {
+            state: state(d.openRouter),
+          })
+        );
       }
       if (d.region !== undefined) {
         parts.push(
@@ -350,7 +360,10 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
       }
       return parts.length === 0
         ? undefined
-        : { key: 'organization.auditLog.detail.settingAdvancedPolicies', values: { values: list(parts) } };
+        : {
+            key: 'organization.auditLog.detail.settingAdvancedPolicies',
+            values: { values: list(parts) },
+          };
     },
     'setting.defaultModel': d => defaultModelRow(d, tools),
     'setting.autoRoute': d => ({
@@ -403,15 +416,13 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
     'setting.byokPriorities': () => undefined,
 
     'integration.connected': d => integration(tools, d.integration, 'integrationConnected'),
-    'integration.disconnected': d =>
-      integration(tools, d.integration, 'integrationDisconnected'),
+    'integration.disconnected': d => integration(tools, d.integration, 'integrationDisconnected'),
     'integration.modelUpdated': d => ({
       key: 'organization.auditLog.detail.integrationModelUpdated',
       values: { integration: t(INTEGRATION_KEYS[d.integration]), model: isolated(d.model) },
     }),
     'integration.installed': d => integration(tools, d.integration, 'integrationConnected'),
-    'integration.uninstalled': d =>
-      integration(tools, d.integration, 'integrationDisconnected'),
+    'integration.uninstalled': d => integration(tools, d.integration, 'integrationDisconnected'),
     'integration.refreshed': d => integration(tools, d.integration, 'integrationRefreshed'),
     'integration.cancelled': d => integration(tools, d.integration, 'integrationCancelled'),
     'integration.keyAdded': d => keyEvent(tools, d.provider, 'integrationKeyAdded'),
@@ -475,7 +486,9 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
   // One lookup per event. The cast is the join the union cannot express on its
   // own: `detail.id` selects an entry, and that entry's parameter is exactly
   // `detail`. `AuditTemplates` above is what proves a member has an entry.
-  const template = templates[detail.id] as ((detail: AuditDetail) => Render | undefined) | undefined;
+  const template = templates[detail.id] as
+    | ((detail: AuditDetail) => Render | undefined)
+    | undefined;
   return template?.(detail);
 }
 
@@ -486,7 +499,10 @@ function usd(amount: number): string {
 
 /** The integration events that name only the service. */
 function integration(tools: Tools, name: AuditIntegration, template: IntegrationKey): Render {
-  return { key: INTEGRATION_TEMPLATE_KEYS[template], values: { integration: tools.t(INTEGRATION_KEYS[name]) } };
+  return {
+    key: INTEGRATION_TEMPLATE_KEYS[template],
+    values: { integration: tools.t(INTEGRATION_KEYS[name]) },
+  };
 }
 
 type IntegrationKey =

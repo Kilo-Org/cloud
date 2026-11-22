@@ -407,7 +407,11 @@ export async function createNamedOrganizationPolicy(
         schema_version: NAMED_POLICY_SCHEMA_VERSION,
       })
       .returning();
-    return { result: { ...row, kind, document }, change: `Created ${kind} policy ${row.id}`, details: { id: 'namedPolicy.created', policyKind: kind, policyId: row.id } };
+    return {
+      result: { ...row, kind, document },
+      change: `Created ${kind} policy ${row.id}`,
+      details: { id: 'namedPolicy.created', policyKind: kind, policyId: row.id },
+    };
   });
 }
 
@@ -453,7 +457,11 @@ export async function updateNamedOrganizationPolicy(
       )
       .returning();
     if (document !== undefined) await assertAttachedPoliciesFit(tx, organizationId);
-    return { result: { ...row, ...parsed }, change: `Updated ${existing.kind} policy ${policyId}`, details: { id: 'namedPolicy.updated', policyKind: existing.kind, policyId } };
+    return {
+      result: { ...row, ...parsed },
+      change: `Updated ${existing.kind} policy ${policyId}`,
+      details: { id: 'namedPolicy.updated', policyKind: existing.kind, policyId },
+    };
   });
 }
 
@@ -473,7 +481,11 @@ export async function deleteNamedOrganizationPolicy(access: AdminAccess, policyI
           eq(organization_named_policies.id, policy.id)
         )
       );
-    return { result: policy.id, change: `Deleted ${policy.kind} policy ${policy.id}`, details: { id: 'namedPolicy.deleted', policyKind: policy.kind, policyId: policy.id } };
+    return {
+      result: policy.id,
+      change: `Deleted ${policy.kind} policy ${policy.id}`,
+      details: { id: 'namedPolicy.deleted', policyKind: policy.kind, policyId: policy.id },
+    };
   });
 }
 
@@ -553,13 +565,13 @@ export async function setNamedOrganizationPolicyLink(
     return {
       result: nextId,
       change: `Set ${kind} link for ${scopeLabel}: ${previousId ?? 'none'} to ${nextId ?? 'none'}`,
-    details: {
-      id: 'namedPolicy.linked',
-      policyKind: kind,
-      scope: scopeLabel,
-      ...(previousId === null ? {} : { previous: previousId }),
-      ...(nextId === null ? {} : { next: nextId }),
-    },
+      details: {
+        id: 'namedPolicy.linked',
+        policyKind: kind,
+        scope: scopeLabel,
+        ...(previousId === null ? {} : { previous: previousId }),
+        ...(nextId === null ? {} : { next: nextId }),
+      },
     };
   });
 }

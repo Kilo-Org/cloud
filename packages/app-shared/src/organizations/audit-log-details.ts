@@ -52,13 +52,7 @@ export const AUDIT_BROWSER_POLICY_TAGS = [
 ] as const satisfies readonly string[];
 export type AuditBrowserPolicyTag = (typeof AUDIT_BROWSER_POLICY_TAGS)[number];
 
-export const AUDIT_INTEGRATION_TAGS = [
-  'byok',
-  'discord',
-  'linear',
-  'slack',
-  'github',
-] as const;
+export const AUDIT_INTEGRATION_TAGS = ['byok', 'discord', 'linear', 'slack', 'github'] as const;
 export type AuditIntegrationTag = (typeof AUDIT_INTEGRATION_TAGS)[number];
 
 /** A mode field whose value is prose, so the change lists it and not its text. */

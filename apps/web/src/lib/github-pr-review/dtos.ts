@@ -135,6 +135,12 @@ export const GitHubPrReviewFileSchema = z
     patchMissingCause: z
       .enum(['binary', 'too_large', 'provider_omitted', 'content_unchanged'])
       .nullable(),
+    // Compatibility with a client bundle that predates `patchMissingCause`: it
+    // reads this boolean and has no cause to show, so dropping the field would
+    // silently flip every patch-less file to "has a diff" on an installed app
+    // that has not taken an update. Derived from the cause, never sent alone;
+    // remove once no released client reads it.
+    patchMissing: z.boolean(),
   })
   .strict();
 export type GitHubPrReviewFile = z.infer<typeof GitHubPrReviewFileSchema>;

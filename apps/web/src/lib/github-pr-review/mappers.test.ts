@@ -433,6 +433,9 @@ describe('buildFilesPage', () => {
       expect(result.files[0]?.patchMissingCause).toBe(testCase.cause);
       // A non-null cause always comes with no patch; a present one with none.
       expect(result.files[0]?.patch === null).toBe(testCase.cause !== null);
+      // The pre-cause field an older client bundle reads is the cause's own
+      // truth, so it can never disagree with the cause on the same response.
+      expect(result.files[0]?.patchMissing).toBe(testCase.cause !== null);
     }
   });
 

@@ -386,6 +386,7 @@ export function buildFilesPage(args: {
   const clampedPage = Math.max(1, Math.min(FILES_MAX_PAGES, page));
   const files: GitHubPrReviewFile[] = rawFiles.map(f => {
     const status = providerPrFileStatus(f.status);
+    const patchMissingCause = githubPatchMissingCause(f, status);
     return {
       path: f.filename,
       previousPath: f.previous_filename ?? null,
@@ -393,7 +394,10 @@ export function buildFilesPage(args: {
       additions: f.additions,
       deletions: f.deletions,
       patch: f.patch ?? null,
-      patchMissingCause: githubPatchMissingCause(f, status),
+      patchMissingCause,
+      // The pre-cause field, kept for a client bundle that has not taken an
+      // update; it is the cause's own truth, never an independent signal.
+      patchMissing: patchMissingCause !== null,
     };
   });
   const reachedCap = clampedPage >= FILES_MAX_PAGES;

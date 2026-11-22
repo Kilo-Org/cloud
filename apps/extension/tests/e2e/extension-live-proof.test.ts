@@ -1,9 +1,64 @@
 import { expect, test } from '@playwright/test';
+import { z } from 'zod';
 import { startDownloadFixture, USER_PAGE_PATH } from './download-fixture';
 import { seedExtensionAuth } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 import { activateTab } from './local-agents-fixture';
 import { launchRealDownloadBrowser } from './real-download-launch';
+
+/*
+ * The unpacked build as Chrome itself lists it: the manager page with developer
+ * mode on, and the extension's own name in the item list. The manager is a
+ * nested shadow-DOM tree, so both the toggle and the name are read through the
+ * same roots the click used rather than through `getByRole`, which does not see
+ * into a closed-over shadow surface from outside.
+ */
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('the unpacked build is listed with developer mode on', async ({}, testInfo) => {
+  test.setTimeout(120_000);
+  const launch = await launchRealDownloadBrowser();
+
+  try {
+    const page = await launch.context.newPage();
+
+    await page.goto('chrome://extensions');
+
+    // The manager is a nested shadow-DOM tree: chrome://extensions > extensions-manager
+    // > shadowRoot > extensions-toolbar > shadowRoot > #devMode (a cr-toggle).
+    await page.evaluate(`(() => {
+      const toolbar = document.querySelector('extensions-manager')?.shadowRoot?.querySelector('extensions-toolbar');
+      const toggle = toolbar?.shadowRoot?.querySelector('#devMode');
+      if (toggle && toggle.getAttribute('aria-checked') !== 'true') { toggle.click(); }
+    })()`);
+
+    const managerState = await page.evaluate(`(() => {
+      const toolbar = document.querySelector('extensions-manager')?.shadowRoot?.querySelector('extensions-toolbar');
+      const toggle = toolbar?.shadowRoot?.querySelector('#devMode');
+      const list = document.querySelector('extensions-manager')?.shadowRoot?.querySelector('extensions-item-list');
+      const item = list?.shadowRoot?.querySelector('extensions-item');
+      const name = item?.shadowRoot?.querySelector('#name');
+      return {
+        itemId: item?.getAttribute('id') ?? null,
+        name: (name?.textContent ?? '').trim(),
+        toggled: toggle?.getAttribute('aria-checked') ?? null
+      };
+    })()`);
+
+    const parsed = z
+      .object({ itemId: z.string().nullable(), name: z.string(), toggled: z.string().nullable() })
+      .parse(managerState);
+
+    expect(parsed.toggled).toBe('true');
+    expect(parsed.name).toBe('Kilo Code');
+
+    await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('00-extension-manager.png'),
+    });
+  } finally {
+    await launch.close();
+  }
+});
 
 /*
  * The panel's own error surface, captured from the unpacked build in a real

@@ -173,7 +173,64 @@ const screenshotConnectedAgent = async (sidePanel: Page, path: string): Promise<
   await sidePanel.screenshot({ fullPage: true, path });
 };
 
-test('a guarded click cancels the download, and the approved retry keeps it', async () => {
+/*
+ * Renders the values a spec has just asserted on the page it drove, so the
+ * capture that follows is a picture of what the run observed rather than of a
+ * page that merely happens to be open.
+ *
+ * Fixed to the top-left corner so a full-page capture cannot scroll past it, and
+ * click-through so a later call in the same spec still reaches its own target:
+ * the overlay sits over the page's content but takes no pointer events.
+ */
+const showObservedState = async (page: Page, lines: readonly string[]): Promise<void> => {
+  const text = lines.join('\n');
+
+  await page.evaluate(`
+    const found = document.querySelector('#observed-state');
+    const overlay = found ?? document.createElement('pre');
+    overlay.id = 'observed-state';
+    overlay.textContent = ${JSON.stringify(text)};
+    overlay.style.cssText = [
+      'background: #ffffff',
+      'border: 1px solid #000000',
+      'box-sizing: border-box',
+      'color: #000000',
+      'font: 13px monospace',
+      'left: 0',
+      'margin: 0',
+      'max-width: 100vw',
+      'overflow-wrap: anywhere',
+      'padding: 8px',
+      'pointer-events: none',
+      'position: fixed',
+      'top: 0',
+      'white-space: pre-wrap',
+      'z-index: 2147483647'
+    ].join('; ');
+    if (found === null) {
+      document.body.append(overlay);
+    }
+  `);
+
+  // The overlay is the record, so it is compared exactly: the capture must not show anything the run did not observe.
+  expect(await page.locator('#observed-state').textContent()).toBe(text);
+};
+
+/**
+ * The answer's own outcome in the words the overlay prints: a refusal shows its
+ * code, a tool answer shows whether it was a result or an error. Read from the
+ * response, never from what the spec expected it to be.
+ */
+const answerText = (answer: LocalAgentToolResponse): string => {
+  if (answer.kind === 'error') {
+    return String(answer.code);
+  }
+
+  return answer.isError ? 'error' : 'result';
+};
+
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('a guarded click cancels the download, and the approved retry keeps it', async ({}, testInfo) => {
   test.setTimeout(120_000);
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
@@ -232,6 +289,22 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     // Nothing is still writing one. The request reaching the fixture is the proof the click ran the download.
     await expectNothingSaved(downloadsPath);
 
+    // The page's own record of the refusal: the answer's code and reason, the folder as the call left it, and the
+    // Requests the fixture really served — so the capture holds the values this run asserted.
+    const refusedFolder = await downloadFiles(downloadsPath);
+    const refusedRequests = fixture.hits();
+
+    await showObservedState(agentPage, [
+      `answer: ${answerText(guarded)}`,
+      `reason: ${items[0]?.reason ?? 'none'}`,
+      `downloads folder: [${refusedFolder.join(', ')}]`,
+      `fixture requests: ${String(refusedRequests)}`,
+    ]);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('02-guarded-click.png'),
+    });
+
     // 2. The human approved: the identical call with the token runs with the guard off once.
     const approved = await session.callTool(
       'browser_click',
@@ -243,7 +316,21 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
 
     // The page named the file, so Chrome wrote it under that name in the folder it was given.
     await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
-    expect(await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME)).toBe(DOWNLOAD_BODY);
+    const approvedBody = await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME);
+
+    expect(approvedBody).toBe(DOWNLOAD_BODY);
+
+    const approvedFolder = await downloadFiles(downloadsPath);
+
+    await showObservedState(agentPage, [
+      `answer: ${answerText(approved)}`,
+      `downloads folder: [${approvedFolder.join(', ')}]`,
+      `body: ${JSON.stringify(approvedBody)}`,
+    ]);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('03-approved-click.png'),
+    });
 
     // 3. The token was burned: the same call again is guarded, so the guard is not left off.
     const reguarded = await session.callTool(
@@ -258,6 +345,9 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
       .poll(() => downloadFiles(downloadsPath), { timeout: 10_000 })
       .toStrictEqual([DOWNLOAD_FILENAME]);
     expect(await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME)).toBe(DOWNLOAD_BODY);
+
+    // The extension's own surface, last: bringing the panel to the front makes the fixture page a background tab.
+    await screenshotConnectedAgent(sidePanel, testInfo.outputPath('01-panel-connected-agent.png'));
   } finally {
     await launch.close();
     await hub.close();
@@ -265,7 +355,8 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
   }
 });
 
-test('a guarded click whose attachment fails saves nothing and claims no file', async () => {
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('a guarded click whose attachment fails saves nothing and claims no file', async ({}, testInfo) => {
   test.setTimeout(120_000);
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
@@ -339,10 +430,136 @@ test('a guarded click whose attachment fails saves nothing and claims no file', 
     // The guarded call's approval bought the click, so the route was asked again; the failed body still saves nothing.
     await expect.poll(() => fixture.brokenHits(), { timeout: 20_000 }).toBeGreaterThan(approvedAt);
     await expectNothingSaved(downloadsPath);
+
+    // The page's record of the call that ran: the click answered as a success, the route was asked, and the
+    // Folder holds neither a file nor a temp file.
+    const failedFolder = await downloadFiles(downloadsPath);
+    const failedRequests = fixture.brokenHits();
+
+    await showObservedState(agentPage, [
+      `answer: ${answerText(approved)}`,
+      `downloads folder: [${failedFolder.join(', ')}]`,
+      `failed attachment requests: ${String(failedRequests)}`,
+    ]);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('04-failed-attachment.png'),
+    });
   } finally {
     await launch.close();
     await hub.close();
     await fixture.close();
+  }
+});
+
+/*
+ * The page the call drives is gone: the fixture server is stopped after the tab
+ * is open and snapshotted, so the click's own navigation has nowhere to land.
+ * The click still runs — the element is in the document the tab holds — and
+ * Chrome puts the tab on its own error page. Nothing is downloaded, so the
+ * folder keeps no file, and the next call on that tab is the extension's own
+ * refusal: the error page's origin is not one any grant can name.
+ *
+ * Measured on this build: the click answers as an ordinary success because no
+ * download was ever created, and the following `browser_snapshot` answers
+ * `needs permission for this origin` with the `read` class — the gate, not a
+ * silent empty read.
+ */
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('a click whose page lost its server reports the failure and saves nothing', async ({}, testInfo) => {
+  test.setTimeout(120_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  // The fixture's own close is not idempotent: stopping it here and again in `finally` would wait for an
+  // EventEmitter 'close' that already fired, so this spec owns the one call.
+  let fixtureStopped = false;
+  const stopFixture = async (): Promise<void> => {
+    if (fixtureStopped) {
+      return;
+    }
+
+    fixtureStopped = true;
+    await fixture.close();
+  };
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Stopped server E2E session',
+    });
+
+    const navigated = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}/page` },
+      grants
+    );
+
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
+
+    // The ref comes from a snapshot of the live page, taken while the fixture still answers.
+    const target = await downloadRef(session, grants);
+
+    await stopFixture();
+
+    // The click reaches the link the tab holds; the navigation it starts has no server to answer it.
+    const clicked = await session.callTool(
+      'browser_click',
+      { element: 'Download report', target },
+      grants
+    );
+
+    expect(clicked).toMatchObject({ isError: false, kind: 'result' });
+    // The tab really left the fixture: Chrome's own error page is what the tab holds now.
+    await expect.poll(() => agentPage.url(), { timeout: 20_000 }).toContain('chrome-error');
+    await expectNothingSaved(downloadsPath);
+
+    // The next call on that tab is refused by the extension: the page's origin cannot be named, so no grant covers it.
+    const refused = await session.callTool('browser_snapshot', {}, grants);
+
+    expect(refused).toMatchObject({ code: -32_010, kind: 'error' });
+    const refusedMessage = refused.kind === 'error' ? refused.message : '';
+
+    expect(refusedMessage).toContain('needs permission for this origin');
+    expect(refused.kind === 'error' ? refused.step?.tool : undefined).toBe('browser_snapshot');
+    await expectNothingSaved(downloadsPath);
+
+    const stoppedFolder = await downloadFiles(downloadsPath);
+
+    await showObservedState(agentPage, [
+      `click answer: ${answerText(clicked)}`,
+      `next call: ${answerText(refused)}`,
+      `message: ${refusedMessage}`,
+      `downloads folder: [${stoppedFolder.join(', ')}]`,
+    ]);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('05-fixture-stopped.png'),
+    });
+  } finally {
+    await launch.close();
+    await hub.close();
+    await stopFixture();
   }
 });
 
@@ -1291,7 +1508,8 @@ test('a drop that carries local file paths needs the upload approval', async ({}
   }
 });
 
-test('the no-permission fallback refuses the same click and names the grant', async () => {
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('the no-permission fallback refuses the same click and names the grant', async ({}, testInfo) => {
   test.setTimeout(120_000);
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
@@ -1357,7 +1575,24 @@ test('the no-permission fallback refuses the same click and names the grant', as
     await expectNothingSaved(downloadsPath);
 
     // The launch really lacks the permission: nothing in this spec promoted it, and the state is the browser's own.
-    expect(await sidePanel.evaluate('typeof chrome.downloads')).toBe('undefined');
+    const downloadsPermissionState = await sidePanel.evaluate('typeof chrome.downloads');
+
+    expect(downloadsPermissionState).toBe('undefined');
+
+    const fallbackFolder = await downloadFiles(downloadsPath);
+    const fallbackMessage = guarded.kind === 'error' ? guarded.message : '';
+
+    await showObservedState(agentPage, [
+      `answer: ${answerText(guarded)}`,
+      `step token offered: ${guarded.kind === 'error' && guarded.stepToken !== undefined ? 'yes' : 'no'}`,
+      `downloads permission: ${String(downloadsPermissionState)}`,
+      `downloads folder: [${fallbackFolder.join(', ')}]`,
+      `message: ${fallbackMessage}`,
+    ]);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('06-fallback-refusal.png'),
+    });
   } finally {
     await launch.close();
     await hub.close();

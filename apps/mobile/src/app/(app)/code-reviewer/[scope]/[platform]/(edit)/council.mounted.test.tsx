@@ -16,6 +16,8 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import '@/i18n';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
+import { billingHrefFor } from '@/lib/trial-refusal';
+import type * as TrialRefusal from '@/lib/trial-refusal';
 import { act } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
@@ -69,6 +71,11 @@ const state = vi.hoisted(() => {
     setOrganizationId: vi.fn(),
     gateReason: null as string | null,
     orgs: undefined as OrganizationMembership[] | undefined,
+    /** The entitlement retry the screen offers, and the read's busy state. */
+    retryEntitlement: vi.fn(),
+    entitlementFetching: false,
+    /** What the role read answers for the reader of this refusal. */
+    canManageBilling: false,
   };
 });
 
@@ -110,7 +117,12 @@ vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
   useReviewerRouteParams: () => ({ scope: state.scope, platform: state.platform }),
 }));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
-  useCouncilGate: () => ({ ...state.gate, refusalReason: state.gateReason }),
+  useCouncilGate: () => ({
+    ...state.gate,
+    refusalReason: state.gateReason,
+    retryEntitlement: state.retryEntitlement,
+    entitlementFetching: state.entitlementFetching,
+  }),
   defaultCouncilConfig: () => ({
     enabled: false,
     aggregation_strategy: 'advisory',
@@ -119,6 +131,14 @@ vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   enabledSpecialistCount: (council: { specialists: { enabled: boolean }[] }) =>
     council.specialists.filter(entry => entry.enabled).length,
 }));
+// The refusal reads the reader's billing role from the shared membership list;
+// the suite holds that answer in state so one case can be the role that may
+// change the plan and the next the member who cannot. `billingHrefFor` stays
+// the real function, so the asserted route is the one the app builds.
+vi.mock('@/lib/trial-refusal', async () => {
+  const actual = await vi.importActual<typeof TrialRefusal>('@/lib/trial-refusal');
+  return { ...actual, useCanManageBilling: () => state.canManageBilling };
+});
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     organizations: {
@@ -166,13 +186,18 @@ vi.mock('@/components/code-reviewer/reviewer-error-screen', () => ({
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/empty-state', () => ({
-  // The refusal's one action is what this suite presses, so the stub carries
-  // its label and handler the way the real `StateAction`'s button does; the
-  // real module would pull the button's native graph into this render suite.
-  StateAction: (props: { label: string; onPress?: () => void }) =>
+  // The refusal's actions are what this suite presses, so the stub carries
+  // their label, busy state and handler the way the real `StateAction`'s
+  // button does; the real module would pull the button's native graph into
+  // this render suite.
+  StateAction: (props: { label: string; onPress?: () => void; loading?: boolean }) =>
     createElement(
       'Pressable',
-      { accessibilityLabel: props.label, onPress: props.onPress },
+      {
+        accessibilityLabel: props.label,
+        onPress: props.onPress,
+        loading: props.loading === true,
+      },
       createElement('Text', null, props.label)
     ),
   // The real state wraps its title and description in `Text` nodes; the stub
@@ -195,8 +220,10 @@ vi.mock('@/components/ui/preference-row', () => ({
 vi.mock('@/components/ui/icons', () => ({
   ArrowRight: 'ArrowRight',
   Building2: 'Building2',
+  CreditCard: 'CreditCard',
   Lock: 'Lock',
   Plus: 'Plus',
+  RotateCcw: 'RotateCcw',
   Users: 'Users',
   ShieldCheck: 'ShieldCheck',
 }));
@@ -270,6 +297,9 @@ beforeEach(() => {
   state.setOrganizationId.mockReset();
   state.gateReason = null;
   state.orgs = [];
+  state.retryEntitlement.mockReset();
+  state.entitlementFetching = false;
+  state.canManageBilling = false;
 
   state.config.data = {
     council: {
@@ -363,9 +393,12 @@ describe('council route gate', () => {
     mounted.unmount();
   });
 
-  it('keeps the neutral sentence when the refusal cannot name a cause', async () => {
+  it('names an app update when the rollout flag is unavailable, and offers no step', async () => {
     state.gate.allowed = false;
     state.gateReason = 'flagUnavailable';
+    // A reader who could change the plan still has no step here: an update is
+    // the only thing that changes this answer.
+    state.canManageBilling = true;
 
     const mounted = await renderWithProviders(createElement(CouncilRoute));
     const { renderer } = mounted;
@@ -373,11 +406,17 @@ describe('council route gate', () => {
 
     const texts = renderedTexts(renderer);
     expect(texts).toContain(
-      'Council review is not available for this organization right now. Try again later.'
+      'Council review is not available for this organization yet. Update the app to the latest version to get it.'
     );
     expect(texts).not.toContain(
       'Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.'
     );
+    // The old neutral sentence promised a wait; the reader now gets the one
+    // step that exists, so nothing may offer "try again later" again.
+    expect(texts).not.toContain(
+      'Council review is not available for this organization right now. Try again later.'
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'Pressable')).toHaveLength(0);
 
     mounted.unmount();
   });
@@ -397,9 +436,10 @@ describe('council route gate', () => {
     mounted.unmount();
   });
 
-  it('explains the plan to an unentitled organisation', async () => {
+  it('offers billing to a reader who can change the plan', async () => {
     state.gate.allowed = false;
     state.gateReason = 'refused';
+    state.canManageBilling = true;
 
     const mounted = await renderWithProviders(createElement(CouncilRoute));
     const { renderer } = mounted;
@@ -410,9 +450,87 @@ describe('council route gate', () => {
       'Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.'
     );
     expect(texts).not.toContain(
+      'Council review needs the Enterprise plan with an active subscription or trial. An organization owner can change the plan.'
+    );
+    expect(texts).not.toContain(
       'Council review is not part of a personal account. It needs an Enterprise organization.'
     );
+    const action = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .find(node => node.props.accessibilityLabel === 'Manage billing');
+    expect(action).toBeDefined();
+    const onPress = action?.props.onPress as (() => void) | undefined;
+    await act(() => {
+      onPress?.();
+    });
+    expect(state.routerPush).toHaveBeenCalledWith(billingHrefFor('org-1'));
+
+    mounted.unmount();
+  });
+
+  it('names the owner to a reader who cannot change the plan, and offers no step', async () => {
+    state.gate.allowed = false;
+    state.gateReason = 'refused';
+    state.canManageBilling = false;
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    const texts = renderedTexts(renderer);
+    expect(texts).toContain(
+      'Council review needs the Enterprise plan with an active subscription or trial. An organization owner can change the plan.'
+    );
+    expect(texts).not.toContain(
+      'Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.'
+    );
+    // The member cannot act on it in the app, so the step would be a dead end.
     expect(renderer.root.findAll(node => String(node.type) === 'Pressable')).toHaveLength(0);
+
+    mounted.unmount();
+  });
+
+  it('offers a retry when the plan check failed, and re-runs that read once', async () => {
+    state.gate.allowed = false;
+    state.gateReason = 'entitlementErrored';
+    // The role read has no bearing on a failed check: the retry is the step.
+    state.canManageBilling = true;
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    expect(renderedTexts(renderer)).toContain(
+      "Council review could not check this organization's plan. Retry to check again."
+    );
+    const action = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .find(node => node.props.accessibilityLabel === 'Retry');
+    expect(action).toBeDefined();
+    expect(action?.props.loading).toBe(false);
+    const onPress = action?.props.onPress as (() => void) | undefined;
+    await act(() => {
+      onPress?.();
+    });
+    expect(state.retryEntitlement).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+  });
+
+  it('reports the retry busy while the plan check re-runs', async () => {
+    state.gate.allowed = false;
+    state.gateReason = 'entitlementErrored';
+    state.entitlementFetching = true;
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    const action = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .find(node => node.props.accessibilityLabel === 'Retry');
+    expect(action?.props.loading).toBe(true);
+    expect(state.retryEntitlement).not.toHaveBeenCalled();
 
     mounted.unmount();
   });

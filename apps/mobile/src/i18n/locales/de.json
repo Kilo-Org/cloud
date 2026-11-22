@@ -653,6 +653,8 @@
       "emptyTitle": "Noch keine Benachrichtigungen",
       "emptyCategoryTitle": "Noch keine Benachrichtigungen in dieser Kategorie",
       "emptyBody": "Benachrichtigungen, die dieses Konto erhält, erscheinen hier. Sie werden {{days}} Tage lang aufbewahrt.",
+      "emptyBody_one": "Benachrichtigungen, die dieses Konto erhält, erscheinen hier. Sie werden {{days}} Tage lang aufbewahrt.",
+      "emptyBody_other": "Benachrichtigungen, die dieses Konto erhält, erscheinen hier. Sie werden {{days}} Tage lang aufbewahrt.",
       "capped": "Es werden die neuesten Benachrichtigungen angezeigt.",
       "loadError": "Der Benachrichtigungsverlauf konnte nicht geladen werden.",
       "openFailed": "Diese Benachrichtigung lässt sich nirgendwo mehr öffnen."
@@ -753,6 +755,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
+      "deniedManagedByOwner": "Bitte einen Inhaber von {{organization}}, die Verbindung zu ändern, die du nicht ändern kannst.",
+      "deniedConnectRole": "Nur Inhaber, Admins und Abrechnungsmanager von {{organization}} können die Verbindung herstellen.",
+      "deniedReconnectRole": "Bitte einen Inhaber, Admin oder Abrechnungsmanager von {{organization}}, sie wiederherzustellen.",
       "managedOnWebTitle": "Im Web verwaltet",
       "managedOnWebShort": "Diese Verbindung wird im Web über einen Computer verwaltet.",
       "managedOnWebRepositories": "Wähle die Repositories für {{organization}} im Web über einen Computer aus.",
@@ -856,7 +861,7 @@
       "toolNameError": "Beim Werkzeug {{name}} ist ein Fehler aufgetreten.",
       "cancelReasonSuperseded": "Es wurde ein neuerer Commit gepusht, daher wurde dieses Review ersetzt.",
       "cancelReasonIntegrationDisconnected": "{{platform}} ist nicht verbunden, daher wurde dieses Review abgebrochen. Stelle die Verbindung wieder her und führe das Review erneut aus.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere es wieder und führe das Review erneut aus.",
+      "cancelReasonBitbucketReviewerDisabled": "Der Code-Prüfer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere ihn wieder und führe das Review erneut aus.",
       "cancelReasonBitbucketPullRequestChanged": "Der Bitbucket-Pull-Request wurde geändert, daher wurde dieses Review ersetzt.",
       "cancelReasonCancelled": "Dieses Review wurde abgebrochen.",
       "cancelReasonInterrupted": "Dieses Review wurde unterbrochen."
@@ -866,7 +871,7 @@
       "connectOwnerOnly": "Bitte einen Organisationsinhaber oder Admin, einen Anbieter zu verbinden.",
       "couldNotLoad": "Die Reviews konnten nicht geladen werden.",
       "noReviews": "Noch keine Reviews",
-      "noReviewsDescription": "Hier erscheinen Reviews, sobald Code Reviewer einen Pull-Request prüft.",
+      "noReviewsDescription": "Hier erscheinen Reviews, sobald der Code-Prüfer einen Pull-Request prüft.",
       "startManualReview": "Manuelles Review starten",
       "title": "Letzte Reviews"
     },
@@ -940,7 +945,7 @@
       "set": "Festgelegt",
       "notSet": "Nicht festgelegt"
     },
-    "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
+    "updateFailed": "Der Code-Prüfer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
     "status": {
       "interrupted": "Unterbrochen"
@@ -963,26 +968,26 @@
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "description": "Code Reviewer wurde deaktiviert, weil Kilo über keine aktive GitHub-App-Installation auf dieses Repository zugreifen kann. Aktualisiere die GitHub-App-Installation und aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil Kilo über keine aktive GitHub-App-Installation auf dieses Repository zugreifen kann. Aktualisiere die GitHub-App-Installation und aktiviere ihn anschließend wieder.",
         "recoveryLabel": "GitHub-App aktualisieren"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Der Code-Prüfer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere ihn anschließend wieder."
       },
       "gitlabProjectAccessRequired": {
-        "description": "Code Reviewer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere ihn anschließend wieder.",
         "recoveryLabel": "GitLab-Integration aktualisieren"
       },
       "byokInvalidKey": {
-        "description": "Code Reviewer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig ist, widerrufen wurde oder nicht die nötigen Berechtigungen hat. Aktualisiere den Schlüssel oder wähle ein anderes Modell. Aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig ist, widerrufen wurde oder nicht die nötigen Berechtigungen hat. Aktualisiere den Schlüssel oder wähle ein anderes Modell. Aktiviere den Code-Prüfer anschließend wieder.",
         "recoveryLabel": "BYOK-Einstellungen aktualisieren"
       },
       "selectedModelUnavailable": {
-        "description": "Code Reviewer wurde deaktiviert, weil das ausgewählte Modell für Cloud-Agent-Sitzungen nicht verfügbar ist. Wähle ein verfügbares Modell und aktiviere Code Reviewer anschließend wieder.",
-        "recoveryLabel": "Code-Reviewer-Einstellungen aktualisieren"
+        "description": "Der Code-Prüfer wurde deaktiviert, weil das ausgewählte Modell für Cloud-Agent-Sitzungen nicht verfügbar ist. Wähle ein verfügbares Modell und aktiviere ihn anschließend wieder.",
+        "recoveryLabel": "Code-Prüfer-Einstellungen aktualisieren"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Der Code-Prüfer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere ihn anschließend wieder."
       },
       "title": "Beim Code-Prüfer musst du eingreifen.",
       "recoveryLabel": "Support kontaktieren"
@@ -1025,7 +1030,9 @@
       "unavailablePersonallySwitchAction": "Organisation wechseln",
       "unavailableOrganizationTitle": "Gremium-Review ist derzeit nicht verfügbar",
       "unavailableForOrganization": "Gremium-Review benötigt den Enterprise-Plan mit einem aktiven Abo oder einer Testphase. Diese Organisation hat es derzeit nicht.",
-      "unavailableForOrganizationNeutral": "Gremium-Review ist derzeit für diese Organisation nicht verfügbar. Versuchen Sie es später erneut.",
+      "unavailablePlanCheck": "Gremium-Review konnte den Plan dieser Organisation nicht prüfen. Versuche es erneut, um die Prüfung zu wiederholen.",
+      "unavailableFlagRollout": "Gremium-Review ist für diese Organisation noch nicht verfügbar. Aktualisiere die App auf die neueste Version, um es zu erhalten.",
+      "unavailableForOrganizationMember": "Gremium-Review benötigt den Enterprise-Plan mit einem aktiven Abo oder einer Testphase. Ein Organisationsinhaber kann den Plan ändern.",
       "unavailableOnBitbucket": "Gremium-Review ist für Bitbucket-Repositories nicht verfügbar.",
       "noRepositories": "Noch keine Code-Repositories ausgewählt. Wähle zuerst Code-Repositories in den Repository-Einstellungen aus.",
       "specialists": "Spezialisten",
@@ -2001,7 +2008,6 @@
       "noMatches": "Keine Treffer",
       "noRepositories": "Keine Repositorys verfügbar",
       "noRepositoriesDescription": "Verbinde GitHub oder GitLab, um Repositorys zu laden.",
-      "loading": "Wird geladen…",
       "accessibility": "Code-Repository: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3646,10 +3652,10 @@
       "nameLabel": "Modusname",
       "nameRequired": "Modusnamen eingeben.",
       "notFound": "Dieser Modus existiert nicht mehr.",
-      "restrictionHint": "Nur Dateien, die diesem Muster entsprechen, können bearbeitet werden. Leer lassen, um alle Dateien zuzulassen.",
-      "restrictionInvalid": "Gültiges Muster eingeben.",
+      "restrictionHint": "Ein regulärer Ausdruck legt fest, welche Dateien dieser Modus bearbeiten darf, zum Beispiel `\\.md$` nur für Markdown-Dateien. Lass das Feld leer, um alle Dateien zuzulassen.",
+      "restrictionInvalid": "Gib einen gültigen regulären Ausdruck ein.",
       "restrictionLabel": "Bezeichnung der Einschränkung",
-      "restrictionPattern": "Dateimuster",
+      "restrictionPattern": "Dateieinschränkung",
       "roleLabel": "Rollendefinition",
       "roleRequired": "Beschreiben, was dieser Modus tut.",
       "tool": {

@@ -1,3 +1,4 @@
+import { type TFunction } from 'i18next';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,7 +9,12 @@ import {
   readBitbucketToken,
 } from './code-reviewer-bitbucket';
 
-const translate = (key: string) => key;
+/** The key plus its variables, so a case can see what interpolation it received. */
+const translate = ((key: string, values?: Readonly<Record<string, unknown>>) =>
+  values ? `${key} ${Object.values(values).join(' ')}` : key) as unknown as TFunction;
+
+/** The name the role sentence interpolates when a call refuses the role. */
+const ORGANIZATION = 'Acme';
 
 /**
  * One readiness state, from the connected-and-ready shape plus the fields a
@@ -158,7 +164,8 @@ describe('bitbucketConnectionFailure', () => {
           data: { code: 'UNAUTHORIZED', message: 'Bitbucket rejected the Workspace Access Token' },
         },
         translate,
-        'first-connect'
+        'first-connect',
+        ORGANIZATION
       )
     ).toEqual({
       kind: 'token-refused',
@@ -171,7 +178,8 @@ describe('bitbucketConnectionFailure', () => {
       bitbucketConnectionFailure(
         { shape: { data: { code: 'UNAUTHORIZED', message: 'The saved token expired' } } },
         translate,
-        'replace-token'
+        'replace-token',
+        ORGANIZATION
       )
     ).toEqual({
       kind: 'token-refused',
@@ -186,15 +194,19 @@ describe('bitbucketConnectionFailure', () => {
         'You do not have access to this organization',
         'The current user cannot manage this organization integration',
       ]) {
+        // The sentence names the organization whose rule refused, so the role
+        // problem reads as this one organization's rather than a rule in the
+        // abstract.
         expect(
           bitbucketConnectionFailure(
             { data: { code: 'UNAUTHORIZED', message } },
             translate,
-            tokenRefusal
+            tokenRefusal,
+            ORGANIZATION
           )
         ).toEqual({
           kind: 'role-refused',
-          message: 'prReview.connect.bitbucketAdminOnlyDescription',
+          message: `codeReviewer.bitbucketConnect.deniedConnectRole ${ORGANIZATION}`,
         });
       }
     }
@@ -203,9 +215,9 @@ describe('bitbucketConnectionFailure', () => {
   it('reads an unprocessable token as a token problem on either surface', () => {
     for (const tokenRefusal of ['first-connect', 'replace-token'] as const) {
       for (const code of ['BAD_REQUEST', 'FORBIDDEN', 'UNPROCESSABLE_CONTENT']) {
-        expect(bitbucketConnectionFailure({ data: { code } }, translate, tokenRefusal).kind).toBe(
-          'token-refused'
-        );
+        expect(
+          bitbucketConnectionFailure({ data: { code } }, translate, tokenRefusal, ORGANIZATION).kind
+        ).toBe('token-refused');
       }
     }
   });
@@ -213,9 +225,9 @@ describe('bitbucketConnectionFailure', () => {
   it('reads a changed connection as one the sheet must reopen on either surface', () => {
     for (const tokenRefusal of ['first-connect', 'replace-token'] as const) {
       for (const code of ['CONFLICT', 'NOT_FOUND']) {
-        expect(bitbucketConnectionFailure({ data: { code } }, translate, tokenRefusal).kind).toBe(
-          'connection-changed'
-        );
+        expect(
+          bitbucketConnectionFailure({ data: { code } }, translate, tokenRefusal, ORGANIZATION).kind
+        ).toBe('connection-changed');
       }
     }
   });
@@ -230,7 +242,7 @@ describe('bitbucketConnectionFailure', () => {
         { data: { code: 'INTERNAL_SERVER_ERROR' } },
         new Error('Network request failed'),
       ]) {
-        expect(bitbucketConnectionFailure(error, translate, tokenRefusal)).toEqual({
+        expect(bitbucketConnectionFailure(error, translate, tokenRefusal, ORGANIZATION)).toEqual({
           kind: 'retryable',
           message: 'prReview.connect.providerCheckFailedMessage',
         });

@@ -4,6 +4,7 @@
 // without mounting a screen.
 
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { type TFunction } from 'i18next';
 import { z } from 'zod';
 
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
@@ -123,9 +124,10 @@ export type BitbucketTokenRefusal = 'first-connect' | 'replace-token';
  * the axis above.
  */
 const FAILURE_COPY_KEY = {
-  // The same role rule the integration page states: an owner, admin or billing
-  // manager is who can connect the workspace.
-  'role-refused': 'prReview.connect.bitbucketAdminOnlyDescription',
+  // The same role rule the integration page states, named for this connection's
+  // organization: the sheet and the recovery card both hold the name, and a
+  // person in several organizations cannot tell which one refused the role.
+  'role-refused': 'codeReviewer.bitbucketConnect.deniedConnectRole',
   'connection-changed': 'prReview.connect.checkFailedTitleBitbucket',
   retryable: 'prReview.connect.providerCheckFailedMessage',
 } as const satisfies Record<Exclude<BitbucketFailure['kind'], 'token-refused'>, string>;
@@ -185,17 +187,26 @@ function failureKind(error: unknown): BitbucketFailure['kind'] {
  * submitting surface names its side of the refusal axis: a token Bitbucket
  * refused has two honest sentences, and only the surface knows whether it
  * pasted a first token that never worked or sat on a connection whose token
- * has stopped working.
+ * has stopped working. `organization` is the display name of the organization
+ * whose role rule refused: every surface that submits holds it, and the role
+ * sentence reads as this one organization's rule rather than as a rule in the
+ * abstract.
  */
+// oxlint-disable-next-line max-params -- the refusal axis, the translator and the organization name are separate inputs every surface already holds; folding them into an options bag would hide which sentence depends on the name
 export function bitbucketConnectionFailure(
   error: unknown,
-  translate: (key: string) => string,
-  tokenRefusal: BitbucketTokenRefusal
+  translate: TFunction,
+  tokenRefusal: BitbucketTokenRefusal,
+  organization: string
 ): BitbucketFailure {
   const kind = failureKind(error);
-  return kind === 'token-refused'
-    ? { kind, message: translate(TOKEN_REFUSED_COPY_KEY[tokenRefusal]) }
-    : { kind, message: translate(FAILURE_COPY_KEY[kind]) };
+  if (kind === 'token-refused') {
+    return { kind, message: translate(TOKEN_REFUSED_COPY_KEY[tokenRefusal]) };
+  }
+  if (kind === 'role-refused') {
+    return { kind, message: translate(FAILURE_COPY_KEY[kind], { organization }) };
+  }
+  return { kind, message: translate(FAILURE_COPY_KEY[kind]) };
 }
 
 /**

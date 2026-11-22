@@ -25,12 +25,12 @@ jest.mock('@octokit/auth-app', () => ({
 }));
 
 import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
+import { fetchPRInlineComments } from './adapter';
 import {
-  fetchPRInlineComments,
   GITHUB_LISTING_TIMEOUT_MS,
   GitHubListingBudgetExceededError,
   MAX_GITHUB_LISTING_BYTES,
-} from './adapter';
+} from './listing-budget';
 
 const PER_PAGE = 100;
 const MAX_PAGES = 5;

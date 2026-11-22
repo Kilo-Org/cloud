@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { markByokAvailable } from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
@@ -22,7 +21,7 @@ import {
 } from './store';
 import { isOpenAiModelServed } from './served-models';
 import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
-import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
+import { OPENAI_CHATGPT_API_URL, readOpenAiChatGptPartnerKey } from './upstream';
 
 /**
  * Routing for the delegated "Sign in with ChatGPT" connection. When a person
@@ -286,9 +285,11 @@ export async function getOpenAiChatGptByokModelIds(
   owner: OpenAiChatGptOwner,
   candidateModelIds: readonly string[]
 ): Promise<Set<string> | null> {
-  if (!(await readServableStoredConnection(owner))) return null;
+  // Same order as routing: an unconfigured deployment cannot tag anything, so it
+  // must not read and decrypt the stored row to find that out.
+  if (readOpenAiChatGptPartnerKey() === null) return null;
 
-  if (getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV).trim().length === 0) return null;
+  if (!(await readServableStoredConnection(owner))) return null;
 
   const tagged = await Promise.all(
     candidateModelIds.map(async modelId => {
@@ -304,9 +305,10 @@ export async function getOpenAiChatGptByokModelIds(
  * Returns `models` with the ChatGPT-served ones marked BYOK-available, so the
  * model picker and the extension show the BYOK badge like pasted BYOK keys. A
  * marked model comes back with `hasUserByokAvailable: true` and `isFree: false`,
- * including one that already carried the badge. The list is returned unchanged
- * when the person has no usable connection. The caller runs it after
- * `addUserByokAvailability`.
+ * including one that already carried the badge; the constraint names `isFree`
+ * because this helper is one of the places that rewrites it. The list is
+ * returned unchanged when the person has no usable connection. The caller runs
+ * it after `addUserByokAvailability`.
  */
 export async function tagOpenAiChatGptByokModels<
   T extends { id: string; hasUserByokAvailable?: boolean; isFree?: boolean },
@@ -535,15 +537,24 @@ export function buildOpenAiChatGptProvider(
 /**
  * Resolves the ChatGPT connection as a provider, a reconnect requirement, or
  * null when the request is not eligible or cannot be served. A `reconnect`
- * result is returned when the person's enabled credential is terminally dead:
- * the request must fail readably instead of silently running on another billing
- * path. Callers keep the standard abuse and organization policy checks
+ * result is returned when the person's enabled credential is terminally dead
+ * and the deployment can serve the route at all: the request must fail readably
+ * instead of silently running on another billing path. Without the partner key
+ * the deployment is not configured for token sharing, so every request takes
+ * the ordinary gateway route instead and no stored credential is consulted.
+ * Callers keep the standard abuse and organization policy checks
  * (`bypassAccessCheck: false`), but skip the zero-balance paid-model block:
  * the ChatGPT plan pays for the request, not Kilo credits.
  */
 export async function checkOpenAiChatGptByok(
   input: OpenAiChatGptRoutingInput
 ): Promise<OpenAiChatGptRoutingResult | null> {
+  const apiKey = readOpenAiChatGptPartnerKey();
+  // Without the partner key the deployment cannot serve a delegated request at
+  // all, so the request takes the ordinary gateway route without reading or
+  // refreshing the stored connection.
+  if (apiKey === null) return null;
+
   const candidates = openAiChatGptOwnerCandidates(input);
 
   for (const owner of candidates) {
@@ -561,9 +572,9 @@ export async function checkOpenAiChatGptByok(
     // and let a later candidate (the caller's own connection) be tried.
     if (outcome.kind !== 'access_token') continue;
 
-    const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+    // The key is present, so this never returns null; the guard stays because the
+    // builder's type admits it, and it keeps the ordinary route if that changes.
     const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, upstreamModel, owner);
-    // A missing partner key is a deployment-wide misconfiguration.
     if (!provider) return null;
 
     return {

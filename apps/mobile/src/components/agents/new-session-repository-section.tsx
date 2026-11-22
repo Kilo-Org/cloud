@@ -115,7 +115,7 @@ export function NewSessionRepositorySection({
 
       {/*
         The picker renders unconditionally. Its trigger always reserves its
-        height and already covers loading ("Loading..."), empty ("Select
+        height and already covers loading ("Loading…"), empty ("Select
         repository") and disabled states, so gating it off (the old
         `hasRepos || anyLoading`) could leave the `Repository` heading as the
         section's only child — a blank void above Start session — while a

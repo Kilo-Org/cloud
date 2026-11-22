@@ -4,6 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ESNext"],
+    "types": [],
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

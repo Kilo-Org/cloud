@@ -223,7 +223,7 @@ export function selectBriefingSettingsPhase(input: {
 /** `agentBriefing.safeguardInput`: whole seconds, 1 to 600, and a positive safe-integer spend. */
 const MAX_BRIEFING_DURATION_SECONDS = 600;
 
-export type BriefingSafeguards = { maxDurationSeconds: number; maxSpendMicrodollars: number };
+type BriefingSafeguards = { maxDurationSeconds: number; maxSpendMicrodollars: number };
 
 /** The safeguard field a refusal names, in the order the card lists them. */
 export type BriefingSafeguardField = 'duration' | 'spend';

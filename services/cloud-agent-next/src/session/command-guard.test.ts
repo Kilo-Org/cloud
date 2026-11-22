@@ -472,6 +472,11 @@ describe('security-remediation push command guard policy', () => {
       'git -C . config remote.origin.push +main',
       "git -C . config alias.p 'push --force'",
       'git -c core.pager=cat config push.default current',
+      "git push '--force'",
+      'git push "--force"',
+      "git push 'origin +main'",
+      'git config remote.origin.mirror true',
+      'git -C . config remote.origin.mirror true',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }

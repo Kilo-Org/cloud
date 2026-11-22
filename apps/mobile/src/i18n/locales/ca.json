@@ -4964,7 +4964,7 @@
     "defaultModel": "Usa el model per defecte de Kilo",
     "duration": "Límit de temps (minuts)",
     "spendLimit": "Límit de despesa (USD)",
-    "invalidSafeguards": "Introdueix límits de temps i despesa positius i finits.",
+    "invalidSafeguards": "Introdueix un nombre positiu dins del rang permès.",
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració. Canvia el model o els límits, o torna-ho a provar més tard.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",

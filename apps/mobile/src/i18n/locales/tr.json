@@ -4875,7 +4875,7 @@
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
     "duration": "Süre sınırı (dakika)",
     "spendLimit": "Harcama sınırı (USD)",
-    "invalidSafeguards": "Pozitif ve sonlu süre ve harcama sınırları girin.",
+    "invalidSafeguards": "İzin verilen aralıkta pozitif bir sayı girin.",
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
     "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil. Modeli veya sınırları değiştirin ya da daha sonra tekrar deneyin.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",

@@ -4875,7 +4875,7 @@
     "defaultModel": "Kilo standart modelidan foydalanish",
     "duration": "Vaqt cheklovi (daqiqa)",
     "spendLimit": "Xarajat cheklovi (USD)",
-    "invalidSafeguards": "Musbat, cheklangan vaqt va xarajat limitlarini kiriting.",
+    "invalidSafeguards": "Ruxsat etilgan oraliqda musbat son kiriting.",
     "estimate": "Taxminiy hisob {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu sozlamalar uchun pullik xulosa mavjud emas. Modelni yoki chegaralarni o‘zgartiring, yoki keyinroq qayta urinib ko‘ring.",
     "confirmPaid": "{{context}} uchun pullik xulosalar yoqilsinmi?",

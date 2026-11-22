@@ -4875,7 +4875,7 @@
     "defaultModel": "Kilo 기본 모델 사용",
     "duration": "시간 안전 한도(분)",
     "spendLimit": "지출 안전 한도(USD)",
-    "invalidSafeguards": "유한한 양수로 시간 및 지출 한도를 입력하세요.",
+    "invalidSafeguards": "허용 범위 안의 양수를 입력하세요.",
     "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
     "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다. 모델이나 한도를 변경하거나 나중에 다시 시도하세요.",
     "confirmPaid": "{{context}}에 유료 요약을 사용하시겠습니까?",

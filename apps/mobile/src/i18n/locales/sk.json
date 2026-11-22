@@ -5053,7 +5053,7 @@
     "defaultModel": "Použiť predvolený model Kilo",
     "duration": "Časový limit (minúty)",
     "spendLimit": "Limit výdavkov (USD)",
-    "invalidSafeguards": "Zadajte kladné, konečné limity času a výdavkov.",
+    "invalidSafeguards": "Zadajte kladné číslo v povolenom rozsahu.",
     "estimate": "Odhad {{estimate}} · maximálne {{maximum}}",
     "estimateUnavailable": "Platený súhrn nie je pre tieto nastavenia dostupný. Zmeňte model alebo limity, prípadne to skúste neskôr znova.",
     "confirmPaid": "Povoliť platené zhrnutia pre {{context}}?",

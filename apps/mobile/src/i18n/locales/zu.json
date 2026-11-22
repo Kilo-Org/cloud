@@ -4875,7 +4875,7 @@
     "defaultModel": "Sebenzisa imodeli ezenzakalelayo ye-Kilo",
     "duration": "Umkhawulo wesikhathi (amaminithi)",
     "spendLimit": "Umkhawulo wezindleko (USD)",
-    "invalidSafeguards": "Faka imikhawulo yesikhathi neyezindleko engaphezu kukaziro nenqunyiwe.",
+    "invalidSafeguards": "Faka inombolo ephozithivu ngaphakathi kwebanga elivunyelwe.",
     "estimate": "Kulinganiselwe {{estimate}} · okuphezulu kakhulu {{maximum}}",
     "estimateUnavailable": "Isifinyezo esikhokhelwayo asitholakali kulezi zilungiselelo. Shintsha imodeli noma imikhawulo, noma zama futhi emva kwesikhathi.",
     "confirmPaid": "Vula izifinyezo ezikhokhelwayo ze-{{context}}?",

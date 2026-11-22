@@ -5142,7 +5142,7 @@
     "defaultModel": "Úsáid múnla réamhshocraithe Kilo",
     "duration": "Cosaint ama (nóiméid)",
     "spendLimit": "Cosaint caiteachais (USD)",
-    "invalidSafeguards": "Cuir isteach teorainneacha ama agus caiteachais dearfacha, teoranta.",
+    "invalidSafeguards": "Cuir isteach uimhir dhearfach laistigh den raon ceadaithe.",
     "estimate": "Meastachán {{estimate}} · uasmhéid {{maximum}}",
     "estimateUnavailable": "Níl achoimre íoctha ar fáil le haghaidh na socruithe seo. Athraigh an tsamhail nó na teorainneacha, nó déan iarracht eile ar ball.",
     "confirmPaid": "Cumasaigh achoimrí íoctha do {{context}}?",

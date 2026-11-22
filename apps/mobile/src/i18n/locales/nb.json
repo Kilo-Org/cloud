@@ -4875,7 +4875,7 @@
     "defaultModel": "Bruk Kilos standardmodell",
     "duration": "Tidsgrense (minutter)",
     "spendLimit": "Forbruksgrense (USD)",
-    "invalidSafeguards": "Angi positive, endelige grenser for tid og forbruk.",
+    "invalidSafeguards": "Angi et positivt tall innenfor det tillatte området.",
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "En betalt oppsummering er ikke tilgjengelig for disse innstillingene. Endre modellen eller grensene, eller prøv igjen senere.",
     "confirmPaid": "Slå på betalte sammendrag for {{context}}?",

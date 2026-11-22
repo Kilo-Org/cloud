@@ -4964,7 +4964,7 @@
     "defaultModel": "Izmantot Kilo noklusējuma modeli",
     "duration": "Laika ierobežojums (minūtes)",
     "spendLimit": "Izdevumu ierobežojums (USD)",
-    "invalidSafeguards": "Ievadiet pozitīvus, galīgus laika un izdevumu ierobežojumus.",
+    "invalidSafeguards": "Ievadiet pozitīvu skaitli atļautajā intervālā.",
     "estimate": "Novērtējums {{estimate}} · maksimums {{maximum}}",
     "estimateUnavailable": "Apmaksāts kopsavilkums šiem iestatījumiem nav pieejams. Mainiet modeli vai ierobežojumus, vai arī mēģiniet vēlreiz vēlāk.",
     "confirmPaid": "Iespējot maksas kopsavilkumus kontekstam {{context}}?",

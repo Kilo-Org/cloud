@@ -45,7 +45,7 @@
     "defaultModel": "Use Kilo’s default model",
     "duration": "Time safeguard (minutes)",
     "spendLimit": "Spend safeguard (USD)",
-    "invalidSafeguards": "Enter positive, finite time and spend limits.",
+    "invalidSafeguards": "Enter a positive limit within the allowed range.",
     "estimate": "Estimate {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "A paid summary is not available for these settings. Change the model or the limits, or try again later.",
     "estimatePricingUnavailable": "Pricing for this model is unavailable. Choose another model.",

@@ -4875,7 +4875,7 @@
     "defaultModel": "Nota sjálfgefið líkan Kilo",
     "duration": "Tímamörk (mínútur)",
     "spendLimit": "Kostnaðarmörk (USD)",
-    "invalidSafeguards": "Sláðu inn jákvæð, endanleg tíma- og kostnaðarmörk.",
+    "invalidSafeguards": "Sláðu inn jákvæða tölu innan leyfilegs bils.",
     "estimate": "Áætlun {{estimate}} · hámark {{maximum}}",
     "estimateUnavailable": "Greidd samantekt er ekki tiltæk fyrir þessar stillingar. Breyttu líkaninu eða hámarkinu, eða reyndu aftur síðar.",
     "confirmPaid": "Virkja greiddar samantektir fyrir {{context}}?",

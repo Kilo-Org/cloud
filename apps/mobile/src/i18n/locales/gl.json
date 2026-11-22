@@ -4875,7 +4875,7 @@
     "defaultModel": "Usar o modelo predeterminado de Kilo",
     "duration": "Límite de tempo (minutos)",
     "spendLimit": "Límite de gasto (USD)",
-    "invalidSafeguards": "Introduce límites de tempo e gasto positivos e finitos.",
+    "invalidSafeguards": "Introduce un número positivo dentro do intervalo permitido.",
     "estimate": "Estimación {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Non hai dispoñible un resumo de pago para estes axustes. Cambia o modelo ou os límites, ou proba de novo máis tarde.",
     "confirmPaid": "Activar os resumos de pago para {{context}}?",

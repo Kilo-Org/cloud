@@ -4875,7 +4875,7 @@
     "defaultModel": "Sèvi ak modèl Kilo pa defo a",
     "duration": "Limit tan (minit)",
     "spendLimit": "Limit depans (USD)",
-    "invalidSafeguards": "Antre limit tan ak depans ki pozitif epi fini.",
+    "invalidSafeguards": "Antre yon chif pozitif nan limit ki pèmèt la.",
     "estimate": "Estime {{estimate}} · maksimòm {{maximum}}",
     "estimateUnavailable": "Pa gen rezime ki pou peye ki disponib pou paramèt sa yo. Chanje modèl la oswa limit yo, oswa eseye ankò pita.",
     "confirmPaid": "Aktive rezime peye pou {{context}}?",

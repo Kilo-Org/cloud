@@ -4875,7 +4875,7 @@
     "defaultModel": "Brug Kilos standardmodel",
     "duration": "Tidsgrænse (minutter)",
     "spendLimit": "Forbrugsgrænse (USD)",
-    "invalidSafeguards": "Angiv positive, endelige tids- og forbrugsgrænser.",
+    "invalidSafeguards": "Angiv et positivt tal inden for det tilladte interval.",
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Et betalt resumé er ikke tilgængeligt med disse indstillinger. Skift model eller grænser, eller prøv igen senere.",
     "estimatePricingUnavailable": "Prissætning for denne model er ikke tilgængelig. Vælg en anden model.",

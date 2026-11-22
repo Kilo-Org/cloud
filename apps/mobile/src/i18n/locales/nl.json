@@ -4875,7 +4875,7 @@
     "defaultModel": "Standaardmodel van Kilo gebruiken",
     "duration": "Tijdslimiet (minuten)",
     "spendLimit": "Uitgavenlimiet (USD)",
-    "invalidSafeguards": "Voer positieve, eindige tijd- en uitgavenlimieten in.",
+    "invalidSafeguards": "Voer een positief getal binnen het toegestane bereik in.",
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
     "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen. Pas het model of de limieten aan, of probeer het later opnieuw.",
     "confirmPaid": "Betaalde samenvattingen inschakelen voor {{context}}?",

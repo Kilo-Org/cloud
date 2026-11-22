@@ -4875,7 +4875,7 @@
     "defaultModel": "Standardmodell von Kilo verwenden",
     "duration": "Zeitlimit (Minuten)",
     "spendLimit": "Kostenlimit (USD)",
-    "invalidSafeguards": "Gib positive, endliche Zeit- und Kostenlimits ein.",
+    "invalidSafeguards": "Gib eine positive Zahl im zulässigen Bereich ein.",
     "estimate": "Schätzung {{estimate}} · maximal {{maximum}}",
     "estimateUnavailable": "Für diese Einstellungen ist keine kostenpflichtige Zusammenfassung verfügbar. Ändere das Modell oder die Grenzwerte, oder versuche es später erneut.",
     "estimatePricingUnavailable": "Für dieses Modell liegen keine Preisinformationen vor. Wähle ein anderes Modell.",

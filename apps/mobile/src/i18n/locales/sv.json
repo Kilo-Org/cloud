@@ -4875,7 +4875,7 @@
     "defaultModel": "Använd Kilos standardmodell",
     "duration": "Tidsgräns (minuter)",
     "spendLimit": "Kostnadsgräns (USD)",
-    "invalidSafeguards": "Ange positiva, ändliga tids- och kostnadsgränser.",
+    "invalidSafeguards": "Ange ett positivt tal inom det tillåtna intervallet.",
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar. Ändra modellen eller gränserna, eller försök igen senare.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",

@@ -4964,7 +4964,7 @@
     "defaultModel": "Koristi zadani model tvrtke Kilo",
     "duration": "Vremensko ograničenje (minute)",
     "spendLimit": "Ograničenje potrošnje (USD)",
-    "invalidSafeguards": "Unesite pozitivna, konačna ograničenja vremena i potrošnje.",
+    "invalidSafeguards": "Unesite pozitivan broj u dopuštenom rasponu.",
     "estimate": "Procjena {{estimate}} · najviše {{maximum}}",
     "estimateUnavailable": "Plaćeni sažetak nije dostupan za ove postavke. Promijenite model ili ograničenja, ili pokušajte ponovno kasnije.",
     "confirmPaid": "Omogućiti plaćene sažetke za {{context}}?",

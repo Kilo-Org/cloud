@@ -5142,7 +5142,7 @@
     "defaultModel": "Uża l-mudell default ta' Kilo",
     "duration": "Salvagwardja tal-ħin (minuti)",
     "spendLimit": "Salvagwardja tal-infiq (USD)",
-    "invalidSafeguards": "Daħħal limiti ta' ħin u nfiq pożittivi u finiti.",
+    "invalidSafeguards": "Daħħal numru pożittiv fil-firxa permessa.",
     "estimate": "Stima {{estimate}} · massimu {{maximum}}",
     "estimateUnavailable": "Sommarju li jitħallas mhuwiex disponibbli għal dawn is-settings. Biddel il-mudell jew il-limiti, jew erġa' pprova aktar tard.",
     "confirmPaid": "Tixgħel sommarji bi ħlas għal {{context}}?",

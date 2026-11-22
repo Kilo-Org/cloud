@@ -5053,7 +5053,7 @@
     "defaultModel": "Użyj domyślnego modelu Kilo",
     "duration": "Limit czasu (minuty)",
     "spendLimit": "Limit wydatków (USD)",
-    "invalidSafeguards": "Wpisz dodatnie, skończone limity czasu i wydatków.",
+    "invalidSafeguards": "Wpisz dodatnią liczbę w dozwolonym zakresie.",
     "estimate": "Szacunek {{estimate}} · maksymalnie {{maximum}}",
     "estimateUnavailable": "Płatne podsumowanie nie jest dostępne dla tych ustawień. Zmień model lub limity albo spróbuj ponownie później.",
     "confirmPaid": "Włączyć płatne podsumowania dla {{context}}?",

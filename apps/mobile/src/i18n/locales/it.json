@@ -4964,7 +4964,7 @@
     "defaultModel": "Usa il modello predefinito di Kilo",
     "duration": "Limite di tempo (minuti)",
     "spendLimit": "Limite di spesa (USD)",
-    "invalidSafeguards": "Inserisci limiti di tempo e spesa positivi e finiti.",
+    "invalidSafeguards": "Inserisci un numero positivo nell'intervallo consentito.",
     "estimate": "Stima {{estimate}} · massimo {{maximum}}",
     "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni. Modifica il modello o i limiti, oppure riprova più tardi.",
     "confirmPaid": "Attivare i riepiloghi a pagamento per {{context}}?",

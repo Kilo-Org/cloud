@@ -5053,7 +5053,7 @@
     "defaultModel": "Uporabi privzeti model Kilo",
     "duration": "Časovna omejitev (minute)",
     "spendLimit": "Omejitev porabe (USD)",
-    "invalidSafeguards": "Vnesite pozitivni, končni omejitvi časa in porabe.",
+    "invalidSafeguards": "Vnesite pozitivno število v dovoljenem obsegu.",
     "estimate": "Ocena {{estimate}} · največ {{maximum}}",
     "estimateUnavailable": "Plačljiv povzetek za te nastavitve ni na voljo. Spremenite model ali omejitve, ali pa poskusite znova pozneje.",
     "confirmPaid": "Omogočiti plačljive povzetke za {{context}}?",

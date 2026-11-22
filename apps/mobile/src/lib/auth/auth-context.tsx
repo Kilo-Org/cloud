@@ -327,6 +327,18 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // sign-in in flight owns the index instead and fires its own clear,
           // so the epoch and sign-out fences hold here as for every other
           // publish in this bootstrap.
+          // The clear of the launcher surfaces also drops the Quick Action URL
+          // a cold start parks natively, and the sign-in path is that URL's
+          // only staging reader. Take the destination that names no account
+          // first and stage it for the sign-in that follows, so a tap on the
+          // New agent action while signed out still lands where it points; the
+          // same take drops an account-bound URL the clear would have dropped.
+          const parkedLaunchUrl = takeAccountIndependentLaunchUrl();
+          const parkedLaunchHref =
+            parkedLaunchUrl === null ? null : resolveIncomingUrl(parkedLaunchUrl);
+          if (parkedLaunchHref !== null && getPendingDeepLinkSnapshot() === null) {
+            setPendingDeepLink(parkedLaunchHref, 'universal-link');
+          }
           clearSystemSearchIndexOnSignedOutLaunch();
           // The account is now known to be none: a system-search destination
           // captured before this point is not this process's to open, so the

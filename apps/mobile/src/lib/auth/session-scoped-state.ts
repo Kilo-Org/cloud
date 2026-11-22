@@ -57,13 +57,14 @@ function clearSearchIndexBestEffort(): void {
  * Re-runs the clears for a launch with no stored session, so the surfaces that
  * outlive a session start empty.
  *
- * Every member here outlives the process that ran the account boundary: the OS
- * search index, the App Intents catalog, the on-disk artifact mirror and PR
- * recents, and the OS launcher surfaces. The boundary's clear of any of them can
- * be lost to a process killed during sign-out's awaited teardown, or to an OS
- * call the platform refused, so a launch that positively restored no session
- * repeats them. The rest of the boundary's members are this process's memory,
- * which a fresh launch starts empty without a re-clear.
+ * The members here are the ones the account boundary clears that a signed-out
+ * launch can still observe: the OS search index, the App Intents catalog, the
+ * on-disk artifact mirror, the device-global PR recents and the OS launcher
+ * surfaces. The boundary's clear of any of them can be lost to a process killed
+ * during sign-out's awaited teardown, or to an OS call the platform refused, so
+ * a launch that positively restored no session repeats them. The rest of the
+ * boundary's in-process members start empty in a fresh process, and the durable
+ * preferences it clears are not re-run here.
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();

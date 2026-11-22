@@ -2183,6 +2183,39 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   }, 60_000);
 
+  it('regression: a signed-out launch stages the parked New agent tap before it clears the launcher surfaces', async () => {
+    // The launcher clear also drops the Quick Action URL a cold start parks
+    // natively, and the sign-in path is that URL's only staging reader. A
+    // launch that restored no session must stage the account-independent
+    // destination first, or the tap is lost before the sign-in that follows.
+    nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/new'
+    );
+    // The earlier cases in this file leave a destination in the pending slot;
+    // this case starts with an empty slot so the parked tap is what is staged.
+    hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot.mockReturnValue(null);
+    hoisted.deepLinkLaunch.setPendingDeepLink.mockClear();
+    // The staged destination must land before the clear drops the parked URL.
+    let stagedBeforeClear: boolean | null = null;
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockImplementationOnce(() => {
+      stagedBeforeClear = hoisted.deepLinkLaunch.setPendingDeepLink.mock.calls.length > 0;
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBeUndefined();
+
+    expect(hoisted.deepLinkLaunch.setPendingDeepLink).toHaveBeenCalledWith(
+      expect.stringContaining('/agent-chat/new'),
+      'universal-link'
+    );
+    expect(stagedBeforeClear).toBe(true);
+    // The take drops the parked value, so the clear afterwards has nothing left
+    // to lose.
+    expect(nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl).toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('a restore-failure bootstrap never wipes the search index', async () => {
     useFakeBackoffClock();
     // Every credential read rejects: the session is not known to be gone, so

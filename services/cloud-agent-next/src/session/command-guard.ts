@@ -394,17 +394,18 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git -?* config -?* --unset *',
   // The `-c key[=value]` form sets configuration on the command line, and git
   // matches a key without regard to case and reads a key with no value as true,
-  // so a rule cannot name one key or one value. Every inline setting is refused
-  // instead. The dash has to start the option group, after `git` or after a
-  // global option, so a short option that is `c` elsewhere, such as the one that
-  // creates a branch, is unaffected.
-  'git -c*',
-  'git  -c*',
-  'git   -c*',
-  'git\t-c*',
-  'git -?* -c*',
-  'git -?*  -c*',
-  'git -?*\t-c*',
+  // so a rule cannot name one key or one value. Every `-c` on a git command is
+  // refused instead. The two subcommands whose own `-c` takes a branch name are
+  // admitted again below: the flag consumes the rest of its argument, so a
+  // setting cannot follow it.
+  'git*-c*',
+];
+
+// Installed after the denies, and only for the branch-creation form.
+const SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED = [
+  'git switch -c *',
+  'git branch -c *',
+  'git -?* switch -c *',
 ];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
@@ -455,6 +456,7 @@ export function getCommandGuardPolicy(
       policyName: 'security-remediation-pr',
       allowed: SECURITY_REMEDIATION_ALLOWED_COMMANDS,
       denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS],
+      allowedAfterDenied: SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED,
     };
   }
 

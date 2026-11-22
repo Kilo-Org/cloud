@@ -1,19 +1,24 @@
 /* eslint-disable max-lines -- one mounted suite covers the screen's gate, its four body states, the window stepper and the row fields */
 
 // Request-logs screen state contract: the billing-role gate, the skeleton while a
-// window loads, a retryable failure that offers the retry, a refusal that offers
-// none, the empty state, the row's fields, the truncation notice, and the window
-// stepper that is both the time range and the paging. The query layer is mocked
-// so each state is driven directly through the screen JSX, the same way the
-// audit-log suite does it.
+// window loads, one failure body whose copy and retry come from the shared
+// failure classifier, the empty state, the row's fields, the truncation notice,
+// the window stepper that is both the time range and the paging, and a pull that
+// refetches the read in place and announces its failure. The query layer is
+// mocked so each state is driven directly through the screen JSX, the same way
+// the audit-log suite does it.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
+// The side-effect registration of the i18n module rides on the named import
+// above; the screen reaches this adapter through `use-manual-refresh`, and
+// importing the mocked module here is how the test reads its spy.
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { canStepOlderTo, HISTORY_DAYS } from './request-log-window';
 import { OrganizationRequestLogsScreen } from './request-logs-screen';
 
@@ -57,7 +62,6 @@ vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
     return {
       data: logsQuery.data,
       error: logsQuery.error,
-      isPending: false,
       isFetching: logsQuery.isFetching,
       refetch: logsQuery.refetch,
     };
@@ -107,6 +111,10 @@ vi.mock('@/components/ui/directional-icons', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
+// The failed pull announces through this adapter, and the real module pulls
+// native deps; the spy records the screen's announcement instead.
+vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
 
 vi.mock('@/components/organization/organization-boundary', async () => {
   const { createElement: h } = await import('react');
@@ -188,6 +196,22 @@ function mount() {
 
 type Handler = () => void;
 
+/** Props a pull-to-refresh control carries. */
+type PullControl = ReactElement<{ refreshing: boolean; onRefresh: () => void }>;
+
+/**
+ * The pull gesture a pull-to-refresh surface carries; a missing one fails the
+ * test. The control is a host stub here (`'RefreshControl'`), so it is read
+ * from the host's props rather than found by type.
+ */
+function pullControl(host: ReactTestInstance): PullControl {
+  const control = host.props.refreshControl as PullControl | undefined;
+  if (!control) {
+    throw new Error(`${String(host.type)} rendered no pull control`);
+  }
+  return control;
+}
+
 /** The element's callback, narrowed out of the renderer's untyped props. */
 function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onRetry'): Handler | undefined {
   const handler: unknown = node.props[name];
@@ -208,6 +232,9 @@ beforeEach(() => {
   logsQuery.error = null;
   logsQuery.isFetching = false;
   logsQuery.refetch.mockClear();
+  // The pull reads the settled result, so the spy resolves one by default.
+  logsQuery.refetch.mockResolvedValue({ isError: false });
+  vi.mocked(announcingToast.error).mockClear();
   boundary.organizationId = 'org-1';
   boundary.role = 'owner';
   boundary.isResolving = false;
@@ -236,7 +263,26 @@ describe('OrganizationRequestLogsScreen', () => {
     unmount();
   });
 
-  it('offers the retry a transient failure can use', async () => {
+  it('names the connection for a failure that never reached the server', async () => {
+    // The read settles instead of pausing, so an offline cold start fails with
+    // the transport rejection rather than a paused read.
+    logsQuery.error = new TypeError('Network request failed');
+    const { renderer, unmount } = await mount();
+
+    const [error] = renderer.root.findAllByType('QueryError');
+    expect(error?.props.variant).toBe('offline');
+    // The failure replaced the skeleton, which is the point of settling.
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
+    await act(() => {
+      if (error) {
+        handlerOf(error, 'onRetry')?.();
+      }
+    });
+    expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('offers the retry a server failure can use', async () => {
     logsQuery.error = { data: { code: 'INTERNAL_SERVER_ERROR', message: 'boom' } };
     const { renderer, unmount } = await mount();
 
@@ -258,6 +304,16 @@ describe('OrganizationRequestLogsScreen', () => {
     const [error] = renderer.root.findAllByType('QueryError');
     expect(error?.props.variant).toBe('permission');
     // Asking again returns the same verdict, so the state has no action.
+    expect(error?.props.onRetry).toBeUndefined();
+    unmount();
+  });
+
+  it('names a removed window as not-found and offers no retry', async () => {
+    logsQuery.error = { data: { code: 'NOT_FOUND', message: 'no such organization' } };
+    const { renderer, unmount } = await mount();
+
+    const [error] = renderer.root.findAllByType('QueryError');
+    expect(error?.props.variant).toBe('not-found');
     expect(error?.props.onRetry).toBeUndefined();
     unmount();
   });
@@ -406,6 +462,56 @@ describe('OrganizationRequestLogsScreen', () => {
 
     const [header] = renderer.root.findAllByType('ScreenHeader');
     expect(header?.props.title).toBe(i18n.t('organization.settingsOnWeb.requestLogs'));
+    unmount();
+  });
+});
+
+describe('OrganizationRequestLogsScreen pull to refresh', () => {
+  it('refetches the window from the control it hands the empty state', async () => {
+    // The hour settled with no rows, so the empty state carries the only pull.
+    logsQuery.data = [];
+    const { renderer, unmount } = await mount();
+
+    const [empty] = renderer.root.findAllByType('EmptyState');
+    if (!empty) {
+      throw new Error('the empty state did not render');
+    }
+    const control = pullControl(empty);
+    expect(control.type).toBe('RefreshControl');
+    expect(control.props.refreshing).toBe(false);
+    expect(logsQuery.refetch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
+    // The pull succeeded, so nothing is announced.
+    expect(announcingToast.error).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('announces a failed pull and keeps the empty copy on screen', async () => {
+    // The read already settled empty; only the pull's own verdict fails, so the
+    // screen announces it instead of replacing what is on screen.
+    logsQuery.data = [];
+    logsQuery.refetch.mockResolvedValue({ isError: true });
+    const { renderer, unmount } = await mount();
+
+    const [empty] = renderer.root.findAllByType('EmptyState');
+    if (!empty) {
+      throw new Error('the empty state did not render');
+    }
+
+    await act(async () => {
+      pullControl(empty).props.onRefresh();
+      await Promise.resolve();
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledTimes(1);
+    expect(announcingToast.error).toHaveBeenCalledWith(i18n.t('common.couldNotRefresh'));
+    const [stillEmpty] = renderer.root.findAllByType('EmptyState');
+    expect(stillEmpty?.props.title).toBe('No requests in this hour');
     unmount();
   });
 });

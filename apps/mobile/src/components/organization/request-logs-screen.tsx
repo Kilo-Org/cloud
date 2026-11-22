@@ -24,12 +24,18 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateBidiText } from '@/lib/bidi';
 import { formatClockTime, formatDate } from '@/lib/format';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
+import {
+  classifyReadFailureKind,
+  type ReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
 import { useSideInsetStyle } from '@/lib/screen-insets';
-import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 /**
@@ -60,8 +66,7 @@ type RequestLogsBody =
   | Readonly<{ kind: 'loading' }>
   | Readonly<{ kind: 'list'; rows: readonly OrgRequestLogEntry[]; truncated: boolean }>
   | Readonly<{ kind: 'empty' }>
-  | Readonly<{ kind: 'retryable'; variant: TrpcErrorVariant }>
-  | Readonly<{ kind: 'refused'; variant: TrpcErrorVariant }>;
+  | Readonly<{ kind: 'failure'; failure: ReadFailureKind }>;
 
 function requestLogsBody(
   rows: readonly OrgRequestLogEntry[] | undefined,
@@ -75,10 +80,15 @@ function requestLogsBody(
   if (error === null || error === undefined) {
     return { kind: 'loading' };
   }
-  const variant = trpcErrorVariant(error);
-  return isRetryableTrpcError(error)
-    ? { kind: 'retryable', variant }
-    : { kind: 'refused', variant };
+  // The read settles instead of pausing (`SETTLE_WHILE_OFFLINE`), so `isPaused`
+  // is always false here. Connectivity stays `unknown` on purpose: a transport
+  // rejection carries no server answer (`servedAnswer` is false), so it is
+  // already named the connection, while a stale NetInfo report fed in here
+  // could rename a coded refusal.
+  return {
+    kind: 'failure',
+    failure: classifyReadFailureKind({ errors: [error], isPaused: false, connectivity: 'unknown' }),
+  };
 }
 
 /**
@@ -108,6 +118,9 @@ export function OrganizationRequestLogsScreen() {
   const logs = useOrgRequestLogs(organizationId, new Date(windowEndMs).toISOString(), allowed);
   const paddingBottom = useTabBarBottomPadding();
   const body = requestLogsBody(logs.data, logs.error);
+  // The screen's own read can be pulled in place, and a failed pull is
+  // announced: the inert reduced-motion indicator cannot say it.
+  const [refreshing, onRefresh] = useManualRefresh(logs.refetch, t('common.couldNotRefresh'));
 
   // `RequestLogRow` is memoized at module scope, so one identity across data
   // updates keeps every unchanged row from re-rendering.
@@ -144,12 +157,7 @@ export function OrganizationRequestLogsScreen() {
   const windowEnd = new Date(windowEndMs);
   const canStepOlder = canStepOlderTo(windowEndMs - HOUR_MS, anchorMs);
   const canStepNewer = windowEndMs < anchorMs;
-  const refreshControl = (
-    <RefreshControl
-      refreshing={logs.isFetching && !logs.isPending}
-      onRefresh={() => void logs.refetch()}
-    />
-  );
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
 
   // One body per outcome. Each outcome names its own recovery, and a refusal
   // carries none: asking again returns the same verdict.
@@ -158,26 +166,18 @@ export function OrganizationRequestLogsScreen() {
       case 'loading': {
         return <RequestLogsSkeleton />;
       }
-      case 'retryable': {
+      case 'failure': {
+        const { failure } = current;
         return (
           <QueryError
             placement="top"
             inset="gutter"
-            variant={current.variant}
-            message={t('organization.requestLogs.loadError')}
-            onRetry={() => void logs.refetch()}
+            variant={readFailureKindVariant(failure)}
+            // Every kind but the retryable one carries its own copy: the
+            // shared "couldn't load" line would only restate it.
+            message={failure === 'retryable' ? t('organization.requestLogs.loadError') : undefined}
+            onRetry={readFailureKindIsRetryable(failure) ? () => void logs.refetch() : undefined}
             isRetrying={logs.isFetching}
-            refreshControl={refreshControl}
-          />
-        );
-      }
-      case 'refused': {
-        return (
-          <QueryError
-            placement="top"
-            inset="gutter"
-            variant={current.variant}
-            message={t('organization.requestLogs.loadError')}
             refreshControl={refreshControl}
           />
         );

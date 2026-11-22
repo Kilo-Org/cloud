@@ -259,20 +259,18 @@ describe('discoverAuthorizedGitHubInstallations', () => {
     jest.useFakeTimers();
     try {
       const signals: AbortSignal[] = [];
-      listInstallations.mockImplementation(
-        (params: { request: { signal: AbortSignal } }) => {
-          const { signal } = params.request;
-          signals.push(signal);
-          const { promise, reject } = Promise.withResolvers<never>();
-          const abort = () => reject(signal.reason);
-          if (signal.aborted) {
-            abort();
-            return promise;
-          }
-          signal.addEventListener('abort', abort, { once: true });
+      listInstallations.mockImplementation((params: { request: { signal: AbortSignal } }) => {
+        const { signal } = params.request;
+        signals.push(signal);
+        const { promise, reject } = Promise.withResolvers<never>();
+        const abort = () => reject(signal.reason);
+        if (signal.aborted) {
+          abort();
           return promise;
         }
-      );
+        signal.addEventListener('abort', abort, { once: true });
+        return promise;
+      });
 
       const discovery = discoverAuthorizedGitHubInstallations({
         accessToken: 'token',

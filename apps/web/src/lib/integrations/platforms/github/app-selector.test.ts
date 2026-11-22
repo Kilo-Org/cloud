@@ -5,16 +5,11 @@ import {
   MAX_GITHUB_LISTING_BYTES,
 } from './listing-budget';
 
-const mockListInstallationsForAuthenticatedUser =
-  jest.fn<
-    (_params: {
-      per_page: number;
-      page: number;
-      request: { signal: AbortSignal };
-    }) => Promise<{
-      data: { total_count: number; installations: Array<{ id: number; padding?: string }> };
-    }>
-  >();
+const mockListInstallationsForAuthenticatedUser = jest.fn<
+  (_params: { per_page: number; page: number; request: { signal: AbortSignal } }) => Promise<{
+    data: { total_count: number; installations: Array<{ id: number; padding?: string }> };
+  }>
+>();
 
 jest.mock(
   '@octokit/rest',

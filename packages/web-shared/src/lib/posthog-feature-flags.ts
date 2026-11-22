@@ -6,7 +6,18 @@ import { captureException, startSpan } from '@sentry/nextjs';
 
 const posthogClient = PostHogClient();
 
-/** How long one resolved flag value serves every read of the same key. */
+/**
+ * How long one resolved flag value serves every read of the same key.
+ *
+ * This bound also governs `isReleaseToggleEnabled`, which gates authorization
+ * decisions: disabling the native Apple nonce relaxation or the organization
+ * auto-model write gate in PostHog is honored on each warm instance within this
+ * window, not on the next request. The window was chosen for that trade: a
+ * disable applies within 30 seconds, and the flags these reads gate change
+ * rarely enough that the saving is worth it. A failed read never extends a
+ * grant, because a failure serves the caller's default (`false` for release
+ * toggles) instead of the last enabled answer.
+ */
 const FLAG_CACHE_TTL_MS = 30_000;
 
 /**

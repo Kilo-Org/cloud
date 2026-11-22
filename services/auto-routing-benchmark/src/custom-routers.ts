@@ -37,7 +37,7 @@ import {
   type ClientProfileRow,
 } from './client-profiles';
 import caseComplexity from './datasets/case-complexity.json';
-import { getRoutingCaseResultsForEntries, getSummariesForRuns } from './db';
+import { getRoutingCaseResultsForEntries, getSummariesForRuns, readBenchmarkCutover } from './db';
 import {
   catalogCandidatePrices,
   catalogModelVariants,
@@ -716,6 +716,18 @@ function clientRowProfileState(row: ClientProfileRow): ProfileState {
   };
 }
 
+/**
+ * A `pending` profile row is queue work only with a demand flag and a request at or after the
+ * paid cutover; every other status is real work whatever its request time says. A missing
+ * marker (`null`) fails closed for pending.
+ */
+function platformRowIsQueueWork(row: ProfileRow, cutoverAt: string | null): boolean {
+  if (row.status !== 'pending') return true;
+  if (cutoverAt === null) return false;
+  if (!row.platform_requested && !row.user_requested) return false;
+  return row.requested_at >= cutoverAt;
+}
+
 function measurementStatus<T extends MeasurementRow>(
   rows: readonly T[],
   isCurrent: (row: T) => boolean,
@@ -785,6 +797,8 @@ export async function lookupCustomRouterStatuses(
     source
   );
   const platformRows = loaded.platformRows;
+  // Read-only: fences inert pending rows out of the platform status predicates below.
+  const cutoverAt = await readBenchmarkCutover(db);
   const legacy = await readLegacyServingTargets(
     db,
     context,
@@ -815,7 +829,9 @@ export async function lookupCustomRouterStatuses(
             const status = linked
               ? measurementStatus(
                   platformRows.get(benchmarkPairKey(linked)) ?? [],
-                  row => isCurrentLinkedProfile(row, current, linked, loaded.catalog),
+                  row =>
+                    isCurrentLinkedProfile(row, current, linked, loaded.catalog) &&
+                    platformRowIsQueueWork(row, cutoverAt),
                   platformMeasuredAt
                 )
               : measurementStatus(
@@ -870,7 +886,9 @@ export async function lookupCustomRouterStatuses(
         variants: item.pairs.map(pair => {
           const status = measurementStatus(
             platformRows.get(benchmarkPairKey(pair)) ?? [],
-            row => isCurrentBenchmarkProfile(row, current, pair),
+            row =>
+              isCurrentBenchmarkProfile(row, current, pair) &&
+              platformRowIsQueueWork(row, cutoverAt),
             platformMeasuredAt
           );
           return {

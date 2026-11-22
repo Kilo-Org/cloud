@@ -3160,7 +3160,8 @@ describe('router selection', () => {
     expect(countCurrentProfilesByStatus).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ router: 'frontier' }),
-      'user'
+      'user',
+      '2026-06-01T00:00:00.000Z'
     );
   });
 });

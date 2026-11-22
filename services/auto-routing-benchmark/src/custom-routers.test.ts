@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CUSTOM_ROUTER_STATUS_PATH,
   PLATFORM_MEASUREMENTS_PATH,
   PlatformMeasurementsResponseSchema,
 } from '@kilocode/auto-routing-contracts';
@@ -20,6 +21,8 @@ import {
 } from './custom-routers';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
+import { countCurrentProfilesByStatus, listCurrentPlatformProfileStatuses } from './db';
+import { saveBenchmarkConfig } from './config';
 import { app } from './index';
 
 const CONFIG: BenchmarkConfig = {
@@ -1484,5 +1487,304 @@ describe('observed serving pin (real SQLite)', () => {
     );
     expect(rankedModels(promoted.table)).toEqual([ALIAS]);
     expect(promoted.table?.version).toBe(unpinned.table?.version);
+  });
+});
+
+/**
+ * Only a `pending` row with a demand flag requested at or after the cutover is queue work. A
+ * bookkeeping, pre-cutover or parked row reads as not benchmarked; ready, running and failed
+ * rows keep their meaning, and a missing marker fails pending closed.
+ */
+describe('inert pending rows are not queue work (real migrated SQLite)', () => {
+  const CUTOVER = '2026-11-21T00:00:00.000Z';
+  const AFTER = '2026-11-21T06:00:00.000Z';
+  const BEFORE = '2026-11-19T00:00:00.000Z';
+  const PARKED = '1970-01-01T00:00:00.000Z';
+
+  let sqlite: DatabaseSync;
+  let db: D1Database;
+
+  beforeEach(() => {
+    sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    db = sqliteD1(sqlite);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sqlite.close();
+  });
+
+  const markCutover = () =>
+    sqlite.prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)').run(CUTOVER);
+
+  function profile(row: {
+    status: string;
+    requestedAt: string;
+    platformRequested?: boolean;
+    userRequested?: boolean;
+    runId?: string | null;
+    engine?: string;
+    variant?: string;
+    model?: string;
+  }) {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, run_id, requested_at, updated_at, completed_at, platform_requested,
+          user_requested)
+         VALUES ('efficient', ?, ?, ?, 3, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        row.model ?? 'vendor/gw',
+        row.variant ?? '',
+        row.engine ?? ENGINE,
+        row.status,
+        row.runId ?? null,
+        row.requestedAt,
+        row.requestedAt,
+        row.status === 'ready' ? row.requestedAt : null,
+        row.platformRequested ? 1 : 0,
+        row.userRequested ? 1 : 0
+      );
+  }
+
+  const statusContext: CustomRouterBenchmarkContext = {
+    ownerType: 'user',
+    ownerId: 'user-inert',
+    baseRouter: 'efficient',
+    entries: [{ kind: 'gateway', model: 'vendor/gw' }],
+    clientEvalEntryKeys: [],
+  };
+
+  async function statusVariant() {
+    const status = await lookupCustomRouterStatuses(db, CONFIG, statusContext, source);
+    return status.entries[0]?.variants[0];
+  }
+
+  it('does not present a bookkeeping pending row as benchmarking', async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+  });
+
+  it('does not present a pre-cutover user-only pending row as benchmarking', async () => {
+    markCutover();
+    profile({ status: 'pending', requestedAt: BEFORE, userRequested: true });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+  });
+
+  it('does not present a parked epoch pending row as benchmarking', async () => {
+    markCutover();
+    profile({ status: 'pending', requestedAt: PARKED, platformRequested: true });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+  });
+
+  it('presents a current post-cutover platform demand row as benchmarking', async () => {
+    markCutover();
+    profile({ status: 'pending', requestedAt: AFTER, platformRequested: true });
+    expect(await statusVariant()).toMatchObject({
+      status: 'pending',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('presents a current post-cutover user-only demand row as benchmarking', async () => {
+    // The union of both queues: a paid user request is real work even though the platform flag
+    // is clear, so it must not be filtered like bookkeeping.
+    markCutover();
+    profile({ status: 'pending', requestedAt: AFTER, userRequested: true });
+    expect(await statusVariant()).toMatchObject({
+      status: 'pending',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('keeps a running row visible whatever its request time says', async () => {
+    profile({
+      status: 'running',
+      requestedAt: BEFORE,
+      userRequested: false,
+      platformRequested: false,
+      runId: 'run-live',
+    });
+    expect(await statusVariant()).toMatchObject({
+      status: 'running',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('keeps a ready measurement visible whatever its request time says', async () => {
+    profile({
+      status: 'ready',
+      requestedAt: BEFORE,
+      userRequested: false,
+      platformRequested: false,
+      runId: 'run-ready',
+    });
+    expect(await statusVariant()).toMatchObject({ status: 'ready', availability: 'ready' });
+  });
+
+  it('keeps a settled failure visible whatever its request time says', async () => {
+    profile({
+      status: 'failed',
+      requestedAt: BEFORE,
+      userRequested: false,
+      platformRequested: false,
+    });
+    sqlite.exec(
+      `UPDATE benchmark_profiles SET failure_class = 'provider_unavailable', failure_attempts = 1`
+    );
+    expect(await statusVariant()).toMatchObject({
+      status: 'failed',
+      availability: 'unbenchmarked',
+      failure: expect.objectContaining({ kind: 'retryable' }),
+    });
+  });
+
+  it('keeps an older-engine ready measurement as stale beside an inert pending row', async () => {
+    profile({
+      status: 'ready',
+      requestedAt: BEFORE,
+      runId: 'run-old',
+      engine: 'efficient:v0:old',
+      platformRequested: false,
+      userRequested: false,
+    });
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    expect(await statusVariant()).toMatchObject({ status: 'stale', availability: 'stale' });
+  });
+
+  it('fails closed on pending rows when the cutover marker is missing', async () => {
+    profile({ status: 'pending', requestedAt: AFTER, platformRequested: true });
+    // No `benchmark_cutover` row: a demand row cannot prove it is post-cutover work.
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+    // The read is read-only: it must not create the marker to satisfy itself.
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_cutover').get()).toEqual({ n: 0 });
+  });
+
+  it('counts and lists only real demand for the admin registry', async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: true,
+      model: 'vendor/eligible',
+    });
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      userRequested: true,
+      model: 'vendor/user-eligible',
+    });
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+      model: 'vendor/bookkeeping',
+    });
+    profile({
+      status: 'pending',
+      requestedAt: BEFORE,
+      userRequested: true,
+      model: 'vendor/legacy',
+    });
+    profile({
+      status: 'ready',
+      requestedAt: BEFORE,
+      runId: 'run-ready',
+      platformRequested: true,
+      model: 'vendor/served',
+    });
+    profile({
+      status: 'failed',
+      requestedAt: BEFORE,
+      platformRequested: true,
+      model: 'vendor/failed',
+    });
+    const current = { router: 'efficient' as const, engineIdentity: ENGINE, repetitions: 3 };
+
+    expect(await countCurrentProfilesByStatus(db, current, 'platform', CUTOVER)).toEqual([
+      { status: 'failed', count: 1 },
+      { status: 'pending', count: 1 },
+      { status: 'ready', count: 1 },
+    ]);
+    expect(await countCurrentProfilesByStatus(db, current, 'user', CUTOVER)).toEqual([
+      { status: 'pending', count: 1 },
+    ]);
+
+    const entries = await listCurrentPlatformProfileStatuses(db, current, CUTOVER);
+    expect(entries.map(row => `${row.model}:${row.status}`).sort()).toEqual([
+      'vendor/eligible:pending',
+      'vendor/failed:failed',
+      'vendor/served:ready',
+    ]);
+  });
+
+  it('serves the status API route through the same fence', async () => {
+    markCutover();
+    // The status route answers 400 without a saved router config, so seed the real one.
+    await saveBenchmarkConfig(db, CONFIG, 'test');
+    // Serve the catalog without egress; afterEach restores the global.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockImplementation(async () =>
+        Response.json({
+          data: [{ id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } }],
+        })
+      )
+    );
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    const env = {
+      BENCH_DB: db,
+      INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' },
+      KILO_WEB_API_BASE_URL: 'https://app.test',
+    } as unknown as Env;
+    const response = await app.request(
+      `https://bench.test${CUSTOM_ROUTER_STATUS_PATH}`,
+      {
+        method: 'POST',
+        headers: { authorization: 'Bearer test-secret', 'content-type': 'application/json' },
+        body: JSON.stringify(statusContext),
+      },
+      env
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      entries: { variants: { status: string; availability?: string }[] }[];
+    };
+    expect(body.entries[0]?.variants[0]).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_cutover').get()).toEqual({ n: 1 });
   });
 });

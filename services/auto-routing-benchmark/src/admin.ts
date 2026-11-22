@@ -116,6 +116,7 @@ import {
   listRunModelIds,
   listRunningRunIds,
   listRuns,
+  readBenchmarkCutover,
   readBenchmarkReadinessEpoch,
   requeueRetryableCurrentProfiles,
 } from './db';
@@ -701,10 +702,12 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       engineIdentity: computeEngineIdentity('decider', router),
       repetitions: resolveEffectivePolicy(config).deciderRepetitions,
     };
+    // Fences pending rows out of both counters; a missing marker fails closed in the readers.
+    const cutoverAt = await readBenchmarkCutover(c.env.BENCH_DB);
     const [platform, user, platformEntries, failedEntries] = await Promise.all([
-      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform'),
-      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user'),
-      listCurrentPlatformProfileStatuses(c.env.BENCH_DB, current),
+      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform', cutoverAt),
+      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user', cutoverAt),
+      listCurrentPlatformProfileStatuses(c.env.BENCH_DB, current, cutoverAt),
       listCurrentFailedProfiles(c.env.BENCH_DB, current),
     ]);
     const toQueue = (rows: Awaited<ReturnType<typeof countCurrentProfilesByStatus>>) => {

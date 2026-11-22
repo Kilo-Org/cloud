@@ -3153,11 +3153,25 @@ export async function listQueuedRemeasures(
     );
 }
 
+/**
+ * A `pending` row is queue work only when requested at or after the paid cutover; every other
+ * status passes unfiltered. `undefined` leaves the read untouched; `null` fails pending closed.
+ */
+function pendingRespectsCutover(cutoverAt: string | null | undefined) {
+  if (cutoverAt === undefined) return undefined;
+  if (cutoverAt === null) return ne(benchmarkProfiles.status, 'pending');
+  return or(
+    ne(benchmarkProfiles.status, 'pending'),
+    gte(benchmarkProfiles.requested_at, cutoverAt)
+  );
+}
+
 /** Registry row counts per wire status for one queue's current-engine rows. */
 export async function countCurrentProfilesByStatus(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
-  queue: BenchmarkRunPurpose
+  queue: BenchmarkRunPurpose,
+  cutoverAt?: string | null
 ): Promise<Array<{ status: BenchmarkProfileStatus; count: number }>> {
   const rows = await drizzle(db)
     .select({ status: benchmarkProfiles.status, n: count() })
@@ -3169,7 +3183,8 @@ export async function countCurrentProfilesByStatus(
         eq(benchmarkProfiles.repetitions, current.repetitions),
         queue === 'platform'
           ? eq(benchmarkProfiles.platform_requested, true)
-          : eq(benchmarkProfiles.user_requested, true)
+          : eq(benchmarkProfiles.user_requested, true),
+        pendingRespectsCutover(cutoverAt)
       )
     )
     .groupBy(benchmarkProfiles.status);
@@ -3184,7 +3199,8 @@ export async function countCurrentProfilesByStatus(
 /** Exact platform-pair coverage for the currently measured engine and repetitions. */
 export async function listCurrentPlatformProfileStatuses(
   db: D1Database,
-  current: { router?: AutoRouter; engineIdentity: string; repetitions: number }
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
+  cutoverAt?: string | null
 ): Promise<
   Array<{
     model: string;
@@ -3212,7 +3228,8 @@ export async function listCurrentPlatformProfileStatuses(
         eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
-        eq(benchmarkProfiles.platform_requested, true)
+        eq(benchmarkProfiles.platform_requested, true),
+        pendingRespectsCutover(cutoverAt)
       )
     )
     .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));

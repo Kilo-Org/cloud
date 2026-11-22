@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} συνεδρίες",
       "sectionAccessibility": "{{title}}: {{displayCount}} συνεδρίες",
       "live": "ΣΕ ΠΡΑΓΜΑΤΙΚΟ ΧΡΟΝΟ",
-      "updating": "Ενημέρωση"
+      "updating": "Ενημέρωση",
+      "retentionLimit": "Εμφανίζονται οι πιο πρόσφατες συνεδρίες σας."
     },
     "sessionRow": {
       "deleteTitle": "Διαγραφή συνεδρίας;",

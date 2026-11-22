@@ -2817,7 +2817,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessions",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessions",
       "live": "EN DIRECT",
-      "updating": "Mise à jour en cours"
+      "updating": "Mise à jour en cours",
+      "retentionLimit": "Affichage des sessions les plus récentes."
     },
     "sessionRow": {
       "deleteTitle": "Supprimer la session ?",

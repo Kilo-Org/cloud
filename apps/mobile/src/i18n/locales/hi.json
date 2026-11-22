@@ -1614,7 +1614,8 @@
       "tryAdjustFilters": "अपने फ़िल्टर बदलकर या हटाकर देखें।",
       "tryDifferentSearch": "किसी दूसरे शब्द से खोजें।",
       "live": "लाइव",
-      "updating": "अपडेट जारी है"
+      "updating": "अपडेट जारी है",
+      "retentionLimit": "सबसे हाल के सत्र दिखाए जा रहे हैं।"
     },
     "sessionRow": {
       "copyId": "सत्र की ID कॉपी करें",

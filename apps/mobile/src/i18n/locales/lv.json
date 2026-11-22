@@ -2223,7 +2223,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesijas",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesijas",
       "live": "REĀLLAIKĀ",
-      "updating": "Notiek atjaunināšana"
+      "updating": "Notiek atjaunināšana",
+      "retentionLimit": "Tiek rādītas jūsu jaunākās sesijas."
     },
     "sessionRow": {
       "deleteTitle": "Dzēst sesiju?",

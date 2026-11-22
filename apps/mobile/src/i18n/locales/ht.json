@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesyon",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesyon",
       "live": "AN DIRÈK",
-      "updating": "Ap mete ajou"
+      "updating": "Ap mete ajou",
+      "retentionLimit": "Sa yo se sesyon ki pi resan yo."
     },
     "sessionRow": {
       "deleteTitle": "Efase sesyon an?",

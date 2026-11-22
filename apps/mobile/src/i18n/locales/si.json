@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} සැසි",
       "sectionAccessibility": "{{title}}: {{displayCount}} සැසි",
       "live": "සජීවී",
-      "updating": "යාවත්කාලීන වෙමින්"
+      "updating": "යාවත්කාලීන වෙමින්",
+      "retentionLimit": "ඔබේ නවතම සැසි පෙන්වයි."
     },
     "sessionRow": {
       "deleteTitle": "සැසිය මකන්නද?",

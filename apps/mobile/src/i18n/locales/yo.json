@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
       "sectionAccessibility": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
       "live": "LỌ́WỌ́LỌ́WỌ́",
-      "updating": "Ń ṣe ìmúdójúìwọ̀n"
+      "updating": "Ń ṣe ìmúdójúìwọ̀n",
+      "retentionLimit": "Ń ṣàfihàn àwọn ìgbà iṣẹ́ tuntun jùlọ rẹ."
     },
     "sessionRow": {
       "deleteTitle": "Pa ìgbà iṣẹ́ rẹ́?",

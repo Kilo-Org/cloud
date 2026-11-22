@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} fotoam-piasana",
       "sectionAccessibility": "{{title}}: {{displayCount}} fotoam-piasana",
       "live": "MIVANTANA",
-      "updating": "Manavao"
+      "updating": "Manavao",
+      "retentionLimit": "Aseho ny fotoam-piasana farany indrindra."
     },
     "sessionRow": {
       "deleteTitle": "Hofafana ve ny fotoam-piasana?",

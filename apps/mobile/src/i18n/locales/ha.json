@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} zama",
       "sectionAccessibility": "{{title}}: {{displayCount}} zama",
       "live": "KAI TSAYE",
-      "updating": "Ana sabuntawa"
+      "updating": "Ana sabuntawa",
+      "retentionLimit": "Ana nuna zaman ku na baya-bayan nan."
     },
     "sessionRow": {
       "deleteTitle": "Share zaman?",

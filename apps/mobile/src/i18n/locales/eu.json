@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} saio",
       "sectionAccessibility": "{{title}}: {{displayCount}} saio",
       "live": "ZUZENEAN",
-      "updating": "Eguneratzen"
+      "updating": "Eguneratzen",
+      "retentionLimit": "Azken saioak erakusten dira."
     },
     "sessionRow": {
       "deleteTitle": "Ezabatu saioa?",

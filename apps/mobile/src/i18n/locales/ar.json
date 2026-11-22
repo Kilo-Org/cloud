@@ -1698,7 +1698,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} جلسة",
       "sectionAccessibility": "{{title}}: {{displayCount}} جلسة",
       "live": "مباشر",
-      "updating": "جارٍ التحديث"
+      "updating": "جارٍ التحديث",
+      "retentionLimit": "يتم عرض أحدث الجلسات."
     },
     "sessionRow": {
       "deleteTitle": "حذف الجلسة؟",

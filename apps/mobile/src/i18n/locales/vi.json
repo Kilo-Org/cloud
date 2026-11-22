@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} phiên",
       "sectionAccessibility": "{{title}}: {{displayCount}} phiên",
       "live": "TRỰC TIẾP",
-      "updating": "Đang cập nhật"
+      "updating": "Đang cập nhật",
+      "retentionLimit": "Đang hiển thị các phiên gần đây nhất của bạn."
     },
     "sessionRow": {
       "deleteTitle": "Xóa phiên?",

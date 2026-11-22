@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessiya",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessiya",
       "live": "JONLI",
-      "updating": "Yangilanmoqda"
+      "updating": "Yangilanmoqda",
+      "retentionLimit": "Eng so'nggi sessiyalaringiz ko'rsatilmoqda."
     },
     "sessionRow": {
       "deleteTitle": "Sessiya o'chirilsinmi?",

@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} سیشنز",
       "sectionAccessibility": "{{title}}: {{displayCount}} سیشنز",
       "live": "لائیو",
-      "updating": "اپ ڈیٹ ہو رہا ہے"
+      "updating": "اپ ڈیٹ ہو رہا ہے",
+      "retentionLimit": "آپ کے حالیہ ترین سیشنز دکھائے جا رہے ہیں۔"
     },
     "sessionRow": {
       "deleteTitle": "سیشن حذف کریں؟",

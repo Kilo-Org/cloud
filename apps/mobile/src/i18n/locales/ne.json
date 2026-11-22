@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} सत्रहरू",
       "sectionAccessibility": "{{title}}: {{displayCount}} सत्रहरू",
       "live": "प्रत्यक्ष",
-      "updating": "अद्यावधिक हुँदै"
+      "updating": "अद्यावधिक हुँदै",
+      "retentionLimit": "तपाईंका सबैभन्दा पछिल्ला सत्रहरू देखाइँदै छ।"
     },
     "sessionRow": {
       "deleteTitle": "सत्र मेट्ने?",

@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessies",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessies",
       "live": "ACTIEF",
-      "updating": "Bijwerken"
+      "updating": "Bijwerken",
+      "retentionLimit": "De meest recente sessies worden weergegeven."
     },
     "sessionRow": {
       "deleteTitle": "Sessie verwijderen?",

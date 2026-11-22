@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} เซสชัน",
       "sectionAccessibility": "{{title}}: {{displayCount}} เซสชัน",
       "live": "สด",
-      "updating": "กำลังอัปเดต"
+      "updating": "กำลังอัปเดต",
+      "retentionLimit": "กำลังแสดงเซสชันล่าสุดของคุณ"
     },
     "sessionRow": {
       "deleteTitle": "ลบเซสชันนี้หรือไม่?",

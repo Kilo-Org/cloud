@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} kalfadhi",
       "sectionAccessibility": "{{title}}: {{displayCount}} kalfadhi",
       "live": "TOOS AH",
-      "updating": "Waa la cusboonaysiinayaa"
+      "updating": "Waa la cusboonaysiinayaa",
+      "retentionLimit": "Waxaa la muujinayaa kalfadhiyadaada ugu dambeeyay."
     },
     "sessionRow": {
       "deleteTitle": "Ma la tirtiraa kalfadhiga?",

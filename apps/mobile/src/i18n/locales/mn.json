@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сесс",
       "sectionAccessibility": "{{title}}: {{displayCount}} сесс",
       "live": "ШУУД",
-      "updating": "Шинэчилж байна"
+      "updating": "Шинэчилж байна",
+      "retentionLimit": "Хамгийн сүүлийн сессүүдээ харуулж байна."
     },
     "sessionRow": {
       "deleteTitle": "Сессийг устгах уу?",

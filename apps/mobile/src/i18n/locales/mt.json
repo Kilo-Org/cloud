@@ -2317,7 +2317,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessjonijiet",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessjonijiet",
       "live": "F'ĦIN REALI",
-      "updating": "Qed isir l-aġġornament"
+      "updating": "Qed isir l-aġġornament",
+      "retentionLimit": "Qed jintwerew is-sessjonijiet l-aktar reċenti tiegħek."
     },
     "sessionRow": {
       "deleteTitle": "Tħassar is-sessjoni?",

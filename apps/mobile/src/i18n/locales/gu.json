@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} સત્રો",
       "sectionAccessibility": "{{title}}: {{displayCount}} સત્રો",
       "live": "લાઇવ",
-      "updating": "અપડેટ થઈ રહ્યું છે"
+      "updating": "અપડેટ થઈ રહ્યું છે",
+      "retentionLimit": "સૌથી તાજેતરનાં સત્રો દર્શાવવામાં આવે છે."
     },
     "sessionRow": {
       "deleteTitle": "સત્ર કાઢી નાખવું છે?",

@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} turtii",
       "sectionAccessibility": "{{title}}: {{displayCount}} turtii",
       "live": "KALLATTIIN",
-      "updating": "Haaromsaa jira"
+      "updating": "Haaromsaa jira",
+      "retentionLimit": "Turtiiwwan kee haaraan agarsiifamaa jiran."
     },
     "sessionRow": {
       "deleteTitle": "Turtiin haa haqamu?",

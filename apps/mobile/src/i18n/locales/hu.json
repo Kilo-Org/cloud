@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} munkamenet",
       "sectionAccessibility": "{{title}}: {{displayCount}} munkamenet",
       "live": "ÉLŐ",
-      "updating": "Frissítés"
+      "updating": "Frissítés",
+      "retentionLimit": "A legutóbbi munkamenetek láthatók."
     },
     "sessionRow": {
       "deleteTitle": "Munkamenet törlése?",

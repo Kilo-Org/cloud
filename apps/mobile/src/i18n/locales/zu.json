@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} iziseshini",
       "sectionAccessibility": "{{title}}: {{displayCount}} iziseshini",
       "live": "BUKHOMA",
-      "updating": "Kuyabuyekezwa"
+      "updating": "Kuyabuyekezwa",
+      "retentionLimit": "Kuboniswa iziseshini zakho zakamuva."
     },
     "sessionRow": {
       "deleteTitle": "Uyasusa iseshini?",

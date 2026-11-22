@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ಸೆಶನ್‌ಗಳು",
       "sectionAccessibility": "{{title}}: {{displayCount}} ಸೆಶನ್‌ಗಳು",
       "live": "ನೇರ",
-      "updating": "ನವೀಕರಿಸಲಾಗುತ್ತಿದೆ"
+      "updating": "ನವೀಕರಿಸಲಾಗುತ್ತಿದೆ",
+      "retentionLimit": "ಅತ್ಯಂತ ಇತ್ತೀಚಿನ ಸೆಶನ್‌ಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ."
     },
     "sessionRow": {
       "deleteTitle": "ಸೆಶನ್ ಅಳಿಸುವುದೇ?",

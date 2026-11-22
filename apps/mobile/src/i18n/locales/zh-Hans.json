@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 个会话",
       "sectionAccessibility": "{{title}}：{{displayCount}} 个会话",
       "live": "实时",
-      "updating": "正在更新"
+      "updating": "正在更新",
+      "retentionLimit": "仅显示最近的历史会话。"
     },
     "sessionRow": {
       "deleteTitle": "删除会话？",

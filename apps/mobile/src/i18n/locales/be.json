@@ -2270,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сеанса",
       "sectionAccessibility": "{{title}}: {{displayCount}} сеанса",
       "live": "НАЖЫВА",
-      "updating": "Абнаўленне"
+      "updating": "Абнаўленне",
+      "retentionLimit": "Паказваюцца самыя апошнія сеансы."
     },
     "sessionRow": {
       "deleteTitle": "Выдаліць сеанс?",

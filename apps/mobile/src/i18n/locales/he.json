@@ -1635,7 +1635,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} סשנים",
       "sectionAccessibility": "{{title}}: {{displayCount}} סשנים",
       "live": "בזמן אמת",
-      "updating": "העדכון מתבצע"
+      "updating": "העדכון מתבצע",
+      "retentionLimit": "מוצגות השיחות העדכניות ביותר."
     },
     "sessionRow": {
       "deleteTitle": "למחוק את השיחה?",

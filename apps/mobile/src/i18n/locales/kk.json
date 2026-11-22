@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сеанс",
       "sectionAccessibility": "{{title}}: {{displayCount}} сеанс",
       "live": "БЕЛСЕНДІ",
-      "updating": "Жаңартылуда"
+      "updating": "Жаңартылуда",
+      "retentionLimit": "Ең соңғы сеанстар көрсетілуде."
     },
     "sessionRow": {
       "deleteTitle": "Сеансты жою керек пе?",

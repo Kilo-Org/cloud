@@ -1623,7 +1623,8 @@
       "sectionAccessibility_zero": "{{title}}: {{displayCount}} sessões",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessões",
       "live": "EM TEMPO REAL",
-      "updating": "Atualizando"
+      "updating": "Atualizando",
+      "retentionLimit": "Mostrando suas sessões mais recentes."
     },
     "sessionRow": {
       "deleteTitle": "Excluir sessão?",

@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seanca",
       "sectionAccessibility": "{{title}}: {{displayCount}} seanca",
       "live": "DREJTPËRDREJT",
-      "updating": "Po përditësohet"
+      "updating": "Po përditësohet",
+      "retentionLimit": "Po shfaqen seancat më të fundit."
     },
     "sessionRow": {
       "deleteTitle": "Të fshihet seanca?",

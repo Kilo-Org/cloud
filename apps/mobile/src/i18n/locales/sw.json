@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} vikao",
       "sectionAccessibility": "{{title}}: {{displayCount}} vikao",
       "live": "MOJA KWA MOJA",
-      "updating": "Inasasisha"
+      "updating": "Inasasisha",
+      "retentionLimit": "Inaonyesha vikao vyako vya hivi karibuni."
     },
     "sessionRow": {
       "deleteTitle": "Ungependa kufuta kikao?",

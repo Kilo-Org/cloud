@@ -1656,7 +1656,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesji",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesji",
       "live": "NA ŻYWO",
-      "updating": "Aktualizowanie"
+      "updating": "Aktualizowanie",
+      "retentionLimit": "Wyświetlane są najnowsze sesje."
     },
     "sessionRow": {
       "deleteTitle": "Usunąć sesję?",

@@ -2270,7 +2270,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesijos",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesijos",
       "live": "TIESIOGIAI",
-      "updating": "Atnaujinama"
+      "updating": "Atnaujinama",
+      "retentionLimit": "Rodomos naujausios sesijos."
     },
     "sessionRow": {
       "deleteTitle": "Ištrinti sesiją?",

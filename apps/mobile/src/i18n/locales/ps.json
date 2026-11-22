@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ناستې",
       "sectionAccessibility": "{{title}}: {{displayCount}} ناستې",
       "live": "ژوندی",
-      "updating": "تازه کېږي"
+      "updating": "تازه کېږي",
+      "retentionLimit": "ستاسو تر ټولو وروستي ناستې ښودل کېږي."
     },
     "sessionRow": {
       "deleteTitle": "ناسته ړنګه شي؟",

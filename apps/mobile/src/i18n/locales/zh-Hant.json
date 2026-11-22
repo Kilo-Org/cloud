@@ -1614,7 +1614,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 個工作階段",
       "sectionAccessibility": "{{title}}：{{displayCount}} 個工作階段",
       "live": "即時",
-      "updating": "更新中"
+      "updating": "更新中",
+      "retentionLimit": "顯示您最近的工作階段。"
     },
     "sessionRow": {
       "deleteTitle": "要刪除工作階段嗎？",

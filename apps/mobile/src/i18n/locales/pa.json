@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ਸੈਸ਼ਨ",
       "sectionAccessibility": "{{title}}: {{displayCount}} ਸੈਸ਼ਨ",
       "live": "ਲਾਈਵ",
-      "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
+      "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵੇਂ ਸੈਸ਼ਨ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ।"
     },
     "sessionRow": {
       "deleteTitle": "ਕੀ ਸੈਸ਼ਨ ਮਿਟਾਉਣਾ ਹੈ?",

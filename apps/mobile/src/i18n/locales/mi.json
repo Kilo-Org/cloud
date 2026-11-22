@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} wātū",
       "sectionAccessibility": "{{title}}: {{displayCount}} wātū",
       "live": "MATAORA",
-      "updating": "Kei te whakahou"
+      "updating": "Kei te whakahou",
+      "retentionLimit": "E whakaatu ana i ōu wātū tino hou."
     },
     "sessionRow": {
       "deleteTitle": "Mukua te wātū?",

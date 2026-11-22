@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} seanssi",
       "sectionAccessibility": "{{title}}: {{displayCount}} seanssi",
       "live": "REAALAJAS",
-      "updating": "Uuendamine"
+      "updating": "Uuendamine",
+      "retentionLimit": "Kuvatakse kõige hiljutisemad seansid."
     },
     "sessionRow": {
       "deleteTitle": "Kas kustutada seanss?",

@@ -2176,7 +2176,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioner",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessioner",
       "live": "I REALTID",
-      "updating": "Uppdaterar"
+      "updating": "Uppdaterar",
+      "retentionLimit": "Visar de senaste sessionerna."
     },
     "sessionRow": {
       "deleteTitle": "Ta bort session?",

@@ -3148,6 +3148,53 @@ test('a later missing terminal tool frame keeps its own frontier while an earlie
   connection.close();
 });
 
+test('a response whose body never arrives times out like a stalled connect', async () => {
+  const neverEnding = () => new Response(new ReadableStream({ start() {} }));
+  let stallBody = true;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange')
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (!stallBody) return Response.json({ items: [], cursor: null });
+    if (path === '/v1/sessions') return neverEnding();
+    return new Response(new ReadableStream({ start() {} }), { status: 503 });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  const track = (operation: Promise<unknown>) => {
+    const state = { code: 'pending' };
+    void operation.then(
+      () => {
+        state.code = 'resolved';
+      },
+      (error: { code?: string }) => {
+        state.code = error.code ?? 'failed';
+      }
+    );
+    return state;
+  };
+  const first = track(client.listSessions());
+  await flush();
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(first.code).toBe('request_timeout');
+  // The failing status path reads a body too, so it carries the same bound.
+  const failing = track(client.request('/v1/sessions'));
+  await flush();
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(failing.code).toBe('request_timeout');
+  stallBody = false;
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+});
+
 test('a stalled grant exchange times out, fails the call, and is replaced on the next call', async () => {
   let exchanges = 0;
   let stallExchange = true;

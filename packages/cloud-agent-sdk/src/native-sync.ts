@@ -528,7 +528,13 @@ export class NativeSyncClient {
           })
       );
       if (!response.ok) {
-        const body = record(await response.json().catch(() => null));
+        const body = record(
+          await raceAbort(
+            controller.signal,
+            () => failure,
+            () => response.json().catch(() => null)
+          )
+        );
         const error = record(body['error']);
         const retry = response.headers.get('Retry-After');
         const retryAfterMs = retry

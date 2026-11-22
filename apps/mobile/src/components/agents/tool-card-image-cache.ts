@@ -256,6 +256,12 @@ export function cacheToolAttachment(
       if (tempFile) {
         bestEffortDelete(tempFile);
       }
+      // Drop the memoized handle: it can outlive a directory that was removed
+      // after it was created (the system evicts the cache, or the user clears
+      // app storage), so a later attempt would keep failing against a stale
+      // handle. `create` is called with `idempotent: true`, so recreating the
+      // directory on the next attempt costs nothing.
+      cacheDirectory = undefined;
       if (generation !== cacheGeneration) {
         // The cache was reset while the write ran; this attempt publishes
         // nothing into the new generation — no latch, no pending mark, no URI.

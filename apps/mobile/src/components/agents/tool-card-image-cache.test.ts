@@ -582,6 +582,42 @@ describe('cacheToolAttachment write lifetime', () => {
     });
   });
 
+  it('recreates the cache directory after a failed write dropped the stale handle', async () => {
+    cacheToolAttachment('part-first', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
+    await vi.waitFor(() => {
+      expect(getToolCardImageUri('part-first')).toBe(
+        'file:///cache/tool-card-images/part-first.png'
+      );
+    });
+    // The successful attempt memoized the directory handle: one construction,
+    // one create.
+    expect(expoFileSystemMock.Directory).toHaveBeenCalledTimes(1);
+    expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledTimes(1);
+
+    // The directory is gone by the time the second part writes; the failed
+    // attempt drops the handle it was holding.
+    mockTempWrite(() => Promise.reject(new Error('directory gone')));
+    cacheToolAttachment('part-second', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,AAA',
+    });
+    await drainCacheWrites();
+    expect(getToolCardImageUri('part-second')).toBeUndefined();
+    expect(isToolCardImagePending('part-second')).toBe(false);
+
+    // A third part recreates the directory instead of reusing the stale handle,
+    // and publishes; the second part's latch covers only its own part id.
+    cacheToolAttachment('part-third', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
+    await vi.waitFor(() => {
+      expect(getToolCardImageUri('part-third')).toBe(
+        'file:///cache/tool-card-images/part-third.png'
+      );
+    });
+    expect(expoFileSystemMock.Directory).toHaveBeenCalledTimes(2);
+    expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledTimes(2);
+    expect(isToolCardImagePending('part-third')).toBe(false);
+  });
+
   it('cleans up the temp file when the write fails', async () => {
     mockTempWrite(() => Promise.reject(new Error('disk full')));
 

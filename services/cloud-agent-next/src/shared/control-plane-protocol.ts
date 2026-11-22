@@ -1068,16 +1068,36 @@ export const controlPlaneAnswerPayloadSchema = z
   .strict();
 
 /**
+ * The continuation turn a settled answer becomes. It carries exactly what
+ * `answerMessageIntent` produces — the reply text, the last turn's agent and
+ * its finalization — and nothing else, so a caller cannot add a server-owned
+ * field such as `context`, an attachment, or a synthetic part that the
+ * preflight never saw.
+ */
+export const controlPlaneContinuationIntentSchema = controlPlanePromptPayloadBaseSchema
+  .pick({ messageId: true, finalization: true })
+  .extend({
+    turn: z
+      .object({
+        type: z.literal('prompt'),
+        prompt: z.string(),
+      })
+      .strict(),
+    agent: controlPlanePromptAgentSchema,
+  })
+  .strict();
+
+/**
  * A settled answer is not admitted by the answer call. The answer returns the
  * continuation intent, the Worker runs the same balance and model preflight a
- * prompt runs, then this payload admits exactly that intent under the message id
- * the caller preflighted.
+ * prompt runs, then this payload admits exactly that intent for exactly the
+ * interaction it resolves.
  */
 export const controlPlaneAdmitAnswerPayloadSchema = z
   .object({
     sessionId: z.string().min(1),
     reply: controlPlaneAnswerReplySchema,
-    intent: controlPlanePromptPayloadSchema,
+    intent: controlPlaneContinuationIntentSchema,
   })
   .strict();
 
@@ -1090,7 +1110,7 @@ export const controlPlaneDispatchResultSchema = z.union([
     .object({
       result: z.literal('continuation'),
       /** The new turn the settled answer would become, not yet admitted. */
-      intent: controlPlanePromptPayloadSchema,
+      intent: controlPlaneContinuationIntentSchema,
     })
     .strict(),
 ]);
@@ -1846,6 +1866,7 @@ export type ControlPlaneSessionRefPayload = z.infer<typeof controlPlaneSessionRe
 export type ControlPlaneReleasePayload = z.infer<typeof controlPlaneReleasePayloadSchema>;
 export type ControlPlaneAnswerReply = z.infer<typeof controlPlaneAnswerReplySchema>;
 export type ControlPlaneAnswerPayload = z.infer<typeof controlPlaneAnswerPayloadSchema>;
+export type ControlPlaneContinuationIntent = z.infer<typeof controlPlaneContinuationIntentSchema>;
 export type ControlPlaneAdmitAnswerPayload = z.infer<typeof controlPlaneAdmitAnswerPayloadSchema>;
 export type ControlPlaneContinuationAdmissionResult = z.infer<
   typeof controlPlaneContinuationAdmissionResultSchema

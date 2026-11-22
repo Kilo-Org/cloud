@@ -197,7 +197,7 @@ import {
   type SessionMessage,
   type SessionMessageState,
 } from './messages.js';
-import { answerMessageIntent, sameContinuationIntent } from './answers.js';
+import { admittedPayload, answerMessageIntent, sameContinuationIntent } from './answers.js';
 import { messageFailureText } from './failure-messages.js';
 import {
   createControlPlaneWorktreeChanges,
@@ -2181,10 +2181,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Admits the continuation a settled answer preflighted. The caller returns the
-   * exact intent `answer` produced; this call rebuilds it and refuses when the
-   * session moved on, so the admitted turn is always the one that passed the
-   * preflight. A replay of the same message id resolves nothing twice, and a live
-   * turn that appeared since the preflight owns the answer instead.
+   * exact intent `answer` produced; this call rebuilds it from the session's
+   * current state and refuses when the two differ, so the admitted turn is always
+   * the one that passed the preflight.
+   *
+   * The admitting call resolves its interaction, so a message that already exists
+   * for this id proves that interaction was resolved. When the reply still names
+   * a pending interaction of the same kind, that is a different interaction whose
+   * rendered text happens to match, and the replay is refused rather than
+   * resolving it. A live turn that appeared after the preflight takes the reply
+   * through the wrapper, exactly like a live answer.
    */
   async admitAnswerContinuation(
     payload: ControlPlaneAdmitAnswerPayload
@@ -2194,17 +2200,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const parsed = controlPlaneAdmitAnswerPayloadSchema.parse(payload);
     return this.enqueue(async () => {
       const target = pendingInteractionTarget(parsed.reply);
+      const pending = this.hasPendingInteraction(target.collection, target.id);
       const existing = this.messages.find(message => message.messageId === parsed.intent.messageId);
       if (existing !== undefined) {
-        // A retried admit replays; a colliding different intent is refused.
         if (!sameContinuationIntent(existing.intent, parsed.intent)) return 'not_connected';
-        if (this.hasPendingInteraction(target.collection, target.id)) {
-          await this.resolvePendingInteraction(parsed.reply);
-        }
-        return 'sent';
+        return pending ? 'not_connected' : 'sent';
       }
-      // The preflighted intent is the only one admitted: rebuild it from this
-      // session's current state and refuse when either side moved on.
+      if (!pending) return 'not_connected';
       const rebuilt = answerMessageIntent(
         this.messages,
         parsed.reply,
@@ -2214,12 +2216,33 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (rebuilt === null || !sameContinuationIntent(rebuilt, parsed.intent)) {
         return 'not_connected';
       }
-      if (!this.hasPendingInteraction(target.collection, target.id)) return 'not_connected';
-      if (this.messages.some(message => message.state === 'accepted')) return 'not_connected';
-      if ((await this.admitMessage(parsed.intent)) === 'queue-full') return 'not_connected';
+      if (this.messages.some(message => message.state === 'accepted')) {
+        return this.forwardToLiveTurn(parsed.reply);
+      }
+      if ((await this.admitMessage(admittedPayload(parsed.intent))) === 'queue-full') {
+        return 'not_connected';
+      }
       await this.resolvePendingInteraction(parsed.reply);
       return 'sent';
     });
+  }
+
+  /** Hands a reply to the live turn that now owns it (spec §5). */
+  private async forwardToLiveTurn(
+    reply: ControlPlaneAnswerReply
+  ): Promise<ControlPlaneContinuationAdmissionResult> {
+    const peer = this.sandboxPeer();
+    if (peer === null) return 'not_connected';
+    let result: ControlPlaneDispatchResult;
+    try {
+      result = await peer.answer({ sessionId: this.sessionId, reply });
+    } catch {
+      return 'not_connected';
+    }
+    // The Sandbox DO only answers a live turn, so it cannot return a continuation.
+    if (result !== 'sent') return 'not_connected';
+    await this.resolvePendingInteraction(reply);
+    return 'sent';
   }
 
   /**

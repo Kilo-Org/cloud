@@ -1,5 +1,6 @@
 import type {
   ControlPlaneAnswerReply,
+  ControlPlaneContinuationIntent,
   ControlPlanePromptPayload,
 } from '../../shared/control-plane-protocol.js';
 import type { SessionMessage } from './messages.js';
@@ -41,24 +42,33 @@ export function answerPromptText(reply: ControlPlaneAnswerReply): string | null 
  */
 export function sameContinuationIntent(
   left: ControlPlanePromptPayload,
-  right: ControlPlanePromptPayload
+  right: ControlPlaneContinuationIntent
 ): boolean {
-  if (left.messageId !== right.messageId) return false;
-  if (left.turn.type !== right.turn.type) return false;
-  if (left.turn.type === 'prompt') {
-    if (right.turn.type !== 'prompt') return false;
-    if (left.turn.prompt !== right.turn.prompt) return false;
-  } else {
-    if (right.turn.type !== 'command') return false;
-    if (left.turn.command !== right.turn.command) return false;
-    if (left.turn.arguments !== right.turn.arguments) return false;
-  }
-  if (left.agent.mode !== right.agent.mode || left.agent.model !== right.agent.model) return false;
-  if (left.agent.variant !== right.agent.variant) return false;
+  // A stored intent is a prompt turn; a command intent can never be a continuation.
+  if (left.turn.type !== 'prompt') return false;
   return (
+    left.messageId === right.messageId &&
+    left.turn.prompt === right.turn.prompt &&
+    left.agent.mode === right.agent.mode &&
+    left.agent.model === right.agent.model &&
+    left.agent.variant === right.agent.variant &&
     left.finalization?.autoCommit === right.finalization?.autoCommit &&
     left.finalization?.condenseOnComplete === right.finalization?.condenseOnComplete
   );
+}
+
+/**
+ * The admitted payload for a continuation. `answerMessageIntent` emits no
+ * server-owned `context`, attachment, or synthetic part, so this widens the
+ * continuation into the admitted shape the Session DO stores and nothing else.
+ */
+export function admittedPayload(intent: ControlPlaneContinuationIntent): ControlPlanePromptPayload {
+  return {
+    messageId: intent.messageId,
+    turn: { type: 'prompt', prompt: intent.turn.prompt },
+    agent: intent.agent,
+    ...(intent.finalization === undefined ? {} : { finalization: intent.finalization }),
+  };
 }
 
 /**
@@ -74,7 +84,7 @@ export function answerMessageIntent(
   reply: ControlPlaneAnswerReply,
   messageId: string,
   fallbackModel?: string
-): ControlPlanePromptPayload | null {
+): ControlPlaneContinuationIntent | null {
   const last = messages[messages.length - 1];
   if (last === undefined) return null;
   const prompt = answerPromptText(reply);
@@ -84,7 +94,7 @@ export function answerMessageIntent(
   if (resolvedModel === undefined) return null;
   return {
     messageId,
-    turn: { type: 'prompt', prompt },
+    turn: { type: 'prompt' as const, prompt },
     agent: { mode, model: resolvedModel, ...(variant === undefined ? {} : { variant }) },
     ...(last.intent.finalization === undefined ? {} : { finalization: last.intent.finalization }),
   };

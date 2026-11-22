@@ -328,13 +328,20 @@ describe('effective organization model access', () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
-        groupPolicies: [
-          [
-            {
-              type: 'model_access',
-              data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['Anthropic'] },
-            },
-          ],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: [],
+                  provider_allow_list: ['Anthropic'],
+                },
+              },
+            ],
+          },
         ],
       })
     );

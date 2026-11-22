@@ -273,6 +273,8 @@ describe('a web search', () => {
     expect(world.requests).toHaveLength(15);
     expect(outcome.slice(0, 15).every(answer => Result.isFailure(answer))).toBe(true);
     expect(reasonOf(outcome[15])).toContain('all 15 of its web search attempts');
+    // Nothing answered, so the model must say the search did not work.
+    expect(reasonOf(outcome[15])).toContain('say the search did not work');
     expect(spent.used).toBe(0);
     expect(spent.attempts).toBe(15);
   });

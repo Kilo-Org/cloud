@@ -45,9 +45,14 @@ const TIMED_OUT = 'Web search took too long and was stopped. Tell the person it 
 const OVER_BUDGET =
   `This question already used ${String(MAX_SEARCHES_PER_QUESTION)} web searches, the limit. ` +
   'Do not search again: answer with what you have.';
-const OVER_ATTEMPTS =
+/**
+ * The stop for a question that used its attempts. It says whether any search
+ * answered, because only then may the model's reply read as if the web was
+ * searched; with none answered it must say the search did not work.
+ */
+const overAttempts = (answered: boolean): string =>
   `This question has used all ${String(MAX_ATTEMPTS_PER_QUESTION)} of its web search attempts. ` +
-  'Do not search again: answer with what you have.';
+  `Do not search again: answer with what you have${answered ? '.' : ', and say the search did not work.'}`;
 const ALLOWANCE_EXHAUSTED =
   "The account's free web searches for this month are used up and it has no credit balance. " +
   'Tell the person they can add credits in Kilo to search again.';
@@ -155,7 +160,7 @@ async function search(argumentsText: string, context: SearchContext): Promise<Se
     return failed(OVER_BUDGET);
   }
   if (spent !== undefined && spent.attempts >= MAX_ATTEMPTS_PER_QUESTION) {
-    return failed(OVER_ATTEMPTS);
+    return failed(overAttempts(spent.used > 0));
   }
   if (!onlineManager.isOnline()) {
     return failed(OFFLINE);

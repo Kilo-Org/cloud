@@ -1,8 +1,9 @@
 /**
  * Locale-aware matching for the Settings search index. The caller owns the
  * index (the rendered settings and their translated labels/keywords); this
- * module folds the text and maps matches back onto the original label so the
- * screen can highlight the exact UTF-16 range.
+ * module folds that index once per locale and returns the query function, and
+ * maps a label match back onto the original string so the screen can highlight
+ * the exact UTF-16 range.
  */
 
 export type SettingsSearchText = {
@@ -35,10 +36,17 @@ type SearchResult<T> = {
   ranges: readonly SettingsMatchRange[];
 };
 
+type PreparedEntry<T> = {
+  entry: T;
+  label: FoldedLabel;
+  context: string | null;
+  keywords: readonly string[];
+};
+
 /**
- * Marks in these ranges are optional accents or reading aids and are folded
- * away. Kana voicing, Thai tones and Indic vowel signs sit outside these
- * ranges (and `\p{Diacritic}` would fold the first two), so they stay.
+ * Marks in these ranges are optional accents or reading aids and are dropped.
+ * Kana voicing, Thai tones and Indic vowel signs sit outside these ranges (and
+ * `\p{Diacritic}` would drop the first two), so they stay.
  */
 const FOLDED_MARK_RANGES = [
   ['\u0300', '\u036F'],
@@ -54,6 +62,26 @@ const FOLDED_MARK_RANGES = [
 const SERBIAN_CYRILLIC = 'абвгдђежзијклљмнњопрстћуфхцчџш';
 // Same order as SERBIAN_CYRILLIC; diacritics stay for the fold below to strip.
 const SERBIAN_LATIN = 'a b v g d dj e ž z i j k l lj m n nj o p r s t ć u f h c č dž š'.split(' ');
+
+/**
+ * Latin letters the shipped catalogs use that carry no canonical
+ * decomposition, so NFD leaves them and an accent-free query could not reach
+ * the label. The value is the conventional ASCII alias.
+ */
+const LATIN_ALIAS = {
+  ł: 'l',
+  ø: 'o',
+  æ: 'ae',
+  œ: 'oe',
+  ð: 'd',
+  þ: 'th',
+  ħ: 'h',
+} as const satisfies Record<string, string>;
+
+/** Whether a letter has a conventional ASCII alias. */
+function isAliasedLetter(letter: string): letter is keyof typeof LATIN_ALIAS {
+  return Object.hasOwn(LATIN_ALIAS, letter);
+}
 
 const MARK = /\p{M}/u;
 
@@ -91,11 +119,21 @@ function transliterateSerbian(char: string): string {
   return SERBIAN_LATIN[index] ?? char;
 }
 
+/** Whether a decomposed part is an optional mark this locale folds away. */
+function foldedMark(part: string): boolean {
+  return (
+    MARK.test(part) && FOLDED_MARK_RANGES.some(([first, last]) => part >= first && part <= last)
+  );
+}
+
 /**
  * Fold one grapheme cluster. Canonically equivalent input composes first, so
- * `I` + U+0307 is the same as `İ` before Turkic lowercasing. Every folded code
- * unit of the cluster maps to the whole cluster, which keeps an expanded
- * scalar (`ß`, `đ`, `џ`) and its trailing accents on the same label range.
+ * `I` + U+0307 is the same as `İ` before Turkic lowercasing. The optional
+ * marks are dropped before the remainder is composed again, so a voiced kana
+ * becomes one letter (`し` + U+3099 is `じ`) instead of leaving its base as a
+ * prefix of the voiced form. Every folded code unit of the cluster maps to the
+ * whole cluster, which keeps an expanded scalar (`ß`, `đ`, `џ`, `æ`) and its
+ * trailing accents on the same original label range.
  */
 function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string {
   let text = '';
@@ -113,33 +151,23 @@ function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string 
     }
   };
 
-  const extendLast = (end: number) => {
-    if (mapping === undefined) {
-      return;
-    }
-    const last = mapping.ends.at(-1);
-    if (last !== undefined) {
-      mapping.ends[mapping.ends.length - 1] = Math.max(last, end);
-    }
-  };
-
-  const foldPart = (part: string, start: number, end: number) => {
-    if (MARK.test(part)) {
-      if (FOLDED_MARK_RANGES.some(([first, last]) => part >= first && part <= last)) {
-        extendLast(end);
-      } else {
-        append(part, start, end);
+  const foldCluster = (cluster: string, start: number, end: number) => {
+    for (const char of cluster.normalize('NFC')) {
+      for (const lowered of lowercaseForLocale(char, rules.language)) {
+        const letters = rules.serbianCyrillic ? transliterateSerbian(lowered) : lowered;
+        const kept = [...letters.normalize('NFD')].filter(part => !foldedMark(part)).join('');
+        for (const letter of kept.normalize('NFC')) {
+          if (letter === 'ß') {
+            append('ss', start, end);
+          } else if (letter === 'đ') {
+            append(rules.djDigraph ? 'dj' : 'd', start, end);
+          } else if (letter === 'ς') {
+            append('σ', start, end);
+          } else {
+            append(isAliasedLetter(letter) ? LATIN_ALIAS[letter] : letter, start, end);
+          }
+        }
       }
-      return;
-    }
-    if (part === 'ß') {
-      append('ss', start, end);
-    } else if (part === 'đ') {
-      append(rules.djDigraph ? 'dj' : 'd', start, end);
-    } else if (part === 'ς') {
-      append('σ', start, end);
-    } else {
-      append(part, start, end);
     }
   };
 
@@ -158,19 +186,7 @@ function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string 
       offset += next.value.length;
       next = codePoints.next();
     }
-    const end = offset;
-
-    for (const char of cluster.normalize('NFC')) {
-      const lowered = lowercaseForLocale(char, rules.language);
-      for (const loweredChar of lowered) {
-        const transliterated = rules.serbianCyrillic
-          ? transliterateSerbian(loweredChar)
-          : loweredChar;
-        for (const part of transliterated.normalize('NFD')) {
-          foldPart(part, start, end);
-        }
-      }
-    }
+    foldCluster(cluster, start, offset);
   }
 
   return text;
@@ -225,56 +241,64 @@ function mergeRanges(ranges: SettingsMatchRange[]): SettingsMatchRange[] {
 }
 
 /**
- * Case- and diacritic-insensitive search over the current locale's settings
- * labels, contexts and translated keywords. Every query word must match at
- * least one field; a word may match the label, context or a keyword. Only
- * label matches produce highlight ranges. Label matches rank above entries
- * matched only by context or keywords; both groups keep index order. An empty
- * query returns no results, so callers keep the normal Settings list.
+ * Fold the localized index once, then return the query function for it. Case
+ * and diacritics are insensitive: every query word must match at least one
+ * field, and a word may match the label, the containing screen's breadcrumb or
+ * a translated keyword. Only label matches produce highlight ranges. Label
+ * matches rank above entries matched only by context or keywords; both groups
+ * keep index order. An empty query returns no results, so callers keep the
+ * normal Settings list.
+ *
+ * The folded text depends only on the locale and the entry strings, so it is
+ * computed here rather than on every keystroke.
  */
-export function searchSettings<T extends SettingsSearchText>(
+export function prepareSettingsSearch<T extends SettingsSearchText>(
   entries: readonly T[],
-  query: string,
   locale: string
 ) {
   const rules = localeRules(locale);
-  const tokens = searchTokens(query, rules);
-  if (tokens.length === 0) {
-    return [];
-  }
+  const prepared: PreparedEntry<T>[] = entries.map(entry => ({
+    entry,
+    label: foldLabel(entry.label, rules),
+    context: entry.context === undefined ? null : fold(entry.context, rules),
+    keywords: (entry.keywords ?? []).map(keyword => fold(keyword, rules)),
+  }));
 
-  const labelMatches: SearchResult<T>[] = [];
-  const otherMatches: SearchResult<T>[] = [];
+  return (query: string) => {
+    const tokens = searchTokens(query, rules);
+    if (tokens.length === 0) {
+      return [];
+    }
 
-  for (const entry of entries) {
-    const label = foldLabel(entry.label, rules);
-    const context = entry.context === undefined ? null : fold(entry.context, rules);
-    const keywords = (entry.keywords ?? []).map(keyword => fold(keyword, rules));
+    const labelMatches: SearchResult<T>[] = [];
+    const otherMatches: SearchResult<T>[] = [];
 
-    let allTokensMatched = true;
-    let labelMatched = false;
+    for (const { entry, label, context, keywords } of prepared) {
+      let allTokensMatched = true;
+      let labelMatched = false;
 
-    for (const token of tokens) {
-      if (label.text.includes(token)) {
-        labelMatched = true;
-      } else {
-        const otherFieldMatched =
-          context?.includes(token) === true || keywords.some(keyword => keyword.includes(token));
-        if (!otherFieldMatched) {
-          allTokensMatched = false;
-          break;
+      for (const token of tokens) {
+        if (label.text.includes(token)) {
+          labelMatched = true;
+        } else {
+          const otherFieldMatched =
+            context?.includes(token) === true || keywords.some(keyword => keyword.includes(token));
+          if (!otherFieldMatched) {
+            allTokensMatched = false;
+            break;
+          }
+        }
+      }
+
+      if (allTokensMatched) {
+        if (labelMatched) {
+          labelMatches.push({ entry, ranges: findLabelRanges(label, tokens) });
+        } else {
+          otherMatches.push({ entry, ranges: [] });
         }
       }
     }
 
-    if (allTokensMatched) {
-      if (labelMatched) {
-        labelMatches.push({ entry, ranges: findLabelRanges(label, tokens) });
-      } else {
-        otherMatches.push({ entry, ranges: [] });
-      }
-    }
-  }
-
-  return [...labelMatches, ...otherMatches];
+    return [...labelMatches, ...otherMatches];
+  };
 }

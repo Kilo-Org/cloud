@@ -3748,7 +3748,7 @@
       "restrictionHint": "A regular expression selects the files this mode may edit, for example `\\.md$` for markdown files only. Leave it empty to allow every file.",
       "restrictionInvalid": "Enter a valid regular expression.",
       "restrictionLabel": "Restriction label",
-      "restrictionPattern": "File restriction (regular expression)",
+      "restrictionPattern": "File restriction",
       "roleLabel": "Role definition",
       "roleRequired": "Describe what this mode does.",
       "tool": {

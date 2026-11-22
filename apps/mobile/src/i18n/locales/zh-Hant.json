@@ -3648,7 +3648,7 @@
       "restrictionHint": "正規表示式選擇此模式可以編輯哪些檔案，例如 `\\.md$` 僅符合 markdown 檔案。留空則允許所有檔案。",
       "restrictionInvalid": "請輸入有效的正規表示式。",
       "restrictionLabel": "限制標籤",
-      "restrictionPattern": "檔案限制（正規表示式）",
+      "restrictionPattern": "檔案限制",
       "roleLabel": "角色定義",
       "roleRequired": "請描述此模式的用途。",
       "tool": {

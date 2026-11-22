@@ -3830,7 +3830,7 @@
       "restrictionHint": "Espressjoni regolari tagħżel il-fajls li dan il-mod jista' jeditja, pereżempju `\\.md$` għall-fajls markdown biss. Ħallih vojt biex tippermetti kull fajl.",
       "restrictionInvalid": "Daħħal espressjoni regolari valida.",
       "restrictionLabel": "Tikketta tar-restrizzjoni",
-      "restrictionPattern": "Restrizzjoni tal-fajl (espressjoni regolari)",
+      "restrictionPattern": "Restrizzjoni tal-fajl",
       "roleLabel": "Definizzjoni tar-rwol",
       "roleRequired": "Iddeskrivi x'jagħmel dan il-mod.",
       "tool": {

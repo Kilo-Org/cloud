@@ -3644,7 +3644,7 @@
       "restrictionHint": "Isisho esijwayelekile sikhetha amafayela le modi engawahlela, isibonelo `\\.md$` kumafayela e-markdown kuphela. Shiya kungenalutho ukuze kuvunyelwe wonke amafayela.",
       "restrictionInvalid": "Faka isisho esijwayelekile esivumelekile.",
       "restrictionLabel": "Ilebula yomkhawulo",
-      "restrictionPattern": "Umkhawulo wamafayela (isisho esijwayelekile)",
+      "restrictionPattern": "Umkhawulo wamafayela",
       "roleLabel": "Incazelo yendima",
       "roleRequired": "Chaza okwenziwa yile modi.",
       "tool": {

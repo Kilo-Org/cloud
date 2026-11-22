@@ -3896,7 +3896,7 @@
       "restrictionHint": "يحدد التعبير النمطي الملفات التي يمكن لهذا الوضع تحريرها، مثل `\\.md$` لملفات Markdown فقط. اتركه فارغًا للسماح بكل الملفات.",
       "restrictionInvalid": "أدخل تعبيرًا نمطيًا صالحًا.",
       "restrictionLabel": "تسمية القيد",
-      "restrictionPattern": "قيد الملف (تعبير نمطي)",
+      "restrictionPattern": "قيد الملف",
       "roleLabel": "تعريف الدور",
       "roleRequired": "صِف ما يفعله هذا الوضع.",
       "tool": {

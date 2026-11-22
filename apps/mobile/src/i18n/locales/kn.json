@@ -3644,7 +3644,7 @@
       "restrictionHint": "ನಿಯಮಿತ ಸೂತ್ರ (regular expression) ಈ ಮೋಡ್ ಸಂಪಾದಿಸಬಹುದಾದ ಫೈಲ್‌ಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡುತ್ತದೆ, ಉದಾಹರಣೆಗೆ `\\.md$` ಕೇವಲ markdown ಫೈಲ್‌ಗಳಿಗೆ. ಎಲ್ಲಾ ಫೈಲ್‌ಗಳನ್ನು ಅನುಮತಿಸಲು ಅದನ್ನು ಖಾಲಿ ಬಿಡಿ.",
       "restrictionInvalid": "ಮಾನ್ಯ ನಿಯಮಿತ ಸೂತ್ರವನ್ನು ನಮೂದಿಸಿ.",
       "restrictionLabel": "ನಿರ್ಬಂಧ ಲೇಬಲ್",
-      "restrictionPattern": "ಫೈಲ್ ನಿರ್ಬಂಧ (ನಿಯಮಿತ ಸೂತ್ರ)",
+      "restrictionPattern": "ಫೈಲ್ ನಿರ್ಬಂಧ",
       "roleLabel": "ಪಾತ್ರ ವ್ಯಾಖ್ಯಾನ",
       "roleRequired": "ಈ ಮೋಡ್ ಏನು ಮಾಡುತ್ತದೆ ಎಂಬುದನ್ನು ವಿವರಿಸಿ.",
       "tool": {

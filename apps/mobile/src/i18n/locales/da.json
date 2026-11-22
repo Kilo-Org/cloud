@@ -3644,7 +3644,7 @@
       "restrictionHint": "Et regulært udtryk vælger, hvilke filer denne tilstand må redigere, for eksempel `\\.md$` kun for markdown-filer. Lad feltet være tomt for at tillade alle filer.",
       "restrictionInvalid": "Angiv et gyldigt regulært udtryk.",
       "restrictionLabel": "Begrænsningsetiket",
-      "restrictionPattern": "Filbegrænsning (regulært udtryk)",
+      "restrictionPattern": "Filbegrænsning",
       "roleLabel": "Rolledefinition",
       "roleRequired": "Beskriv, hvad denne tilstand gør.",
       "tool": {

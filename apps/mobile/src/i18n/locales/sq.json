@@ -3644,7 +3644,7 @@
       "restrictionHint": "Një shprehje e rregullt zgjedh skedarët që kjo mënyrë mund të redaktojë, për shembull `\\.md$` vetëm për skedarët markdown. Lëre bosh për të lejuar çdo skedar.",
       "restrictionInvalid": "Vendos një shprehje të rregullt të vlefshme.",
       "restrictionLabel": "Etiketa e kufizimit",
-      "restrictionPattern": "Kufizim skedarësh (shprehje e rregullt)",
+      "restrictionPattern": "Kufizim skedarësh",
       "roleLabel": "Përkufizimi i rolit",
       "roleRequired": "Përshkruaj çfarë bën kjo mënyrë.",
       "tool": {

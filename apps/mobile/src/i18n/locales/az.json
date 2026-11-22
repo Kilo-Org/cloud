@@ -3644,7 +3644,7 @@
       "restrictionHint": "Müntəzəm ifadə bu rejimin redaktə edə biləcəyi faylları seçir, məsələn yalnız markdown faylları üçün `\\.md$`. Bütün fayllara icazə vermək üçün onu boş buraxın.",
       "restrictionInvalid": "Düzgün müntəzəm ifadə daxil edin.",
       "restrictionLabel": "Məhdudiyyət etiketi",
-      "restrictionPattern": "Fayl məhdudiyyəti (müntəzəm ifadə)",
+      "restrictionPattern": "Fayl məhdudiyyəti",
       "roleLabel": "Rol tərifi",
       "roleRequired": "Bu rejimin nə etdiyini təsvir edin.",
       "tool": {

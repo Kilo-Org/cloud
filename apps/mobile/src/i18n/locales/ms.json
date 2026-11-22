@@ -3644,7 +3644,7 @@
       "restrictionHint": "Ungkapan nalar biasa memilih fail yang boleh disunting oleh mod ini, contohnya `\\.md$` untuk fail markdown sahaja. Biarkan kosong untuk membenarkan semua fail.",
       "restrictionInvalid": "Masukkan ungkapan nalar biasa yang sah.",
       "restrictionLabel": "Label sekatan",
-      "restrictionPattern": "Sekatan fail (ungkapan nalar biasa)",
+      "restrictionPattern": "Sekatan fail",
       "roleLabel": "Definisi peranan",
       "roleRequired": "Terangkan fungsi mod ini.",
       "tool": {

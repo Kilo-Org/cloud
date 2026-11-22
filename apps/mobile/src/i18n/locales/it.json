@@ -3710,7 +3710,7 @@
       "restrictionHint": "Un'espressione regolare seleziona i file che questa modalità può modificare, ad esempio `\\.md$` solo per i file markdown. Lascia vuoto per consentire tutti i file.",
       "restrictionInvalid": "Inserisci un'espressione regolare valida.",
       "restrictionLabel": "Etichetta restrizione",
-      "restrictionPattern": "Restrizione file (espressione regolare)",
+      "restrictionPattern": "Restrizione file",
       "roleLabel": "Definizione del ruolo",
       "roleRequired": "Descrivi cosa fa questa modalità.",
       "tool": {

@@ -3644,7 +3644,7 @@
       "restrictionHint": "นิพจน์ทั่วไปใช้เลือกไฟล์ที่โหมดนี้แก้ไขได้ เช่น `\\.md$` สำหรับเฉพาะไฟล์ markdown เว้นว่างไว้เพื่ออนุญาตทุกไฟล์",
       "restrictionInvalid": "กรอกนิพจน์ทั่วไปที่ถูกต้อง",
       "restrictionLabel": "ป้ายกำกับข้อจำกัด",
-      "restrictionPattern": "ข้อจำกัดไฟล์ (นิพจน์ทั่วไป)",
+      "restrictionPattern": "ข้อจำกัดไฟล์",
       "roleLabel": "นิยามบทบาท",
       "roleRequired": "อธิบายว่าโหมดนี้ทำอะไร",
       "tool": {

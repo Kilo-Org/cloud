@@ -3644,7 +3644,7 @@
       "restrictionHint": "Pinipili ng isang regular expression kung aling mga file ang maaaring i-edit ng modong ito, halimbawa `\\.md$` para sa mga markdown file lamang. Iwanan itong walang laman para payagan ang lahat ng file.",
       "restrictionInvalid": "Maglagay ng wastong regular expression.",
       "restrictionLabel": "Label ng paghihigpit",
-      "restrictionPattern": "Paghihigpit sa file (regular expression)",
+      "restrictionPattern": "Paghihigpit sa file",
       "roleLabel": "Depinisyon ng role",
       "roleRequired": "Ilarawan ang ginagawa ng modong ito.",
       "tool": {

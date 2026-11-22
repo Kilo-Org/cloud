@@ -3644,7 +3644,7 @@
       "restrictionHint": "Regulaaravaldis valib, milliseid faile see režiim võib muuta, näiteks `\\.md$` ainult markdown-failide jaoks. Jäta väli tühjaks, et lubada kõiki faile.",
       "restrictionInvalid": "Sisesta kehtiv regulaaravaldis.",
       "restrictionLabel": "Piirangu silt",
-      "restrictionPattern": "Faili piirang (regulaaravaldis)",
+      "restrictionPattern": "Faili piirang",
       "roleLabel": "Rolli määratlus",
       "roleRequired": "Kirjelda, mida see režiim teeb.",
       "tool": {

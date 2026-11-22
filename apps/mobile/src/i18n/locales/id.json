@@ -3648,7 +3648,7 @@
       "restrictionHint": "Ekspresi reguler memilih file yang boleh diedit mode ini, misalnya `\\.md$` hanya untuk file markdown. Biarkan kosong untuk mengizinkan semua file.",
       "restrictionInvalid": "Masukkan ekspresi reguler yang valid.",
       "restrictionLabel": "Label batasan",
-      "restrictionPattern": "Batasan file (ekspresi reguler)",
+      "restrictionPattern": "Batasan file",
       "roleLabel": "Definisi peran",
       "roleRequired": "Jelaskan fungsi mode ini.",
       "tool": {

@@ -3706,7 +3706,7 @@
       "restrictionHint": "Una expressió regular selecciona quins fitxers pot editar aquest mode, per exemple `\\.md$` només per a fitxers markdown. Deixa'l buit per permetre tots els fitxers.",
       "restrictionInvalid": "Introdueix una expressió regular vàlida.",
       "restrictionLabel": "Etiqueta de restricció",
-      "restrictionPattern": "Restricció de fitxers (expressió regular)",
+      "restrictionPattern": "Restricció de fitxers",
       "roleLabel": "Definició del rol",
       "roleRequired": "Descriu què fa aquest mode.",
       "tool": {

@@ -3768,7 +3768,7 @@
       "restrictionHint": "Reguliarusis reiškinys parenka failus, kuriuos šis režimas gali redaguoti, pavyzdžiui, `\\.md$` – tik markdown failams. Palikite jį tuščią, kad būtų leidžiami visi failai.",
       "restrictionInvalid": "Įveskite tinkamą reguliarųjį reiškinį.",
       "restrictionLabel": "Apribojimo žymė",
-      "restrictionPattern": "Failų apribojimas (reguliarusis reiškinys)",
+      "restrictionPattern": "Failų apribojimas",
       "roleLabel": "Vaidmens aprašymas",
       "roleRequired": "Aprašykite, ką daro šis režimas.",
       "tool": {

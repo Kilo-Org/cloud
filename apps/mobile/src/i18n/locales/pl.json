@@ -3772,7 +3772,7 @@
       "restrictionHint": "Wyrażenie regularne wybiera pliki, które ten tryb może edytować, na przykład `\\.md$` tylko dla plików markdown. Pozostaw puste, aby zezwolić na wszystkie pliki.",
       "restrictionInvalid": "Wprowadź prawidłowe wyrażenie regularne.",
       "restrictionLabel": "Etykieta ograniczenia",
-      "restrictionPattern": "Ograniczenie plików (wyrażenie regularne)",
+      "restrictionPattern": "Ograniczenie plików",
       "roleLabel": "Definicja roli",
       "roleRequired": "Opisz, co robi ten tryb.",
       "tool": {

@@ -3648,7 +3648,7 @@
       "restrictionHint": "Ein regulärer Ausdruck legt fest, welche Dateien dieser Modus bearbeiten darf, zum Beispiel `\\.md$` nur für Markdown-Dateien. Lass das Feld leer, um alle Dateien zuzulassen.",
       "restrictionInvalid": "Gib einen gültigen regulären Ausdruck ein.",
       "restrictionLabel": "Bezeichnung der Einschränkung",
-      "restrictionPattern": "Dateieinschränkung (regulärer Ausdruck)",
+      "restrictionPattern": "Dateieinschränkung",
       "roleLabel": "Rollendefinition",
       "roleRequired": "Beschreiben, was dieser Modus tut.",
       "tool": {

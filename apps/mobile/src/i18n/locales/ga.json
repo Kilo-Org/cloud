@@ -3830,7 +3830,7 @@
       "restrictionHint": "Roghnaíonn slonn ionadaíoch na comhaid ar féidir leis an mód seo iad a chur in eagar, mar shampla `\\.md$` le haghaidh comhaid markdown amháin. Fág folamh é chun gach comhad a cheadú.",
       "restrictionInvalid": "Cuir isteach slonn ionadaíoch bailí.",
       "restrictionLabel": "Lipéad srianta",
-      "restrictionPattern": "Srian comhaid (slonn ionadaíoch)",
+      "restrictionPattern": "Srian comhaid",
       "roleLabel": "Sainmhíniú róil",
       "roleRequired": "Cuir síos ar a dhéanann an mód seo.",
       "tool": {

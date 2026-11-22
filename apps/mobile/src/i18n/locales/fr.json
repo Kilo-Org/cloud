@@ -3710,7 +3710,7 @@
       "restrictionHint": "Une expression régulière sélectionne les fichiers que ce mode peut modifier, par exemple `\\.md$` pour les fichiers markdown uniquement. Laissez-le vide pour autoriser tous les fichiers.",
       "restrictionInvalid": "Saisissez une expression régulière valide.",
       "restrictionLabel": "Libellé de restriction",
-      "restrictionPattern": "Restriction de fichier (expression régulière)",
+      "restrictionPattern": "Restriction de fichier",
       "roleLabel": "Définition du rôle",
       "roleRequired": "Décrivez ce que fait ce mode.",
       "tool": {

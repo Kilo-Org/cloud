@@ -3644,7 +3644,7 @@
       "restrictionHint": "Usemi wa kawaida huchagua faili ambazo hali hii inaweza kuhariri, kwa mfano `\\.md$` kwa faili za markdown pekee. Iache wazi ili kuruhusu kila faili.",
       "restrictionInvalid": "Weka usemi wa kawaida sahihi.",
       "restrictionLabel": "Lebo ya kizuizi",
-      "restrictionPattern": "Kizuizi cha faili (usemi wa kawaida)",
+      "restrictionPattern": "Kizuizi cha faili",
       "roleLabel": "Ufafanuzi wa jukumu",
       "roleRequired": "Eleza kazi ya hali hii.",
       "tool": {

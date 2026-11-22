@@ -3648,7 +3648,7 @@
       "restrictionHint": "Düzenli ifade, bu modun düzenleyebileceği dosyaları seçer; örneğin yalnızca markdown dosyaları için `\\.md$`. Tüm dosyalara izin vermek için boş bırakın.",
       "restrictionInvalid": "Geçerli bir düzenli ifade girin.",
       "restrictionLabel": "Kısıtlama etiketi",
-      "restrictionPattern": "Dosya kısıtlaması (düzenli ifade)",
+      "restrictionPattern": "Dosya kısıtlaması",
       "roleLabel": "Rol tanımı",
       "roleRequired": "Bu modun ne yaptığını açıklayın.",
       "tool": {

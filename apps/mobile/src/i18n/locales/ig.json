@@ -3644,7 +3644,7 @@
       "restrictionHint": "Regular expression na-ahọrọ faịlụ ndị ọnọdụ a nwere ike idezi, dịka ọmụmaatụ `\\.md$` maka naanị faịlụ markdown. Hapụ ya tọfụ ka faịlụ niile kweere.",
       "restrictionInvalid": "Tinye regular expression ziri ezi.",
       "restrictionLabel": "Akara mmachi",
-      "restrictionPattern": "Mmachi faịlụ (regular expression)",
+      "restrictionPattern": "Mmachi faịlụ",
       "roleLabel": "Nkọwa ọrụ",
       "roleRequired": "Kọwaa ihe ụdị ọrụ a na-eme.",
       "tool": {

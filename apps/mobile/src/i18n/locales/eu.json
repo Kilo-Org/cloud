@@ -3644,7 +3644,7 @@
       "restrictionHint": "Adierazpen erregular batek hautatzen du zein fitxategi edita ditzakeen modu honek, adibidez `\\.md$` markdown fitxategietarako soilik. Utzi hutsik fitxategi guztiak onartzeko.",
       "restrictionInvalid": "Sartu baliozko adierazpen erregular bat.",
       "restrictionLabel": "Murrizketaren etiketa",
-      "restrictionPattern": "Fitxategi-murrizketa (adierazpen erregularra)",
+      "restrictionPattern": "Fitxategi-murrizketa",
       "roleLabel": "Rolaren definizioa",
       "roleRequired": "Deskribatu modu honek zer egiten duen.",
       "tool": {

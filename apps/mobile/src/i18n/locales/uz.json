@@ -3644,7 +3644,7 @@
       "restrictionHint": "Muntazam ifoda ushbu rejim tahrirlashi mumkin bo‘lgan fayllarni tanlaydi, masalan, faqat markdown fayllari uchun `\\.md$`. Barcha fayllarga ruxsat berish uchun bo‘sh qoldiring.",
       "restrictionInvalid": "Yaroqli muntazam ifoda kiriting.",
       "restrictionLabel": "Cheklov yorlig‘i",
-      "restrictionPattern": "Fayl cheklovi (muntazam ifoda)",
+      "restrictionPattern": "Fayl cheklovi",
       "roleLabel": "Rol ta’rifi",
       "roleRequired": "Bu rejim nima qilishini ta’riflang.",
       "tool": {

@@ -3648,7 +3648,7 @@
       "restrictionHint": "Biểu thức chính quy chọn các tệp mà chế độ này được phép sửa, ví dụ `\\.md$` chỉ cho tệp markdown. Để trống để cho phép mọi tệp.",
       "restrictionInvalid": "Nhập biểu thức chính quy hợp lệ.",
       "restrictionLabel": "Nhãn giới hạn",
-      "restrictionPattern": "Giới hạn tệp (biểu thức chính quy)",
+      "restrictionPattern": "Giới hạn tệp",
       "roleLabel": "Định nghĩa vai trò",
       "roleRequired": "Mô tả chức năng của chế độ này.",
       "tool": {

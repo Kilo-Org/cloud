@@ -3644,7 +3644,7 @@
       "restrictionHint": "Tibaax caadi ah ayaa doorata faylasha qaabkani tafatiran karo, tusaale ahaan `\\.md$` kaliya faylasha markdown. Ka tag madhan si fayl walba loo oggolaado.",
       "restrictionInvalid": "Geli tibaax caadi ah oo sax ah.",
       "restrictionLabel": "Summada xaddidka",
-      "restrictionPattern": "Xaddidka faylka (tibaax caadi ah)",
+      "restrictionPattern": "Xaddidka faylka",
       "roleLabel": "Qeexitaanka doorka",
       "roleRequired": "Sharax waxa qaabkani qabto.",
       "tool": {

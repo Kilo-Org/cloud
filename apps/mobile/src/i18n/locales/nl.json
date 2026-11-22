@@ -3648,7 +3648,7 @@
       "restrictionHint": "Een reguliere expressie selecteert de bestanden die deze modus mag bewerken, bijvoorbeeld `\\.md$` voor alleen markdown-bestanden. Laat dit leeg om elk bestand toe te staan.",
       "restrictionInvalid": "Voer een geldige reguliere expressie in.",
       "restrictionLabel": "Beperkingslabel",
-      "restrictionPattern": "Bestandsbeperking (reguliere expressie)",
+      "restrictionPattern": "Bestandsbeperking",
       "roleLabel": "Roldefinitie",
       "roleRequired": "Beschrijf wat deze modus doet.",
       "tool": {

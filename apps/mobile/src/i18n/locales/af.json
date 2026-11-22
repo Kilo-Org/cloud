@@ -3644,7 +3644,7 @@
       "restrictionHint": "'n Gereelde uitdrukking kies watter lêers hierdie modus mag redigeer, byvoorbeeld `\\.md$` vir slegs markdown-lêers. Laat dit leeg om alle lêers toe te laat.",
       "restrictionInvalid": "Voer 'n geldige gereelde uitdrukking in.",
       "restrictionLabel": "Beperkingsetiket",
-      "restrictionPattern": "Lêerbeperking (gereelde uitdrukking)",
+      "restrictionPattern": "Lêerbeperking",
       "roleLabel": "Roldefinisie",
       "roleRequired": "Beskryf wat hierdie modus doen.",
       "tool": {

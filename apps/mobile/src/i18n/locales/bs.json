@@ -3706,7 +3706,7 @@
       "restrictionHint": "Regularni izraz određuje koje datoteke ovaj način rada može uređivati, na primjer `\\.md$` samo za markdown datoteke. Ostavi prazno da dozvoliš sve datoteke.",
       "restrictionInvalid": "Unesi ispravan regularni izraz.",
       "restrictionLabel": "Oznaka ograničenja",
-      "restrictionPattern": "Ograničenje datoteka (regularni izraz)",
+      "restrictionPattern": "Ograničenje datoteka",
       "roleLabel": "Definicija uloge",
       "roleRequired": "Opiši šta ovaj način rada radi.",
       "tool": {

@@ -3644,7 +3644,7 @@
       "restrictionHint": "Ìfọ̀rọ̀wérọ̀ deede ń yan àwọn fáìlì tí ipò yìí lè ṣàtúnṣe, fún àpẹẹrẹ `\\.md$` fún àwọn fáìlì markdown nìkan. Fi sílẹ̀ òfìfo láti gbà gbogbo fáìlì.",
       "restrictionInvalid": "Tẹ ìfọ̀rọ̀wérọ̀ deede tó tọ́.",
       "restrictionLabel": "Àmì ìhámọ́",
-      "restrictionPattern": "Ìhámọ́ fáìlì (ìfọ̀rọ̀wérọ̀ deede)",
+      "restrictionPattern": "Ìhámọ́ fáìlì",
       "roleLabel": "Ìtumọ̀ ipa",
       "roleRequired": "Ṣàpèjúwe ohun tí ipò yìí ń ṣe.",
       "tool": {

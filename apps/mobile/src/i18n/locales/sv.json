@@ -3644,7 +3644,7 @@
       "restrictionHint": "Ett reguljärt uttryck väljer vilka filer det här läget får redigera, till exempel `\\.md$` för endast markdown-filer. Lämna det tomt för att tillåta alla filer.",
       "restrictionInvalid": "Ange ett giltigt reguljärt uttryck.",
       "restrictionLabel": "Begränsningsetikett",
-      "restrictionPattern": "Filbegränsning (reguljärt uttryck)",
+      "restrictionPattern": "Filbegränsning",
       "roleLabel": "Rolldefinition",
       "roleRequired": "Beskriv vad det här läget gör.",
       "tool": {

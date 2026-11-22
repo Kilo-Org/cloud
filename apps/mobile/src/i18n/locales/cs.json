@@ -3768,7 +3768,7 @@
       "restrictionHint": "Regulární výraz vybírá, které soubory může tento režim upravovat, například `\\.md$` jen pro soubory markdown. Nechte prázdné pro povolení všech souborů.",
       "restrictionInvalid": "Zadejte platný regulární výraz.",
       "restrictionLabel": "Označení omezení",
-      "restrictionPattern": "Omezení souborů (regulární výraz)",
+      "restrictionPattern": "Omezení souborů",
       "roleLabel": "Definice role",
       "roleRequired": "Popište, co tento režim dělá.",
       "tool": {

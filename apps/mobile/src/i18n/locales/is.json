@@ -3644,7 +3644,7 @@
       "restrictionHint": "Regluleg segð velur hvaða skrár þessi hamur má breyta, til dæmis `\\.md$` fyrir aðeins markdown-skrár. Skildu það eftir autt til að leyfa allar skrár.",
       "restrictionInvalid": "Sláðu inn gilda reglulega segð.",
       "restrictionLabel": "Merki takmörkunar",
-      "restrictionPattern": "Skráartakmörkun (regluleg segð)",
+      "restrictionPattern": "Skráartakmörkun",
       "roleLabel": "Skilgreining hlutverks",
       "roleRequired": "Lýstu því hvað þessi hamur gerir.",
       "tool": {

@@ -3644,7 +3644,7 @@
       "restrictionHint": "Ny regex no mifidy izay rakitra azon'ity fomba fiasa ovaina, ohatra `\\.md$` ho an'ny rakitra markdown ihany. Avelao foana izany mba hamela ny rakitra rehetra.",
       "restrictionInvalid": "Ampidiro ny regex mety.",
       "restrictionLabel": "Etikety famerana",
-      "restrictionPattern": "Famerana rakitra (regex)",
+      "restrictionPattern": "Famerana rakitra",
       "roleLabel": "Famaritana ny anjara asa",
       "roleRequired": "Lazao izay ataon'ity fomba fiasa ity.",
       "tool": {

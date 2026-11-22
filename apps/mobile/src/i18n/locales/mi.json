@@ -3644,7 +3644,7 @@
       "restrictionHint": "Ka tīpakohia e tētahi kīanga auau (regex) ngā kōnae ka taea e tēnei aratau te whakatika, hei tauira `\\.md$` mō ngā kōnae markdown anake. Waiho kia wātea kia āhei ai ngā kōnae katoa.",
       "restrictionInvalid": "Whakaurua he kīanga auau (regex) tika.",
       "restrictionLabel": "Tapanga here",
-      "restrictionPattern": "Here kōnae (regex)",
+      "restrictionPattern": "Here kōnae",
       "roleLabel": "Whakamārama tūranga",
       "roleRequired": "Whakaahuahia ngā mahi a tēnei aratau.",
       "tool": {

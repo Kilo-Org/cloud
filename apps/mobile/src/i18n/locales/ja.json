@@ -3648,7 +3648,7 @@
       "restrictionHint": "正規表現はこのモードが編集できるファイルを選択します。たとえば `\\.md$` はマークダウンファイルのみを対象にします。空欄にするとすべてのファイルを許可します。",
       "restrictionInvalid": "有効な正規表現を入力してください。",
       "restrictionLabel": "制限ラベル",
-      "restrictionPattern": "ファイル制限（正規表現）",
+      "restrictionPattern": "ファイル制限",
       "roleLabel": "ロール定義",
       "roleRequired": "このモードの役割を説明してください。",
       "tool": {

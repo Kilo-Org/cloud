@@ -3706,7 +3706,7 @@
       "restrictionHint": "Regulārā izteiksme izvēlas failus, ko šis režīms drīkst rediģēt, piemēram, `\\.md$` tikai markdown failiem. Atstājiet to tukšu, lai atļautu visus failus.",
       "restrictionInvalid": "Ievadiet derīgu regulāro izteiksmi.",
       "restrictionLabel": "Ierobežojuma apzīmējums",
-      "restrictionPattern": "Failu ierobežojums (regulārā izteiksme)",
+      "restrictionPattern": "Failu ierobežojums",
       "roleLabel": "Lomas definīcija",
       "roleRequired": "Aprakstiet, ko šis režīms dara.",
       "tool": {

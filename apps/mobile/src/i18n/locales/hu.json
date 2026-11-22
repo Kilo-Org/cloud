@@ -3644,7 +3644,7 @@
       "restrictionHint": "A reguláris kifejezés kiválasztja, hogy ez a mód mely fájlokat szerkesztheti; például a `\\.md$` csak a markdown-fájlokat engedi. Hagyja üresen, hogy minden fájl engedélyezett legyen.",
       "restrictionInvalid": "Adjon meg egy érvényes reguláris kifejezést.",
       "restrictionLabel": "Korlátozás címkéje",
-      "restrictionPattern": "Fájlkorlátozás (reguláris kifejezés)",
+      "restrictionPattern": "Fájlkorlátozás",
       "roleLabel": "Szerepkör meghatározása",
       "roleRequired": "Írja le, mit csinál ez a mód.",
       "tool": {

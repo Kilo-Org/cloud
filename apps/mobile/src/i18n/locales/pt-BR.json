@@ -4874,6 +4874,7 @@
     "contextAll": "Todos os contextos",
     "dismiss": "Ignorar relatório",
     "dismissFailed": "Ainda não foi possível ignorar este relatório. Tentaremos novamente em segundo plano.",
+    "readMarkFailed": "Ainda não foi possível marcar este relatório como lido. Tentaremos novamente quando ele for recarregado.",
     "offline": "Offline · relatório salvo",
     "cached": "Relatório salvo · atualização indisponível",
     "summary": "Resumo por IA",

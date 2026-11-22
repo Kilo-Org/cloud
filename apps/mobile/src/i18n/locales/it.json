@@ -4790,6 +4790,7 @@
     "contextAll": "Tutti i contesti",
     "dismiss": "Ignora il briefing",
     "dismissFailed": "Non è stato possibile ignorare subito questo briefing. Verrà ritentato automaticamente in background.",
+    "readMarkFailed": "Non è stato possibile contrassegnare questo briefing come letto. Verrà ritentato al prossimo caricamento del briefing.",
     "offline": "Offline · briefing salvato",
     "cached": "Briefing salvato · aggiornamento non disponibile",
     "summary": "Riepilogo AI",

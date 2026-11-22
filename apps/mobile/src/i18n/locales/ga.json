@@ -4958,6 +4958,7 @@
     "contextAll": "Gach comhthéacs",
     "dismiss": "Cuir an tuarascáil as an áireamh",
     "dismissFailed": "Ní féidir an túarascáil seo a chur as an áireamh go fóill. Déanfaidh sé iarracht arís sa chúlra.",
+    "readMarkFailed": "Níorbh fhéidir an túarascáil seo a mharcáil mar léite. Déanfaidh sé iarracht arís nuair a athlódálfar an túarascáil.",
     "offline": "As líne · tuarascáil shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
     "summary": "Achoimre AI",

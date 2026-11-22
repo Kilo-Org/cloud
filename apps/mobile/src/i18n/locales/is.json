@@ -4706,6 +4706,7 @@
     "contextAll": "Öll samhengi",
     "dismiss": "Vísa yfirliti frá",
     "dismissFailed": "Tókst ekki að vísa yfirlitinu frá eins og er. Það reynir aftur í bakgrunni.",
+    "readMarkFailed": "Tókst ekki að merkja þetta yfirlit sem lesið. Það reynir aftur þegar yfirlitið hleðst aftur.",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistað yfirlit · ekki hægt að uppfæra",
     "summary": "AI samantekt",

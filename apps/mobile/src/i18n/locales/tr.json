@@ -4706,6 +4706,7 @@
     "contextAll": "Tüm bağlamlar",
     "dismiss": "Raporu yok say",
     "dismissFailed": "Bu rapor henüz yok sayılamadı. Arka planda yeniden denenecek.",
+    "readMarkFailed": "Bu rapor okundu olarak işaretlenemedi. Rapor yeniden yüklendiğinde tekrar denenecek.",
     "offline": "Çevrimdışı · kayıtlı rapor",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
     "summary": "AI özeti",

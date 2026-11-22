@@ -4706,6 +4706,7 @@
     "contextAll": "Barcha kontekstlar",
     "dismiss": "Brifingni e’tiborsiz qoldirish",
     "dismissFailed": "Brifingni hozircha e’tiborsiz qoldirib bo‘lmadi. U fonda qayta urinadi.",
+    "readMarkFailed": "Brifingni o‘qilgan deb belgilab bo‘lmadi. Brifing qayta yuklanganda u yana urinib ko‘radi.",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan brifing · yangilab bo‘lmaydi",
     "summary": "AI xulosasi",

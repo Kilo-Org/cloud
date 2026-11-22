@@ -4874,6 +4874,7 @@
     "contextAll": "Visi kontekstai",
     "dismiss": "Atmesti suvestinę",
     "dismissFailed": "Šios suvestinės dar nepavyko atmesti. Bandymas kartojamas fone.",
+    "readMarkFailed": "Šios suvestinės nepavyko pažymėti kaip perskaitytos. Bandymas bus pakartotas, kai suvestinė bus įkelta iš naujo.",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota suvestinė · atnaujinti negalima",
     "summary": "AI santrauka",

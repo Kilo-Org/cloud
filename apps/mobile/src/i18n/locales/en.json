@@ -17,6 +17,7 @@
     "contextAll": "All contexts",
     "dismiss": "Dismiss brief",
     "dismissFailed": "Couldn’t dismiss this brief yet. It retries in the background.",
+    "readMarkFailed": "Couldn’t mark this brief as read. It will try again when the brief reloads.",
     "offline": "Offline · saved brief",
     "cached": "Saved brief · refresh unavailable",
     "summary": "AI summary",

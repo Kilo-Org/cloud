@@ -4706,6 +4706,7 @@
     "contextAll": "Të gjithë kontekstet",
     "dismiss": "Hidh poshtë raportin",
     "dismissFailed": "Raporti nuk u hodh dot poshtë akoma. Provon përsëri në sfond.",
+    "readMarkFailed": "Ky raport nuk u shënua dot si i lexuar. Do të provojë përsëri kur raporti të ringarkohet.",
     "offline": "Jashtë linje · raport i ruajtur",
     "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
     "summary": "Përmbledhje AI",

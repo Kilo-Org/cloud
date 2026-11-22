@@ -4706,6 +4706,7 @@
     "contextAll": "Alle contexten",
     "dismiss": "Briefing negeren",
     "dismissFailed": "Deze briefing kon nog niet worden genegeerd. Er wordt op de achtergrond opnieuw geprobeerd.",
+    "readMarkFailed": "Deze briefing kon niet als gelezen worden gemarkeerd. Er wordt opnieuw geprobeerd zodra de briefing opnieuw laadt.",
     "offline": "Offline · opgeslagen briefing",
     "cached": "Opgeslagen briefing · vernieuwen niet beschikbaar",
     "summary": "AI-samenvatting",

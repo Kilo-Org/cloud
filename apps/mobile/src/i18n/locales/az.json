@@ -4706,6 +4706,7 @@
     "contextAll": "Bütün kontekstlər",
     "dismiss": "Hesabatı rədd et",
     "dismissFailed": "Bu hesabatı rədd etmək hələ alınmadı. Arxa planda yenidən cəhd edilir.",
+    "readMarkFailed": "Bu hesabatı oxunmuş kimi qeyd etmək alınmadı. Hesabat yenidən yüklənəndə təkrar cəhd ediləcək.",
     "offline": "Oflayn · saxlanmış hesabat",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
     "summary": "AI xülasəsi",

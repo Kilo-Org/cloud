@@ -4706,6 +4706,7 @@
     "contextAll": "Alla kontexter",
     "dismiss": "Avskriv rapport",
     "dismissFailed": "Det gick inte att avfärda den här rapporten ännu. Den försöker igen i bakgrunden.",
+    "readMarkFailed": "Det gick inte att markera den här rapporten som läst. Det görs ett nytt försök när rapporten läses in igen.",
     "offline": "Offline · sparad rapport",
     "cached": "Sparad rapport · kan inte uppdateras",
     "summary": "AI-sammanfattning",

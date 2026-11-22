@@ -4706,6 +4706,7 @@
     "contextAll": "Alle kontekster",
     "dismiss": "Avvis brief",
     "dismissFailed": "Klarte ikke å avvise denne briefen ennå. Forsøket gjentas i bakgrunnen.",
+    "readMarkFailed": "Klarte ikke å merke denne briefen som lest. Forsøket gjentas når briefen lastes på nytt.",
     "offline": "Frakoblet · lagret brief",
     "cached": "Lagret brief · kan ikke oppdateres",
     "summary": "AI-sammendrag",

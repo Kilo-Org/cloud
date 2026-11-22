@@ -4706,6 +4706,7 @@
     "contextAll": "Semua konteks",
     "dismiss": "Ketepikan laporan",
     "dismissFailed": "Laporan ini masih belum dapat diketepikan. Ia akan dicuba semula di latar belakang.",
+    "readMarkFailed": "Laporan ini tidak dapat ditanda sebagai dibaca. Ia akan dicuba semula apabila laporan dimuat semula.",
     "offline": "Luar talian · laporan disimpan",
     "cached": "Laporan disimpan · muat semula tidak tersedia",
     "summary": "Ringkasan AI",

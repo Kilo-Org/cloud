@@ -4706,6 +4706,7 @@
     "contextAll": "Lahat ng konteksto",
     "dismiss": "Balewalain ang briefing",
     "dismissFailed": "Hindi pa matatanggal ang briefing na ito. Sasubukin itong muli sa background.",
+    "readMarkFailed": "Hindi pa namarkahan ang briefing na ito bilang nabasa. Sasubukin itong muli kapag nag-reload ang briefing.",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na briefing · hindi ma-refresh",
     "summary": "Buod ng AI",

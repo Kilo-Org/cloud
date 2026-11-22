@@ -4706,6 +4706,7 @@
     "contextAll": "Alle kontekster",
     "dismiss": "Afvis briefing",
     "dismissFailed": "Denne briefing kunne ikke afvises endnu. Der forsøges igen i baggrunden.",
+    "readMarkFailed": "Denne briefing kunne ikke markeres som læst. Der forsøges igen, når briefingen indlæses.",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt briefing · kan ikke opdateres",
     "summary": "AI-resumé",

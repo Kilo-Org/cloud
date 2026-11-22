@@ -76,6 +76,7 @@ export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?
                 icon={WandSparkles}
                 title={t(PREFERENCES_HUB_SETTINGS.toolSummaryTranslation.label)}
                 subtitle={t('preferences.toolSummaryTranslationSubtitle')}
+                subtitleNumberOfLines={2}
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
                 }}

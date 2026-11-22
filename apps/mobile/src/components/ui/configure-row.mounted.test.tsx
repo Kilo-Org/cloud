@@ -52,6 +52,9 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 function renderRow(
   props: {
     title?: string;
+    /** The line under the title; `null` renders the row without one. */
+    subtitle?: string | null;
+    subtitleNumberOfLines?: number;
     tone?: 'good' | 'warn' | 'danger';
     disabled?: boolean;
     testID?: string;
@@ -63,7 +66,10 @@ function renderRow(
     const element = createElement(ConfigureRow, {
       icon: Globe,
       title: props.title ?? 'General',
-      subtitle: 'Transcribe',
+      ...(props.subtitle === null ? {} : { subtitle: props.subtitle ?? 'Transcribe' }),
+      ...(props.subtitleNumberOfLines === undefined
+        ? {}
+        : { subtitleNumberOfLines: props.subtitleNumberOfLines }),
       ...(props.pressable === false ? {} : { onPress: () => undefined }),
       ...(props.tone === undefined ? {} : { tone: props.tone }),
       ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
@@ -170,6 +176,39 @@ describe('ConfigureRow icon tile', () => {
     expect(danger.tileClassName).toContain('bg-danger-tile-bg');
     expect(danger.iconColor).toBe('#F28B7A');
     expect(danger.iconColor).not.toBe(neutral.iconColor);
+  });
+});
+
+/** The mounted subtitle node: the single text node painted with `content`. */
+function subtitleNodeOf(
+  root: TestRenderer.ReactTestInstance,
+  content: string
+): TestRenderer.ReactTestInstance {
+  return root.find(
+    candidate => Object.is(candidate.type, 'Text') && Object.is(candidate.props.children, content)
+  );
+}
+
+describe('ConfigureRow subtitle line cap', () => {
+  // The subtitle is one line of `text-xs`. Uncapped, a single unbreakable token
+  // (an email, a host name) cannot wrap on Android and is hard-clipped at the
+  // row edge with no ellipsis, while a long sentence grows the row past its
+  // neighbours, so the cap is the row's own default and a caller whose subtitle
+  // is prose opts into the second line.
+  it('caps a subtitle the caller does not size', () => {
+    expect(subtitleNodeOf(renderRow(), 'Transcribe').props.numberOfLines).toBe(1);
+  });
+
+  it('gives a caller-sized subtitle the second line it asks for', () => {
+    const node = subtitleNodeOf(renderRow({ subtitleNumberOfLines: 2 }), 'Transcribe');
+
+    expect(node.props.numberOfLines).toBe(2);
+  });
+
+  it('renders no subtitle line at all when the row has no subtitle', () => {
+    const texts = renderRow({ subtitle: null }).findAll(node => Object.is(node.type, 'Text'));
+
+    expect(texts.map(node => node.props.children)).toEqual(['General']);
   });
 });
 

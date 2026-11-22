@@ -9,6 +9,7 @@ import { createMessageId, MESSAGE_ID_PATTERN } from '../../src/session/message-i
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
+  controlPlaneAdmitAnswerPayloadSchema,
   type ControlPlaneAnswerReply,
   type ControlPlanePromptPayload,
 } from '../../src/shared/control-plane-protocol.js';
@@ -839,14 +840,17 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
       })
     ).resolves.toBe('not_connected');
 
-    // A server-owned field the builder never emits is refused at the wire.
-    await expect(
-      stub.admitAnswerContinuation({
+    // A server-owned field the builder never emits has no place on the wire.
+    // Checked on the schema itself: the throwing RPC would surface as an
+    // unhandled rejection in this runtime rather than as a test failure.
+    const withContext = { ...continuation.intent, context: 'injected' };
+    expect(
+      controlPlaneAdmitAnswerPayloadSchema.safeParse({
         sessionId,
         reply,
-        intent: { ...continuation.intent, context: 'injected' } as never,
-      })
-    ).rejects.toThrow();
+        intent: withContext,
+      }).success
+    ).toBe(false);
 
     // The preflighted intent is admitted once; a repeat changes nothing more.
     await expect(

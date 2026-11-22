@@ -55,10 +55,13 @@ function textActionBoxStyle() {
  * Two placeholders, chosen by whether a cell will land. `TEXT_ACTION_SKELETON_CLASS`
  * holds the compact button's own `sm` frame (`min-h-[36px]`), for the case
  * where the settled row renders that button, so the row does not move when it
- * lands. `TEXT_ACTION_PENDING_BAND_CLASS` holds the row's own content band, for
- * the case where the settled row renders no cell at all (a viewer whose role
- * cannot manage): a 36px box would make that row 57pt tall inside its `py-3`,
- * and the row would shrink to 48pt when the read landed.
+ * lands: 36 + `py-3`'s 21 is the 57pt band the button lays out.
+ * `TEXT_ACTION_PENDING_BAND_CLASS` holds the row's own content band, for the
+ * case where the settled row renders no cell at all (a viewer whose role cannot
+ * manage): such a row settles on its text column, which a 36px placeholder
+ * would have exceeded, so the row would shrink when the read landed. The band
+ * placeholder contributes 27 + 21 = 48pt, the row's own `min-h` floor, so it
+ * leaves the settled height to that column instead of growing the row.
  *
  * Explicit px, because NativeWind's rem is 14pt here and `h-9` would measure
  * 31.5pt against the button's 36pt frame.

@@ -6,7 +6,7 @@ import { KiloOrganizationIdSchema } from '@kilocode/usage-contracts';
 import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
+import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import { getGrantedClaudeBillingConnection, type ClaudeBillingOwner } from './store';
 import { claudeBillingOwnerMatches } from './owner';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
@@ -80,11 +80,13 @@ export async function getAuthoritativeClaudeBillingState(
   if (!isUSRegion())
     return claudeBillingPayerState(await getGrantedClaudeBillingConnection(owner, db));
   if (!INTERNAL_API_SECRET) throw new Error('Claude payer-state authentication is not configured');
-  if (!parseInternalServiceUrl(APP_URL)) {
-    throw new Error('Claude payer-state endpoint is not configured');
-  }
+  const payerStateUrl = parseInternalServiceEndpoint(
+    APP_URL,
+    '/api/internal/claude-billing/payer-state'
+  );
+  if (!payerStateUrl) throw new Error('Claude payer-state endpoint is not configured');
   const response = await fetchClaudeWithRetry(
-    new URL('/api/internal/claude-billing/payer-state', APP_URL).toString(),
+    payerStateUrl.toString(),
     async () => ({
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-internal-api-key': INTERNAL_API_SECRET },

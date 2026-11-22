@@ -29,15 +29,19 @@ export function readClaudeBillingRefusalCode(body: unknown): string | null {
   return parsed.data.error.details?.error_code ?? parsed.data.error.code ?? null;
 }
 
-// Anthropic is still consolidating its 402 codes, so a code Kilo does not know
-// is reported by its status. A status-only refusal remains visible without
-// changing the connection state.
+/** The refusals Anthropic sends with a status and no code Kilo knows. */
+const STATUS_ONLY_REFUSALS: ReadonlyMap<number, ClaudeBillingRefusal> = new Map([
+  [402, CLAUDE_BILLING_REFUSALS.paymentRequiredWithoutCode],
+  [403, CLAUDE_BILLING_REFUSALS.forbiddenWithoutCode],
+]);
+
+// Anthropic is still consolidating its payment-required codes, so a code Kilo
+// does not know is reported by its status. A status-only refusal remains visible
+// without changing the connection state.
 export function claudeBillingRefusalCodeFor(status: number, body: unknown): string | null {
   const code = readClaudeBillingRefusalCode(body);
   if (code && recognizedRefusalCodes.has(code)) return code;
-  if (status === 403) return CLAUDE_BILLING_REFUSALS.forbiddenWithoutCode;
-  if (status === 402) return CLAUDE_BILLING_REFUSALS.paymentRequiredWithoutCode;
-  return null;
+  return STATUS_ONLY_REFUSALS.get(status) ?? null;
 }
 
 type ClaudeBillingRefusalClass = 'payment_required' | 'forbidden';
@@ -53,10 +57,9 @@ const refusalClassOf: Record<ClaudeBillingRefusal, ClaudeBillingRefusalClass> = 
 };
 
 /** The refusals that carry their status class and nothing else. */
-const statusOnlyRefusalClass = new Map<string, ClaudeBillingRefusalClass>([
-  [CLAUDE_BILLING_REFUSALS.forbiddenWithoutCode, 'forbidden'],
-  [CLAUDE_BILLING_REFUSALS.paymentRequiredWithoutCode, 'payment_required'],
-]);
+const statusOnlyRefusalClass: ReadonlyMap<string, ClaudeBillingRefusalClass> = new Map(
+  [...STATUS_ONLY_REFUSALS.values()].map(code => [code, refusalClassOf[code]])
+);
 
 /**
  * The stored codes a status-only refusal must not replace. Those codes name the
@@ -80,5 +83,5 @@ export function isClaudeBillingConnectionDead(code: string): boolean {
 
 /** True for the responses that are never worth retrying on another payer. */
 export function isClaudeBillingRefusedStatus(status: number): boolean {
-  return status === 402 || status === 403;
+  return STATUS_ONLY_REFUSALS.has(status);
 }

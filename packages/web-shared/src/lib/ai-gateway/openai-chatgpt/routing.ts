@@ -231,6 +231,26 @@ function logSharedConnectorGone(organizationId: string, connectorId: string): vo
 }
 
 /**
+ * The owner's stored connection when it may serve traffic, or null. The shared-services
+ * connector rule applies here so routing and the models-list tag cannot disagree; only a
+ * caller that reports the condition passes `onSharedConnectorGone`.
+ */
+async function readServableStoredConnection(
+  owner: OpenAiChatGptOwner,
+  onSharedConnectorGone?: (organizationId: string, connectorId: string) => void
+): Promise<OpenAiChatGptStoredConnection | null> {
+  const stored = await getOpenAiChatGptStoredConnection(owner);
+  if (!isUsableStoredConnection(stored)) return null;
+
+  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
+    onSharedConnectorGone?.(owner.organizationId, stored.createdBy);
+    return null;
+  }
+
+  return stored;
+}
+
+/**
  * The upstream model one specific owner's connection would serve the request
  * with, or null when that connection is not eligible.
  */
@@ -248,13 +268,7 @@ async function eligibleUpstreamModelForOwner(
     return null;
   }
 
-  const stored = await getOpenAiChatGptStoredConnection(owner);
-  if (!isUsableStoredConnection(stored)) return null;
-
-  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
-    logSharedConnectorGone(owner.organizationId, stored.createdBy);
-    return null;
-  }
+  if (!(await readServableStoredConnection(owner, logSharedConnectorGone))) return null;
 
   return upstreamModel;
 }
@@ -271,12 +285,7 @@ export async function getOpenAiChatGptByokModelIds(
   owner: OpenAiChatGptOwner,
   candidateModelIds: readonly string[]
 ): Promise<Set<string> | null> {
-  const stored = await getOpenAiChatGptStoredConnection(owner);
-  if (!isUsableStoredConnection(stored)) return null;
-
-  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
-    return null;
-  }
+  if (!(await readServableStoredConnection(owner))) return null;
 
   const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
   if (apiKey.trim().length === 0) return null;

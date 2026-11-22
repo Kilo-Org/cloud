@@ -1921,29 +1921,64 @@ describe('agent browser calls', () => {
   it('runs one download guard on the retry an upload approval covers', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let dropping = false;
 
-    const drop = (sensitive: readonly string[]) =>
+    cdp.setHandlers({
+      // The file this call starts is created while its own command runs.
+      'Input.dispatchDragEvent': () => {
+        if (dropping) {
+          dropping = false;
+          downloads.emit({ id: 61, tabId: TAB_ID, url: `${MAIN_ORIGIN}/report.txt` });
+        }
+
+        return {};
+      },
+    });
+
+    const drop = (sensitive: readonly string[], args: Record<string, unknown>) =>
       runtime.runTool({
         agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
-        arguments: { paths: ['/tmp/receipt.pdf'], target: '#zone' },
+        arguments: args,
         caller: agent(),
         tabId: TAB_ID,
         toolName: 'browser_drop',
       });
 
-    // This call needs the upload approval, and the approval is asked before any work runs.
-    const refused = await drop([]);
+    const refused = await drop([], { paths: ['/tmp/receipt.pdf'], target: '#zone' });
 
     expect(refused).toMatchObject({
       items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.fileUpload }],
       kind: 'needs_permission',
     });
-    // A call that ran nothing arms no guard.
     expect(cdp.downloadsDenied()).toBe(0);
 
-    // The approval buys the step alone, so the retry it covers still runs exactly one download guard.
-    await drop([expectStepToken(refused)]);
+    // The retry runs one download guard, so the file it starts is stopped and named.
+    dropping = true;
+    const guarded = await drop([expectStepToken(refused)], {
+      paths: ['/tmp/receipt.pdf'],
+      target: '#zone',
+    });
 
+    expect(guarded).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(downloads.cancelled).toStrictEqual([61]);
+  });
+
+  it('runs a drop that carries page data under the ordinary act rule', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    const dropped = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { data: { 'text/plain': 'x' }, target: '#zone' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_drop',
+    });
+
+    expect(dropped.kind).toBe('result');
     expect(cdp.downloadsDenied()).toBe(1);
   });
 

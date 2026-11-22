@@ -35,6 +35,23 @@ const LABEL_SOURCE = readFileSync(
   fileURLToPath(new URL('../components/ui/tab-bar-label.tsx', import.meta.url)),
   'utf8'
 );
+const RTL_TEXT_SOURCE = readFileSync(
+  fileURLToPath(new URL('rtl-text.ts', import.meta.url)),
+  'utf8'
+);
+
+/**
+ * The regex literal assigned by `declaration` in `source`. The script classes
+ * here are plain `\uXXXX` ranges with no `/` inside, so the first two slashes
+ * after the declaration delimit the literal.
+ */
+function scriptLiteral(source: string, declaration: string): string {
+  const at = source.indexOf(declaration);
+  expect(at, `${declaration} in source`).toBeGreaterThanOrEqual(0);
+  const open = source.indexOf('/', at);
+  const close = source.indexOf('/', open + 1);
+  return source.slice(open, close + 1);
+}
 
 describe('getTabBarOverlayHeight', () => {
   it('includes the bottom safe area on iOS', () => {
@@ -235,6 +252,23 @@ describe('tabLabelWidth', () => {
       5
     );
   });
+
+  it('counts joined-script glyphs at the fallback-font advance too', () => {
+    // `Text` drops the mono family for the joined scripts as well, so a
+    // Devanagari or Thai tab label renders in the same proportional fallback
+    // as Arabic and Hebrew. Measuring them at the mono advance would keep an
+    // estimate the renderer no longer draws.
+    // "अभी": 3 Devanagari code points.
+    expect(tabLabelWidth('अभी')).toBeCloseTo(3 * (0.55 * 11 + 0.2), 5);
+    // "ตอนนี้": 6 Thai code points (a vowel and a tone mark among them).
+    expect(tabLabelWidth('ตอนนี้')).toBeCloseTo(6 * (0.55 * 11 + 0.2), 5);
+  });
+
+  it('leaves the Latin glyphs of a mixed joined-script label at the mono advance', () => {
+    // "Home" (4 mono glyphs) + a space + "अभी" (3 joined-script glyphs): only
+    // the joined-script glyphs move to the fallback advance.
+    expect(tabLabelWidth('Home अभी')).toBeCloseTo(5 * (0.6 * 11 + 0.2) + 3 * (0.55 * 11 + 0.2), 5);
+  });
 });
 
 describe('tabLabelFits', () => {
@@ -350,6 +384,18 @@ describe('mirrored tab label metrics', () => {
     );
     expect(LABEL_SOURCE).toContain('numberOfLines={resolvedLines}');
     expect(tabLabelWidth('A')).toBeCloseTo(0.6 * 11 + 0.2);
+  });
+
+  it('keeps the inlined script classes identical to the ones `Text` renders by', () => {
+    // The measure is only right while the classes it inlines are the classes
+    // `rtl-text.ts` hands `Text`: drift either way makes `tabLabelWidth` count
+    // copy the renderer no longer draws in the fallback font (or the reverse).
+    expect(scriptLiteral(LAYOUT_SOURCE, 'const RTL_SCRIPT =')).toBe(
+      scriptLiteral(RTL_TEXT_SOURCE, 'const RTL_SCRIPT =')
+    );
+    expect(scriptLiteral(LAYOUT_SOURCE, 'const JOINED_SCRIPT =')).toBe(
+      scriptLiteral(RTL_TEXT_SOURCE, 'export const JOINED_SCRIPT =')
+    );
   });
 });
 

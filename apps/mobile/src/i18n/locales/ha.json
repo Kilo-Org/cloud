@@ -2122,7 +2122,7 @@
       "prAlreadyOpened": "Tuni akwai PR na gyara a buɗe.",
       "duplicateAnalysisResult": "Wannan sakamakon nazari ya riga ya samar da aikin gyara.",
       "retryNotAllowed": "Ba a iya sake gwada wannan ƙoƙarin.",
-      "securityAgentDisabled": "An kashe Wakilin tsaro ga wannan mai ƙungiyar.",
+      "securityAgentDisabled": "An kashe Wakilin tsaro ga wannan mai mallaka.",
       "autoRemediationDisabled": "An kashe gyara na atomatik. Har yanzu ana iya fara gyara da hannu idan an cika sharuɗɗan tsaro.",
       "includeExistingDisabled": "Ba a haɗa matsalolin da aka riga aka gano cikin gyara na atomatik ba.",
       "belowThreshold": "Tsananin matsalar bai kai matakin da ake buƙata don gyara na atomatik ba. Har yanzu ana iya fara gyara da hannu idan an cika sharuɗɗan tsaro.",

@@ -1502,7 +1502,9 @@
       "githubError": "Asikwazanga ukuvula ukusetha i-GitHub. Sicela uzame futhi.",
       "gitlabAccount": "i-akhawunti ye-GitLab",
       "gitlabError": "Asikwazanga ukuvula ukusetha i-GitLab. Sicela uzame futhi.",
-      "description": "Xhuma ne-Kilo usebenzisa {{label}} ukuze kuhlolwe izicelo zokuhlanganisa ikhodi ngokuzenzakalelayo."
+      "description": "Xhuma ne-Kilo usebenzisa {{label}} ukuze kuhlolwe izicelo zokuhlanganisa ikhodi ngokuzenzakalelayo.",
+      "notConnectedTitle": "I-{{platform}} ayixhunyiwe",
+      "githubAdminOnlyDescription": "Abanikazi benhlangano nabalawuli kuphela abangayixhuma."
     },
     "overview": {
       "allAreas": "Zonke izindawo",

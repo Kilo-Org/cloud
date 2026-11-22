@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Stelle die Verbindung über Kilo her ({{label}}), um Pull-Requests automatisch prüfen zu lassen.",
+      "notConnectedTitle": "{{platform}} ist nicht verbunden",
+      "githubAdminOnlyDescription": "Nur Organisationsinhaber und Admins können die Verbindung herstellen.",
       "githubApp": "GitHub-App",
       "githubError": "Die GitHub-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut.",
       "gitlabAccount": "GitLab-Konto",

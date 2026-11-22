@@ -1530,7 +1530,9 @@
       "githubError": "Nije moguće otvoriti podešavanje za GitHub. Pokušaj ponovo.",
       "gitlabAccount": "GitLab nalog",
       "gitlabError": "Nije moguće otvoriti podešavanje za GitLab. Pokušaj ponovo.",
-      "description": "Poveži Kilo integraciju ({{label}}) za automatski pregled PR-ova."
+      "description": "Poveži Kilo integraciju ({{label}}) za automatski pregled PR-ova.",
+      "notConnectedTitle": "{{platform}} nije povezan",
+      "githubAdminOnlyDescription": "Samo vlasnici organizacije i administratori mogu da ga povežu."
     },
     "overview": {
       "allAreas": "Sve oblasti",

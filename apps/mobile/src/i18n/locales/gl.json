@@ -1502,7 +1502,9 @@
       "githubError": "Non se puido abrir a configuración de GitHub. Téntao de novo.",
       "gitlabAccount": "conta de GitLab",
       "gitlabError": "Non se puido abrir a configuración de GitLab. Téntao de novo.",
-      "description": "Conecta a {{label}} de Kilo para revisar as solicitudes de cambios automaticamente."
+      "description": "Conecta a {{label}} de Kilo para revisar as solicitudes de cambios automaticamente.",
+      "notConnectedTitle": "{{platform}} non está conectado",
+      "githubAdminOnlyDescription": "Só os propietarios da organización e os administradores poden conectalo."
     },
     "overview": {
       "allAreas": "Todas as áreas",

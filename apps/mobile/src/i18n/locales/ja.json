@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "プルリクエストを自動でレビューするには、Kiloの{{label}}を接続してください。",
+      "notConnectedTitle": "{{platform}}が接続されていません",
+      "githubAdminOnlyDescription": "接続できるのは組織のオーナーと管理者のみです。",
       "githubApp": "GitHub App",
       "githubError": "GitHubのセットアップを開けませんでした。もう一度お試しください。",
       "gitlabAccount": "GitLabアカウント",

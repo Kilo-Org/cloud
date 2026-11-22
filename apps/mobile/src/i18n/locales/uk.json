@@ -821,6 +821,8 @@
     },
     "providerConnect": {
       "description": "Підключіть {{label}} до Kilo, щоб автоматично перевіряти запити на злиття.",
+      "notConnectedTitle": "{{platform}} не підключено",
+      "githubAdminOnlyDescription": "Підключити його можуть лише власники та адміністратори організації.",
       "githubApp": "застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
       "gitlabAccount": "обліковий запис GitLab",

@@ -1502,7 +1502,9 @@
       "githubError": "Ekki tókst að opna uppsetningu GitHub. Reyndu aftur.",
       "gitlabAccount": "GitLab-reikninginn",
       "gitlabError": "Ekki tókst að opna uppsetningu GitLab. Reyndu aftur.",
-      "description": "Tengdu Kilo við {{label}} til að yfirfara samrunabeiðnir sjálfkrafa."
+      "description": "Tengdu Kilo við {{label}} til að yfirfara samrunabeiðnir sjálfkrafa.",
+      "notConnectedTitle": "{{platform}} er ekki tengt",
+      "githubAdminOnlyDescription": "Aðeins eigendur fyrirtækisins og stjórnendur geta tengt það."
     },
     "overview": {
       "allAreas": "Allir þættir",

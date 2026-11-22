@@ -1502,7 +1502,9 @@
       "githubError": "Hindi mabuksan ang setup ng GitHub. Pakisubukang muli.",
       "gitlabAccount": "account sa GitLab",
       "gitlabError": "Hindi mabuksan ang setup ng GitLab. Pakisubukang muli.",
-      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request."
+      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request.",
+      "notConnectedTitle": "Hindi nakakonekta ang {{platform}}",
+      "githubAdminOnlyDescription": "Mga may-ari ng organisasyon at admin lang ang maaaring magkonekta nito."
     },
     "overview": {
       "allAreas": "Lahat ng aspeto",

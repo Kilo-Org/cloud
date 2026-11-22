@@ -1502,7 +1502,9 @@
       "githubError": "GitHub سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "gitlabAccount": "GitLab اکاؤنٹ",
       "gitlabError": "GitLab سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔"
+      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔",
+      "notConnectedTitle": "{{platform}} منسلک نہیں ہے",
+      "githubAdminOnlyDescription": "صرف تنظیم کے مالک اور منتظم اسے منسلک کر سکتے ہیں۔"
     },
     "overview": {
       "allAreas": "تمام شعبے",

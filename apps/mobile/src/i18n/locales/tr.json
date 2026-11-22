@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Çekme isteklerini otomatik olarak incelemek için Kilo bağlantısını kur: {{label}}.",
+      "notConnectedTitle": "{{platform}} bağlı değil",
+      "githubAdminOnlyDescription": "Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
       "githubApp": "GitHub uygulaması",
       "githubError": "GitHub kurulumu açılamadı. Lütfen tekrar dene.",
       "gitlabAccount": "GitLab hesabı",

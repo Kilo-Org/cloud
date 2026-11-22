@@ -1502,7 +1502,9 @@
       "githubError": "GitHubni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "gitlabAccount": "GitLab hisobi",
       "gitlabError": "GitLabni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang."
+      "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang.",
+      "notConnectedTitle": "{{platform}} ulanmagan",
+      "githubAdminOnlyDescription": "Faqat tashkilot egalar va administratorlar uni ulashi mumkin."
     },
     "overview": {
       "allAreas": "Barcha yo'nalishlar",

@@ -786,6 +786,8 @@
     },
     "providerConnect": {
       "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
+      "notConnectedTitle": "{{platform}} n'est pas connecté",
+      "githubAdminOnlyDescription": "Seuls les propriétaires et les administrateurs de l'organisation peuvent établir la connexion.",
       "githubApp": "application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
       "gitlabAccount": "compte GitLab",

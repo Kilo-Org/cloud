@@ -1502,7 +1502,9 @@
       "githubError": "باز کردن صفحه راه‌اندازی GitHub ممکن نشد. لطفاً دوباره تلاش کنید.",
       "gitlabAccount": "حساب GitLab",
       "gitlabError": "باز کردن صفحه راه‌اندازی GitLab ممکن نشد. لطفاً دوباره تلاش کنید.",
-      "description": "برای بررسی خودکار درخواست‌های ادغام، {{label}} مربوط به Kilo را متصل کنید."
+      "description": "برای بررسی خودکار درخواست‌های ادغام، {{label}} مربوط به Kilo را متصل کنید.",
+      "notConnectedTitle": "{{platform}} متصل نیست",
+      "githubAdminOnlyDescription": "فقط مالکان سازمان و مدیران می‌توانند آن را متصل کنند."
     },
     "overview": {
       "allAreas": "همه حوزه‌ها",

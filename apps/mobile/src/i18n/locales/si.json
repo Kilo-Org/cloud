@@ -1502,7 +1502,9 @@
       "githubError": "GitHub සැකසුම විවෘත කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "gitlabAccount": "GitLab ගිණුම",
       "gitlabError": "GitLab සැකසුම විවෘත කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "description": "PR ස්වයංක්‍රීයව සමාලෝචනය කිරීමට Kilo {{label}} සම්බන්ධ කරන්න."
+      "description": "PR ස්වයංක්‍රීයව සමාලෝචනය කිරීමට Kilo {{label}} සම්බන්ධ කරන්න.",
+      "notConnectedTitle": "{{platform}} සම්බන්ධ වී නොමැත",
+      "githubAdminOnlyDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකවරුන්ට පමණි."
     },
     "overview": {
       "allAreas": "සියලුම ක්ෂේත්‍ර",

@@ -1502,7 +1502,9 @@
       "githubError": "GitHub quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
       "gitlabAccount": "GitLab hesabı",
       "gitlabError": "GitLab quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
-      "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur."
+      "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur.",
+      "notConnectedTitle": "{{platform}} qoşulmayıb",
+      "githubAdminOnlyDescription": "Onu yalnız təşkilat sahibləri və inzibatçılar qoşa bilər."
     },
     "overview": {
       "allAreas": "Bütün sahələr",

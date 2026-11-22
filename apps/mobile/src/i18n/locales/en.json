@@ -1600,7 +1600,9 @@
       "githubError": "Could not open GitHub setup. Please try again.",
       "gitlabAccount": "GitLab account",
       "gitlabError": "Could not open GitLab setup. Please try again.",
-      "description": "Connect the Kilo {{label}} to review pull requests automatically."
+      "description": "Connect the Kilo {{label}} to review pull requests automatically.",
+      "notConnectedTitle": "{{platform}} not connected",
+      "githubAdminOnlyDescription": "Only organization owners and admins can connect it."
     },
     "overview": {
       "allAreas": "All areas",

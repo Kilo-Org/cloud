@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Kết nối {{label}} của Kilo để tự động rà soát các yêu cầu hợp nhất.",
+      "notConnectedTitle": "{{platform}} chưa được kết nối",
+      "githubAdminOnlyDescription": "Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể kết nối.",
       "githubApp": "ứng dụng GitHub",
       "githubError": "Không thể mở trang thiết lập GitHub. Vui lòng thử lại.",
       "gitlabAccount": "tài khoản GitLab",

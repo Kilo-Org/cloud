@@ -1586,7 +1586,9 @@
       "githubError": "Níorbh fhéidir socrú GitHub a oscailt. Bain triail as arís le do thoil.",
       "gitlabAccount": "an cuntas GitLab",
       "gitlabError": "Níorbh fhéidir socrú GitLab a oscailt. Bain triail as arís le do thoil.",
-      "description": "Ceangail {{label}} le Kilo chun iarratais tarraingthe a athbhreithniú go huathoibríoch."
+      "description": "Ceangail {{label}} le Kilo chun iarratais tarraingthe a athbhreithniú go huathoibríoch.",
+      "notConnectedTitle": "Níl {{platform}} nasctha",
+      "githubAdminOnlyDescription": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta é a cheangal."
     },
     "overview": {
       "allAreas": "Gach réimse",

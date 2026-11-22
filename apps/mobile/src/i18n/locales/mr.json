@@ -1502,7 +1502,9 @@
       "githubError": "GitHub सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "gitlabAccount": "GitLab खाते",
       "gitlabError": "GitLab सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा."
+      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा.",
+      "notConnectedTitle": "{{platform}} जोडलेले नाही",
+      "githubAdminOnlyDescription": "केवळ संस्थेचे मालक आणि प्रशासक ते जोडू शकतात."
     },
     "overview": {
       "allAreas": "सर्व क्षेत्रे",

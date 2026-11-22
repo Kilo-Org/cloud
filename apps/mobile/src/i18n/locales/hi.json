@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "पुल रिक्वेस्ट की स्वचालित समीक्षा के लिए Kilo {{label}} कनेक्ट करें।",
+      "notConnectedTitle": "{{platform}} कनेक्ट नहीं है",
+      "githubAdminOnlyDescription": "केवल संगठन के मालिक और एडमिन ही इसे कनेक्ट कर सकते हैं।",
       "githubApp": "GitHub ऐप",
       "githubError": "GitHub सेटअप नहीं खुल सका। कृपया फिर से कोशिश करें।",
       "gitlabAccount": "GitLab खाता",

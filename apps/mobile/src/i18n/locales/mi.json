@@ -1502,7 +1502,9 @@
       "githubError": "Kāore i taea te whakatuwhera i te whakarite GitHub. Whakamātau anō.",
       "gitlabAccount": "pūkete GitLab",
       "gitlabError": "Kāore i taea te whakatuwhera i te whakarite GitLab. Whakamātau anō.",
-      "description": "Honohonotia te {{label}} a Kilo hei arotake aunoa i ngā tono kume."
+      "description": "Honohonotia te {{label}} a Kilo hei arotake aunoa i ngā tono kume.",
+      "notConnectedTitle": "Kāore anō kia honoa a {{platform}}",
+      "githubAdminOnlyDescription": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te hono."
     },
     "overview": {
       "allAreas": "Ngā wāhanga katoa",

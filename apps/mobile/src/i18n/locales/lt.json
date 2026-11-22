@@ -1558,7 +1558,9 @@
       "githubError": "Nepavyko atidaryti GitHub sąrankos. Bandyk dar kartą.",
       "gitlabAccount": "GitLab paskyra",
       "gitlabError": "Nepavyko atidaryti GitLab sąrankos. Bandyk dar kartą.",
-      "description": "Prijunk Kilo, kad {{label}} automatiškai peržiūrėtų PR."
+      "description": "Prijunk Kilo, kad {{label}} automatiškai peržiūrėtų PR.",
+      "notConnectedTitle": "{{platform}} neprijungtas",
+      "githubAdminOnlyDescription": "Ją prijungti gali tik organizacijos savininkai ir administratoriai."
     },
     "overview": {
       "allAreas": "Visos sritys",

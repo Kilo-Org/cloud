@@ -1502,7 +1502,9 @@
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
       "gitlabAccount": "akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
-      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik."
+      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik.",
+      "notConnectedTitle": "{{platform}} tidak disambungkan",
+      "githubAdminOnlyDescription": "Hanya pemilik organisasi dan pentadbir boleh menyambungkannya."
     },
     "overview": {
       "allAreas": "Semua bidang",

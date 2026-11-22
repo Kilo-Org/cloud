@@ -1530,7 +1530,9 @@
       "githubError": "Nu s-a putut deschide configurarea GitHub. Încearcă din nou.",
       "gitlabAccount": "contul GitLab",
       "gitlabError": "Nu s-a putut deschide configurarea GitLab. Încearcă din nou.",
-      "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile."
+      "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile.",
+      "notConnectedTitle": "{{platform}} nu este conectat",
+      "githubAdminOnlyDescription": "Doar proprietarii și administratorii organizației îl pot conecta."
     },
     "overview": {
       "allAreas": "Toate domeniile",

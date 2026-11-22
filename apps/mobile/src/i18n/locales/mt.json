@@ -1586,7 +1586,9 @@
       "githubError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova.",
       "gitlabAccount": "il-kont ta' GitLab",
       "gitlabError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitLab. Jekk jogħġbok erġa' pprova.",
-      "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament."
+      "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament.",
+      "notConnectedTitle": "{{platform}} mhux konness",
+      "githubAdminOnlyDescription": "Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jikkonnettjawh."
     },
     "overview": {
       "allAreas": "L-oqsma kollha",

@@ -1502,7 +1502,9 @@
       "githubError": "Nem sikerült megnyitni a GitHub beállítását. Próbáld újra.",
       "gitlabAccount": "GitLab-fiók",
       "gitlabError": "Nem sikerült megnyitni a GitLab beállítását. Próbáld újra.",
-      "description": "A PR-ek automatikus kódellenőrzéséhez hozd létre ezt a kapcsolatot a Kilo szolgáltatással: {{label}}."
+      "description": "A PR-ek automatikus kódellenőrzéséhez hozd létre ezt a kapcsolatot a Kilo szolgáltatással: {{label}}.",
+      "notConnectedTitle": "A {{platform}} nincs csatlakoztatva",
+      "githubAdminOnlyDescription": "Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják."
     },
     "overview": {
       "allAreas": "Minden terület",

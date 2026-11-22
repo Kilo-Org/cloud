@@ -1558,7 +1558,9 @@
       "githubError": "Nastavení GitHubu se nepodařilo otevřít. Zkuste to prosím znovu.",
       "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky."
+      "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky.",
+      "notConnectedTitle": "{{platform}} není připojen",
+      "githubAdminOnlyDescription": "Připojit ji mohou pouze vlastníci organizace a správci."
     },
     "overview": {
       "allAreas": "Všechny oblasti",

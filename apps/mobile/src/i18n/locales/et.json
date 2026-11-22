@@ -1502,7 +1502,9 @@
       "githubError": "GitHubi seadistamist ei õnnestunud avada. Proovi uuesti.",
       "gitlabAccount": "GitLabi konto",
       "gitlabError": "GitLabi seadistamist ei õnnestunud avada. Proovi uuesti.",
-      "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata."
+      "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata.",
+      "notConnectedTitle": "{{platform}} pole ühendatud",
+      "githubAdminOnlyDescription": "Selle saavad ühendada ainult organisatsiooni omanikud ja administraatorid."
     },
     "overview": {
       "allAreas": "Kõik valdkonnad",

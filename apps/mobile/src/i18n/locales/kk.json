@@ -1502,7 +1502,9 @@
       "githubError": "GitHub баптау бетін ашу мүмкін болмады. Қайталап көріңіз.",
       "gitlabAccount": "GitLab тіркелгісі",
       "gitlabError": "GitLab баптау бетін ашу мүмкін болмады. Қайталап көріңіз.",
-      "description": "Біріктіру сұрауларын автоматты түрде тексеру үшін Kilo {{label}} арқылы қосылыңыз."
+      "description": "Біріктіру сұрауларын автоматты түрде тексеру үшін Kilo {{label}} арқылы қосылыңыз.",
+      "notConnectedTitle": "{{platform}} қосылмаған",
+      "githubAdminOnlyDescription": "Оны тек ұйым иелері мен әкімшілері қоса алады."
     },
     "overview": {
       "allAreas": "Барлық бағыттар",

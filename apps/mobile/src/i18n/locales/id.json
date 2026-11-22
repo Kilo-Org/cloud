@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Hubungkan {{label}} Kilo untuk meninjau PR secara otomatis.",
+      "notConnectedTitle": "{{platform}} tidak terhubung",
+      "githubAdminOnlyDescription": "Hanya pemilik organisasi dan admin yang dapat menghubungkannya.",
       "githubApp": "aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Coba lagi.",
       "gitlabAccount": "akun GitLab",

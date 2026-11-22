@@ -1502,7 +1502,9 @@
       "githubError": "Tsy nety nosokafana ny fametrahana ny GitHub. Andramo indray azafady.",
       "gitlabAccount": "kaonty GitLab",
       "gitlabError": "Tsy nety nosokafana ny fametrahana ny GitLab. Andramo indray azafady.",
-      "description": "Ampifandraiso amin'i Kilo ny {{label}} mba hanamarinana PR ho azy."
+      "description": "Ampifandraiso amin'i Kilo ny {{label}} mba hanamarinana PR ho azy.",
+      "notConnectedTitle": "Tsy mifandray ny {{platform}}",
+      "githubAdminOnlyDescription": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka mampifandray azy."
     },
     "overview": {
       "allAreas": "Lafiny rehetra",

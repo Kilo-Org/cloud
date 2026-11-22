@@ -1502,7 +1502,9 @@
       "githubError": "Qophii GitHub banuun hin danda'amne. Irra deebi'ii yaali.",
       "gitlabAccount": "herrega GitLab",
       "gitlabError": "Qophii GitLab banuun hin danda'amne. Irra deebi'ii yaali.",
-      "description": "Gaaffii makuu ofumaan sakatta'uuf {{label}} kan Kilo walqabsiisi."
+      "description": "Gaaffii makuu ofumaan sakatta'uuf {{label}} kan Kilo walqabsiisi.",
+      "notConnectedTitle": "{{platform}} hin walqabsiifamne",
+      "githubAdminOnlyDescription": "Abbootiin dhaabbataa fi bulchitootaa qofa isa walqabsiisuu danda'u."
     },
     "overview": {
       "allAreas": "Kutaa hunda",

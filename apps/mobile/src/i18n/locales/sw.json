@@ -1502,7 +1502,9 @@
       "githubError": "Imeshindikana kufungua usanidi wa GitHub. Tafadhali jaribu tena.",
       "gitlabAccount": "akaunti ya GitLab",
       "gitlabError": "Imeshindikana kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
-      "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki."
+      "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki.",
+      "notConnectedTitle": "{{platform}} haijaunganishwa",
+      "githubAdminOnlyDescription": "Wamiliki na wasimamizi wa shirika pekee wanaweza kuiunganisha."
     },
     "overview": {
       "allAreas": "Maeneo yote",

@@ -1502,7 +1502,9 @@
       "githubError": "Enweghị ike imepe nhazi GitHub. Biko nwaa ọzọ.",
       "gitlabAccount": "akaụntụ GitLab",
       "gitlabError": "Enweghị ike imepe nhazi GitLab. Biko nwaa ọzọ.",
-      "description": "Jikọọ {{label}} na Kilo iji nyochaa arịrịọ ijikọ koodu na-akpaghị aka."
+      "description": "Jikọọ {{label}} na Kilo iji nyochaa arịrịọ ijikọ koodu na-akpaghị aka.",
+      "notConnectedTitle": "E jikọghị {{platform}}",
+      "githubAdminOnlyDescription": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ijikọ ya."
     },
     "overview": {
       "allAreas": "Akụkụ niile",

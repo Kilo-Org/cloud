@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Koppel de Kilo {{label}} om PR's automatisch te laten beoordelen.",
+      "notConnectedTitle": "{{platform}} is niet gekoppeld",
+      "githubAdminOnlyDescription": "Alleen organisatie-eigenaren en beheerders kunnen de koppeling instellen.",
       "githubApp": "GitHub-app",
       "githubError": "Het instellen van GitHub kon niet worden geopend. Probeer het opnieuw.",
       "gitlabAccount": "GitLab-account",

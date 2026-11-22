@@ -788,6 +788,8 @@
     },
     "providerConnect": {
       "description": "Conecte {{label}} ao Kilo para revisar PRs automaticamente.",
+      "notConnectedTitle": "O {{platform}} não está conectado",
+      "githubAdminOnlyDescription": "Somente proprietários e administradores da organização podem conectá-lo.",
       "githubApp": "o app do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tente novamente.",
       "gitlabAccount": "a conta do GitLab",

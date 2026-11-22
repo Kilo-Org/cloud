@@ -786,6 +786,8 @@
     },
     "providerConnect": {
       "description": "Connetti {{label}} di Kilo per revisionare automaticamente le pull request.",
+      "notConnectedTitle": "{{platform}} non è connesso",
+      "githubAdminOnlyDescription": "Solo i proprietari dell'organizzazione e gli amministratori possono connetterlo.",
       "githubApp": "l'app GitHub",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
       "gitlabAccount": "l'account GitLab",

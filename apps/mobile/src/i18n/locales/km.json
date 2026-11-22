@@ -1502,7 +1502,9 @@
       "githubError": "មិនអាចបើកការរៀបចំ GitHub បានទេ។ សូមព្យាយាមម្តងទៀត។",
       "gitlabAccount": "គណនី GitLab",
       "gitlabError": "មិនអាចបើកការរៀបចំ GitLab បានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "description": "ភ្ជាប់ {{label}} របស់ Kilo ដើម្បីត្រួតពិនិត្យសំណើបញ្ចូលកូដដោយស្វ័យប្រវត្តិ។"
+      "description": "ភ្ជាប់ {{label}} របស់ Kilo ដើម្បីត្រួតពិនិត្យសំណើបញ្ចូលកូដដោយស្វ័យប្រវត្តិ។",
+      "notConnectedTitle": "{{platform}} មិនបានភ្ជាប់ទេ",
+      "githubAdminOnlyDescription": "មានតែម្ចាស់អង្គការ និងអ្នកគ្រប់គ្រងប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។"
     },
     "overview": {
       "allAreas": "គ្រប់ផ្នែក",

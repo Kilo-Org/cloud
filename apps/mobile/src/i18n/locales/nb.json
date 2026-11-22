@@ -1502,7 +1502,9 @@
       "githubError": "Kunne ikke åpne GitHub-oppsettet. Prøv igjen.",
       "gitlabAccount": "GitLab-kontoen",
       "gitlabError": "Kunne ikke åpne GitLab-oppsettet. Prøv igjen.",
-      "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk."
+      "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk.",
+      "notConnectedTitle": "{{platform}} er ikke tilkoblet",
+      "githubAdminOnlyDescription": "Bare organisasjonseiere og administratorer kan opprette tilkoblingen."
     },
     "overview": {
       "allAreas": "Alle områder",

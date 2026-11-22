@@ -444,9 +444,16 @@ describe('ProfileInstructionsScreen read-only row', () => {
     h.query.data = [testInstruction({ name: LONG_INSTRUCTION_NAME })];
     const { renderer, unmount } = await mountScreen();
 
+    // The row's own spoken name finds the line on either revision, so the two
+    // assertions below are what differ: the clamped bare name before the fix,
+    // the isolated run with no line cap after it.
     const nameLine = findAll(renderer.root, 'Text').find(
-      node => node.props.children === isolateLtrBidiText(LONG_INSTRUCTION_NAME)
+      node =>
+        node.props.accessibilityLabel ===
+        [LONG_INSTRUCTION_NAME, `.kilocode/rules/${LONG_INSTRUCTION_NAME}.md`].join(', ')
     );
+    expect(nameLine).toBeDefined();
+    expect(nameLine?.props.children).toBe(isolateLtrBidiText(LONG_INSTRUCTION_NAME));
     expect(nameLine?.props.numberOfLines).toBeUndefined();
 
     unmount();

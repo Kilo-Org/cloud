@@ -66,7 +66,7 @@ import { buildVercelModelIdOverrides } from '@/lib/providers/openrouter/vercel-m
 import { loadModelsDevCatalog } from '@/lib/providers/direct-byok/models-dev';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   fetchCustomLlmsFromDatabase,
   type CustomLlm,
@@ -161,7 +161,7 @@ export function withDisplayPricing(model: OpenRouterModel): OpenRouterModel {
 async function syncProviders(params: {
   providers: OpenRouterProvider[];
   openRouterModels: GatewayModelMap;
-  openRouterCatalogModels: CatalogModel[];
+  openRouterCatalogModels: OpenRouterCatalogModel[];
   vercelModels: GatewayModelMap;
   vercelModelIdOverrides: VercelModelIdOverrides;
   customLlms: CustomLlm[];
@@ -370,7 +370,7 @@ async function storeVercelModelIdOverrides(overrides: VercelModelIdOverride[]) {
 /** Read from the primary, since the stored targets carry pending switches across runs. */
 async function generateLatestAliasTargets(
   openRouterModels: GatewayModelMap,
-  openRouterCatalogModels: readonly CatalogModel[]
+  openRouterCatalogModels: readonly OpenRouterCatalogModel[]
 ): Promise<LatestAliasTarget[] | null> {
   try {
     return updateLatestAliasTargets({

@@ -229,7 +229,7 @@ const fakeFs = vi.hoisted(() => {
         }
       }
     },
-    /** Make the next delete of `uri` throw, as a held-open entry does. */
+    /** Make every delete of `uri` throw until `restoreDelete` or a reset. */
     refuseDelete: (uri: string) => {
       refusedDeletes.add(uri);
     },
@@ -337,17 +337,16 @@ describe('applyArtifactSnapshot', () => {
     applyArtifactSnapshot(snapshotOf([{ id: 's1', files: ['keep', 'held'] }]));
     fakeFs.seedFile(`${SESSIONS_DIR}/s1/keep`, 'bytes');
     fakeFs.seedFile(`${SESSIONS_DIR}/s1/held`, 'bytes');
-    fakeFs.seedFile(`${SESSIONS_DIR}/s1/stale`, 'stale');
     fakeFs.refuseDelete(`${SESSIONS_DIR}/s1/held`);
 
     const next = snapshotOf([{ id: 's1', files: ['keep'] }]);
-    expect(applyArtifactSnapshot(next)).toBe(true);
+    // The refused entry is the only stale one, so nothing moved the tree and
+    // the report stays false even though the index advanced.
+    expect(applyArtifactSnapshot(next)).toBe(false);
 
-    // The refused entry survives, and it does not hold the index write back.
     expect(fakeFs.readFile(MANIFEST_URI)).toBe(JSON.stringify(next));
     expect(readArtifactMirror()).toEqual(next);
     expect(fakeFs.has(`${SESSIONS_DIR}/s1/held`)).toBe(true);
-    expect(fakeFs.has(`${SESSIONS_DIR}/s1/stale`)).toBe(false);
     expect(fakeFs.readFile(`${SESSIONS_DIR}/s1/keep`)).toBe('bytes');
 
     // The next run still sees the entry as stale and removes it.
@@ -355,6 +354,18 @@ describe('applyArtifactSnapshot', () => {
     expect(applyArtifactSnapshot(next)).toBe(true);
 
     expect(fakeFs.has(`${SESSIONS_DIR}/s1/held`)).toBe(false);
+  });
+
+  it('advances the index past a session folder it cannot list', () => {
+    // A file where a session folder belongs: `exists` holds, so the reconcile
+    // creates nothing, and the prune's `list()` throws instead.
+    fakeFs.seedFile(`${SESSIONS_DIR}/s1`, 'not a dir');
+    const snapshot = snapshotOf([{ id: 's1' }]);
+
+    expect(() => applyArtifactSnapshot(snapshot)).not.toThrow();
+
+    expect(fakeFs.readFile(MANIFEST_URI)).toBe(JSON.stringify(snapshot));
+    expect(readArtifactMirror()).toEqual(snapshot);
   });
 
   it('reports a repair when it re-creates a session folder the browser deleted', () => {

@@ -170,8 +170,9 @@ function pruneStaleEntries(directory: Directory, liveNames: ReadonlySet<string>)
       }
     }
   } catch {
-    // A directory the filesystem will not even list must not hold the index
-    // back either: its entries stay for the next run.
+    // A folder the filesystem will not even list, or a path that is not one,
+    // must not hold the index back either: whatever sits there stays for the
+    // next run.
   }
   return pruned;
 }

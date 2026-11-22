@@ -61,8 +61,15 @@ test('the unpacked build is listed with developer mode on', async ({}, testInfo)
 
     // Polls until the manager has rendered both, so a slow manager fails on its own state rather than on scheduling.
     await expect
-      .poll(async () => JSON.stringify(await readManager()), { timeout: 30_000 })
-      .toBe(JSON.stringify({ itemId: expect.anything(), name: 'Kilo Code', toggled: 'true' }));
+      .poll(
+        async () => {
+          const state = await readManager();
+
+          return { name: state.name, toggled: state.toggled };
+        },
+        { timeout: 30_000 }
+      )
+      .toEqual({ name: 'Kilo Code', toggled: 'true' });
 
     const managerState = await readManager();
 

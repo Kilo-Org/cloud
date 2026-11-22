@@ -225,20 +225,28 @@ const MAX_BRIEFING_DURATION_SECONDS = 600;
 
 export type BriefingSafeguards = { maxDurationSeconds: number; maxSpendMicrodollars: number };
 
-export function parseBriefingSafeguards(
-  minutes: number,
-  dollars: number
-): BriefingSafeguards | null {
-  const maxDurationSeconds = Math.round(minutes * 60);
-  const maxSpendMicrodollars = Math.round(dollars * 1_000_000);
-  const valid =
-    Number.isFinite(minutes) &&
-    Number.isFinite(dollars) &&
-    maxDurationSeconds >= 1 &&
-    maxDurationSeconds <= MAX_BRIEFING_DURATION_SECONDS &&
-    maxSpendMicrodollars > 0 &&
-    Number.isSafeInteger(maxSpendMicrodollars);
-  return valid ? { maxDurationSeconds, maxSpendMicrodollars } : null;
+/** The safeguard field a refusal names, in the order the card lists them. */
+export type BriefingSafeguardField = 'duration' | 'spend';
+
+/** The typed fields: both limits, or every field the card must mark. */
+export type BriefingSafeguardInput =
+  | { readonly kind: 'valid'; readonly limits: BriefingSafeguards }
+  | { readonly kind: 'invalid'; readonly fields: readonly BriefingSafeguardField[] };
+
+/** Whole seconds from 1 to 600, or null when the minutes fall outside the server range. */
+export function briefingDurationSeconds(minutes: number): number | null {
+  const seconds = Math.round(minutes * 60);
+  return Number.isFinite(minutes) && seconds >= 1 && seconds <= MAX_BRIEFING_DURATION_SECONDS
+    ? seconds
+    : null;
+}
+
+/** Microdollars of a positive spend that is still a safe integer, or null. */
+export function briefingSpendMicrodollars(dollars: number): number | null {
+  const microdollars = Math.round(dollars * 1_000_000);
+  return Number.isFinite(dollars) && microdollars > 0 && Number.isSafeInteger(microdollars)
+    ? microdollars
+    : null;
 }
 
 /**
@@ -306,20 +314,32 @@ function readSafeguardAmount(text: string, locale: string): number | null {
 /**
  * The two safeguard fields as a person typed them in the active language: a
  * decimal comma in `de` is the decimal separator, not a bad value. Text the
- * language's number grammar cannot read leaves the fields invalid, and the
+ * language's number grammar cannot read leaves its field invalid, and the
  * existing inline message says so, so a value is never silently rescaled.
+ *
+ * An invalid pair names every field that failed, duration first, so the card
+ * marks the field at fault instead of the whole block.
  */
 export function parseBriefingSafeguardInput(
   minutes: string,
   dollars: string,
   locale: string
-): BriefingSafeguards | null {
+): BriefingSafeguardInput {
   const duration = readSafeguardAmount(minutes, locale);
   const spend = readSafeguardAmount(dollars, locale);
-  if (duration === null || spend === null) {
-    return null;
+  const maxDurationSeconds = duration === null ? null : briefingDurationSeconds(duration);
+  const maxSpendMicrodollars = spend === null ? null : briefingSpendMicrodollars(spend);
+  if (maxDurationSeconds === null || maxSpendMicrodollars === null) {
+    const fields: BriefingSafeguardField[] = [];
+    if (maxDurationSeconds === null) {
+      fields.push('duration');
+    }
+    if (maxSpendMicrodollars === null) {
+      fields.push('spend');
+    }
+    return { kind: 'invalid', fields };
   }
-  return parseBriefingSafeguards(duration, spend);
+  return { kind: 'valid', limits: { maxDurationSeconds, maxSpendMicrodollars } };
 }
 
 const SYNC_RETRY_DELAYS_MS = [0, 2000, 8000] as const;

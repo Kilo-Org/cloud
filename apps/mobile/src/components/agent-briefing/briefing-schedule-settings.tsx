@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -20,19 +19,46 @@ import {
   briefingScheduleProblems,
 } from '@/lib/agent-briefing-schedule';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { formatClockTime } from '@/lib/format';
 import { dateTimeFormat } from '@/lib/intl-cache';
+import { assertSurfaceFailureHandled, type SurfaceFeedback } from '@/lib/surface-feedback';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
-export function ScheduleSettings({
-  preferences,
-}: {
-  readonly preferences: Pick<
-    BriefingPreferences,
-    'timezone' | 'nightStart' | 'morningStart' | 'morningEnd'
-  >;
-}) {
+/** The schedule field a refusal names, in the order the card lists them. */
+type BriefingScheduleField = 'timezone' | 'times';
+
+/** The save's refusal: the server answered no, and nothing was stored. */
+type BriefingScheduleFailure = { readonly kind: 'refused' };
+
+/** The card's one line for a refused save, or nothing for any other phase. */
+function saveStatusMessage(
+  feedback: SurfaceFeedback<BriefingScheduleFailure>,
+  t: (key: string) => string
+): string | null {
+  switch (feedback.status) {
+    case 'failed': {
+      // One refusal arm: the line above Save is the whole surface for it.
+      return t('common.couldNotSaveSetting');
+    }
+    case 'idle':
+    case 'pending':
+    case 'succeeded': {
+      return null;
+    }
+    default: {
+      return assertSurfaceFailureHandled(feedback);
+    }
+  }
+}
+
+type StoredSchedule = Pick<
+  BriefingPreferences,
+  'timezone' | 'nightStart' | 'morningStart' | 'morningEnd'
+>;
+
+export function ScheduleSettings({ preferences }: { readonly preferences: StoredSchedule }) {
   const trpc = useTRPC();
   const client = useQueryClient();
   const { t, i18n } = useTranslation();
@@ -49,9 +75,12 @@ export function ScheduleSettings({
     morningEnd: preferences.morningEnd,
   });
   const [activeTime, setActiveTime] = useState<keyof typeof times | null>(null);
-  const [timezoneInvalid, setTimezoneInvalid] = useState(false);
-  const [timesInvalid, setTimesInvalid] = useState(false);
+  const [problems, setProblems] = useState<readonly BriefingScheduleField[]>([]);
   const [timezoneInputKey, setTimezoneInputKey] = useState(0);
+  // The save's own phase, in the shared primitive: a stale refusal cannot paint
+  // over a newer attempt, and a second Save cannot start while one is pending.
+  const saveFeedback = useSurfaceFeedback<BriefingScheduleFailure>();
+  const saveFailure = saveFeedback.failure;
   const update = useMutation(
     trpc.agentBriefing.updatePreferences.mutationOptions({
       onMutate: async input => {
@@ -69,10 +98,11 @@ export function ScheduleSettings({
         announcingToast.success(t('agentBriefing.saved'));
       },
       onError: (_error, _input, context) => {
+        // The cache returns to the stored plan; the card, not a toast, says the
+        // save was refused, so the message stays where the values are.
         for (const [key, value] of context?.previous ?? []) {
           client.setQueryData(key, value);
         }
-        toast.error(t('common.couldNotSaveSetting'));
       },
       onSettled: () => {
         void client.invalidateQueries({ queryKey: trpc.agentBriefing.preferences.pathKey() });
@@ -86,13 +116,54 @@ export function ScheduleSettings({
   ] as const;
   const save = () => {
     const next = draft.current;
-    const problems = briefingScheduleProblems(next);
-    setTimezoneInvalid(problems.timezone);
-    setTimesInvalid(problems.times);
-    if (problems.timezone || problems.times) {
+    const refused = briefingScheduleProblems(next);
+    const failing: BriefingScheduleField[] = [];
+    if (refused.timezone) {
+      failing.push('timezone');
+    }
+    if (refused.times) {
+      failing.push('times');
+    }
+    setProblems(failing);
+    if (failing.length > 0) {
       return;
     }
-    update.mutate({ ...next, language: i18n.resolvedLanguage ?? i18n.language });
+    const attempt = saveFeedback.begin();
+    if (attempt === null) {
+      return;
+    }
+    setProblems([]);
+    update.mutate(
+      { ...next, language: i18n.resolvedLanguage ?? i18n.language },
+      {
+        onSuccess: () => {
+          attempt.abandon();
+        },
+        onError: () => {
+          attempt.fail({ kind: 'refused' });
+        },
+      }
+    );
+  };
+  // A refused save keeps what the person typed, so a typo in one value never
+  // costs the whole draft; the inline message says it was not stored, and
+  // Discard is the one exit that goes back to the stored plan.
+  const discardRefusedSave = () => {
+    draft.current = {
+      timezone: preferences.timezone,
+      nightStart: preferences.nightStart,
+      morningStart: preferences.morningStart,
+      morningEnd: preferences.morningEnd,
+    };
+    setTimes({
+      nightStart: preferences.nightStart,
+      morningStart: preferences.morningStart,
+      morningEnd: preferences.morningEnd,
+    });
+    // The timezone field is uncontrolled, so it rewrites only on a new key.
+    setTimezoneInputKey(key => key + 1);
+    setProblems([]);
+    saveFeedback.clearWhere(() => true);
   };
   return (
     <Card>
@@ -101,12 +172,12 @@ export function ScheduleSettings({
           key={timezoneInputKey}
           label={t('agentBriefing.timezone')}
           defaultValue={draft.current.timezone}
-          error={timezoneInvalid ? t('agentBriefing.invalidSchedule') : undefined}
+          error={problems.includes('timezone') ? t('agentBriefing.invalidSchedule') : undefined}
           autoCapitalize="none"
           autoCorrect={false}
           onChangeText={value => {
             draft.current.timezone = value.trim();
-            setTimezoneInvalid(false);
+            setProblems(current => current.filter(field => field !== 'timezone'));
           }}
         />
         <Text variant="caption">{t('agentBriefing.timezoneHint')}</Text>
@@ -117,7 +188,7 @@ export function ScheduleSettings({
           disabled={offline || update.isPending}
           onPress={() => {
             draft.current.timezone = dateTimeFormat(undefined, {}).resolvedOptions().timeZone;
-            setTimezoneInvalid(false);
+            setProblems(current => current.filter(field => field !== 'timezone'));
             setTimezoneInputKey(key => key + 1);
           }}
         >
@@ -164,7 +235,7 @@ export function ScheduleSettings({
                     const next = briefingPickerTime(date);
                     draft.current[field.key] = next;
                     setTimes(current => ({ ...current, [field.key]: next }));
-                    setTimesInvalid(false);
+                    setProblems(current => current.filter(item => item !== 'times'));
                     if (Platform.OS === 'android') {
                       setActiveTime(null);
                     }
@@ -186,11 +257,28 @@ export function ScheduleSettings({
         );
       })}
       <AccessibleStatus
-        message={timesInvalid ? t('agentBriefing.invalidSchedule') : null}
+        message={problems.includes('times') ? t('agentBriefing.invalidSchedule') : null}
         className="text-sm"
       />
       <Text variant="caption">{t('agentBriefing.timeHint')}</Text>
       <Text variant="caption">{t('agentBriefing.scheduleHint')}</Text>
+      {saveFailure ? (
+        <>
+          <AccessibleStatus
+            message={saveStatusMessage(saveFeedback.feedback, t)}
+            className="text-sm"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(STATE_ACTION_CLASS, 'self-start')}
+            disabled={update.isPending}
+            onPress={discardRefusedSave}
+          >
+            <Text>{t('common.discard')}</Text>
+          </Button>
+        </>
+      ) : null}
       <Button disabled={offline} loading={update.isPending} onPress={save}>
         <Text>{t('common.save')}</Text>
       </Button>

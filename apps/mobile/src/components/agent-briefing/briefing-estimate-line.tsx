@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { type BriefingEstimate } from '@kilocode/app-shared/agent-briefing';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { briefingEstimateUnavailableKey } from '@/lib/agent-briefing-state';
@@ -75,18 +76,29 @@ export function parseBriefingEstimateLineQuote(
 /**
  * Exactly one line per quote phase, so no flag pair can render two lines or the
  * wrong one. A cached quote renders whatever the read is doing: going offline
- * disables the query but keeps its data, and a failed refetch keeps the last
- * quote. `invalid` owns the line for unparsable fields, because the disabled
- * query cannot speak for the current limits. `offline` and `failed` render only
- * with no quote cached, each beside the recovery the card offers: connectivity
- * for the offline phase, and the card's Retry for the failed one.
+ * disables the query but keeps its data, a failed refetch keeps the last quote,
+ * and a key change keeps the previous quote through `keepPreviousData`.
+ * `invalid` owns the line for unparsable fields, because the disabled query
+ * cannot speak for the current limits; its copy shows on the field at fault, so
+ * the line itself is announce-only. `offline` and `failed` render only with no
+ * quote cached, each beside the recovery the card offers: connectivity for the
+ * offline phase, and the card's Retry for the failed one.
  */
 export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstimateLineQuote }) {
   const { t, i18n } = useTranslation();
   switch (quote.kind) {
     case 'invalid': {
+      // The sentence now shows on the safeguard field at fault, so the line keeps
+      // no visible copy. It still announces: the wait this line owned is over,
+      // and that is what changed for a reader who cannot see the field's error.
+      // Same hidden technique as `estimating`, with no line to reserve.
       return (
-        <Text className="text-sm text-destructive">{t('agentBriefing.invalidSafeguards')}</Text>
+        <View className="relative">
+          <AccessibleStatus
+            message={t('agentBriefing.invalidSafeguards')}
+            className="absolute size-px overflow-hidden"
+          />
+        </View>
       );
     }
     case 'estimating': {
@@ -107,16 +119,21 @@ export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstima
       // A disabled read will not start while the device is offline; the card's
       // other controls are disabled for the same reason, so the line says what
       // the whole card is waiting for instead of posing as a wait in progress.
-      return <Text className="text-xs text-muted-foreground">{t('offline.noInternet')}</Text>;
+      // Announced like the other phase that replaces the placeholder.
+      return (
+        <AccessibleStatus message={t('offline.noInternet')} tone="status" className="text-xs" />
+      );
     }
     case 'failed': {
       // The read settled as an error with no cached quote; the retry button
       // beside the line owns recovery, so the line only names the miss. The
       // copy names the estimate, not the briefs the card beside it lists.
       return (
-        <Text className="text-xs text-muted-foreground">
-          {t('agentBriefing.estimateLoadError')}
-        </Text>
+        <AccessibleStatus
+          message={t('agentBriefing.estimateLoadError')}
+          tone="status"
+          className="text-xs"
+        />
       );
     }
     case 'unavailable': {

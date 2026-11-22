@@ -3238,6 +3238,62 @@ test('a stalled grant exchange times out, aborts its request, and is replaced on
   expect(exchanges).toBe(2);
 });
 
+test('two callers minting at once keep the newer grant when the older exchange fails', async () => {
+  // Both callers see the same expired entry and start their own exchange. The older one fails
+  // after the newer one was cached; the shared entry must stay, and later calls reuse it.
+  let exchanges = 0;
+  // Fresh enough for the first call, stale once the clock advances past the reuse margin.
+  const expiresAt = new Date(Date.now() + 31_000).toISOString();
+  // ES2022/Hermes consumers do not provide Promise.withResolvers.
+  let rejectOlder: (error: Error) => void = () => {};
+  let resolveNewer: (response: Response) => void = () => {};
+  const older = new Promise<Response>((_resolve, reject) => {
+    rejectOlder = reject;
+  });
+  const newer = new Promise<Response>(resolve => {
+    resolveNewer = resolve;
+  });
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      exchanges++;
+      if (exchanges === 2) return older;
+      if (exchanges === 3) return newer;
+      return Response.json({ token: `grant-${exchanges}`, expiresAt });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(exchanges).toBe(1);
+  await jest.advanceTimersByTimeAsync(2000);
+  const first = trackOutcome(client.listSessions());
+  const second = trackOutcome(client.listSessions());
+  await flush();
+  expect(exchanges).toBe(3);
+  // The newer exchange wins the cache; the older one then fails.
+  resolveNewer(
+    Response.json({
+      token: 'grant-newer',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    })
+  );
+  await flush();
+  rejectOlder(new Error('offline'));
+  await flush();
+  // The caller whose own exchange failed reports that failure.
+  expect(first.code).toBe('failed');
+  expect(second.code).toBe('resolved');
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  // The newer entry survived, so the shared cache answers without a fourth exchange.
+  expect(exchanges).toBe(3);
+});
+
 test('a stalled ticket mint reaches the connect backoff', async () => {
   const random = jest.spyOn(Math, 'random').mockReturnValue(0);
   let stallTicket = true;

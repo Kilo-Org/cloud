@@ -495,10 +495,9 @@ export class NativeSyncClient {
     try {
       return await pending;
     } catch (error) {
-      // Only this exchange can be cached under the key: `get` and `set` run without an await,
-      // so a concurrent caller reuses this pending promise instead of starting another, and the
-      // 401 replacement is written only after this one resolved.
-      this.grants.delete(key);
+      // Two callers can mint at once: both await the same expired entry, then each replaces it.
+      // Delete only this exchange, so a newer cached grant survives its predecessor's failure.
+      if (this.grants.get(key) === pending) this.grants.delete(key);
       throw error;
     }
   }

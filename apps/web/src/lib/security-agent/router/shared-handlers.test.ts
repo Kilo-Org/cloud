@@ -85,6 +85,7 @@ const mockAutoDismissEligibleFindings =
     ) => Promise<{ dismissed: number; skipped: number; errors: number }>
   >();
 const mockAdmitOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockGetOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockMarkReconcilePending = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockRecordOperationAcceptance = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
@@ -115,6 +116,7 @@ jest.mock('../services/manual-remediation-client', () => ({
 }));
 jest.mock('@kilocode/db/operation-ledger', () => ({
   admitOperation: mockAdmitOperation,
+  getOperation: mockGetOperation,
   isTerminalOperationStatus: (status: string) =>
     ['completed', 'failed', 'no_op', 'interrupted', 'superseded'].includes(status),
   markReconcilePending: mockMarkReconcilePending,
@@ -199,6 +201,42 @@ beforeAll(async () => {
   ({ createSecurityAgentHandlers } = await import('./shared-handlers'));
 });
 
+/**
+ * Default admission for tests that reach a keyless submission without stubbing
+ * the ledger: it echoes the request identity, so the handler's own
+ * intent/resource checks pass and the submission runs.
+ */
+function defaultAdmission(admission: unknown) {
+  const request = admission as {
+    intent: string;
+    operationKey: string;
+    resourceKey: string;
+    userId: string;
+    orgId: string | null;
+  };
+  return {
+    admission: 'admitted',
+    row: {
+      id: 'ledger-row-id',
+      operation_key: request.operationKey,
+      domain: 'security',
+      intent: request.intent,
+      kilo_user_id: request.userId,
+      organization_id: request.orgId,
+      resource_key: request.resourceKey,
+      provider_ref: null,
+      taxonomy: 'reconcile-first',
+      status: 'admitted',
+      outcome_code: null,
+      canonical_result: null,
+      admitted_at: '2026-06-17T10:00:00.000Z',
+      settled_at: null,
+      lease_expires_at: '2026-06-17T10:02:00.000Z',
+      expires_at: '2026-07-17T10:00:00.000Z',
+    },
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   // `jest.clearAllMocks` keeps a mock's implementation, but an earlier test may
@@ -209,6 +247,10 @@ beforeEach(() => {
   mockEnqueueBacklogFindings.mockResolvedValue(0);
   mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 1 });
   mockCheckDependabotAlertsAvailability.mockResolvedValue([]);
+  mockGetOperation.mockResolvedValue(null);
+  mockAdmitOperation.mockImplementation(async (_database: unknown, admission: unknown) =>
+    defaultAdmission(admission)
+  );
   mockRecordOperationAcceptance.mockResolvedValue({ status: 'admitted' });
   mockMarkReconcilePending.mockResolvedValue({ status: 'reconcile_pending' });
   mockSettleOperation.mockResolvedValue({ settled: true });
@@ -1677,6 +1719,251 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
       expect.objectContaining({ operationKey })
+    );
+  });
+
+  it('admits a keyless manual sync under a minted key and submits with it', async () => {
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const request = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(request.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}$/);
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: request.operationKey })
+    );
+  });
+
+  it('admits a keyless dismissal under a minted key and submits with it', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      source: 'dependabot',
+      severity: 'high',
+    });
+    mockSubmitManualFindingDismissal.mockResolvedValue({
+      ...accepted,
+      messageId: 'dismiss-message-123',
+    });
+
+    await expect(
+      createHandlers().dismissFinding.handler({
+        ctx: context,
+        input: { findingId, reason: 'not_used' },
+      })
+    ).resolves.toMatchObject({ success: true, accepted: true, commandId });
+
+    const request = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(request.operationKey).toMatch(/^mt:dismiss_finding:[0-9a-f]{48}$/);
+    expect(mockSubmitManualFindingDismissal).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: request.operationKey })
+    );
+  });
+
+  it('mints one key for two keyless syncs in a window and conflicts while the first is in flight', async () => {
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    mockAdmitOperation.mockResolvedValue({ admission: 'duplicate_in_flight', row: ledgerRow() });
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'operation_in_progress' });
+
+    const first = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    const second = mockAdmitOperation.mock.calls[1]?.[1] as { operationKey: string };
+    expect(second.operationKey).toBe(first.operationKey);
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
+  });
+
+  it('replays a settled keyless sync without re-submitting', async () => {
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        status: 'completed',
+        canonical_result: { commandId, runId, messageId },
+      }),
+    });
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({
+      success: true,
+      accepted: true,
+      commandId,
+      runId,
+      messageId,
+      replayed: true,
+    });
+
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+  });
+
+  it('answers a repeat from the previous bucket while its row is live', async () => {
+    mockGetOperation
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(ledgerRow({ id: 'ledger-row-previous', status: 'admitted' }));
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const previousBucketKey = mockGetOperation.mock.calls[1]?.[1] as { operationKey: string };
+    const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(admitted.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}$/);
+    expect(admitted.operationKey).toBe(previousBucketKey.operationKey);
+  });
+
+  it("answers a retry in the current bucket from its own re-derived key, not the previous bucket's settled key", async () => {
+    mockGetOperation
+      .mockResolvedValueOnce(ledgerRow({ status: 'failed' }))
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        ledgerRow({
+          id: 'ledger-row-previous',
+          status: 'completed',
+          canonical_result: { commandId, runId, messageId },
+        })
+      );
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(admitted.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}:r[0-9a-f]{16}$/);
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
+  });
+
+  it('mints the current bucket key when neither bucket holds a row', async () => {
+    mockGetOperation.mockResolvedValue(null);
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(admitted.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}$/);
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: admitted.operationKey })
+    );
+  });
+
+  it('answers a previous-bucket released submission with its re-derived key', async () => {
+    mockGetOperation
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(ledgerRow({ id: 'ledger-row-previous', status: 'failed' }))
+      .mockResolvedValueOnce(null);
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(admitted.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}:r[0-9a-f]{16}$/);
+  });
+
+  it('re-derives the minted key past a released window and keeps the plain key when the window settled', async () => {
+    mockGetOperation.mockResolvedValueOnce(ledgerRow({ status: 'failed' })).mockResolvedValue(null);
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const released = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(released.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}:r[0-9a-f]{16}$/);
+
+    mockGetOperation.mockResolvedValue(ledgerRow({ status: 'completed' }));
+    mockAdmitOperation.mockClear();
+
+    await createHandlers().triggerSync.handler({
+      ctx: context,
+      input: { repoFullName: 'kilo/repo' },
+    });
+
+    const settled = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(settled.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}$/);
+  });
+
+  it('walks a chain of released windows so a repeated failure still yields a runnable key', async () => {
+    mockGetOperation
+      .mockResolvedValueOnce(ledgerRow({ id: 'ledger-row-first', status: 'failed' }))
+      .mockResolvedValueOnce(ledgerRow({ id: 'ledger-row-second', status: 'failed' }))
+      .mockResolvedValueOnce(null);
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const firstReleaseKey = mockGetOperation.mock.calls[1]?.[1] as { operationKey: string };
+    const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(admitted.operationKey).toMatch(/^mt:manual_sync:[0-9a-f]{48}:r[0-9a-f]{16}$/);
+    expect(admitted.operationKey).not.toBe(firstReleaseKey.operationKey);
+  });
+
+  it('mints a distinct identity when a window has spent its release chain', async () => {
+    mockGetOperation.mockResolvedValue(ledgerRow({ status: 'failed' }));
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    const admitted = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    expect(admitted.operationKey).toMatch(
+      /^mt:manual_sync:[0-9a-f]{48}(:r[0-9a-f]{16})*:x[0-9a-f]{8}$/
+    );
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
+  });
+
+  // The Worker validates `operationKey` with `max(128)` (`services/security-sync/src/index.ts`),
+  // and a key it rejects is a 400 the ledger treats as a definitive pre-acceptance rejection.
+  // Each release step re-derives from the base identity, so the length is bounded by the intent
+  // name and the chain depth does not add to it.
+  it('keeps every admitted key inside the Worker input bound, whatever the chain has walked', async () => {
+    mockGetOperation.mockResolvedValue(ledgerRow({ status: 'failed' }));
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      source: 'dependabot',
+      severity: 'high',
+    });
+    mockSubmitManualFindingDismissal.mockResolvedValue({
+      ...accepted,
+      messageId: 'dismiss-message-123',
+    });
+
+    await createHandlers().triggerSync.handler({
+      ctx: context,
+      input: { repoFullName: 'kilo/repo' },
+    });
+    await createHandlers().dismissFinding.handler({
+      ctx: context,
+      input: { findingId, reason: 'not_used' },
+    });
+
+    const syncKey = mockAdmitOperation.mock.calls[0]?.[1] as { operationKey: string };
+    const dismissKey = mockAdmitOperation.mock.calls[1]?.[1] as { operationKey: string };
+    expect(syncKey.operationKey).toHaveLength(91);
+    expect(dismissKey.operationKey).toHaveLength(95);
+    for (const admitted of [syncKey, dismissKey]) {
+      expect(admitted.operationKey.length).toBeLessThanOrEqual(128);
+    }
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: syncKey.operationKey })
+    );
+    expect(mockSubmitManualFindingDismissal).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: dismissKey.operationKey })
     );
   });
 

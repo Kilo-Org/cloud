@@ -225,11 +225,13 @@ function readFailure(path: string): Response {
 }
 
 /**
- * The fixture's tRPC client. `checks-not-available` answers the checks read as
- * not found, which is the terminal the section maps to its unavailable message;
- * every other surface answers a loaded read.
+ * The fixture's tRPC client. `checks-not-available` answers its checks read as
+ * not found, which the section maps to its unavailable state: the GitHub read
+ * and its dead-end terminal by default, and under `?scope=gitlab` the provider
+ * read and the recovery row that scope renders. Every other surface answers a
+ * loaded read.
  */
-export function createFixtureClient(surface: string | undefined) {
+export function createFixtureClient(surface: string | undefined, scope?: string) {
   return createTRPCClient<MobileRouter>({
     links: [
       httpLink({
@@ -243,6 +245,16 @@ export function createFixtureClient(surface: string | undefined) {
           const url = input instanceof Request ? input.url : input.toString();
           if (init?.method !== 'GET') {
             throw new Error(FIXTURE_WRITE_REFUSED);
+          }
+          // The checks surface's provider arm: the link asked for a provider
+          // scope, so the section mounted below it reads `providerReview` and
+          // this answers that read with the same not-found.
+          if (
+            surface === 'checks-not-available' &&
+            scope === 'gitlab' &&
+            url.includes('/providerReview.listChecks')
+          ) {
+            return readFailure('providerReview.listChecks');
           }
           if (url.includes('/githubPrReview.getPullRequest')) {
             return fixtureResponse(githubOverview(surface));

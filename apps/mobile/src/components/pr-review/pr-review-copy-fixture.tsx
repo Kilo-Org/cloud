@@ -1,6 +1,6 @@
 import { MutationCache, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
@@ -53,10 +53,11 @@ import { TRPCProvider } from '@/lib/trpc';
 // through the app's native link scheme; the overview surfaces are
 // dev/pr-review-copy-fixture/{overview,overview-blocked,overview-merged,merge-request,
 // merge-request-missing,merge-request-error}.
-// The checks-not-available surface answers the checks read as not found, the
-// terminal that renders the section's unavailable message; the composer surface
-// mounts the comment composer on a line, with
-// dev/pr-review-copy-fixture/composer?side=LEFT reaching the deleted-line
+// The checks-not-available surface answers the checks read as not found: by
+// default the GitHub read, whose terminal is the section's unavailable message,
+// and with `?scope=gitlab` the provider read, whose not-found renders the
+// recovery row; the composer surface mounts the comment composer on a line,
+// with dev/pr-review-copy-fixture/composer?side=LEFT reaching the deleted-line
 // (suggestions unavailable) state and composer?selected=1 the added line with a
 // seeded selection; the gate surfaces are dev/pr-review-copy-fixture/gate-*.
 // The screen surfaces open the REAL nested routes instead of re-created bodies:
@@ -110,10 +111,16 @@ function ChecksSectionSurface() {
 }
 
 export function PrReviewCopyFixture() {
-  const { surface, side, selected } = useLocalSearchParams<{
+  const {
+    surface,
+    side,
+    selected,
+    scope: scopeParam,
+  } = useLocalSearchParams<{
     surface?: string;
     side?: string;
     selected?: string;
+    scope?: string;
   }>();
   // The composer surface defaults to the added-line state; `side=LEFT` reaches
   // the deleted-line state and `selected=1` seeds an added-line selection.
@@ -132,7 +139,12 @@ export function PrReviewCopyFixture() {
         }),
       })
   );
-  const [client] = useState(() => createFixtureClient(surface));
+  // Keyed on the surface AND the scope param: the link's `?scope=gitlab`
+  // changes which checks read the client answers, and the route key only names
+  // the surface, so a state-held client would keep answering the first link's
+  // arm. Every other surface passes no scope, so its client identity is the
+  // same one it always had.
+  const client = useMemo(() => createFixtureClient(surface, scopeParam), [surface, scopeParam]);
   // Point the selection bridge at the state the link asks for, before the
   // composer below reads it. Applied once per distinct link, so navigating
   // between the three composer surfaces does not leave one's selection on the
@@ -272,6 +284,16 @@ export function PrReviewCopyFixture() {
           }}
         />
       </PendingReviewProvider>
+    );
+  } else if (surface === 'checks-not-available' && scopeParam === 'gitlab') {
+    // The same link, with `?scope=gitlab` riding in its query: the scope makes
+    // the section read `providerReview` and render the recovery row that
+    // provider's NOT_FOUND maps to. Without the param the branch below keeps
+    // the GitHub section exactly as before.
+    content = (
+      <ProviderPrScopeProvider value={scope}>
+        <ChecksSectionSurface />
+      </ProviderPrScopeProvider>
     );
   } else {
     content = <ChecksSectionSurface />;

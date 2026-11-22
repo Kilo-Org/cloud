@@ -4400,6 +4400,7 @@
       "promptPlaceholder": "Uyi…",
       "tools": "Amathuluzi",
       "wholeToolRule": "Le ejenti isebenzisa umthetho owodwa kwithuluzi ngalinye ngasikhathi sinye: {{rule}}. Lawa maswishi afundwa kuphela.",
+      "toolRule": "Umthetho ogciniwe: {{rule}}",
       "visibility": "Ukubonakala",
       "visibilityPrimary": "Okuyinhloko — kukhonjiswe kusikhi",
       "visibilitySubagent": "I-Subagent — itholakala kuphela kwabanye",

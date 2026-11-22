@@ -4400,6 +4400,7 @@
       "promptPlaceholder": "Siz bir…",
       "tools": "Alətlər",
       "wholeToolRule": "Bu agent bütün alətlərə eyni anda bir qayda tətbiq edir: {{rule}}. Bu keçidlər yalnız oxunaqlıdır.",
+      "toolRule": "Saxlanılan qayda: {{rule}}",
       "visibility": "Görünüş",
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",

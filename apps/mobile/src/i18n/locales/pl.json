@@ -4558,6 +4558,7 @@
       "promptPlaceholder": "Jesteś…",
       "tools": "Narzędzia",
       "wholeToolRule": "Ten agent stosuje jedną regułę do wszystkich narzędzi jednocześnie: {{rule}}. Te przełączniki są tylko do odczytu.",
+      "toolRule": "Zapisana reguła: {{rule}}",
       "visibility": "Widoczność",
       "visibilityPrimary": "Podstawowy — pokazany w selektorze",
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",

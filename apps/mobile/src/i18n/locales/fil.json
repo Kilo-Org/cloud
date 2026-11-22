@@ -4400,6 +4400,7 @@
       "promptPlaceholder": "ikaw ay isang…",
       "tools": "Mga gamit",
       "wholeToolRule": "Naglalapat ang ahenteng ito ng isang panuntunan sa lahat ng gamit nang sabay-sabay: {{rule}}. Ang mga switch na ito ay basahin lamang.",
+      "toolRule": "Nakaimbak na panuntunan: {{rule}}",
       "visibility": "Bisibilidad",
       "visibilityPrimary": "Pangunahin — ipinapakita sa picker",
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",

@@ -4558,6 +4558,7 @@
       "promptPlaceholder": "Tu esi…",
       "tools": "Įrankiai",
       "wholeToolRule": "Šis agentas vienu metu taiko vieną taisyklę visiems įrankiams: {{rule}}. Šie jungikliai yra tik skaitomi.",
+      "toolRule": "Išsaugota taisyklė: {{rule}}",
       "visibility": "Matomumas",
       "visibilityPrimary": "Pagrindinis — rodomas rinkiklyje",
       "visibilitySubagent": "Subagentas — kviečiamas tik iš kitų",

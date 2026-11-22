@@ -4637,6 +4637,7 @@
       "promptPlaceholder": "Int…",
       "tools": "Għodda",
       "wholeToolRule": "Dan l-aġent japplika regola waħda għal kull għodda fl-istess ħin: {{rule}}. Dawn l-iswiċċijiet huma biss għall-qari.",
+      "toolRule": "Regola maħżuna: {{rule}}",
       "visibility": "Viżibilità",
       "visibilityPrimary": "Primarja — muri fil-picker",
       "visibilitySubagent": "Subaġent — jissejjaħ biss minn oħrajn",

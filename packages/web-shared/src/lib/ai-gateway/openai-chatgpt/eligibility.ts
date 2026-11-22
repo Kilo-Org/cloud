@@ -59,7 +59,7 @@ export async function probeOpenAiChatGptEligibility(accessToken: string): Promis
   if (apiKey.trim() === '') return true;
 
   try {
-    if (!(await isOpenAiModelServed(apiKey, PROBE_MODEL))) return true;
+    if (!(await isOpenAiModelServed(PROBE_MODEL))) return true;
 
     const response = await fetch(`${OPENAI_CHATGPT_API_URL}/responses`, {
       method: 'POST',

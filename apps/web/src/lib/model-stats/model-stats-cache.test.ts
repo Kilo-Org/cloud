@@ -181,9 +181,10 @@ describe('model stats snapshot cache', () => {
   it('serves the last known-good snapshot, reports once, then retries after the cooldown', async () => {
     // The case the derived views cannot see: the cache swallows the failure and returns its cached
     // snapshot, so the report has to happen here and the caller never learns of the outage.
+    const outage = new Error('unavailable');
     const first = await cache.getModelStatsSnapshot();
     jest.advanceTimersByTime(TTL);
-    mockOrderBy.mockRejectedValueOnce(new Error('unavailable'));
+    mockOrderBy.mockRejectedValueOnce(outage);
 
     expect(await cache.getModelStatsSnapshot()).toBe(first);
     expect(mockWarn).toHaveBeenCalledTimes(1);
@@ -203,10 +204,10 @@ describe('model stats snapshot cache', () => {
     expect(mockSelect).toHaveBeenCalledTimes(3);
     expect(mockWarn).toHaveBeenCalledTimes(1);
 
-    // A successful load cleared the marker, so the next outage reports again even with the same
-    // error object.
+    // A successful load cleared the marker, so the next outage reports again even though it rejects
+    // with the very same error object the first outage used.
     jest.advanceTimersByTime(TTL);
-    mockOrderBy.mockRejectedValueOnce(new Error('unavailable'));
+    mockOrderBy.mockRejectedValueOnce(outage);
     expect(await cache.getModelStatsSnapshot()).toBe(recovered);
     expect(mockWarn).toHaveBeenCalledTimes(2);
   });

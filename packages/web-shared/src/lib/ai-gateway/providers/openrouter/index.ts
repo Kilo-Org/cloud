@@ -249,7 +249,8 @@ type ModelListInputs = Awaited<ReturnType<typeof loadModelListInputs>>;
 async function listCatalogModels(
   models: OpenRouterCatalogModel[],
   inputs: ModelListInputs,
-  countryCode: string | null
+  countryCode: string | null,
+  fromDb?: ModelStatsLoadClient
 ) {
   const {
     endpointsMetadata,
@@ -294,7 +295,7 @@ async function listCatalogModels(
       listedOpenRouterModels: listedModels,
       openRouterMetadata: endpointsMetadata,
     }),
-    getTerminalBenchSummaries(),
+    getTerminalBenchSummaries({ fromDb }),
   ]);
   const gatewayModels = listedModels
     .map((model): OpenRouterCatalogModel => {
@@ -441,12 +442,17 @@ function sortByPreferredOrder(models: OpenRouterCatalogModel[]) {
   });
 }
 
-async function enhancedModelList(models: OpenRouterCatalogModel[], countryCode: string | null) {
+async function enhancedModelList(
+  models: OpenRouterCatalogModel[],
+  countryCode: string | null,
+  fromDb?: ModelStatsLoadClient
+) {
   const inputs = await loadModelListInputs();
   const { catalogModels, publicCustomLlmProviders } = await listCatalogModels(
     models,
     inputs,
-    countryCode
+    countryCode,
+    fromDb
   );
   const enhancedModels = await enrichCatalogModels(catalogModels, inputs, publicCustomLlmProviders);
   return sortByPreferredOrder(enhancedModels);
@@ -644,7 +650,7 @@ export async function getEnhancedOpenRouterModels({
 }): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels();
 
-  const models = await enhancedModelList(rawResponse.data, countryCode);
+  const models = await enhancedModelList(rawResponse.data, countryCode, fromDb);
   const snapshot = await getEnkryptBenchmarks({ fromDb });
   return { data: publishEnkryptModels(models, snapshot) };
 }

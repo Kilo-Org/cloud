@@ -53,18 +53,23 @@ export function isEnkryptPublicModel(
   );
 }
 
+/** A shallow copy of `value` without the stored `enkrypt` member. */
+function withoutStoredEnkrypt<T extends object>(value: T): Omit<T, 'enkrypt'> {
+  const copy = { ...value };
+  Reflect.deleteProperty(copy, 'enkrypt');
+  return copy;
+}
+
 export function publishEnkryptModelStats<
   T extends PublicModel & Pick<ModelStats, 'benchmarks' | 'openrouterData'>,
 >(stat: T, snapshot: ModelStatsCacheMetadata, verification?: unknown) {
-  const openrouterData = { ...stat.openrouterData };
-  if ('enkrypt' in openrouterData) delete openrouterData.enkrypt;
+  const openrouterData = withoutStoredEnkrypt(stat.openrouterData);
   const publishedStat = { ...stat, openrouterData };
   if (!stat.benchmarks) return publishedStat;
-  const benchmarks = { ...stat.benchmarks };
-  delete benchmarks.enkrypt;
+  const benchmarks = withoutStoredEnkrypt(stat.benchmarks);
   const enkrypt =
     isModelStatsSnapshotFresh(snapshot) && isEnkryptPublicModel(stat, snapshot.customLlmIds)
       ? publishEnkryptBenchmark(stat.benchmarks.enkrypt, Date.now(), verification)
       : undefined;
-  return { ...publishedStat, benchmarks: { ...benchmarks, ...(enkrypt && { enkrypt }) } };
+  return { ...publishedStat, benchmarks: enkrypt ? { ...benchmarks, enkrypt } : benchmarks };
 }

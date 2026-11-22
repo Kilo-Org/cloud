@@ -376,6 +376,49 @@ describe('withoutLeadingDirectionMarks', () => {
     expect(withoutLeadingDirectionMarks('Kilo \u200Fغير متصل')).toBe('Kilo \u200Fغير متصل');
   });
 
+  // A task item's checkbox is its own machinery: the text the reader reads
+  // starts after it, so a mark there still names the item's edge.
+  it('strips the mark behind a task checkbox', () => {
+    expect(withoutLeadingDirectionMarks('- [ ] \u200FLatin task')).toBe('- [ ] Latin task');
+    expect(withoutLeadingDirectionMarks('- [x] \u200FLatin done')).toBe('- [x] Latin done');
+  });
+
+  it('strips the mark behind an emphasis opener', () => {
+    expect(withoutLeadingDirectionMarks('- **\u200FLatin**')).toBe('- **Latin**');
+    expect(withoutLeadingDirectionMarks('## __\u200FLatin__')).toBe('## __Latin__');
+    expect(withoutLeadingDirectionMarks('1. ~~\u200FLatin~~')).toBe('1. ~~Latin~~');
+  });
+
+  // The mark is the link label's own first character, and the label is the
+  // block's text: the destination after it is a URL, not the block's opening.
+  it('strips the mark that opens a link label', () => {
+    expect(withoutLeadingDirectionMarks('- [\u200FLatin](https://example.com)')).toBe(
+      '- [Latin](https://example.com)'
+    );
+  });
+
+  // A reference is looked up by a key of its label's text, so dropping the mark
+  // would rename the key and point the link elsewhere: it stays.
+  it('keeps the mark that opens a reference label', () => {
+    const value = '- [\u200FLatin][ref]\n\n[ref]: https://example.com';
+    expect(withoutLeadingDirectionMarks(value)).toBe(value);
+  });
+
+  // A paragraph may be indented up to three spaces and still be one; a mark
+  // after that indentation is in front of the paragraph's first character.
+  it('strips a mark after up to three spaces of indentation', () => {
+    expect(withoutLeadingDirectionMarks('  \u200FLatin indented')).toBe('  Latin indented');
+    expect(withoutLeadingDirectionMarks('   \u200FLatin indented')).toBe('   Latin indented');
+  });
+
+  // An inline code span is code the content wrote: only the mark in front of the
+  // span is the block's, and a mark deeper inside it orders that code run.
+  it('keeps a mark written deeper inside an inline code span', () => {
+    expect(withoutLeadingDirectionMarks('- `\u200FLatin code`')).toBe('- `Latin code`');
+    const inside = '- `a \u200Fb`';
+    expect(withoutLeadingDirectionMarks(inside)).toBe(inside);
+  });
+
   it('leaves a continuation line and the rest of the source byte-identical', () => {
     const value = '\u200FFirst\nsecond \u200Fline\n\n- \u200Fitem';
     expect(withoutLeadingDirectionMarks(value)).toBe('First\nsecond \u200Fline\n\n- item');

@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines -- the direction, script, joining, and mark rules one message's copy is laid out with share fixtures and must read together */
 import { createElement, Fragment, isValidElement, type ReactNode } from 'react';
 import { I18nManager, type StyleProp, StyleSheet, type TextStyle } from 'react-native';
 
@@ -430,8 +431,9 @@ export function markdownMessageDirection(markdown: string): 'ltr' | 'rtl' | unde
  * first character their only effect is to name that block's edge. */
 const DIRECTION_MARK = /[\u061C\u200E\u200F]/;
 
-/** A run of direction marks at a block's first character. */
-const LEADING_DIRECTION_MARK = /^[\u061C\u200E\u200F]+/;
+/** A run of direction marks, matched where a block's opening run reaches it.
+ * Sticky: the walk asks whether the run starts at one offset and nowhere else. */
+const DIRECTION_MARK_RUN = /[\u061C\u200E\u200F]+/y;
 
 /** A line's blockquote markers, `>` or `> `, nested. */
 const BLOCKQUOTE_START = /^(?: {0,3}>[ \t]?)+/;
@@ -448,18 +450,125 @@ const FENCE_START = /^ {0,3}(?:```|~~~)/;
 /** A line indented enough to be an indented code block after a blank line. */
 const INDENTED_CODE = /^(?: {4}|\t)/;
 
+/** Up to three spaces: an indentation a block's own content may still carry
+ * after its marker, and the most a line may be indented and stay a paragraph. */
+const CONTENT_INDENT = / {0,3}/y;
+
+/** A task list item's checkbox and the space after it: `[ ]`, `[x]` or `[X]`. */
+const TASK_CHECKBOX = /\[[ xX]\][ \t]+/y;
+
+/** The run of backticks that opens an inline code span. */
+const BACKTICK_RUN = /`+/y;
+
+/** The inline openers a block's text may start with, each longer spelling
+ * before the one it contains, so `**` is one opener and not two `*`. The
+ * renderer parses GFM, so `~~` opens strikethrough as well. A link or image
+ * opener, and a code span, are read apart: their labels and bodies are the
+ * block's own text, not markup. */
+const INLINE_OPENERS = ['**', '__', '~~', '*', '_'] as const;
+
+/** A link or image opener, whose label's own text is the block's text. */
+const LINK_OPENER = /!?\[/y;
+
+/** The offset past the match of sticky `pattern` at `at`, or `at`. */
+function pastMatch(pattern: RegExp, text: string, at: number): number {
+  pattern.lastIndex = at;
+  return pattern.exec(text) === null ? at : pattern.lastIndex;
+}
+
+/** The offset past the inline opener at `at`, or `at` when no opener is there. */
+function pastOpener(text: string, at: number): number {
+  const opener = INLINE_OPENERS.find(spelling => text.startsWith(spelling, at));
+  if (opener !== undefined) {
+    return at + opener.length;
+  }
+  // A link or image label, whose own text is the block's first text.
+  return pastLinkOpener(text, at);
+}
+
 /**
- * `line` with the direction marks in front of its own block content removed:
- * after its blockquote markers (already measured as `quoted`) and, when it is a
- * list item or a heading, after that marker too.
+ * The offset past the link or image opener at `at` — just past its opening
+ * bracket, where the label's own text begins — when the label closes on an
+ * inline destination; otherwise `at`.
+ *
+ * A reference label (`[label][definition]`, `[label]`, or a definition line
+ * `[label]: url`) is looked up by a normalised key of its text, so dropping a
+ * mark from that label would rename the key and change which destination
+ * resolves: a reference label keeps its mark.
  */
-function stripLineMarks(line: string, quoted: number, body: string): string {
-  const marker = (LIST_START.exec(body) ?? HEADING_START.exec(body))?.[0].length ?? 0;
-  const contentStart = quoted + marker;
-  const marks = LEADING_DIRECTION_MARK.exec(line.slice(contentStart))?.[0];
-  return marks === undefined
-    ? line
-    : line.slice(0, contentStart) + line.slice(contentStart + marks.length);
+function pastLinkOpener(text: string, at: number): number {
+  const labelStart = pastMatch(LINK_OPENER, text, at);
+  if (labelStart === at) {
+    return at;
+  }
+  const close = text.indexOf(']', labelStart);
+  const label = text.slice(labelStart, close);
+  return close !== -1 && text[close + 1] === '(' && !/[[\n]/.test(label) ? labelStart : at;
+}
+
+/** Records the direction marks that start at `at`, when any do, and returns the
+ * offset past them: they sit in front of content that has not started yet, so
+ * they name the block's edge and nothing else. */
+function takeMarkRun(line: string, at: number, runs: [number, number][]): number {
+  const after = pastMatch(DIRECTION_MARK_RUN, line, at);
+  if (after > at) {
+    runs.push([at, after]);
+  }
+  return after;
+}
+
+/** `line` without the `[start, end)` ranges in `runs`, which do not overlap and
+ * are in ascending order. */
+function withoutRuns(line: string, runs: readonly (readonly [number, number])[]): string {
+  let kept = '';
+  let from = 0;
+  for (const [start, end] of runs) {
+    kept += line.slice(from, start);
+    from = end;
+  }
+  return kept + line.slice(from);
+}
+
+/**
+ * `line` from `at` — where the line's own content begins, past its blockquote
+ * markers and its list or heading marker — with the direction marks in front of
+ * the content's first character removed.
+ *
+ * The content may open on more machinery and markup before that character: up
+ * to three spaces of indentation, a list item's task checkbox, then a run of
+ * inline openers. A mark may sit in front of an opener (`- ‏**Latin**`) or
+ * right after one (`- [‏Latin](url)`, where it is the link label's own first
+ * character and still opens the block), so the walk reads one opening token at
+ * a time and drops the mark runs in front of it. Once a token is not
+ * recognised, the rest is the block's text, whose marks order the runs they
+ * were written for and stay: markup this walk does not know (an HTML tag, say)
+ * ends it there for the same reason.
+ */
+function stripLineMarks(line: string, at: number, listItem: boolean): string {
+  const runs: [number, number][] = [];
+  let cursor = takeMarkRun(line, at, runs);
+  // The block's machinery is kept exactly as written.
+  cursor = takeMarkRun(line, pastMatch(CONTENT_INDENT, line, cursor), runs);
+  // A checkbox belongs to a list item's structure; without a list marker the
+  // brackets and space are the paragraph's own text.
+  const checkbox = listItem ? pastMatch(TASK_CHECKBOX, line, cursor) : cursor;
+  if (checkbox > cursor) {
+    cursor = takeMarkRun(line, checkbox, runs);
+  }
+  let opener = pastOpener(line, cursor);
+  while (opener > cursor) {
+    cursor = takeMarkRun(line, opener, runs);
+    opener = pastOpener(line, cursor);
+  }
+  const span = pastMatch(BACKTICK_RUN, line, cursor);
+  if (span > cursor) {
+    takeMarkRun(line, span, runs);
+  }
+  // A mark just inside the opening backticks is still the block's first
+  // character and went above; from the span's own text to the end of the line
+  // nothing more is dropped, because that is code the content wrote and a mark
+  // deeper inside it orders the code run it was written for.
+  return withoutRuns(line, runs);
 }
 
 /**
@@ -474,13 +583,23 @@ function stripLineMarks(line: string, quoted: number, body: string): string {
  * above it (the design gate's markdown fallback block measured exactly that).
  * A mark in front of a block's first character names that block's edge and
  * nothing else, so removing it there leaves the block's own letter to decide;
- * a mark inside a block's text still orders the run it was written for, and
- * code keeps every character it holds. Nothing is added: a block with no letter
- * at all takes the message's direction from the renderer's container.
+ * a mark inside a block's text still orders the run it was written for.
+ * Nothing is added: a block with no letter at all takes the message's direction
+ * from the renderer's container.
  *
  * A block starts at the first line, after a blank line, and at a list,
- * blockquote or heading line's own content after its marker. A continuation
- * line of a paragraph or of a list item keeps its marks.
+ * blockquote or heading line's own content after its marker. Its content may
+ * open on further machinery and markup — indentation, a task checkbox, emphasis,
+ * a link or image label — so the mark is found through all of it, in front of
+ * the block's first real character rather than its marker. A continuation line
+ * of a paragraph or of a list item keeps its marks.
+ *
+ * Fenced and indented code keep every character they hold. An inline code span
+ * is the one place where the two rules meet: a mark as a span's first character
+ * is also the block's first character, so it goes (as in `` `‏Latin code` ``),
+ * while a mark deeper inside the span is part of the code written there and
+ * stays. A reference link label keeps its mark, because a reference is looked
+ * up by a key of its label's text.
  */
 export function withoutLeadingDirectionMarks(markdown: string): string {
   if (!DIRECTION_MARK.test(markdown)) {
@@ -497,9 +616,16 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     const opensFence = FENCE_START.test(body);
     // Code is copy in its own right: a mark inside it is part of the code.
     const code = inFence || (previousBlank && INDENTED_CODE.test(body));
-    const startsBlock = previousBlank || LIST_START.test(body) || HEADING_START.test(body);
+    // A list item or heading's own marker is line machinery its content follows;
+    // a continuation line has none and keeps its marks.
+    const list = LIST_START.exec(body);
+    const heading = list === null ? HEADING_START.exec(body) : null;
+    const marker = (list ?? heading)?.[0].length ?? 0;
+    const startsBlock = previousBlank || marker > 0;
     const stripped =
-      opensFence || code || blank || !startsBlock ? line : stripLineMarks(line, quoted, body);
+      opensFence || code || blank || !startsBlock
+        ? line
+        : stripLineMarks(line, quoted + marker, list !== null);
     if (opensFence) {
       inFence = !inFence;
     }

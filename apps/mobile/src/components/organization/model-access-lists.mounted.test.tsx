@@ -1,29 +1,34 @@
-import { createElement } from 'react';
+import { createElement, Fragment } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
+import { TAB_SCREEN_TRAILING_GAP } from '@/components/tab-screen';
 
-import { ProviderAllowList } from './model-access-lists';
+import { ModelDenyList, ProviderAllowList } from './model-access-lists';
 
 // FlashList renders through callbacks, so a host-string mock would drop both the
 // rows and the empty state. This mock mirrors the real list: the header always,
 // the rows through `renderItem`, and the empty component only when data is empty.
+// The two style props are forwarded so a test reads the frame and content
+// reservations the component sets.
 vi.mock('@shopify/flash-list', async () => {
   // `vi.mock` factories hoist above this file's imports, so `react` is loaded
   // from inside the factory; a static import would not be defined yet.
   const React = await import('react');
   return {
     FlashList: (props: {
-      data: readonly string[];
-      renderItem?: (info: { item: string; index: number }) => React.ReactNode;
+      data: readonly unknown[];
+      renderItem?: (info: { item: unknown; index: number }) => React.ReactNode;
       ListHeaderComponent?: React.ReactNode;
       ListEmptyComponent?: React.ReactNode;
+      style?: unknown;
+      contentContainerStyle?: unknown;
     }) =>
       React.createElement(
         'FlashList',
-        null,
+        { style: props.style, contentContainerStyle: props.contentContainerStyle },
         props.ListHeaderComponent,
         ...props.data.map((item, index) => props.renderItem?.({ item, index })),
         props.data.length === 0 ? props.ListEmptyComponent : null
@@ -31,9 +36,46 @@ vi.mock('@shopify/flash-list', async () => {
   };
 });
 vi.mock('react-native', () => ({ View: 'View' }));
-// The frame's tab-bar clearance needs the tabs layout; these lists only use it
-// as bottom padding, which no assertion here reads.
-vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+// The lists draw the tab-screen frame, so its own logic runs: only the pieces
+// it reads from outside are fixed, the tab bar's height and the keyboard.
+const frame = vi.hoisted(() => ({ tabBarHeight: 56, keyboardHeight: 300 }));
+const keyboard = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    height: 0,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setHeight: (height: number) => {
+      keyboard.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboard.height;
+  return {
+    useKeyboardState: (selector?: (snapshot: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboard.subscribe, heightOf, heightOf);
+      const snapshot = { height, isVisible: height > 0, progress: height > 0 ? 1 : 0, duration: 0 };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
+// The tabs layout publishes the rendered bar height; this suite fixes it so the
+// frame's reserve is a number a test can name.
+vi.mock('@/lib/tab-bar-clearance', () => ({
+  useEffectiveTabBarHeight: () => frame.tabBarHeight,
+}));
+vi.mock('@/lib/screen-insets', () => ({ useSideInsetMarginStyle: () => undefined }));
 // The search field is driven through its own `onChangeText`, the query the
 // component keeps in state; the field's own layout has its own suite.
 vi.mock('@/components/ui/search-field', () => ({ SearchField: 'SearchField' }));
@@ -64,6 +106,68 @@ async function mount(providers: readonly string[], names: Readonly<Record<string
   );
   renderer = view.renderer;
   return view.renderer.root;
+}
+
+const DENY_MODELS = [{ id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' }];
+
+/** Both lists of the Providers and models tab, as the form renders them. */
+async function mountBothLists() {
+  const view = await renderWithProviders(
+    createElement(
+      Fragment,
+      null,
+      createElement(ProviderAllowList, {
+        providers: ['anthropic'],
+        names: {},
+        draft: DRAFT,
+        onChange: () => undefined,
+        disabled: false,
+      }),
+      createElement(ModelDenyList, {
+        models: DENY_MODELS,
+        draft: DRAFT,
+        onChange: () => undefined,
+        disabled: false,
+      })
+    )
+  );
+  renderer = view.renderer;
+  return view.renderer.root;
+}
+
+/**
+ * Each list's frame wrapper: the `View` host node the list renders inside, in
+ * the order the two lists render. The mocked FlashList component sits between
+ * the list node and that host node, so the walk skips it.
+ */
+function listFrames(root: ReactTestRenderer['root']) {
+  return root.findAll(node => Object.is(node.type, 'FlashList')).map(list => {
+    for (let node = list.parent; node; node = node.parent) {
+      if (Object.is(node.type, 'View')) {
+        return node;
+      }
+    }
+    throw new Error('the list renders outside its frame');
+  });
+}
+
+/** The margin each list's frame reserves at the window's bottom edge. */
+function frameMargins(root: ReactTestRenderer['root']) {
+  return listFrames(root).map(node => {
+    const style: unknown = node.props.style;
+    if (typeof style !== 'object' || style === null || !('marginBottom' in style)) {
+      return undefined;
+    }
+    const { marginBottom } = style;
+    return typeof marginBottom === 'number' ? marginBottom : undefined;
+  });
+}
+
+/** The content-container style each list sets on its rows. */
+function listContentStyles(root: ReactTestRenderer['root']) {
+  return root
+    .findAll(node => Object.is(node.type, 'FlashList'))
+    .map(node => node.props.contentContainerStyle);
 }
 
 function typeQuery(root: ReactTestRenderer['root'], text: string) {
@@ -99,6 +203,8 @@ beforeEach(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  // The keyboard store outlives one mount; every case starts with it down.
+  keyboard.setHeight(0);
 });
 
 describe('ProviderAllowList empty state', () => {
@@ -193,5 +299,49 @@ describe('ProviderAllowList rows', () => {
     typeQuery(root, 'router');
 
     expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: undefined }]);
+  });
+});
+
+// A filtered result's empty state is centred in the list's viewport, so the
+// viewport must end above the software keyboard. The frame reserves the IME
+// band while the keyboard is up, and the tab-bar band — which hides with the
+// keyboard — while it is down.
+describe('Model access lists keyboard frame', () => {
+  it('reserves the tab-bar band in both list frames while the keyboard is down', async () => {
+    const root = await mountBothLists();
+
+    expect(listFrames(root)).toHaveLength(2);
+    expect(frameMargins(root)).toEqual([frame.tabBarHeight, frame.tabBarHeight]);
+  });
+
+  it('replaces the tab-bar band with the keyboard band in both list frames', async () => {
+    await mountBothLists();
+
+    act(() => {
+      keyboard.setHeight(frame.keyboardHeight);
+    });
+
+    // Re-read the mounted tree after the keyboard landed.
+    const live = renderer?.root;
+    if (!live) {
+      throw new Error('renderer is not mounted');
+    }
+    expect(frameMargins(live)).toEqual([frame.keyboardHeight, frame.keyboardHeight]);
+    // The bar hides with the keyboard, so its band is replaced, never stacked.
+    expect(frameMargins(live)).not.toContain(frame.tabBarHeight);
+  });
+
+  it('keeps only the trailing gap on the list content', async () => {
+    const root = await mountBothLists();
+
+    expect(listContentStyles(root)).toEqual([
+      { paddingBottom: TAB_SCREEN_TRAILING_GAP },
+      { paddingBottom: TAB_SCREEN_TRAILING_GAP },
+    ]);
+    // The band lives on the frame alone; leaving it on the content as well
+    // would double the reserve.
+    expect(listContentStyles(root)).not.toContainEqual({
+      paddingBottom: frame.tabBarHeight + TAB_SCREEN_TRAILING_GAP,
+    });
   });
 });

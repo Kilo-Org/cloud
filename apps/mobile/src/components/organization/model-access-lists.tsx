@@ -11,7 +11,7 @@ import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
 import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { TAB_SCREEN_TRAILING_GAP, useTabScreenFrame } from '@/components/tab-screen';
 import {
   type DenyListModel,
   denyListRowNote,
@@ -24,6 +24,12 @@ import {
 } from '@/lib/organization/model-access';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
+
+// The frame reserves the tab-bar band, or the IME band while the keyboard is
+// up, so the content keeps only the room below its last row.
+const listContentStyle = {
+  paddingBottom: TAB_SCREEN_TRAILING_GAP,
+} satisfies ViewStyle;
 
 /** The search field and filter row both lists carry above their rows. */
 function ListHeader({
@@ -94,8 +100,7 @@ export function ProviderAllowList({
 }>) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
-  const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingBottom };
+  const { frameStyle, measureFrame } = useTabScreenFrame();
   // A row is searchable by its slug and by the name it shows, so a query typed
   // from either answer finds it.
   const shown = providers.filter(provider => matchesSearch([provider, names[provider]], search));
@@ -136,49 +141,54 @@ export function ProviderAllowList({
     : t('organizationModelAccess.providersNone');
 
   return (
-    <FlashList
-      data={shown}
-      keyExtractor={provider => provider}
-      renderItem={renderItem}
-      style={listStyle}
-      contentContainerClassName="px-4"
-      contentContainerStyle={contentContainerStyle}
-      keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={
-        <ListHeader
-          description={t('organizationModelAccess.providersDescription')}
-          searchPlaceholder={t('profile.providerKeys.searchProviders')}
-          search={search}
-          onSearchChange={setSearch}
-          showControls={showControls}
-          bulk={
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={disabled || shown.length === 0}
-                onPress={() => {
-                  onChange(setProvidersAllowed(draft, shown, true));
-                }}
-              >
-                <Text>{t('organizationModelAccess.allowAllShown')}</Text>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={disabled || shown.length === 0}
-                onPress={() => {
-                  onChange(setProvidersAllowed(draft, shown, false));
-                }}
-              >
-                <Text>{t('organizationModelAccess.denyAllShown')}</Text>
-              </Button>
-            </>
-          }
-        />
-      }
-      ListEmptyComponent={<NoMatch label={emptyLabel} />}
-    />
+    // The frame reserves the tab-bar band, or the IME band while the keyboard
+    // is up, so a filtered result's empty state stays above the keyboard. The
+    // IME band replaces the tab-bar band rather than stacking on it.
+    <View className="flex-1" style={frameStyle} onLayout={measureFrame}>
+      <FlashList
+        data={shown}
+        keyExtractor={provider => provider}
+        renderItem={renderItem}
+        style={listStyle}
+        contentContainerClassName="px-4"
+        contentContainerStyle={listContentStyle}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <ListHeader
+            description={t('organizationModelAccess.providersDescription')}
+            searchPlaceholder={t('profile.providerKeys.searchProviders')}
+            search={search}
+            onSearchChange={setSearch}
+            showControls={showControls}
+            bulk={
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={disabled || shown.length === 0}
+                  onPress={() => {
+                    onChange(setProvidersAllowed(draft, shown, true));
+                  }}
+                >
+                  <Text>{t('organizationModelAccess.allowAllShown')}</Text>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={disabled || shown.length === 0}
+                  onPress={() => {
+                    onChange(setProvidersAllowed(draft, shown, false));
+                  }}
+                >
+                  <Text>{t('organizationModelAccess.denyAllShown')}</Text>
+                </Button>
+              </>
+            }
+          />
+        }
+        ListEmptyComponent={<NoMatch label={emptyLabel} />}
+      />
+    </View>
   );
 }
 
@@ -203,8 +213,7 @@ export function ModelDenyList({
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [deniedOnly, setDeniedOnly] = useState(false);
-  const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingBottom };
+  const { frameStyle, measureFrame } = useTabScreenFrame();
   const shown = models.filter(
     model =>
       matchesSearch([model.name, model.id], search) &&
@@ -243,56 +252,61 @@ export function ModelDenyList({
   })();
 
   return (
-    <FlashList
-      data={shown}
-      keyExtractor={model => model.id}
-      renderItem={renderItem}
-      style={listStyle}
-      contentContainerClassName="px-4"
-      contentContainerStyle={contentContainerStyle}
-      keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={
-        <ListHeader
-          description={t('organizationModelAccess.modelsDescription')}
-          searchPlaceholder={t('common.searchModels')}
-          search={search}
-          onSearchChange={setSearch}
-          filter={
-            <FilterChip
-              label={t('organizationModelAccess.modelsDeniedOnly')}
-              selected={deniedOnly}
-              onPress={() => {
-                setDeniedOnly(current => !current);
-              }}
-            />
-          }
-          bulk={
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={disabled || shownIds.length === 0}
+    // The frame reserves the tab-bar band, or the IME band while the keyboard
+    // is up, so a filtered result's empty state stays above the keyboard. The
+    // IME band replaces the tab-bar band rather than stacking on it.
+    <View className="flex-1" style={frameStyle} onLayout={measureFrame}>
+      <FlashList
+        data={shown}
+        keyExtractor={model => model.id}
+        renderItem={renderItem}
+        style={listStyle}
+        contentContainerClassName="px-4"
+        contentContainerStyle={listContentStyle}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <ListHeader
+            description={t('organizationModelAccess.modelsDescription')}
+            searchPlaceholder={t('common.searchModels')}
+            search={search}
+            onSearchChange={setSearch}
+            filter={
+              <FilterChip
+                label={t('organizationModelAccess.modelsDeniedOnly')}
+                selected={deniedOnly}
                 onPress={() => {
-                  onChange(setModelsAllowed(draft, shownIds, true));
+                  setDeniedOnly(current => !current);
                 }}
-              >
-                <Text>{t('organizationModelAccess.allowAllShown')}</Text>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={disabled || shownIds.length === 0}
-                onPress={() => {
-                  onChange(setModelsAllowed(draft, shownIds, false));
-                }}
-              >
-                <Text>{t('organizationModelAccess.denyAllShown')}</Text>
-              </Button>
-            </>
-          }
-        />
-      }
-      ListEmptyComponent={<NoMatch label={emptyLabel} />}
-    />
+              />
+            }
+            bulk={
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={disabled || shownIds.length === 0}
+                  onPress={() => {
+                    onChange(setModelsAllowed(draft, shownIds, true));
+                  }}
+                >
+                  <Text>{t('organizationModelAccess.allowAllShown')}</Text>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={disabled || shownIds.length === 0}
+                  onPress={() => {
+                    onChange(setModelsAllowed(draft, shownIds, false));
+                  }}
+                >
+                  <Text>{t('organizationModelAccess.denyAllShown')}</Text>
+                </Button>
+              </>
+            }
+          />
+        }
+        ListEmptyComponent={<NoMatch label={emptyLabel} />}
+      />
+    </View>
   );
 }

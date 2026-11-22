@@ -294,8 +294,15 @@ internal object SessionNotifications {
     }
     // The post landed: record the superseded ask before retiring it, so a
     // process that dies between these two steps cannot leave its record behind
-    // with nothing left to name it.
-    sweepRetiring(context, card.sessionId)
+    // with nothing left to name it. The asks a crash left recorded are swept
+    // here too, except the request this card shows and the request the previous
+    // card showed: a repeat of either carries the same key, so sweeping one
+    // would leave a card in the shade answering nothing.
+    sweepRetiring(
+      context,
+      card.sessionId,
+      setOfNotNull(card.approvalKey, previousApprovalKey)
+    )
     if (previousApprovalKey != null && previousApprovalKey != card.approvalKey) {
       retire(context, card.sessionId, previousApprovalKey)
     }
@@ -348,16 +355,29 @@ internal object SessionNotifications {
     updateRetiring(context, sessionId) { keys -> keys - approvalKey }
   }
 
-  /** Cancel every record a superseded ask left named for this session. */
-  private fun sweepRetiring(context: Context, sessionId: String) {
-    val keys = retiring(context, sessionId)
-    if (keys.isEmpty()) {
+  /**
+   * Cancel every record a superseded ask left named for this session, except the
+   * asks `keep` names.
+   *
+   * A crash can leave an ask recorded that a card in the shade still answers: a
+   * repeat of one request carries the same key, so the card a later post shows
+   * can be the recorded ask itself. Cancelling it would leave that card's
+   * Approve action answering nothing, so the kept asks stay recorded until a
+   * teardown removes the card that shows them.
+   */
+  private fun sweepRetiring(
+    context: Context,
+    sessionId: String,
+    keep: Set<String> = emptySet()
+  ) {
+    val cancelled = retiring(context, sessionId) - keep
+    if (cancelled.isEmpty()) {
       return
     }
-    for (key in keys) {
+    for (key in cancelled) {
       ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, key)
     }
-    updateRetiring(context, sessionId) { emptySet() }
+    updateRetiring(context, sessionId) { keys -> keys - cancelled }
   }
 
   /** The superseded asks of one session that a later pass still has to retire. */
@@ -402,9 +422,17 @@ internal object SessionNotifications {
     editor.commitOrReport("Cannot restore the followed session card")
   }
 
-  /** The ask one stored card answers, or null when it stores none. */
+  /** The ask one stored card answers, or null when it stores none or cannot be read. */
   private fun approvalKeyOf(stored: String?): String? =
-    stored?.let { SessionNotificationCard().apply { fillFromJson(JSONObject(it)) }.approvalKey }
+    stored?.let {
+      try {
+        SessionNotificationCard().apply { fillFromJson(JSONObject(it)) }.approvalKey
+      } catch (error: JSONException) {
+        // An entry that cannot be read names no ask to keep, and it must not
+        // take the post down before the card is posted.
+        null
+      }
+    }
 
   /**
    * Arm the quiet moment of a Working card, or disarm it for every other card.

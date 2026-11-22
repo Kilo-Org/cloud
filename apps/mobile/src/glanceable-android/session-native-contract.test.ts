@@ -288,7 +288,7 @@ describe('a post that does not land leaves the card answering the request it sho
 
   it('retires the superseded ask only after the card is posted, and records it first', () => {
     const notify = post.indexOf('manager(context).notify(');
-    const sweep = post.indexOf('sweepRetiring(context, card.sessionId)');
+    const sweep = post.indexOf('sweepRetiring(');
     const retire = post.indexOf('retire(context, card.sessionId, previousApprovalKey)');
     expect(notify, 'post must post the card').toBeGreaterThan(-1);
     expect(sweep, 'post must sweep an ask a crash left recorded').toBeGreaterThan(notify);
@@ -301,6 +301,34 @@ describe('a post that does not land leaves the card answering the request it sho
     expect(record, 'retire must record the ask first').toBeGreaterThan(-1);
     expect(cancel).toBeGreaterThan(record);
     expect(retireBody.slice(cancel)).toContain('keys -> keys - approvalKey');
+  });
+
+  it('sweeps every recorded ask but the ones a card in the shade answers', () => {
+    // A repeat of one request carries the same key, so a recorded ask can be
+    // the ask a card still shows. Cancelling it would leave that card's Approve
+    // action answering nothing, so both asks are kept: the one this card shows
+    // and the one the previous card showed, which survives a failed post.
+    expect(post).toMatch(
+      /sweepRetiring\(\s+context,\s+card\.sessionId,\s+setOfNotNull\(card\.approvalKey, previousApprovalKey\)\s+\)/
+    );
+    const sweep = body(NOTIFICATIONS, 'private fun sweepRetiring(');
+    expect(sweep).toContain('retiring(context, sessionId) - keep');
+    expect(sweep).toContain('updateRetiring(context, sessionId) { keys -> keys - cancelled }');
+    // The teardown removes the cards themselves, so it keeps nothing.
+    expect(body(NOTIFICATIONS, 'fun cancel(')).toContain('sweepRetiring(context, sessionId)');
+  });
+
+  it('keeps the post alive when a stored entry cannot be read', () => {
+    const askOf = body(NOTIFICATIONS, 'private fun approvalKeyOf(');
+    const attempt = askOf.indexOf('try {');
+    const parse = askOf.indexOf('SessionNotificationCard().apply { fillFromJson(JSONObject(it)) }');
+    const guard = askOf.indexOf('catch (error: JSONException)');
+    expect(attempt, 'the stored entry must be parsed in a guard').toBeGreaterThan(-1);
+    expect(parse, 'the stored entry must be parsed').toBeGreaterThan(attempt);
+    expect(guard, 'an unreadable entry must be caught').toBeGreaterThan(parse);
+    expect(askOf.slice(guard), 'the catch must answer no ask').toMatch(
+      /catch \(error: JSONException\) \{[\s\S]*?\bnull\b/
+    );
   });
 
   it('retires an ask a crash left recorded from the teardown too', () => {

@@ -641,7 +641,10 @@
       "diffTooLarge": "તફાવત ખૂબ મોટો છે",
       "openFile": "{{path}} ખોલો",
       "openFileViewed": "{{path}} ખોલો (જોયેલી)",
-      "title": "ફાઇલો"
+      "title": "ફાઇલો",
+      "binaryDiff": "બાઇનરી ફાઇલ",
+      "diffUnavailable": "પ્રદાતા તરફથી કોઈ તફાવત નથી",
+      "contentUnchanged": "સામગ્રીમાં કોઈ ફેરફાર નથી"
     },
     "fileRows": {
       "markViewed": "{{path}}ને જોયેલી તરીકે ચિહ્નિત કરો",
@@ -650,9 +653,12 @@
       "expandFile": "ફાઇલની વિગતો બતાવો",
       "diffTooLarge": "તફાવત એટલો મોટો છે કે તેને બતાવી શકાતો નથી.",
       "noPreview": "આ ફાઇલનું પૂર્વાવલોકન ઉપલબ્ધ નથી",
-      "openOnGitHub": "GitHub પર ખોલો",
-      "openDiffOnGitHub": "આ ફાઇલનો તફાવત GitHub પર ખોલો",
-      "githubDiff": "GitHub પરનો તફાવત"
+      "binaryDiff": "આ બાઇનરી ફાઇલ માટે બતાવવા કોઈ તફાવત નથી",
+      "diffUnavailable": "આ પ્રદાતા ફાઇલ તફાવતો મોકલતું નથી",
+      "contentUnchanged": "આ ફાઇલમાં સામગ્રીમાં કોઈ ફેરફાર નથી",
+      "openOnProvider": "આ ફાઇલ {{provider}} પર ખોલો",
+      "openDiffOnProvider": "આ ફાઇલનો તફાવત {{provider}} પર ખોલો",
+      "providerDiff": "{{provider}} પરનો તફાવત"
     },
     "floatingActions": {
       "clearSelection": "પસંદગી દૂર કરો",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "મર્જ કરતાં પહેલાં બેઝ બ્રાન્ચમાંથી ફેરફારો લઈને આ બ્રાન્ચ અપડેટ કરો અથવા રીબેઝ કરો.",
         "behindDetail": "હેડ બ્રાન્ચ બેઝ બ્રાન્ચ કરતાં પાછળ છે. મર્જ કરતાં પહેલાં બ્રાન્ચ રીબેઝ કરો અથવા અપડેટ કરો.",
         "notMergeableTitle": "આ પુલ રિક્વેસ્ટ હજુ મર્જ કરી શકાતી નથી",
-        "notMergeableDetail": "GitHubએ મર્જ કરવાની સ્થિતિ {{state}} દર્શાવી છે."
+        "notMergeableDetail": "GitHubએ મર્જ કરવાની સ્થિતિ {{state}} દર્શાવી છે.",
+        "notOpenDetail": "ફક્ત ખુલ્લી {{term}} જ મર્જ કરી શકાય છે.",
+        "unresolvedDiscussionsDetail": "મર્જ કરતાં પહેલાં બધી ચર્ચાઓ ઉકેલો.",
+        "unresolvedTasksDetail": "મર્જ કરતાં પહેલાં બધા ખુલ્લા કાર્યો ઉકેલો.",
+        "otherDetail": "પ્રદાતા કોઈ એવા કારણસર આ મર્જને અવરોધે છે જે તેણે જણાવ્યું નથી."
       },
       "restrictions": {
         "title": "મર્જ મર્યાદાઓ",
@@ -1106,7 +1116,8 @@
       "modified": "ફેરફાર કરેલી",
       "renamed": "નામ બદલેલી",
       "copied": "કૉપિ થઈ",
-      "changed": "બદલાયેલી"
+      "changed": "બદલાયેલી",
+      "unknown": "ફેરફારનો પ્રકાર જણાવેલ નથી"
     },
     "diff": {
       "selectedTapToChange": "{{label}} પસંદ કરેલું છે, પસંદગી બદલવા ટૅપ કરો",

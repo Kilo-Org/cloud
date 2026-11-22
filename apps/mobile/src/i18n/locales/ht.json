@@ -641,7 +641,10 @@
       "diffTooLarge": "diferans kòd yo twò gwo",
       "openFile": "Louvri {{path}}",
       "openFileViewed": "Louvri {{path}} (deja wè)",
-      "title": "Fichye"
+      "title": "Fichye",
+      "binaryDiff": "fichye binè",
+      "diffUnavailable": "pa gen diferans kòd soti nan founisè a",
+      "contentUnchanged": "pa gen chanjman kontni"
     },
     "fileRows": {
       "markViewed": "Make {{path}} kòm deja wè",
@@ -650,9 +653,12 @@
       "expandFile": "Montre kontni fichye a",
       "diffTooLarge": "Diferans kòd yo twò gwo pou afiche.",
       "noPreview": "Pa gen apèsi disponib pou fichye sa a",
-      "openOnGitHub": "Louvri sou GitHub",
-      "openDiffOnGitHub": "Louvri diferans kòd fichye sa a sou GitHub",
-      "githubDiff": "Diferans kòd sou GitHub"
+      "binaryDiff": "Pa gen diferans kòd pou afiche pou fichye binè sa a",
+      "diffUnavailable": "Founisè sa a pa voye diferans kòd fichye yo",
+      "contentUnchanged": "Pa gen chanjman kontni nan fichye sa a",
+      "openOnProvider": "Louvri fichye sa a sou {{provider}}",
+      "openDiffOnProvider": "Louvri diferans kòd fichye sa a sou {{provider}}",
+      "providerDiff": "Diferans kòd sou {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Anile seleksyon an",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Mete branch lan ajou apati branch baz la, oswa chanje baz li, anvan ou fizyonnen li.",
         "behindDetail": "Branch sous la anreta sou branch baz la. Chanje baz branch sous la oswa mete li ajou anvan ou fizyonnen li.",
         "notMergeableTitle": "Demann sa a poko ka fizyonnen",
-        "notMergeableDetail": "GitHub endike eta {{state}} pou posiblite fizyon an."
+        "notMergeableDetail": "GitHub endike eta {{state}} pou posiblite fizyon an.",
+        "notOpenDetail": "Se sèlman yon {{term}} ouvè ki ka fizyonnen.",
+        "unresolvedDiscussionsDetail": "Rezoud tout diskisyon yo anvan ou fizyonnen.",
+        "unresolvedTasksDetail": "Rezoud tout tach ki ouvè yo anvan ou fizyonnen.",
+        "otherDetail": "Founisè a ap bloke fizyon sa a pou yon rezon li pa nonmen."
       },
       "restrictions": {
         "title": "Restriksyon fizyon",
@@ -1106,7 +1116,8 @@
       "modified": "Modifye",
       "renamed": "Non chanje",
       "copied": "Kopye",
-      "changed": "Chanje"
+      "changed": "Chanje",
+      "unknown": "Tip chanjman pa rapòte"
     },
     "diff": {
       "selectedTapToChange": "{{label}} chwazi, peze pou chanje seleksyon an",

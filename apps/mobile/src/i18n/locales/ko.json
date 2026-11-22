@@ -3070,7 +3070,10 @@
       "viewedCount_other": "{{total}}개 중 {{viewed}}개 확인함",
       "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
       "viewedOfListed_one": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
-      "viewedOfListed_other": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
+      "viewedOfListed_other": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
+      "binaryDiff": "바이너리 파일",
+      "diffUnavailable": "제공자로부터 변경 내용 없음",
+      "contentUnchanged": "내용 변경 없음"
     },
     "fileRows": {
       "collapseFile": "파일 접기",
@@ -3078,10 +3081,13 @@
       "noPreview": "이 파일은 미리 보기를 사용할 수 없습니다",
       "expandFile": "파일 펼치기",
       "markViewed": "{{path}} 확인함으로 표시",
-      "openDiffOnGitHub": "GitHub에서 이 파일의 변경 내용 열기",
-      "openOnGitHub": "GitHub에서 열기",
       "unmarkViewed": "{{path}} 확인 표시 해제",
-      "githubDiff": "GitHub 변경 내용"
+      "binaryDiff": "이 바이너리 파일에는 표시할 변경 내용이 없습니다.",
+      "diffUnavailable": "이 제공자는 파일 변경 내용을 전송하지 않습니다.",
+      "contentUnchanged": "이 파일에는 내용 변경이 없습니다.",
+      "openOnProvider": "{{provider}}에서 이 파일 열기",
+      "openDiffOnProvider": "{{provider}}에서 이 파일의 변경 내용 열기",
+      "providerDiff": "{{provider}} 변경 내용"
     },
     "floatingActions": {
       "clear": "해제",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "병합 전에 기준 브랜치의 변경 사항으로 브랜치를 업데이트하거나 리베이스하세요.",
         "behindDetail": "현재 브랜치에 기준 브랜치의 최신 변경 사항이 반영되지 않았습니다. 병합 전에 브랜치를 리베이스하거나 업데이트하세요.",
         "notMergeableTitle": "아직 병합할 수 없는 풀 리퀘스트",
-        "notMergeableDetail": "GitHub에서 확인한 병합 가능 상태는 {{state}}입니다."
+        "notMergeableDetail": "GitHub에서 확인한 병합 가능 상태는 {{state}}입니다.",
+        "notOpenDetail": "열려 있는 {{term}}만 병합할 수 있습니다.",
+        "unresolvedDiscussionsDetail": "병합 전에 모든 논의를 해결하세요.",
+        "unresolvedTasksDetail": "병합 전에 열려 있는 모든 작업을 해결하세요.",
+        "otherDetail": "제공자가 명시하지 않은 이유로 이 병합을 차단하고 있습니다."
       },
       "restrictions": {
         "title": "병합 제한",
@@ -3326,7 +3336,8 @@
       "changed": "변경됨",
       "copied": "복사 완료",
       "modified": "수정됨",
-      "renamed": "이름 변경됨"
+      "renamed": "이름 변경됨",
+      "unknown": "변경 유형이 보고되지 않음"
     },
     "tabs": {
       "discussion": "토론",

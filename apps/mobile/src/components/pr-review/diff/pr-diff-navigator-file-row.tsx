@@ -4,6 +4,7 @@
 // trailing mark-viewed icon toggle flips the per-PR viewed set without
 // dismissing — non-nested sibling of the select pressable (AC6).
 
+import { type ProviderPrFilePatchMissingCause } from '@kilocode/app-shared/provider-review';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -22,6 +23,18 @@ function splitPath(path: string) {
   }
   return { dir: path.slice(0, slash + 1), basename: path.slice(slash + 1) };
 }
+
+/**
+ * One key per reason a file has no patch. The record is exhaustive, so a cause
+ * added to the contract fails this module instead of painting a raw word; a
+ * file that carried a patch says nothing here, because its counts fill the line.
+ */
+const PATCH_MISSING_NOTE_KEY = {
+  too_large: 'prReview.fileNavigator.diffTooLarge',
+  binary: 'prReview.fileNavigator.binaryDiff',
+  provider_omitted: 'prReview.fileNavigator.diffUnavailable',
+  content_unchanged: 'prReview.fileNavigator.contentUnchanged',
+} as const satisfies Record<ProviderPrFilePatchMissingCause, string>;
 
 export function NavigatorFileRow({
   file,
@@ -45,6 +58,8 @@ export function NavigatorFileRow({
     directoryRun === null
       ? `${LTR_ISOLATE_OPEN}${basename}${LTR_ISOLATE_CLOSE}`
       : `${basename}${LTR_ISOLATE_CLOSE}`;
+  const missingNote =
+    file.patchMissingCause === null ? null : t(PATCH_MISSING_NOTE_KEY[file.patchMissingCause]);
   return (
     <View className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft bg-card px-4 py-2.5">
       <Pressable
@@ -89,11 +104,11 @@ export function NavigatorFileRow({
             <Text variant="muted" className="text-xs">
               {isolateLtrBidiText(`-${file.deletions}`)}
             </Text>
-            {file.patchMissing ? (
+            {missingNote === null ? null : (
               <Text variant="muted" className="text-xs">
-                {t('prReview.fileNavigator.diffTooLarge')}
+                {missingNote}
               </Text>
-            ) : null}
+            )}
           </View>
         </View>
       </Pressable>

@@ -16,15 +16,15 @@ describe('sessionDiffFileToPrReviewFile', () => {
     expect(sessionDiffFileToPrReviewFile(file()).status).toBe('modified');
   });
 
-  it('keeps a text patch and marks an empty (binary) patch missing', () => {
+  it('keeps a text patch and names an empty (binary) patch a binary cause', () => {
     expect(sessionDiffFileToPrReviewFile(file())).toMatchObject({
       path: 'src/a.ts',
       previousPath: null,
       patch,
-      patchMissing: false,
+      patchMissingCause: null,
     });
     expect(
       sessionDiffFileToPrReviewFile(file({ patch: '', additions: 0, deletions: 0 }))
-    ).toMatchObject({ patch: null, patchMissing: true });
+    ).toMatchObject({ patch: null, patchMissingCause: 'binary' });
   });
 });

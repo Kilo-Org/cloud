@@ -650,7 +650,10 @@
       "diffTooLarge": "comparáid athruithe rómhór",
       "openFile": "Oscail {{path}}",
       "openFileViewed": "Oscail {{path}} (feicthe)",
-      "title": "Comhaid"
+      "title": "Comhaid",
+      "binaryDiff": "comhad dénártha",
+      "diffUnavailable": "gan comparáid athruithe ón soláthraí",
+      "contentUnchanged": "gan aon athrú ábhair"
     },
     "fileRows": {
       "markViewed": "Marcáil {{path}} mar fheicthe",
@@ -659,9 +662,12 @@
       "expandFile": "Leathnaigh an comhad",
       "diffTooLarge": "Tá an chomparáid athruithe rómhór le taispeáint.",
       "noPreview": "Níl réamhamharc ar fáil don chomhad seo",
-      "openOnGitHub": "Oscail ar GitHub",
-      "openDiffOnGitHub": "Oscail comparáid athruithe an chomhaid seo ar GitHub",
-      "githubDiff": "Comparáid athruithe GitHub"
+      "binaryDiff": "Níl aon chomparáid athruithe le taispeáint don chomhad dénártha seo",
+      "diffUnavailable": "Ní sheolann an soláthraí seo comparáidí athruithe comhad",
+      "contentUnchanged": "Níl aon athruithe ábhair sa chomhad seo",
+      "openOnProvider": "Oscail an comhad seo ar {{provider}}",
+      "openDiffOnProvider": "Oscail comparáid athruithe an chomhaid seo ar {{provider}}",
+      "providerDiff": "Comparáid athruithe {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Glan an roghnú",
@@ -806,7 +812,11 @@
         "behindDetailUpdatable": "Nuashonraigh an brainse ón mbunbrainse nó athbhunaigh é sula ndéanfaidh tú an cumasc.",
         "behindDetail": "Tá an brainse foinseach taobh thiar den bhunbrainse. Athbhunaigh nó nuashonraigh é sula ndéanfaidh tú an cumasc.",
         "notMergeableTitle": "Ní féidir an t-iarratas tarraingthe seo a chumasc go fóill",
-        "notMergeableDetail": "Thuairiscigh GitHub an stádas cumaisc seo: {{state}}."
+        "notMergeableDetail": "Thuairiscigh GitHub an stádas cumaisc seo: {{state}}.",
+        "notOpenDetail": "Ní féidir ach {{term}} atá oscailte a chumasc.",
+        "unresolvedDiscussionsDetail": "Réitigh na pléití go léir sula ndéanfaidh tú an cumasc.",
+        "unresolvedTasksDetail": "Réitigh na tascanna oscailte go léir sula ndéanfaidh tú an cumasc.",
+        "otherDetail": "Tá an soláthraí ag cur bac ar an gcumasc seo ar chúis nár ainmnigh sé."
       },
       "restrictions": {
         "title": "Srianta cumaisc",
@@ -1184,7 +1194,8 @@
       "modified": "Modhnaithe",
       "renamed": "Athainmnithe",
       "copied": "Cóipeáilte",
-      "changed": "Athraithe"
+      "changed": "Athraithe",
+      "unknown": "Cineál athraithe nár tuairiscíodh"
     },
     "diff": {
       "selectedTapToChange": "{{label}} roghnaithe, tapáil chun an roghnú a athrú",

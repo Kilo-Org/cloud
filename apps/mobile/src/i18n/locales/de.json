@@ -3070,7 +3070,10 @@
       "viewedCount_other": "{{viewed}} von {{total}} angesehen",
       "viewedOfListed": "{{viewed}} von {{total}} der aufgelisteten Dateien angesehen",
       "viewedOfListed_one": "{{viewed}} von {{total}} der aufgelisteten Dateien angesehen",
-      "viewedOfListed_other": "{{viewed}} von {{total}} der aufgelisteten Dateien angesehen"
+      "viewedOfListed_other": "{{viewed}} von {{total}} der aufgelisteten Dateien angesehen",
+      "binaryDiff": "Binärdatei",
+      "diffUnavailable": "kein Diff vom Anbieter",
+      "contentUnchanged": "keine Inhaltsänderung"
     },
     "fileRows": {
       "collapseFile": "Datei einklappen",
@@ -3078,10 +3081,13 @@
       "noPreview": "Keine Vorschau für diese Datei verfügbar",
       "expandFile": "Datei ausklappen",
       "markViewed": "{{path}} als angesehen markieren",
-      "openDiffOnGitHub": "Diff dieser Datei auf GitHub öffnen",
-      "openOnGitHub": "Auf GitHub öffnen",
       "unmarkViewed": "{{path}} als nicht angesehen markieren",
-      "githubDiff": "GitHub-Diff"
+      "binaryDiff": "Kein Diff für diese Binärdatei verfügbar",
+      "diffUnavailable": "Dieser Anbieter sendet keine Datei-Diffs.",
+      "contentUnchanged": "Keine Inhaltsänderungen in dieser Datei",
+      "openOnProvider": "Diese Datei auf {{provider}} öffnen",
+      "openDiffOnProvider": "Den Diff dieser Datei auf {{provider}} öffnen",
+      "providerDiff": "{{provider}}-Diff"
     },
     "floatingActions": {
       "clear": "Aufheben",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "Übernimm vor dem Zusammenführen die Änderungen aus dem Basis-Branch oder führe einen Rebase durch.",
         "behindDetail": "Im Quell-Branch fehlen aktuelle Änderungen aus dem Basis-Branch. Führe vor dem Zusammenführen einen Rebase durch oder aktualisiere den Quell-Branch.",
         "notMergeableTitle": "Dieser Pull-Request kann noch nicht zusammengeführt werden",
-        "notMergeableDetail": "GitHub meldet den Status zur Zusammenführbarkeit: {{state}}."
+        "notMergeableDetail": "GitHub meldet den Status zur Zusammenführbarkeit: {{state}}.",
+        "notOpenDetail": "Nur ein offener {{term}} kann zusammengeführt werden.",
+        "unresolvedDiscussionsDetail": "Löse alle Diskussionen vor dem Zusammenführen.",
+        "unresolvedTasksDetail": "Löse alle offenen Aufgaben vor dem Zusammenführen.",
+        "otherDetail": "Der Anbieter blockiert diesen Merge aus einem Grund, den er nicht genannt hat."
       },
       "restrictions": {
         "title": "Merge-Bedingungen",
@@ -3326,7 +3336,8 @@
       "changed": "Geändert",
       "copied": "Kopiert",
       "modified": "Geändert",
-      "renamed": "Umbenannt"
+      "renamed": "Umbenannt",
+      "unknown": "Änderungstyp nicht gemeldet"
     },
     "tabs": {
       "discussion": "Diskussion",

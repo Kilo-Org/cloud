@@ -641,7 +641,10 @@
       "diffTooLarge": "shumë ndryshime për t'u shfaqur",
       "openFile": "Hap {{path}}",
       "openFileViewed": "Hap {{path}} (i parë)",
-      "title": "Skedarë"
+      "title": "Skedarë",
+      "binaryDiff": "skedar binar",
+      "diffUnavailable": "pa ndryshime nga ofruesi",
+      "contentUnchanged": "pa ndryshime përmbajtjeje"
     },
     "fileRows": {
       "markViewed": "Shëno {{path}} si të parë",
@@ -650,9 +653,12 @@
       "expandFile": "Shfaq përmbajtjen e skedarit",
       "diffTooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur.",
       "noPreview": "Nuk ka parapamje për këtë skedar",
-      "openOnGitHub": "Hap në GitHub",
-      "openDiffOnGitHub": "Hap ndryshimet e këtij skedari në GitHub",
-      "githubDiff": "Ndryshimet në GitHub"
+      "binaryDiff": "Nuk ka ndryshime për t'u shfaqur në këtë skedar binar",
+      "diffUnavailable": "Ky ofrues nuk dërgon ndryshime skedarësh",
+      "contentUnchanged": "Nuk ka ndryshime përmbajtjeje në këtë skedar",
+      "openOnProvider": "Hap këtë skedar në {{provider}}",
+      "openDiffOnProvider": "Hap ndryshimet e këtij skedari në {{provider}}",
+      "providerDiff": "Ndryshimet në {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Pastro përzgjedhjen",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Përditëso degën nga dega bazë ose ribazoje përpara bashkimit.",
         "behindDetail": "Dega burimore nuk i përmban ndryshimet e fundit të degës bazë. Ribazoje ose përditësoje përpara bashkimit.",
         "notMergeableTitle": "Kjo kërkesë ende nuk mund të bashkohet",
-        "notMergeableDetail": "GitHub raportoi gjendjen {{state}} për mundësinë e bashkimit."
+        "notMergeableDetail": "GitHub raportoi gjendjen {{state}} për mundësinë e bashkimit.",
+        "notOpenDetail": "Vetëm një {{term}} në gjendje të hapur mund të bashkohet.",
+        "unresolvedDiscussionsDetail": "Zgjidh të gjitha diskutimet përpara bashkimit.",
+        "unresolvedTasksDetail": "Zgjidh të gjitha detyrat e hapura përpara bashkimit.",
+        "otherDetail": "Ofruesi po e bllokon këtë bashkim për një arsye që nuk e përmendi."
       },
       "restrictions": {
         "title": "Kufizime bashkimi",
@@ -1106,7 +1116,8 @@
       "modified": "I modifikuar",
       "renamed": "I riemërtuar",
       "copied": "U kopjua",
-      "changed": "I ndryshuar"
+      "changed": "I ndryshuar",
+      "unknown": "Lloji i ndryshimit nuk raportohet"
     },
     "diff": {
       "selectedTapToChange": "Përzgjedhja: {{label}}, prek për ta ndryshuar",

@@ -125,11 +125,16 @@ export const GitHubPrReviewFileSchema = z
   .object({
     path: z.string().min(1),
     previousPath: z.string().nullable(),
-    status: z.string(),
+    // Closed on purpose: the mapper normalizes GitHub's word through
+    // `providerPrFileStatus`, so the wire can never carry a word the review UI
+    // has no label for.
+    status: z.enum(['added', 'removed', 'modified', 'renamed', 'copied', 'changed', 'unknown']),
     additions: z.number().int().nonnegative(),
     deletions: z.number().int().nonnegative(),
     patch: z.string().nullable(),
-    patchMissing: z.boolean(),
+    patchMissingCause: z
+      .enum(['binary', 'too_large', 'provider_omitted', 'content_unchanged'])
+      .nullable(),
   })
   .strict();
 export type GitHubPrReviewFile = z.infer<typeof GitHubPrReviewFileSchema>;

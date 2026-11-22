@@ -641,7 +641,10 @@
       "diffTooLarge": "bambancin fayil ya yi yawa",
       "openFile": "Buɗe {{path}}",
       "openFileViewed": "Buɗe {{path}} (an duba)",
-      "title": "Fayiloli"
+      "title": "Fayiloli",
+      "binaryDiff": "fayil ɗin da ba rubutu ba",
+      "diffUnavailable": "babu bambanci daga mai samarwa",
+      "contentUnchanged": "babu canjin abun ciki"
     },
     "fileRows": {
       "markViewed": "Sa alamar an duba a {{path}}",
@@ -650,9 +653,12 @@
       "expandFile": "Nuna bayanan fayil",
       "diffTooLarge": "Bambancin fayil ya yi yawa don a nuna shi.",
       "noPreview": "Babu samfoti ga wannan fayil",
-      "openOnGitHub": "Buɗe a GitHub",
-      "openDiffOnGitHub": "Buɗe bambancin wannan fayil ɗin a GitHub",
-      "githubDiff": "Bambancin fayil a GitHub"
+      "binaryDiff": "Babu bambancin da za a nuna ga wannan fayil ɗin da ba rubutu ba",
+      "diffUnavailable": "Wannan mai samarwa ba ya aika bambancin fayil",
+      "contentUnchanged": "Babu canjin abun ciki a wannan fayil",
+      "openOnProvider": "Buɗe wannan fayil a {{provider}}",
+      "openDiffOnProvider": "Buɗe bambancin wannan fayil ɗin a {{provider}}",
+      "providerDiff": "Bambancin fayil a {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Cire zaɓin",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Sabunta reshen daga reshen tushe ko sake kafa tushensa kafin haɗawa.",
         "behindDetail": "Reshen da za a haɗa bai samu sabbin canje-canjen reshen tushe ba. Sake kafa tushensa ko sabunta shi kafin haɗawa.",
         "notMergeableTitle": "Ba za a iya haɗa wannan buƙatar haɗawa ba tukuna",
-        "notMergeableDetail": "GitHub ya ba da rahoton matsayin haɗawa: {{state}}."
+        "notMergeableDetail": "GitHub ya ba da rahoton matsayin haɗawa: {{state}}.",
+        "notOpenDetail": "{{term}} da ke buɗe ne kawai za a iya haɗawa.",
+        "unresolvedDiscussionsDetail": "Warware duk tattaunawa kafin haɗawa.",
+        "unresolvedTasksDetail": "Warware duk ayyukan da ke buɗe kafin haɗawa.",
+        "otherDetail": "Mai samarwa yana hana wannan haɗawa saboda wani dalili da bai ambata ba."
       },
       "restrictions": {
         "title": "Ƙuntatawan haɗawa",
@@ -1106,7 +1116,8 @@
       "modified": "An gyara",
       "renamed": "An canza suna",
       "copied": "An kwafi",
-      "changed": "An canza"
+      "changed": "An canza",
+      "unknown": "Ba a bayar da nau'in canji ba"
     },
     "diff": {
       "selectedTapToChange": "An zaɓi {{label}}, taɓa don canza zaɓin",

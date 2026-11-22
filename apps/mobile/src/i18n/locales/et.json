@@ -641,7 +641,10 @@
       "diffTooLarge": "liiga palju muudatusi",
       "openFile": "Ava {{path}}",
       "openFileViewed": "Ava {{path}} (vaadatud)",
-      "title": "Failid"
+      "title": "Failid",
+      "binaryDiff": "binaarfail",
+      "diffUnavailable": "teenusepakkujalt pole muudatusi",
+      "contentUnchanged": "sisu pole muutunud"
     },
     "fileRows": {
       "markViewed": "Märgi {{path}} vaadatuks",
@@ -650,9 +653,12 @@
       "expandFile": "Laienda fail",
       "diffTooLarge": "Muudatusi on kuvamiseks liiga palju",
       "noPreview": "Selle faili eelvaade pole saadaval",
-      "openOnGitHub": "Ava GitHubis",
-      "openDiffOnGitHub": "Ava selle faili muudatuste vaade GitHubis",
-      "githubDiff": "GitHubi muudatuste vaade"
+      "binaryDiff": "Selle binaarfaili jaoks pole muudatusi kuvada",
+      "diffUnavailable": "See teenusepakkuja ei saada faili muudatusi",
+      "contentUnchanged": "Selles failis pole sisumuudatusi",
+      "openOnProvider": "Ava see fail teenuses {{provider}}",
+      "openDiffOnProvider": "Ava selle faili muudatuste vaade teenuses {{provider}}",
+      "providerDiff": "{{provider}} muudatuste vaade"
     },
     "floatingActions": {
       "clearSelection": "Tühista valik",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Enne ühendamist värskenda haru alusharu muudatustega või baseeri haru ümber.",
         "behindDetail": "Lähteharus puuduvad alusharu uusimad muudatused. Enne ühendamist baseeri haru ümber või värskenda seda.",
         "notMergeableTitle": "Seda tõmbetaotlust ei saa veel ühendada",
-        "notMergeableDetail": "GitHub teatas ühendatavuse olekust {{state}}."
+        "notMergeableDetail": "GitHub teatas ühendatavuse olekust {{state}}.",
+        "notOpenDetail": "Ainult avatud {{term}} saab ühendada.",
+        "unresolvedDiscussionsDetail": "Lahenda enne ühendamist kõik arutelud.",
+        "unresolvedTasksDetail": "Lahenda enne ühendamist kõik avatud ülesanded.",
+        "otherDetail": "Teenusepakkuja blokeerib selle ühendamise põhjusel, mida ta ei nimetanud."
       },
       "restrictions": {
         "title": "Ühendamise tingimused",
@@ -1106,7 +1116,8 @@
       "modified": "Muudetud",
       "renamed": "Ümber nimetatud",
       "copied": "Kopeeritud",
-      "changed": "Muutunud"
+      "changed": "Muutunud",
+      "unknown": "Muudatuse tüüp pole teatatud"
     },
     "diff": {
       "selectedTapToChange": "Valitud {{label}}, puuduta valiku muutmiseks",

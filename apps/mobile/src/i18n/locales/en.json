@@ -737,6 +737,9 @@
       "retryLoadingMoreFiles": "Retry loading more files",
       "noMatches": "No files match \"{{query}}\"",
       "diffTooLarge": "diff too large",
+      "binaryDiff": "binary file",
+      "diffUnavailable": "no diff from provider",
+      "contentUnchanged": "no content change",
       "openFile": "Open {{path}}",
       "openFileViewed": "Open {{path}} (viewed)",
       "title": "Files"
@@ -747,10 +750,13 @@
       "collapseFile": "Collapse file",
       "expandFile": "Expand file",
       "diffTooLarge": "Diff too large to display",
+      "binaryDiff": "No diff to show for this binary file",
+      "diffUnavailable": "This provider does not send file diffs",
+      "contentUnchanged": "No content changes in this file",
       "noPreview": "No preview available for this file",
-      "openOnGitHub": "Open on GitHub",
-      "openDiffOnGitHub": "Open this file's diff on GitHub",
-      "githubDiff": "GitHub diff"
+      "openOnProvider": "Open this file on {{provider}}",
+      "openDiffOnProvider": "Open this file's diff on {{provider}}",
+      "providerDiff": "{{provider}} diff"
     },
     "floatingActions": {
       "clearSelection": "Clear selection",
@@ -874,7 +880,11 @@
         "behindDetailUpdatable": "Update the branch from the base, or rebase, before merging.",
         "behindDetail": "The head branch is behind the base. Rebase or update the branch before merging.",
         "notMergeableTitle": "This pull request is not mergeable yet",
-        "notMergeableDetail": "GitHub reported a {{state}} mergeable state."
+        "notMergeableDetail": "GitHub reported a {{state}} mergeable state.",
+        "notOpenDetail": "Only an open {{term}} can be merged.",
+        "unresolvedDiscussionsDetail": "Resolve all discussions before merging.",
+        "unresolvedTasksDetail": "Resolve all open tasks before merging.",
+        "otherDetail": "The provider is blocking this merge for a reason it did not name."
       },
       "restrictions": {
         "title": "Merge restrictions",
@@ -1204,7 +1214,8 @@
       "modified": "Modified",
       "renamed": "Renamed",
       "copied": "Copied",
-      "changed": "Changed"
+      "changed": "Changed",
+      "unknown": "Change type not reported"
     },
     "diff": {
       "selectedTapToChange": "Selected {{label}}, tap to change selection",

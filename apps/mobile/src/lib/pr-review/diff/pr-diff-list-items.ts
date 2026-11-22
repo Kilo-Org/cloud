@@ -2,6 +2,8 @@
 // The list builder lives in `pr-diff-list-builder.ts` so each file
 // stays under the max-lines limit.
 
+import { type ProviderPrPlatform } from '@kilocode/app-shared/provider-review';
+
 import {
   PR_REVIEW_MAX_LISTED_FILES,
   type PrReviewFile,
@@ -37,15 +39,15 @@ type FileHeaderItem = {
 };
 
 /**
- * `githubUrl` is `null` when the diff has no web page to fall back to (a
- * session diff): the row then says there is no preview instead of linking out.
+ * `link` is null when the diff has no web page to fall back to (a session
+ * diff): the row then says there is no preview instead of linking out.
  */
 type FilePatchMissingItem = {
   kind: 'file-patch-missing';
   key: string;
   file: PrReviewFile;
   viewed: boolean | null;
-  githubUrl: string | null;
+  link: { url: string; provider: ProviderPrPlatform } | null;
 };
 
 type HunkHeaderItem = {
@@ -185,15 +187,6 @@ export function itemTypeFor(item: ListItem): string {
   }
 }
 
-export function buildGithubFileUrl(args: {
-  owner: string;
-  repo: string;
-  number: number;
-  path: string;
-}): string {
-  return `https://github.com/${args.owner}/${args.repo}/pull/${args.number}/files#diff-${encodeURIComponent(args.path)}`;
-}
-
 export function addContextLoadState(args: {
   state: Record<string, Record<number, ExpandSeparatorState>>;
   filePath: string;
@@ -276,8 +269,8 @@ export function setContextLines(args: {
 
 /**
  * Where the listed files come from. A PR diff tracks viewed files, links a
- * missing patch to GitHub, and offers gap expansion read at `headSha`. A
- * session diff is a read-only snapshot with none of those.
+ * missing patch to the provider's own diff page, and offers gap expansion read
+ * at `headSha`. A session diff is a read-only snapshot with none of those.
  */
 export type DiffFileSource =
   | {
@@ -288,6 +281,12 @@ export type DiffFileSource =
       headSha: string;
       expandedContext: Record<string, Record<number, ExpandSeparatorState>>;
       viewed: (path: string) => boolean;
+      /**
+       * The provider's page for one file's diff, or null when the surface has
+       * no published provider URL yet. The builder never guesses a host: the
+       * caller resolves it from the scope and the loaded PR/MR.
+       */
+      link: (path: string) => { url: string; provider: ProviderPrPlatform } | null;
     }
   | { kind: 'session' };
 
@@ -306,6 +305,8 @@ export type BuildItemsArgs = {
   expanded: Record<string, boolean>;
   expandedContext: Record<string, Record<number, ExpandSeparatorState>>;
   viewed: (path: string) => boolean;
+  /** The provider's page for one file's diff (see `DiffFileSource`). */
+  link: (path: string) => { url: string; provider: ProviderPrPlatform } | null;
   headSha: string;
   owner: string;
   repo: string;

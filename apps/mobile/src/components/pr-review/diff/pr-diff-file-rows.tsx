@@ -1,6 +1,10 @@
 // File-level row components for the PR diff FlashList.
 
 import { selectionHaptic } from '@/lib/haptics';
+import {
+  type ProviderPrFilePatchMissingCause,
+  type ProviderPrPlatform,
+} from '@kilocode/app-shared/provider-review';
 import { ChevronDown, ChevronUp, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -14,6 +18,7 @@ import {
   ROW_FRAME_CONTENT_PRESS_CLASS,
 } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -162,32 +167,49 @@ export function FileHeaderRow({
 }
 
 /**
- * A file whose patch is absent. With a `githubUrl` (a PR) the patch was too
- * large and the row links to GitHub; without one (a session diff, where an
- * empty patch means a binary file) the row only says there is no preview.
+ * One key per reason a patch can be absent. The record is exhaustive, so a
+ * cause added to the contract fails this module instead of painting a raw word.
+ */
+const PATCH_MISSING_COPY_KEY = {
+  too_large: 'prReview.fileRows.diffTooLarge',
+  binary: 'prReview.fileRows.binaryDiff',
+  provider_omitted: 'prReview.fileRows.diffUnavailable',
+  content_unchanged: 'prReview.fileRows.contentUnchanged',
+} as const satisfies Record<ProviderPrFilePatchMissingCause, string>;
+
+/**
+ * A file whose patch is absent. The row names WHY in the provider's terms
+ * (`file.patchMissingCause`), and links to the provider's whole diff page when
+ * the diff has one — every provider here except a session diff, which has no
+ * web page at all.
  */
 export function PatchMissingRow({
   file,
   viewedToggle,
-  githubUrl,
+  link,
 }: {
   file: PrReviewFile;
   viewedToggle: FileViewedToggle;
-  githubUrl: string | null;
+  link: { url: string; provider: ProviderPrPlatform } | null;
 }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  // A null cause with no patch means the read carried one that parsed to no
+  // hunks, which is its own sentence.
+  const causeCopy =
+    file.patchMissingCause === null
+      ? t('prReview.fileRows.noPreview')
+      : t(PATCH_MISSING_COPY_KEY[file.patchMissingCause]);
+  const provider = link === null ? null : reviewerPlatformLabel(link.provider);
   return (
     <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3">
       {/* The row spans 7 dp of the padding around it and cancels it again, so
           the toggle's slop lands inside the row it touches in (46 dp) without
-          reaching the GitHub link's own `mt-2` gap below. */}
+          reaching the provider link's own `mt-2` gap below. */}
       <View className="-my-2 flex-row items-center gap-2 py-2">
         <File size={14} color={colors.mutedForeground} />
         <View className="flex-1">
-          <Text className="text-sm text-foreground">
-            {githubUrl ? t('prReview.fileRows.diffTooLarge') : t('prReview.fileRows.noPreview')}
-          </Text>
+          <Text className="text-sm text-foreground">{causeCopy}</Text>
           <Text variant="muted" className="text-xs">
             {isolateLtrBidiText(file.path)}
           </Text>
@@ -200,22 +222,24 @@ export function PatchMissingRow({
           />
         ) : null}
       </View>
-      {githubUrl ? (
+      {link === null || provider === null ? null : (
         <Pressable
           onPress={() => {
-            void openExternalUrl(githubUrl, { label: t('prReview.fileRows.githubDiff') });
+            void openExternalUrl(link.url, {
+              label: t('prReview.fileRows.providerDiff', { provider }),
+            });
           }}
           accessibilityRole="link"
-          accessibilityLabel={t('prReview.fileRows.openDiffOnGitHub')}
+          accessibilityLabel={t('prReview.fileRows.openDiffOnProvider', { provider })}
           className="mt-2 flex-row items-center gap-1.5 self-start"
         >
           <Link2 size={14} color={colors.info} />
           {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}
           <Text className="text-sm" style={{ color: colors.info }}>
-            {t('prReview.fileRows.openOnGitHub')}
+            {t('prReview.fileRows.openOnProvider', { provider })}
           </Text>
         </Pressable>
-      ) : null}
+      )}
     </View>
   );
 }

@@ -641,7 +641,10 @@
       "diffTooLarge": "ọdịiche buru oke ibu",
       "openFile": "Mepee {{path}}",
       "openFileViewed": "Mepee {{path}} (elelela)",
-      "title": "Faịlụ"
+      "title": "Faịlụ",
+      "binaryDiff": "faịlụ ọnụọgụ abụọ",
+      "diffUnavailable": "enweghị ọdịiche sitere n'aka onye na-enye",
+      "contentUnchanged": "enweghị mgbanwe ọdịnaya"
     },
     "fileRows": {
       "markViewed": "Kaa {{path}} ka faịlụ elelere",
@@ -650,9 +653,12 @@
       "expandFile": "Gosi ọdịnaya faịlụ",
       "diffTooLarge": "Ọdịiche buru oke ibu nke na enweghị ike igosi ya.",
       "noPreview": "Enweghị nlele maka faịlụ a",
-      "openOnGitHub": "Mepee na GitHub",
-      "openDiffOnGitHub": "Mepee ọdịiche faịlụ a na GitHub",
-      "githubDiff": "Ọdịiche na GitHub"
+      "binaryDiff": "Enweghị ọdịiche iji gosi maka faịlụ ọnụọgụ abụọ a",
+      "diffUnavailable": "Onye na-enye a anaghị ezipu ọdịiche faịlụ",
+      "contentUnchanged": "Enweghị mgbanwe ọdịnaya na faịlụ a",
+      "openOnProvider": "Mepee faịlụ a na {{provider}}",
+      "openDiffOnProvider": "Mepee ọdịiche faịlụ a na {{provider}}",
+      "providerDiff": "Ọdịiche na {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Wepụ nhọrọ",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Melite alaka site na alaka isi, ma ọ bụ gbanwee ntọala ya, tupu ijikọta.",
         "behindDetail": "Alaka e si na ya ewepụta mgbanwe enweghị mmelite niile dị na alaka isi. Gbanwee ntọala ya ma ọ bụ melite ya tupu ijikọta.",
         "notMergeableTitle": "Enweghị ike ijikọta arịrịọ ijikọ koodu a ugbu a",
-        "notMergeableDetail": "GitHub gosiri {{state}} dị ka ọnọdụ ikike njikọta."
+        "notMergeableDetail": "GitHub gosiri {{state}} dị ka ọnọdụ ikike njikọta.",
+        "notOpenDetail": "Naanị {{term}} mepere emepe ka enwere ike ijikọta.",
+        "unresolvedDiscussionsDetail": "Dozie mkparịta ụka niile tupu ijikọta.",
+        "unresolvedTasksDetail": "Dozie ọrụ niile mepere emepe tupu ijikọta.",
+        "otherDetail": "Onye na-enye na-egbochi njikọta a n'ihi ihe ọ kpọghị aha."
       },
       "restrictions": {
         "title": "Ihe mgbochi njikọta",
@@ -1106,7 +1116,8 @@
       "modified": "Agbanwere",
       "renamed": "Agbanwere aha",
       "copied": "Edetuola",
-      "changed": "Agbanwere"
+      "changed": "Agbanwere",
+      "unknown": "Akọpụtaghị ụdị mgbanwe"
     },
     "diff": {
       "selectedTapToChange": "Ahọpụtara {{label}}, pịa iji gbanwee nhọrọ",

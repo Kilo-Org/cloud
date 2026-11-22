@@ -641,7 +641,10 @@
       "diffTooLarge": "endringsvisningen er for stor",
       "openFile": "Åpne {{path}}",
       "openFileViewed": "Åpne {{path}} (gjennomgått)",
-      "title": "Filer"
+      "title": "Filer",
+      "binaryDiff": "binær fil",
+      "diffUnavailable": "ingen endringer fra leverandøren",
+      "contentUnchanged": "ingen innholdsendring"
     },
     "fileRows": {
       "markViewed": "Merk {{path}} som gjennomgått",
@@ -650,9 +653,12 @@
       "expandFile": "Vis filinnholdet",
       "diffTooLarge": "Endringene er for omfattende til å vises.",
       "noPreview": "Ingen forhåndsvisning tilgjengelig for denne filen",
-      "openOnGitHub": "Åpne på GitHub",
-      "openDiffOnGitHub": "Åpne endringene i denne filen på GitHub",
-      "githubDiff": "Endringsvisning på GitHub"
+      "binaryDiff": "Ingen endringer å vise for denne binære filen",
+      "diffUnavailable": "Denne leverandøren sender ikke filendringer",
+      "contentUnchanged": "Ingen innholdsendringer i denne filen",
+      "openOnProvider": "Åpne denne filen på {{provider}}",
+      "openDiffOnProvider": "Åpne endringene i denne filen på {{provider}}",
+      "providerDiff": "Endringsvisning på {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Fjern markeringen",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Oppdater grenen fra målgrenen, eller ombaser den, før du fletter.",
         "behindDetail": "Kildegrenen mangler endringer fra målgrenen. Ombaser eller oppdater grenen før du fletter.",
         "notMergeableTitle": "Denne PR-en kan ikke flettes ennå",
-        "notMergeableDetail": "GitHub rapporterte følgende flettestatus: {{state}}."
+        "notMergeableDetail": "GitHub rapporterte følgende flettestatus: {{state}}.",
+        "notOpenDetail": "Bare en åpen {{term}} kan flettes.",
+        "unresolvedDiscussionsDetail": "Løs alle diskusjoner før du fletter.",
+        "unresolvedTasksDetail": "Løs alle åpne oppgaver før du fletter.",
+        "otherDetail": "Leverandøren blokkerer denne flettingen av en grunn den ikke oppgav."
       },
       "restrictions": {
         "title": "Flettebegrensninger",
@@ -1106,7 +1116,8 @@
       "modified": "Endret",
       "renamed": "Omdøpt",
       "copied": "Kopiert",
-      "changed": "Endret"
+      "changed": "Endret",
+      "unknown": "Endringstype ikke rapportert"
     },
     "diff": {
       "selectedTapToChange": "{{label}} er markert, trykk for å endre markeringen",

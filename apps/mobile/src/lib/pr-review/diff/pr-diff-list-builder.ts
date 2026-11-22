@@ -5,7 +5,6 @@ import { languageForPath } from '@/lib/pr-review/diff/highlight';
 import { parsePatch } from '@/lib/pr-review/diff/parse-patch';
 import { pushGapItems } from '@/lib/pr-review/diff/pr-diff-gap-builder';
 import {
-  buildGithubFileUrl,
   type BuildItemsArgs,
   type DiffFileItemsArgs,
   type DiffFileSource,
@@ -120,9 +119,7 @@ function pushPatchMissingItems(
     key: `file-pm:${file.path}`,
     file,
     viewed: pr ? pr.viewed(file.path) : null,
-    githubUrl: pr
-      ? buildGithubFileUrl({ owner: pr.owner, repo: pr.repo, number: pr.number, path: file.path })
-      : null,
+    link: pr ? pr.link(file.path) : null,
   });
 }
 
@@ -134,7 +131,7 @@ function pushExpandedFileItems(
   const parsed: ParsedFile = parsedPatchFor(file);
   const hunks = parsed.hunks;
 
-  if (file.patchMissing || hunks.length === 0) {
+  if (file.patchMissingCause !== null || hunks.length === 0) {
     pushPatchMissingItems(items, file, args.source);
     return;
   }
@@ -277,10 +274,15 @@ export function buildFileItems(args: DiffFileItemsArgs): ListItem[] {
       key: `file-header:${file.path}`,
       file,
       expanded: isExpanded,
-      hasDiff: !file.patchMissing,
+      hasDiff: file.patchMissingCause === null,
       viewed: args.source.kind === 'pr' ? args.source.viewed(file.path) : null,
     });
-    if (isExpanded) {
+    // A file the read has no patch for cannot expand, so its explanation is
+    // part of the collapsed row: leaving it behind the expand control would
+    // hide the one line that says why there is nothing to render.
+    if (file.patchMissingCause !== null) {
+      pushPatchMissingItems(items, file, args.source);
+    } else if (isExpanded) {
       pushExpandedFileItems(items, file, args);
     }
   }
@@ -305,6 +307,7 @@ function prFileItemsArgs(args: BuildItemsArgs): DiffFileItemsArgs {
       headSha: args.headSha,
       expandedContext: args.expandedContext,
       viewed: args.viewed,
+      link: args.link,
     },
   };
 }

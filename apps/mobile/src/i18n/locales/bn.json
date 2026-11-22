@@ -641,7 +641,10 @@
       "diffTooLarge": "ডিফ অনেক বড়",
       "openFile": "{{path}} খুলুন",
       "openFileViewed": "{{path}} খুলুন (দেখা হয়েছে)",
-      "title": "ফাইল"
+      "title": "ফাইল",
+      "binaryDiff": "বাইনারি ফাইল",
+      "diffUnavailable": "প্রোভাইডার থেকে কোনো ডিফ নেই",
+      "contentUnchanged": "কোনো কনটেন্ট পরিবর্তন নেই"
     },
     "fileRows": {
       "markViewed": "{{path}}-কে দেখা হয়েছে বলে চিহ্নিত করুন",
@@ -650,9 +653,12 @@
       "expandFile": "ফাইল মেলে ধরুন",
       "diffTooLarge": "ডিফটি এত বড় যে দেখানো যাচ্ছে না।",
       "noPreview": "এই ফাইলের কোনো প্রিভিউ নেই",
-      "openOnGitHub": "GitHub-এ খুলুন",
-      "openDiffOnGitHub": "GitHub-এ এই ফাইলের ডিফ খুলুন",
-      "githubDiff": "GitHub ডিফ"
+      "binaryDiff": "এই বাইনারি ফাইলের জন্য দেখানোর মতো কোনো ডিফ নেই।",
+      "diffUnavailable": "এই প্রোভাইডার ফাইলের ডিফ পাঠায় না।",
+      "contentUnchanged": "এই ফাইলে কোনো কনটেন্ট পরিবর্তন নেই।",
+      "openOnProvider": "{{provider}}-এ এই ফাইলটি খুলুন",
+      "openDiffOnProvider": "{{provider}}-এ এই ফাইলের ডিফ খুলুন",
+      "providerDiff": "{{provider}} ডিফ"
     },
     "floatingActions": {
       "clearSelection": "নির্বাচন বাতিল করুন",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "মার্জ করার আগে বেস ব্রাঞ্চ থেকে ব্রাঞ্চটি আপডেট করুন অথবা রিবেস করুন।",
         "behindDetail": "হেড ব্রাঞ্চটি বেস ব্রাঞ্চের চেয়ে পিছিয়ে আছে। মার্জ করার আগে ব্রাঞ্চটি রিবেস বা আপডেট করুন।",
         "notMergeableTitle": "এই পুল রিকোয়েস্ট এখনও মার্জ করা যাচ্ছে না",
-        "notMergeableDetail": "GitHub-এর দেওয়া মার্জের অবস্থা: {{state}}।"
+        "notMergeableDetail": "GitHub-এর দেওয়া মার্জের অবস্থা: {{state}}।",
+        "notOpenDetail": "কেবল একটি খোলা {{term}} মার্জ করা যায়।",
+        "unresolvedDiscussionsDetail": "মার্জ করার আগে সব আলোচনা সমাধান করুন।",
+        "unresolvedTasksDetail": "মার্জ করার আগে সব খোলা টাস্ক সমাধান করুন।",
+        "otherDetail": "প্রোভাইডার কোনো কারণ উল্লেখ না করেই এই মার্জ ব্লক করছে।"
       },
       "restrictions": {
         "title": "মার্জ সংক্রান্ত সীমাবদ্ধতা",
@@ -1106,7 +1116,8 @@
       "modified": "পরিবর্তিত",
       "renamed": "নাম বদলানো হয়েছে",
       "copied": "কপি হয়েছে",
-      "changed": "পরিবর্তিত"
+      "changed": "পরিবর্তিত",
+      "unknown": "পরিবর্তনের ধরন জানানো হয়নি"
     },
     "diff": {
       "selectedTapToChange": "{{label}} নির্বাচিত, নির্বাচন বদলাতে ট্যাপ করুন",

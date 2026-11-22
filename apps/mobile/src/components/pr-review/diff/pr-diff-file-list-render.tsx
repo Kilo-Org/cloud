@@ -227,7 +227,7 @@ export function useDiffRenderItem(args: UseDiffRenderItemArgs) {
             <PatchMissingRow
               file={item.file}
               viewedToggle={viewedToggleFor(item.file.path, item.viewed)}
-              githubUrl={item.githubUrl}
+              link={item.link}
             />
           );
         }

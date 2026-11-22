@@ -3,6 +3,12 @@ import 'server-only';
 import { z } from 'zod';
 
 import {
+  providerPrFileStatus,
+  type ProviderPrFilePatchMissingCause,
+  type ProviderPrFileStatus,
+} from '@kilocode/app-shared/provider-review';
+
+import {
   FILE_LINES_MAX,
   FILES_MAX_PAGES,
   REVIEW_THREADS_PAGE_SIZE,
@@ -342,6 +348,27 @@ type PullRequestFileInput = {
   patch?: string;
 };
 
+/**
+ * Why GitHub sent no `patch` for one file. GitHub omits it for a binary file,
+ * for a patch it dropped as oversized, and for a change with no content at
+ * all: `changed` is a mode-only change, and `renamed`/`copied` without a
+ * content change has no hunks. GitHub also reports a binary file with zero
+ * line counts, which is the only signal that separates it from a dropped
+ * oversized patch on a file whose counts are non-zero.
+ */
+function githubPatchMissingCause(
+  file: PullRequestFileInput,
+  status: ProviderPrFileStatus
+): ProviderPrFilePatchMissingCause | null {
+  if (file.patch) return null;
+  if (file.additions === 0 && file.deletions === 0) {
+    return status === 'renamed' || status === 'copied' || status === 'changed'
+      ? 'content_unchanged'
+      : 'binary';
+  }
+  return 'too_large';
+}
+
 export function buildFilesPage(args: {
   page: number;
   perPage: number;
@@ -357,15 +384,18 @@ export function buildFilesPage(args: {
 }): GitHubPrReviewFilesResult {
   const { page, perPage, rawFiles, linkHasNext } = args;
   const clampedPage = Math.max(1, Math.min(FILES_MAX_PAGES, page));
-  const files: GitHubPrReviewFile[] = rawFiles.map(f => ({
-    path: f.filename,
-    previousPath: f.previous_filename ?? null,
-    status: f.status,
-    additions: f.additions,
-    deletions: f.deletions,
-    patch: f.patch ?? null,
-    patchMissing: !f.patch,
-  }));
+  const files: GitHubPrReviewFile[] = rawFiles.map(f => {
+    const status = providerPrFileStatus(f.status);
+    return {
+      path: f.filename,
+      previousPath: f.previous_filename ?? null,
+      status,
+      additions: f.additions,
+      deletions: f.deletions,
+      patch: f.patch ?? null,
+      patchMissingCause: githubPatchMissingCause(f, status),
+    };
+  });
   const reachedCap = clampedPage >= FILES_MAX_PAGES;
   const shortPage = files.length < perPage;
   const hasNext = linkHasNext ?? !shortPage;

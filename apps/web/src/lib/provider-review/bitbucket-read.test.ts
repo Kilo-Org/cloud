@@ -391,9 +391,49 @@ describe('listChangedFiles — pagination', () => {
       status: 'modified',
       additions: 3,
       deletions: 1,
+      // The diffstat endpoint never carries a patch, whatever the file holds.
+      patch: null,
+      patchMissingCause: 'provider_omitted',
     });
     expect(result.files[1]).toMatchObject({ path: 'src/fingerprint.ts', status: 'added' });
     expect(result.nextCursor).not.toBeNull();
+  });
+
+  it('normalizes a diffstat status word: removed stays removed, an unknown word is unknown', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      return jsonResponse({
+        pagelen: 2,
+        values: [
+          {
+            status: 'removed',
+            lines_added: 0,
+            lines_removed: 4,
+            old: { path: 'src/old.ts' },
+            new: null,
+          },
+          {
+            status: 'suspiciously-worded',
+            lines_added: 1,
+            lines_removed: 1,
+            old: { path: 'src/odd.ts' },
+            new: { path: 'src/odd.ts' },
+          },
+        ],
+      });
+    });
+
+    const result = await listChangedFiles(ORG_OWNER, 'acme', 'repo', 12);
+
+    expect(result.files[0]).toMatchObject({ path: 'src/old.ts', status: 'removed' });
+    expect(result.files[1]).toMatchObject({
+      path: 'src/odd.ts',
+      status: 'unknown',
+      patchMissingCause: 'provider_omitted',
+    });
   });
 
   it('follows the encoded provider next URL with a fresh token on page 2', async () => {
@@ -2266,10 +2306,31 @@ describe('getMergeRestrictions', () => {
     const state = await getMergeRestrictions(ORG_OWNER, 'acme', 'repo', 12);
 
     expect(state.blockedReasons).toContainEqual({
-      code: 'other',
+      code: 'unresolved_tasks',
       message: 'Resolve all tasks before merging.',
     });
     expect(state.canMerge).toBe(false);
+  });
+
+  it('names a merged pull request as not_open', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (new URL(full).pathname.endsWith('/branch-restrictions')) {
+        return new Response(null, { status: 403 });
+      }
+      return jsonResponse({ ...prDetail, state: 'MERGED', task_count: 0 });
+    });
+
+    const state = await getMergeRestrictions(ORG_OWNER, 'acme', 'repo', 12);
+
+    expect(state.canMerge).toBe(false);
+    expect(state.blockedReasons).toContainEqual({
+      code: 'not_open',
+      message: 'Only open pull requests can be merged.',
+    });
   });
 
   it('treats unreadable branch restrictions as no visible merge gate', async () => {

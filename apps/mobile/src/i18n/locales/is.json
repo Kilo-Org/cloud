@@ -641,7 +641,10 @@
       "diffTooLarge": "of miklar breytingar",
       "openFile": "Opna {{path}}",
       "openFileViewed": "Opna {{path}} (skoðuð)",
-      "title": "Skrár"
+      "title": "Skrár",
+      "binaryDiff": "tvíundarskrá",
+      "diffUnavailable": "enginn breytingasamanburður frá veitanda",
+      "contentUnchanged": "engin innihaldsbreyting"
     },
     "fileRows": {
       "markViewed": "Merkja {{path}} sem skoðaða",
@@ -650,9 +653,12 @@
       "expandFile": "Fella út skrá",
       "diffTooLarge": "Breytingarnar eru of umfangsmiklar til að birta.",
       "noPreview": "Engin forskoðun í boði fyrir þessa skrá",
-      "openOnGitHub": "Opna á GitHub",
-      "openDiffOnGitHub": "Opna breytingasamanburð skrárinnar á GitHub",
-      "githubDiff": "Breytingasamanburður á GitHub"
+      "binaryDiff": "Enginn breytingasamanburður í boði fyrir þessa tvíundarskrá",
+      "diffUnavailable": "Þessi veitandi sendir ekki breytingasamanburð skráa",
+      "contentUnchanged": "Engar innihaldsbreytingar í þessari skrá",
+      "openOnProvider": "Opna þessa skrá á {{provider}}",
+      "openDiffOnProvider": "Opna breytingasamanburð þessarar skrár á {{provider}}",
+      "providerDiff": "Breytingasamanburður hjá {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Hreinsa val",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Uppfærðu greinina út frá grunngreininni eða endurgrunnaðu hana áður en þú sameinar.",
         "behindDetail": "Upprunagreinin er á eftir grunngreininni. Endurgrunnaðu eða uppfærðu greinina áður en þú sameinar.",
         "notMergeableTitle": "Ekki er enn hægt að sameina þessa sameiningarbeiðni",
-        "notMergeableDetail": "GitHub tilkynnti eftirfarandi sameiningarstöðu: {{state}}."
+        "notMergeableDetail": "GitHub tilkynnti eftirfarandi sameiningarstöðu: {{state}}.",
+        "notOpenDetail": "Aðeins er hægt að sameina {{term}} í opinni stöðu.",
+        "unresolvedDiscussionsDetail": "Leystu allar umræður áður en þú sameinar.",
+        "unresolvedTasksDetail": "Leystu öll opin verkefni áður en þú sameinar.",
+        "otherDetail": "Veitandinn hindrar þessa sameiningu af ástæðu sem hann nefndi ekki."
       },
       "restrictions": {
         "title": "Takmarkanir við sameiningu",
@@ -1106,7 +1116,8 @@
       "modified": "Breytt",
       "renamed": "Endurnefnd",
       "copied": "Afritað",
-      "changed": "Breytt"
+      "changed": "Breytt",
+      "unknown": "Tegund breytingar ekki tilkynnt"
     },
     "diff": {
       "selectedTapToChange": "Val: {{label}}, ýttu til að breyta valinu",

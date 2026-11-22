@@ -151,6 +151,29 @@ export function providerPrWebUrl(link: ProviderPrLink): string | null {
 }
 
 /**
+ * The provider's own page for ONE file's diff inside this PR/MR, or null when
+ * the change has no web URL at all (`providerPrWebUrl` is null).
+ *
+ * Only GitHub publishes a per-file anchor we can build: its files page keys
+ * each rendered diff by the path (`#diff-<percent-encoded path>`). GitLab and
+ * Bitbucket expose no per-file anchor a client can construct, so their whole
+ * diff page is the target and the file is found by its path on that page.
+ */
+export function providerPrFileUrl(link: ProviderPrLink, path: string): string | null {
+  const webUrl = providerPrWebUrl(link);
+  if (webUrl === null) {
+    return null;
+  }
+  if (link.ref.platform === 'github') {
+    return `${webUrl}/files#diff-${encodeURIComponent(path)}`;
+  }
+  if (link.ref.platform === 'gitlab') {
+    return `${webUrl}/diffs`;
+  }
+  return `${webUrl}/diff`;
+}
+
+/**
  * The GitLab instance a route param names, as `scheme://host[:port]`, or
  * `undefined` when the param is not an http(s) URL with a host. The path,
  * query, fragment and any credentials are dropped, so the hint is an

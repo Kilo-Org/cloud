@@ -641,7 +641,10 @@
       "diffTooLarge": "परिवर्तन विवरण धेरै ठूलो छ",
       "openFile": "{{path}} खोल्नुहोस्",
       "openFileViewed": "{{path}} खोल्नुहोस् (हेरिसकेको)",
-      "title": "फाइलहरू"
+      "title": "फाइलहरू",
+      "binaryDiff": "बाइनरी फाइल",
+      "diffUnavailable": "प्रदायकबाट परिवर्तन विवरण छैन",
+      "contentUnchanged": "सामग्री परिवर्तन छैन"
     },
     "fileRows": {
       "markViewed": "{{path}} लाई हेरिसकेको चिन्ह लगाउनुहोस्",
@@ -650,9 +653,12 @@
       "expandFile": "फाइलको विवरण देखाउनुहोस्",
       "diffTooLarge": "परिवर्तन विवरण देखाउन नसकिने गरी ठूलो छ।",
       "noPreview": "यो फाइलको पूर्वावलोकन उपलब्ध छैन",
-      "openOnGitHub": "GitHub मा खोल्नुहोस्",
-      "openDiffOnGitHub": "यो फाइलको परिवर्तन विवरण GitHub मा खोल्नुहोस्",
-      "githubDiff": "GitHub मा परिवर्तन विवरण"
+      "binaryDiff": "यो बाइनरी फाइलका लागि देखाउन कुनै परिवर्तन विवरण छैन",
+      "diffUnavailable": "यो प्रदायकले फाइल परिवर्तन विवरण पठाउँदैन",
+      "contentUnchanged": "यो फाइलमा कुनै सामग्री परिवर्तन छैन",
+      "openOnProvider": "यो फाइल {{provider}} मा खोल्नुहोस्",
+      "openDiffOnProvider": "यो फाइलको परिवर्तन विवरण {{provider}} मा खोल्नुहोस्",
+      "providerDiff": "{{provider}} मा परिवर्तन विवरण"
     },
     "floatingActions": {
       "clearSelection": "चयन हटाउनुहोस्",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "मर्ज गर्नुअघि आधार शाखाबाट यो शाखा अद्यावधिक गर्नुहोस् वा रिबेस गर्नुहोस्।",
         "behindDetail": "हेड शाखा आधार शाखाभन्दा पछाडि छ। मर्ज गर्नुअघि यो शाखा रिबेस वा अद्यावधिक गर्नुहोस्।",
         "notMergeableTitle": "यो पुल रिक्वेस्ट अझै मर्ज गर्न मिल्दैन",
-        "notMergeableDetail": "GitHub ले मर्जसम्बन्धी अवस्था {{state}} रहेको जनाएको छ।"
+        "notMergeableDetail": "GitHub ले मर्जसम्बन्धी अवस्था {{state}} रहेको जनाएको छ।",
+        "notOpenDetail": "खुला {{term}} मात्र मर्ज गर्न सकिन्छ।",
+        "unresolvedDiscussionsDetail": "मर्ज गर्नु अघि सबै छलफलहरू समाधान गर्नुहोस्।",
+        "unresolvedTasksDetail": "मर्ज गर्नु अघि सबै खुला कार्यहरू समाधान गर्नुहोस्।",
+        "otherDetail": "प्रदायकले नाम नखुलाएको कारणले यो मर्ज रोकिरहेको छ।"
       },
       "restrictions": {
         "title": "मर्ज प्रतिबन्धहरू",
@@ -1106,7 +1116,8 @@
       "modified": "परिमार्जित",
       "renamed": "नाम फेरिएको",
       "copied": "प्रतिलिपि गरियो",
-      "changed": "परिवर्तन भएको"
+      "changed": "परिवर्तन भएको",
+      "unknown": "परिवर्तन प्रकार जनाइएको छैन"
     },
     "diff": {
       "selectedTapToChange": "{{label}} चयन गरियो, चयन परिवर्तन गर्न ट्याप गर्नुहोस्",

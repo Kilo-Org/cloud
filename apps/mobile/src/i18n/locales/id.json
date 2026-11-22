@@ -3070,7 +3070,10 @@
       "viewedCount_other": "{{viewed}} dari {{total}} sudah dilihat",
       "viewedOfListed": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat",
       "viewedOfListed_one": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat",
-      "viewedOfListed_other": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat"
+      "viewedOfListed_other": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat",
+      "binaryDiff": "file biner",
+      "diffUnavailable": "tidak ada perbedaan kode dari penyedia",
+      "contentUnchanged": "tidak ada perubahan konten"
     },
     "fileRows": {
       "collapseFile": "Ciutkan file",
@@ -3078,10 +3081,13 @@
       "noPreview": "Pratinjau tidak tersedia untuk file ini",
       "expandFile": "Bentangkan file",
       "markViewed": "Tandai {{path}} sebagai sudah dilihat",
-      "openDiffOnGitHub": "Buka perbedaan kode file ini di GitHub",
-      "openOnGitHub": "Buka di GitHub",
       "unmarkViewed": "Hapus tanda sudah dilihat pada {{path}}",
-      "githubDiff": "Perbedaan kode di GitHub"
+      "binaryDiff": "Tidak ada perbedaan kode yang dapat ditampilkan untuk file biner ini.",
+      "diffUnavailable": "Penyedia ini tidak mengirim perbedaan kode file.",
+      "contentUnchanged": "Tidak ada perubahan konten di file ini.",
+      "openOnProvider": "Buka file ini di {{provider}}",
+      "openDiffOnProvider": "Buka perbedaan kode file ini di {{provider}}",
+      "providerDiff": "Perbedaan kode di {{provider}}"
     },
     "floatingActions": {
       "clear": "Batalkan",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "Perbarui cabang dari cabang tujuan atau ubah basisnya sebelum menggabungkannya.",
         "behindDetail": "Cabang sumber tertinggal dari cabang tujuan. Ubah basis atau perbarui cabang sebelum menggabungkannya.",
         "notMergeableTitle": "PR ini belum dapat digabungkan",
-        "notMergeableDetail": "GitHub melaporkan status penggabungan: {{state}}."
+        "notMergeableDetail": "GitHub melaporkan status penggabungan: {{state}}.",
+        "notOpenDetail": "Hanya {{term}} yang terbuka yang dapat digabungkan.",
+        "unresolvedDiscussionsDetail": "Selesaikan semua diskusi sebelum menggabungkan.",
+        "unresolvedTasksDetail": "Selesaikan semua tugas yang terbuka sebelum menggabungkan.",
+        "otherDetail": "Penyedia memblokir penggabungan ini karena alasan yang tidak disebutkan."
       },
       "restrictions": {
         "title": "Pembatasan penggabungan",
@@ -3326,7 +3336,8 @@
       "changed": "Diubah",
       "copied": "Disalin",
       "modified": "Diubah",
-      "renamed": "Nama diubah"
+      "renamed": "Nama diubah",
+      "unknown": "Jenis perubahan tidak dilaporkan"
     },
     "tabs": {
       "discussion": "Diskusi",

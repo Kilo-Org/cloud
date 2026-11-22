@@ -641,7 +641,10 @@
       "diffTooLarge": "ልዩነቱ በጣም ትልቅ ነው",
       "openFile": "{{path}}ን ክፈት",
       "openFileViewed": "{{path}}ን ክፈት (ታይቷል)",
-      "title": "ፋይሎች"
+      "title": "ፋይሎች",
+      "binaryDiff": "ሁለትዮሽ ፋይል",
+      "diffUnavailable": "ከአቅራቢው ልዩነት የለም",
+      "contentUnchanged": "የይዘት ለውጥ የለም"
     },
     "fileRows": {
       "markViewed": "{{path}}ን እንደታየ ምልክት አድርግ",
@@ -650,9 +653,12 @@
       "expandFile": "የፋይሉን ዝርዝር ዘርጋ",
       "diffTooLarge": "ልዩነቱ በጣም ትልቅ ስለሆነ ማሳየት አይቻልም።",
       "noPreview": "ለዚህ ፋይል ቅድመ እይታ የለም",
-      "openOnGitHub": "በGitHub ክፈት",
-      "openDiffOnGitHub": "የዚህን ፋይል ልዩነት በGitHub ክፈት",
-      "githubDiff": "በGitHub ያለው ልዩነት"
+      "binaryDiff": "ለዚህ ሁለትዮሽ ፋይል ማሳየት የሚቻል ልዩነት የለም",
+      "diffUnavailable": "ይህ አቅራቢ የፋይል ልዩነቶችን አይልክም",
+      "contentUnchanged": "በዚህ ፋይል ውስጥ የይዘት ለውጦች የሉም",
+      "openOnProvider": "ይህን ፋይል በ{{provider}} ክፈት",
+      "openDiffOnProvider": "የዚህን ፋይል ልዩነት በ{{provider}} ክፈት",
+      "providerDiff": "በ{{provider}} ያለው ልዩነት"
     },
     "floatingActions": {
       "clearSelection": "ምርጫውን አጽዳ",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "ከማዋሃድህ በፊት ቅርንጫፉን ከመሠረት ቅርንጫፉ አዘምን፣ ወይም መሠረቱን ቀይር።",
         "behindDetail": "የምንጭ ቅርንጫፉ ከመሠረት ቅርንጫፉ ወደ ኋላ ቀርቷል። ከማዋሃድህ በፊት መሠረቱን ቀይር ወይም ቅርንጫፉን አዘምን።",
         "notMergeableTitle": "ይህን የማዋሃድ ጥያቄ ገና ማዋሃድ አይቻልም",
-        "notMergeableDetail": "GitHub የማዋሃድ ሁኔታው {{state}} እንደሆነ አሳውቋል።"
+        "notMergeableDetail": "GitHub የማዋሃድ ሁኔታው {{state}} እንደሆነ አሳውቋል።",
+        "notOpenDetail": "ሊዋሃድ የሚችለው ክፍት {{term}} ብቻ ነው።",
+        "unresolvedDiscussionsDetail": "ከማዋሃድህ በፊት ሁሉንም ውይይቶች ፍታ።",
+        "unresolvedTasksDetail": "ከማዋሃድህ በፊት ሁሉንም ክፍት ተግባሮች ፍታ።",
+        "otherDetail": "አቅራቢው ስሙን ያልጠቀሰበት ምክንያት ስላለ ይህን ውህደት እያገደው ነው።"
       },
       "restrictions": {
         "title": "የማዋሃድ ገደቦች",
@@ -1106,7 +1116,8 @@
       "modified": "ተቀይሯል",
       "renamed": "ስሙ ተቀይሯል",
       "copied": "ተቀድቷል",
-      "changed": "ተለውጧል"
+      "changed": "ተለውጧል",
+      "unknown": "የለውጥ ዓይነት አልተገለጸም"
     },
     "diff": {
       "selectedTapToChange": "{{label}} ተመርጧል፣ ምርጫውን ለመቀየር ንካ",

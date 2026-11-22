@@ -3164,7 +3164,10 @@
       "viewedOfListed_one": "переглянуто {{viewed}} з {{total}} файлів у списку",
       "viewedOfListed_few": "переглянуто {{viewed}} з {{total}} файлів у списку",
       "viewedOfListed_many": "переглянуто {{viewed}} з {{total}} файлів у списку",
-      "viewedOfListed_other": "переглянуто {{viewed}} з {{total}} файлів у списку"
+      "viewedOfListed_other": "переглянуто {{viewed}} з {{total}} файлів у списку",
+      "binaryDiff": "двійковий файл",
+      "diffUnavailable": "немає змін від провайдера",
+      "contentUnchanged": "немає змін вмісту"
     },
     "fileRows": {
       "collapseFile": "Згорнути файл",
@@ -3172,10 +3175,13 @@
       "noPreview": "Попередній перегляд цього файлу недоступний",
       "expandFile": "Розгорнути файл",
       "markViewed": "Позначити {{path}} як переглянутий",
-      "openDiffOnGitHub": "Відкрити зміни цього файлу на GitHub",
-      "openOnGitHub": "Відкрити на GitHub",
       "unmarkViewed": "Зняти позначку перегляду з {{path}}",
-      "githubDiff": "Зміни на GitHub"
+      "binaryDiff": "Немає змін для відображення цього двійкового файлу.",
+      "diffUnavailable": "Цей провайдер не надсилає зміни файлів.",
+      "contentUnchanged": "У цьому файлі немає змін вмісту.",
+      "openOnProvider": "Відкрити цей файл на {{provider}}",
+      "openDiffOnProvider": "Відкрити зміни цього файлу на {{provider}}",
+      "providerDiff": "Зміни на {{provider}}"
     },
     "floatingActions": {
       "clear": "Очистити",
@@ -3318,7 +3324,11 @@
         "behindDetailUpdatable": "Перш ніж виконати злиття, оновіть гілку змінами з базової гілки або виконайте перебазування.",
         "behindDetail": "Вихідна гілка відстає від базової. Перш ніж виконати злиття, перебазуйте або оновіть її.",
         "notMergeableTitle": "Цей запит ще не можна злити",
-        "notMergeableDetail": "GitHub повідомив про такий стан готовності до злиття: {{state}}."
+        "notMergeableDetail": "GitHub повідомив про такий стан готовності до злиття: {{state}}.",
+        "notOpenDetail": "Злити можна лише {{term}} у відкритому стані.",
+        "unresolvedDiscussionsDetail": "Перш ніж виконати злиття, розв'яжіть усі обговорення.",
+        "unresolvedTasksDetail": "Перш ніж виконати злиття, розв'яжіть усі відкриті завдання.",
+        "otherDetail": "Провайдер блокує це злиття з причини, яку не назвав."
       },
       "restrictions": {
         "title": "Обмеження на злиття",
@@ -3448,7 +3458,8 @@
       "changed": "Змінено",
       "copied": "Скопійовано",
       "modified": "Змінено",
-      "renamed": "Перейменовано"
+      "renamed": "Перейменовано",
+      "unknown": "Тип зміни не вказано"
     },
     "tabs": {
       "discussion": "Обговорення",

@@ -9,16 +9,17 @@
  */
 import 'server-only';
 
-import type {
-  ProviderPrChecksResult,
-  ProviderPrFile,
-  ProviderPrFilesPage,
-  ProviderPrInboxItem,
-  ProviderPrInboxPage,
-  ProviderPrMergeBlockedReason,
-  ProviderPrMergeState,
-  ProviderPrSummary,
-  ProviderPrThread,
+import {
+  providerPrFileStatus,
+  type ProviderPrChecksResult,
+  type ProviderPrFile,
+  type ProviderPrFilesPage,
+  type ProviderPrInboxItem,
+  type ProviderPrInboxPage,
+  type ProviderPrMergeBlockedReason,
+  type ProviderPrMergeState,
+  type ProviderPrSummary,
+  type ProviderPrThread,
 } from '@kilocode/app-shared/provider-review';
 import {
   fetchGitLabMergeRequest,
@@ -150,6 +151,17 @@ function diffLineCounts(diff: string): { additions: number; deletions: number } 
 }
 
 /**
+ * Whether a non-empty diff is GitLab's binary placeholder rather than hunks.
+ * GitLab sends one line, `Binary files a/<old> and b/<new> differ`, where a
+ * text file sends `@@` hunks; the line has no hunk header, so a reader that
+ * only counts hunks would call the file "no preview" instead of binary.
+ */
+function isBinaryPlaceholderDiff(diff: string): boolean {
+  const lines = diff.split('\n').filter(line => line.length > 0);
+  return lines.length === 1 && lines[0]?.startsWith('Binary files ') === true && lines[0].endsWith(' differ');
+}
+
+/**
  * The MR's own changed-file total, or null when GitLab has none yet. The
  * value is a string that is empty while the diff is still computing and
  * carries a `+` suffix once it exceeds the project's diff limit (`1000+`);
@@ -166,13 +178,17 @@ function parseChangesCount(value: string | null | undefined): number | null {
 
 function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
   const { additions, deletions } = diffLineCounts(diff.diff ?? '');
-  const status = diff.new_file
-    ? 'added'
-    : diff.deleted_file
-      ? 'deleted'
-      : diff.renamed_file
-        ? 'renamed'
-        : 'modified';
+  // GitLab words a deletion `deleted`; the shared vocabulary has one word for
+  // it, so every status goes through the contract's normalizer.
+  const status = providerPrFileStatus(
+    diff.new_file
+      ? 'added'
+      : diff.deleted_file
+        ? 'deleted'
+        : diff.renamed_file
+          ? 'renamed'
+          : 'modified'
+  );
   return {
     path: diff.new_path,
     previousPath: diff.old_path !== diff.new_path ? diff.old_path : null,
@@ -180,7 +196,16 @@ function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
     additions,
     deletions,
     patch: diff.diff || null,
-    patchMissing: !diff.diff,
+    // GitLab sends no patch for a blank diff and a one-line placeholder
+    // ("Binary files … differ") for a binary file, which parses to no hunks.
+    // A rename that changed no content sends the blank diff, so it says so
+    // rather than claiming the file is binary.
+    patchMissingCause:
+      diff.diff && !isBinaryPlaceholderDiff(diff.diff)
+        ? null
+        : diff.renamed_file && !diff.new_file && !diff.deleted_file
+          ? 'content_unchanged'
+          : 'binary',
   };
 }
 
@@ -643,7 +668,7 @@ export async function getMergeState(
     const blockedReasons: ProviderPrMergeBlockedReason[] = [];
     if (mr.state !== 'opened') {
       blockedReasons.push({
-        code: 'other',
+        code: 'not_open',
         message: 'Only open merge requests can be merged.',
       });
     }
@@ -682,7 +707,7 @@ export async function getMergeState(
       const unresolved = await hasUnresolvedDiscussions(access, mrIid);
       if (unresolved) {
         blockedReasons.push({
-          code: 'other',
+          code: 'unresolved_discussions',
           message: 'Resolve all discussions before merging.',
         });
       }

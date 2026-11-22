@@ -641,7 +641,10 @@
       "diffTooLarge": "perbezaan kod terlalu besar",
       "openFile": "Buka {{path}}",
       "openFileViewed": "Buka {{path}} (sudah dilihat)",
-      "title": "Fail"
+      "title": "Fail",
+      "binaryDiff": "fail binari",
+      "diffUnavailable": "tiada perbezaan kod daripada penyedia",
+      "contentUnchanged": "tiada perubahan kandungan"
     },
     "fileRows": {
       "markViewed": "Tandakan {{path}} sebagai sudah dilihat",
@@ -650,9 +653,12 @@
       "expandFile": "Paparkan kandungan fail",
       "diffTooLarge": "Perbezaan kod terlalu besar untuk dipaparkan.",
       "noPreview": "Tiada pratonton tersedia untuk fail ini",
-      "openOnGitHub": "Buka di GitHub",
-      "openDiffOnGitHub": "Buka perbezaan kod fail ini di GitHub",
-      "githubDiff": "Perbezaan kod GitHub"
+      "binaryDiff": "Tiada perbezaan kod untuk ditunjukkan bagi fail binari ini",
+      "diffUnavailable": "Penyedia ini tidak menghantar perbezaan kod fail",
+      "contentUnchanged": "Tiada perubahan kandungan dalam fail ini",
+      "openOnProvider": "Buka fail ini di {{provider}}",
+      "openDiffOnProvider": "Buka perbezaan kod fail ini di {{provider}}",
+      "providerDiff": "Perbezaan kod {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Kosongkan pilihan",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Kemas kini cabang daripada cabang asas atau asaskan semula cabang sebelum membuat penggabungan.",
         "behindDetail": "Cabang sumber belum mempunyai perubahan terkini daripada cabang asas. Asaskan semula atau kemas kini cabang sebelum membuat penggabungan.",
         "notMergeableTitle": "Permintaan tarik ini belum boleh digabungkan",
-        "notMergeableDetail": "GitHub melaporkan status kebolehgabungan: {{state}}."
+        "notMergeableDetail": "GitHub melaporkan status kebolehgabungan: {{state}}.",
+        "notOpenDetail": "Hanya {{term}} yang terbuka boleh digabungkan.",
+        "unresolvedDiscussionsDetail": "Selesaikan semua perbincangan sebelum membuat penggabungan.",
+        "unresolvedTasksDetail": "Selesaikan semua tugas terbuka sebelum membuat penggabungan.",
+        "otherDetail": "Penyedia menyekat penggabungan ini atas sebab yang tidak dinyatakan."
       },
       "restrictions": {
         "title": "Sekatan penggabungan",
@@ -1106,7 +1116,8 @@
       "modified": "Diubah suai",
       "renamed": "Dinamakan semula",
       "copied": "Disalin",
-      "changed": "Diubah"
+      "changed": "Diubah",
+      "unknown": "Jenis perubahan tidak dilaporkan"
     },
     "diff": {
       "selectedTapToChange": "{{label}} dipilih, ketik untuk menukar pilihan",

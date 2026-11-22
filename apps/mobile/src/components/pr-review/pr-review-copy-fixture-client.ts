@@ -1,5 +1,6 @@
 import {
   GITLAB_REVIEW_CAPABILITIES,
+  providerPrFileStatus,
   type ProviderPrMergeState,
   type ProviderPrSummary,
   type ProviderReviewCapabilities,
@@ -15,13 +16,70 @@ import { FIXTURE_WRITE_REFUSED } from '@/lib/pr-review/pr-review-copy-fixture-ro
 // The fake reads behind the PR-review copy fixture. Real review consumers run
 // against these owned DTOs across an asynchronous tRPC boundary: the reads
 // never touch global fetch, and a write is refused before any mutation function
-// runs. The navigator starts with 100 of 101 files, exercising listed-file
+// runs. The navigator starts with 100 of 106 files, exercising listed-file
 // progress; searching fetches the final page through the usual pagination hook.
 
 export const triple = { owner: 'sample', repo: 'review-copy', number: 1 };
 export const headSha = '0123456789abcdef0123456789abcdef01234567';
 
-const files = [
+/**
+ * One file per reason a patch can be absent, so a fixture run shows every
+ * `prReview.fileRows` / `prReview.fileNavigator` cause at once. The last one's
+ * provider word (`mode_change`) is outside the contract vocabulary, so it
+ * arrives as `unknown` and the row prints the catalog's "change type not
+ * reported" label rather than the raw word.
+ */
+const patchlessFiles: readonly PrReviewFile[] = [
+  {
+    path: 'assets/photo.png',
+    previousPath: null,
+    status: 'added',
+    additions: 0,
+    deletions: 0,
+    patch: null,
+    patchMissingCause: 'binary',
+  },
+  {
+    path: 'src/generated/large-table.ts',
+    previousPath: null,
+    status: 'modified',
+    additions: 2400,
+    deletions: 1800,
+    patch: null,
+    patchMissingCause: 'too_large',
+  },
+  {
+    path: 'src/provider-omits-diff.ts',
+    previousPath: null,
+    status: 'modified',
+    additions: 4,
+    deletions: 2,
+    patch: null,
+    patchMissingCause: 'provider_omitted',
+  },
+  {
+    path: 'src/mode-change.ts',
+    previousPath: null,
+    status: 'changed',
+    additions: 0,
+    deletions: 0,
+    patch: null,
+    patchMissingCause: 'content_unchanged',
+  },
+  {
+    path: 'src/renamed-away.ts',
+    previousPath: 'src/old-name.ts',
+    // A provider word outside the contract vocabulary arrives as `unknown`.
+    status: providerPrFileStatus('mode_change'),
+    additions: 1,
+    deletions: 1,
+    patch: null,
+    patchMissingCause: null,
+  },
+];
+
+const files: readonly PrReviewFile[] = [
+  ...patchlessFiles,
   {
     path: 'src/greeting.ts',
     previousPath: null,
@@ -30,7 +88,7 @@ const files = [
     deletions: 1,
     patch:
       '@@ -1,3 +1,3 @@\n import { formatGreeting } from "./format";\n-export const greeting = "Hi";\n+export const greeting = "Hello";\n export default greeting;',
-    patchMissing: false,
+    patchMissingCause: null,
   },
   {
     path: 'src/greeting.test.ts',
@@ -39,18 +97,18 @@ const files = [
     additions: 1,
     deletions: 0,
     patch: '@@ -0,0 +1 @@\n+expect(greeting).toBe("Hello");',
-    patchMissing: false,
+    patchMissingCause: null,
   },
-  ...Array.from({ length: 99 }, (_, index) => ({
+  ...Array.from({ length: 99 }, (_, index): PrReviewFile => ({
     path: `src/example-${String(index + 1).padStart(3, '0')}.ts`,
     previousPath: null,
     status: 'added',
     additions: 1,
     deletions: 0,
     patch: '@@ -0,0 +1 @@\n+export const example = true;',
-    patchMissing: false,
+    patchMissingCause: null,
   })),
-] satisfies PrReviewFile[];
+];
 
 /**
  * The `files-context` surface reads hunks that start below the file's first
@@ -59,7 +117,7 @@ const files = [
  * keeps its leading hunk at line 1.
  */
 const CONTEXT_SURFACE = 'files-context';
-const contextFiles = [
+const contextFiles: readonly PrReviewFile[] = [
   {
     path: 'src/greeting.ts',
     previousPath: null,
@@ -68,7 +126,7 @@ const contextFiles = [
     deletions: 1,
     patch:
       '@@ -6,3 +6,3 @@\n export const greeting = "Hello";\n-export const name = "Hi";\n+export const name = "Hello";\n export default greeting;',
-    patchMissing: false,
+    patchMissingCause: null,
   },
   {
     path: 'src/greeting.test.ts',
@@ -78,9 +136,9 @@ const contextFiles = [
     deletions: 1,
     patch:
       '@@ -2,2 +2,2 @@\n-const title = "greeting";\n+const title = "greeting test";\n export default title;',
-    patchMissing: false,
+    patchMissingCause: null,
   },
-] satisfies PrReviewFile[];
+];
 
 /** The files a surface reads: the short-gap set, or the paginated full list. */
 export function filesForSurface(surface: string | undefined): readonly PrReviewFile[] {
@@ -132,7 +190,7 @@ const providerSummary: ProviderPrSummary = {
   headRef: 'greeting-copy',
   baseRef: 'main',
   headSha,
-  changedFiles: 101,
+  changedFiles: files.length,
   additions: 120,
   deletions: 8,
   webUrl: 'https://gitlab.example.test/acme/review-copy/-/merge_requests/7',

@@ -3070,7 +3070,10 @@
       "viewedCount_other": "已檢視 {{viewed}} / {{total}}",
       "viewedOfListed": "清單中的 {{total}} 個檔案已檢視 {{viewed}} 個",
       "viewedOfListed_one": "清單中的 {{total}} 個檔案已檢視 {{viewed}} 個",
-      "viewedOfListed_other": "清單中的 {{total}} 個檔案已檢視 {{viewed}} 個"
+      "viewedOfListed_other": "清單中的 {{total}} 個檔案已檢視 {{viewed}} 個",
+      "binaryDiff": "二進位檔案",
+      "diffUnavailable": "提供者未提供差異",
+      "contentUnchanged": "內容未變更"
     },
     "fileRows": {
       "collapseFile": "收合檔案",
@@ -3078,10 +3081,13 @@
       "noPreview": "此檔案無法預覽",
       "expandFile": "展開檔案",
       "markViewed": "將 {{path}} 標記為已檢視",
-      "openDiffOnGitHub": "在 GitHub 上開啟此檔案的差異",
-      "openOnGitHub": "在 GitHub 上開啟",
       "unmarkViewed": "取消 {{path}} 的已檢視標記",
-      "githubDiff": "GitHub 差異"
+      "binaryDiff": "此二進位檔案沒有可顯示的差異。",
+      "diffUnavailable": "此提供者不會傳送檔案差異。",
+      "contentUnchanged": "此檔案沒有內容變更。",
+      "openOnProvider": "在 {{provider}} 上開啟此檔案",
+      "openDiffOnProvider": "在 {{provider}} 上開啟此檔案的差異",
+      "providerDiff": "{{provider}} 差異"
     },
     "floatingActions": {
       "clear": "清除",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "合併前，請先以基礎分支的內容更新此分支，或進行變基。",
         "behindDetail": "來源分支落後於基礎分支。合併前，請先進行變基或更新來源分支。",
         "notMergeableTitle": "此提取請求尚無法合併",
-        "notMergeableDetail": "GitHub 回報的合併狀態為 {{state}}。"
+        "notMergeableDetail": "GitHub 回報的合併狀態為 {{state}}。",
+        "notOpenDetail": "只有開啟的 {{term}} 才能合併。",
+        "unresolvedDiscussionsDetail": "合併前請先解決所有討論。",
+        "unresolvedTasksDetail": "合併前請先解決所有未完成的任務。",
+        "otherDetail": "提供者基於未說明的理由阻擋此合併。"
       },
       "restrictions": {
         "title": "合併限制",
@@ -3326,7 +3336,8 @@
       "changed": "已變更",
       "copied": "已複製",
       "modified": "已修改",
-      "renamed": "已重新命名"
+      "renamed": "已重新命名",
+      "unknown": "未回報變更類型"
     },
     "tabs": {
       "discussion": "討論",

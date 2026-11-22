@@ -10,6 +10,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { SessionChangesBody } from './session-changes-body';
 
 const state = vi.hoisted(() => ({ insets: { left: 0, right: 0 } }));
@@ -45,14 +46,14 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-const READ_ONLY_FILE = {
+const READ_ONLY_FILE: PrReviewFile = {
   path: 'src/app.ts',
   previousPath: null,
   status: 'modified',
   additions: 3,
   deletions: 1,
   patch: null,
-  patchMissing: true,
+  patchMissingCause: 'binary',
 };
 
 /** The body's read-only session diff: one saved file, no Cloud Agent capture. */

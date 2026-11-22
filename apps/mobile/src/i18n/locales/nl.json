@@ -3070,7 +3070,10 @@
       "viewedCount_other": "{{viewed}} van {{total}} bekeken",
       "viewedOfListed": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
       "viewedOfListed_one": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
-      "viewedOfListed_other": "{{viewed}} van de {{total}} bestanden in de lijst bekeken"
+      "viewedOfListed_other": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
+      "binaryDiff": "binair bestand",
+      "diffUnavailable": "geen diff van provider",
+      "contentUnchanged": "geen inhoudswijziging"
     },
     "fileRows": {
       "collapseFile": "Bestand inklappen",
@@ -3078,10 +3081,13 @@
       "noPreview": "Geen voorbeeld beschikbaar voor dit bestand",
       "expandFile": "Bestand uitklappen",
       "markViewed": "{{path}} markeren als bekeken",
-      "openDiffOnGitHub": "De diff van dit bestand op GitHub openen",
-      "openOnGitHub": "Op GitHub openen",
       "unmarkViewed": "Markering als bekeken verwijderen voor {{path}}",
-      "githubDiff": "GitHub-diff"
+      "binaryDiff": "Geen diff om weer te geven voor dit binaire bestand",
+      "diffUnavailable": "Deze provider verstuurt geen bestandsdiffs.",
+      "contentUnchanged": "Geen inhoudswijzigingen in dit bestand",
+      "openOnProvider": "Dit bestand openen op {{provider}}",
+      "openDiffOnProvider": "De diff van dit bestand openen op {{provider}}",
+      "providerDiff": "{{provider}}-diff"
     },
     "floatingActions": {
       "clear": "Wissen",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "Werk de branch bij vanuit de basisbranch of voer een rebase uit voordat je samenvoegt.",
         "behindDetail": "De bronbranch loopt achter op de basisbranch. Voer een rebase uit of werk de branch bij voordat je samenvoegt.",
         "notMergeableTitle": "Deze PR kan nog niet worden samengevoegd",
-        "notMergeableDetail": "GitHub meldt de samenvoegstatus {{state}}."
+        "notMergeableDetail": "GitHub meldt de samenvoegstatus {{state}}.",
+        "notOpenDetail": "Alleen een open {{term}} kan worden samengevoegd.",
+        "unresolvedDiscussionsDetail": "Los alle discussies op voordat je samenvoegt.",
+        "unresolvedTasksDetail": "Los alle openstaande taken op voordat je samenvoegt.",
+        "otherDetail": "De provider blokkeert deze samenvoeging om een reden die niet is vermeld."
       },
       "restrictions": {
         "title": "Samenvoegrestricties",
@@ -3326,7 +3336,8 @@
       "changed": "Gewijzigd",
       "copied": "Gekopieerd",
       "modified": "Aangepast",
-      "renamed": "Hernoemd"
+      "renamed": "Hernoemd",
+      "unknown": "Wijzigingstype niet gemeld"
     },
     "tabs": {
       "discussion": "Discussie",

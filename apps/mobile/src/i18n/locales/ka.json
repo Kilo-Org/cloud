@@ -641,7 +641,10 @@
       "diffTooLarge": "ცვლილებების მოცულობა ზედმეტად დიდია",
       "openFile": "{{path}}-ის გახსნა",
       "openFileViewed": "{{path}}-ის გახსნა (ნანახია)",
-      "title": "ფაილები"
+      "title": "ფაილები",
+      "binaryDiff": "ბინარული ფაილი",
+      "diffUnavailable": "პროვაიდერისგან ცვლილება არ არის",
+      "contentUnchanged": "შიგთავსის ცვლილება არ არის"
     },
     "fileRows": {
       "markViewed": "{{path}}-ის ნანახად მონიშვნა",
@@ -650,9 +653,12 @@
       "expandFile": "ფაილის გაშლა",
       "diffTooLarge": "ცვლილებების მოცულობა ზედმეტად დიდია საჩვენებლად.",
       "noPreview": "ამ ფაილის გადახედვა მიუწვდომელია",
-      "openOnGitHub": "GitHub-ზე გახსნა",
-      "openDiffOnGitHub": "ამ ფაილის ცვლილებების GitHub-ზე გახსნა",
-      "githubDiff": "ცვლილებები GitHub-ზე"
+      "binaryDiff": "ამ ბინარული ფაილისთვის საჩვენებელი ცვლილებები არ არის",
+      "diffUnavailable": "ეს პროვაიდერი ფაილების ცვლილებებს არ აგზავნის",
+      "contentUnchanged": "ამ ფაილში შიგთავსის ცვლილებები არ არის",
+      "openOnProvider": "ამ ფაილის {{provider}}-ზე გახსნა",
+      "openDiffOnProvider": "ამ ფაილის ცვლილებების {{provider}}-ზე გახსნა",
+      "providerDiff": "ცვლილებები {{provider}}-ზე"
     },
     "floatingActions": {
       "clearSelection": "მონიშვნის გაუქმება",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "შერწყმამდე განაახლე განშტოება საბაზო განშტოებიდან ან შეცვალე მისი ბაზა.",
         "behindDetail": "საწყისი განშტოება საბაზო განშტოებას ჩამორჩება. შერწყმამდე შეცვალე მისი ბაზა ან განაახლე განშტოება.",
         "notMergeableTitle": "ამ შერწყმის მოთხოვნის შერწყმა ჯერ შეუძლებელია",
-        "notMergeableDetail": "GitHub-ის თანახმად, შერწყმის მდგომარეობაა: {{state}}."
+        "notMergeableDetail": "GitHub-ის თანახმად, შერწყმის მდგომარეობაა: {{state}}.",
+        "notOpenDetail": "მხოლოდ ღია {{term}} შეიძლება შერწყმდეს.",
+        "unresolvedDiscussionsDetail": "შერწყმამდე მოაგვარე ყველა დისკუსია.",
+        "unresolvedTasksDetail": "შერწყმამდე მოაგვარე ყველა ღია დავალება.",
+        "otherDetail": "პროვაიდერი ამ შერწყმას ბლოკავს მიზეზის გამო, რომელიც არ დაუსახელებია."
       },
       "restrictions": {
         "title": "შერწყმის შეზღუდვები",
@@ -1106,7 +1116,8 @@
       "modified": "შეცვლილია",
       "renamed": "სახელი შეცვლილია",
       "copied": "დაკოპირდა",
-      "changed": "შეცვლილია"
+      "changed": "შეცვლილია",
+      "unknown": "ცვლილების ტიპი არ არის მითითებული"
     },
     "diff": {
       "selectedTapToChange": "მონიშნულია {{label}}, მონიშვნის შესაცვლელად შეეხე",

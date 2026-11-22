@@ -29,7 +29,7 @@ function makeFile(patch: string, path = 'a.ts'): PrReviewFile {
     additions: 1,
     deletions: 1,
     patch,
-    patchMissing: false,
+    patchMissingCause: null,
   };
 }
 
@@ -39,6 +39,7 @@ function baseArgs(overrides: Partial<BuildItemsArgs> = {}): BuildItemsArgs {
     expanded: {},
     expandedContext: {},
     viewed: () => false,
+    link: () => null,
     headSha: 'abc',
     owner: 'owner',
     repo: 'repo',

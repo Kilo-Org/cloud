@@ -641,7 +641,10 @@
       "diffTooLarge": "garaagarummaan garmalee guddaa",
       "openFile": "{{path}} bani",
       "openFileViewed": "{{path}} bani (ilaalame)",
-      "title": "Faayiloota"
+      "title": "Faayiloota",
+      "binaryDiff": "faayilii binaayirii",
+      "diffUnavailable": "dhiyeessaa irraa garaagarummaan hin jiru",
+      "contentUnchanged": "jijjiiramni qabiyyee hin jiru"
     },
     "fileRows": {
       "markViewed": "{{path}} akka ilaalametti mallatteessi",
@@ -650,9 +653,12 @@
       "expandFile": "Faayilii bal'isi",
       "diffTooLarge": "Garaagarummaan agarsiisuuf garmalee guddaadha.",
       "noPreview": "Faayilii kanaaf duraaltoon hin jiru",
-      "openOnGitHub": "GitHub irratti bani",
-      "openDiffOnGitHub": "Garaagarummaa faayilii kanaa GitHub irratti bani",
-      "githubDiff": "Garaagarummaa GitHub"
+      "binaryDiff": "Faayilii binaayirii kanaaf garaagarummaa agarsiisuuf hin jiru.",
+      "diffUnavailable": "Dhiyeessaan kun garaagarummaa faayilii hin ergu",
+      "contentUnchanged": "Faayilii kana keessatti jijjiiramni qabiyyee hin jiru",
+      "openOnProvider": "Faayilii kana {{provider}} irratti bani",
+      "openDiffOnProvider": "Garaagarummaa faayilii kanaa {{provider}} irratti bani",
+      "providerDiff": "Garaagarummaa {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Filannoo haqi",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Walitti makuu dura damee bu'uuraa irraa damee kana haaromsi ykn bu'uura isaa jijjiiri.",
         "behindDetail": "Dameen madda jijjiiramaa damee bu'uuraa duubatti hafeera. Walitti makuu dura bu'uura isaa jijjiiri ykn damee haaromsi.",
         "notMergeableTitle": "Gaaffiin walitti makuu kun ammatti raawwatamuu hin danda'u",
-        "notMergeableDetail": "GitHub haala walitti makamuu {{state}} jedhamu gabaase."
+        "notMergeableDetail": "GitHub haala walitti makamuu {{state}} jedhamu gabaase.",
+        "notOpenDetail": "{{term}} banaa qofti walitti makamuu danda'a.",
+        "unresolvedDiscussionsDetail": "Walitti makuu dura marii hunda furi.",
+        "unresolvedTasksDetail": "Walitti makuu dura hojiiwwan banaa hunda furi.",
+        "otherDetail": "Dhiyeessaan walitti makamuu kana sababa hin ibsineen dhorkaa jira."
       },
       "restrictions": {
         "title": "Dhorkawwan raawwachuu",
@@ -1106,7 +1116,8 @@
       "modified": "Fooyya'e",
       "renamed": "Maqaan jijjiirame",
       "copied": "Garagalfame",
-      "changed": "Jijjiirame"
+      "changed": "Jijjiirame",
+      "unknown": "Gosa jijjiiramaa hin gabaafamne"
     },
     "diff": {
       "selectedTapToChange": "{{label}} filatame, filannoo jijjiiruuf tuqi",

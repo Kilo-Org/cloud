@@ -380,14 +380,77 @@ describe('buildFilesPage', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('flags patchMissing when GitHub omits the patch', () => {
+  it('derives the patch-missing cause from the status and the line counts', () => {
+    // GitHub omits `patch` for a binary file (which it reports with zero line
+    // counts), for a patch it dropped as oversized (non-zero counts), and for
+    // a change with no content at all (0/0 `changed`, 0/0 `renamed`).
+    const cases = [
+      {
+        name: 'binary file: zero counts and no patch',
+        raw: { filename: 'logo.png', status: 'modified', additions: 0, deletions: 0 },
+        cause: 'binary',
+      },
+      {
+        name: 'oversized patch: non-zero counts and no patch',
+        raw: { filename: 'huge.ts', status: 'modified', additions: 40, deletions: 10 },
+        cause: 'too_large',
+      },
+      {
+        name: 'mode-only change: 0/0 `changed`',
+        raw: { filename: 'script.sh', status: 'changed', additions: 0, deletions: 0 },
+        cause: 'content_unchanged',
+      },
+      {
+        name: 'rename with no content change: 0/0 `renamed`',
+        raw: {
+          filename: 'new.ts',
+          previous_filename: 'old.ts',
+          status: 'renamed',
+          additions: 0,
+          deletions: 0,
+        },
+        cause: 'content_unchanged',
+      },
+      {
+        name: 'a present patch needs no cause',
+        raw: {
+          filename: 'src/a.ts',
+          status: 'modified',
+          additions: 1,
+          deletions: 1,
+          patch: '@@ -1 +1 @@\n-old\n+new\n',
+        },
+        cause: null,
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const result = buildFilesPage({
+        page: 1,
+        perPage: 50,
+        rawFiles: [{ ...testCase.raw }],
+      });
+      expect(result.files[0]?.patchMissingCause).toBe(testCase.cause);
+      // A non-null cause always comes with no patch; a present one with none.
+      expect(result.files[0]?.patch === null).toBe(testCase.cause !== null);
+    }
+  });
+
+  it('normalizes an unknown GitHub status word to unknown', () => {
     const result = buildFilesPage({
       page: 1,
       perPage: 50,
-      rawFiles: [{ filename: 'big.bin', status: 'modified', additions: 0, deletions: 0 }],
+      rawFiles: [
+        {
+          filename: 'src/a.ts',
+          status: 'brand-new-word',
+          additions: 1,
+          deletions: 0,
+          patch: '@@ -0,0 +1 @@\n+a\n',
+        },
+      ],
     });
-    expect(result.files[0]?.patchMissing).toBe(true);
-    expect(result.files[0]?.patch).toBeNull();
+    expect(result.files[0]?.status).toBe('unknown');
   });
 
   it('preserves previousPath on renames', () => {

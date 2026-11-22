@@ -647,7 +647,10 @@
       "diffTooLarge": "занадта шмат змен",
       "openFile": "Адкрыць {{path}}",
       "openFileViewed": "Адкрыць {{path}} (прагледжаны)",
-      "title": "Файлы"
+      "title": "Файлы",
+      "binaryDiff": "бінарны файл",
+      "diffUnavailable": "няма змен ад правайдэра",
+      "contentUnchanged": "няма змен зместу"
     },
     "fileRows": {
       "markViewed": "Пазначыць {{path}} як прагледжаны",
@@ -656,9 +659,12 @@
       "expandFile": "Разгарнуць файл",
       "diffTooLarge": "Змен занадта шмат для паказу.",
       "noPreview": "Папярэдні прагляд гэтага файла недаступны",
-      "openOnGitHub": "Адкрыць на GitHub",
-      "openDiffOnGitHub": "Адкрыць змены гэтага файла на GitHub",
-      "githubDiff": "Змены на GitHub"
+      "binaryDiff": "Няма змен для паказу ў гэтым бінарным файле.",
+      "diffUnavailable": "Гэты правайдэр не перадае змены файлаў.",
+      "contentUnchanged": "У гэтым файле няма змен зместу.",
+      "openOnProvider": "Адкрыць гэты файл на {{provider}}",
+      "openDiffOnProvider": "Адкрыць змены гэтага файла на {{provider}}",
+      "providerDiff": "Змены на {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Зняць вылучэнне",
@@ -796,7 +802,11 @@
         "behindDetailUpdatable": "Перад зліццём абнаві галіну зменамі з базавай галіны або выканай перабазаванне.",
         "behindDetail": "Зыходная галіна адстае ад базавай. Перад зліццём выканай перабазаванне або абнаві галіну.",
         "notMergeableTitle": "Гэты запыт пакуль немагчыма зліць",
-        "notMergeableDetail": "GitHub паведаміў пра наступны стан магчымасці зліцця: {{state}}."
+        "notMergeableDetail": "GitHub паведаміў пра наступны стан магчымасці зліцця: {{state}}.",
+        "notOpenDetail": "Зліць можна толькі адкрыты {{term}}.",
+        "unresolvedDiscussionsDetail": "Перад зліццём вырашы ўсе абмеркаванні.",
+        "unresolvedTasksDetail": "Перад зліццём вырашы ўсе адкрытыя задачы.",
+        "otherDetail": "Правайдэр блакуе гэтае зліццё па прычыне, якую не назваў."
       },
       "restrictions": {
         "title": "Абмежаванні на зліццё",
@@ -1158,7 +1168,8 @@
       "modified": "Зменены",
       "renamed": "Перайменаваны",
       "copied": "Скапіявана",
-      "changed": "Зменены"
+      "changed": "Зменены",
+      "unknown": "Тып змены не паведамлены"
     },
     "diff": {
       "selectedTapToChange": "Вылучана {{label}}, націсні, каб змяніць вылучэнне",

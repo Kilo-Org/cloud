@@ -641,7 +641,10 @@
       "diffTooLarge": "masyadong malaki ang pagkakaiba",
       "openFile": "Buksan ang {{path}}",
       "openFileViewed": "Buksan ang {{path}} (natingnan)",
-      "title": "Mga payl"
+      "title": "Mga payl",
+      "binaryDiff": "di-tekstong file",
+      "diffUnavailable": "walang pagkakaiba mula sa tagapagbigay",
+      "contentUnchanged": "walang pagbabago sa nilalaman"
     },
     "fileRows": {
       "markViewed": "Markahan ang {{path}} bilang natingnan",
@@ -650,9 +653,12 @@
       "expandFile": "Ipakita ang nilalaman ng file",
       "diffTooLarge": "Masyadong malaki ang pagkakaiba para maipakita.",
       "noPreview": "Walang preview para sa file na ito",
-      "openOnGitHub": "Buksan sa GitHub",
-      "openDiffOnGitHub": "Buksan ang pagkakaiba ng file na ito sa GitHub",
-      "githubDiff": "Pagkakaiba sa GitHub"
+      "binaryDiff": "Walang pagkakaibang maipapakita para sa di-tekstong file na ito",
+      "diffUnavailable": "Hindi nagpapadala ng mga pagkakaiba ng file ang tagapagbigay na ito",
+      "contentUnchanged": "Walang pagbabago sa nilalaman ng file na ito",
+      "openOnProvider": "Buksan ang file na ito sa {{provider}}",
+      "openDiffOnProvider": "Buksan sa {{provider}} ang pagkakaiba ng file na ito",
+      "providerDiff": "Pagkakaiba sa {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Alisin ang pagkakapili",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "I-update ang branch gamit ang base branch, o mag-rebase, bago mag-merge.",
         "behindDetail": "Kulang ang head branch sa mga pagbabago mula sa base branch. Mag-rebase o i-update ang branch bago mag-merge.",
         "notMergeableTitle": "Hindi pa maaaring i-merge ang pull request na ito",
-        "notMergeableDetail": "Iniulat ng GitHub ang {{state}} bilang status ng pag-merge."
+        "notMergeableDetail": "Iniulat ng GitHub ang {{state}} bilang status ng pag-merge.",
+        "notOpenDetail": "Bukas na {{term}} lamang ang maaaring i-merge.",
+        "unresolvedDiscussionsDetail": "Ayusin ang lahat ng talakayan bago mag-merge.",
+        "unresolvedTasksDetail": "Ayusin ang lahat ng bukas na gawain bago mag-merge.",
+        "otherDetail": "Hinaharang ng tagapagbigay ang merge na ito dahil sa isang dahilang hindi nito isinaad."
       },
       "restrictions": {
         "title": "Mga paghihigko sa pag-merge",
@@ -1106,7 +1116,8 @@
       "modified": "Binago",
       "renamed": "Pinalitan ng pangalan",
       "copied": "Kinopya",
-      "changed": "Binago"
+      "changed": "Binago",
+      "unknown": "Hindi iniulat ang uri ng pagbabago"
     },
     "diff": {
       "selectedTapToChange": "Napili ang {{label}}, i-tap para baguhin ang pagkakapili",

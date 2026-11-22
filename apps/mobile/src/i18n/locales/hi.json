@@ -3070,7 +3070,10 @@
       "viewedCount_other": "{{viewed}}/{{total}} देखी गईं",
       "viewedOfListed": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं",
       "viewedOfListed_one": "सूचीबद्ध फ़ाइल में से {{viewed}}/{{total}} देखी गई",
-      "viewedOfListed_other": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं"
+      "viewedOfListed_other": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं",
+      "binaryDiff": "बाइनरी फ़ाइल",
+      "diffUnavailable": "प्रदाता से कोई डिफ़ नहीं",
+      "contentUnchanged": "कोई सामग्री परिवर्तन नहीं"
     },
     "fileRows": {
       "collapseFile": "फ़ाइल समेटें",
@@ -3078,10 +3081,13 @@
       "noPreview": "इस फ़ाइल का पूर्वावलोकन उपलब्ध नहीं है",
       "expandFile": "फ़ाइल फैलाएँ",
       "markViewed": "{{path}} को देखी गई फ़ाइल के रूप में चिह्नित करें",
-      "openDiffOnGitHub": "GitHub पर इस फ़ाइल का डिफ़ खोलें",
-      "openOnGitHub": "GitHub पर खोलें",
       "unmarkViewed": "{{path}} से देखी गई फ़ाइल का चिह्न हटाएँ",
-      "githubDiff": "GitHub डिफ़"
+      "binaryDiff": "इस बाइनरी फ़ाइल में दिखाने के लिए कोई डिफ़ नहीं है।",
+      "diffUnavailable": "यह प्रदाता फ़ाइल डिफ़ नहीं भेजता।",
+      "contentUnchanged": "इस फ़ाइल में कोई सामग्री परिवर्तन नहीं है।",
+      "openOnProvider": "इस फ़ाइल को {{provider}} पर खोलें",
+      "openDiffOnProvider": "{{provider}} पर इस फ़ाइल का डिफ़ खोलें",
+      "providerDiff": "{{provider}} डिफ़"
     },
     "floatingActions": {
       "clear": "हटाएँ",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "मर्ज करने से पहले ब्रांच को बेस ब्रांच से अपडेट करें या रीबेस करें।",
         "behindDetail": "हेड ब्रांच बेस ब्रांच से पीछे है। मर्ज करने से पहले ब्रांच को रीबेस करें या अपडेट करें।",
         "notMergeableTitle": "यह पुल रिक्वेस्ट अभी मर्ज नहीं की जा सकती",
-        "notMergeableDetail": "GitHub ने मर्ज की स्थिति {{state}} बताई है।"
+        "notMergeableDetail": "GitHub ने मर्ज की स्थिति {{state}} बताई है।",
+        "notOpenDetail": "मर्ज करने के लिए {{term}} का खुला होना ज़रूरी है।",
+        "unresolvedDiscussionsDetail": "मर्ज करने से पहले सभी चर्चाएँ सुलझाएँ।",
+        "unresolvedTasksDetail": "मर्ज करने से पहले सभी खुले कार्य सुलझाएँ।",
+        "otherDetail": "प्रदाता बिना कोई कारण बताए यह मर्ज रोक रहा है।"
       },
       "restrictions": {
         "title": "मर्ज प्रतिबंध",
@@ -3326,7 +3336,8 @@
       "changed": "बदला गया",
       "copied": "कॉपी किया गया",
       "modified": "संशोधित",
-      "renamed": "नाम बदला गया"
+      "renamed": "नाम बदला गया",
+      "unknown": "परिवर्तन का प्रकार नहीं बताया गया"
     },
     "tabs": {
       "discussion": "चर्चा",

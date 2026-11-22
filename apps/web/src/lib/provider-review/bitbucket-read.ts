@@ -14,6 +14,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import {
+  providerPrFileStatus,
   type ProviderPrChecksResult,
   type ProviderPrFile,
   type ProviderPrFilesPage,
@@ -542,11 +543,13 @@ function mapDiffstatEntry(entry: z.infer<typeof BitbucketDiffstatEntrySchema>): 
   return {
     path,
     previousPath: oldPath !== null && oldPath !== path ? oldPath : null,
-    status: entry.status ?? 'modified',
+    status: providerPrFileStatus(entry.status ?? 'modified'),
     additions: entry.lines_added ?? 0,
     deletions: entry.lines_removed ?? 0,
+    // The diffstat endpoint reports counts only: it never carries a patch for
+    // any file, so the reason is the endpoint itself, not the file's content.
     patch: null,
-    patchMissing: true,
+    patchMissingCause: 'provider_omitted',
   };
 }
 
@@ -1474,7 +1477,7 @@ export async function getMergeRestrictions(
     const blockedReasons: ProviderPrMergeBlockedReason[] = [];
     if (detail.state !== 'OPEN') {
       blockedReasons.push({
-        code: 'other',
+        code: 'not_open',
         message: 'Only open pull requests can be merged.',
       });
     }
@@ -1492,7 +1495,7 @@ export async function getMergeRestrictions(
     // never decide whether the provider counts tasks.
     if ((detail.task_count ?? 0) > 0) {
       blockedReasons.push({
-        code: 'other',
+        code: 'unresolved_tasks',
         message: 'Resolve all tasks before merging.',
       });
     }

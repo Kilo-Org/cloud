@@ -650,7 +650,10 @@
       "diffTooLarge": "wisq differenzi",
       "openFile": "Iftaħ {{path}}",
       "openFileViewed": "Iftaħ {{path}} (diġà rajtu)",
-      "title": "Fajls"
+      "title": "Fajls",
+      "binaryDiff": "fajl binarju",
+      "diffUnavailable": "l-ebda differenzi mill-fornitur",
+      "contentUnchanged": "l-ebda tibdil fil-kontenut"
     },
     "fileRows": {
       "markViewed": "Immarka {{path}} bħala fajl li rajt",
@@ -659,9 +662,12 @@
       "expandFile": "Uri l-kontenut tal-fajl",
       "diffTooLarge": "Hemm wisq differenzi biex jintwerew.",
       "noPreview": "M'hemmx preview disponibbli għal dan il-fajl",
-      "openOnGitHub": "Iftaħ fuq GitHub",
-      "openDiffOnGitHub": "Iftaħ id-differenzi ta' dan il-fajl fuq GitHub",
-      "githubDiff": "Differenzi fuq GitHub"
+      "binaryDiff": "M'hemmx differenzi biex jintwerew għal dan il-fajl binarju.",
+      "diffUnavailable": "Dan il-fornitur ma jibgħatx differenzi tal-fajl.",
+      "contentUnchanged": "M'hemmx tibdil fil-kontenut ta' dan il-fajl.",
+      "openOnProvider": "Iftaħ dan il-fajl fuq {{provider}}",
+      "openDiffOnProvider": "Iftaħ id-differenzi ta' dan il-fajl fuq {{provider}}",
+      "providerDiff": "Differenzi fuq {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Neħħi l-għażla",
@@ -806,7 +812,11 @@
         "behindDetailUpdatable": "Aġġorna l-fergħa mill-fergħa bażi, jew ibdel il-bażi tagħha, qabel ma tagħmel l-għaqda.",
         "behindDetail": "Il-fergħa tas-sors tinsab lura mill-fergħa bażi. Ibdel il-bażi tagħha jew aġġornaha qabel ma tagħmel l-għaqda.",
         "notMergeableTitle": "Din it-talba għall-għaqda għadha ma tistax tingħaqad",
-        "notMergeableDetail": "GitHub irrapporta l-istat {{state}} għall-possibbiltà tal-għaqda."
+        "notMergeableDetail": "GitHub irrapporta l-istat {{state}} għall-possibbiltà tal-għaqda.",
+        "notOpenDetail": "Biss {{term}} miftuħa tista' tiġi mgħaqqda.",
+        "unresolvedDiscussionsDetail": "Solvi d-diskussjonijiet kollha qabel ma tagħmel l-għaqda.",
+        "unresolvedTasksDetail": "Solvi l-kompiti miftuħa kollha qabel ma tagħmel l-għaqda.",
+        "otherDetail": "Il-fornitur qed jibblokka din l-għaqda għal raġuni li ma semmiex."
       },
       "restrictions": {
         "title": "Restrizzjonijiet fuq l-għaqda",
@@ -1184,7 +1194,8 @@
       "modified": "Modifikat",
       "renamed": "Isem mibdul",
       "copied": "Ikkupjat",
-      "changed": "Mibdul"
+      "changed": "Mibdul",
+      "unknown": "Tip ta' bidla mhux irrappurtat"
     },
     "diff": {
       "selectedTapToChange": "Magħżul: {{label}}, tektek biex tibdel l-għażla",

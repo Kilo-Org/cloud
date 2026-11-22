@@ -641,7 +641,10 @@
       "diffTooLarge": "ຄວາມແຕກຕ່າງໃຫຍ່ເກີນໄປ",
       "openFile": "ເປີດ {{path}}",
       "openFileViewed": "ເປີດ {{path}} (ເບິ່ງແລ້ວ)",
-      "title": "ໄຟລ໌"
+      "title": "ໄຟລ໌",
+      "binaryDiff": "ໄຟລ໌ບິນນາຣີ",
+      "diffUnavailable": "ບໍ່ມີຄວາມແຕກຕ່າງຈາກຜູ້ໃຫ້ບໍລິການ",
+      "contentUnchanged": "ບໍ່ມີການປ່ຽນແປງເນື້ອຫາ"
     },
     "fileRows": {
       "markViewed": "ໝາຍ {{path}} ວ່າເບິ່ງແລ້ວ",
@@ -650,9 +653,12 @@
       "expandFile": "ຂະຫຍາຍໄຟລ໌",
       "diffTooLarge": "ຄວາມແຕກຕ່າງໃຫຍ່ເກີນກວ່າຈະສະແດງໄດ້.",
       "noPreview": "ບໍ່ມີຕົວຢ່າງສຳລັບໄຟລ໌ນີ້",
-      "openOnGitHub": "ເປີດໃນ GitHub",
-      "openDiffOnGitHub": "ເປີດຄວາມແຕກຕ່າງຂອງໄຟລ໌ນີ້ໃນ GitHub",
-      "githubDiff": "ຄວາມແຕກຕ່າງໃນ GitHub"
+      "binaryDiff": "ບໍ່ມີຄວາມແຕກຕ່າງໃຫ້ສະແດງສຳລັບໄຟລ໌ບິນນາຣີນີ້",
+      "diffUnavailable": "ຜູ້ໃຫ້ບໍລິການນີ້ບໍ່ໄດ້ສົ່ງຄວາມແຕກຕ່າງຂອງໄຟລ໌",
+      "contentUnchanged": "ບໍ່ມີການປ່ຽນແປງເນື້ອຫາໃນໄຟລ໌ນີ້",
+      "openOnProvider": "ເປີດໄຟລ໌ນີ້ໃນ {{provider}}",
+      "openDiffOnProvider": "ເປີດຄວາມແຕກຕ່າງຂອງໄຟລ໌ນີ້ໃນ {{provider}}",
+      "providerDiff": "ຄວາມແຕກຕ່າງໃນ {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "ລ້າງການເລືອກ",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "ອັບເດດສາຂາຈາກສາຂາຖານ ຫຼື ປ່ຽນຖານກ່ອນລວມ.",
         "behindDetail": "ສາຂາຕົ້ນທາງຍັງບໍ່ມີການປ່ຽນແປງຫຼ້າສຸດຈາກສາຂາຖານ. ປ່ຽນຖານ ຫຼື ອັບເດດສາຂາກ່ອນລວມ.",
         "notMergeableTitle": "ຍັງລວມຄຳຂໍລວມໂຄດນີ້ບໍ່ໄດ້",
-        "notMergeableDetail": "GitHub ລາຍງານສະຖານະຄວາມພ້ອມໃນການລວມເປັນ {{state}}."
+        "notMergeableDetail": "GitHub ລາຍງານສະຖານະຄວາມພ້ອມໃນການລວມເປັນ {{state}}.",
+        "notOpenDetail": "ມີພຽງ {{term}} ທີ່ເປີດຢູ່ເທົ່ານັ້ນທີ່ສາມາດລວມໄດ້.",
+        "unresolvedDiscussionsDetail": "ແກ້ໄຂການສົນທະນາທັງໝົດກ່ອນລວມ.",
+        "unresolvedTasksDetail": "ແກ້ໄຂໜ້າວຽກທີ່ເປີດຢູ່ທັງໝົດກ່ອນລວມ.",
+        "otherDetail": "ຜູ້ໃຫ້ບໍລິການກຳລັງຂັດຂວາງການລວມນີ້ດ້ວຍເຫດຜົນທີ່ບໍ່ໄດ້ລະບຸ."
       },
       "restrictions": {
         "title": "ຂໍ້ຈຳກັດການລວມ",
@@ -1106,7 +1116,8 @@
       "modified": "ແກ້ໄຂແລ້ວ",
       "renamed": "ປ່ຽນຊື່ແລ້ວ",
       "copied": "ຄັດລອກແລ້ວ",
-      "changed": "ປ່ຽນແປງແລ້ວ"
+      "changed": "ປ່ຽນແປງແລ້ວ",
+      "unknown": "ບໍ່ໄດ້ລາຍງານປະເພດການປ່ຽນແປງ"
     },
     "diff": {
       "selectedTapToChange": "ເລືອກ {{label}} ແລ້ວ, ແຕະເພື່ອປ່ຽນການເລືອກ",

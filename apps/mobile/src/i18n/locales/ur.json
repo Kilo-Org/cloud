@@ -641,7 +641,10 @@
       "diffTooLarge": "تبدیلیوں کا موازنہ بہت بڑا ہے",
       "openFile": "{{path}} کھولیں",
       "openFileViewed": "{{path}} کھولیں (دیکھی گئی)",
-      "title": "فائلیں"
+      "title": "فائلیں",
+      "binaryDiff": "بائنری فائل",
+      "diffUnavailable": "پرووائیڈر سے کوئی تبدیلیوں کا موازنہ نہیں",
+      "contentUnchanged": "مواد میں کوئی تبدیلی نہیں"
     },
     "fileRows": {
       "markViewed": "{{path}} پر دیکھی گئی فائل کا نشان لگائیں",
@@ -650,9 +653,12 @@
       "expandFile": "فائل کی تفصیل دکھائیں",
       "diffTooLarge": "تبدیلیوں کا موازنہ اتنا بڑا ہے کہ اسے دکھایا نہیں جا سکتا۔",
       "noPreview": "اس فائل کا کوئی پیش منظر دستیاب نہیں",
-      "openOnGitHub": "GitHub پر کھولیں",
-      "openDiffOnGitHub": "اس فائل کی تبدیلیوں کا موازنہ GitHub پر کھولیں",
-      "githubDiff": "GitHub پر تبدیلیوں کا موازنہ"
+      "binaryDiff": "اس بائنری فائل کے لیے دکھانے کو کوئی تبدیلیوں کا موازنہ نہیں",
+      "diffUnavailable": "یہ پرووائیڈر فائل کی تبدیلیوں کا موازنہ نہیں بھیجتا",
+      "contentUnchanged": "اس فائل کے مواد میں کوئی تبدیلی نہیں",
+      "openOnProvider": "اس فائل کو {{provider}} پر کھولیں",
+      "openDiffOnProvider": "اس فائل کی تبدیلیوں کا موازنہ {{provider}} پر کھولیں",
+      "providerDiff": "{{provider}} پر تبدیلیوں کا موازنہ"
     },
     "floatingActions": {
       "clearSelection": "انتخاب ہٹائیں",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "مرج کرنے سے پہلے بنیادی برانچ کی تبدیلیاں لے کر برانچ اپ ڈیٹ کریں یا ریبیس کریں۔",
         "behindDetail": "ہیڈ برانچ میں بنیادی برانچ کی تازہ تبدیلیاں شامل نہیں ہیں۔ مرج کرنے سے پہلے برانچ کو ریبیس یا اپ ڈیٹ کریں۔",
         "notMergeableTitle": "یہ پل ریکویسٹ ابھی مرج نہیں ہو سکتی",
-        "notMergeableDetail": "GitHub کے مطابق مرج کی حالت {{state}} ہے۔"
+        "notMergeableDetail": "GitHub کے مطابق مرج کی حالت {{state}} ہے۔",
+        "notOpenDetail": "صرف کھلا {{term}} ہی مرج کیا جا سکتا ہے۔",
+        "unresolvedDiscussionsDetail": "مرج کرنے سے پہلے تمام بحثیں حل کریں۔",
+        "unresolvedTasksDetail": "مرج کرنے سے پہلے تمام کھلے ٹاسک حل کریں۔",
+        "otherDetail": "پرووائیڈر یہ مرج کسی ایسی وجہ سے روک رہا ہے جو اس نے نہیں بتائی۔"
       },
       "restrictions": {
         "title": "مرج پابندیاں",
@@ -1106,7 +1116,8 @@
       "modified": "ترمیم شدہ",
       "renamed": "نام تبدیل",
       "copied": "کاپی ہو گیا",
-      "changed": "تبدیل شدہ"
+      "changed": "تبدیل شدہ",
+      "unknown": "تبدیلی کی قسم نہیں بتائی گئی"
     },
     "diff": {
       "selectedTapToChange": "{{label}} منتخب ہے، انتخاب بدلنے کے لیے ٹیپ کریں",
@@ -1460,7 +1471,7 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے، اس لیے مالک کو ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کرنی ہوگی۔"
+      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے، اس لیے مالک کو \u2068kilo.ai\u2069 پر بلنگ اپ ڈیٹ کرنی ہوگی۔"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",

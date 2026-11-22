@@ -641,7 +641,10 @@
       "diffTooLarge": "túl nagy a különbség",
       "openFile": "{{path}} megnyitása",
       "openFileViewed": "{{path}} megnyitása (megtekintve)",
-      "title": "Fájlok"
+      "title": "Fájlok",
+      "binaryDiff": "bináris fájl",
+      "diffUnavailable": "nincs különbség a szolgáltatótól",
+      "contentUnchanged": "nincs tartalmi változás"
     },
     "fileRows": {
       "markViewed": "{{path}} megjelölése megtekintettként",
@@ -650,9 +653,12 @@
       "expandFile": "Fájl kibontása",
       "diffTooLarge": "A különbségnézet túl nagy a megjelenítéshez.",
       "noPreview": "Ehhez a fájlhoz nem érhető el előnézet",
-      "openOnGitHub": "Megnyitás a GitHubon",
-      "openDiffOnGitHub": "A fájl különbségnézetének megnyitása a GitHubon",
-      "githubDiff": "GitHub-különbségnézet"
+      "binaryDiff": "Ehhez a bináris fájlhoz nincs megjeleníthető különbségnézet",
+      "diffUnavailable": "Ez a szolgáltató nem küld fájlkülönbségnézeteket",
+      "contentUnchanged": "Ebben a fájlban nincsenek tartalmi változások",
+      "openOnProvider": "A fájl megnyitása a {{provider}}on",
+      "openDiffOnProvider": "A fájl különbségnézetének megnyitása a {{provider}}on",
+      "providerDiff": "{{provider}}-különbségnézet"
     },
     "floatingActions": {
       "clearSelection": "Kijelölés megszüntetése",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Az összevonás előtt frissítsd az ágat az alapágból, vagy végezz újraalapozást.",
         "behindDetail": "A forráság le van maradva az alapághoz képest. Az összevonás előtt végezz újraalapozást, vagy frissítsd az ágat.",
         "notMergeableTitle": "Ez a módosítási kérelem még nem vonható össze",
-        "notMergeableDetail": "A GitHub által jelzett összevonhatósági állapot: {{state}}."
+        "notMergeableDetail": "A GitHub által jelzett összevonhatósági állapot: {{state}}.",
+        "notOpenDetail": "Csak nyitott {{term}} vonható össze.",
+        "unresolvedDiscussionsDetail": "Az összevonás előtt oldd fel az összes megbeszélést.",
+        "unresolvedTasksDetail": "Az összevonás előtt oldd meg az összes nyitott feladatot.",
+        "otherDetail": "A szolgáltató egy meg nem nevezett ok miatt blokkolja ezt az összevonást."
       },
       "restrictions": {
         "title": "Összevonási korlátozások",
@@ -1106,7 +1116,8 @@
       "modified": "Módosítva",
       "renamed": "Átnevezve",
       "copied": "Másolva",
-      "changed": "Változott"
+      "changed": "Változott",
+      "unknown": "Változástípus nincs megadva"
     },
     "diff": {
       "selectedTapToChange": "Kijelölve: {{label}}, koppints a kijelölés módosításához",

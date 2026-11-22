@@ -3070,7 +3070,10 @@
       "viewedCount_other": "已查看 {{viewed}}/{{total}}",
       "viewedOfListed": "所列文件：已查看 {{viewed}}/{{total}}",
       "viewedOfListed_one": "所列文件：已查看 {{viewed}}/{{total}}",
-      "viewedOfListed_other": "所列文件：已查看 {{viewed}}/{{total}}"
+      "viewedOfListed_other": "所列文件：已查看 {{viewed}}/{{total}}",
+      "binaryDiff": "二进制文件",
+      "diffUnavailable": "无提供商差异",
+      "contentUnchanged": "无内容更改"
     },
     "fileRows": {
       "collapseFile": "折叠文件",
@@ -3078,10 +3081,13 @@
       "noPreview": "此文件无法预览",
       "expandFile": "展开文件",
       "markViewed": "将 {{path}} 标记为已查看",
-      "openDiffOnGitHub": "在 GitHub 上打开此文件的差异",
-      "openOnGitHub": "在 GitHub 上打开",
       "unmarkViewed": "取消 {{path}} 的已查看标记",
-      "githubDiff": "GitHub 差异"
+      "binaryDiff": "此二进制文件没有可显示的差异",
+      "diffUnavailable": "此提供商不发送文件差异",
+      "contentUnchanged": "此文件没有内容更改",
+      "openOnProvider": "在 {{provider}} 上打开此文件",
+      "openDiffOnProvider": "在 {{provider}} 上打开此文件的差异",
+      "providerDiff": "{{provider}} 差异"
     },
     "floatingActions": {
       "clear": "清除",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "合并前，请用基础分支的最新内容更新当前分支，或进行变基。",
         "behindDetail": "源分支落后于基础分支。合并前，请进行变基或更新分支。",
         "notMergeableTitle": "此拉取请求暂时无法合并",
-        "notMergeableDetail": "GitHub 返回的合并状态为 {{state}}。"
+        "notMergeableDetail": "GitHub 返回的合并状态为 {{state}}。",
+        "notOpenDetail": "只有打开的 {{term}} 才能合并。",
+        "unresolvedDiscussionsDetail": "合并前请先解决所有讨论。",
+        "unresolvedTasksDetail": "合并前请先解决所有未完成的任务。",
+        "otherDetail": "提供商阻止了此次合并，但未说明原因。"
       },
       "restrictions": {
         "title": "合并限制",
@@ -3326,7 +3336,8 @@
       "changed": "已更改",
       "copied": "已复制",
       "modified": "已修改",
-      "renamed": "已重命名"
+      "renamed": "已重命名",
+      "unknown": "更改类型未报告"
     },
     "tabs": {
       "discussion": "讨论",

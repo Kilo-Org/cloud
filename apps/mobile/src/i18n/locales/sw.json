@@ -641,7 +641,10 @@
       "diffTooLarge": "tofauti za msimbo ni nyingi mno",
       "openFile": "Fungua {{path}}",
       "openFileViewed": "Fungua {{path}} (imeangaliwa)",
-      "title": "Faili"
+      "title": "Faili",
+      "binaryDiff": "faili isiyo ya maandishi",
+      "diffUnavailable": "hakuna tofauti za msimbo kutoka kwa mtoa huduma",
+      "contentUnchanged": "hakuna mabadiliko ya maudhui"
     },
     "fileRows": {
       "markViewed": "Weka alama kuwa {{path}} imeangaliwa",
@@ -650,9 +653,12 @@
       "expandFile": "Panua faili",
       "diffTooLarge": "Tofauti za msimbo ni nyingi mno kuonyeshwa.",
       "noPreview": "Hakuna onyesho la kukagua kwa faili hii",
-      "openOnGitHub": "Fungua kwenye GitHub",
-      "openDiffOnGitHub": "Fungua tofauti za msimbo wa faili hii kwenye GitHub",
-      "githubDiff": "Tofauti za msimbo kwenye GitHub"
+      "binaryDiff": "Hakuna tofauti za msimbo za kuonyesha kwa faili hii isiyo ya maandishi",
+      "diffUnavailable": "Mtoa huduma huyu hatumi tofauti za msimbo za faili",
+      "contentUnchanged": "Hakuna mabadiliko ya maudhui kwenye faili hii",
+      "openOnProvider": "Fungua faili hii kwenye {{provider}}",
+      "openDiffOnProvider": "Fungua tofauti za msimbo wa faili hii kwenye {{provider}}",
+      "providerDiff": "Tofauti za msimbo kwenye {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Ondoa uteuzi",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Sasisha tawi kwa mabadiliko kutoka kwenye tawi la msingi, au weka upya msingi wake, kabla ya kuunganisha.",
         "behindDetail": "Tawi lenye mabadiliko halina mabadiliko ya karibuni ya tawi la msingi. Weka upya msingi wake au lisasishe kabla ya kuunganisha.",
         "notMergeableTitle": "Ombi hili bado haliwezi kuunganishwa",
-        "notMergeableDetail": "GitHub imeripoti hali ya kuunganisha kuwa {{state}}."
+        "notMergeableDetail": "GitHub imeripoti hali ya kuunganisha kuwa {{state}}.",
+        "notOpenDetail": "{{term}} iliyo wazi pekee inaweza kuunganishwa.",
+        "unresolvedDiscussionsDetail": "Tatua majadiliano yote kabla ya kuunganisha.",
+        "unresolvedTasksDetail": "Tatua kazi zote zilizo wazi kabla ya kuunganisha.",
+        "otherDetail": "Mtoa huduma anazuia uunganishaji huu kwa sababu ambayo hakuitaja."
       },
       "restrictions": {
         "title": "Vikwazo vya kuunganisha",
@@ -1106,7 +1116,8 @@
       "modified": "Imebadilishwa",
       "renamed": "Jina limebadilishwa",
       "copied": "Imenakiliwa",
-      "changed": "Imebadilika"
+      "changed": "Imebadilika",
+      "unknown": "Aina ya mabadiliko haijaripotiwa"
     },
     "diff": {
       "selectedTapToChange": "{{label}} imechaguliwa, gusa ili ubadilishe uteuzi",

@@ -413,10 +413,114 @@ describe('listChangedFiles', () => {
       status: 'added',
       additions: 2,
       deletions: 0,
-      patchMissing: false,
+      patchMissingCause: null,
     });
     expect(page.files[1]).toMatchObject({ status: 'modified', additions: 1, deletions: 1 });
     expect(page.nextCursor).toBeNull();
+  });
+
+  it('names a binary file and a rename-only file as the two empty-diff causes', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/diffs')) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              old_path: 'assets/logo.png',
+              new_path: 'assets/logo.png',
+              new_file: false,
+              renamed_file: false,
+              deleted_file: false,
+              diff: '',
+            },
+            {
+              old_path: 'src/old-name.ts',
+              new_path: 'src/new-name.ts',
+              new_file: false,
+              renamed_file: true,
+              deleted_file: false,
+              diff: '',
+            },
+          ])
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files[0]).toMatchObject({
+      path: 'assets/logo.png',
+      patch: null,
+      patchMissingCause: 'binary',
+    });
+    expect(page.files[1]).toMatchObject({
+      path: 'src/new-name.ts',
+      previousPath: 'src/old-name.ts',
+      status: 'renamed',
+      patch: null,
+      patchMissingCause: 'content_unchanged',
+    });
+  });
+
+  it('reads GitLab binary placeholder as a binary cause, not as hunks', async () => {
+    // GitLab sends one line for a binary file rather than an empty diff, so a
+    // reader that only looks for a blank diff would report nothing to explain.
+    fetchMock.mockImplementation((url: string) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/diffs')) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              old_path: 'assets/pixel.bin',
+              new_path: 'assets/pixel.bin',
+              new_file: true,
+              renamed_file: false,
+              deleted_file: false,
+              diff: 'Binary files a/assets/pixel.bin and b/assets/pixel.bin differ\n',
+            },
+          ])
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files[0]).toMatchObject({
+      path: 'assets/pixel.bin',
+      status: 'added',
+      patchMissingCause: 'binary',
+    });
+  });
+
+  it('arrives a GitLab `deleted` diff as the shared `removed` status', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/diffs')) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              old_path: 'src/gone.ts',
+              new_path: 'src/gone.ts',
+              new_file: false,
+              renamed_file: false,
+              deleted_file: true,
+              diff: '@@ -1,2 +0,0 @@\n-a\n-b\n',
+            },
+          ])
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files[0]).toMatchObject({
+      status: 'removed',
+      deletions: 2,
+      patchMissingCause: null,
+    });
   });
 
   it('keeps page identity in the cursor and requests the next page', async () => {
@@ -1072,8 +1176,26 @@ describe('getMergeState', () => {
       conflicts: true,
     });
     expect(state.blockedReasons.map(reason => reason.code)).toEqual(
-      expect.arrayContaining(['conflicts', 'required_approvals', 'failing_pipeline', 'other'])
+      expect.arrayContaining([
+        'conflicts',
+        'required_approvals',
+        'failing_pipeline',
+        'unresolved_discussions',
+      ])
     );
+  });
+
+  it('names a closed merge request as not_open', async () => {
+    routeResponses({ settings: {}, approvals: { approvals_required: 0, approvals_left: 0 } });
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, state: 'closed' });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    expect(state.canMerge).toBe(false);
+    expect(state.blockedReasons).toContainEqual({
+      code: 'not_open',
+      message: 'Only open merge requests can be merged.',
+    });
   });
 
   it('allows merge when every gate is satisfied', async () => {
@@ -1108,7 +1230,9 @@ describe('getMergeState', () => {
     const blocked = testCase.resolvable && !testCase.resolved;
     expect(state.canMerge).toBe(!blocked);
     expect(state.blockedReasons).toEqual(
-      blocked ? [{ code: 'other', message: 'Resolve all discussions before merging.' }] : []
+      blocked
+        ? [{ code: 'unresolved_discussions', message: 'Resolve all discussions before merging.' }]
+        : []
     );
   });
 
@@ -1183,7 +1307,7 @@ describe('getMergeState', () => {
 
     expect(state.canMerge).toBe(false);
     expect(state.blockedReasons).toContainEqual({
-      code: 'other',
+      code: 'unresolved_discussions',
       message: 'Resolve all discussions before merging.',
     });
   });

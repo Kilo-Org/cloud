@@ -3164,7 +3164,10 @@
       "viewedOfListed_one": "{{viewed}} de {{total}} arquivos listados visualizados",
       "viewedOfListed_many": "{{viewed}} de {{total}} arquivos listados visualizados",
       "viewedOfListed_other": "{{viewed}} de {{total}} arquivos listados visualizados",
-      "viewedOfListed_zero": "{{viewed}} de {{total}} arquivos listados visualizados"
+      "viewedOfListed_zero": "{{viewed}} de {{total}} arquivos listados visualizados",
+      "binaryDiff": "arquivo binário",
+      "diffUnavailable": "sem comparação do provedor",
+      "contentUnchanged": "sem alteração de conteúdo"
     },
     "fileRows": {
       "collapseFile": "Recolher arquivo",
@@ -3172,10 +3175,13 @@
       "noPreview": "Nenhuma pré-visualização disponível para este arquivo",
       "expandFile": "Expandir arquivo",
       "markViewed": "Marcar {{path}} como visualizado",
-      "openDiffOnGitHub": "Abrir a comparação deste arquivo no GitHub",
-      "openOnGitHub": "Abrir no GitHub",
       "unmarkViewed": "Desmarcar {{path}} como visualizado",
-      "githubDiff": "Comparação no GitHub"
+      "binaryDiff": "Nenhuma comparação a exibir para este arquivo binário",
+      "diffUnavailable": "Este provedor não envia comparações de arquivos.",
+      "contentUnchanged": "Nenhuma alteração de conteúdo neste arquivo",
+      "openOnProvider": "Abrir este arquivo no {{provider}}",
+      "openDiffOnProvider": "Abrir a comparação deste arquivo no {{provider}}",
+      "providerDiff": "Comparação no {{provider}}"
     },
     "floatingActions": {
       "clear": "Limpar",
@@ -3318,7 +3324,11 @@
         "behindDetailUpdatable": "Antes de mesclar, atualize o branch a partir do branch de base ou reaplique seus commits sobre ele.",
         "behindDetail": "O branch de origem não inclui todas as alterações do branch de base. Reaplique os commits ou atualize o branch antes de mesclar.",
         "notMergeableTitle": "Este pull request ainda não pode ser mesclado",
-        "notMergeableDetail": "O GitHub informou o seguinte estado de mesclagem: {{state}}."
+        "notMergeableDetail": "O GitHub informou o seguinte estado de mesclagem: {{state}}.",
+        "notOpenDetail": "Apenas um {{term}} aberto pode ser mesclado.",
+        "unresolvedDiscussionsDetail": "Resolva todas as discussões antes de mesclar.",
+        "unresolvedTasksDetail": "Resolva todas as tarefas em aberto antes de mesclar.",
+        "otherDetail": "O provedor está bloqueando esta mesclagem por um motivo que não informou."
       },
       "restrictions": {
         "title": "Restrições de mesclagem",
@@ -3448,7 +3458,8 @@
       "changed": "Alterado",
       "copied": "Copiado",
       "modified": "Modificado",
-      "renamed": "Renomeado"
+      "renamed": "Renomeado",
+      "unknown": "Tipo de alteração não informado"
     },
     "tabs": {
       "discussion": "Discussão",

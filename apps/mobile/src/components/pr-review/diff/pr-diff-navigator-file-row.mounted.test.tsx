@@ -8,7 +8,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { NavigatorFileRow } from './pr-diff-navigator-file-row';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 
@@ -64,7 +64,10 @@ function inlineRuns(runs: readonly (TestRenderer.ReactTestInstance | string)[]) 
   return runs.filter((run): run is TestRenderer.ReactTestInstance => typeof run !== 'string');
 }
 
-function mountRow(path: string): void {
+function mountRow(
+  path: string,
+  patchMissingCause: Parameters<typeof NavigatorFileRow>[0]['file']['patchMissingCause'] = null
+): void {
   i18nManager.isRTL = true;
   act(() => {
     renderer = TestRenderer.create(
@@ -76,7 +79,7 @@ function mountRow(path: string): void {
           additions: 3,
           deletions: 1,
           patch: '@@ -1 +1 @@\n-export const greeting = "Hi";\n+export const greeting = "Hello";',
-          patchMissing: false,
+          patchMissingCause,
         },
         viewed: false,
         onSelect: () => undefined,
@@ -176,5 +179,43 @@ describe('NavigatorFileRow mark-viewed toggle', () => {
 
     expect(parentClass).toContain('py-2.5');
     expect(parentClass).toContain('flex-row');
+  });
+});
+
+/**
+ * The navigator names why a file has no patch, in the same four terms the diff
+ * row uses. A file that carried a patch says nothing here: its counts already
+ * fill the line.
+ */
+describe('NavigatorFileRow patch-missing note', () => {
+  function paintedTexts(): string[] {
+    return (
+      renderer?.root
+        .findAll(node => Object.is(node.type, 'Text') && typeof node.props.children === 'string')
+        .map(node => String(node.props.children)) ?? []
+    );
+  }
+
+  it.each([
+    ['too_large', 'prReview.fileNavigator.diffTooLarge'],
+    ['binary', 'prReview.fileNavigator.binaryDiff'],
+    ['provider_omitted', 'prReview.fileNavigator.diffUnavailable'],
+    ['content_unchanged', 'prReview.fileNavigator.contentUnchanged'],
+  ] as const)('paints %s from its own key', (cause, key) => {
+    mountRow('assets/photo.png', cause);
+    expect(paintedTexts()).toContain(i18n.t(key));
+  });
+
+  it('paints no note when the file carried a patch', () => {
+    mountRow('src/greeting.ts');
+    const texts = paintedTexts();
+    for (const key of [
+      'prReview.fileNavigator.diffTooLarge',
+      'prReview.fileNavigator.binaryDiff',
+      'prReview.fileNavigator.diffUnavailable',
+      'prReview.fileNavigator.contentUnchanged',
+    ] as const) {
+      expect(texts).not.toContain(i18n.t(key));
+    }
   });
 });

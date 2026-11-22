@@ -641,7 +641,10 @@
       "diffTooLarge": "ਡਿਫ਼ ਬਹੁਤ ਵੱਡਾ",
       "openFile": "{{path}} ਖੋਲ੍ਹੋ",
       "openFileViewed": "{{path}} ਖੋਲ੍ਹੋ (ਵੇਖੀ ਗਈ)",
-      "title": "ਫਾਈਲਾਂ"
+      "title": "ਫਾਈਲਾਂ",
+      "binaryDiff": "ਬਾਈਨਰੀ ਫਾਈਲ",
+      "diffUnavailable": "ਪ੍ਰੋਵਾਈਡਰ ਤੋਂ ਕੋਈ ਡਿਫ਼ ਨਹੀਂ",
+      "contentUnchanged": "ਸਮੱਗਰੀ ਵਿੱਚ ਕੋਈ ਬਦਲਾਅ ਨਹੀਂ"
     },
     "fileRows": {
       "markViewed": "{{path}} 'ਤੇ ਵੇਖੀ ਗਈ ਹੋਣ ਦਾ ਨਿਸ਼ਾਨ ਲਗਾਓ",
@@ -650,9 +653,12 @@
       "expandFile": "ਫਾਈਲ ਫੈਲਾਓ",
       "diffTooLarge": "ਡਿਫ਼ ਇੰਨਾ ਵੱਡਾ ਹੈ ਕਿ ਦਿਖਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ।",
       "noPreview": "ਇਸ ਫਾਈਲ ਲਈ ਕੋਈ ਝਲਕ ਉਪਲਬਧ ਨਹੀਂ",
-      "openOnGitHub": "GitHub 'ਤੇ ਖੋਲ੍ਹੋ",
-      "openDiffOnGitHub": "GitHub 'ਤੇ ਇਸ ਫਾਈਲ ਦਾ ਡਿਫ਼ ਖੋਲ੍ਹੋ",
-      "githubDiff": "GitHub ਡਿਫ਼"
+      "binaryDiff": "ਇਸ ਬਾਈਨਰੀ ਫਾਈਲ ਲਈ ਦਿਖਾਉਣ ਲਈ ਕੋਈ ਡਿਫ਼ ਨਹੀਂ",
+      "diffUnavailable": "ਇਹ ਪ੍ਰੋਵਾਈਡਰ ਫਾਈਲਾਂ ਦੇ ਡਿਫ਼ ਨਹੀਂ ਭੇਜਦਾ",
+      "contentUnchanged": "ਇਸ ਫਾਈਲ ਦੀ ਸਮੱਗਰੀ ਵਿੱਚ ਕੋਈ ਬਦਲਾਅ ਨਹੀਂ",
+      "openOnProvider": "ਇਸ ਫਾਈਲ ਨੂੰ {{provider}} 'ਤੇ ਖੋਲ੍ਹੋ",
+      "openDiffOnProvider": "ਇਸ ਫਾਈਲ ਦਾ ਡਿਫ਼ {{provider}} 'ਤੇ ਖੋਲ੍ਹੋ",
+      "providerDiff": "{{provider}} ਡਿਫ਼"
     },
     "floatingActions": {
       "clearSelection": "ਚੋਣ ਹਟਾਓ",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਬੇਸ ਬ੍ਰਾਂਚ ਤੋਂ ਬਦਲਾਅ ਲੈ ਕੇ ਬ੍ਰਾਂਚ ਅੱਪਡੇਟ ਕਰੋ ਜਾਂ ਰੀਬੇਸ ਕਰੋ।",
         "behindDetail": "ਹੈੱਡ ਬ੍ਰਾਂਚ ਬੇਸ ਬ੍ਰਾਂਚ ਤੋਂ ਪਿੱਛੇ ਹੈ। ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਬ੍ਰਾਂਚ ਨੂੰ ਰੀਬੇਸ ਜਾਂ ਅੱਪਡੇਟ ਕਰੋ।",
         "notMergeableTitle": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਅਜੇ ਮਰਜ ਨਹੀਂ ਹੋ ਸਕਦੀ",
-        "notMergeableDetail": "GitHub ਮੁਤਾਬਕ ਮਰਜ ਦੀ ਸਥਿਤੀ {{state}} ਹੈ।"
+        "notMergeableDetail": "GitHub ਮੁਤਾਬਕ ਮਰਜ ਦੀ ਸਥਿਤੀ {{state}} ਹੈ।",
+        "notOpenDetail": "ਸਿਰਫ਼ ਖੁੱਲ੍ਹੇ {{term}} ਨੂੰ ਹੀ ਮਰਜ ਕੀਤਾ ਜਾ ਸਕਦਾ ਹੈ।",
+        "unresolvedDiscussionsDetail": "ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸਾਰੀਆਂ ਚਰਚਾਵਾਂ ਹੱਲ ਕਰੋ।",
+        "unresolvedTasksDetail": "ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸਾਰੇ ਖੁੱਲ੍ਹੇ ਕੰਮ ਹੱਲ ਕਰੋ।",
+        "otherDetail": "ਪ੍ਰੋਵਾਈਡਰ ਇਸ ਮਰਜ ਨੂੰ ਕਿਸੇ ਅਣਦੱਸੇ ਕਾਰਨ ਕਰਕੇ ਰੋਕ ਰਿਹਾ ਹੈ।"
       },
       "restrictions": {
         "title": "ਮਰਜ਼ ਪਾਬੰਦੀਆਂ",
@@ -1106,7 +1116,8 @@
       "modified": "ਸੋਧੀ ਗਈ",
       "renamed": "ਨਾਮ ਬਦਲਿਆ",
       "copied": "ਕਾਪੀ ਕੀਤੀ ਗਈ",
-      "changed": "ਬਦਲੀ ਗਈ"
+      "changed": "ਬਦਲੀ ਗਈ",
+      "unknown": "ਬਦਲਾਅ ਦੀ ਕਿਸਮ ਨਹੀਂ ਦੱਸੀ ਗਈ"
     },
     "diff": {
       "selectedTapToChange": "{{label}} ਚੁਣਿਆ ਗਿਆ, ਚੋਣ ਬਦਲਣ ਲਈ ਟੈਪ ਕਰੋ",

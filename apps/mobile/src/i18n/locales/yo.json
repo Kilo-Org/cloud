@@ -641,7 +641,10 @@
       "diffTooLarge": "ìyàtọ̀ náà tóbi jù",
       "openFile": "Ṣí {{path}}",
       "openFileViewed": "Ṣí {{path}} (a ti wò ó)",
-      "title": "Àwọn fáìlì"
+      "title": "Àwọn fáìlì",
+      "binaryDiff": "fáìlì bínárì",
+      "diffUnavailable": "kò sí ìyàtọ̀ láti ọ̀dọ̀ olùpèsè",
+      "contentUnchanged": "kò sí ìyípadà àkóónú"
     },
     "fileRows": {
       "markViewed": "Sàmì sí {{path}} pé o ti wò ó",
@@ -650,9 +653,12 @@
       "expandFile": "Fi àkóónú fáìlì hàn",
       "diffTooLarge": "Ìyàtọ̀ náà tóbi jù láti fihàn.",
       "noPreview": "Kò sí àwòtẹ́lẹ̀ fún fáìlì yìí",
-      "openOnGitHub": "Ṣí lórí GitHub",
-      "openDiffOnGitHub": "Ṣí ìyàtọ̀ fáìlì yìí lórí GitHub",
-      "githubDiff": "Ìyàtọ̀ lórí GitHub"
+      "binaryDiff": "Kò sí ìyàtọ̀ láti fihàn fún fáìlì bínárì yìí",
+      "diffUnavailable": "Olùpèsè yìí kò ránṣẹ́ àwọn ìyàtọ̀ fáìlì.",
+      "contentUnchanged": "Kò sí ìyípadà àkóónú nínú fáìlì yìí",
+      "openOnProvider": "Ṣí fáìlì yìí lórí {{provider}}",
+      "openDiffOnProvider": "Ṣí ìyàtọ̀ fáìlì yìí lórí {{provider}}",
+      "providerDiff": "Ìyàtọ̀ ti {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Yọ àwọn ohun tí o yàn kúrò",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Ṣe ìmúdójúìwọ̀n ẹ̀ka láti ẹ̀ka ìpìlẹ̀, tàbí ṣe ìyípadà ìpìlẹ̀, kí o tó dà á pọ̀.",
         "behindDetail": "Ẹ̀ka orísun kò tíì ní àwọn ìyípadà tuntun tó wà ní ẹ̀ka ìpìlẹ̀. Ṣe ìyípadà ìpìlẹ̀ tàbí ìmúdójúìwọ̀n ẹ̀ka kí o tó dà á pọ̀.",
         "notMergeableTitle": "A kò lè da ìbéèrè ìṣọ̀kan yìí pọ̀ síbẹ̀",
-        "notMergeableDetail": "GitHub sọ pé ipò ìdàpọ̀ náà jẹ́ {{state}}."
+        "notMergeableDetail": "GitHub sọ pé ipò ìdàpọ̀ náà jẹ́ {{state}}.",
+        "notOpenDetail": "{{term}} tí ó ṣí nìkan ni a lè dà pọ̀.",
+        "unresolvedDiscussionsDetail": "Yanjú gbogbo àwọn ìjíròrò kí o tó dà á pọ̀.",
+        "unresolvedTasksDetail": "Yanjú gbogbo àwọn iṣẹ́ tí ó ṣí kí o tó dà á pọ̀.",
+        "otherDetail": "Olùpèsè náà ń ṣe ìdíwọ́ fún ìdàpọ̀ yìí fún ìdí tí kò dárúkọ."
       },
       "restrictions": {
         "title": "Àwọn ìdènà ìdàpọ̀",
@@ -1106,7 +1116,8 @@
       "modified": "A ti yí padà",
       "renamed": "A ti sọ lórúkọ tuntun",
       "copied": "A ti ṣe ẹ̀dà",
-      "changed": "A ti yí padà"
+      "changed": "A ti yí padà",
+      "unknown": "A kò jábọ̀ irú ìyípadà"
     },
     "diff": {
       "selectedTapToChange": "A ti yan {{label}}, tẹ̀ láti yí ohun tí a yàn padà",

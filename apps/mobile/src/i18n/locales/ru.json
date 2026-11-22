@@ -3164,7 +3164,10 @@
       "viewedOfListed_one": "просмотрено {{viewed}} из {{total}} файлов в списке",
       "viewedOfListed_few": "просмотрено {{viewed}} из {{total}} файлов в списке",
       "viewedOfListed_many": "просмотрено {{viewed}} из {{total}} файлов в списке",
-      "viewedOfListed_other": "просмотрено {{viewed}} из {{total}} файлов в списке"
+      "viewedOfListed_other": "просмотрено {{viewed}} из {{total}} файлов в списке",
+      "binaryDiff": "бинарный файл",
+      "diffUnavailable": "нет изменений от провайдера",
+      "contentUnchanged": "нет изменений содержимого"
     },
     "fileRows": {
       "collapseFile": "Свернуть файл",
@@ -3172,10 +3175,13 @@
       "noPreview": "Предпросмотр этого файла недоступен",
       "expandFile": "Развернуть файл",
       "markViewed": "Отметить файл {{path}} как просмотренный",
-      "openDiffOnGitHub": "Открыть изменения этого файла на GitHub",
-      "openOnGitHub": "Открыть на GitHub",
       "unmarkViewed": "Снять отметку о просмотре файла {{path}}",
-      "githubDiff": "Изменения на GitHub"
+      "binaryDiff": "Для этого бинарного файла нет изменений для отображения.",
+      "diffUnavailable": "Этот провайдер не передаёт изменения файлов.",
+      "contentUnchanged": "В этом файле нет изменений содержимого.",
+      "openOnProvider": "Открыть этот файл на {{provider}}",
+      "openDiffOnProvider": "Открыть изменения этого файла на {{provider}}",
+      "providerDiff": "Изменения на {{provider}}"
     },
     "floatingActions": {
       "clear": "Снять выделение",
@@ -3318,7 +3324,11 @@
         "behindDetailUpdatable": "Перед слиянием обновите ветку из базовой или выполните перебазирование.",
         "behindDetail": "Исходная ветка отстаёт от базовой. Перед слиянием выполните перебазирование или обновите ветку.",
         "notMergeableTitle": "Слияние этого запроса пока невозможно",
-        "notMergeableDetail": "GitHub сообщил о состоянии слияния: {{state}}."
+        "notMergeableDetail": "GitHub сообщил о состоянии слияния: {{state}}.",
+        "notOpenDetail": "Слить можно только открытый {{term}}.",
+        "unresolvedDiscussionsDetail": "Перед слиянием разрешите все обсуждения.",
+        "unresolvedTasksDetail": "Перед слиянием разрешите все открытые задачи.",
+        "otherDetail": "Провайдер блокирует это слияние по причине, которую не указал."
       },
       "restrictions": {
         "title": "Ограничения на слияние",
@@ -3448,7 +3458,8 @@
       "changed": "Изменён",
       "copied": "Скопировано",
       "modified": "Изменён",
-      "renamed": "Переименован"
+      "renamed": "Переименован",
+      "unknown": "Тип изменения не указан"
     },
     "tabs": {
       "discussion": "Обсуждение",

@@ -641,7 +641,10 @@
       "diffTooLarge": "твърде много разлики",
       "openFile": "Отвори {{path}}",
       "openFileViewed": "Отвори {{path}} (прегледан)",
-      "title": "Файлове"
+      "title": "Файлове",
+      "binaryDiff": "двоичен файл",
+      "diffUnavailable": "няма разлики от доставчика",
+      "contentUnchanged": "няма промяна в съдържанието"
     },
     "fileRows": {
       "markViewed": "Отбележи {{path}} като прегледан",
@@ -650,9 +653,12 @@
       "expandFile": "Разгъни файла",
       "diffTooLarge": "Разликите са твърде големи, за да се покажат.",
       "noPreview": "Няма наличен преглед за този файл",
-      "openOnGitHub": "Отвори в GitHub",
-      "openDiffOnGitHub": "Отвори разликите в този файл в GitHub",
-      "githubDiff": "Разликите в GitHub"
+      "binaryDiff": "Няма разлики за показване в този двоичен файл",
+      "diffUnavailable": "Този доставчик не изпраща разлики за файлове",
+      "contentUnchanged": "Няма промени в съдържанието на този файл",
+      "openOnProvider": "Отвори този файл в {{provider}}",
+      "openDiffOnProvider": "Отвори разликите в този файл в {{provider}}",
+      "providerDiff": "Разликите в {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Изчисти избора",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Обнови клона с промените от основния клон или го пребазирай преди обединяването.",
         "behindDetail": "Изходният клон изостава от основния. Пребазирай или обнови клона преди обединяването.",
         "notMergeableTitle": "Тази заявка все още не може да се обедини",
-        "notMergeableDetail": "GitHub съобщи следното състояние за възможността за обединяване: {{state}}."
+        "notMergeableDetail": "GitHub съобщи следното състояние за възможността за обединяване: {{state}}.",
+        "notOpenDetail": "Само отворена {{term}} може да бъде обединена.",
+        "unresolvedDiscussionsDetail": "Разреши всички дискусии преди обединяването.",
+        "unresolvedTasksDetail": "Разреши всички отворени задачи преди обединяването.",
+        "otherDetail": "Доставчикът блокира това обединяване поради причина, която не е посочил."
       },
       "restrictions": {
         "title": "Ограничения при обединяване",
@@ -1106,7 +1116,8 @@
       "modified": "Променен",
       "renamed": "Преименуван",
       "copied": "Копирано",
-      "changed": "Променен"
+      "changed": "Променен",
+      "unknown": "Типът на промяната не е отчетен"
     },
     "diff": {
       "selectedTapToChange": "Избор: {{label}}. Докосни, за да промениш избора",

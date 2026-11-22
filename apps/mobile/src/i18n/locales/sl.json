@@ -647,7 +647,10 @@
       "diffTooLarge": "preobsežne razlike",
       "openFile": "Odpri {{path}}",
       "openFileViewed": "Odpri {{path}} (ogledano)",
-      "title": "Datoteke"
+      "title": "Datoteke",
+      "binaryDiff": "binarna datoteka",
+      "diffUnavailable": "ni razlik od ponudnika",
+      "contentUnchanged": "ni sprememb vsebine"
     },
     "fileRows": {
       "markViewed": "Označi {{path}} kot ogledano",
@@ -656,9 +659,12 @@
       "expandFile": "Razširi datoteko",
       "diffTooLarge": "Razlike so preobsežne za prikaz.",
       "noPreview": "Predogled te datoteke ni na voljo",
-      "openOnGitHub": "Odpri na GitHubu",
-      "openDiffOnGitHub": "Odpri prikaz razlik te datoteke na GitHubu",
-      "githubDiff": "Prikaz razlik na GitHubu"
+      "binaryDiff": "Za to binarno datoteko ni razlik za prikaz",
+      "diffUnavailable": "Ta ponudnik ne pošilja datotečnih razlik",
+      "contentUnchanged": "V tej datoteki ni sprememb vsebine",
+      "openOnProvider": "Odpri to datoteko na {{provider}}",
+      "openDiffOnProvider": "Odpri prikaz razlik te datoteke na {{provider}}",
+      "providerDiff": "Prikaz razlik na {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Počisti izbor",
@@ -796,7 +802,11 @@
         "behindDetailUpdatable": "Pred združitvijo posodobi vejo s spremembami iz osnovne veje ali prestavi njeno osnovo.",
         "behindDetail": "Izvorna veja zaostaja za osnovno vejo. Pred združitvijo prestavi njeno osnovo ali jo posodobi.",
         "notMergeableTitle": "Tega zahtevka za združitev še ni mogoče združiti",
-        "notMergeableDetail": "GitHub je sporočil stanje možnosti združitve: {{state}}."
+        "notMergeableDetail": "GitHub je sporočil stanje možnosti združitve: {{state}}.",
+        "notOpenDetail": "Združiti je mogoče samo odprt {{term}}.",
+        "unresolvedDiscussionsDetail": "Pred združitvijo razreši vse razprave.",
+        "unresolvedTasksDetail": "Pred združitvijo razreši vse odprte naloge.",
+        "otherDetail": "Ponudnik blokira to združitev iz razloga, ki ga ni navedel."
       },
       "restrictions": {
         "title": "Omejitve združevanja",
@@ -1158,7 +1168,8 @@
       "modified": "Spremenjeno",
       "renamed": "Preimenovano",
       "copied": "Kopirano",
-      "changed": "Spremenjeno"
+      "changed": "Spremenjeno",
+      "unknown": "Vrsta spremembe ni navedena"
     },
     "diff": {
       "selectedTapToChange": "Izbrano: {{label}}, tapni za spremembo izbora",

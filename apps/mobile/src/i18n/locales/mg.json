@@ -641,7 +641,10 @@
       "diffTooLarge": "lehibe loatra ny fahasamihafana",
       "openFile": "Sokafy {{path}}",
       "openFileViewed": "Sokafy {{path}} (voajery)",
-      "title": "Rakitra"
+      "title": "Rakitra",
+      "binaryDiff": "rakitra tsy lahatsoratra",
+      "diffUnavailable": "tsy misy fahasamihafana avy amin'ny mpanome",
+      "contentUnchanged": "tsy misy fiovan'ny votoaty"
     },
     "fileRows": {
       "markViewed": "Mariho ho voajery ny {{path}}",
@@ -650,9 +653,12 @@
       "expandFile": "Avelaro ny rakitra",
       "diffTooLarge": "Lehibe loatra ny fahasamihafana ka tsy azo aseho.",
       "noPreview": "Tsy misy topimaso azo jerena ho an'ity rakitra ity",
-      "openOnGitHub": "Sokafy ao amin'ny GitHub",
-      "openDiffOnGitHub": "Sokafy ao amin'ny GitHub ny fahasamihafan'ity rakitra ity",
-      "githubDiff": "Fahasamihafana ao amin'ny GitHub"
+      "binaryDiff": "Tsy misy fahasamihafana azo aseho ho an'ity rakitra tsy lahatsoratra ity",
+      "diffUnavailable": "Tsy mandefa fahasamihafan'ny rakitra ity mpanome ity",
+      "contentUnchanged": "Tsy misy fiovan'ny votoaty ao amin'ity rakitra ity",
+      "openOnProvider": "Sokafy ao amin'ny {{provider}} ity rakitra ity",
+      "openDiffOnProvider": "Sokafy ao amin'ny {{provider}} ny fahasamihafan'ity rakitra ity",
+      "providerDiff": "Fahasamihafana ao amin'ny {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Esory ny safidy",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Havaozy avy amin'ny sampana fototra ny sampana, na afindrao ny fotony, alohan'ny fampiraisana.",
         "behindDetail": "Tsy mbola ao amin'ny sampana niavian'ny fanovana ny fanovana farany ao amin'ny sampana fototra. Afindrao ny fotony na havaozy ilay sampana alohan'ny fampiraisana.",
         "notMergeableTitle": "Mbola tsy azo ampiraisina ity fangatahana fampiraisana ity",
-        "notMergeableDetail": "Izao ny sata momba ny fampiraisana nambaran'ny GitHub: {{state}}."
+        "notMergeableDetail": "Izao ny sata momba ny fampiraisana nambaran'ny GitHub: {{state}}.",
+        "notOpenDetail": "Ny {{term}} misokatra ihany no azo ampiarahina.",
+        "unresolvedDiscussionsDetail": "Vahao ny fifampiresahana rehetra alohan'ny fampiraisana.",
+        "unresolvedTasksDetail": "Vahao ny asa misokatra rehetra alohan'ny fampiraisana.",
+        "otherDetail": "Manakana ity fampiraisana ity ny mpanome noho ny antony tsy voalazany."
       },
       "restrictions": {
         "title": "Fepetra momba ny fampiraisana",
@@ -1106,7 +1116,8 @@
       "modified": "Novaina",
       "renamed": "Novana anarana",
       "copied": "Voadika",
-      "changed": "Niova"
+      "changed": "Niova",
+      "unknown": "Tsy voalaza ny karazana fiovana"
     },
     "diff": {
       "selectedTapToChange": "Voafidy ny {{label}}, tsindrio hanova ny safidy",

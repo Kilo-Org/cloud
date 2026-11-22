@@ -3070,7 +3070,10 @@
       "viewedCount_other": "Đã xem {{viewed}}/{{total}}",
       "viewedOfListed": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
       "viewedOfListed_one": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
-      "viewedOfListed_other": "Đã xem {{viewed}}/{{total}} tệp trong danh sách"
+      "viewedOfListed_other": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
+      "binaryDiff": "tệp nhị phân",
+      "diffUnavailable": "không có bản so sánh từ nhà cung cấp",
+      "contentUnchanged": "không có thay đổi nội dung"
     },
     "fileRows": {
       "collapseFile": "Thu gọn tệp",
@@ -3078,10 +3081,13 @@
       "noPreview": "Không có bản xem trước cho tệp này",
       "expandFile": "Mở rộng tệp",
       "markViewed": "Đánh dấu {{path}} là đã xem",
-      "openDiffOnGitHub": "Mở bản so sánh của tệp này trên GitHub",
-      "openOnGitHub": "Mở trên GitHub",
       "unmarkViewed": "Bỏ dấu đã xem của {{path}}",
-      "githubDiff": "Bản so sánh trên GitHub"
+      "binaryDiff": "Không có bản so sánh nào để hiển thị cho tệp nhị phân này",
+      "diffUnavailable": "Nhà cung cấp này không gửi bản so sánh tệp",
+      "contentUnchanged": "Không có thay đổi nội dung trong tệp này",
+      "openOnProvider": "Mở tệp này trên {{provider}}",
+      "openDiffOnProvider": "Mở bản so sánh của tệp này trên {{provider}}",
+      "providerDiff": "Bản so sánh trên {{provider}}"
     },
     "floatingActions": {
       "clear": "Bỏ chọn",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "Cập nhật nhánh từ nhánh đích hoặc chuyển gốc trước khi hợp nhất.",
         "behindDetail": "Nhánh nguồn chưa có các thay đổi mới nhất từ nhánh đích. Chuyển gốc hoặc cập nhật nhánh trước khi hợp nhất.",
         "notMergeableTitle": "Chưa thể hợp nhất PR này",
-        "notMergeableDetail": "GitHub đã báo cáo trạng thái hợp nhất là {{state}}."
+        "notMergeableDetail": "GitHub đã báo cáo trạng thái hợp nhất là {{state}}.",
+        "notOpenDetail": "Chỉ có thể hợp nhất {{term}} đang mở.",
+        "unresolvedDiscussionsDetail": "Hãy giải quyết tất cả cuộc thảo luận trước khi hợp nhất.",
+        "unresolvedTasksDetail": "Hãy giải quyết tất cả tác vụ đang mở trước khi hợp nhất.",
+        "otherDetail": "Nhà cung cấp đang chặn việc hợp nhất này vì một lý do không được nêu rõ."
       },
       "restrictions": {
         "title": "Hạn chế hợp nhất",
@@ -3326,7 +3336,8 @@
       "changed": "Đã thay đổi",
       "copied": "Đã sao chép",
       "modified": "Đã sửa đổi",
-      "renamed": "Đã đổi tên"
+      "renamed": "Đã đổi tên",
+      "unknown": "Chưa báo cáo loại thay đổi"
     },
     "tabs": {
       "discussion": "Thảo luận",

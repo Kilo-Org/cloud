@@ -771,7 +771,7 @@
     },
     "autoReviews": "مراجعات تلقائية",
     "bitbucket": {
-      "notConnectedReadOnlyPlan": "انتهت الفترة التجريبية للمؤسسة، لذا يجب على المالك تحديث الفوترة على ⁨kilo.ai⁩."
+      "notConnectedReadOnlyPlan": "انتهت الفترة التجريبية للمؤسسة، لذا يجب على المالك تحديث الفوترة على \u2068kilo.ai\u2069."
     },
     "bitbucketConnect": {
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
@@ -3258,7 +3258,10 @@
       "viewedOfListed_two": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
       "viewedOfListed_few": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
       "viewedOfListed_many": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
-      "viewedOfListed_other": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات"
+      "viewedOfListed_other": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "binaryDiff": "ملف ثنائي",
+      "diffUnavailable": "لا توجد فروق من المزوّد",
+      "contentUnchanged": "لا تغيير في المحتوى"
     },
     "fileRows": {
       "collapseFile": "طي الملف",
@@ -3266,10 +3269,13 @@
       "noPreview": "لا تتوفر معاينة لهذا الملف",
       "expandFile": "توسيع الملف",
       "markViewed": "تحديد {{path}} كملف تم الاطلاع عليه",
-      "openDiffOnGitHub": "فتح فروق هذا الملف على GitHub",
-      "openOnGitHub": "فتح على GitHub",
       "unmarkViewed": "إلغاء تحديد {{path}} كملف تم الاطلاع عليه",
-      "githubDiff": "الفروق على GitHub"
+      "binaryDiff": "لا توجد فروق لعرضها لهذا الملف الثنائي",
+      "diffUnavailable": "هذا المزوّد لا يرسل فروق الملفات",
+      "contentUnchanged": "لا توجد تغييرات في محتوى هذا الملف",
+      "openOnProvider": "فتح هذا الملف على {{provider}}",
+      "openDiffOnProvider": "فتح فروق هذا الملف على {{provider}}",
+      "providerDiff": "الفروق على {{provider}}"
     },
     "floatingActions": {
       "clear": "مسح",
@@ -3426,7 +3432,11 @@
         "behindDetailUpdatable": "حدّث الفرع من الفرع الأساسي، أو أعد تأسيسه، قبل الدمج.",
         "behindDetail": "الفرع المصدر متأخر عن الفرع الأساسي. أعد تأسيسه أو حدّثه قبل الدمج.",
         "notMergeableTitle": "طلب السحب هذا غير قابل للدمج بعد",
-        "notMergeableDetail": "أبلغ GitHub عن حالة إمكانية الدمج التالية: {{state}}."
+        "notMergeableDetail": "أبلغ GitHub عن حالة إمكانية الدمج التالية: {{state}}.",
+        "notOpenDetail": "لا يمكن دمج {{term}} إلا إذا كان مفتوحًا.",
+        "unresolvedDiscussionsDetail": "حُل جميع المناقشات قبل الدمج.",
+        "unresolvedTasksDetail": "حُل جميع المهام المفتوحة قبل الدمج.",
+        "otherDetail": "المزوّد يمنع هذا الدمج لسبب لم يذكره."
       },
       "restrictions": {
         "title": "قيود الدمج",
@@ -3570,7 +3580,8 @@
       "changed": "متغيّر",
       "copied": "تم النسخ",
       "modified": "معدّل",
-      "renamed": "أُعيدت تسميته"
+      "renamed": "أُعيدت تسميته",
+      "unknown": "نوع التغيير غير مُبلَّغ عنه"
     },
     "tabs": {
       "discussion": "المناقشة",

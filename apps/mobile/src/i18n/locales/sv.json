@@ -641,7 +641,10 @@
       "diffTooLarge": "för stor diff",
       "openFile": "Öppna {{path}}",
       "openFileViewed": "Öppna {{path}} (visad)",
-      "title": "Filer"
+      "title": "Filer",
+      "binaryDiff": "binär fil",
+      "diffUnavailable": "ingen diff från leverantören",
+      "contentUnchanged": "ingen innehållsändring"
     },
     "fileRows": {
       "markViewed": "Markera {{path}} som visad",
@@ -650,9 +653,12 @@
       "expandFile": "Fäll ut filen",
       "diffTooLarge": "Diffen är för stor för att visas",
       "noPreview": "Ingen förhandsvisning tillgänglig för den här filen",
-      "openOnGitHub": "Öppna på GitHub",
-      "openDiffOnGitHub": "Öppna den här filens diff på GitHub",
-      "githubDiff": "GitHub-diff"
+      "binaryDiff": "Ingen diff att visa för den här binära filen",
+      "diffUnavailable": "Den här leverantören skickar inga fildiffar",
+      "contentUnchanged": "Inga innehållsändringar i den här filen",
+      "openOnProvider": "Öppna den här filen på {{provider}}",
+      "openDiffOnProvider": "Öppna den här filens diff på {{provider}}",
+      "providerDiff": "{{provider}}-diff"
     },
     "floatingActions": {
       "clearSelection": "Rensa markeringen",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Uppdatera grenen från basgrenen eller gör en ombasering före sammanslagningen.",
         "behindDetail": "Källgrenen ligger efter basgrenen. Gör en ombasering eller uppdatera grenen före sammanslagningen.",
         "notMergeableTitle": "Den här PR:en kan inte slås samman ännu",
-        "notMergeableDetail": "GitHub rapporterade följande status för sammanslagningen: {{state}}."
+        "notMergeableDetail": "GitHub rapporterade följande status för sammanslagningen: {{state}}.",
+        "notOpenDetail": "Endast en öppen {{term}} kan sammanfogas.",
+        "unresolvedDiscussionsDetail": "Lös alla diskussioner före sammanslagningen.",
+        "unresolvedTasksDetail": "Lös alla öppna uppgifter före sammanslagningen.",
+        "otherDetail": "Leverantören blockerar den här sammanslagningen av en anledning som den inte har angett."
       },
       "restrictions": {
         "title": "Sammanslagningsbegränsningar",
@@ -1106,7 +1116,8 @@
       "modified": "Ändrad",
       "renamed": "Namnändrad",
       "copied": "Kopierat",
-      "changed": "Modifierad"
+      "changed": "Modifierad",
+      "unknown": "Ändringstyp ej rapporterad"
     },
     "diff": {
       "selectedTapToChange": "{{label}} är markerad, tryck för att ändra markeringen",

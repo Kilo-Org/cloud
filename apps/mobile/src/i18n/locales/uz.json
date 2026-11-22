@@ -641,7 +641,10 @@
       "diffTooLarge": "farqlar hajmi juda katta",
       "openFile": "{{path}}ni ochish",
       "openFileViewed": "{{path}}ni ochish (ko'rilgan)",
-      "title": "Fayllar"
+      "title": "Fayllar",
+      "binaryDiff": "ikkilik fayl",
+      "diffUnavailable": "provayderdan farq yo'q",
+      "contentUnchanged": "mazmun o'zgarishi yo'q"
     },
     "fileRows": {
       "markViewed": "{{path}}ni ko'rilgan deb belgilash",
@@ -650,9 +653,12 @@
       "expandFile": "Faylni yoyish",
       "diffTooLarge": "Farqlar hajmi juda katta, ularni ko'rsatib bo'lmaydi.",
       "noPreview": "Bu fayl uchun oldindan ko'rish mavjud emas",
-      "openOnGitHub": "GitHubda ochish",
-      "openDiffOnGitHub": "Bu fayldagi farqlarni GitHubda ochish",
-      "githubDiff": "GitHubdagi farqlar"
+      "binaryDiff": "Bu ikkilik fayl uchun ko'rsatiladigan farq yo'q",
+      "diffUnavailable": "Bu provayder fayl farqlarini yubormaydi",
+      "contentUnchanged": "Bu faylda mazmun o'zgarishlari yo'q",
+      "openOnProvider": "Bu faylni {{provider}}da ochish",
+      "openDiffOnProvider": "Bu fayldagi farqlarni {{provider}}da ochish",
+      "providerDiff": "{{provider}}dagi farqlar"
     },
     "floatingActions": {
       "clearSelection": "Tanlovni bekor qilish",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Birlashtirishdan oldin tarmoqni asosiy tarmoqdan yangilang yoki asosini almashtiring.",
         "behindDetail": "Manba tarmoq asosiy tarmoqdan ortda qolgan. Birlashtirishdan oldin manba tarmoqni yangilang yoki asosini almashtiring.",
         "notMergeableTitle": "Bu PRni hali birlashtirib bo'lmaydi",
-        "notMergeableDetail": "GitHub birlashtirish imkoniyati uchun quyidagi holatni bildirdi: {{state}}."
+        "notMergeableDetail": "GitHub birlashtirish imkoniyati uchun quyidagi holatni bildirdi: {{state}}.",
+        "notOpenDetail": "Faqat ochiq {{term}} birlashtirilishi mumkin.",
+        "unresolvedDiscussionsDetail": "Birlashtirishdan oldin barcha muhokamalarni hal qiling.",
+        "unresolvedTasksDetail": "Birlashtirishdan oldin barcha ochiq vazifalarni hal qiling.",
+        "otherDetail": "Provayder bu birlashtirishni sababini aytmasdan to'sib qo'ymoqda."
       },
       "restrictions": {
         "title": "Birlashtirish cheklovlari",
@@ -1106,7 +1116,8 @@
       "modified": "O'zgartirildi",
       "renamed": "Nomi o'zgartirildi",
       "copied": "Nusxalandi",
-      "changed": "O'zgardi"
+      "changed": "O'zgardi",
+      "unknown": "O'zgarish turi ko'rsatilmagan"
     },
     "diff": {
       "selectedTapToChange": "{{label}} tanlandi, tanlovni o'zgartirish uchun bosing",

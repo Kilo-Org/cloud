@@ -644,7 +644,10 @@
       "diffTooLarge": "massa diferències",
       "openFile": "Obre {{path}}",
       "openFileViewed": "Obre {{path}} (vist)",
-      "title": "Fitxers"
+      "title": "Fitxers",
+      "binaryDiff": "fitxer binari",
+      "diffUnavailable": "sense diferències del proveïdor",
+      "contentUnchanged": "sense canvi de contingut"
     },
     "fileRows": {
       "markViewed": "Marca {{path}} com a vist",
@@ -653,9 +656,12 @@
       "expandFile": "Desplega el fitxer",
       "diffTooLarge": "Hi ha massa diferències per mostrar-les totes.",
       "noPreview": "No hi ha cap previsualització disponible per a aquest fitxer",
-      "openOnGitHub": "Obre a GitHub",
-      "openDiffOnGitHub": "Obre les diferències d'aquest fitxer a GitHub",
-      "githubDiff": "Diferències a GitHub"
+      "binaryDiff": "No hi ha cap diferència per mostrar per a aquest fitxer binari",
+      "diffUnavailable": "Aquest proveïdor no envia diferències de fitxers",
+      "contentUnchanged": "No hi ha canvis de contingut en aquest fitxer",
+      "openOnProvider": "Obre aquest fitxer a {{provider}}",
+      "openDiffOnProvider": "Obre les diferències d'aquest fitxer a {{provider}}",
+      "providerDiff": "Diferències a {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Desfés la selecció",
@@ -786,7 +792,11 @@
         "behindDetailUpdatable": "Actualitza la branca amb els canvis de la branca base o canvia'n la base abans de fusionar.",
         "behindDetail": "A la branca d'origen li falten canvis de la branca base. Canvia'n la base o actualitza-la abans de fusionar.",
         "notMergeableTitle": "Aquesta sol·licitud d'integració encara no es pot fusionar",
-        "notMergeableDetail": "GitHub indica aquest estat de fusió: {{state}}."
+        "notMergeableDetail": "GitHub indica aquest estat de fusió: {{state}}.",
+        "notOpenDetail": "Només es pot fusionar una {{term}} oberta.",
+        "unresolvedDiscussionsDetail": "Resol totes les discussions abans de fusionar.",
+        "unresolvedTasksDetail": "Resol totes les tasques obertes abans de fusionar.",
+        "otherDetail": "El proveïdor bloqueja aquesta fusió per un motiu que no ha indicat."
       },
       "restrictions": {
         "title": "Restriccions de fusió",
@@ -1132,7 +1142,8 @@
       "modified": "Modificat",
       "renamed": "Reanomenat",
       "copied": "Copiat",
-      "changed": "Canviat"
+      "changed": "Canviat",
+      "unknown": "Tipus de canvi no informat"
     },
     "diff": {
       "selectedTapToChange": "Selecció actual: {{label}}. Toca per canviar-la",

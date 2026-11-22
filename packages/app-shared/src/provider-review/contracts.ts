@@ -155,35 +155,76 @@ export type ProviderPrSummary = {
 };
 
 /**
+ * The change vocabulary the review UI renders, closed on purpose: every
+ * provider word maps into this set, so the presentation never prints a token
+ * it cannot translate. `removed` is the one word for a deletion (GitHub sends
+ * `removed`, GitLab `deleted`); `unknown` is the explicit bucket for a word no
+ * mapper recognises, and the rows give it a generic label of their own.
+ */
+export type ProviderPrFileStatus =
+  | 'added'
+  | 'removed'
+  | 'modified'
+  | 'renamed'
+  | 'copied'
+  | 'changed'
+  | 'unknown';
+
+/** The normalized status for one provider word: `deleted` is `removed`, anything unrecognised is `unknown`. */
+export function providerPrFileStatus(raw: string | null | undefined): ProviderPrFileStatus {
+  switch (raw) {
+    case 'added':
+    case 'removed':
+    case 'modified':
+    case 'renamed':
+    case 'copied':
+    case 'changed':
+      return raw;
+    case 'deleted':
+      return 'removed';
+    default:
+      return 'unknown';
+  }
+}
+
+/**
+ * Why a changed file has no patch to show. Each cause earns its own copy: the
+ * file is binary, the provider dropped an oversized patch, the read's endpoint
+ * carries no patch at all, or the file changed without changing its content
+ * (a mode or rename-only change), so there is nothing to diff.
+ */
+export type ProviderPrFilePatchMissingCause =
+  | 'binary'
+  | 'too_large'
+  | 'provider_omitted'
+  | 'content_unchanged';
+
+/**
  * One changed file in the files page.
  *
- * `status` is the provider's own change vocabulary, passed through rather than
- * normalized: GitHub sends its file status (`added`, `removed`, `modified`,
- * `renamed`, `copied`, `changed`), GitLab derives `added`, `deleted`,
- * `renamed` or `modified` from its per-file flags, and Bitbucket sends the
- * diffstat status it returned. The presentation maps the words it knows and
- * renders an unknown word verbatim.
+ * `status` is the closed display vocabulary above; each mapper maps the
+ * provider's own word through `providerPrFileStatus`, so a word the UI has no
+ * label for arrives as `unknown` instead of leaking through.
  *
  * `patch` is the unified diff the provider returned for the file, or null
  * when it returned none.
  *
- * `patchMissing` is the presentation's "nothing to render" flag: true when
- * the file has no usable diff — the provider omitted the patch (GitHub drops
- * it for binary and oversized files), the diff is empty (a binary file), or
- * the read carries no patch at all (Bitbucket's diffstat). The rows then show
- * the "diff too large" copy and the provider's own diff instead of hunks.
- * Each mapper sets it from the patch it produced, so today `patchMissing` is
- * true exactly when `patch` is null; a consumer that only asks whether hunks
- * exist can test either.
+ * `patchMissingCause` names WHY there is no patch, or null when the read
+ * carried one. It is the mapper's answer, not a derivation the presentation
+ * repeats: GitHub drops the patch for binary files and for oversized ones and
+ * reports binary files with zero line counts, GitLab returns an empty diff for
+ * a binary file, and Bitbucket's diffstat endpoint never carries a patch. A
+ * non-null cause always comes with `patch === null`; a null cause can still
+ * parse to zero hunks, which the rows answer as "no preview".
  */
 export type ProviderPrFile = {
   path: string;
   previousPath: string | null;
-  status: string;
+  status: ProviderPrFileStatus;
   additions: number;
   deletions: number;
   patch: string | null;
-  patchMissing: boolean;
+  patchMissingCause: ProviderPrFilePatchMissingCause | null;
 };
 
 /**
@@ -240,8 +281,12 @@ export type ProviderPrChecksResult = {
 
 /**
  * Why a merge is blocked right now. `code` is the stable machine id the
- * presentation picks an icon and a layout from; `message` is the
- * human-readable provider text.
+ * presentation renders catalog copy from — one key per code, in the reader's
+ * language. `message` is the provider's own text (or the mapper's English
+ * sentence) and is secondary detail only: a surface that shows it shows it
+ * beside the localized copy, never instead of it. `other` is the explicit
+ * unknown bucket, and it is the only code whose `message` may say something
+ * the copy cannot.
  */
 export type ProviderPrMergeBlockedReason = {
   code:
@@ -250,6 +295,9 @@ export type ProviderPrMergeBlockedReason = {
     | 'failing_pipeline'
     | 'pending_pipeline'
     | 'draft'
+    | 'not_open'
+    | 'unresolved_discussions'
+    | 'unresolved_tasks'
     | 'permission'
     | 'other';
   message: string;

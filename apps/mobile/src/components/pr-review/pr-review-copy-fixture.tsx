@@ -67,7 +67,7 @@ import { TRPCProvider } from '@/lib/trpc';
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
 // function runs, including production hooks that use the singleton tRPC client.
-// The navigator starts with 100 of 101 files, exercising listed-file progress;
+// The navigator starts with 100 of 106 files, exercising listed-file progress;
 // searching fetches the final page through the usual pagination hook.
 const OVERVIEW_SURFACES = [
   'overview',

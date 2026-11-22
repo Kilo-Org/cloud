@@ -641,7 +641,10 @@
       "diffTooLarge": "diferentziak handiegiak dira",
       "openFile": "Ireki {{path}}",
       "openFileViewed": "Ireki {{path}} (ikusita)",
-      "title": "Fitxategiak"
+      "title": "Fitxategiak",
+      "binaryDiff": "fitxategi bitarra",
+      "diffUnavailable": "hornitzailearen diferentziarik ez",
+      "contentUnchanged": "eduki-aldaketarik ez"
     },
     "fileRows": {
       "markViewed": "Markatu {{path}} ikusitako gisa",
@@ -650,9 +653,12 @@
       "expandFile": "Zabaldu fitxategia",
       "diffTooLarge": "Diferentziak handiegiak dira bistaratzeko.",
       "noPreview": "Fitxategi honek ez du aurrebistarik",
-      "openOnGitHub": "Ireki GitHub-en",
-      "openDiffOnGitHub": "Ireki fitxategi honen diferentziak GitHub-en",
-      "githubDiff": "GitHub-eko diferentziak"
+      "binaryDiff": "Fitxategi bitar honetarako ez dago erakusteko diferentziarik",
+      "diffUnavailable": "Hornitzaile honek ez ditu fitxategi-diferentziak bidaltzen",
+      "contentUnchanged": "Fitxategi honetan ez dago eduki-aldaketarik",
+      "openOnProvider": "Ireki fitxategi hau {{provider}}-en",
+      "openDiffOnProvider": "Ireki fitxategi honen diferentziak {{provider}}-en",
+      "providerDiff": "{{provider}}-eko diferentziak"
     },
     "floatingActions": {
       "clearSelection": "Garbitu hautaketa",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Eguneratu adarra oinarri-adarreko aldaketekin edo aldatu haren oinarria bateratu aurretik.",
         "behindDetail": "Jatorri-adarrak oinarri-adarreko aldaketak falta ditu. Aldatu adarraren oinarria edo eguneratu adarra bateratu aurretik.",
         "notMergeableTitle": "Bateratze-eskaera hau ezin da oraindik bateratu",
-        "notMergeableDetail": "GitHub-ek bateratzeko egoera hau jakinarazi du: {{state}}."
+        "notMergeableDetail": "GitHub-ek bateratzeko egoera hau jakinarazi du: {{state}}.",
+        "notOpenDetail": "{{term}} ireki bat soilik batera daiteke.",
+        "unresolvedDiscussionsDetail": "Konpondu eztabaida guztiak bateratu aurretik.",
+        "unresolvedTasksDetail": "Konpondu zeregin ireki guztiak bateratu aurretik.",
+        "otherDetail": "Hornitzaileak bateratze hau blokeatzen du, arrazoirik aipatu gabe."
       },
       "restrictions": {
         "title": "Bateratze-murrizketak",
@@ -1106,7 +1116,8 @@
       "modified": "Aldatuta",
       "renamed": "Berrizendatuta",
       "copied": "Kopiatuta",
-      "changed": "Aldatuta"
+      "changed": "Aldatuta",
+      "unknown": "Jakinarazi gabeko aldaketa mota"
     },
     "diff": {
       "selectedTapToChange": "{{label}} hautatuta, sakatu hautaketa aldatzeko",

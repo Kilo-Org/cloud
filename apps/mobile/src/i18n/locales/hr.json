@@ -644,7 +644,10 @@
       "diffTooLarge": "prikaz razlika je prevelik",
       "openFile": "Otvori {{path}}",
       "openFileViewed": "Otvori {{path}} (pregledano)",
-      "title": "Datoteke"
+      "title": "Datoteke",
+      "binaryDiff": "binarna datoteka",
+      "diffUnavailable": "nema razlika od pružatelja",
+      "contentUnchanged": "nema promjene sadržaja"
     },
     "fileRows": {
       "markViewed": "Označi {{path}} kao pregledano",
@@ -653,9 +656,12 @@
       "expandFile": "Proširi datoteku",
       "diffTooLarge": "Razlike su prevelike za prikaz.",
       "noPreview": "Pregled ove datoteke nije dostupan",
-      "openOnGitHub": "Otvori na GitHubu",
-      "openDiffOnGitHub": "Otvori prikaz razlika ove datoteke na GitHubu",
-      "githubDiff": "Prikaz razlika na GitHubu"
+      "binaryDiff": "Za ovu binarnu datoteku nema razlika za prikaz",
+      "diffUnavailable": "Ovaj pružatelj ne šalje razlike datoteka",
+      "contentUnchanged": "Nema promjena sadržaja u ovoj datoteci",
+      "openOnProvider": "Otvori ovu datoteku na {{provider}}",
+      "openDiffOnProvider": "Otvori prikaz razlika ove datoteke na {{provider}}",
+      "providerDiff": "Prikaz razlika na {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Poništi odabir",
@@ -786,7 +792,11 @@
         "behindDetailUpdatable": "Prije spajanja ažuriraj granu izmjenama iz osnovne grane ili promijeni njezinu osnovu.",
         "behindDetail": "Izvorišna grana zaostaje za osnovnom. Prije spajanja promijeni njezinu osnovu ili je ažuriraj.",
         "notMergeableTitle": "Ovaj zahtjev za spajanje još nije moguće spojiti",
-        "notMergeableDetail": "GitHub je prijavio sljedeće stanje mogućnosti spajanja: {{state}}."
+        "notMergeableDetail": "GitHub je prijavio sljedeće stanje mogućnosti spajanja: {{state}}.",
+        "notOpenDetail": "Samo se {{term}} u otvorenom stanju može spojiti.",
+        "unresolvedDiscussionsDetail": "Riješi sve rasprave prije spajanja.",
+        "unresolvedTasksDetail": "Riješi sve otvorene zadatke prije spajanja.",
+        "otherDetail": "Pružatelj blokira ovo spajanje iz razloga koji nije naveo."
       },
       "restrictions": {
         "title": "Ograničenja spajanja",
@@ -1132,7 +1142,8 @@
       "modified": "Izmijenjeno",
       "renamed": "Preimenovano",
       "copied": "Kopirano",
-      "changed": "Promijenjeno"
+      "changed": "Promijenjeno",
+      "unknown": "Vrsta promjene nije navedena"
     },
     "diff": {
       "selectedTapToChange": "Odabrano: {{label}}, dodirni za promjenu odabira",

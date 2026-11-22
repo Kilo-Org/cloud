@@ -641,7 +641,10 @@
       "diffTooLarge": "verskille te groot",
       "openFile": "Maak {{path}} oop",
       "openFileViewed": "Maak {{path}} oop (bekyk)",
-      "title": "Lêers"
+      "title": "Lêers",
+      "binaryDiff": "binêre lêer",
+      "diffUnavailable": "geen verskille van die verskaffer",
+      "contentUnchanged": "geen inhoudsverandering"
     },
     "fileRows": {
       "markViewed": "Merk {{path}} as bekyk",
@@ -650,9 +653,12 @@
       "expandFile": "Vou lêer uit",
       "diffTooLarge": "Die verskille is te groot om te vertoon.",
       "noPreview": "Geen voorskou beskikbaar vir hierdie lêer nie",
-      "openOnGitHub": "Maak op GitHub oop",
-      "openDiffOnGitHub": "Maak hierdie lêer se verskille op GitHub oop",
-      "githubDiff": "Verskille op GitHub"
+      "binaryDiff": "Geen verskille om vir hierdie binêre lêer te wys nie",
+      "diffUnavailable": "Hierdie verskaffer stuur nie lêerverskille nie",
+      "contentUnchanged": "Geen inhoudsveranderinge in hierdie lêer nie",
+      "openOnProvider": "Maak hierdie lêer op {{provider}} oop",
+      "openDiffOnProvider": "Maak hierdie lêer se verskille op {{provider}} oop",
+      "providerDiff": "Verskille op {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Hef die keuse op",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Werk die tak vanuit die basistak by of herbaseer dit voordat jy saamvoeg.",
         "behindDetail": "Die brontak is agter die basistak. Herbaseer die tak of werk dit by voordat jy saamvoeg.",
         "notMergeableTitle": "Hierdie trekversoek kan nog nie saamgevoeg word nie",
-        "notMergeableDetail": "GitHub het die samevoegingstatus as {{state}} aangegee."
+        "notMergeableDetail": "GitHub het die samevoegingstatus as {{state}} aangegee.",
+        "notOpenDetail": "Slegs 'n oop {{term}} kan saamgevoeg word.",
+        "unresolvedDiscussionsDetail": "Los alle besprekings op voordat jy saamvoeg.",
+        "unresolvedTasksDetail": "Los alle oop take op voordat jy saamvoeg.",
+        "otherDetail": "Die verskaffer blokkeer hierdie samevoeging om 'n rede wat dit nie genoem het nie."
       },
       "restrictions": {
         "title": "Saamvoegbeperkings",
@@ -1106,7 +1116,8 @@
       "modified": "Gewysig",
       "renamed": "Hernoem",
       "copied": "Gekopieer",
-      "changed": "Verander"
+      "changed": "Verander",
+      "unknown": "Veranderingstipe nie gerapporteer nie"
     },
     "diff": {
       "selectedTapToChange": "{{label}} gekies, tik om die keuse te verander",

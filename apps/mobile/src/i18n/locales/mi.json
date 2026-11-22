@@ -641,7 +641,10 @@
       "diffTooLarge": "he nui rawa ngā rerekētanga",
       "openFile": "Whakatuwheratia {{path}}",
       "openFileViewed": "Whakatuwheratia {{path}} (kua tirohia)",
-      "title": "Ngā kōnae"
+      "title": "Ngā kōnae",
+      "binaryDiff": "kōnae ā-rua",
+      "diffUnavailable": "kāore he rerekētanga mai i te kaiwhakarato",
+      "contentUnchanged": "kāore he rerekētanga ihirangi"
     },
     "fileRows": {
       "markViewed": "Tohua {{path}} hei kōnae kua tirohia",
@@ -650,9 +653,12 @@
       "expandFile": "Whakawhānuitia te tirohanga kōnae",
       "diffTooLarge": "He nui rawa ngā rerekētanga hei whakaatu",
       "noPreview": "Kāore he arokite mō tēnei kōnae",
-      "openOnGitHub": "Whakatuwheratia ki GitHub",
-      "openDiffOnGitHub": "Whakatuwheratia ngā rerekētanga o tēnei kōnae ki GitHub",
-      "githubDiff": "Ngā rerekētanga i GitHub"
+      "binaryDiff": "Kāore he rerekētanga hei whakaatu mō tēnei kōnae ā-rua",
+      "diffUnavailable": "Kāore tēnei kaiwhakarato e tuku rerekētanga kōnae",
+      "contentUnchanged": "Kāore he rerekētanga ihirangi i tēnei kōnae",
+      "openOnProvider": "Whakatuwheratia tēnei kōnae ki {{provider}}",
+      "openDiffOnProvider": "Whakatuwheratia ngā rerekētanga o tēnei kōnae ki {{provider}}",
+      "providerDiff": "Ngā rerekētanga i {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Ūkuia te kōwhiringa",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Whakahoutia te peka mā te peka pūtake, whakapūtaketia anō rānei, i mua i te whakakotahitanga.",
         "behindDetail": "Kei muri te peka i takea mai ai ngā huringa i te peka pūtake. Whakapūtaketia anō, whakahoutia rānei te peka i mua i te whakakotahitanga.",
         "notMergeableTitle": "Kāore anō kia taea te whakakotahi i tēnei tono kume",
-        "notMergeableDetail": "E ai ki tā GitHub pūrongo, ko {{state}} te tūnga mō te whakakotahitanga."
+        "notMergeableDetail": "E ai ki tā GitHub pūrongo, ko {{state}} te tūnga mō te whakakotahitanga.",
+        "notOpenDetail": "Ka taea anake te whakakotahi i tētahi {{term}} tuwhera.",
+        "unresolvedDiscussionsDetail": "Whakataua ngā kōrerorero katoa i mua i te whakakotahi.",
+        "unresolvedTasksDetail": "Whakataua ngā tūmahi tuwhera katoa i mua i te whakakotahi.",
+        "otherDetail": "Kei te ārai te kaiwhakarato i tēnei whakakotahitanga mō tētahi take kāore i whakahuatia e ia."
       },
       "restrictions": {
         "title": "Here whakakotahi",
@@ -1106,7 +1116,8 @@
       "modified": "Kua whakarerekētia",
       "renamed": "Kua whakaingoatia anō",
       "copied": "Kua tāruatia",
-      "changed": "Kua huri"
+      "changed": "Kua huri",
+      "unknown": "Kāore te momo huringa i pūrongotia"
     },
     "diff": {
       "selectedTapToChange": "Kua kōwhiria {{label}}, pā atu hei huri i te kōwhiringa",

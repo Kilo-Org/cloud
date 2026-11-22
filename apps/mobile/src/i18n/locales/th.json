@@ -641,7 +641,10 @@
       "diffTooLarge": "ส่วนต่างมีขนาดใหญ่เกินไป",
       "openFile": "เปิด {{path}}",
       "openFileViewed": "เปิด {{path}} (ดูแล้ว)",
-      "title": "ไฟล์"
+      "title": "ไฟล์",
+      "binaryDiff": "ไฟล์ไบนารี",
+      "diffUnavailable": "ไม่มีส่วนต่างจากผู้ให้บริการ",
+      "contentUnchanged": "ไม่มีการเปลี่ยนแปลงเนื้อหา"
     },
     "fileRows": {
       "markViewed": "ทำเครื่องหมาย {{path}} ว่าดูแล้ว",
@@ -650,9 +653,12 @@
       "expandFile": "ขยายไฟล์",
       "diffTooLarge": "ส่วนต่างมีขนาดใหญ่เกินกว่าจะแสดงได้",
       "noPreview": "ไม่มีตัวอย่างสำหรับไฟล์นี้",
-      "openOnGitHub": "เปิดบน GitHub",
-      "openDiffOnGitHub": "เปิดส่วนต่างของไฟล์นี้บน GitHub",
-      "githubDiff": "ส่วนต่างบน GitHub"
+      "binaryDiff": "ไม่มีส่วนต่างที่จะแสดงสำหรับไฟล์ไบนารีนี้",
+      "diffUnavailable": "ผู้ให้บริการรายนี้ไม่ส่งส่วนต่างของไฟล์",
+      "contentUnchanged": "ไม่มีการเปลี่ยนแปลงเนื้อหาในไฟล์นี้",
+      "openOnProvider": "เปิดไฟล์นี้บน {{provider}}",
+      "openDiffOnProvider": "เปิดส่วนต่างของไฟล์นี้บน {{provider}}",
+      "providerDiff": "ส่วนต่างบน {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "ล้างการเลือก",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "อัปเดตบรานช์จากบรานช์ปลายทาง หรือรีเบสก่อนรวม",
         "behindDetail": "บรานช์ต้นทางยังตามหลังบรานช์ปลายทาง ให้รีเบสหรืออัปเดตบรานช์ก่อนรวม",
         "notMergeableTitle": "ยังรวม PR นี้ไม่ได้",
-        "notMergeableDetail": "GitHub รายงานสถานะการรวมเป็น {{state}}"
+        "notMergeableDetail": "GitHub รายงานสถานะการรวมเป็น {{state}}",
+        "notOpenDetail": "รวมได้เฉพาะ {{term}} ที่เปิดอยู่เท่านั้น",
+        "unresolvedDiscussionsDetail": "แก้ไขบทสนทนาทั้งหมดให้เรียบร้อยก่อนรวม",
+        "unresolvedTasksDetail": "แก้ไขงานที่เปิดอยู่ทั้งหมดให้เรียบร้อยก่อนรวม",
+        "otherDetail": "ผู้ให้บริการกำลังบล็อกการรวมนี้ด้วยเหตุผลที่ไม่ได้ระบุไว้"
       },
       "restrictions": {
         "title": "ข้อจำกัดการรวม",
@@ -1106,7 +1116,8 @@
       "modified": "แก้ไขแล้ว",
       "renamed": "เปลี่ยนชื่อแล้ว",
       "copied": "คัดลอกแล้ว",
-      "changed": "เปลี่ยนแปลงแล้ว"
+      "changed": "เปลี่ยนแปลงแล้ว",
+      "unknown": "ไม่ได้รายงานประเภทการเปลี่ยนแปลง"
     },
     "diff": {
       "selectedTapToChange": "เลือก {{label}} แล้ว แตะเพื่อเปลี่ยนการเลือก",

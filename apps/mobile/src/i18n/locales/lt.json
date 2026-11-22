@@ -647,7 +647,10 @@
       "diffTooLarge": "pakeitimų palyginimas per didelis",
       "openFile": "Atidaryti {{path}}",
       "openFileViewed": "Atidaryti {{path}} (peržiūrėtas)",
-      "title": "Failai"
+      "title": "Failai",
+      "binaryDiff": "dvejetainis failas",
+      "diffUnavailable": "nėra pakeitimų palyginimo iš teikėjo",
+      "contentUnchanged": "nėra turinio pakeitimų"
     },
     "fileRows": {
       "markViewed": "Pažymėti {{path}} kaip peržiūrėtą",
@@ -656,9 +659,12 @@
       "expandFile": "Išskleisti failą",
       "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti",
       "noPreview": "Šio failo peržiūra negalima",
-      "openOnGitHub": "Atidaryti GitHub platformoje",
-      "openDiffOnGitHub": "Atidaryti šio failo pakeitimų palyginimą GitHub platformoje",
-      "githubDiff": "GitHub pakeitimų palyginimas"
+      "binaryDiff": "Nėra pakeitimų palyginimo, kurį būtų galima parodyti šiam dvejetainiam failui",
+      "diffUnavailable": "Šis teikėjas nesiunčia failų pakeitimų palyginimų",
+      "contentUnchanged": "Šiame faile nėra turinio pakeitimų",
+      "openOnProvider": "Atidaryti šį failą {{provider}} platformoje",
+      "openDiffOnProvider": "Atidaryti šio failo pakeitimų palyginimą {{provider}} platformoje",
+      "providerDiff": "{{provider}} pakeitimų palyginimas"
     },
     "floatingActions": {
       "clearSelection": "Panaikinti pažymėjimą",
@@ -796,7 +802,11 @@
         "behindDetailUpdatable": "Prieš sujungdamas atnaujink šaką pagal bazinę šaką arba perkelk jos pakeitimų įrašus į naują bazę.",
         "behindDetail": "Užklausos šaka atsilieka nuo bazinės šakos. Prieš sujungdamas perkelk pakeitimų įrašus į naują bazę arba atnaujink šaką.",
         "notMergeableTitle": "Šios pakeitimų užklausos dar negalima sujungti",
-        "notMergeableDetail": "GitHub nurodė sujungimo būseną: {{state}}."
+        "notMergeableDetail": "GitHub nurodė sujungimo būseną: {{state}}.",
+        "notOpenDetail": "Sujungti galima tik atvirą {{term}}.",
+        "unresolvedDiscussionsDetail": "Prieš sujungdamas išspręsk visas diskusijas.",
+        "unresolvedTasksDetail": "Prieš sujungdamas išspręsk visas atviras užduotis.",
+        "otherDetail": "Teikėjas blokuoja šį sujungimą dėl priežasties, kurios nenurodė."
       },
       "restrictions": {
         "title": "Sujungimo apribojimai",
@@ -1158,7 +1168,8 @@
       "modified": "Modifikuota",
       "renamed": "Pervadinta",
       "copied": "Nukopijuota",
-      "changed": "Pakeista"
+      "changed": "Pakeista",
+      "unknown": "Pakeitimo tipas nenurodytas"
     },
     "diff": {
       "selectedTapToChange": "Pažymėta: {{label}}, bakstelėk, kad pakeistum pažymėjimą",

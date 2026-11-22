@@ -3117,7 +3117,10 @@
       "viewedOfListed": "{{viewed}} de {{total}} archivos de la lista vistos",
       "viewedOfListed_one": "{{viewed}} de {{total}} archivos de la lista vistos",
       "viewedOfListed_many": "{{viewed}} de {{total}} archivos de la lista vistos",
-      "viewedOfListed_other": "{{viewed}} de {{total}} archivos de la lista vistos"
+      "viewedOfListed_other": "{{viewed}} de {{total}} archivos de la lista vistos",
+      "binaryDiff": "archivo binario",
+      "diffUnavailable": "sin diferencias del proveedor",
+      "contentUnchanged": "sin cambios de contenido"
     },
     "fileRows": {
       "collapseFile": "Contraer archivo",
@@ -3125,10 +3128,13 @@
       "noPreview": "No hay vista previa disponible para este archivo",
       "expandFile": "Expandir archivo",
       "markViewed": "Marcar {{path}} como visto",
-      "openDiffOnGitHub": "Abrir las diferencias de este archivo en GitHub",
-      "openOnGitHub": "Abrir en GitHub",
       "unmarkViewed": "Desmarcar {{path}} como visto",
-      "githubDiff": "Diferencias en GitHub"
+      "binaryDiff": "No hay diferencias que mostrar para este archivo binario",
+      "diffUnavailable": "Este proveedor no envía diferencias de archivos",
+      "contentUnchanged": "No hay cambios de contenido en este archivo",
+      "openOnProvider": "Abrir este archivo en {{provider}}",
+      "openDiffOnProvider": "Abrir las diferencias de este archivo en {{provider}}",
+      "providerDiff": "Diferencias en {{provider}}"
     },
     "floatingActions": {
       "clear": "Quitar",
@@ -3264,7 +3270,11 @@
         "behindDetailUpdatable": "Actualiza la rama con los cambios de la rama base o reorganízala antes de fusionar.",
         "behindDetail": "A la rama de origen le faltan cambios de la rama base. Reorganiza o actualiza la rama de origen antes de fusionar.",
         "notMergeableTitle": "Esta PR aún no se puede fusionar",
-        "notMergeableDetail": "GitHub indicó el siguiente estado de fusión: {{state}}."
+        "notMergeableDetail": "GitHub indicó el siguiente estado de fusión: {{state}}.",
+        "notOpenDetail": "Solo se puede fusionar un {{term}} en estado abierto.",
+        "unresolvedDiscussionsDetail": "Resuelve todas las conversaciones antes de fusionar.",
+        "unresolvedTasksDetail": "Resuelve todas las tareas pendientes antes de fusionar.",
+        "otherDetail": "El proveedor está bloqueando esta fusión por un motivo que no especificó."
       },
       "restrictions": {
         "title": "Restricciones de fusión",
@@ -3387,7 +3397,8 @@
       "changed": "Cambiado",
       "copied": "Copiado",
       "modified": "Modificado",
-      "renamed": "Renombrado"
+      "renamed": "Renombrado",
+      "unknown": "Tipo de cambio no informado"
     },
     "tabs": {
       "discussion": "Conversación",

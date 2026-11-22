@@ -641,7 +641,10 @@
       "diffTooLarge": "muutosvertailu on liian suuri",
       "openFile": "Avaa {{path}}",
       "openFileViewed": "Avaa {{path}} (katsottu)",
-      "title": "Tiedostot"
+      "title": "Tiedostot",
+      "binaryDiff": "binääritiedosto",
+      "diffUnavailable": "ei muutosvertailua palveluntarjoajalta",
+      "contentUnchanged": "ei sisältömuutosta"
     },
     "fileRows": {
       "markViewed": "Merkitse {{path}} katsotuksi",
@@ -650,9 +653,12 @@
       "expandFile": "Laajenna tiedosto",
       "diffTooLarge": "Muutosvertailu on liian suuri näytettäväksi",
       "noPreview": "Tälle tiedostolle ei ole esikatselua",
-      "openOnGitHub": "Avaa GitHubissa",
-      "openDiffOnGitHub": "Avaa tämän tiedoston muutosvertailu GitHubissa",
-      "githubDiff": "GitHubin muutosvertailu"
+      "binaryDiff": "Tälle binääritiedostolle ei ole näytettävää muutosvertailua",
+      "diffUnavailable": "Tämä palveluntarjoaja ei lähetä tiedostojen muutosvertailuja",
+      "contentUnchanged": "Tässä tiedostossa ei ole sisältömuutoksia",
+      "openOnProvider": "Avaa tämä tiedosto {{provider}}issa",
+      "openDiffOnProvider": "Avaa tämän tiedoston muutosvertailu {{provider}}issa",
+      "providerDiff": "{{provider}}in muutosvertailu"
     },
     "floatingActions": {
       "clearSelection": "Tyhjennä valinta",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Päivitä haara kohdehaarasta tai uudelleenperusta se ennen yhdistämistä.",
         "behindDetail": "Lähdehaara on jäljessä kohdehaarasta. Uudelleenperusta tai päivitä lähdehaara ennen yhdistämistä.",
         "notMergeableTitle": "Tätä muutospyyntöä ei voi vielä yhdistää",
-        "notMergeableDetail": "GitHub ilmoitti yhdistettävyyden tilaksi {{state}}."
+        "notMergeableDetail": "GitHub ilmoitti yhdistettävyyden tilaksi {{state}}.",
+        "notOpenDetail": "Vain avoin {{term}} voidaan yhdistää.",
+        "unresolvedDiscussionsDetail": "Ratkaise kaikki keskustelut ennen yhdistämistä.",
+        "unresolvedTasksDetail": "Ratkaise kaikki avoimet tehtävät ennen yhdistämistä.",
+        "otherDetail": "Palveluntarjoaja estää tämän yhdistämisen ilmoittamatta syytä."
       },
       "restrictions": {
         "title": "Yhdistämisen ehdot",
@@ -1106,7 +1116,8 @@
       "modified": "Muokattu",
       "renamed": "Nimetty uudelleen",
       "copied": "Kopioitu",
-      "changed": "Muutettu"
+      "changed": "Muutettu",
+      "unknown": "Muutostyyppiä ei ilmoitettu"
     },
     "diff": {
       "selectedTapToChange": "Valittu: {{label}}. Muuta valintaa napauttamalla",

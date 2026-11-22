@@ -206,7 +206,7 @@ function makeFile(path: string): PrReviewFile {
     additions: 0,
     deletions: 0,
     patch: null,
-    patchMissing: false,
+    patchMissingCause: null,
   };
 }
 

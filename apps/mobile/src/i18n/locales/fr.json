@@ -3117,7 +3117,10 @@
       "viewedOfListed": "{{viewed}} sur {{total}} consultés parmi les fichiers affichés",
       "viewedOfListed_one": "{{viewed}} sur {{total}} consulté parmi les fichiers affichés",
       "viewedOfListed_many": "{{viewed}} sur {{total}} consultés parmi les fichiers affichés",
-      "viewedOfListed_other": "{{viewed}} sur {{total}} consultés parmi les fichiers affichés"
+      "viewedOfListed_other": "{{viewed}} sur {{total}} consultés parmi les fichiers affichés",
+      "binaryDiff": "fichier binaire",
+      "diffUnavailable": "aucune différence du fournisseur",
+      "contentUnchanged": "aucun changement de contenu"
     },
     "fileRows": {
       "collapseFile": "Réduire le fichier",
@@ -3125,10 +3128,13 @@
       "noPreview": "Aucun aperçu disponible pour ce fichier",
       "expandFile": "Développer le fichier",
       "markViewed": "Marquer {{path}} comme consulté",
-      "openDiffOnGitHub": "Ouvrir les différences de ce fichier sur GitHub",
-      "openOnGitHub": "Ouvrir sur GitHub",
       "unmarkViewed": "Marquer {{path}} comme non consulté",
-      "githubDiff": "Différences sur GitHub"
+      "binaryDiff": "Aucune différence à afficher pour ce fichier binaire",
+      "diffUnavailable": "Ce fournisseur n'envoie pas de différences de fichiers",
+      "contentUnchanged": "Aucun changement de contenu dans ce fichier",
+      "openOnProvider": "Ouvrir ce fichier sur {{provider}}",
+      "openDiffOnProvider": "Ouvrir les différences de ce fichier sur {{provider}}",
+      "providerDiff": "Différences sur {{provider}}"
     },
     "floatingActions": {
       "clear": "Désélectionner",
@@ -3264,7 +3270,11 @@
         "behindDetailUpdatable": "Avant de fusionner, mettez la branche à jour à partir de la branche cible ou rebasez-la.",
         "behindDetail": "La branche source est en retard sur la branche cible. Rebasez-la ou mettez-la à jour avant de fusionner.",
         "notMergeableTitle": "Cette pull request ne peut pas encore être fusionnée",
-        "notMergeableDetail": "GitHub a signalé un état de fusion {{state}}."
+        "notMergeableDetail": "GitHub a signalé un état de fusion {{state}}.",
+        "notOpenDetail": "Seule une {{term}} ouverte peut être fusionnée.",
+        "unresolvedDiscussionsDetail": "Résolvez toutes les discussions avant de fusionner.",
+        "unresolvedTasksDetail": "Résolvez toutes les tâches ouvertes avant de fusionner.",
+        "otherDetail": "Le fournisseur bloque cette fusion pour une raison qu'il n'a pas précisée."
       },
       "restrictions": {
         "title": "Restrictions de fusion",
@@ -3387,7 +3397,8 @@
       "changed": "Changé",
       "copied": "Copié",
       "modified": "Modifié",
-      "renamed": "Renommé"
+      "renamed": "Renommé",
+      "unknown": "Type de changement non signalé"
     },
     "tabs": {
       "discussion": "Échanges",

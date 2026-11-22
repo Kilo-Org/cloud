@@ -3070,7 +3070,10 @@
       "viewedCount_other": "{{total}}件中{{viewed}}件を確認済み",
       "viewedOfListed": "表示中の{{total}}件中{{viewed}}件を確認済み",
       "viewedOfListed_one": "表示中の{{total}}件中{{viewed}}件を確認済み",
-      "viewedOfListed_other": "表示中の{{total}}件中{{viewed}}件を確認済み"
+      "viewedOfListed_other": "表示中の{{total}}件中{{viewed}}件を確認済み",
+      "binaryDiff": "バイナリファイル",
+      "diffUnavailable": "プロバイダーからの差分なし",
+      "contentUnchanged": "内容の変更なし"
     },
     "fileRows": {
       "collapseFile": "ファイルを折りたたむ",
@@ -3078,10 +3081,13 @@
       "noPreview": "このファイルはプレビューできません",
       "expandFile": "ファイルを展開",
       "markViewed": "{{path}}を確認済みにする",
-      "openDiffOnGitHub": "このファイルの差分をGitHubで開く",
-      "openOnGitHub": "GitHubで開く",
       "unmarkViewed": "{{path}}を未確認にする",
-      "githubDiff": "GitHubの差分"
+      "binaryDiff": "このバイナリファイルには表示できる差分がありません",
+      "diffUnavailable": "このプロバイダーはファイルの差分を送信しません",
+      "contentUnchanged": "このファイルには内容の変更がありません",
+      "openOnProvider": "このファイルを{{provider}}で開く",
+      "openDiffOnProvider": "このファイルの差分を{{provider}}で開く",
+      "providerDiff": "{{provider}}の差分"
     },
     "floatingActions": {
       "clear": "クリア",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "マージする前に、ベースブランチの変更を取り込むか、リベースしてください。",
         "behindDetail": "マージ元のブランチにベースブランチの最新の変更が反映されていません。マージする前に、リベースするか、ブランチを更新してください。",
         "notMergeableTitle": "このプルリクエストはまだマージできません",
-        "notMergeableDetail": "GitHubから報告されたマージの状態は「{{state}}」です。"
+        "notMergeableDetail": "GitHubから報告されたマージの状態は「{{state}}」です。",
+        "notOpenDetail": "マージできるのはオープンな{{term}}のみです。",
+        "unresolvedDiscussionsDetail": "マージする前に、すべてのディスカッションを解決してください。",
+        "unresolvedTasksDetail": "マージする前に、すべてのオープンなタスクを解決してください。",
+        "otherDetail": "プロバイダーが明示していない理由により、このマージをブロックしています。"
       },
       "restrictions": {
         "title": "マージの制限",
@@ -3326,7 +3336,8 @@
       "changed": "変更",
       "copied": "コピー済み",
       "modified": "変更",
-      "renamed": "名前変更"
+      "renamed": "名前変更",
+      "unknown": "変更種別不明"
     },
     "tabs": {
       "discussion": "ディスカッション",

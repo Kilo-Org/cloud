@@ -641,7 +641,10 @@
       "diffTooLarge": "kala duwanaansho aad u weyn",
       "openFile": "Fur {{path}}",
       "openFileViewed": "Fur {{path}} (la arkay)",
-      "title": "Faylal"
+      "title": "Faylal",
+      "binaryDiff": "fayl aan qoraal ahayn",
+      "diffUnavailable": "ma jiro kala duwanaansho bixiyaha ka yimid",
+      "contentUnchanged": "ma jiro isbeddel nuxur ah"
     },
     "fileRows": {
       "markViewed": "Ku calaamadee {{path}} mid la arkay",
@@ -650,9 +653,12 @@
       "expandFile": "Ballaarso faylka",
       "diffTooLarge": "Kala duwanaanshuhu aad buu u weyn yahay in la muujiyo.",
       "noPreview": "Faylkan horu-eeg looma hayo",
-      "openOnGitHub": "Ku fur GitHub",
-      "openDiffOnGitHub": "Ku fur GitHub kala duwanaanshaha faylkan",
-      "githubDiff": "Kala duwanaanshaha GitHub"
+      "binaryDiff": "Ma jiro kala duwanaansho la muujiyo faylkan aan qoraal ahayn",
+      "diffUnavailable": "Bixiyahan ma soo dirto kala duwanaanshaha faylalka",
+      "contentUnchanged": "Ma jiro isbeddel nuxur ah oo ku jira faylkan",
+      "openOnProvider": "Ku fur faylkan {{provider}}",
+      "openDiffOnProvider": "Ku fur {{provider}} kala duwanaanshaha faylkan",
+      "providerDiff": "Kala duwanaanshaha {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Ka saar xulashada",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Ku cusboonaysii laanta isbeddellada laanta saldhigga ama samee saldhig-beddel ka hor intaadan isku darin.",
         "behindDetail": "Laanta isbeddelladu way ka dambaysaa laanta saldhigga. Samee saldhig-beddel ama cusboonaysii laanta ka hor intaadan isku darin.",
         "notMergeableTitle": "Codsigan isku-darka weli lama fulin karo",
-        "notMergeableDetail": "GitHub wuxuu xaaladda suurtagalnimada isku-darka ku sheegay {{state}}."
+        "notMergeableDetail": "GitHub wuxuu xaaladda suurtagalnimada isku-darka ku sheegay {{state}}.",
+        "notOpenDetail": "Kaliya {{term}} furan ayaa la isku dari karaa.",
+        "unresolvedDiscussionsDetail": "Xalli dhammaan doodaha ka hor intaadan isku darin.",
+        "unresolvedTasksDetail": "Xalli dhammaan hawlaha furan ka hor intaadan isku darin.",
+        "otherDetail": "Bixiyaha wuxuu xannibayaa isku-darkan sabab uusan magacaabin."
       },
       "restrictions": {
         "title": "Xaddidaadaha isku-darka",
@@ -1106,7 +1116,8 @@
       "modified": "Waa la beddelay",
       "renamed": "Magaca ayaa la beddelay",
       "copied": "Waa la nuqulay",
-      "changed": "Waa la beddelay"
+      "changed": "Waa la beddelay",
+      "unknown": "Nooca isbeddelka lama soo sheegin"
     },
     "diff": {
       "selectedTapToChange": "{{label}} ayaa la doortay, taabo si aad u beddesho xulashada",

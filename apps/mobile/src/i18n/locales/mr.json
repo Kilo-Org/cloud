@@ -641,7 +641,10 @@
       "diffTooLarge": "तुलनेसाठी खूप मोठे बदल",
       "openFile": "{{path}} उघडा",
       "openFileViewed": "{{path}} उघडा (पाहिलेली)",
-      "title": "फाइल्स"
+      "title": "फाइल्स",
+      "binaryDiff": "बायनरी फाइल",
+      "diffUnavailable": "प्रदात्याकडून बदलांची तुलना नाही",
+      "contentUnchanged": "सामग्रीत बदल नाही"
     },
     "fileRows": {
       "markViewed": "{{path}} ही फाइल पाहिल्याची खूण करा",
@@ -650,9 +653,12 @@
       "expandFile": "फाइलमधील तपशील दाखवा",
       "diffTooLarge": "बदल इतके मोठे आहेत की त्यांची तुलना दाखवता येत नाही.",
       "noPreview": "या फाइलचे पूर्वावलोकन उपलब्ध नाही",
-      "openOnGitHub": "GitHub वर उघडा",
-      "openDiffOnGitHub": "या फाइलमधील बदलांची तुलना GitHub वर उघडा",
-      "githubDiff": "GitHub वरील बदलांची तुलना"
+      "binaryDiff": "या बायनरी फाइलसाठी बदलांची तुलना दाखवता येत नाही",
+      "diffUnavailable": "हा प्रदाता फाइलमधील बदलांची तुलना पाठवत नाही",
+      "contentUnchanged": "या फाइलमधील सामग्रीत कोणताही बदल नाही",
+      "openOnProvider": "ही फाइल {{provider}} वर उघडा",
+      "openDiffOnProvider": "या फाइलमधील बदलांची तुलना {{provider}} वर उघडा",
+      "providerDiff": "{{provider}} वरील बदलांची तुलना"
     },
     "floatingActions": {
       "clearSelection": "निवड काढा",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "मर्ज करण्यापूर्वी बेस शाखेतील बदल घेऊन शाखा अपडेट करा किंवा रिबेस करा.",
         "behindDetail": "हेड शाखेत बेस शाखेतील नवीनतम बदल नाहीत. मर्ज करण्यापूर्वी शाखा रिबेस करा किंवा अपडेट करा.",
         "notMergeableTitle": "ही पुल रिक्वेस्ट अजून मर्ज होऊ शकत नाही",
-        "notMergeableDetail": "GitHub ने मर्ज करण्याची स्थिती {{state}} असल्याचे कळवले."
+        "notMergeableDetail": "GitHub ने मर्ज करण्याची स्थिती {{state}} असल्याचे कळवले.",
+        "notOpenDetail": "केवळ उघड्या स्थितीतील {{term}} मर्ज केले जाऊ शकते.",
+        "unresolvedDiscussionsDetail": "मर्ज करण्यापूर्वी सर्व चर्चा निकाली काढा.",
+        "unresolvedTasksDetail": "मर्ज करण्यापूर्वी सर्व उघडी कार्ये निकाली काढा.",
+        "otherDetail": "प्रदात्याने हा मर्ज न सांगितलेल्या कारणामुळे रोखला आहे."
       },
       "restrictions": {
         "title": "मर्जवरील निर्बंध",
@@ -1106,7 +1116,8 @@
       "modified": "बदल केलेली",
       "renamed": "नाव बदललेली",
       "copied": "कॉपी केले",
-      "changed": "बदललेली"
+      "changed": "बदललेली",
+      "unknown": "बदलाचा प्रकार नोंदवलेला नाही"
     },
     "diff": {
       "selectedTapToChange": "{{label}} निवडले, निवड बदलण्यासाठी टॅप करा",

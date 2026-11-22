@@ -647,7 +647,10 @@
       "diffTooLarge": "přehled změn je příliš velký",
       "openFile": "Otevřít {{path}}",
       "openFileViewed": "Otevřít {{path}} (prohlédnuto)",
-      "title": "Soubory"
+      "title": "Soubory",
+      "binaryDiff": "binární soubor",
+      "diffUnavailable": "žádný přehled změn od poskytovatele",
+      "contentUnchanged": "žádná změna obsahu"
     },
     "fileRows": {
       "markViewed": "Označit {{path}} jako prohlédnutý",
@@ -656,9 +659,12 @@
       "expandFile": "Rozbalit soubor",
       "diffTooLarge": "Přehled změn je příliš velký na zobrazení.",
       "noPreview": "Pro tento soubor není k dispozici náhled",
-      "openOnGitHub": "Otevřít na GitHubu",
-      "openDiffOnGitHub": "Otevřít přehled změn tohoto souboru na GitHubu",
-      "githubDiff": "Přehled změn na GitHubu"
+      "binaryDiff": "Pro tento binární soubor není k dispozici žádný přehled změn",
+      "diffUnavailable": "Tento poskytovatel neposílá přehledy změn souborů",
+      "contentUnchanged": "V tomto souboru nejsou žádné změny obsahu",
+      "openOnProvider": "Otevřít tento soubor na {{provider}}",
+      "openDiffOnProvider": "Otevřít přehled změn tohoto souboru na {{provider}}",
+      "providerDiff": "Přehled změn na {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Zrušit výběr",
@@ -796,7 +802,11 @@
         "behindDetailUpdatable": "Před sloučením aktualizuj větev podle cílové větve nebo ji na cílovou větev přesaď.",
         "behindDetail": "Zdrojové větvi chybí změny z cílové větve. Před sloučením ji aktualizuj nebo přesaď na cílovou větev.",
         "notMergeableTitle": "Tento PR zatím nelze sloučit",
-        "notMergeableDetail": "GitHub nahlásil stav sloučení {{state}}."
+        "notMergeableDetail": "GitHub nahlásil stav sloučení {{state}}.",
+        "notOpenDetail": "Sloučit lze pouze {{term}} v otevřeném stavu.",
+        "unresolvedDiscussionsDetail": "Před sloučením vyřeš všechny diskuze.",
+        "unresolvedTasksDetail": "Před sloučením vyřeš všechny otevřené úkoly.",
+        "otherDetail": "Poskytovatel blokuje toto sloučení z důvodu, který neuvedl."
       },
       "restrictions": {
         "title": "Omezení slučování",
@@ -1158,7 +1168,8 @@
       "modified": "Upraven",
       "renamed": "Přejmenován",
       "copied": "Zkopírováno",
-      "changed": "Změněn"
+      "changed": "Změněn",
+      "unknown": "Typ změny neuveden"
     },
     "diff": {
       "selectedTapToChange": "Vybráno: {{label}}, klepnutím změníš výběr",

@@ -641,7 +641,10 @@
       "diffTooLarge": "demasiadas diferenzas",
       "openFile": "Abrir {{path}}",
       "openFileViewed": "Abrir {{path}} (visto)",
-      "title": "Ficheiros"
+      "title": "Ficheiros",
+      "binaryDiff": "ficheiro binario",
+      "diffUnavailable": "sen diferenzas do proveedor",
+      "contentUnchanged": "sen cambios de contido"
     },
     "fileRows": {
       "markViewed": "Marcar {{path}} como visto",
@@ -650,9 +653,12 @@
       "expandFile": "Expandir ficheiro",
       "diffTooLarge": "Hai demasiadas diferenzas para amosalas.",
       "noPreview": "Non hai vista previa dispoñible para este ficheiro",
-      "openOnGitHub": "Abrir en GitHub",
-      "openDiffOnGitHub": "Abrir as diferenzas deste ficheiro en GitHub",
-      "githubDiff": "Diferenzas en GitHub"
+      "binaryDiff": "Non hai diferenzas para amosar neste ficheiro binario",
+      "diffUnavailable": "Este proveedor non envía as diferenzas dos ficheiros",
+      "contentUnchanged": "Non hai cambios de contido neste ficheiro",
+      "openOnProvider": "Abrir este ficheiro en {{provider}}",
+      "openDiffOnProvider": "Abrir as diferenzas deste ficheiro en {{provider}}",
+      "providerDiff": "Diferenzas en {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Limpar a selección",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Actualiza a rama cos cambios da rama base ou cambia a súa base antes de fusionar.",
         "behindDetail": "A rama de orixe está atrasada respecto da rama base. Cambia a súa base ou actualízaa antes de fusionar.",
         "notMergeableTitle": "Esta solicitude de integración aínda non se pode fusionar",
-        "notMergeableDetail": "GitHub indicou o estado {{state}} para a fusión."
+        "notMergeableDetail": "GitHub indicou o estado {{state}} para a fusión.",
+        "notOpenDetail": "Só se pode fusionar cando {{term}} está en estado aberto.",
+        "unresolvedDiscussionsDetail": "Resolve todas as discusións antes de fusionar.",
+        "unresolvedTasksDetail": "Resolve todas as tarefas pendentes antes de fusionar.",
+        "otherDetail": "O proveedor está bloqueando esta fusión por un motivo que non especificou."
       },
       "restrictions": {
         "title": "Restricións de fusión",
@@ -1106,7 +1116,8 @@
       "modified": "Modificado",
       "renamed": "Renomeado",
       "copied": "Copiado",
-      "changed": "Cambiado"
+      "changed": "Cambiado",
+      "unknown": "Tipo de cambio non indicado"
     },
     "diff": {
       "selectedTapToChange": "Selección actual: {{label}}. Toca para cambiar a selección",

@@ -3164,7 +3164,10 @@
       "viewedOfListed_one": "przejrzano {{viewed}} z {{total}} plików na liście",
       "viewedOfListed_few": "przejrzano {{viewed}} z {{total}} plików na liście",
       "viewedOfListed_many": "przejrzano {{viewed}} z {{total}} plików na liście",
-      "viewedOfListed_other": "przejrzano {{viewed}} z {{total}} plików na liście"
+      "viewedOfListed_other": "przejrzano {{viewed}} z {{total}} plików na liście",
+      "binaryDiff": "plik binarny",
+      "diffUnavailable": "brak różnic od dostawcy",
+      "contentUnchanged": "brak zmian zawartości"
     },
     "fileRows": {
       "collapseFile": "Zwiń plik",
@@ -3172,10 +3175,13 @@
       "noPreview": "Podgląd tego pliku jest niedostępny",
       "expandFile": "Rozwiń plik",
       "markViewed": "Oznacz {{path}} jako przejrzany",
-      "openDiffOnGitHub": "Otwórz różnice w tym pliku w serwisie GitHub",
-      "openOnGitHub": "Otwórz w serwisie GitHub",
       "unmarkViewed": "Usuń oznaczenie przejrzenia pliku {{path}}",
-      "githubDiff": "Różnice w serwisie GitHub"
+      "binaryDiff": "Brak różnic do wyświetlenia dla tego pliku binarnego",
+      "diffUnavailable": "Ten dostawca nie przesyła różnic w plikach",
+      "contentUnchanged": "Brak zmian zawartości w tym pliku",
+      "openOnProvider": "Otwórz ten plik w serwisie {{provider}}",
+      "openDiffOnProvider": "Otwórz różnice w tym pliku w serwisie {{provider}}",
+      "providerDiff": "Różnice w serwisie {{provider}}"
     },
     "floatingActions": {
       "clear": "Wyczyść",
@@ -3318,7 +3324,11 @@
         "behindDetailUpdatable": "Przed scaleniem zaktualizuj gałąź na podstawie gałęzi bazowej lub zmień jej bazę.",
         "behindDetail": "Gałąź źródłowa nie zawiera najnowszych zmian z gałęzi bazowej. Przed scaleniem zmień jej bazę lub ją zaktualizuj.",
         "notMergeableTitle": "Nie można jeszcze scalić tego PR",
-        "notMergeableDetail": "GitHub zgłosił status scalania: {{state}}."
+        "notMergeableDetail": "GitHub zgłosił status scalania: {{state}}.",
+        "notOpenDetail": "Tylko otwarty {{term}} można scalić.",
+        "unresolvedDiscussionsDetail": "Przed scaleniem rozwiąż wszystkie dyskusje.",
+        "unresolvedTasksDetail": "Przed scaleniem rozwiąż wszystkie otwarte zadania.",
+        "otherDetail": "Dostawca blokuje to scalenie z powodu, którego nie podał."
       },
       "restrictions": {
         "title": "Ograniczenia scalania",
@@ -3448,7 +3458,8 @@
       "changed": "Zmieniono",
       "copied": "Skopiowano",
       "modified": "Zmodyfikowano",
-      "renamed": "Zmieniono nazwę"
+      "renamed": "Zmieniono nazwę",
+      "unknown": "Nie zgłoszono typu zmiany"
     },
     "tabs": {
       "discussion": "Dyskusja",

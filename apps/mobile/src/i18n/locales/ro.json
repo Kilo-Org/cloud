@@ -644,7 +644,10 @@
       "diffTooLarge": "prea multe diferențe",
       "openFile": "Deschide {{path}}",
       "openFileViewed": "Deschide {{path}} (vizualizat)",
-      "title": "Fișiere"
+      "title": "Fișiere",
+      "binaryDiff": "fișier binar",
+      "diffUnavailable": "nicio diferență de la furnizor",
+      "contentUnchanged": "nicio modificare de conținut"
     },
     "fileRows": {
       "markViewed": "Marchează {{path}} ca vizualizat",
@@ -653,9 +656,12 @@
       "expandFile": "Extinde fișierul",
       "diffTooLarge": "Diferențele sunt prea mari pentru a fi afișate.",
       "noPreview": "Nu există previzualizare pentru acest fișier",
-      "openOnGitHub": "Deschide pe GitHub",
-      "openDiffOnGitHub": "Deschide comparația acestui fișier pe GitHub",
-      "githubDiff": "Comparația de pe GitHub"
+      "binaryDiff": "Nu există diferențe de afișat pentru acest fișier binar",
+      "diffUnavailable": "Acest furnizor nu trimite diferențe pentru fișiere",
+      "contentUnchanged": "Nicio modificare de conținut în acest fișier",
+      "openOnProvider": "Deschide acest fișier pe {{provider}}",
+      "openDiffOnProvider": "Deschide comparația acestui fișier pe {{provider}}",
+      "providerDiff": "Comparația de pe {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Anulează selecția",
@@ -786,7 +792,11 @@
         "behindDetailUpdatable": "Actualizează ramura cu modificările din ramura de bază sau rebazeaz-o înainte de îmbinare.",
         "behindDetail": "Ramura sursă nu include cele mai recente modificări din ramura de bază. Rebazează sau actualizează ramura înainte de îmbinare.",
         "notMergeableTitle": "Acest PR nu poate fi îmbinat încă",
-        "notMergeableDetail": "GitHub a raportat următoarea stare pentru îmbinare: {{state}}."
+        "notMergeableDetail": "GitHub a raportat următoarea stare pentru îmbinare: {{state}}.",
+        "notOpenDetail": "Doar un {{term}} deschis poate fi îmbinat.",
+        "unresolvedDiscussionsDetail": "Rezolvă toate discuțiile înainte de îmbinare.",
+        "unresolvedTasksDetail": "Rezolvă toate sarcinile deschise înainte de îmbinare.",
+        "otherDetail": "Furnizorul blochează această îmbinare dintr-un motiv pe care nu l-a precizat."
       },
       "restrictions": {
         "title": "Restricții de îmbinare",
@@ -1132,7 +1142,8 @@
       "modified": "Modificat",
       "renamed": "Redenumit",
       "copied": "Copiat",
-      "changed": "Schimbat"
+      "changed": "Schimbat",
+      "unknown": "Tip de modificare nespecificat"
     },
     "diff": {
       "selectedTapToChange": "Selecție: {{label}}, atinge pentru a o modifica",

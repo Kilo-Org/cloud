@@ -653,7 +653,10 @@
       "diffTooLarge": "gormod o wahaniaethau",
       "openFile": "Agor {{path}}",
       "openFileViewed": "Agor {{path}} (wedi'i gweld)",
-      "title": "Ffeiliau"
+      "title": "Ffeiliau",
+      "binaryDiff": "ffeil ddeuaidd",
+      "diffUnavailable": "dim gwahaniaethau gan y darparwr",
+      "contentUnchanged": "dim newid cynnwys"
     },
     "fileRows": {
       "markViewed": "Marcio {{path}} fel ffeil sydd wedi'i gweld",
@@ -662,9 +665,12 @@
       "expandFile": "Ehangu'r ffeil",
       "diffTooLarge": "Mae gormod o wahaniaethau i'w dangos.",
       "noPreview": "Does dim rhagolwg ar gael ar gyfer y ffeil hon",
-      "openOnGitHub": "Agor ar GitHub",
-      "openDiffOnGitHub": "Agor gwahaniaethau'r ffeil hon ar GitHub",
-      "githubDiff": "Gwahaniaethau ar GitHub"
+      "binaryDiff": "Does dim gwahaniaethau i'w dangos ar gyfer y ffeil ddeuaidd hon",
+      "diffUnavailable": "Nid yw'r darparwr hwn yn anfon gwahaniaethau ffeil",
+      "contentUnchanged": "Does dim newidiadau cynnwys yn y ffeil hon",
+      "openOnProvider": "Agor y ffeil hon ar {{provider}}",
+      "openDiffOnProvider": "Agor gwahaniaethau'r ffeil hon ar {{provider}}",
+      "providerDiff": "Gwahaniaethau ar {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Clirio'r dewis",
@@ -816,7 +822,11 @@
         "behindDetailUpdatable": "Diweddarwch y gangen o'r gangen sylfaen, neu ailsylfaenwch hi, cyn cyfuno.",
         "behindDetail": "Mae'r gangen ffynhonnell ar ei hôl hi o gymharu â'r gangen sylfaen. Ailsylfaenwch neu ddiweddarwch y gangen cyn cyfuno.",
         "notMergeableTitle": "Ni ellir cyfuno'r cais tynnu hwn eto",
-        "notMergeableDetail": "Yn ôl GitHub, y statws cyfuno yw {{state}}."
+        "notMergeableDetail": "Yn ôl GitHub, y statws cyfuno yw {{state}}.",
+        "notOpenDetail": "Dim ond {{term}} agored y gellir ei gyfuno.",
+        "unresolvedDiscussionsDetail": "Datryswch yr holl drafodaethau cyn cyfuno.",
+        "unresolvedTasksDetail": "Datryswch yr holl dasgau agored cyn cyfuno.",
+        "otherDetail": "Mae'r darparwr yn rhwystro'r cyfuniad hwn am reswm na nododd."
       },
       "restrictions": {
         "title": "Cyfyngiadau uno",
@@ -1210,7 +1220,8 @@
       "modified": "Wedi'i addasu",
       "renamed": "Wedi'i ailenwi",
       "copied": "Copïwyd",
-      "changed": "Wedi'i newid"
+      "changed": "Wedi'i newid",
+      "unknown": "Ni nodwyd y math o newid"
     },
     "diff": {
       "selectedTapToChange": "{{label}} wedi'i ddewis, tapiwch i newid y dewis",

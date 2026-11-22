@@ -1,6 +1,7 @@
 import './pr-merge-sheet.test-mocks';
 import { describe, expect, it } from 'vitest';
 import { type ProviderPrMergeState } from '@kilocode/app-shared/provider-review';
+import { i18n } from '@/i18n';
 import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 import {
   baseProps,
@@ -100,15 +101,94 @@ describe('PrMergeSheet provider behavior', () => {
     ]);
     const text = visibleText(renderer);
     expect(text).toContain('2 approvals required');
-    expect(text).toContain('The pipeline is failing on the latest commit.');
-    expect(text).toContain('A merge is already running');
-    expect(text.split('Resolve the merge conflicts on this branch before merging.')).toHaveLength(
-      2
-    );
+    // Every code renders the catalog's own copy, never the provider's prose.
+    const conflictsDetail = i18n.t('prReview.merge.blocked.conflictsDetail');
+    const otherDetail = i18n.t('prReview.merge.blocked.otherDetail');
+    expect(text).toContain(i18n.t('prReview.merge.providerBlocked.failingPipeline'));
+    expect(text).toContain(otherDetail);
+    // The provider's own `conflicts` reason replaces the synthesized row, so
+    // the copy appears exactly once rather than twice.
+    expect(text.split(conflictsDetail)).toHaveLength(2);
+    expect(text).not.toContain('Provider conflict');
+    expect(text).not.toContain('Provider pipeline failure');
     expect(text).not.toContain('The pipeline must succeed before merging.');
+    // `other` is the one code with no self-explanatory cause, so it repeats the
+    // provider's own sentence as the row's muted detail.
+    const detail = hosts(renderer, 'Text').find(node =>
+      node.children.includes('A merge is already running')
+    );
+    expect(detail?.props.variant).toBe('muted');
+    expect(String(detail?.props.className)).toContain('text-xs');
+    expect(text).toContain('A merge is already running');
     await press(renderer, 'Discard');
     expect(baseProps.onDismiss).toHaveBeenCalledOnce();
     expect(state.merge.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('names a closed merge request, open discussions and open tasks in catalog copy', async () => {
+    const renderer = await mount({
+      prRef: gitlab,
+      mergeState: {
+        ...allowed,
+        canMerge: false,
+        blockedReasons: [
+          { code: 'not_open', message: 'Provider says the merge request is closed' },
+          { code: 'unresolved_discussions', message: 'Provider says discussions are open' },
+          { code: 'unresolved_tasks', message: 'Provider says tasks are open' },
+        ],
+      },
+    });
+    const text = visibleText(renderer);
+    expect(text).toContain(
+      i18n.t('prReview.merge.blocked.notOpenDetail', { term: 'merge request' })
+    );
+    expect(text).toContain(
+      i18n.t('prReview.merge.blocked.unresolvedDiscussionsDetail', { term: 'merge request' })
+    );
+    expect(text).toContain(
+      i18n.t('prReview.merge.blocked.unresolvedTasksDetail', { term: 'merge request' })
+    );
+    // `not_open` is "Only an open merge request can be merged." — the noun is the
+    // provider's, not GitHub's.
+    expect(text).toContain('Only an open merge request can be merged.');
+    // None of these codes repeats the provider's own sentence as a detail.
+    expect(text).not.toContain('Provider says the merge request is closed');
+    expect(text).not.toContain('Provider says discussions are open');
+    expect(text).not.toContain('Provider says tasks are open');
+    // The list carries the restrictions heading and nothing submit-shaped.
+    expect(text).toContain(i18n.t('prReview.merge.restrictions.title'));
+    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
+      'Discard',
+    ]);
+  });
+
+  it('names a closed Bitbucket pull request and its open discussions and tasks', async () => {
+    const renderer = await mount({
+      prRef: bitbucket,
+      mergeState: {
+        ...allowed,
+        canMerge: false,
+        blockedReasons: [
+          { code: 'not_open', message: 'Provider says the pull request is closed' },
+          { code: 'unresolved_discussions', message: 'Provider says discussions are open' },
+          { code: 'unresolved_tasks', message: 'Provider says tasks are open' },
+        ],
+      },
+    });
+    const text = visibleText(renderer);
+    expect(text).toContain(
+      i18n.t('prReview.merge.blocked.notOpenDetail', { term: 'pull request' })
+    );
+    expect(text).toContain(
+      i18n.t('prReview.merge.blocked.unresolvedDiscussionsDetail', { term: 'pull request' })
+    );
+    expect(text).toContain(
+      i18n.t('prReview.merge.blocked.unresolvedTasksDetail', { term: 'pull request' })
+    );
+    expect(text).toContain('Only an open pull request can be merged.');
+    expect(text).not.toContain('Provider says the pull request is closed');
+    expect(text).not.toContain('Provider says discussions are open');
+    expect(text).not.toContain('Provider says tasks are open');
   });
 
   it('shows restrictions without disconnecting an allowed form CTA', async () => {

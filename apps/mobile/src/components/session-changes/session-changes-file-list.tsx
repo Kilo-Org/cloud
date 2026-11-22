@@ -2,6 +2,7 @@
 // counts, and a pull-to-refresh that asks the session for a fresh capture.
 
 import { FlashList } from '@shopify/flash-list';
+import { providerPrFileStatus } from '@kilocode/app-shared/provider-review';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -15,19 +16,16 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { type SessionChangesFile, sessionChangesFileKey } from '@/lib/session-changes-review';
 
-/** A worktree file's status uses the diff vocabulary; `deleted` reads as `removed`. */
-function fileStatusForLabel(status: SessionChangesFile['status']): string {
-  return status === 'deleted' ? 'removed' : status;
-}
-
 function SessionChangesFileRow({
   file,
   onOpen,
 }: Readonly<{ file: SessionChangesFile; onOpen: (file: SessionChangesFile) => void }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const StatusIcon = fileStatusIcon(fileStatusForLabel(file.status));
-  const statusLabel = fileStatusLabel(fileStatusForLabel(file.status));
+  // The worktree's words are not the contract's: `deleted` reads as `removed`.
+  const status = providerPrFileStatus(file.status);
+  const StatusIcon = fileStatusIcon(status);
+  const statusLabel = fileStatusLabel(status);
   return (
     <Pressable
       onPress={() => {

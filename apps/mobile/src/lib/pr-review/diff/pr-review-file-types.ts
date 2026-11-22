@@ -2,14 +2,19 @@
 // in a module with no React / react-query imports so it can be tested in
 // plain Node.
 
+import {
+  type ProviderPrFilePatchMissingCause,
+  type ProviderPrFileStatus,
+} from '@kilocode/app-shared/provider-review';
+
 export type PrReviewFile = {
   path: string;
   previousPath: string | null;
-  status: string;
+  status: ProviderPrFileStatus;
   additions: number;
   deletions: number;
   patch: string | null;
-  patchMissing: boolean;
+  patchMissingCause: ProviderPrFilePatchMissingCause | null;
 };
 
 export const PR_REVIEW_MAX_LISTED_FILES = 3000;

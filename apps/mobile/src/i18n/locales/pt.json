@@ -647,7 +647,10 @@
       "diffTooLarge": "demasiadas diferenças",
       "openFile": "Abrir {{path}}",
       "openFileViewed": "Abrir {{path}} (visto)",
-      "title": "Ficheiros"
+      "title": "Ficheiros",
+      "binaryDiff": "ficheiro binário",
+      "diffUnavailable": "sem diferenças do fornecedor",
+      "contentUnchanged": "sem alterações de conteúdo"
     },
     "fileRows": {
       "markViewed": "Marcar {{path}} como visto",
@@ -656,9 +659,12 @@
       "expandFile": "Expandir ficheiro",
       "diffTooLarge": "As diferenças são demasiado extensas para serem apresentadas.",
       "noPreview": "Pré-visualização indisponível para este ficheiro",
-      "openOnGitHub": "Abrir no GitHub",
-      "openDiffOnGitHub": "Abrir as diferenças deste ficheiro no GitHub",
-      "githubDiff": "Diferenças no GitHub"
+      "binaryDiff": "Não há diferenças para mostrar neste ficheiro binário",
+      "diffUnavailable": "Este fornecedor não envia diferenças de ficheiros",
+      "contentUnchanged": "Sem alterações de conteúdo neste ficheiro",
+      "openOnProvider": "Abrir este ficheiro no {{provider}}",
+      "openDiffOnProvider": "Abrir as diferenças deste ficheiro no {{provider}}",
+      "providerDiff": "Diferenças no {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Limpar seleção",
@@ -796,7 +802,11 @@
         "behindDetailUpdatable": "Atualiza o ramo a partir do ramo base ou reaplica os commits antes de o integrar.",
         "behindDetail": "O ramo de origem não inclui as alterações mais recentes do ramo base. Reaplica os commits ou atualiza o ramo antes de o integrar.",
         "notMergeableTitle": "Ainda não é possível integrar este PR",
-        "notMergeableDetail": "O GitHub indicou o estado de integração {{state}}."
+        "notMergeableDetail": "O GitHub indicou o estado de integração {{state}}.",
+        "notOpenDetail": "Só é possível integrar um {{term}} aberto.",
+        "unresolvedDiscussionsDetail": "Resolve todas as discussões antes de o integrar.",
+        "unresolvedTasksDetail": "Resolve todas as tarefas abertas antes de o integrar.",
+        "otherDetail": "O fornecedor está a bloquear esta integração por um motivo que não especificou."
       },
       "restrictions": {
         "title": "Restrições à integração",
@@ -1158,7 +1168,8 @@
       "modified": "Modificado",
       "renamed": "Renomeado",
       "copied": "Copiado",
-      "changed": "Alterado"
+      "changed": "Alterado",
+      "unknown": "Tipo de alteração não indicado"
     },
     "diff": {
       "selectedTapToChange": "Seleção atual: {{label}}, toca para alterar a seleção",

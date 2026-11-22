@@ -644,7 +644,10 @@
       "diffTooLarge": "izmaiņu salīdzinājums ir pārāk liels",
       "openFile": "Atvērt {{path}}",
       "openFileViewed": "Atvērt {{path}} (apskatīts)",
-      "title": "Faili"
+      "title": "Faili",
+      "binaryDiff": "binārs fails",
+      "diffUnavailable": "nav izmaiņu salīdzinājuma no nodrošinātāja",
+      "contentUnchanged": "nav satura izmaiņu"
     },
     "fileRows": {
       "markViewed": "Atzīmēt {{path}} kā apskatītu",
@@ -653,9 +656,12 @@
       "expandFile": "Izvērst failu",
       "diffTooLarge": "Izmaiņu salīdzinājums ir pārāk liels, lai to parādītu.",
       "noPreview": "Šim failam priekšskatījums nav pieejams",
-      "openOnGitHub": "Atvērt GitHub",
-      "openDiffOnGitHub": "Atvērt šī faila izmaiņu salīdzinājumu GitHub",
-      "githubDiff": "GitHub izmaiņu salīdzinājums"
+      "binaryDiff": "Šim binārajam failam nav izmaiņu salīdzinājuma, ko parādīt",
+      "diffUnavailable": "Šis nodrošinātājs nesūta failu izmaiņu salīdzinājumus",
+      "contentUnchanged": "Šim failam nav satura izmaiņu",
+      "openOnProvider": "Atvērt šo failu {{provider}}",
+      "openDiffOnProvider": "Atvērt šī faila izmaiņu salīdzinājumu {{provider}}",
+      "providerDiff": "{{provider}} izmaiņu salīdzinājums"
     },
     "floatingActions": {
       "clearSelection": "Notīrīt atlasi",
@@ -786,7 +792,11 @@
         "behindDetailUpdatable": "Pirms apvienošanas atjaunini zaru ar bāzes zara izmaiņām vai pārbāzē to.",
         "behindDetail": "Avota zarā trūkst jaunāko bāzes zara izmaiņu. Pirms apvienošanas pārbāzē vai atjaunini avota zaru.",
         "notMergeableTitle": "Šo izmaiņu pieprasījumu vēl nevar apvienot",
-        "notMergeableDetail": "GitHub ziņoja par apvienojamības stāvokli {{state}}."
+        "notMergeableDetail": "GitHub ziņoja par apvienojamības stāvokli {{state}}.",
+        "notOpenDetail": "Tikai atvērtu {{term}} var apvienot.",
+        "unresolvedDiscussionsDetail": "Pirms apvienošanas atrisini visas diskusijas.",
+        "unresolvedTasksDetail": "Pirms apvienošanas atrisini visus atvērtos uzdevumus.",
+        "otherDetail": "Nodrošinātājs bloķē šo apvienošanu, nenorādot iemeslu."
       },
       "restrictions": {
         "title": "Apvienošanas ierobežojumi",
@@ -1132,7 +1142,8 @@
       "modified": "Mainīts",
       "renamed": "Pārdēvēts",
       "copied": "Kopēts",
-      "changed": "Mainīts"
+      "changed": "Mainīts",
+      "unknown": "Izmaiņu veids nav norādīts"
     },
     "diff": {
       "selectedTapToChange": "Atlasīts: {{label}}. Pieskaries, lai mainītu atlasi",

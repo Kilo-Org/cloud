@@ -42,7 +42,12 @@ import { PrDiffFileListState } from '@/components/pr-review/diff/pr-diff-file-li
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
-import { providerPrRefKey, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import {
+  providerPrFileUrl,
+  providerPrRefKey,
+  useProviderPrScope,
+  useProviderPrWebUrl,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView } from '@/components/pr-review/diff/pr-diff-rows';
@@ -98,6 +103,9 @@ export function PrReviewFileList({
   // one project on two GitLab instances — never share a set. On the GitHub
   // route the fallback ref is the triple itself, keeping the legacy bytes.
   const scope = useProviderPrScope({ owner, repo, number });
+  // The provider URL the overview published: a file row's link resolves from
+  // it, so a GitLab row points at the instance the read actually ran against.
+  const serverWebUrl = useProviderPrWebUrl();
   const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchToCompletion = useFetchToCompletion(query, changedFiles);
 
@@ -169,6 +177,10 @@ export function PrReviewFileList({
           headSha,
           expandedContext,
           viewed: viewed.isViewed,
+          link: path => {
+            const url = providerPrFileUrl({ ref: scope.ref, serverWebUrl }, path);
+            return url === null ? null : { url, provider: scope.ref.platform };
+          },
         },
       }),
     [
@@ -182,6 +194,8 @@ export function PrReviewFileList({
       number,
       changedFiles,
       effectiveViewMode,
+      scope.ref,
+      serverWebUrl,
     ]
   );
 
@@ -192,6 +206,10 @@ export function PrReviewFileList({
         expanded,
         expandedContext,
         viewed: viewed.isViewed,
+        link: path => {
+          const url = providerPrFileUrl({ ref: scope.ref, serverWebUrl }, path);
+          return url === null ? null : { url, provider: scope.ref.platform };
+        },
         headSha,
         owner,
         repo,

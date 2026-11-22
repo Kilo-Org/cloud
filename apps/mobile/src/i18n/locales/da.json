@@ -641,7 +641,10 @@
       "diffTooLarge": "ændringsvisningen er for stor",
       "openFile": "Åbn {{path}}",
       "openFileViewed": "Åbn {{path}} (gennemset)",
-      "title": "Filer"
+      "title": "Filer",
+      "binaryDiff": "binær fil",
+      "diffUnavailable": "ingen ændringsvisning fra udbyderen",
+      "contentUnchanged": "ingen indholdsændring"
     },
     "fileRows": {
       "markViewed": "Markér {{path}} som gennemset",
@@ -650,9 +653,12 @@
       "expandFile": "Fold filen ud",
       "diffTooLarge": "Ændringerne er for omfattende til at blive vist.",
       "noPreview": "Ingen forhåndsvisning tilgængelig for denne fil",
-      "openOnGitHub": "Åbn på GitHub",
-      "openDiffOnGitHub": "Åbn filens ændringsvisning på GitHub",
-      "githubDiff": "Ændringsvisning på GitHub"
+      "binaryDiff": "Ingen ændringsvisning at vise for denne binære fil",
+      "diffUnavailable": "Denne udbyder sender ikke ændringsvisninger for filer.",
+      "contentUnchanged": "Ingen indholdsændringer i denne fil",
+      "openOnProvider": "Åbn denne fil på {{provider}}",
+      "openDiffOnProvider": "Åbn ændringsvisningen for denne fil på {{provider}}",
+      "providerDiff": "Ændringsvisning fra {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Fjern markeringen",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Opdater grenen fra målgrenen, eller flyt dens basis, før du fletter.",
         "behindDetail": "Kildegrenen mangler ændringer fra målgrenen. Flyt grenens basis, eller opdater grenen, før du fletter.",
         "notMergeableTitle": "Denne pull request kan ikke flettes endnu",
-        "notMergeableDetail": "GitHub har angivet flettestatussen {{state}}."
+        "notMergeableDetail": "GitHub har angivet flettestatussen {{state}}.",
+        "notOpenDetail": "Kun en åben {{term}} kan flettes.",
+        "unresolvedDiscussionsDetail": "Løs alle diskussioner, før du fletter.",
+        "unresolvedTasksDetail": "Løs alle åbne opgaver, før du fletter.",
+        "otherDetail": "Udbyderen blokerer denne fletning af en årsag, som den ikke har oplyst."
       },
       "restrictions": {
         "title": "Fletterestriktioner",
@@ -1106,7 +1116,8 @@
       "modified": "Ændret",
       "renamed": "Omdøbt",
       "copied": "Kopieret",
-      "changed": "Ændret"
+      "changed": "Ændret",
+      "unknown": "Ændringstype ikke rapporteret"
     },
     "diff": {
       "selectedTapToChange": "{{label}} er valgt, tryk for at ændre markeringen",

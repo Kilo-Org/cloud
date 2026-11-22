@@ -641,7 +641,10 @@
       "diffTooLarge": "dəyişikliklərin həcmi çox böyükdür",
       "openFile": "{{path}} faylını aç",
       "openFileViewed": "{{path}} faylını aç (baxılıb)",
-      "title": "Fayllar"
+      "title": "Fayllar",
+      "binaryDiff": "ikili fayl",
+      "diffUnavailable": "provayderdən dəyişiklik yoxdur",
+      "contentUnchanged": "məzmun dəyişikliyi yoxdur"
     },
     "fileRows": {
       "markViewed": "{{path}} faylını baxılmış kimi işarələ",
@@ -650,9 +653,12 @@
       "expandFile": "Faylın məzmununu göstər",
       "diffTooLarge": "Dəyişikliklərin həcmi göstərilmək üçün çox böyükdür.",
       "noPreview": "Bu fayl üçün önizləmə mövcud deyil",
-      "openOnGitHub": "GitHub-da aç",
-      "openDiffOnGitHub": "Bu faylın dəyişikliklərini GitHub-da aç",
-      "githubDiff": "GitHub-dakı dəyişikliklər"
+      "binaryDiff": "Bu ikili fayl üçün göstəriləcək dəyişiklik yoxdur",
+      "diffUnavailable": "Bu provayder fayl dəyişikliklərini göndərmir",
+      "contentUnchanged": "Bu faylda məzmun dəyişikliyi yoxdur",
+      "openOnProvider": "Bu faylı {{provider}}-da aç",
+      "openDiffOnProvider": "Bu faylın dəyişikliklərini {{provider}}-da aç",
+      "providerDiff": "{{provider}}-dakı dəyişikliklər"
     },
     "floatingActions": {
       "clearSelection": "Seçimi təmizlə",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Birləşdirmədən əvvəl budağı əsas budaqdan yenilə və ya bazasını dəyiş.",
         "behindDetail": "Mənbə budaq əsas budaqdan geri qalır. Birləşdirmədən əvvəl budağın bazasını dəyiş və ya budağı yenilə.",
         "notMergeableTitle": "Bu birləşdirmə sorğusunu hələ birləşdirmək mümkün deyil",
-        "notMergeableDetail": "GitHub birləşdirmə vəziyyətini {{state}} kimi bildirdi."
+        "notMergeableDetail": "GitHub birləşdirmə vəziyyətini {{state}} kimi bildirdi.",
+        "notOpenDetail": "Yalnız açıq {{term}} birləşdirilə bilər.",
+        "unresolvedDiscussionsDetail": "Birləşdirmədən əvvəl bütün müzakirələri həll et.",
+        "unresolvedTasksDetail": "Birləşdirmədən əvvəl bütün açıq tapşırıqları həll et.",
+        "otherDetail": "Provayder bu birləşdirməni adını çəkmədiyi bir səbəbə görə bloklayır."
       },
       "restrictions": {
         "title": "Birləşdirmə məhdudiyyətləri",
@@ -1106,7 +1116,8 @@
       "modified": "Dəyişdirilib",
       "renamed": "Adı dəyişdirilib",
       "copied": "Kopyalandı",
-      "changed": "Dəyişib"
+      "changed": "Dəyişib",
+      "unknown": "Dəyişiklik növü bildirilməyib"
     },
     "diff": {
       "selectedTapToChange": "{{label}} seçilib, seçimi dəyişmək üçün toxun",

@@ -765,7 +765,7 @@
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
-      "notConnectedReadOnlyPlan": "תקופת הניסיון של הארגון הסתיימה, ולכן הבעלים חייבים לעדכן את החיוב ב-⁨kilo.ai⁩."
+      "notConnectedReadOnlyPlan": "תקופת הניסיון של הארגון הסתיימה, ולכן הבעלים חייבים לעדכן את החיוב ב-\u2068kilo.ai\u2069."
     },
     "bitbucketConnect": {
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
@@ -3117,7 +3117,10 @@
       "viewedOfListed": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
       "viewedOfListed_one": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
       "viewedOfListed_two": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
-      "viewedOfListed_other": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה"
+      "viewedOfListed_other": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "binaryDiff": "קובץ בינארי",
+      "diffUnavailable": "אין השוואת שינויים מהספק",
+      "contentUnchanged": "אין שינוי תוכן"
     },
     "fileRows": {
       "collapseFile": "כיווץ הקובץ",
@@ -3125,10 +3128,13 @@
       "noPreview": "אין תצוגה מקדימה זמינה לקובץ הזה",
       "expandFile": "הרחבת הקובץ",
       "markViewed": "סימון {{path}} כנצפה",
-      "openDiffOnGitHub": "פתיחת השוואת השינויים בקובץ הזה ב-GitHub",
-      "openOnGitHub": "פתיחה ב-GitHub",
       "unmarkViewed": "ביטול הסימון של {{path}} כנצפה",
-      "githubDiff": "השוואת השינויים ב-GitHub"
+      "binaryDiff": "אין השוואת שינויים להצגה בקובץ הבינארי הזה",
+      "diffUnavailable": "הספק הזה לא שולח השוואות שינויים של קבצים",
+      "contentUnchanged": "אין שינויי תוכן בקובץ הזה",
+      "openOnProvider": "פתיחת הקובץ הזה ב-{{provider}}",
+      "openDiffOnProvider": "פתיחת השוואת השינויים של הקובץ הזה ב-{{provider}}",
+      "providerDiff": "השוואת השינויים ב-{{provider}}"
     },
     "floatingActions": {
       "clear": "ניקוי",
@@ -3264,7 +3270,11 @@
         "behindDetailUpdatable": "עדכן את הענף מענף הבסיס או בצע ריבייס לפני המיזוג.",
         "behindDetail": "בענף המקור חסרים עדכונים מענף הבסיס. בצע ריבייס או עדכן את הענף לפני המיזוג.",
         "notMergeableTitle": "עדיין לא ניתן למזג את בקשת המשיכה הזו",
-        "notMergeableDetail": "מצב אפשרות המיזוג שדווח על ידי GitHub: {{state}}."
+        "notMergeableDetail": "מצב אפשרות המיזוג שדווח על ידי GitHub: {{state}}.",
+        "notOpenDetail": "ניתן למזג רק {{term}} במצב פתוח.",
+        "unresolvedDiscussionsDetail": "פתור את כל הדיונים לפני המיזוג.",
+        "unresolvedTasksDetail": "פתור את כל המשימות הפתוחות לפני המיזוג.",
+        "otherDetail": "הספק חוסם את המיזוג הזה מסיבה שלא ציין."
       },
       "restrictions": {
         "title": "הגבלות מיזוג",
@@ -3387,7 +3397,8 @@
       "changed": "השתנה",
       "copied": "הועתק",
       "modified": "שונה",
-      "renamed": "השם שונה"
+      "renamed": "השם שונה",
+      "unknown": "סוג השינוי לא דווח"
     },
     "tabs": {
       "discussion": "דיון",

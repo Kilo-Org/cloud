@@ -3117,7 +3117,10 @@
       "viewedOfListed": "{{viewed}} su {{total}} file elencati visualizzati",
       "viewedOfListed_one": "{{viewed}} su {{total}} file elencati visualizzati",
       "viewedOfListed_many": "{{viewed}} su {{total}} file elencati visualizzati",
-      "viewedOfListed_other": "{{viewed}} su {{total}} file elencati visualizzati"
+      "viewedOfListed_other": "{{viewed}} su {{total}} file elencati visualizzati",
+      "binaryDiff": "file binario",
+      "diffUnavailable": "nessun confronto dal fornitore",
+      "contentUnchanged": "nessuna modifica al contenuto"
     },
     "fileRows": {
       "collapseFile": "Comprimi il file",
@@ -3125,10 +3128,13 @@
       "noPreview": "Nessuna anteprima disponibile per questo file",
       "expandFile": "Espandi il file",
       "markViewed": "Segna {{path}} come visualizzato",
-      "openDiffOnGitHub": "Apri il confronto delle modifiche a questo file su GitHub",
-      "openOnGitHub": "Apri su GitHub",
       "unmarkViewed": "Segna {{path}} come non visualizzato",
-      "githubDiff": "Confronto su GitHub"
+      "binaryDiff": "Nessun confronto da mostrare per questo file binario",
+      "diffUnavailable": "Questo fornitore non invia i confronti delle modifiche ai file.",
+      "contentUnchanged": "Nessuna modifica al contenuto di questo file",
+      "openOnProvider": "Apri questo file su {{provider}}",
+      "openDiffOnProvider": "Apri il confronto delle modifiche a questo file su {{provider}}",
+      "providerDiff": "Confronto su {{provider}}"
     },
     "floatingActions": {
       "clear": "Deseleziona",
@@ -3264,7 +3270,11 @@
         "behindDetailUpdatable": "Prima dell'unione, aggiorna il branch con le modifiche del branch di base oppure riallinea i commit.",
         "behindDetail": "Il branch di origine non contiene le ultime modifiche del branch di base. Riallinea i commit o aggiorna il branch prima dell'unione.",
         "notMergeableTitle": "Questa pull request non può ancora essere unita",
-        "notMergeableDetail": "GitHub ha segnalato questo stato per l'unione: {{state}}."
+        "notMergeableDetail": "GitHub ha segnalato questo stato per l'unione: {{state}}.",
+        "notOpenDetail": "Solo una {{term}} aperta può essere unita.",
+        "unresolvedDiscussionsDetail": "Risolvi tutte le discussioni prima di unirla.",
+        "unresolvedTasksDetail": "Risolvi tutte le attività aperte prima di unirla.",
+        "otherDetail": "Il fornitore sta bloccando questa unione per un motivo che non ha specificato."
       },
       "restrictions": {
         "title": "Restrizioni di unione",
@@ -3387,7 +3397,8 @@
       "changed": "Modificato",
       "copied": "Copiato",
       "modified": "Modificato",
-      "renamed": "Rinominato"
+      "renamed": "Rinominato",
+      "unknown": "Tipo di modifica non riportato"
     },
     "tabs": {
       "discussion": "Discussione",

@@ -72,7 +72,7 @@ function mountList(): void {
             additions: 2,
             deletions: 1,
             patch: '@@ -1 +1 @@\n-export const greeting = "Hi";\n+export const greeting = "Hello";',
-            patchMissing: false,
+            patchMissingCause: null,
           },
           {
             path: 'src/index.ts',
@@ -81,7 +81,7 @@ function mountList(): void {
             additions: 1,
             deletions: 0,
             patch: '@@ -1 +1 @@\n-export const index = 0;\n+export const index = 1;',
-            patchMissing: false,
+            patchMissingCause: null,
           },
         ],
       })

@@ -13,7 +13,7 @@ function makeFile(path: string, patch: string | null): PrReviewFile {
     additions: patch ? 1 : 0,
     deletions: patch ? 1 : 0,
     patch,
-    patchMissing: patch === null,
+    patchMissingCause: patch === null ? 'binary' : null,
   };
 }
 
@@ -23,6 +23,7 @@ function baseArgs(overrides: Partial<BuildItemsArgs> = {}): BuildItemsArgs {
     expanded: {},
     expandedContext: {},
     viewed: () => false,
+    link: () => null,
     headSha: 'abc',
     owner: 'owner',
     repo: 'repo',

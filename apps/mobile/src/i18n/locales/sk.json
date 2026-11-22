@@ -647,7 +647,10 @@
       "diffTooLarge": "prehľad zmien je príliš veľký",
       "openFile": "Otvoriť {{path}}",
       "openFileViewed": "Otvoriť {{path}} (prezreté)",
-      "title": "Súbory"
+      "title": "Súbory",
+      "binaryDiff": "binárny súbor",
+      "diffUnavailable": "žiadny prehľad zmien od poskytovateľa",
+      "contentUnchanged": "žiadna zmena obsahu"
     },
     "fileRows": {
       "markViewed": "Označiť súbor {{path}} ako prezretý",
@@ -656,9 +659,12 @@
       "expandFile": "Rozbaliť súbor",
       "diffTooLarge": "Prehľad zmien je príliš veľký na zobrazenie.",
       "noPreview": "Pre tento súbor nie je k dispozícii náhľad",
-      "openOnGitHub": "Otvoriť na GitHub",
-      "openDiffOnGitHub": "Otvoriť prehľad zmien tohto súboru na GitHub",
-      "githubDiff": "Prehľad zmien na GitHub"
+      "binaryDiff": "Pre tento binárny súbor nie je k dispozícii prehľad zmien",
+      "diffUnavailable": "Tento poskytovateľ neposiela prehľady zmien súborov",
+      "contentUnchanged": "V tomto súbore nie sú žiadne zmeny obsahu",
+      "openOnProvider": "Otvoriť tento súbor na {{provider}}",
+      "openDiffOnProvider": "Otvoriť prehľad zmien tohto súboru na {{provider}}",
+      "providerDiff": "Prehľad zmien na {{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Zrušiť výber",
@@ -796,7 +802,11 @@
         "behindDetailUpdatable": "Pred zlúčením aktualizuj vetvu z cieľovej vetvy alebo presaď commity na cieľovú vetvu.",
         "behindDetail": "Zdrojová vetva neobsahuje najnovšie zmeny z cieľovej vetvy. Pred zlúčením presaď jej commity na cieľovú vetvu alebo ju aktualizuj.",
         "notMergeableTitle": "Táto žiadosť sa ešte nedá zlúčiť",
-        "notMergeableDetail": "GitHub oznámil tento stav možnosti zlúčenia: {{state}}."
+        "notMergeableDetail": "GitHub oznámil tento stav možnosti zlúčenia: {{state}}.",
+        "notOpenDetail": "Zlúčiť možno len otvorený {{term}}.",
+        "unresolvedDiscussionsDetail": "Pred zlúčením vyrieš všetky diskusie.",
+        "unresolvedTasksDetail": "Pred zlúčením vyrieš všetky otvorené úlohy.",
+        "otherDetail": "Poskytovateľ blokuje toto zlúčenie z dôvodu, ktorý neuviedol."
       },
       "restrictions": {
         "title": "Obmedzenia zlúčenia",
@@ -1158,7 +1168,8 @@
       "modified": "Upravené",
       "renamed": "Premenované",
       "copied": "Skopírované",
-      "changed": "Zmenené"
+      "changed": "Zmenené",
+      "unknown": "Typ zmeny nie je nahlásený"
     },
     "diff": {
       "selectedTapToChange": "Vybrané: {{label}}. Klepnutím zmeníš výber",

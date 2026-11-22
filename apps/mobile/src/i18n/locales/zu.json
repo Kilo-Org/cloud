@@ -641,7 +641,10 @@
       "diffTooLarge": "umehluko mkhulu kakhulu",
       "openFile": "Vula {{path}}",
       "openFileViewed": "Vula {{path}} (libukiwe)",
-      "title": "Amafayela"
+      "title": "Amafayela",
+      "binaryDiff": "ifayela lebhinari",
+      "diffUnavailable": "akukho mehluko ovela kumhlinzeki",
+      "contentUnchanged": "akukho ukushintshwa kokuqukethwe"
     },
     "fileRows": {
       "markViewed": "Maka {{path}} njengelibukiwe",
@@ -650,9 +653,12 @@
       "expandFile": "Nweba ifayela",
       "diffTooLarge": "Umehluko mkhulu kakhulu ukuba uboniswe.",
       "noPreview": "Akukho ukubuka kuqala okutholakalayo kwaleli fayela",
-      "openOnGitHub": "Vula ku-GitHub",
-      "openDiffOnGitHub": "Vula umehluko waleli fayela ku-GitHub",
-      "githubDiff": "Umehluko ku-GitHub"
+      "binaryDiff": "Akukho mehluko ongaboniswa kuleli fayela lebhinari",
+      "diffUnavailable": "Lo mhlinzeki akayithumeli imehluko yamafayela",
+      "contentUnchanged": "Akukho zinguquko zokuqukethwe kuleli fayela",
+      "openOnProvider": "Vula leli fayela ku-{{provider}}",
+      "openDiffOnProvider": "Vula umehluko okuleli fayela ku-{{provider}}",
+      "providerDiff": "Umehluko we-{{provider}}"
     },
     "floatingActions": {
       "clearSelection": "Sula okukhethiwe",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "Buyekeza igatsha ngezinguquko zegatsha eliyisisekelo, noma ubeke amarekhodi alo esisekelweni esisha, ngaphambi kokuhlanganisa.",
         "behindDetail": "Igatsha eliqukethe izinguquko lisalele emuva kwegatsha eliyisisekelo. Beka amarekhodi alo esisekelweni esisha noma ulibuyekeze ngaphambi kokuhlanganisa.",
         "notMergeableTitle": "Lesi sicelo sokuhlanganisa asikakwazi ukuhlanganiswa",
-        "notMergeableDetail": "I-GitHub ibike isimo sokuhlanganiseka esingu-{{state}}."
+        "notMergeableDetail": "I-GitHub ibike isimo sokuhlanganiseka esingu-{{state}}.",
+        "notOpenDetail": "Kungahlanganiswa kuphela {{term}} esivulekile.",
+        "unresolvedDiscussionsDetail": "Xazulula zonke izingxoxo ngaphambi kokuhlanganisa.",
+        "unresolvedTasksDetail": "Xazulula yonke imisebenzi evulekile ngaphambi kokuhlanganisa.",
+        "otherDetail": "Umhlinzeki uvimba lokhu kuhlanganisa ngesizathu angasidalulanga."
       },
       "restrictions": {
         "title": "Imikhawulo yokuhlanganisa",
@@ -1106,7 +1116,8 @@
       "modified": "Lishintshiwe",
       "renamed": "Liqanjwe kabusha",
       "copied": "Kukopishwe",
-      "changed": "Lishintshiwe"
+      "changed": "Lishintshiwe",
+      "unknown": "Uhlobo lwenguquko alubikiwe"
     },
     "diff": {
       "selectedTapToChange": "Kukhethiwe {{label}}, thepha ukuze ushintshe okukhethiwe",

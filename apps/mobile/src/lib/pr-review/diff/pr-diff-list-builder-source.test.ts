@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildFileItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { type DiffFileSource, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
+import { providerPrFileUrl, type ProviderPrLink } from '@/lib/pr-review/provider-pr-ref';
 
 // The first hunk starts at line 5 and the file continues past it, so a PR
 // build emits a leading and a trailing expand separator.
@@ -22,7 +23,7 @@ const textFile: PrReviewFile = {
   additions: 1,
   deletions: 1,
   patch,
-  patchMissing: false,
+  patchMissingCause: null,
 };
 
 const binaryFile: PrReviewFile = {
@@ -32,7 +33,12 @@ const binaryFile: PrReviewFile = {
   additions: 0,
   deletions: 0,
   patch: null,
-  patchMissing: true,
+  patchMissingCause: 'binary',
+};
+
+const githubLink: ProviderPrLink = {
+  ref: { platform: 'github', owner: 'owner', repo: 'repo', number: 1 },
+  serverWebUrl: null,
 };
 
 const prSource: DiffFileSource = {
@@ -43,6 +49,10 @@ const prSource: DiffFileSource = {
   headSha: 'abc',
   expandedContext: {},
   viewed: () => false,
+  link: path => {
+    const url = providerPrFileUrl(githubLink, path);
+    return url === null ? null : { url, provider: 'github' };
+  },
 };
 
 function build(source: DiffFileSource): ListItem[] {
@@ -59,22 +69,50 @@ function ofKind<K extends ListItem['kind']>(items: ListItem[], kind: K) {
 }
 
 describe('buildFileItems diff source', () => {
-  it('builds a session diff without expand separators, viewed state, or GitHub links', () => {
+  it('builds a session diff without expand separators, viewed state, or provider links', () => {
     const items = build({ kind: 'session' });
     expect(ofKind(items, 'expand-separator')).toHaveLength(0);
     expect(ofKind(items, 'file-header').map(item => item.viewed)).toEqual([null, null]);
     expect(ofKind(items, 'file-patch-missing')).toMatchObject([
-      { file: { path: 'logo.png' }, viewed: null, githubUrl: null },
+      { file: { path: 'logo.png' }, viewed: null, link: null },
     ]);
     expect(ofKind(items, 'diff-line').length).toBeGreaterThan(0);
   });
 
-  it('keeps expand separators, viewed state, and the GitHub link on a PR diff', () => {
+  it('keeps expand separators, viewed state, and the provider link on a PR diff', () => {
     const items = build(prSource);
     expect(ofKind(items, 'expand-separator').length).toBeGreaterThan(0);
     expect(ofKind(items, 'file-header').map(item => item.viewed)).toEqual([false, false]);
-    expect(ofKind(items, 'file-patch-missing')[0]?.githubUrl).toBe(
-      'https://github.com/owner/repo/pull/1/files#diff-logo.png'
-    );
+    expect(ofKind(items, 'file-patch-missing')[0]?.link).toEqual({
+      url: 'https://github.com/owner/repo/pull/1/files#diff-logo.png',
+      provider: 'github',
+    });
+  });
+
+  it('passes the file path to the injected link callback', () => {
+    const linked: string[] = [];
+    build({
+      ...prSource,
+      link: path => {
+        linked.push(path);
+        return null;
+      },
+    });
+    expect(linked).toEqual(['logo.png']);
+  });
+
+  it('explains a patch-less file while it is collapsed', () => {
+    // The row cannot expand, so a cause hidden behind the expand control would
+    // never paint: the explanation belongs to the collapsed list.
+    const items = buildFileItems({
+      files: [binaryFile],
+      expanded: {},
+      changedFiles: 1,
+      source: prSource,
+    });
+    expect(ofKind(items, 'file-patch-missing')).toMatchObject([
+      { file: { path: 'logo.png', patchMissingCause: 'binary' } },
+    ]);
+    expect(ofKind(items, 'file-header')[0]?.hasDiff).toBe(false);
   });
 });

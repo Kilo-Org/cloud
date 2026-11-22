@@ -641,7 +641,10 @@
       "diffTooLarge": "වෙනස්කම් ප්‍රමාණය ඉතා විශාලයි",
       "openFile": "{{path}} විවෘත කරන්න",
       "openFileViewed": "{{path}} විවෘත කරන්න (බලා ඇත)",
-      "title": "ගොනු"
+      "title": "ගොනු",
+      "binaryDiff": "ද්විමය ගොනුව",
+      "diffUnavailable": "සැපයුම්කරුගෙන් වෙනස්කම් නොමැත",
+      "contentUnchanged": "අන්තර්ගත වෙනසක් නොමැත"
     },
     "fileRows": {
       "markViewed": "{{path}} බැලූ බව සලකුණු කරන්න",
@@ -650,9 +653,12 @@
       "expandFile": "ගොනුව පුළුල් කරන්න",
       "diffTooLarge": "වෙනස්කම් ප්‍රමාණය පෙන්වීමට නොහැකි තරම් විශාලයි.",
       "noPreview": "මෙම ගොනුව සඳහා පෙරදසුනක් නොමැත",
-      "openOnGitHub": "GitHub හි විවෘත කරන්න",
-      "openDiffOnGitHub": "මෙම ගොනුවේ වෙනස්කම් GitHub හි විවෘත කරන්න",
-      "githubDiff": "GitHub හි වෙනස්කම්"
+      "binaryDiff": "මෙම ද්විමය ගොනුව සඳහා පෙන්වීමට වෙනස්කම් නොමැත",
+      "diffUnavailable": "මෙම සැපයුම්කරු ගොනු වෙනස්කම් යවන්නේ නැත",
+      "contentUnchanged": "මෙම ගොනුවේ අන්තර්ගත වෙනස්කම් නොමැත",
+      "openOnProvider": "මෙම ගොනුව {{provider}} හි විවෘත කරන්න",
+      "openDiffOnProvider": "මෙම ගොනුවේ වෙනස්කම් {{provider}} හි විවෘත කරන්න",
+      "providerDiff": "{{provider}} හි වෙනස්කම්"
     },
     "floatingActions": {
       "clearSelection": "තේරීම ඉවත් කරන්න",
@@ -776,7 +782,11 @@
         "behindDetailUpdatable": "ඒකාබද්ධ කිරීමට පෙර මූලික ශාඛාවේ වෙනස්කම් ගෙන මෙම ශාඛාව යාවත්කාලීන කරන්න, නැතහොත් රීබේස් කරන්න.",
         "behindDetail": "මූලාශ්‍ර ශාඛාවේ මූලික ශාඛාවේ නවතම වෙනස්කම් නොමැත. ඒකාබද්ධ කිරීමට පෙර ශාඛාව රීබේස් කරන්න හෝ යාවත්කාලීන කරන්න.",
         "notMergeableTitle": "මෙම පුල් ඉල්ලීම තවමත් ඒකාබද්ධ කළ නොහැක",
-        "notMergeableDetail": "GitHub වාර්තා කළ ඒකාබද්ධ කිරීමේ හැකියාව පිළිබඳ තත්ත්වය: {{state}}."
+        "notMergeableDetail": "GitHub වාර්තා කළ ඒකාබද්ධ කිරීමේ හැකියාව පිළිබඳ තත්ත්වය: {{state}}.",
+        "notOpenDetail": "විවෘත {{term}} එකක් පමණක් ඒකාබද්ධ කළ හැකිය.",
+        "unresolvedDiscussionsDetail": "ඒකාබද්ධ කිරීමට පෙර සියලු සාකච්ඡා විසඳන්න.",
+        "unresolvedTasksDetail": "ඒකාබද්ධ කිරීමට පෙර සියලු විවෘත කාර්යයන් විසඳන්න.",
+        "otherDetail": "සැපයුම්කරු තමා නම් නොකළ හේතුවක් සඳහා මෙම ඒකාබද්ධ කිරීම අවහිර කරයි."
       },
       "restrictions": {
         "title": "ඒකාබද්ධ කිරීමේ සීමාවන්",
@@ -1106,7 +1116,8 @@
       "modified": "වෙනස් කර ඇත",
       "renamed": "නම වෙනස් කර ඇත",
       "copied": "පිටපත් කර ඇත",
-      "changed": "වෙනස් වී ඇත"
+      "changed": "වෙනස් වී ඇත",
+      "unknown": "වෙනස් වීමේ වර්ගය වාර්තා කර නොමැත"
     },
     "diff": {
       "selectedTapToChange": "{{label}} තේරී ඇත, තේරීම වෙනස් කිරීමට තට්ටු කරන්න",

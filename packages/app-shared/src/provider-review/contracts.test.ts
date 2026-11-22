@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { gitlabInstanceOrigin, providerPrRefKey, type ProviderPrRef } from './contracts';
+import {
+  gitlabInstanceOrigin,
+  providerPrFileStatus,
+  providerPrRefKey,
+  type ProviderPrRef,
+} from './contracts';
 
 const GITHUB: ProviderPrRef = { platform: 'github', owner: 'acme', repo: 'api', number: 7 };
 const GITLAB: ProviderPrRef = {
@@ -99,4 +104,30 @@ describe('gitlabInstanceOrigin', () => {
     expect(gitlabInstanceOrigin('gitlab.example.com:8443')).toBe('gitlab.example.com:8443');
     expect(gitlabInstanceOrigin('gitlab.example.com/?x=1')).toBe('gitlab.example.com');
   });
+});
+
+describe('providerPrFileStatus', () => {
+  // Every provider word that reaches the UI has a label; anything else is the
+  // explicit `unknown` bucket, never the raw token.
+  it.each([
+    ['added', 'added'],
+    ['removed', 'removed'],
+    ['modified', 'modified'],
+    ['renamed', 'renamed'],
+    ['copied', 'copied'],
+    ['changed', 'changed'],
+  ])('passes the known word %s through', (raw, expected) => {
+    expect(providerPrFileStatus(raw)).toBe(expected);
+  });
+
+  it("folds GitLab's `deleted` into the one deletion word", () => {
+    expect(providerPrFileStatus('deleted')).toBe('removed');
+  });
+
+  it.each(['unknown-word', '', 'Added', 'REMOVED', null, undefined])(
+    'answers %p as unknown',
+    raw => {
+      expect(providerPrFileStatus(raw)).toBe('unknown');
+    }
+  );
 });

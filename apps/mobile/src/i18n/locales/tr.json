@@ -3070,7 +3070,10 @@
       "viewedCount_other": "{{viewed}}/{{total}} görüntülendi",
       "viewedOfListed": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi",
       "viewedOfListed_one": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi",
-      "viewedOfListed_other": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi"
+      "viewedOfListed_other": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi",
+      "binaryDiff": "ikili dosya",
+      "diffUnavailable": "sağlayıcıdan fark yok",
+      "contentUnchanged": "içerik değişikliği yok"
     },
     "fileRows": {
       "collapseFile": "Dosyayı daralt",
@@ -3078,10 +3081,13 @@
       "noPreview": "Bu dosya için önizleme yok",
       "expandFile": "Dosyayı genişlet",
       "markViewed": "{{path}} dosyasını görüntülenmiş olarak işaretle",
-      "openDiffOnGitHub": "Bu dosyanın farkını GitHub'da aç",
-      "openOnGitHub": "GitHub'da aç",
       "unmarkViewed": "{{path}} dosyasının görüntülenmiş işaretini kaldır",
-      "githubDiff": "GitHub farkı"
+      "binaryDiff": "Bu ikili dosya için gösterilecek fark yok",
+      "diffUnavailable": "Bu sağlayıcı dosya farklarını göndermiyor",
+      "contentUnchanged": "Bu dosyada içerik değişikliği yok",
+      "openOnProvider": "Bu dosyayı {{provider}} üzerinde aç",
+      "openDiffOnProvider": "Bu dosyanın farkını {{provider}} üzerinde aç",
+      "providerDiff": "{{provider}} farkı"
     },
     "floatingActions": {
       "clear": "Temizle",
@@ -3210,7 +3216,11 @@
         "behindDetailUpdatable": "Birleştirmeden önce dalı hedef daldaki değişikliklerle güncelle veya yeniden temellendir.",
         "behindDetail": "Kaynak dal, hedef dalın gerisinde. Birleştirmeden önce dalı yeniden temellendir veya güncelle.",
         "notMergeableTitle": "Bu çekme isteği henüz birleştirilemiyor",
-        "notMergeableDetail": "GitHub, birleştirme durumunu {{state}} olarak bildirdi."
+        "notMergeableDetail": "GitHub, birleştirme durumunu {{state}} olarak bildirdi.",
+        "notOpenDetail": "Yalnızca açık bir {{term}} birleştirilebilir.",
+        "unresolvedDiscussionsDetail": "Birleştirmeden önce tüm tartışmaları çöz.",
+        "unresolvedTasksDetail": "Birleştirmeden önce tüm açık görevleri çöz.",
+        "otherDetail": "Sağlayıcı, adını belirtmediği bir nedenle bu birleştirmeyi engelliyor."
       },
       "restrictions": {
         "title": "Birleştirme kısıtlamaları",
@@ -3326,7 +3336,8 @@
       "changed": "Değiştirildi",
       "copied": "Kopyalandı",
       "modified": "Değiştirildi",
-      "renamed": "Yeniden adlandırıldı"
+      "renamed": "Yeniden adlandırıldı",
+      "unknown": "Değişiklik türü bildirilmedi"
     },
     "tabs": {
       "discussion": "Tartışma",

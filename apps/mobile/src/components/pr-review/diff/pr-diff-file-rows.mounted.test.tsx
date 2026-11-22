@@ -7,17 +7,29 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { type ProviderPrFileStatus } from '@kilocode/app-shared/provider-review';
+
 import { i18n } from '@/i18n';
-import { FileHeaderRow } from './pr-diff-file-rows';
+import { openExternalUrl } from '@/lib/external-link';
+import { FileHeaderRow, PatchMissingRow } from './pr-diff-file-rows';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({
-  I18nManager: i18nManager,
-  Pressable: 'Pressable',
-  Text: 'Text',
-  View: 'View',
-}));
+vi.mock('react-native', async () => {
+  // A `vi.mock` factory runs before this file's imports are initialised, so the
+  // shared flatten comes in dynamically; a static import would be unbound here.
+  // The shared `Text` reads a caller's own base direction through
+  // `StyleSheet.flatten` (`pinsTextDirection`), and the provider link's colour
+  // is a caller style, so this stub must flatten.
+  const { flattenStyle: flatten } = await import('@/test/style-sheet-mock');
+  return {
+    I18nManager: i18nManager,
+    Pressable: 'Pressable',
+    StyleSheet: { create: (styles: unknown) => styles, flatten },
+    Text: 'Text',
+    View: 'View',
+  };
+});
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
@@ -48,6 +60,7 @@ afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
   i18nManager.isRTL = false;
+  vi.mocked(openExternalUrl).mockClear();
 });
 
 /** The host `Text` nodes, whose children are the strings the row paints. */
@@ -60,7 +73,7 @@ function hostTexts(): TestRenderer.ReactTestInstance[] {
   );
 }
 
-function mountRow(status = 'modified'): void {
+function mountRow(status: ProviderPrFileStatus = 'modified'): void {
   i18nManager.isRTL = true;
   act(() => {
     renderer = TestRenderer.create(
@@ -72,7 +85,7 @@ function mountRow(status = 'modified'): void {
           additions: 3,
           deletions: 1,
           patch: '@@ -1 +1 @@\n-export const greeting = "Hi";\n+export const greeting = "Hello";',
-          patchMissing: false,
+          patchMissingCause: null,
         },
         expanded: false,
         hasDiff: true,
@@ -147,5 +160,92 @@ describe('FileHeaderRow status label in Lithuanian', () => {
     const changed = i18n.t('prReview.fileStatus.changed');
     expect(changed).not.toBe(modified);
     expect(hostTexts().some(node => node.props.children === changed)).toBe(true);
+  });
+});
+
+type PatchMissingFile = Parameters<typeof PatchMissingRow>[0]['file'];
+
+function patchlessFile(patchMissingCause: PatchMissingFile['patchMissingCause']): PatchMissingFile {
+  return {
+    path: 'assets/photo.png',
+    previousPath: null,
+    status: 'modified',
+    additions: 0,
+    deletions: 0,
+    patch: null,
+    patchMissingCause,
+  };
+}
+
+function mountPatchlessRow(
+  patchMissingCause: PatchMissingFile['patchMissingCause'],
+  link: Parameters<typeof PatchMissingRow>[0]['link'] = null
+): void {
+  act(() => {
+    renderer = TestRenderer.create(
+      createElement(PatchMissingRow, {
+        file: patchlessFile(patchMissingCause),
+        viewedToggle: null,
+        link,
+      })
+    );
+  });
+}
+
+/**
+ * Every reason a patch can be absent has its own sentence: a binary file, an
+ * oversized diff and a provider that never sends diffs are three different
+ * answers, and a file whose patch parsed to nothing is a fourth.
+ */
+describe('PatchMissingRow causes', () => {
+  it.each([
+    ['too_large', 'prReview.fileRows.diffTooLarge'],
+    ['binary', 'prReview.fileRows.binaryDiff'],
+    ['provider_omitted', 'prReview.fileRows.diffUnavailable'],
+    ['content_unchanged', 'prReview.fileRows.contentUnchanged'],
+    [null, 'prReview.fileRows.noPreview'],
+  ] as const)('paints %s from its own key', (cause, key) => {
+    mountPatchlessRow(cause);
+    const copy = i18n.t(key);
+    expect(hostTexts().some(node => node.props.children === copy)).toBe(true);
+  });
+});
+
+describe('PatchMissingRow provider link', () => {
+  it('names GitLab and opens its diff page', () => {
+    const url = 'https://gitlab.example.com/group/sub/repo/-/merge_requests/12/diffs';
+    mountPatchlessRow('provider_omitted', { url, provider: 'gitlab' });
+
+    expect(
+      hostTexts().some(
+        node =>
+          node.props.children === i18n.t('prReview.fileRows.openOnProvider', { provider: 'GitLab' })
+      )
+    ).toBe(true);
+    const linkNode = renderer?.root.find(
+      node => Object.is(node.type, 'Pressable') && node.props.accessibilityRole === 'link'
+    );
+    expect(linkNode?.props.accessibilityLabel).toBe(
+      i18n.t('prReview.fileRows.openDiffOnProvider', { provider: 'GitLab' })
+    );
+    const onPress = (linkNode?.props as { onPress: () => void } | undefined)?.onPress;
+    act(() => {
+      onPress?.();
+    });
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      url,
+      expect.objectContaining({
+        label: i18n.t('prReview.fileRows.providerDiff', { provider: 'GitLab' }),
+      })
+    );
+  });
+
+  it('renders no link when the surface has no provider URL', () => {
+    mountPatchlessRow('too_large');
+    expect(
+      renderer?.root.findAll(
+        node => Object.is(node.type, 'Pressable') && node.props.accessibilityRole === 'link'
+      )
+    ).toHaveLength(0);
   });
 });

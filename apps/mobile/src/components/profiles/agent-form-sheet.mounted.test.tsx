@@ -125,6 +125,34 @@ function changeText(root: ReactTestInstance, label: string, value: string): void
   });
 }
 
+/** The per-tool rule captions painted under the tool names, in row order. */
+function ruleNotes(root: ReactTestInstance): ReactTestInstance[] {
+  const prefix = i18n.t('profiles.agents.toolRule', { rule: '' });
+  return findAll(root, 'Text').filter(node => {
+    const text: unknown = node.props.children;
+    return typeof text === 'string' && text.startsWith(prefix);
+  });
+}
+
+/** A switch's flip prop, read from the string host stub that carries it untyped. */
+type SwitchFlip = (next: boolean) => void;
+
+/** Drives one tool switch the way the native control reports a flip. */
+function flipTool(root: ReactTestInstance, label: string, next: boolean): void {
+  const node = toolSwitches(root).find(item => item.props.accessibilityLabel === label);
+  if (!node) {
+    throw new Error(`switch ${label} was not rendered`);
+  }
+  const onValueChange: unknown = node.props.onValueChange;
+  if (typeof onValueChange !== 'function') {
+    throw new TypeError(`switch ${label} has no flip handler`);
+  }
+  // Checked to be a function above; the stub props carry no call signature.
+  act(() => {
+    (onValueChange as SwitchFlip)(next);
+  });
+}
+
 function pressVariant(root: ReactTestInstance, variant: string): void {
   const pressable = findAll(root, 'Pressable').find(node =>
     String(node.props.accessibilityLabel).startsWith(`${variant} thinking effort`)
@@ -337,17 +365,16 @@ describe('AgentFormSheet parity fields', () => {
       },
     });
 
-    const notePrefix = i18n.t('profiles.agents.toolRule', { rule: '' });
-    const notes = findAll(renderer.root, 'Text')
-      .map(node => node.props.children)
-      .filter(
-        (child): child is string => typeof child === 'string' && child.startsWith(notePrefix)
-      );
-
-    expect(notes).toEqual([
+    expect(ruleNotes(renderer.root).map(node => node.props.children)).toEqual([
       i18n.t('profiles.agents.toolRule', { rule: 'ask' }),
       i18n.t('profiles.agents.toolRule', { rule: 'git *: allow · *: ask' }),
     ]);
+
+    // A wide pattern map keeps both ends: the tail entry is a rule too.
+    for (const node of ruleNotes(renderer.root)) {
+      expect(node.props.ellipsizeMode).toBe('middle');
+      expect(node.props.numberOfLines).toBe(1);
+    }
 
     for (const node of toolSwitches(renderer.root)) {
       expect(node.props.disabled).toBe(false);
@@ -359,6 +386,25 @@ describe('AgentFormSheet parity fields', () => {
     );
     // `edit` stores no rule, so neither its row nor its switch carries a note.
     expect(switchFor('edit')?.props.accessibilityHint).toBeUndefined();
+
+    // The caption follows the row's own state, so a switched-off row names no
+    // rule while an untouched row keeps its caption.
+    flipTool(renderer.root, 'bash', false);
+
+    expect(ruleNotes(renderer.root).map(node => node.props.children)).toEqual([
+      i18n.t('profiles.agents.toolRule', { rule: 'ask' }),
+    ]);
+    expect(switchFor('bash')?.props.accessibilityHint).toBeUndefined();
+
+    flipTool(renderer.root, 'bash', true);
+
+    expect(ruleNotes(renderer.root).map(node => node.props.children)).toEqual([
+      i18n.t('profiles.agents.toolRule', { rule: 'ask' }),
+      i18n.t('profiles.agents.toolRule', { rule: 'git *: allow · *: ask' }),
+    ]);
+    expect(switchFor('bash')?.props.accessibilityHint).toBe(
+      i18n.t('profiles.agents.toolRule', { rule: 'git *: allow · *: ask' })
+    );
 
     unmount();
   });

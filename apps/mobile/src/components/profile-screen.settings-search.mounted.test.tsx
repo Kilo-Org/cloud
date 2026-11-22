@@ -161,6 +161,19 @@ describe('ProfileScreen settings search', () => {
     expect(renderedRowTitles(root)).toContain(signOutLabel);
     expect(targetHighlights(root)).toHaveLength(1);
     expect(signOutFn).not.toHaveBeenCalled();
+
+    // The same result can be chosen again. The target id is unchanged, so the
+    // selection asks for a fresh reveal without running the row's action.
+    query(root, 'logout');
+    const repeated = results(root).find(result => result.entry.id === 'profile.signOut');
+    if (!repeated) {
+      throw new Error('the repeated logout search does not find the sign-out row');
+    }
+    selectResult(root, repeated);
+    expect(keyboardDismissFn).toHaveBeenCalledTimes(2);
+    expect(targetHighlights(root)).toHaveLength(1);
+    expect(signOutFn).not.toHaveBeenCalled();
+    expect(confirmFn).not.toHaveBeenCalled();
   });
 
   it('indexes the dev-only native remote row only while it renders', async () => {

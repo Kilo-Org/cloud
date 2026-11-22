@@ -28,11 +28,18 @@ type LinearIntegrationDetailsProps = {
   connectPath?: string;
 };
 
+/**
+ * The copy a viewer without management authority reads, and the message the
+ * `permission_required` connect error carries. One constant, so the read-only
+ * state and the server answer cannot drift apart.
+ */
+export const LINEAR_MANAGEMENT_REQUIRED_MESSAGE =
+  'Only organization owners, admins, and billing managers can connect or change the organization Linear integration.';
+
 const linearConnectionErrorMessages: Record<string, string> = {
   workspace_already_connected:
     'This Linear workspace is already connected to another Kilo account or organization. Disconnect it there before connecting it here.',
-  permission_required:
-    'Only organization owners, admins, and billing managers can connect or change the organization Linear integration.',
+  permission_required: LINEAR_MANAGEMENT_REQUIRED_MESSAGE,
   organization_access_required:
     'You no longer have access to this organization. Ask an organization owner or admin for access.',
 };
@@ -256,10 +263,7 @@ export function LinearIntegrationDetails({
 
       {organizationId !== undefined && !mayManage && (
         <Alert>
-          <AlertDescription>
-            Only organization owners, admins, and billing managers can connect or change the
-            organization Linear integration.
-          </AlertDescription>
+          <AlertDescription>{LINEAR_MANAGEMENT_REQUIRED_MESSAGE}</AlertDescription>
         </Alert>
       )}
 

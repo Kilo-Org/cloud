@@ -7,14 +7,6 @@ import type * as LinearIntegrationDetailsModule from './LinearIntegrationDetails
 // `PrStatus.test.ts` and `SubOrganizationSections.test.ts`.
 globalThis.React = React;
 
-/**
- * The copy the card shows a viewer whose role its procedures reject. It is the
- * same sentence the server's `permission_required` error carries, so the card
- * and the procedures cannot drift apart silently.
- */
-const readOnlyNote =
-  'Only organization owners, admins, and billing managers can connect or change the organization Linear integration.';
-
 let mockInstallationData: unknown;
 const mockComboboxProps: Array<{ disabled?: boolean }> = [];
 const mockButtons: Array<{ children?: React.ReactNode }> = [];
@@ -55,11 +47,17 @@ jest.mock('@/components/ui/button', () => ({
 // The mocks above must be registered before the card and its imports load, so
 // the card is required here rather than imported.
 let LinearIntegrationDetails: typeof LinearIntegrationDetailsModule.LinearIntegrationDetails;
+let readOnlyNote: string;
 
 beforeAll(() => {
-  ({ LinearIntegrationDetails } = jest.requireActual<typeof LinearIntegrationDetailsModule>(
+  const actual = jest.requireActual<typeof LinearIntegrationDetailsModule>(
     './LinearIntegrationDetails'
-  ));
+  );
+  LinearIntegrationDetails = actual.LinearIntegrationDetails;
+  // The card renders this exact constant, so the assertion follows the copy
+  // rather than restating it.
+  readOnlyNote = actual.LINEAR_MANAGEMENT_REQUIRED_MESSAGE;
+  expect(readOnlyNote).toMatch(/Only organization owners, admins, and billing managers/);
 });
 
 const activeInstallation = {
@@ -112,6 +110,25 @@ describe('LinearIntegrationDetails organization authority', () => {
     expect(rendersButtonLabel('Re-install')).toBe(false);
     expect(rendersButtonLabel('Disconnect')).toBe(false);
     expect(mockComboboxProps.at(-1)?.disabled).toBe(true);
+  });
+
+  // A caller that forgets the prop must still get the read-only view: the
+  // default is the protection, so a case that omits the prop pins it.
+  test('falls back to the read-only organization card when the prop is omitted', () => {
+    const markup = renderCard({ organizationId: 'organization-id' });
+
+    expect(markup).toContain(readOnlyNote);
+    expect(rendersButtonLabel('Re-install')).toBe(false);
+    expect(rendersButtonLabel('Disconnect')).toBe(false);
+    expect(mockComboboxProps.at(-1)?.disabled).toBe(true);
+  });
+
+  test('withholds the connect action when the prop is omitted on an unconnected organization', () => {
+    mockInstallationData = notConnectedInstallation;
+    const markup = renderCard({ organizationId: 'organization-id' });
+
+    expect(markup).toContain(readOnlyNote);
+    expect(rendersButtonLabel('Connect Linear')).toBe(false);
   });
 
   test('keeps the controls for an authorized manager', () => {

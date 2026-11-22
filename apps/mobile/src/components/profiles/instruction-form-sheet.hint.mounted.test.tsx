@@ -1,10 +1,12 @@
 /**
  * What the row under the file-name field shows, and how the preview inside it is
- * cut. The row is reserved by the rule sentence, so the preview must stay inside
- * that room; the preview carries the only new information on the line, so it is
- * cut in the middle rather than at its tail, which would hide the end of the
- * name a save writes. These cases pin one preview line cut in the middle, and
- * the rule stated in the same row when the fold leaves nothing to store.
+ * cut. The row is reserved at one line of the catalog's preview copy, so the
+ * preview must stay inside that one line; the preview carries the only new
+ * information on the line, so it is cut in the middle rather than at its tail,
+ * which would hide the end of the name a save writes. These cases pin one
+ * preview line cut in the middle plus its one-line reserve, and the rule the
+ * name field states as its own error while the fold leaves nothing to store,
+ * with Done dimmed for it.
  */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -88,6 +90,26 @@ function mountSheet() {
   );
 }
 
+/** The name field the sheet rendered, found by its label. */
+function nameField(root: ReactTestInstance): ReactTestInstance {
+  const field = findAll(root, 'FormField').find(
+    node => node.props.label === i18n.t('profiles.instructionNameLabel')
+  );
+  if (!field) {
+    throw new Error('the name field was not rendered');
+  }
+  return field;
+}
+
+/** The header's Done state as the sheet renders it. */
+function doneDisabled(root: ReactTestInstance): boolean {
+  const header = findAll(root, 'SheetHeader')[0];
+  if (!header) {
+    throw new Error('the header was not rendered');
+  }
+  return header.props.doneDisabled === true;
+}
+
 describe('InstructionFormSheet file-name line', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -102,31 +124,73 @@ describe('InstructionFormSheet file-name line', () => {
       'Release Notes For The Nightly Dependency Upgrade Reviewer With Extra Words'
     );
 
-    const preview = findAll(renderer.root, 'Text').filter(
-      node =>
-        node.props.children ===
-        i18n.t('profiles.instructionNamePreview', {
-          name: 'release-notes-for-the-nightly-dependency-upgrade-reviewer-with-extra-words',
-        })
-    );
-    expect(preview).toHaveLength(1);
-    expect(preview[0]?.props.numberOfLines).toBe(1);
-    expect(preview[0]?.props.ellipsizeMode).toBe('middle');
+    const previewCopy = i18n.t('profiles.instructionNamePreview', {
+      name: 'release-notes-for-the-nightly-dependency-upgrade-reviewer-with-extra-words',
+    });
+    const line = findAll(renderer.root, 'Text').filter(node => node.props.children === previewCopy);
+    // The reserve and the painted preview: exactly the two nodes the row spends
+    // on its one line.
+    expect(line).toHaveLength(2);
+
+    const painted = line.filter(node => node.props.ellipsizeMode === 'middle');
+    expect(painted).toHaveLength(1);
+    expect(painted[0]?.props.numberOfLines).toBe(1);
 
     unmount();
   });
 
-  it('states the rule instead when the fold leaves no file name to store', async () => {
+  it('reserves the row at one text line of the preview copy in every state', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    // Blank, a name that saves as typed, and a name with nothing left after the
+    // fold: all three keep the same one-line reserve, and the reserve always
+    // carries the preview sentence rather than the longer rule.
+    const states: readonly (readonly [typed: string, slug: string])[] = [
+      ['', ''],
+      ['release-notes', ''],
+      ['Release Notes', 'release-notes'],
+      ['पुणे कार्यालय नियम', ''],
+    ];
+    for (const [typed, slug] of states) {
+      typeName(renderer.root, typed);
+
+      const reserve = findAll(renderer.root, 'Text').filter(
+        node => node.props.pointerEvents === 'none' && node.props.importantForAccessibility
+      );
+      expect(reserve).toHaveLength(1);
+      expect(reserve[0]?.props.numberOfLines).toBe(1);
+      expect(reserve[0]?.props.className).toContain('opacity-0');
+      expect(reserve[0]?.props.children).toBe(
+        i18n.t('profiles.instructionNamePreview', { name: slug })
+      );
+    }
+
+    unmount();
+  });
+
+  it('states the rule as the field error and dims Done when the fold leaves no file name', async () => {
     const { renderer, unmount } = await mountSheet();
 
     typeName(renderer.root, 'पुणे कार्यालय नियम');
 
     const rule = i18n.t('profiles.instructionNameInvalid');
-    const announced = findAll(renderer.root, 'AccessibleStatus').filter(
-      node => node.props.message === rule
-    );
-    expect(announced).toHaveLength(1);
-    expect(announced[0]?.props.tone).toBe('status');
+    expect(nameField(renderer.root).props.error).toBe(rule);
+    expect(doneDisabled(renderer.root)).toBe(true);
+    // The row no longer states the rule in its own status line.
+    expect(
+      findAll(renderer.root, 'AccessibleStatus').filter(node => node.props.message === rule)
+    ).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('leaves Done enabled for a name that saves', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    typeName(renderer.root, 'release-notes');
+
+    expect(nameField(renderer.root).props.error).toBeUndefined();
+    expect(doneDisabled(renderer.root)).toBe(false);
 
     unmount();
   });

@@ -58,52 +58,49 @@ type InstructionFormSheetProps = Readonly<{
 
 type InstructionNameHintLineProps = Readonly<{
   hint: InstructionNameHint;
-  /** The field's own error copy, which already states the rule when it shows. */
-  nameError: string | undefined;
 }>;
 
 /**
- * The line under the name field: the slug a save will store, or the rule a name
- * must follow when the fold leaves nothing to store. The row is reserved at the
- * height the rule sentence wraps to in the current catalog, with a transparent
- * copy in native layout, so the content field below never moves while the name
- * is typed and the rule always fits without growing the form. The rule goes
- * through `AccessibleStatus`, so a reader using a screen reader hears it while
- * typing instead of at Save, and it stays quiet while the field's own error
- * already states the same sentence.
+ * The line under the name field: the slug a save will store, in one line. The
+ * row is reserved at exactly one line of this catalog's preview copy, with a
+ * transparent copy in native layout, so the content field below never moves
+ * while the name is typed and the row keeps no second line when it has nothing
+ * to show. The rule a name must follow is the name field's own error while the
+ * fold leaves nothing to store, so it is not stated here.
  */
-function InstructionNameHintLine({ hint, nameError }: InstructionNameHintLineProps) {
+function InstructionNameHintLine({ hint }: InstructionNameHintLineProps) {
   const { t } = useTranslation();
-  const rule = t('profiles.instructionNameInvalid');
-  const shown = hint.kind === 'preview' || (hint.kind === 'rule' && nameError === undefined);
+  // The sentence the row paints. A name that is blank or already a slug has no
+  // preview to paint, so the reserve carries the same catalog sentence with no
+  // name folded into it: one line of this catalog's copy either way.
+  const preview = t('profiles.instructionNamePreview', {
+    name: hint.kind === 'preview' ? hint.slug : '',
+  });
   return (
     <View>
-      {/* The rule sentence holds the row's height in native layout, invisible,
-          so the row never depends on which line shows and the rule is never
-          clipped. A long catalog sentence therefore reserves more than one text
-          line; that is the price of stating the rule in full without moving the
-          content field when it appears. The preview can be longer than the rule
-          once a name folds to a long slug, so it stays one line and its ellipsis
-          sits in the middle, the app's treatment for an identifier: both ends of
-          the stored file name stay readable, including in the catalogs that put
-          the slug last. */}
+      {/* The preview sentence holds the row's height in native layout, invisible
+          and cut to one line, so the row is one text line in every state and
+          every script: the reserved height is the catalog's own copy, not a
+          number of wrapped lines. A long slug cannot grow it, and no state
+          leaves a second empty line between the field and the label below. */}
       <Text
         className="text-xs opacity-0"
+        numberOfLines={1}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         pointerEvents="none"
       >
-        {rule}
+        {preview}
       </Text>
-      {shown ? (
+      {hint.kind === 'preview' ? (
         <View className="absolute inset-x-0 top-0">
-          {hint.kind === 'preview' ? (
-            <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
-              {t('profiles.instructionNamePreview', { name: hint.slug })}
-            </Text>
-          ) : (
-            <AccessibleStatus message={rule} tone="status" className="text-xs" />
-          )}
+          {/* The preview carries the only information on the line, so it stays
+              one line and its ellipsis sits in the middle, the app's treatment
+              for an identifier: both ends of the stored file name stay
+              readable, including in the catalogs that put the slug last. */}
+          <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
+            {preview}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -118,11 +115,12 @@ function InstructionNameHintLine({ hint, nameError }: InstructionNameHintLinePro
  * The name is reduced to the server's slug rule on save and the line under the
  * field says so first, so a typed `Release Notes` is never silently stored as
  * another file name. A name with nothing left in ASCII after the fold shows the
- * rule itself there, before Save, because the fold would otherwise leave the
- * field silent on exactly the input the save refuses. Save validates the name as
- * typed through `validateInstructionInput`; a name with nothing left in ASCII
- * after the fold is refused as invalid, not as empty. A refused input shows the
- * matching `profiles.instruction*` message under the field at fault.
+ * rule as the field's own error while it is typed, and Done dims with it,
+ * because the fold would otherwise leave the field silent on exactly the input
+ * the save refuses. Save validates the name as typed through
+ * `validateInstructionInput`; a name with nothing left in ASCII after the fold
+ * is refused as invalid, not as empty. A refused input shows the matching
+ * `profiles.instruction*` message under the field at fault.
  */
 export function InstructionFormSheet({
   draftScope,
@@ -164,6 +162,21 @@ export function InstructionFormSheet({
     error !== null && instructionNameErrorShown(error)
       ? t(instructionErrorKey(error), { max: INSTRUCTION_NAME_MAX_LENGTH })
       : undefined;
+  // The rule the name must follow, shown as the field's own error while the
+  // fold leaves nothing to store: a disabled Done with no message would leave
+  // the person nothing to fix. A refused save's own message carries the same
+  // sentence or a more specific one, so it wins.
+  const ruleError = nameHint.kind === 'rule' ? t(instructionErrorKey('bad-name')) : undefined;
+  // Every message the name field can show, reserved as one slot at the field's
+  // first focus so an error never moves the form under the keyboard. The keys
+  // come from the same mapping the refused-save path reads, so a renamed
+  // catalog key cannot leave one path behind.
+  const nameErrorMessages = [
+    t(instructionErrorKey('empty')),
+    t(instructionErrorKey('bad-name')),
+    t(instructionErrorKey('reserved')),
+    t(instructionErrorKey('too-long'), { max: INSTRUCTION_NAME_MAX_LENGTH }),
+  ];
   const contentKey = instructionContentErrorKey(error);
   const contentError =
     contentKey === null ? undefined : t(contentKey, { max: INSTRUCTION_CONTENT_MAX_LENGTH });
@@ -218,7 +231,7 @@ export function InstructionFormSheet({
         onDone={submit}
         onCancel={requestClose}
         doneLabel={t('common.save')}
-        doneDisabled={isSaving}
+        doneDisabled={isSaving || nameHint.kind === 'rule'}
         topInset="ios-page-sheet"
       />
       <ScrollView
@@ -243,7 +256,8 @@ export function InstructionFormSheet({
         <FormField
           label={t('profiles.instructionNameLabel')}
           defaultValue={nameRef.current}
-          error={nameError}
+          error={nameError ?? ruleError}
+          reserveErrorMessages={nameErrorMessages}
           disabled={isSaving}
           required
           autoCapitalize="none"
@@ -258,13 +272,13 @@ export function InstructionFormSheet({
             }
           }}
         />
-        {/* The line under the name field, always mounted at the height the rule
-            sentence wraps to, so the content field never moves while a name is
-            typed. A name that saves as typed leaves the row blank instead of
-            removing it. The rule is not repeated while the field's own error
-            already says the same sentence. */}
+        {/* The one preview line under the name field, always mounted at one text
+            line of this catalog's preview copy, so the content field never moves
+            while a name is typed and no state leaves a second empty line. A name
+            that is blank or saves as typed leaves the row blank instead of
+            removing it. The rule is the field's own error, not this row's. */}
         <View className="-mt-2">
-          <InstructionNameHintLine hint={nameHint} nameError={nameError} />
+          <InstructionNameHintLine hint={nameHint} />
         </View>
         <FormField
           label={t('profiles.instructionContentLabel')}

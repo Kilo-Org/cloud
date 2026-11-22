@@ -1,7 +1,10 @@
-import type { TFunction } from 'i18next';
-
-import type { AuditDetail, AuditModeField } from '@kilocode/app-shared/organizations';
-import { parseAuditDetail } from '@kilocode/app-shared/organizations';
+/* eslint-disable max-lines -- the audit log's event vocabulary: one catalog sentence per event id, which the union's own tags key, so the table cannot hide an event behind a runtime lookup */
+import {
+  type AuditDetail,
+  type AuditModeField,
+  parseAuditDetail,
+} from '@kilocode/app-shared/organizations';
+import { type TFunction } from 'i18next';
 
 import { isolateBidiText } from '@/lib/bidi';
 import { formatList, formatNumber } from '@/lib/format';
@@ -49,6 +52,16 @@ type Render = Readonly<{
   /** An absent value is left out of the sentence by i18next. */
   values: Record<string, string | number | undefined>;
 }>;
+
+/**
+ * The table: one sentence per event id.
+ *
+ * Declared as a map over the union's own ids, so a member without an entry is a
+ * type error and the compiler proves the list is complete.
+ */
+type AuditTemplates = {
+  readonly [K in AuditDetail['id']]?: (detail: Extract<AuditDetail, { id: K }>) => Render | undefined;
+};
 
 type AuditRole = 'owner' | 'admin' | 'billing_manager' | 'member';
 type AuditPlatform = 'github' | 'gitlab' | 'bitbucket';
@@ -134,9 +147,7 @@ const DEFAULT_BEHAVIOR_KEYS = {
  */
 function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefined {
   const { t, isolated, list, state } = tools;
-  const templates: {
-    [K in AuditDetail['id']]?: (detail: Extract<AuditDetail, { id: K }>) => Render | undefined;
-  } = {
+  const templates: AuditTemplates = {
     'mode.identity': d => ({
       key: 'organization.auditLog.detail.modeIdentity',
       values: { name: isolated(d.name), slug: isolated(d.slug) },
@@ -341,24 +352,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
         ? undefined
         : { key: 'organization.auditLog.detail.settingAdvancedPolicies', values: { values: list(parts) } };
     },
-    'setting.defaultModel': d =>
-      d.previous === undefined
-        ? d.next === undefined
-          ? undefined
-          : { key: 'organization.auditLog.detail.settingDefaultModelSet', values: { next: isolated(d.next) } }
-        : d.next === undefined
-          ? {
-              key: 'organization.auditLog.detail.settingDefaultModelRemoved',
-              values: { previous: isolated(d.previous) },
-            }
-          : {
-              key: 'organization.auditLog.detail.fieldChange',
-              values: {
-                field: t(DEFAULT_MODEL_FIELD_KEY),
-                previous: isolated(d.previous),
-                next: isolated(d.next),
-              },
-            },
+    'setting.defaultModel': d => defaultModelRow(d, tools),
     'setting.autoRoute': d => ({
       key: 'organization.auditLog.detail.settingAutoRoute',
       values: {
@@ -385,7 +379,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
             key: 'organization.auditLog.detail.settingMinimumBalanceOn',
             values: {
               threshold: usd(d.threshold ?? 0),
-              emails: list((d.emails ?? []).map(isolated)),
+              emails: list((d.emails ?? []).map(value => isolated(value))),
             },
           }
         : undefined,
@@ -397,7 +391,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
       key: 'organization.auditLog.detail.settingBrowserControl',
       values: {
         policy: t(BROWSER_POLICY_KEYS[d.policy]),
-        origins: list((d.origins ?? []).map(isolated)),
+        origins: list((d.origins ?? []).map(value => isolated(value))),
       },
     }),
     // The event name above the row already says what these three carry.
@@ -434,14 +428,14 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
         parts.push(
           t('organization.auditLog.detail.autoRoutingAdded', {
             provider: isolated(group.provider),
-            models: list(group.models.map(isolated)),
+            models: list(group.models.map(value => isolated(value))),
           })
         );
       }
       if (d.removed.length > 0) {
         parts.push(
           t('organization.auditLog.detail.autoRoutingRemoved', {
-            models: list(d.removed.map(isolated)),
+            models: list(d.removed.map(value => isolated(value))),
           })
         );
       }
@@ -478,8 +472,9 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
     }),
   };
 
-  // One lookup per event. Narrowing `detail` to the member its own `id` names is
-  // what lets each entry read only the fields that member carries.
+  // One lookup per event. The cast is the join the union cannot express on its
+  // own: `detail.id` selects an entry, and that entry's parameter is exactly
+  // `detail`. `AuditTemplates` above is what proves a member has an entry.
   const template = templates[detail.id] as ((detail: AuditDetail) => Render | undefined) | undefined;
   return template?.(detail);
 }
@@ -542,3 +537,40 @@ const POLICY_EVENT_TEMPLATE_KEYS = {
   namedPolicyUpdated: 'organization.auditLog.detail.namedPolicyUpdated',
   namedPolicyDeleted: 'organization.auditLog.detail.namedPolicyDeleted',
 } as const satisfies Record<PolicyEventKey, string>;
+
+/**
+ * A default-model change, which reads as set, removed or a move.
+ *
+ * Written as early returns rather than one nested conditional: the three cases
+ * carry different sentences, and a reader should not have to count `?`s to find
+ * the one they want.
+ */
+function defaultModelRow(
+  detail: Extract<AuditDetail, { id: 'setting.defaultModel' }>,
+  tools: Tools
+): Render | undefined {
+  const { t, isolated } = tools;
+  if (detail.previous === undefined) {
+    if (detail.next === undefined) {
+      return undefined;
+    }
+    return {
+      key: 'organization.auditLog.detail.settingDefaultModelSet',
+      values: { next: isolated(detail.next) },
+    };
+  }
+  if (detail.next === undefined) {
+    return {
+      key: 'organization.auditLog.detail.settingDefaultModelRemoved',
+      values: { previous: isolated(detail.previous) },
+    };
+  }
+  return {
+    key: 'organization.auditLog.detail.fieldChange',
+    values: {
+      field: t(DEFAULT_MODEL_FIELD_KEY),
+      previous: isolated(detail.previous),
+      next: isolated(detail.next),
+    },
+  };
+}

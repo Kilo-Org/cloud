@@ -60,7 +60,7 @@ function formatAuditTime(createdAt: string): string {
 }
 
 const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
-  const { t, i18n } = useTranslation();
+  const { t, i18n: translation } = useTranslation();
   const colors = useThemeColors();
   const [expanded, setExpanded] = useState(false);
   const actor = entry.actor_email ?? entry.actor_name;
@@ -72,7 +72,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   // events. A row with no structured event — one written before the column
   // existed, or an event this build has no sentence for — shows its event name
   // alone rather than an English sentence.
-  const detail = auditEntryDetail(t, i18n.language, entry.details);
+  const detail = auditEntryDetail(t, translation.language, entry.details);
   const showsDetail = detail !== undefined;
   // The actor and the time render as two elements in one row, never one
   // interpolated string: the row shrinks the actor, not the time, and each

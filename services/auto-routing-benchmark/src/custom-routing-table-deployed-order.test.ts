@@ -17,6 +17,11 @@
  *   # hardlink-copy node_modules from a warm checkout, then:
  *   <scratch>/node_modules/.bin/tsx <scratch>/services/auto-routing-benchmark/scripts/render-deployed-custom-table.ts \
  *     > services/auto-routing-benchmark/test/fixtures/custom-table-deployed-0487d998.json
+ *   ./node_modules/.bin/oxfmt services/auto-routing-benchmark/test/fixtures/custom-table-deployed-0487d998.json
+ *
+ * The last step is part of the recipe: `format:check` runs oxfmt over the
+ * repository, so an unformatted golden file fails CI. The assertions compare
+ * parsed JSON re-serialized by `JSON.stringify`, so they hold on either layout.
  */
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';

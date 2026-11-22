@@ -1,11 +1,7 @@
 {
   "_provenance": {
     "commit": "0487d998b60cbea224bf7ed69d5f6b6353b93de4",
-    "pool": [
-      "vendor/aaa",
-      "vendor/variants",
-      "vendor/zzz"
-    ],
+    "pool": ["vendor/aaa", "vendor/variants", "vendor/zzz"],
     "generator": "services/auto-routing-benchmark/scripts/render-deployed-custom-table.ts"
   },
   "table": {

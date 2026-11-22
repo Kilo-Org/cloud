@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { searchSettings } from '@/lib/settings-search/match';
+import { prepareSettingsSearch } from '@/lib/settings-search/match';
 
 import { CATALOG_LOADERS } from './catalogs';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
@@ -160,7 +160,7 @@ describe('settings search copy', () => {
     const entries = entriesOf(catalog);
     const appearance = catalog.preferences.appearance;
 
-    const hit = hitFor(searchSettings(entries, appearance, tag), appearance);
+    const hit = hitFor(prepareSettingsSearch(entries, tag)(appearance), appearance);
 
     expect(hit, `${tag} did not match "${appearance}"`).toBeDefined();
     expect(highlightedSpan(hit?.ranges ?? [])).toEqual({ start: 0, end: appearance.length });
@@ -175,7 +175,7 @@ describe('settings search copy', () => {
     }
     const { label, keyword } = candidate;
 
-    const hit = hitFor(searchSettings(entries, keyword, tag), label);
+    const hit = hitFor(prepareSettingsSearch(entries, tag)(keyword), label);
 
     expect(hit, `${tag} did not match keyword "${keyword}" for "${label}"`).toBeDefined();
     // A keyword-only hit highlights nothing in the label.
@@ -185,7 +185,7 @@ describe('settings search copy', () => {
     const withoutKeywords = entries.map(entry =>
       entry.label === label ? { label: entry.label, keywords: [] } : entry
     );
-    const control = searchSettings(withoutKeywords, keyword, tag);
+    const control = prepareSettingsSearch(withoutKeywords, tag)(keyword);
     expect(
       control.some(result => result.entry.label === label),
       `${tag} still matched "${label}" without its keywords`
@@ -210,7 +210,7 @@ describe('settings search copy', () => {
 
     expect(query, `${tag} produced the label unchanged`).not.toBe(label);
 
-    const hit = hitFor(searchSettings(entries, query, tag), label);
+    const hit = hitFor(prepareSettingsSearch(entries, tag)(query), label);
 
     expect(hit, `${tag} did not match "${label}" from "${query}"`).toBeDefined();
     expect(highlightedSpan(hit?.ranges ?? [])).toEqual({ start: 0, end: label.length });

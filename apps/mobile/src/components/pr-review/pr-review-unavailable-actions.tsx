@@ -41,13 +41,20 @@ import { useTRPC } from '@/lib/trpc';
  * it, at the same compact size with its own leading icon, because it answers a
  * different question — whether the account is still connected — and a state
  * with two equally weighted buttons has no primary at all.
+ *
+ * That primary belongs to a whole-surface unavailable state. A caller that
+ * embeds the row inside a body owning its own primary passes `secondary`
+ * instead, which leaves both controls secondary and the body's primary alone.
  */
 export function PrReviewUnavailableActions({
   onRetry,
   isRetrying,
+  emphasis = 'primary',
 }: Readonly<{
   onRetry: () => void;
   isRetrying: boolean;
+  /** `secondary` when the surrounding body already shows its own primary action. */
+  emphasis?: 'primary' | 'secondary';
 }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -131,6 +138,7 @@ export function PrReviewUnavailableActions({
         icon={RotateCcw}
         onPress={onRetry}
         loading={isRetrying}
+        emphasis={emphasis}
       />
       <Button
         size="sm"

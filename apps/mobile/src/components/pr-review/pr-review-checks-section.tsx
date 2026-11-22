@@ -251,6 +251,8 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
       // GitLab folds its connection failures into the same NOT_FOUND, and
       // Bitbucket does the same for its workspace failures, so those scopes
       // get the read retry plus the connection check instead of a dead end.
+      // This card sits in the overview body, whose merge section below owns
+      // the single filled primary, so the recovery row stays secondary.
       if (isProviderPlatform(queries.platform)) {
         return (
           <Section label={t('prReview.checks.title')}>
@@ -259,6 +261,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
                 {t('prReview.terms.unavailableDescription')}
               </Text>
               <PrReviewUnavailableActions
+                emphasis="secondary"
                 onRetry={() => {
                   checks.refetch();
                 }}

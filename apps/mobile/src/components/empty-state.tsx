@@ -206,6 +206,12 @@ type StateActionProps = {
   accessibilityLabel?: string;
   /** Extra context a name cannot carry, e.g. what the retry re-reads. */
   accessibilityHint?: string;
+  /**
+   * Which of the two faces the action takes: `primary` is the filled default
+   * the slot's single primary paints, `secondary` the filled neutral a caller
+   * embedded in a body that owns its own primary passes instead.
+   */
+  emphasis?: 'primary' | 'secondary';
 };
 
 /**
@@ -220,6 +226,10 @@ type StateActionProps = {
  * becomes a spinner, so a retry stays readable as "the same action, working"
  * instead of collapsing to a ring. The button announces the wait, reports
  * itself disabled, and refuses presses until it clears.
+ *
+ * `emphasis` only picks the fill: `secondary` keeps every other piece of the
+ * control — the compact size, the tap-target floor, the busy face — and gives
+ * up the brand fill, for a caller whose body already shows its own primary.
  */
 export function StateAction({
   label,
@@ -230,20 +240,26 @@ export function StateAction({
   testID,
   accessibilityLabel,
   accessibilityHint,
+  emphasis = 'primary',
 }: Readonly<StateActionProps>) {
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const busy = Boolean(loading);
+  const secondary = emphasis === 'secondary';
   // A busy action keeps its enabled face — the brand fill and the label ink the
   // button paints on it (`Button` never dims or mutes a control that announces
   // busy) — so its mark must take that same ink. The muted ink is only for the
   // disabled face, whose fill is the palette's muted surface; on the brand fill
-  // it measures about 1.4:1 and the spinner all but disappears.
-  const markColor = disabled === true && !busy ? mutedDisabledInk : colors.primaryForeground;
+  // it measures about 1.4:1 and the spinner all but disappears. The secondary
+  // face paints `--secondary-fill` instead, where the enabled mark is the
+  // regular foreground rather than the brand fill's own contrasting ink.
+  const enabledMark = secondary ? colors.foreground : colors.primaryForeground;
+  const markColor = disabled === true && !busy ? mutedDisabledInk : enabledMark;
   return (
     <Button
       size="sm"
       className={STATE_ACTION_CLASS}
+      {...(secondary ? { variant: 'secondary' as const } : {})}
       disabled={Boolean(disabled) || busy}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? label}

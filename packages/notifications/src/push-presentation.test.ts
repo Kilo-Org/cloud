@@ -498,7 +498,7 @@ describe('genericPushContentForPushData', () => {
     [
       'agent_briefing',
       { type: 'agent_briefing', url: '/agent-briefing' },
-      'Active agents have an update',
+      'Your agent brief is ready',
     ],
     [
       'active_agents_glanceable',
@@ -522,6 +522,33 @@ describe('genericPushContentForPushData', () => {
     expect(genericPushContentForPushData(pushDataSchema.parse(payload))).toEqual({
       title: 'Kilo',
       body,
+    });
+  });
+
+  it('gives the briefing and the glanceable card their own bodies', () => {
+    const briefing = pushDataSchema.parse({ type: 'agent_briefing', url: '/agent-briefing' });
+    const glanceable = pushDataSchema.parse({
+      type: 'active_agents_glanceable',
+      schemaVersion: 1,
+      revision: 1,
+      scopeKey: 'scope-1',
+      organizationBound: false,
+      status: 'happy',
+      running: 1,
+      needsInput: 0,
+      idle: 0,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2026-01-01T08:00:00.000Z',
+      needsInputSince: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(genericPushContentForPushData(briefing)).toEqual({
+      title: 'Kilo',
+      body: 'Your agent brief is ready',
+    });
+    expect(genericPushContentForPushData(glanceable)).toEqual({
+      title: 'Kilo',
+      body: 'Active agents have an update',
     });
   });
 

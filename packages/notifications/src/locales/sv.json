@@ -7,6 +7,7 @@
       "spendAlert": "Dina utgifter kräver uppmärksamhet",
       "securityFinding": "En säkerhetsupptäckt kräver uppmärksamhet",
       "securityUpdate": "En säkerhetskontroll har en uppdatering",
+      "agentBriefing": "Din agentrapport är klar",
       "activeAgentsGlanceable": "Aktiva agenter har en uppdatering"
     }
   },

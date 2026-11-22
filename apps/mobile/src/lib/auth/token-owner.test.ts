@@ -283,7 +283,7 @@ describe('token-owner', () => {
   describe('publishActiveTokenExpiry', () => {
     it('stores the resolved expiry in the current owner', () => {
       setActiveToken('token-a', null);
-      publishActiveTokenExpiry(currentSnapshot(), 1234);
+      publishActiveTokenExpiry(currentSnapshot(), { kind: 'known', atMs: 1234 });
       expect(getActiveToken()).toEqual({ token: 'token-a', expiresAtMs: 1234 });
     });
 
@@ -291,12 +291,15 @@ describe('token-owner', () => {
       setActiveToken('token-a', null);
       const snapshot = currentSnapshot();
       setActiveToken('token-b', 5678);
-      publishActiveTokenExpiry(snapshot, 1234);
+      publishActiveTokenExpiry(snapshot, { kind: 'known', atMs: 1234 });
       expect(getActiveToken()).toEqual({ token: 'token-b', expiresAtMs: 5678 });
     });
 
     it('does nothing when no owner is held', () => {
-      publishActiveTokenExpiry({ token: 'token-a', expiresAtMs: null, epoch: 0 }, 1234);
+      publishActiveTokenExpiry(
+        { token: 'token-a', expiry: { kind: 'unknown' }, epoch: 0 },
+        { kind: 'known', atMs: 1234 }
+      );
       expect(getActiveToken()).toBeNull();
     });
 
@@ -304,7 +307,7 @@ describe('token-owner', () => {
       setActiveToken('token-a', null);
       const snapshot = currentSnapshot();
       bumpAuthEpoch();
-      publishActiveTokenExpiry(snapshot, 1234);
+      publishActiveTokenExpiry(snapshot, { kind: 'known', atMs: 1234 });
       expect(getActiveToken()).toBeNull();
     });
   });

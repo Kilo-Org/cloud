@@ -8,7 +8,26 @@ export type ActiveToken = {
   expiresAtMs: number | null;
 };
 
-export type ActiveTokenSnapshot = ActiveToken & { epoch: number };
+/**
+ * What the owner knows about the held token's expiry. `unknown` means no read
+ * has resolved it yet — including a read the locked keychain refused — so a
+ * caller must read it rather than treat it as "no expiry".
+ */
+export type TokenExpiry =
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'known'; readonly atMs: number };
+
+export type ActiveTokenSnapshot = {
+  token: string;
+  expiry: TokenExpiry;
+  epoch: number;
+};
+
+/** The expiry as a number, or null when it is unknown or absent. */
+export function expiryAtMs(expiry: TokenExpiry): number | null {
+  return expiry.kind === 'known' ? expiry.atMs : null;
+}
 
 let activeToken: ActiveTokenSnapshot | null = null;
 
@@ -31,7 +50,11 @@ export function isSignOutTeardownActive(): boolean {
 
 /** Holds the token in memory, tagged with the auth epoch that was current when it was stored. */
 export function setActiveToken(token: string, expiresAtMs: number | null): void {
-  activeToken = { token, expiresAtMs, epoch: currentAuthEpoch() };
+  activeToken = {
+    token,
+    expiry: expiresAtMs === null ? { kind: 'unknown' } : { kind: 'known', atMs: expiresAtMs },
+    epoch: currentAuthEpoch(),
+  };
 }
 
 /** Returns the held token and expiry, or null when unset or when the epoch moved. */
@@ -40,7 +63,7 @@ export function getActiveToken(): ActiveToken | null {
   if (!snapshot) {
     return null;
   }
-  return { token: snapshot.token, expiresAtMs: snapshot.expiresAtMs };
+  return { token: snapshot.token, expiresAtMs: expiryAtMs(snapshot.expiry) };
 }
 
 export function getActiveTokenSnapshot(): ActiveTokenSnapshot | null {
@@ -56,10 +79,7 @@ export function getActiveTokenSnapshot(): ActiveTokenSnapshot | null {
  * token for the current epoch, so a newer owner published while the expiry
  * was read is never overwritten.
  */
-export function publishActiveTokenExpiry(
-  snapshot: ActiveTokenSnapshot,
-  expiresAtMs: number | null
-): void {
+export function publishActiveTokenExpiry(snapshot: ActiveTokenSnapshot, expiry: TokenExpiry): void {
   if (
     !activeToken ||
     activeToken.token !== snapshot.token ||
@@ -68,7 +88,7 @@ export function publishActiveTokenExpiry(
   ) {
     return;
   }
-  activeToken = { ...activeToken, expiresAtMs };
+  activeToken = { ...activeToken, expiry };
 }
 
 export function clearActiveToken(): void {

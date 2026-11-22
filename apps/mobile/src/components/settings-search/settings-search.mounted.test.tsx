@@ -240,18 +240,18 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     typeQuery(root, 'appearance');
     const appearanceRows = rows(root);
     expect(appearanceRows).toHaveLength(4);
-    expect(appearanceRows.map(row => row.props.accessibilityLabel).sort()).toEqual([
-      'Appearance',
-      'Dark',
-      'Light',
-      'System',
+    expect(
+      appearanceRows.map(row => row.props.accessibilityLabel).sort((a, b) => a.localeCompare(b))
+    ).toEqual(['Appearance', 'Dark', 'Light', 'System']);
+    const optionRows = appearanceRows.filter(
+      appearanceRow => appearanceRow.props.accessibilityLabel !== 'Appearance'
+    );
+    expect(optionRows).toHaveLength(3);
+    expect(optionRows.map(appearanceRow => appearanceRow.props.accessibilityHint)).toEqual([
+      'Preferences · Appearance',
+      'Preferences · Appearance',
+      'Preferences · Appearance',
     ]);
-    for (const appearanceRow of appearanceRows) {
-      if (appearanceRow.props.accessibilityLabel === 'Appearance') {
-        continue;
-      }
-      expect(appearanceRow.props.accessibilityHint).toBe('Preferences · Appearance');
-    }
   });
 
   it('resolves each keyword catalog entry once per index, not per keystroke', () => {

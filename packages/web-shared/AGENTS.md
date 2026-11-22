@@ -36,6 +36,11 @@ work, work after the upstream request starts, and exceptional paths may use it.
   acceptable for auth. Shared helpers keep their `fromDb = db` default for the
   web app; gateway callers must pass `readDb`, since omitting it selects the
   primary.
+- The web-session revocation stamp is the one auth read a replica cannot answer:
+  `revokeWebSessions` commits it on the primary, so `resolveUserFromSession` reads
+  `web_session_pepper` from the primary (`readWebSessionPepper`) before it admits a
+  browser session, and only when the caller's connection is a replica. Bearer
+  authentication is unaffected.
 - `lib/model-stats/model-stats-cache` keeps one snapshot per read client, so the
   gateway's replica load and the web app's primary load never answer for each
   other; `invalidateModelStatsCache` expires both. The gateway callers that load

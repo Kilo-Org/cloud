@@ -61,7 +61,10 @@ import { isCredentialExemptibleClass } from '@kilocode/web-shared/lib/admin/step
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
-import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
+import {
+  isWebSessionCurrent,
+  readWebSessionPepper,
+} from '@kilocode/web-shared/lib/web-session-revocation';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
   isCloudAgentAuthorityHttpPathAllowed,
@@ -686,8 +689,20 @@ async function resolveUserFromSession(
   const user = await findUserById(maybeKiloUserId, fromDb);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
+  // A replica only lags behind the primary, so a row that does not carry this
+  // session's pepper is already the answer.
   if (!isWebSessionCurrent(session.webSessionPepper, user))
     return authError(401, 'Reauthentication required', maybeKiloUserId);
+
+  // `revokeWebSessions` commits the pepper on the primary and that write is the
+  // authoritative revocation, so the decision uses the primary value: a replica
+  // that has not caught up yet still holds the pre-revocation pepper. When the
+  // caller already read the primary this row is that value, so this costs nothing.
+  if (fromDb !== db) {
+    const primaryPepper = await readWebSessionPepper(maybeKiloUserId);
+    if (!isWebSessionCurrent(session.webSessionPepper, { web_session_pepper: primaryPepper }))
+      return authError(401, 'Reauthentication required', maybeKiloUserId);
+  }
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
   return await validateUserAuthorization({

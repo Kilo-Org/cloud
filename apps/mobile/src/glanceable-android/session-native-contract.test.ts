@@ -152,6 +152,12 @@ describe('SessionNotifications', () => {
     expect(body(gate, 'fun intent(')).toContain(
       'SessionNotificationIdentity.sessionData(sessionId)'
     );
+    // The Approve record carries the ask as well as the session, so a newer ask
+    // is a different record and cannot rewrite the one the card in the shade
+    // still shows.
+    expect(body(gate, 'fun intent(')).toContain(
+      'SessionNotificationIdentity.askData(sessionId, approvalKey)'
+    );
     // Nothing outside the retirement helpers may derive an identity from a hash.
     expect(identity).toContain('fun legacyNotificationId(');
     expect(identity).toContain('fun legacyRequestCode(');
@@ -179,6 +185,22 @@ describe('SessionNotifications', () => {
     expect(retirement).toBeLessThan(build);
   });
 
+  it('retires a card under both Approve identities a build could have posted it', () => {
+    // A card posted before the Approve record carried its ask keeps that record
+    // under the session alone, so a teardown that cancelled only the ask-keyed
+    // one would leave a stale Approve action behind its card.
+    const actions = body(NOTIFICATIONS, 'private fun cancelActions(');
+    const askKeyed = actions.indexOf(
+      'ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, approvalKey)'
+    );
+    const sessionOnly = actions.indexOf(
+      'ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, null)'
+    );
+    expect(askKeyed, 'the ask-keyed record must be cancelled').toBeGreaterThan(-1);
+    expect(sessionOnly, 'the session-only record must be cancelled too').toBeGreaterThan(-1);
+    expect(sessionOnly).toBeGreaterThan(askKeyed);
+  });
+
   it('starts restoration even when registration loads after the app became active', () => {
     expect(REGISTER).toMatch(
       /if \(AppState\.currentState === 'active'\) \{\s+void sessionFollowStorage\(\)\.restoreFollowedSessionCardsFromStorage\(\)/
@@ -198,6 +220,68 @@ describe('SessionNotifications', () => {
     const channelId = /private const val CHANNEL_ID = "([^"]+)"/.exec(NOTIFICATIONS)?.[1];
     expect(channelId).toBeDefined();
     expect(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS).toContain(channelId);
+  });
+});
+
+describe('a post that does not land leaves the card answering the request it shows', () => {
+  const post = body(NOTIFICATIONS, 'fun post(');
+
+  it('reads the previous ask before it writes the stored card', () => {
+    // A failed post leaves the previous card in the shade, so the facts that
+    // describe it must be read before this call overwrites them.
+    const read = post.indexOf('val previousApprovalKey = approvalKeyOf(previousJson)');
+    const write = post.indexOf('putString(KEY_PREFIX + card.sessionId, stored.toString())');
+    expect(read, 'post must read the previous ask').toBeGreaterThan(-1);
+    expect(write, 'post must write the stored card').toBeGreaterThan(-1);
+    expect(read).toBeLessThan(write);
+  });
+
+  it('puts the previous stored card back inside the catch a failed post falls into', () => {
+    const guard = post.indexOf('} catch (error: Throwable) {');
+    const restore = post.indexOf('restoreStored(context, card.sessionId, previousJson)');
+    const rethrow = post.indexOf('throw error');
+    expect(guard, 'post must guard its own post').toBeGreaterThan(-1);
+    expect(restore, 'the catch must put the previous card back').toBeGreaterThan(-1);
+    expect(rethrow, 'the catch must rethrow').toBeGreaterThan(-1);
+    expect(restore).toBeGreaterThan(guard);
+    expect(restore).toBeLessThan(rethrow);
+    const restoreStored = body(NOTIFICATIONS, 'private fun restoreStored(');
+    expect(restoreStored).toContain('editor.putString(KEY_PREFIX + sessionId, previousJson)');
+    expect(restoreStored, 'no predecessor leaves nothing stored').toContain(
+      'editor.remove(KEY_PREFIX + sessionId)'
+    );
+  });
+
+  it('drops the newer record in the catch and retires the superseded one after the post', () => {
+    // The record of the ask this call built is unreferenced when the card never
+    // landed; the record of the ask the surviving card shows is the one that
+    // must stay, so the superseded one is retired only once the post landed.
+    const guard = post.indexOf('} catch (error: Throwable) {');
+    const rethrow = post.indexOf('throw error', guard);
+    expect(guard).toBeGreaterThan(-1);
+    expect(rethrow).toBeGreaterThan(guard);
+    const dropped = post.indexOf(
+      'ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, card.approvalKey)'
+    );
+    expect(dropped, 'the catch must drop the record of the newer ask').toBeGreaterThan(-1);
+    expect(dropped).toBeGreaterThan(guard);
+    expect(dropped).toBeLessThan(rethrow);
+
+    const retired = post.indexOf(
+      'ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, previousApprovalKey)'
+    );
+    const notify = post.indexOf('manager(context).notify(');
+    expect(notify, 'post must post the card').toBeGreaterThan(-1);
+    expect(retired, 'the superseded ask must be retired').toBeGreaterThan(-1);
+    expect(retired).toBeGreaterThan(notify);
+  });
+
+  it('arms no quiet moment on the failure path', () => {
+    // The surviving card keeps whatever quiet moment it already had.
+    const rethrow = post.indexOf('throw error');
+    const schedule = post.indexOf('scheduleQuiet(context, card, nowMs)');
+    expect(rethrow, 'the catch must rethrow').toBeGreaterThan(-1);
+    expect(schedule, 'post must arm the quiet moment').toBeGreaterThan(rethrow);
   });
 });
 

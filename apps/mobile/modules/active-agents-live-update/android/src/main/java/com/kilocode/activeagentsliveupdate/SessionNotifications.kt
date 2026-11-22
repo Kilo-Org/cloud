@@ -33,11 +33,13 @@ import org.json.JSONObject
  *
  * The module holds exactly one notification per session, tagged with the
  * session id, so an update can only reach that session's card. Each action
- * carries the session in its Intent data for the same reason; see
- * `SessionNotificationIdentity`. SharedPreferences keeps the card's facts and
- * the scope it was followed in, so a press can answer with the right
- * organization after the process was killed, and so a restart can prune the
- * cards that are no longer in the shade.
+ * carries the session in its Intent data for the same reason, and Approve
+ * carries the ask it answers as well, so a newer ask is a different record and
+ * a post that does not land leaves the card in the shade answering the request
+ * it shows; see `SessionNotificationIdentity`. SharedPreferences keeps the
+ * card's facts and the scope it was followed in, so a press can answer with the
+ * right organization after the process was killed, and so a restart can prune
+ * the cards that are no longer in the shade.
  */
 internal object SessionNotifications {
   private const val STORE = "active_agents_session_notifications"
@@ -119,6 +121,10 @@ internal object SessionNotifications {
    * that shows fewer actions owns fewer records. Each is retrieved with
    * `FLAG_NO_CREATE`, which cancels a record that exists and answers null
    * instead of creating one when it does not.
+   *
+   * The Approve record is retired under both identities a card can have posted
+   * it under: the ask-keyed one this build builds, and the session-only one a
+   * build before it used, so no stale Approve action outlives its card.
    */
   private fun cancelActions(context: Context, sessionId: String, card: SessionNotificationCard?) {
     val openUrl = card?.openUrl ?: ""
@@ -133,6 +139,11 @@ internal object SessionNotifications {
     card?.approvalKey?.let { approvalKey ->
       ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, approvalKey)
     }
+    // A card posted before the Approve record carried its ask kept that record
+    // under the session alone, so the teardown retires that identity too; a
+    // record that never existed answers null. This cannot reach the aggregate
+    // card's record, which has its own request code.
+    ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, null)
     PendingIntent.getBroadcast(
       context,
       DELETE_REQUEST_CODE,
@@ -225,12 +236,23 @@ internal object SessionNotifications {
    * still cancel it, and a restore keeps it out of the followed set and drops it
    * once the window passes. The timeout needs API 26; on API 24-25 the restore
    * after the window is what removes it.
+   *
+   * A post that does not land leaves the previous card in the shade, so it
+   * leaves that card answering the request it shows: the stored facts go back
+   * to it, and the Approve record of the newer ask this call built is dropped
+   * because nothing shows it. The superseded ask's record is retired only after
+   * the newer card is posted.
    */
   fun post(context: Context, card: SessionNotificationCard, dismissAfterMs: Long) {
     // One clock read for the whole post: the card drawn now and the quiet
     // alarm must agree on whether the quiet window has passed.
     val nowMs = System.currentTimeMillis()
     val timeoutMs = dismissAfterMs.coerceAtLeast(0)
+    // Snapshot what the shade holds before this post replaces it: a failed post
+    // leaves that card posted, so its stored facts must survive, and its
+    // Approve record must keep answering the ask it shows.
+    val previousJson = state(context).getString(KEY_PREFIX + card.sessionId, null)
+    val previousApprovalKey = approvalKeyOf(previousJson)
     val stored = card.toJson()
     if (timeoutMs > 0) {
       stored.put(FINISHED_UNTIL, nowMs + timeoutMs)
@@ -242,17 +264,52 @@ internal object SessionNotifications {
     // Retire the earlier build's records before this post builds its own, so
     // the retirement can only act on what the earlier build left behind.
     cancelLegacy(context, card.sessionId, card)
-    val builder = builder(context, card.shownAt(nowMs))
-    if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
-      builder.setTimeoutAfter(timeoutMs)
+    try {
+      val builder = builder(context, card.shownAt(nowMs))
+      if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
+        builder.setTimeoutAfter(timeoutMs)
+      }
+      manager(context).notify(
+        SessionNotificationIdentity.tag(card.sessionId),
+        SessionNotificationIdentity.NOTIFICATION_ID,
+        builder.build()
+      )
+    } catch (error: Throwable) {
+      // The post did not land: the previous card is still in the shade, so put
+      // back the facts that describe it and drop the record of a newer ask,
+      // which no card shows. A record for the ask the surviving card shows is
+      // left alone, and no quiet moment is armed for a card that is not there.
+      restoreStored(context, card.sessionId, previousJson)
+      if (card.approvalKey != null && card.approvalKey != previousApprovalKey) {
+        ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, card.approvalKey)
+      }
+      throw error
     }
-    manager(context).notify(
-      SessionNotificationIdentity.tag(card.sessionId),
-      SessionNotificationIdentity.NOTIFICATION_ID,
-      builder.build()
-    )
+    // The post landed: retire the superseded ask's record, then arm the quiet
+    // moment, so the card in the shade and the stored card name one ask.
+    if (previousApprovalKey != null && previousApprovalKey != card.approvalKey) {
+      ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, previousApprovalKey)
+    }
     scheduleQuiet(context, card, nowMs)
   }
+
+  /**
+   * Put back the stored card a failed post must keep describing, or forget the
+   * entry when the shade holds no card of this session to describe.
+   */
+  private fun restoreStored(context: Context, sessionId: String, previousJson: String?) {
+    val editor = state(context).edit()
+    if (previousJson == null) {
+      editor.remove(KEY_PREFIX + sessionId)
+    } else {
+      editor.putString(KEY_PREFIX + sessionId, previousJson)
+    }
+    editor.commitOrReport("Cannot restore the followed session card")
+  }
+
+  /** The ask one stored card answers, or null when it stores none. */
+  private fun approvalKeyOf(stored: String?): String? =
+    stored?.let { SessionNotificationCard().apply { fillFromJson(JSONObject(it)) }.approvalKey }
 
   /**
    * Arm the quiet moment of a Working card, or disarm it for every other card.

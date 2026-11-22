@@ -409,7 +409,10 @@ describe('migrated origin permissions', () => {
       const { spec } = buildControlPlaneSessionRegistration(input, selection);
       expect(spec.permission).toMatchObject({
         question: 'deny',
-        edit: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny',
+        edit:
+          createdOnPlatform === 'security-remediation'
+            ? { '*': 'allow', '.git/*': 'deny', '*.git/*': 'deny' }
+            : 'deny',
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',

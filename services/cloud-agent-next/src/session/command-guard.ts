@@ -360,6 +360,11 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}*\t+*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*'*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*"*`,
+  // The matcher normalizes a backslash to a slash in both the pattern and the
+  // command, so these two rules reach a command that carries a backslash before
+  // the option or the `+`.
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*/-*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*/+*`,
 ];
 
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
@@ -392,13 +397,15 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git -?* config -?* --add *',
   'git -?* config -?* --replace-all *',
   'git -?* config -?* --unset *',
-  // The `-c key[=value]` form sets configuration on the command line, and git
-  // matches a key without regard to case and reads a key with no value as true,
-  // so a rule cannot name one key or one value. Every `-c` on a git command is
-  // refused instead. The two subcommands whose own `-c` takes a branch name are
-  // admitted again below: the flag consumes the rest of its argument, so a
-  // setting cannot follow it.
-  'git*-c*',
+  // An inline setting's argument is a dotted key or carries a `=` value, and its
+  // letters are never named, so neither a spelling nor the case of a key can
+  // escape. A `?` covers one separator, so a tab or a short run after `-c` is
+  // included. The subcommands whose own `-c` takes a branch name are admitted
+  // again below: the flag consumes the rest of its argument.
+  'git*-c ?*.*',
+  'git*-c ?*=*',
+  'git*-c*.*=*',
+  'git*-c*?=*',
   // git reads the same configuration from the repository's own file, which a
   // shell command can rewrite directly, so a command that names that file is
   // refused as well.
@@ -549,16 +556,19 @@ export function getCommandGuardPermissions(
   bitbucketReviewId?: string
 ): Record<string, CommandGuardPermission> {
   const bitbucketReviewPolicy = policy.policyName === 'bitbucket-code-review-read-only';
+  const securityRemediationPolicy = policy.policyName === 'security-remediation-pr';
   return {
-    edit:
-      policy.policyName === 'security-remediation-pr'
-        ? 'allow'
-        : bitbucketReviewPolicy && bitbucketReviewId
-          ? {
-              '*': 'deny',
-              [relative(workspacePath, bitbucketReviewInputPath(bitbucketReviewId))]: 'allow',
-            }
-          : 'deny',
+    edit: securityRemediationPolicy
+      ? // The edit tool writes any path without a shell command, and the
+        // repository's own configuration file decides what a push does, so that
+        // file stays out of reach while every other path stays writable.
+        { '*': 'allow', '.git/*': 'deny', '*.git/*': 'deny' }
+      : bitbucketReviewPolicy && bitbucketReviewId
+        ? {
+            '*': 'deny',
+            [relative(workspacePath, bitbucketReviewInputPath(bitbucketReviewId))]: 'allow',
+          }
+        : 'deny',
     bash: buildCommandGuardBashPermissions(policy),
     ...(bitbucketReviewPolicy ? { task: 'deny', lsp: 'deny' } : {}),
     webfetch: 'deny',

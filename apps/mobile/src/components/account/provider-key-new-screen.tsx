@@ -308,9 +308,6 @@ export function ProviderKeyNewScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-1">
-          {/* The screen intro is the muted body line of AGENTS.md's "Screen
-              intro" rule, the same as the provider-keys list. The mappings
-              caution below it is a subordinate line, not a second intro. */}
           <Text variant="muted">
             {keyId === undefined
               ? t('profile.providerKeys.newKeyDescription')

@@ -167,6 +167,12 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
     // was unavailable or outlived its budget inside the worker, so a retry can
     // still mint. Keep that retryability instead of flattening it into a
     // gateway error the client would treat as final.
+    //
+    // Neither branch reads the body, and the status line alone decides the
+    // answer, so the body is released instead of read: minting is a mutation a
+    // session open retries, so every attempt against a stuck worker must not
+    // pin another connection.
+    await response.body?.cancel().catch(() => undefined);
     if (response.status === 503 || response.status === 504) {
       throw new TRPCError({
         code: 'SERVICE_UNAVAILABLE',

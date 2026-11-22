@@ -297,6 +297,71 @@ describe('active-sessions-router', () => {
       }
     );
 
+    it('answers a 503 with a stalled body without waiting for the body read', async () => {
+      // A worker that sends the 503 status line and then never finishes the
+      // body: its `pull` never resolves, so any read of it would hang. The
+      // status alone decides the answer, so the mint must settle on that and
+      // release the body instead of spending the rest of the budget on it.
+      const cancel = jest.fn(async () => undefined);
+      const stream = new ReadableStream<Uint8Array>({
+        pull: () => new Promise<void>(() => {}),
+        cancel,
+      });
+      // Reading the body takes it over through `getReader`; the release is a
+      // plain `cancel`, so the reader must never appear.
+      const getReader = jest.spyOn(stream, 'getReader');
+      const stalled = new Response(stream, { status: 503 });
+      jest.spyOn(global, 'fetch').mockResolvedValue(stalled);
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const rejection = caller.activeSessions.createWebTicket();
+        // No timer advance at all: settling here proves the answer came from
+        // the status line, not from the budget expiring.
+        await expectMintFailure(rejection, 'SERVICE_UNAVAILABLE', 'Session ingest is unavailable');
+        // The body was never read, and it was released instead of being left
+        // checked out: `cancel` disturbs it (hence `bodyUsed`), which is what
+        // ends the transfer, and it ran exactly once.
+        expect(getReader).not.toHaveBeenCalled();
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(stalled.bodyUsed).toBe(true);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('answers a 502 with a stalled body as BAD_GATEWAY without reading the body', async () => {
+      // Any other non-2xx is a gateway answer, and it is decided by the status
+      // line too: the stalled body is cancelled, never read, so a retrying mint
+      // cannot pin a connection on a stuck worker.
+      const cancel = jest.fn(async () => undefined);
+      const stream = new ReadableStream<Uint8Array>({
+        pull: () => new Promise<void>(() => {}),
+        cancel,
+      });
+      const getReader = jest.spyOn(stream, 'getReader');
+      const stalled = new Response(stream, { status: 502 });
+      jest.spyOn(global, 'fetch').mockResolvedValue(stalled);
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        await expectMintFailure(
+          caller.activeSessions.createWebTicket(),
+          'BAD_GATEWAY',
+          'Session ingest failed to mint a ticket (status 502)'
+        );
+        expect(getReader).not.toHaveBeenCalled();
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(stalled.bodyUsed).toBe(true);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it.each([
       ['a malformed', JSON.stringify({ ticket: '', expiresAt: 'not-a-number' })],
       ['a non-JSON', '<html>gateway</html>'],

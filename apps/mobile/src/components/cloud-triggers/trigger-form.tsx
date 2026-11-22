@@ -41,7 +41,7 @@ type TriggerFormProps = Readonly<{
   footer?: ReactNode;
 }>;
 
-export function FailureBand({
+function FailureBand({
   failure,
   onRetry,
   onDismiss,

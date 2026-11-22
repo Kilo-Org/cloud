@@ -1,18 +1,16 @@
 /**
  * The failure band the New trigger screen renders for a refused save.
  *
- * The form is a stand-in, but the band it renders is the product band, so this
- * suite reads the copy and the Retry control the screen actually shows. A taken
- * name must name itself without a Retry, a validation payload must not print its
- * issue array, and a transport failure must offer the retry.
+ * The form is the product form with its pickers replaced by host stand-ins, so
+ * this suite reads the copy and the Retry control the screen actually shows. A
+ * taken name must name itself without a Retry, a validation payload must not
+ * print its issue array, and a transport failure must offer the retry.
  */
 
-import { type ComponentType, createElement } from 'react';
+import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { type TriggerDraft } from '@/lib/cloud-triggers/trigger-draft';
-import { type TriggerFormFailure } from '@/lib/cloud-triggers/trigger-save-failure';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -67,64 +65,30 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
-// The form's own sections are not under test; the band beside them is. Mocking
-// them keeps the real module to the band alone.
-vi.mock('./trigger-form-agent', () => ({ TriggerFormAgent: 'TriggerFormAgent' }));
+
+// The form's pickers and inputs are not under test: the sections are host
+// stand-ins, and the draft edit they report goes through the screen's own
+// `onDraftChange`, exactly as a typed name would.
 vi.mock('./trigger-form-basics', () => ({ TriggerFormBasics: 'TriggerFormBasics' }));
+vi.mock('./trigger-form-agent', () => ({ TriggerFormAgent: 'TriggerFormAgent' }));
 vi.mock('./trigger-form-behaviour', () => ({ TriggerFormBehaviour: 'TriggerFormBehaviour' }));
 
-type BandProps = Readonly<{
-  failure: TriggerFormFailure;
-  onRetry: () => void;
-  onDismiss: () => void;
-}>;
-
-/** The form surface this suite drives: a draft edit, the submit, and the band. */
-type FormStandInProps = Readonly<{
-  draft: TriggerDraft;
-  onDraftChange: (next: TriggerDraft) => void;
-  onSubmit: () => void;
-  failure: TriggerFormFailure | null;
-  onRetry: () => void;
-  onDismissFailure: () => void;
-}>;
-
-vi.mock('./trigger-form', async () => {
-  // A `vi.mock` factory runs before this file's imports are initialized, and it
-  // must render the product band, so both React and the real module load here.
-  const React = await import('react');
-  const actual = await vi.importActual<{ FailureBand: ComponentType<BandProps> }>('./trigger-form');
-  return {
-    TriggerForm: (props: FormStandInProps) =>
-      React.createElement(
-        'View',
-        null,
-        React.createElement('Pressable', {
-          action: 'draft',
-          onPress: () => {
-            props.onDraftChange({ ...props.draft, name: h.draftName });
-          },
-        }),
-        React.createElement('Pressable', { action: 'submit', onPress: props.onSubmit }),
-        props.failure === null
-          ? null
-          : React.createElement(actual.FailureBand, {
-              failure: props.failure,
-              onRetry: props.onRetry,
-              onDismiss: props.onDismissFailure,
-            })
-      ),
-  };
-});
-
-/** Every line of text the band renders, in tree order. */
-function bandText(root: ReactTestInstance): string[] {
+/** Every line of text the screen renders, in tree order. */
+function screenText(root: ReactTestInstance): string[] {
   return root
     .findAllByType('Text')
     .map(node =>
       node.children.filter((child): child is string => typeof child === 'string').join('')
     )
     .filter(line => line.length > 0);
+}
+
+/** The submit control the form renders for its own label, or undefined before it. */
+function submitButton(root: ReactTestInstance): ReactTestInstance | undefined {
+  const label = i18n.t('cloudAgent.triggers.create');
+  return root
+    .findAllByType('Button')
+    .find(button => button.findAllByType('Text').some(node => node.props.children === label));
 }
 
 /** Whether the band renders the Retry control, which only a retryable failure gets. */
@@ -140,19 +104,27 @@ async function mount(): Promise<ReactTestRenderer['root']> {
   return renderer.root;
 }
 
-/** Type the draft name the form reports, the way a field edit does. */
+/** Report the draft name the person typed, through the section that reports it. */
 function editName(root: ReactTestInstance): void {
-  const draftProps = root.findByProps({ action: 'draft' }).props as { onPress: () => void };
+  const basics = root.findByType('TriggerFormBasics');
+  const props = basics.props as {
+    draft: Record<string, unknown>;
+    onDraftChange: (next: Record<string, unknown>) => void;
+  };
   act(() => {
-    draftProps.onPress();
+    props.onDraftChange({ ...props.draft, name: h.draftName });
   });
 }
 
-/** Submit the form and let the answer land. */
+/** Press the form's submit and let the answer land. */
 async function submit(root: ReactTestInstance): Promise<void> {
-  const submitProps = root.findByProps({ action: 'submit' }).props as { onPress: () => void };
+  const button = submitButton(root);
+  if (!button) {
+    throw new Error('the form did not render its submit control');
+  }
+  const press = button.props as { onPress: () => void };
   await act(async () => {
-    submitProps.onPress();
+    press.onPress();
     await Promise.resolve();
   });
 }
@@ -192,8 +164,10 @@ describe('TriggerCreateScreen save failure band', () => {
     await submit(root);
 
     expect(h.createMutation.mutateAsync).toHaveBeenCalledTimes(1);
-    expect(bandText(root)).toContain(i18n.t('cloudAgent.triggers.nameTaken', { name: 'take-one' }));
-    expect(bandText(root)).toContain(i18n.t('common.close'));
+    expect(screenText(root)).toContain(
+      i18n.t('cloudAgent.triggers.nameTaken', { name: 'take-one' })
+    );
+    expect(screenText(root)).toContain(i18n.t('common.close'));
     expect(offersRetry(root)).toBe(false);
   });
 
@@ -204,7 +178,7 @@ describe('TriggerCreateScreen save failure band', () => {
     editName(root);
     await submit(root);
 
-    const text = bandText(root).join(' ');
+    const text = screenText(root).join(' ');
     expect(text).toContain(i18n.t('cloudAgent.triggers.saveFailedCheck'));
     expect(text).not.toContain('too_small');
     expect(text).not.toContain('"path"');
@@ -218,7 +192,7 @@ describe('TriggerCreateScreen save failure band', () => {
     editName(root);
     await submit(root);
 
-    expect(bandText(root)).toContain(i18n.t('cloudAgent.triggers.saveFailedRetry'));
+    expect(screenText(root)).toContain(i18n.t('cloudAgent.triggers.saveFailedRetry'));
     expect(offersRetry(root)).toBe(true);
   });
 });

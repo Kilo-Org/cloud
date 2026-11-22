@@ -63,6 +63,10 @@ type OrgUsageStatsProps = {
  * With `onPress` the whole grid opens the usage screen. The section cannot load
  * keeps its own retry row instead of the wrapper: a pressable around a retry
  * button leaves the reader guessing which control a tap reaches.
+ *
+ * The two token tiles print the same input and output totals the usage screen
+ * prints, so they use its compact notation and the two screens can be compared
+ * at a glance.
  */
 export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
@@ -101,11 +105,25 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
         <View className="flex-row gap-3">
           <StatTile
             label={t('organization.usageStats.inputTokens')}
-            value={data ? formatNumber(data.totalInputTokens, i18n.language) : missingValue}
+            value={
+              data
+                ? formatNumber(data.totalInputTokens, i18n.language, {
+                    notation: 'compact',
+                    maximumFractionDigits: 1,
+                  })
+                : missingValue
+            }
           />
           <StatTile
             label={t('organization.usageStats.outputTokens')}
-            value={data ? formatNumber(data.totalOutputTokens, i18n.language) : missingValue}
+            value={
+              data
+                ? formatNumber(data.totalOutputTokens, i18n.language, {
+                    notation: 'compact',
+                    maximumFractionDigits: 1,
+                  })
+                : missingValue
+            }
           />
         </View>
       </View>

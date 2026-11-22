@@ -13,20 +13,42 @@ export const INSTALLATION_LOCK_WAIT_MS = 5_000;
  */
 export const INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS = 1_000;
 
+/**
+ * Default budget for one SQL statement of a section that takes both the owner
+ * and the server lock. A section that makes an external call passes a lower
+ * budget instead, so its statements and that call together stay below the lock
+ * wait.
+ */
+export const INSTALLATION_WRITE_STATEMENT_TIMEOUT_MS = 30_000;
+
+/**
+ * Serialize a connection write on both its owner and its installation id. This
+ * is the order the connect path takes the two keys in, so a write of the same
+ * connection runs after the other finishes.
+ *
+ * The locks are taken before the statement budget is lowered, so a waiter
+ * observes `lock_timeout` at the lock wait rather than at a statement budget.
+ * The budget then applies to every statement of the section after the locks,
+ * not to the section itself, so an external call the section makes needs its own
+ * budget and the two together must stay below the lock wait.
+ */
 export async function withWorkspaceInstallationLock<T>(
   platform: 'linear' | 'slack' | 'discord',
   owner: Owner,
   installationId: string,
-  operation: (tx: DrizzleTransaction) => Promise<T>
+  operation: (tx: DrizzleTransaction) => Promise<T>,
+  {
+    statementTimeoutMs = INSTALLATION_WRITE_STATEMENT_TIMEOUT_MS,
+  }: { statementTimeoutMs?: number } = {}
 ): Promise<T> {
   return db.transaction(async tx => {
     // Postgres rejects a placeholder in SET, so the value is rendered here.
     await tx.execute(sql.raw(`SET LOCAL lock_timeout = '${INSTALLATION_LOCK_WAIT_MS}ms'`));
-    await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
     const ownerKey = `integration-installation-owner:${platform}:${owner.type}:${owner.id}`;
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerKey}, 0))`);
     const key = `integration-installation:${platform}:${installationId}`;
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+    await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${statementTimeoutMs}ms'`));
     return operation(tx);
   });
 }

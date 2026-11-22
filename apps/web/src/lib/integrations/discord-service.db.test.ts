@@ -6,16 +6,23 @@ import { INTEGRATION_STATUS, PLATFORM } from './core/constants';
 import { isPlatformIntegrationActive } from './core/health';
 import { withWorkspaceInstallationLock } from './oauth/workspace-installation-lock';
 import {
+  DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
   DiscordGuildAlreadyConnectedError,
   DiscordGuildRebindNotAllowedError,
   getInstallation,
   getInstallationByGuildId,
   getOwnerFromInstallation,
+  uninstallApp,
   upsertDiscordInstallation,
 } from './discord-service';
 
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test-model'),
+}));
+
+const mockCaptureException = jest.fn();
+jest.mock('@sentry/nextjs', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 /**
@@ -343,6 +350,59 @@ describe('Discord installation lifecycle', () => {
         .delete(platform_integrations)
         .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
       await db.delete(organizations).where(eq(organizations.id, otherOrgId));
+    }
+  });
+
+  it('keeps a disconnect for a server a second connection records in the account column', async () => {
+    // Real Postgres proof that the ownership check reads both identifier
+    // columns: the second row carries the server only in `platform_account_id`,
+    // so the disconnect is kept while that row exists.
+    const otherUserId = crypto.randomUUID();
+    await db.insert(kilocode_users).values({
+      id: otherUserId,
+      google_user_email: `${otherUserId}@example.com`,
+      google_user_name: 'Discord Legacy Duplicate',
+      google_user_image_url: 'https://example.com/avatar.png',
+      stripe_customer_id: `cus_discord_dup_${otherUserId}`,
+    });
+    const guild = { id: '432109876543210987', name: 'Legacy Duplicate Server', icon: null };
+
+    try {
+      const ownRowId = await insertDiscordRow({ type: 'user', id: userId }, guild);
+      const secondRowId = await insertDiscordRow({ type: 'user', id: otherUserId }, guild, {
+        installationId: null,
+      });
+      const fetchSpy = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 204 }));
+
+      await expect(uninstallApp({ type: 'user', id: userId })).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+      });
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+        tags: { source: 'discord_disconnect', op: 'shared_server' },
+        extra: { guildId: guild.id },
+      });
+
+      const survivors = await db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DISCORD),
+            eq(platform_integrations.platform_account_id, guild.id)
+          )
+        );
+      expect(survivors.map(row => row.id).sort()).toEqual([ownRowId, secondRowId].sort());
+    } finally {
+      jest.restoreAllMocks();
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, otherUserId));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
     }
   });
 

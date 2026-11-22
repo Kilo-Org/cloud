@@ -5,6 +5,8 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 
 const mockLimit = jest.fn();
+const mockTxReadLimit = jest.fn();
+const mockTxGuardLimit = jest.fn();
 const mockUpdateSet = jest.fn();
 const mockUpdateWhere = jest.fn();
 const mockUpdateReturning = jest.fn();
@@ -20,6 +22,21 @@ const mockSelect = jest.fn(() => ({
         limit: mockLimit,
       })),
       limit: mockLimit,
+    })),
+  })),
+}));
+/**
+ * A locked section's own reads, kept apart from `db.select()`. The row read
+ * takes the ordered chain, and the single-statement ownership check takes the
+ * unordered one, so each result is installed for exactly one of them.
+ */
+const mockTxSelect = jest.fn(() => ({
+  from: jest.fn(() => ({
+    where: jest.fn(() => ({
+      orderBy: jest.fn(() => ({
+        limit: mockTxReadLimit,
+      })),
+      limit: mockTxGuardLimit,
     })),
   })),
 }));
@@ -66,6 +83,8 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
   INSTALLATION_LOCK_WAIT_MS,
@@ -75,6 +94,7 @@ import {
 import {
   addDiscordReaction,
   DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+  DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS,
   DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
   DISCORD_RELEASE_REMOVAL_TIMEOUT_MS,
   postDiscordMessage,
@@ -87,6 +107,24 @@ import {
 } from './discord-service';
 
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
+
+/** The text of a drizzle `sql` statement, so a test can name the statement it ran. */
+function statementText(statement: unknown): string {
+  if (!statement || typeof statement !== 'object' || !('queryChunks' in statement)) {
+    return '';
+  }
+  const { queryChunks } = statement;
+  if (!Array.isArray(queryChunks)) return '';
+
+  return queryChunks
+    .map(chunk => {
+      if (typeof chunk === 'string') return chunk;
+      if (!chunk || typeof chunk !== 'object' || !('value' in chunk)) return '';
+      const value = chunk.value;
+      return Array.isArray(value) ? value.join('') : String(value ?? '');
+    })
+    .join('');
+}
 
 function buildDiscordIntegration(overrides: Record<string, unknown> = {}) {
   return {
@@ -364,24 +402,6 @@ describe('discord-service previous guild release', () => {
   const otherOwner = { type: 'user', id: 'user-2' } satisfies Owner;
   const lockState = { depth: 0 };
 
-  /** The text of a drizzle `sql` statement, so a test can name the lock it takes. */
-  function statementText(statement: unknown): string {
-    if (!statement || typeof statement !== 'object' || !('queryChunks' in statement)) {
-      return '';
-    }
-    const { queryChunks } = statement;
-    if (!Array.isArray(queryChunks)) return '';
-
-    return queryChunks
-      .map(chunk => {
-        if (typeof chunk === 'string') return chunk;
-        if (!chunk || typeof chunk !== 'object' || !('value' in chunk)) return '';
-        const value = chunk.value;
-        return Array.isArray(value) ? value.join('') : String(value ?? '');
-      })
-      .join('');
-  }
-
   beforeEach(() => {
     jest.restoreAllMocks();
     mockCaptureException.mockReset();
@@ -401,7 +421,7 @@ describe('discord-service previous guild release', () => {
     });
   });
 
-  it('leaves a server another owner records alone', async () => {
+  it('leaves a server that is not exclusively its own alone', async () => {
     mockLimit.mockResolvedValueOnce([buildDiscordIntegration({ owned_by_user_id: otherOwner.id })]);
     const fetchSpy = jest.spyOn(globalThis, 'fetch');
 
@@ -620,37 +640,69 @@ describe('discord-service bot removal', () => {
 });
 
 describe('discord-service uninstall', () => {
+  const guildId = '123456789012345678';
+  const movedGuildId = '223456789012345678';
+  const stillMovingGuildId = '323456789012345678';
+  const lockState = { depth: 0 };
+
   beforeEach(() => {
     jest.restoreAllMocks();
+    mockCaptureException.mockReset();
     mockLimit.mockReset();
+    mockTxReadLimit.mockReset();
+    mockTxGuardLimit.mockReset();
     mockDeleteWhere.mockReset();
+    mockTxExecute.mockReset();
+    mockTxExecute.mockResolvedValue([]);
+    mockTransaction.mockReset();
+    mockTxGuardLimit.mockResolvedValue([]);
+    lockState.depth = 0;
+    mockTransaction.mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) => {
+      lockState.depth += 1;
+      try {
+        return await operation({
+          execute: mockTxExecute,
+          select: mockTxSelect,
+          delete: () => ({ where: mockDeleteWhere }),
+        });
+      } finally {
+        lockState.depth -= 1;
+      }
+    });
   });
 
-  it('leaves the server before deleting the association', async () => {
-    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
-    const fetchSpy = jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(null, { status: 204 }));
+  it.each([204, 404])(
+    'removes the bot and deletes the association on a %i answer',
+    async status => {
+      mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+      mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
+      const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        expect(lockState.depth).toBe(1);
+        return new Response(null, { status });
+      });
+      const deleteDepths: number[] = [];
+      mockDeleteWhere.mockImplementation(async () => {
+        deleteDepths.push(lockState.depth);
+      });
 
-    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
+      await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'https://discord.com/api/v10/users/%40me/guilds/123456789012345678',
-      expect.objectContaining({ method: 'DELETE' })
-    );
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
-  });
-
-  it('disconnects a suspended association', async () => {
-    mockLimit.mockResolvedValue([buildDiscordIntegration({ integration_status: 'suspended' })]);
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
-
-    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
-  });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://discord.com/api/v10/users/%40me/guilds/${guildId}`,
+        expect.objectContaining({ method: 'DELETE' })
+      );
+      expect(timeoutSpy).toHaveBeenCalledWith(DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS);
+      expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+      expect(deleteDepths).toEqual([1]);
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    }
+  );
 
   it('keeps the association when Discord does not confirm the removal', async () => {
     mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
 
     await expect(uninstallApp(owner)).rejects.toMatchObject({
@@ -662,6 +714,7 @@ describe('discord-service uninstall', () => {
 
   it('keeps the association when Discord rejects the bot token', async () => {
     mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
 
     await expect(uninstallApp(owner)).rejects.toMatchObject({
@@ -683,6 +736,7 @@ describe('discord-service uninstall', () => {
     });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(mockTransaction).not.toHaveBeenCalled();
   });
 
   it('reports a missing association without calling Discord', async () => {
@@ -691,5 +745,140 @@ describe('discord-service uninstall', () => {
 
     await expect(uninstallApp(owner)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it('reports a row that disappears while the lock is held as missing', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit.mockResolvedValue([]);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(uninstallApp(owner)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Discord installation not found',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+  });
+
+  it('keeps the row and the membership for a server that is not exclusively its own', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxGuardLimit.mockResolvedValue([{ id: 'other-integration' }]);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(uninstallApp(owner)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'discord_disconnect', op: 'shared_server' },
+      extra: { guildId },
+    });
+  });
+
+  it('names the server in the guarded delete', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
+
+    const predicate = mockDeleteWhere.mock.calls[0][0];
+    const rendered = new PgDialect().sqlToQuery(predicate as SQL);
+    expect(rendered.params).toContain(guildId);
+    expect(rendered.params).toContain('integration-1');
+  });
+
+  it('follows the row to the server it moved to before removing anything', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit
+      .mockResolvedValueOnce([buildDiscordIntegration({ platform_installation_id: movedGuildId })])
+      .mockResolvedValueOnce([buildDiscordIntegration({ platform_installation_id: movedGuildId })]);
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
+
+    expect(mockTransaction).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `https://discord.com/api/v10/users/%40me/guilds/${movedGuildId}`,
+      expect.objectContaining({ method: 'DELETE' })
+    );
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+
+    const rendered = new PgDialect().sqlToQuery(mockDeleteWhere.mock.calls[0][0] as SQL);
+    expect(rendered.params).toContain(movedGuildId);
+    expect(rendered.params).not.toContain(guildId);
+
+    // The second section names the server the row recorded, not the one the
+    // pre-read saw.
+    const serverLocks = mockTxExecute.mock.calls
+      .map(([statement]) => statementText(statement))
+      .filter(
+        text =>
+          text.includes('pg_advisory_xact_lock') && !text.includes('integration-installation-owner')
+      );
+    expect(serverLocks).toHaveLength(2);
+    expect(serverLocks[0]).toContain(`integration-installation:discord:${guildId}`);
+    expect(serverLocks[1]).toContain(`integration-installation:discord:${movedGuildId}`);
+  });
+
+  it('stops following a row that is still moving and reports the retryable answer', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit
+      .mockResolvedValueOnce([buildDiscordIntegration({ platform_installation_id: movedGuildId })])
+      .mockResolvedValueOnce([
+        buildDiscordIntegration({ platform_installation_id: stillMovingGuildId }),
+      ]);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(uninstallApp(owner)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
+    });
+
+    expect(mockTransaction).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+  });
+
+  it('takes the owner lock and the server lock before lowering the statement budget', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
+
+    const ran = mockTxExecute.mock.calls.map(([statement]) => statementText(statement));
+    const lockIndexes = ran
+      .map((text, index) => (text.includes('pg_advisory_xact_lock') ? index : -1))
+      .filter(index => index >= 0);
+    expect(lockIndexes).toHaveLength(2);
+    expect(ran[lockIndexes[0]]).toContain(
+      `integration-installation-owner:discord:user:${owner.id}`
+    );
+    expect(ran[lockIndexes[1]]).toContain(`integration-installation:discord:${guildId}`);
+
+    const budgetIndex = ran.findIndex(text => text.includes('statement_timeout'));
+    expect(budgetIndex).toBeGreaterThanOrEqual(0);
+    expect(budgetIndex).toBeGreaterThan(lockIndexes[1]);
+    expect(ran[budgetIndex]).toContain(`'${INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS}ms'`);
+    expect(ran.some(text => text.includes(`lock_timeout = '${INSTALLATION_LOCK_WAIT_MS}ms'`))).toBe(
+      true
+    );
+  });
+
+  it('budgets the section below the lock wait', () => {
+    // Three statements run inside the locks: the row read, the ownership
+    // check, and the delete.
+    expect(
+      3 * INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS + DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS
+    ).toBeLessThan(INSTALLATION_LOCK_WAIT_MS);
   });
 });

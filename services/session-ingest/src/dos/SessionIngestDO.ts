@@ -459,8 +459,6 @@ const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
  */
 const RAW_EXPORT_PAGE_ROWS = 200;
 const RAW_EXPORT_PAGE_MAX_BYTES = 4 * 1024 * 1024;
-/** Pending reset of an object that stored nothing; cleared when it gains a row. */
-const EMPTY_CLEANUP_KEY = 'emptyCleanupPending';
 /** Delay so the reset alarm cannot race the response of the export that asked for it. */
 const EMPTY_CLEANUP_DELAY_MS = 1000;
 
@@ -2026,20 +2024,18 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /** Emits session metrics after close drain or inactivity, once per turn. */
   async alarm(): Promise<void> {
-    // The reset requested by an empty export runs here, where restarting the
-    // object cannot race a caller's response. The emptiness check and the reset
-    // share one synchronous stretch, so no ingest can slip between them, and an
-    // object that gained a row since the export is left alone. deleteAll() drops
-    // the schema too, so the object is restarted immediately and the next
-    // request runs the constructor migration; a retried alarm finds no marker
-    // and no meta and does nothing.
-    if ((await this.ctx.storage.get(EMPTY_CLEANUP_KEY)) === true) {
-      if (this.isEmptyObject()) {
-        await this.ctx.storage.deleteAll();
-        this.ctx.abort();
-        return;
-      }
-      await this.ctx.storage.delete(EMPTY_CLEANUP_KEY);
+    // An alarm on an object that stores nothing was scheduled by an empty
+    // export: ingest writes its meta rows before any item, so a metrics alarm
+    // always runs on stored data. The checks and the reset share one synchronous
+    // stretch; deleteAll() drops the schema too, so the object is restarted and
+    // the next request runs the constructor migration. An object that gained a
+    // row since the export is left alone.
+    if (!this.hasAnyData()) {
+      await this.ctx.storage.deleteAlarm();
+      if (this.hasAnyData()) return;
+      await this.ctx.storage.deleteAll();
+      this.ctx.abort();
+      return;
     }
 
     const metaRows = this.db
@@ -2488,11 +2484,18 @@ export class SessionIngestDO extends DurableObject<Env> {
     return { rows: window, nextCursor, done };
   }
 
-  /** True when this object holds no item and no meta row, so only the migration ever wrote there. */
-  private isEmptyObject(): boolean {
-    const item = this.db.select({ id: ingestItems.id }).from(ingestItems).limit(1).get();
-    const meta = this.db.select({ key: ingestMeta.key }).from(ingestMeta).limit(1).get();
-    return item === undefined && meta === undefined;
+  /** True when this object holds at least one stored item row, of any type. */
+  private hasItemRow(): boolean {
+    return (
+      this.db.select({ item_id: ingestItems.item_id }).from(ingestItems).limit(1).get() !==
+      undefined
+    );
+  }
+
+  /** True when this object holds any item row or meta row. */
+  private hasAnyData(): boolean {
+    if (this.hasItemRow()) return true;
+    return this.db.select({ key: ingestMeta.key }).from(ingestMeta).limit(1).get() !== undefined;
   }
 
   /**
@@ -2528,14 +2531,12 @@ export class SessionIngestDO extends DurableObject<Env> {
     const db = this.db;
     const encoder = new TextEncoder();
 
-    if (deleteIfEmpty && this.isEmptyObject()) {
+    if (deleteIfEmpty && !this.hasAnyData()) {
       // deleteAll() also drops this instance's SQLite schema (the constructor
       // migration runs once), so it cannot run while a caller waits on the
-      // response. The reset is committed to storage now and applied by the
-      // alarm, which re-checks emptiness first: the object restarts, so the next
-      // request migrates a fresh schema, and an ingest that lands in between
-      // keeps its rows because a non-empty object is never reset.
-      await this.ctx.storage.put(EMPTY_CLEANUP_KEY, true);
+      // response. The alarm applies the reset, and an empty object can only have
+      // a pending alarm because this export scheduled it: ingest writes its meta
+      // rows before any item, so a metrics alarm always runs on stored data.
       await this.ctx.storage.setAlarm(Date.now() + EMPTY_CLEANUP_DELAY_MS);
       return new ReadableStream<Uint8Array>({
         start: controller => {

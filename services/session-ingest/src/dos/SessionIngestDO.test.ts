@@ -519,6 +519,13 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
       orderBy: vi.fn(() => selectQuery),
       limit: vi.fn(() => selectQuery),
       get: vi.fn(() => {
+        const presence = (selectQuery as { _presence?: 'item' | 'meta' })._presence;
+        if (presence === 'item') {
+          return ingestItemRows.length > 0 ? { item_id: 'present' } : undefined;
+        }
+        if (presence === 'meta') {
+          return meta.size > 0 ? { key: 'kiloUserId', value: 'usr_cost' } : undefined;
+        }
         const key = (selectQuery as { _key?: string })._key;
         if (key === 'metricsEmitted') {
           const value = meta.get('metricsEmitted');
@@ -546,6 +553,27 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     };
 
     const originalSelect = vi.fn((columns?: unknown) => {
+      (selectQuery as { _presence?: 'item' | 'meta' })._presence = undefined;
+      if (
+        columns &&
+        typeof columns === 'object' &&
+        Object.keys(columns).length === 1 &&
+        'item_id' in (columns as Record<string, unknown>)
+      ) {
+        (selectQuery as { _presence?: 'item' | 'meta' })._presence = 'item';
+        (selectQuery as { _allKind?: 'meta' | 'items' })._allKind = undefined;
+        return selectQuery;
+      }
+      if (
+        columns &&
+        typeof columns === 'object' &&
+        Object.keys(columns).length === 1 &&
+        'key' in (columns as Record<string, unknown>)
+      ) {
+        (selectQuery as { _presence?: 'item' | 'meta' })._presence = 'meta';
+        (selectQuery as { _allKind?: 'meta' | 'items' })._allKind = undefined;
+        return selectQuery;
+      }
       if (
         columns &&
         typeof columns === 'object' &&
@@ -846,6 +874,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
       | 'metrics_window'
       | 'row_exists'
       | 'meta_rows'
+      | 'meta_presence'
+      | 'item_presence'
       | 'parent_message'
       | 'part_excerpt'
       | 'other';
@@ -862,6 +892,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     const selectQuery = {
       from: vi.fn((table: unknown) => {
         if (table === ingestMeta && selectKind === 'other') selectKind = 'meta_rows';
+        if (table === ingestItems && selectKind === 'other') selectKind = 'item_presence';
         return selectQuery;
       }),
       where: vi.fn((condition: unknown) => {
@@ -880,6 +911,16 @@ describe('SessionIngestDO live activity + cost persist', () => {
         return selectQuery;
       }),
       get: vi.fn(() => {
+        if (selectKind === 'item_presence') {
+          const first = itemRows.values().next();
+          return first.done ? undefined : { item_id: first.value.item_id };
+        }
+        if (selectKind === 'meta_presence') {
+          const first = meta.keys().next();
+          return first.done
+            ? undefined
+            : { key: first.value, value: meta.get(first.value) ?? null };
+        }
         if (selectKind === 'row_exists') {
           // The cut test: is there a counted row (message or part) older than the cursor the
           // scan stopped at?
@@ -1042,6 +1083,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
           }
         } else if (cols && 'value' in cols) {
           selectKind = 'meta_get';
+        } else if (cols && Object.keys(cols).length === 1 && 'key' in cols) {
+          selectKind = 'meta_presence';
         } else if (cols && 'ingested_at' in cols) {
           selectKind = 'item_guard';
         } else {

@@ -44,7 +44,7 @@ export type OrganizationMembershipColumns = {
 };
 
 /** The organization is live: an "active" decision ignores soft-deleted rows. */
-function liveOrganizationCondition(organization: OrganizationColumns): SQL {
+export function liveOrganizationCondition(organization: OrganizationColumns): SQL {
   return isNull(organization.deleted_at);
 }
 

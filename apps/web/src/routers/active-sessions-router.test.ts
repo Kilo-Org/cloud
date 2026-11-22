@@ -610,6 +610,9 @@ describe('active-sessions-router', () => {
         pull: () => new Promise<void>(() => {}),
         cancel,
       });
+      // Reading the body takes it over through `getReader`; the release is a
+      // plain `cancel`, so the reader must never appear.
+      const getReader = jest.spyOn(stream, 'getReader');
       const stalled = new Response(stream, { status: 503 });
       jest.spyOn(global, 'fetch').mockResolvedValue(stalled);
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -624,9 +627,12 @@ describe('active-sessions-router', () => {
           code: 'SERVICE_UNAVAILABLE',
           message: 'Session ingest is unavailable',
         });
-        // The body was never taken, so nothing had to be torn down either.
-        expect(stalled.bodyUsed).toBe(false);
-        expect(cancel).not.toHaveBeenCalled();
+        // The body was never read, and it was released instead of being left
+        // checked out: `cancel` disturbs it (hence `bodyUsed`), which is what
+        // ends the transfer, and it ran exactly once.
+        expect(getReader).not.toHaveBeenCalled();
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(stalled.bodyUsed).toBe(true);
         expect(jest.getTimerCount()).toBe(0);
         // Status only: the 503 log line carries no excerpt argument.
         expect(warn).toHaveBeenCalledTimes(1);

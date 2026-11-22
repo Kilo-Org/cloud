@@ -306,7 +306,7 @@ describe('readTextWithinBudget', () => {
     const stream = new ReadableStream<Uint8Array>({
       pull(controller) {
         pulls += 1;
-        // Five 100-character bursts; the cap is reached during the first.
+        // Five 100-character bursts; the cap is reached during the second.
         controller.enqueue(encoder.encode('z'.repeat(100)));
         if (pulls === 5) {
           controller.close();

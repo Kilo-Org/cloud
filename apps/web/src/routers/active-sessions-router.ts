@@ -307,6 +307,11 @@ export const activeSessionsRouter = createTRPCRouter({
         // not hold the poll for the rest of the budget to report an error the
         // code already knows. Keep it retryable instead of flattening it into a
         // gateway error the client would treat as final.
+        //
+        // The body is never read, so it is released here: an unread body must
+        // not stay checked out on a polled query, where every poll against a
+        // stuck worker would pin another connection.
+        await response.body?.cancel().catch(() => undefined);
         console.warn(
           `[active-sessions.instances] non-2xx: ${response.status} ${response.statusText}`
         );

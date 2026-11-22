@@ -2665,7 +2665,7 @@
       "searchPlaceholder": "Hľadať repozitáre",
       "noMatches": "Žiadne zhody",
       "noRepositories": "Žiadne dostupné repozitáre",
-      "noRepositoriesDescription": "K tvojmu účtu nie sú pripojené žiadne repozitáre.",
+      "noRepositoriesDescription": "Ak chcete načítať repozitáre, pripojte GitHub alebo GitLab.",
       "loading": "Načítava sa…",
       "accessibility": "Repozitár: {{label}}",
       "platformBitbucket": "Bitbucket"

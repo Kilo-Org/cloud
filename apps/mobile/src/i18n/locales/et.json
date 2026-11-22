@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Otsi hoidlaid",
       "noMatches": "Vasteid pole",
       "noRepositories": "Saadaolevaid hoidlaid pole",
-      "noRepositoriesDescription": "Sinu kontoga pole ühendatud ühtegi hoidlat.",
+      "noRepositoriesDescription": "Hoidlate laadimiseks ühenda GitHub või GitLab.",
       "loading": "Laadimine…",
       "accessibility": "Hoidla: {{label}}",
       "platformBitbucket": "Bitbucket"

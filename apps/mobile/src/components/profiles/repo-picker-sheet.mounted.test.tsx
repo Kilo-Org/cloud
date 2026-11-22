@@ -1,138 +1,229 @@
-import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/renderer.ts) */
+import { createElement, type ReactNode } from 'react';
+import { type Href } from 'expo-router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { type RepoOption } from './repo-bindings-model';
-import { RepoPickerSheet } from './repo-picker-sheet';
-import { act, type ReactTestInstance } from '@/test/renderer';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { connectedServicesHref } from '@/lib/profile-navigation';
+import { act, TestRenderer } from '@/test/renderer';
 
+import { RepoPickerSheet } from './repo-picker-sheet';
+
+/**
+ * The repo picker's empty state.
+ *
+ * A person with no repository to pick used to hit a dead end: the list said
+ * "No repositories available" and nothing opened the screen where a repository
+ * service is connected. The state now carries one action, and that action must
+ * not push the Connected services route while the native sheet is still
+ * presented — a push under a presented sheet reads as a dead tap — so the push
+ * waits for the sheet's finished-dismissal report.
+ */
+
+const router = vi.hoisted(() => ({ push: vi.fn<(href: Href) => void>() }));
+
+vi.mock('expo-router', () => ({ useRouter: () => router }));
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
-  View: 'View',
+  Keyboard: { dismiss: vi.fn() },
   ScrollView: 'ScrollView',
-  Pressable: 'Pressable',
-  useColorScheme: () => 'light',
+  View: 'View',
 }));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
-vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#888', foreground: '#000' }),
+}));
+// The sheet stays mounted through the native dismiss animation, so the stub
+// renders `children` whatever `visible` says and exposes `onDismiss` for the
+// suite to report the finished dismissal.
+vi.mock('@/components/agents/session-page-sheet', () => ({
+  SessionPageSheet: (props: { children?: ReactNode }) =>
+    createElement('SessionPageSheet', props, props.children),
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
-vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
-vi.mock('@/components/ui/search-field', () => ({ SearchField: 'SearchField' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   GitBranch: 'GitBranch',
   Lock: 'Lock',
+  Plug: 'Plug',
   SearchX: 'SearchX',
   Unlock: 'Unlock',
 }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#000000' }),
-}));
-vi.mock('@/lib/picker-list', () => ({
-  SEARCHABLE_PICKER_LIST_PROPS: {},
-  dismissSearchPickerKeyboard: vi.fn(),
-}));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+vi.mock('@/components/ui/search-field', () => ({ SearchField: 'SearchField' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
-const githubRepo: RepoOption = { platform: 'github', fullName: 'acme/widgets', private: false };
+/** The props the empty state, its action, the search field and the sheet receive as host nodes. */
+type EmptyStateProps = { title?: string; description?: string; action?: ReactNode };
+type StateActionProps = { label?: string; onPress?: () => void };
+type SearchFieldProps = { onChangeText?: (text: string) => void };
+type SheetProps = { visible?: boolean; onClose?: () => void; onDismiss?: () => void };
 
-/** The first host node of a mocked component type (host node types are not in the intrinsic map). */
-function nodeOfType(root: ReactTestInstance, type: string): ReactTestInstance | undefined {
-  return root.findAll(node => node.type === type)[0];
-}
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-/** How many host nodes of a mocked component type the tree holds. */
-function countOfType(root: ReactTestInstance, type: string): number {
-  return root.findAll(node => node.type === type).length;
-}
-
-type QueryErrorNode = { props: { title?: string; onRetry?: () => void } };
-
-function queryErrorOf(root: ReactTestInstance): QueryErrorNode {
-  const node = nodeOfType(root, 'QueryError');
-  if (!node) {
-    throw new Error('the query error did not render');
+function nodesOfType(type: string): TestRenderer.ReactTestInstance[] {
+  if (!renderer) {
+    throw new Error('Missing renderer');
   }
-  // The mocked surface is a host node, so its props are untyped at the boundary.
-  return { props: node.props as QueryErrorNode['props'] };
+  return renderer.root.findAll(node => (node.type as string) === type);
 }
 
-describe('repo picker sheet', () => {
-  it('error: names the repository list, not the profiles it does not show', async () => {
-    const onRetry = vi.fn<() => void>();
-    const { renderer, unmount } = await renderWithProviders(
+function emptyStateProps(): EmptyStateProps {
+  const [state] = nodesOfType('EmptyState');
+  if (!state) {
+    throw new Error('the empty state did not render');
+  }
+  return state.props as EmptyStateProps;
+}
+
+function actionProps(): StateActionProps | undefined {
+  const [action] = nodesOfType('StateAction');
+  return action?.props as StateActionProps | undefined;
+}
+
+function sheetProps(): SheetProps[] {
+  return nodesOfType('SessionPageSheet').map(node => node.props as SheetProps);
+}
+
+function mountSheet(href: Href, options: { isLoading?: boolean; isError?: boolean } = {}) {
+  const onClose = vi.fn<() => void>();
+  act(() => {
+    renderer = TestRenderer.create(
       createElement(RepoPickerSheet, {
         repositories: [],
-        isLoading: false,
-        isError: true,
-        onRetry,
+        isLoading: options.isLoading ?? false,
+        isError: options.isError ?? false,
+        onRetry: vi.fn<() => void>(),
         selectedKey: null,
-        onSelect: vi.fn<(repo: RepoOption) => void>(),
-        onClose: vi.fn<() => void>(),
+        onSelect: vi.fn<() => void>(),
+        onClose,
+        connectedServicesHref: href,
       })
     );
+  });
+  return onClose;
+}
 
-    expect(countOfType(renderer.root, 'QueryError')).toBe(1);
-    expect(queryErrorOf(renderer.root).props.title).toBe(i18n.t('common.couldNotLoadRepositories'));
-    expect(queryErrorOf(renderer.root).props.title).toBe('Could not load repositories');
-    expect(queryErrorOf(renderer.root).props.title).not.toBe(i18n.t('profiles.loadFailed'));
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  router.push.mockReset();
+});
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+  vi.unstubAllGlobals();
+});
+
+describe('RepoPickerSheet empty state', () => {
+  it('offers the Connected services action without naming the destination twice', () => {
+    mountSheet(connectedServicesHref());
+
+    const state = emptyStateProps();
+    const label = i18n.t('integrations.sectionTitle');
+    // The action names the destination; the sentence beside it must not name
+    // the same destination again, or three lines show it twice and read as two
+    // controls.
+    expect(state.description).toBe(i18n.t('agentChat.repoPicker.noRepositoriesDescription'));
+    expect(state.description).not.toContain(label);
+    expect(actionProps()?.label).toBe(label);
+  });
+
+  it('pushes Connected services only after the native dismissal reports', () => {
+    const onClose = mountSheet(connectedServicesHref());
 
     act(() => {
-      (queryErrorOf(renderer.root).props.onRetry as () => void)();
+      actionProps()?.onPress?.();
     });
-    expect(onRetry).toHaveBeenCalledOnce();
 
-    unmount();
+    // The sheet is still presented: a push now would land under it, and the
+    // tap would look dead.
+    expect(onClose).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(sheetProps().map(props => props.visible)).toEqual([false]);
+
+    // `Sheet` forwards its own close edge for the close this asks for, ahead of
+    // the finished-dismissal report. That edge must not become the caller's
+    // close or drop the queued route: the sheet is still sliding down.
+    act(() => {
+      sheetProps()[0]?.onClose?.();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+
+    act(() => {
+      sheetProps()[0]?.onDismiss?.();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledExactlyOnceWith('/(app)/(tabs)/(3_profile)/integrations');
   });
 
-  it('loading: content-shaped rows and no query error', async () => {
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(RepoPickerSheet, {
-        repositories: [],
-        isLoading: true,
-        isError: false,
-        onRetry: vi.fn<() => void>(),
-        selectedKey: null,
-        onSelect: vi.fn<(repo: RepoOption) => void>(),
-        onClose: vi.fn<() => void>(),
-      })
+  it('carries the scope into the route it opens', () => {
+    const onClose = mountSheet(connectedServicesHref('org-1'));
+
+    act(() => {
+      actionProps()?.onPress?.();
+    });
+    act(() => {
+      sheetProps()[0]?.onDismiss?.();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledExactlyOnceWith(
+      '/(app)/(tabs)/(3_profile)/integrations?org=org-1'
     );
-
-    expect(countOfType(renderer.root, 'RowSkeleton')).toBeGreaterThan(0);
-    expect(countOfType(renderer.root, 'QueryError')).toBe(0);
-
-    unmount();
   });
 
-  it('happy: one row per repository option, and a tap selects it', async () => {
-    const onSelect = vi.fn<(repo: RepoOption) => void>();
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(RepoPickerSheet, {
-        repositories: [githubRepo],
-        isLoading: false,
-        isError: false,
-        onRetry: vi.fn<() => void>(),
-        selectedKey: null,
-        onSelect,
-        onClose: vi.fn<() => void>(),
-      })
-    );
+  it('keeps the search-empty state actionless', async () => {
+    mountSheet(connectedServicesHref());
 
-    expect(countOfType(renderer.root, 'ChoiceRow')).toBe(1);
-
-    const row = nodeOfType(renderer.root, 'ChoiceRow');
-    if (!row) {
-      throw new Error('the repository row did not render');
+    const [field] = nodesOfType('SearchField');
+    if (!field) {
+      throw new Error('the search field did not render');
     }
-    act(() => {
-      (row.props.onPress as () => void)();
+    const { onChangeText } = field.props as SearchFieldProps;
+    await act(() => {
+      onChangeText?.('nothing-matches');
     });
-    expect(onSelect).toHaveBeenCalledWith(githubRepo);
 
-    unmount();
+    const state = emptyStateProps();
+    expect(state.title).toBe(i18n.t('common.noRepositoriesFound'));
+    expect(actionProps()).toBeUndefined();
+  });
+
+  it('names the repository list, not the profiles, when the repository read fails', () => {
+    mountSheet(connectedServicesHref(), { isError: true });
+
+    const [error] = nodesOfType('QueryError');
+    if (!error) {
+      throw new Error('the query error did not render');
+    }
+    const { title } = error.props as { title?: string };
+    expect(title).toBe(i18n.t('common.couldNotLoadRepositories'));
+    // The sheet lists repositories; the profile catalog's sentence describes a
+    // different list and must not head this failure.
+    expect(title).not.toBe(i18n.t('profiles.loadFailed'));
+  });
+
+  it('keeps the loading and error states actionless', () => {
+    mountSheet(connectedServicesHref(), { isLoading: true });
+
+    expect(nodesOfType('RowSkeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType('EmptyState')).toHaveLength(0);
+    expect(actionProps()).toBeUndefined();
+
+    act(() => renderer?.unmount());
+    mountSheet(connectedServicesHref(), { isError: true });
+
+    expect(nodesOfType('QueryError')).toHaveLength(1);
+    expect(nodesOfType('EmptyState')).toHaveLength(0);
+    expect(actionProps()).toBeUndefined();
   });
 });

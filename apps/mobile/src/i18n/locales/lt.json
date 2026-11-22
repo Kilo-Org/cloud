@@ -2665,7 +2665,7 @@
       "searchPlaceholder": "Ieškoti saugyklų",
       "noMatches": "Atitikčių nėra",
       "noRepositories": "Nėra prieinamų saugyklų",
-      "noRepositoriesDescription": "Prie jūsų paskyros neprijungta jokių saugyklų.",
+      "noRepositoriesDescription": "Kad įkeltum saugyklas, prijunk GitHub arba GitLab.",
       "loading": "Įkeliama…",
       "accessibility": "Saugykla: {{label}}",
       "platformBitbucket": "Bitbucket"

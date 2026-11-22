@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Repozitoriylarni qidirish",
       "noMatches": "Mos natija topilmadi",
       "noRepositories": "Repozitoriyalar yo'q",
-      "noRepositoriesDescription": "Hisobingizga ulangan repozitoriyalar yo'q.",
+      "noRepositoriesDescription": "Repozitoriyalarni yuklash uchun GitHub yoki GitLabni ulang.",
       "loading": "Yuklanmoqda…",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket"

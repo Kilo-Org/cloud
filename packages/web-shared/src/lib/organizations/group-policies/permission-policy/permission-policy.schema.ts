@@ -5,6 +5,7 @@ import * as z from 'zod';
 export const PERMISSION_POLICY_MAX_AGE_SECONDS = 300;
 export const MAX_PERMISSION_POLICY_BYTES = 32 * 1024;
 export const MAX_MEMBER_PERMISSION_POLICY_BYTES = 256 * 1024;
+export const ORGANIZATION_GROUP_AGENT_PERMISSIONS_POLICY_TYPE = 'agent_permissions';
 const MAX_RULES = 100;
 const MAX_TOOLS = 100;
 const MAX_LAYERS = MAX_ORGANIZATION_GROUPS + 1;
@@ -57,11 +58,13 @@ const AgentPermissionsDataSchema = z
   );
 
 export const OrganizationGroupAgentPermissionsPolicySchema = z.strictObject({
-  type: z.literal('agent_permissions'),
+  type: z.literal(ORGANIZATION_GROUP_AGENT_PERMISSIONS_POLICY_TYPE),
   data: AgentPermissionsDataSchema,
 }) satisfies z.ZodType<OrganizationGroupAgentPermissionsPolicy>;
 
-export const OrganizationPermissionPolicyTypeSchema = z.enum(['agent_permissions']);
+export const OrganizationPermissionPolicyTypeSchema = z.enum([
+  ORGANIZATION_GROUP_AGENT_PERMISSIONS_POLICY_TYPE,
+]);
 export const OrganizationPermissionPolicySchema = OrganizationGroupAgentPermissionsPolicySchema;
 
 export type OrganizationPermissionPolicy = z.infer<typeof OrganizationPermissionPolicySchema>;

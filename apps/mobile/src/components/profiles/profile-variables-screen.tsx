@@ -216,7 +216,7 @@ export function ProfileVariablesScreen({
         description={null}
         placement="top"
         action={
-          <ProfileManageSlot permission={permission}>
+          <ProfileManageSlot permission={permission} organizationId={organizationId}>
             <StateAction label={t('profiles.addVariable')} icon={Plus} onPress={startAdd} />
           </ProfileManageSlot>
         }
@@ -266,7 +266,7 @@ export function ProfileVariablesScreen({
 
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
 
-        <ProfileManageSlot permission={permission}>
+        <ProfileManageSlot permission={permission} organizationId={organizationId}>
           {showAdd && atVariableCap ? (
             <AccessibleStatus
               message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}

@@ -37,6 +37,7 @@ const h = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => h.permission,
 }));
+vi.mock('@/lib/trial-refusal', () => ({ useBillingAction: () => undefined }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({

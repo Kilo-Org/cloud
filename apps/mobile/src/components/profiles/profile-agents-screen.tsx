@@ -157,7 +157,7 @@ export function ProfileAgentsScreen({
         description={null}
         placement="top"
         action={
-          <ProfileManageSlot permission={permission}>
+          <ProfileManageSlot permission={permission} organizationId={organizationId}>
             <StateAction label={t('profiles.agents.add')} icon={Plus} onPress={handleStartAdd} />
           </ProfileManageSlot>
         }
@@ -197,7 +197,7 @@ export function ProfileAgentsScreen({
             );
           })}
         </RowGroup>
-        <ProfileManageSlot permission={permission}>
+        <ProfileManageSlot permission={permission} organizationId={organizationId}>
           {atAgentCap ? (
             <AccessibleStatus
               message={t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS })}

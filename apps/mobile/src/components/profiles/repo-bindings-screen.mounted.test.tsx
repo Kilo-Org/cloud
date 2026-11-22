@@ -65,6 +65,7 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<(href: string) =
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => 'allowed',
 }));
+vi.mock('@/lib/trial-refusal', () => ({ useBillingAction: () => undefined }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
 }));

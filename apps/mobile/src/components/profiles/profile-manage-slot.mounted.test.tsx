@@ -7,22 +7,36 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The shared plan-refusal block is asserted through its props, so a host
+// element of the same name stands in for it.
+vi.mock('@/components/organization/plan-refusal', () => ({
+  OrganizationPlanRefusal: 'OrganizationPlanRefusal',
+}));
+// The billing step reads the reader's membership list, a module chain the
+// mounted project cannot load (see `vitest.setup.ts`), so the hook answers with
+// a known step.
+const BILLING_ACTION = vi.hoisted(() => ({
+  label: 'Manage billing',
+  onPress: () => undefined,
+}));
+vi.mock('@/lib/trial-refusal', () => ({ useBillingAction: () => BILLING_ACTION }));
 
 /** Stands in for the add, edit or delete control the caller would supply. */
 const ACTION = 'Profile action';
 
 const SENTENCE = i18n.t('profiles.organizationRoleRequired');
 // A `plan-ended` reader is an owner or an admin, which is always a billing
-// role, and this slot renders no billing step: the sentence names kilo.ai.
-const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEndedBillingAtKiloAi');
+// role, and the slot pairs the step-offering sentence with that step.
+const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEndedBilling');
 const OWNER_NAMING_SENTENCE = i18n.t('common.organizationTrialEnded');
+const ORGANIZATION_ID = 'org-1';
 
 describe('ProfileManageSlot', () => {
   it('allowed: renders the child and not the sentence', async () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         ProfileManageSlot,
-        { permission: 'allowed' },
+        { permission: 'allowed', organizationId: ORGANIZATION_ID },
         createElement('Action', null, ACTION)
       )
     );
@@ -35,6 +49,9 @@ describe('ProfileManageSlot', () => {
     expect(actions).toHaveLength(1);
     expect(actions[0]?.props.children).toBe(ACTION);
     expect(texts).not.toContain(SENTENCE);
+    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanRefusal')).toEqual(
+      []
+    );
 
     unmount();
   });
@@ -43,7 +60,7 @@ describe('ProfileManageSlot', () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         ProfileManageSlot,
-        { permission: 'read-only' },
+        { permission: 'read-only', organizationId: ORGANIZATION_ID },
         createElement('Action', null, ACTION)
       )
     );
@@ -54,28 +71,34 @@ describe('ProfileManageSlot', () => {
 
     expect(texts).toEqual([SENTENCE]);
     expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanRefusal')).toEqual(
+      []
+    );
 
     unmount();
   });
 
-  it('plan-ended: renders the ended-plan sentence in place of the action', async () => {
+  it('plan-ended: paints the shared refusal with the step-offering copy and the billing step', async () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         ProfileManageSlot,
-        { permission: 'plan-ended' },
+        { permission: 'plan-ended', organizationId: ORGANIZATION_ID },
         createElement('Action', null, ACTION)
       )
     );
 
-    const texts = renderer.root
-      .findAll(node => String(node.type) === 'Text')
-      .map(node => node.props.children);
-
     // The plan, not the role, is what stops this manager: an action here would
-    // be refused by the server on every press. The manager can change the plan,
-    // so the sentence names the destination instead of the owner who can.
-    expect(texts).toEqual([PLAN_ENDED_SENTENCE]);
-    expect(texts).not.toContain(OWNER_NAMING_SENTENCE);
+    // be refused by the server on every press. The reader can change the plan,
+    // so the slot paints the shared block with the sentence that pairs with the
+    // billing step under it, and stretches across an `EmptyState`'s centered
+    // action cell.
+    const refusals = renderer.root.findAll(node => String(node.type) === 'OrganizationPlanRefusal');
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]?.props.message).toBe(PLAN_ENDED_SENTENCE);
+    expect(refusals[0]?.props.message).not.toBe(OWNER_NAMING_SENTENCE);
+    expect(refusals[0]?.props.className).toContain('self-stretch');
+    expect(refusals[0]?.props.action).toBe(BILLING_ACTION);
+    expect(renderer.root.findAll(node => String(node.type) === 'Text')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
 
     unmount();
@@ -85,7 +108,7 @@ describe('ProfileManageSlot', () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         ProfileManageSlot,
-        { permission: 'resolving' },
+        { permission: 'resolving', organizationId: ORGANIZATION_ID },
         createElement('Action', null, ACTION)
       )
     );
@@ -95,6 +118,9 @@ describe('ProfileManageSlot', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Text')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'View')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanRefusal')).toEqual(
+      []
+    );
 
     unmount();
   });

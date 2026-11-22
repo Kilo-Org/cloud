@@ -280,7 +280,7 @@ export function ProfileSkillsScreen({
         description={null}
         placement="top"
         action={
-          <ProfileManageSlot permission={permission}>
+          <ProfileManageSlot permission={permission} organizationId={organizationId}>
             <StateAction label={t('profiles.addSkill')} icon={Plus} onPress={handleStartAdd} />
           </ProfileManageSlot>
         }
@@ -332,7 +332,7 @@ export function ProfileSkillsScreen({
             />
           ))}
         </RowGroup>
-        <ProfileManageSlot permission={permission}>
+        <ProfileManageSlot permission={permission} organizationId={organizationId}>
           {atSkillCap ? (
             <AccessibleStatus
               message={t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })}

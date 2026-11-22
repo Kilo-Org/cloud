@@ -2,10 +2,12 @@
 // so the screen offers Add and per-row Unbind only to a caller it would accept
 // them from, and a member reads the sentence that names who may act. A role
 // still resolving claims neither.
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { StateAction } from '@/components/empty-state';
+import { billingHrefFor } from '@/lib/trial-refusal';
 import { emptyStateProps } from '@/components/profiles/repo-bindings-screen.add-form.test-helpers';
 import {
   findAll,
@@ -69,6 +71,14 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permissionState.permission,
 }));
+// The billing step reads the reader's membership list through this module, and
+// that chain cannot load in the mounted project (see `vitest.setup.ts`), so the
+// read answers with a role that may change the plan. The refusal's own route
+// helper stays real, so the suite asserts the value it returns.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  isMoneyRole: (role: string | undefined) => role === 'owner' || role === 'admin',
+  useOrgBoundary: () => ({ organizationId: 'org-1', role: 'owner', org: undefined }),
+}));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('react-native', () => ({
@@ -110,6 +120,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   ChevronDown: 'ChevronDown',
+  CreditCard: 'CreditCard',
   GitBranch: 'GitBranch',
   Lock: 'Lock',
   Search: 'Search',
@@ -127,9 +138,11 @@ const ADD_LABEL = 'Add default';
 const ROLE_SENTENCE = i18n.t('profiles.organizationRoleRequired');
 const EMPTY_TITLE = i18n.t('profiles.repoBindings.empty');
 const PLAN_TITLE = i18n.t('profiles.repoBindings.planEndedTitle');
-// A 'plan-ended' reader holds a role that can change the plan, so the sentence
-// names the step at kilo.ai rather than an owner who can act.
-const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEndedBillingAtKiloAi');
+// A 'plan-ended' reader holds a role that can change the plan, so the state
+// pairs the step-offering sentence with the billing action under it.
+const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEndedBilling');
+const BILLING_LABEL = i18n.t('organization.hub.manageBilling');
+const BILLING_HREF = billingHrefFor('org-1');
 
 function buttonLabels(root: ReactTestInstance): string[] {
   return findAll(root, 'Button')
@@ -238,20 +251,34 @@ describe('RepoBindingsScreen roles', () => {
     unmount();
   });
 
-  it('plan-ended with no bindings: names the missing plan and offers no action', async () => {
+  it('plan-ended with no bindings: names the missing plan and offers the billing step', async () => {
     permissionState.permission = 'plan-ended';
     bindingsState.bindingsQuery.bindings = [];
 
     const { renderer, unmount } = await mountScreen('org-1');
 
     // The empty list is the whole surface, so its title says the plan is what
-    // is missing instead of reading as a list nobody configured, and its
-    // description is where a manager learns why the action is absent.
+    // is missing instead of reading as a list nobody configured, its description
+    // offers the step, and the step itself is the state's action: without it the
+    // blocking state would leave the reader with no way to end it.
     const empty = findOne(renderer.root, 'EmptyState');
     expect(empty.props.title).toBe(PLAN_TITLE);
     expect(empty.props.title).not.toBe(EMPTY_TITLE);
     expect(empty.props.description).toBe(PLAN_ENDED_SENTENCE);
     expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
+
+    // `EmptyState` is a host stub here, so its action is read as the element the
+    // screen passes: the primary state control, labelled with the billing row.
+    const action = empty.props.action as ReactElement<{ label: string; onPress: () => void }>;
+    expect(action.type).toBe(StateAction);
+    expect(action.props.label).toBe(BILLING_LABEL);
+
+    act(() => {
+      action.props.onPress();
+    });
+    // The step names the organization whose plan ended, so the billing screen
+    // cannot open a different account's plan.
+    expect(routerPush).toHaveBeenCalledWith(BILLING_HREF);
 
     unmount();
   });

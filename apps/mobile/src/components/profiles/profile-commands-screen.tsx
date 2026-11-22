@@ -290,7 +290,7 @@ export function ProfileCommandsScreen({
         description={null}
         placement="top"
         action={
-          <ProfileManageSlot permission={permission}>
+          <ProfileManageSlot permission={permission} organizationId={organizationId}>
             <StateAction label={t('profiles.addCommand')} icon={Plus} onPress={add} />
           </ProfileManageSlot>
         }
@@ -300,7 +300,7 @@ export function ProfileCommandsScreen({
     content = (
       <View className="gap-3">
         <RowGroup>{commands.map((command, index) => renderCommandRow(command, index))}</RowGroup>
-        <ProfileManageSlot permission={permission}>
+        <ProfileManageSlot permission={permission} organizationId={organizationId}>
           {commands.length >= MAX_SETUP_COMMANDS ? (
             <AccessibleStatus
               message={t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS })}

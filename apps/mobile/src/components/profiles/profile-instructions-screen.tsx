@@ -273,7 +273,7 @@ export function ProfileInstructionsScreen({
         }
         placement="top"
         action={
-          <ProfileManageSlot permission={permission}>
+          <ProfileManageSlot permission={permission} organizationId={organizationId}>
             <StateAction
               label={t('profiles.addInstruction')}
               icon={Plus}
@@ -324,7 +324,7 @@ export function ProfileInstructionsScreen({
             />
           ))}
         </RowGroup>
-        <ProfileManageSlot permission={permission}>
+        <ProfileManageSlot permission={permission} organizationId={organizationId}>
           {atInstructionCap ? (
             <AccessibleStatus
               message={t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS })}

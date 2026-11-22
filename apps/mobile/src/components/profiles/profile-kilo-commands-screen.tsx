@@ -174,7 +174,7 @@ export function ProfileKiloCommandsScreen({
         description={null}
         placement="top"
         action={
-          <ProfileManageSlot permission={permission}>
+          <ProfileManageSlot permission={permission} organizationId={organizationId}>
             <StateAction label={t('profiles.slashCommands.add')} icon={Plus} onPress={startAdd} />
           </ProfileManageSlot>
         }
@@ -249,7 +249,7 @@ export function ProfileKiloCommandsScreen({
             );
           })}
         </RowGroup>
-        <ProfileManageSlot permission={permission}>
+        <ProfileManageSlot permission={permission} organizationId={organizationId}>
           {atCommandCap ? (
             <AccessibleStatus
               message={t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS })}

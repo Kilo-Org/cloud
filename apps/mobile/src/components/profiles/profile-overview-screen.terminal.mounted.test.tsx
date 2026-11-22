@@ -41,6 +41,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => 'allowed',
 }));
+vi.mock('@/lib/trial-refusal', () => ({ useBillingAction: () => undefined }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => 'online',
   useCommittedConnectivityStatus: () => 'online',

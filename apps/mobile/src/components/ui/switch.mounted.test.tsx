@@ -60,6 +60,25 @@ function nativeProps(root: I): {
   return node.props as never;
 }
 
+/**
+ * The opacity the Android node paints, read off the style array the component
+ * builds. `undefined` means no part of the array carries one.
+ */
+function nodeOpacity(props: { style?: unknown }): number | undefined {
+  const parts: unknown[] = Array.isArray(props.style) ? props.style : [];
+  for (const part of parts) {
+    if (
+      typeof part === 'object' &&
+      part !== null &&
+      'opacity' in part &&
+      typeof part.opacity === 'number'
+    ) {
+      return part.opacity;
+    }
+  }
+  return undefined;
+}
+
 function touchBox(root: I):
   | {
       accessible?: boolean;
@@ -173,7 +192,11 @@ describe('Switch', () => {
     native.os = 'android';
     const style = { marginVertical: 3 };
     const props = nativeProps(renderSwitch({ style }).root);
-    expect(props.style).toEqual([{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]);
+    expect(props.style).toEqual([
+      { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP },
+      null,
+      style,
+    ]);
   });
 
   it('centers the iOS control at its own size in a hidden 44pt touch box', () => {
@@ -217,87 +240,66 @@ describe('Switch', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
-  it('keeps the on hue at reduced opacity on a disabled on switch and keeps it on', () => {
+  it('paints a disabled on switch the live on pair and dims the node', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     expect(props.value).toBe(true);
-    // `primary` #4F5A10 at 0.7; the off half keeps `mutedSoft` at 0.8.
-    expect(props.trackColor?.true).toBe('rgba(79, 90, 16, 0.7)');
-    expect(props.trackColor?.false).toBe('rgba(169, 163, 154, 0.8)');
-    expect(props.thumbColor).toBe(lightColors.ink2);
-    expect(props.thumbColor).not.toBe(lightColors.primaryForeground);
+    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
+    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+    expect(nodeOpacity(props)).toBe(0.5);
   });
 
-  it('keeps the off hue at reduced opacity on a disabled off switch', () => {
+  // Both schemes and both positions: the dimmed pair is the pair the same
+  // control paints when it is live, so the value it stores still reads under
+  // the dim.
+  it('every scheme: a disabled switch paints exactly the live pair it paints when enabled', () => {
     native.os = 'android';
-    native.scheme = 'light';
-    const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    expect(props.value).toBe(false);
-    expect(props.trackColor?.true).toBe('rgba(79, 90, 16, 0.7)');
-    expect(props.trackColor?.false).toBe('rgba(169, 163, 154, 0.8)');
-    expect(props.thumbColor).toBe(lightColors.ink2);
-  });
-
-  it('keeps the disabled positions apart with their own hues', () => {
-    native.os = 'android';
-    native.scheme = 'light';
-    const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
-    const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    // The stored value stays readable while the control cannot be changed.
-    expect(on.trackColor?.true).not.toBe(on.trackColor?.false);
-    expect(on.trackColor?.true).not.toBe(lightColors.primary);
-    expect(on.trackColor?.false).not.toBe(lightColors.mutedSoft);
-    expect(off.trackColor).toEqual(on.trackColor);
-    // One grip per scheme serves both positions.
-    expect(on.thumbColor).toBe(off.thumbColor);
-  });
-
-  it('never paints a disabled on switch the grip a live row shows', () => {
-    native.os = 'android';
-    for (const [scheme, colors] of [
-      ['light', lightColors],
-      ['dark', darkColors],
+    for (const [scheme, colors, onGrip, offGrip] of [
+      ['light', lightColors, lightColors.primaryForeground, lightColors.primaryForeground],
+      ['dark', darkColors, darkColors.selectionForeground, darkColors.foreground],
     ] as const) {
       native.scheme = scheme;
-      const disabledOn = nativeProps(renderSwitch({ disabled: true, value: true }).root);
-      const liveOff = nativeProps(renderSwitch({ value: false }).root);
-      const grip = scheme === 'dark' ? colors.mutedForeground : colors.ink2;
-      expect(disabledOn.thumbColor, `disabled grip (${scheme})`).toBe(grip);
-      // The grip is what marks the row unavailable: a disabled half keeps its
-      // position's live hue at reduced opacity, so the distance is measured in
-      // `use-theme-colors.contrast.test.ts`, and here only the grip must not be
-      // a live one.
-      expect(disabledOn.thumbColor, `grip vs live off grip (${scheme})`).not.toBe(
-        liveOff.thumbColor
-      );
+      for (const value of [true, false]) {
+        const disabled = nativeProps(renderSwitch({ disabled: true, value }).root);
+        const live = nativeProps(renderSwitch({ value }).root);
+        expect(disabled.trackColor, `trackColor (${scheme}, ${value})`).toEqual({
+          false: scheme === 'dark' ? colors.mutedForeground : colors.mutedSoft,
+          true: scheme === 'dark' ? colors.selection : colors.primary,
+        });
+        expect(disabled.trackColor, `trackColor vs live (${scheme}, ${value})`).toEqual(
+          live.trackColor
+        );
+        expect(disabled.thumbColor, `thumbColor (${scheme}, ${value})`).toBe(
+          value ? onGrip : offGrip
+        );
+        expect(disabled.thumbColor, `thumbColor vs live (${scheme}, ${value})`).toBe(
+          live.thumbColor
+        );
+        expect(nodeOpacity(disabled), `opacity (${scheme}, ${value})`).toBe(0.5);
+      }
     }
   });
 
-  it('reduces the on hue further in dark mode, off the brand accent', () => {
+  it('carries no dim on an enabled Android switch', () => {
     native.os = 'android';
-    native.scheme = 'dark';
-    const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
-    const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    // `selection` #647214 at 0.45; the off half keeps `mutedForeground` at 0.65.
-    expect(on.trackColor?.true).toBe('rgba(100, 114, 20, 0.45)');
-    expect(on.trackColor?.false).toBe('rgba(138, 134, 128, 0.65)');
-    expect(on.trackColor?.true).not.toBe(darkColors.selection);
-    expect(off.trackColor).toEqual(on.trackColor);
-    expect(on.thumbColor).toBe(darkColors.mutedForeground);
-    expect(on.thumbColor).not.toBe(darkColors.selectionForeground);
-    expect(off.thumbColor).toBe(on.thumbColor);
+    for (const scheme of ['light', 'dark'] as const) {
+      native.scheme = scheme;
+      const props = nativeProps(renderSwitch({ value: true }).root);
+      expect(nodeOpacity(props), `opacity (${scheme})`).toBeUndefined();
+    }
   });
 
   it('takes the disabled state from the accessibility state', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
-    expect(props.trackColor?.true).toBe('rgba(79, 90, 16, 0.7)');
-    expect(props.thumbColor).toBe(lightColors.ink2);
+    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
+    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+    expect(nodeOpacity(props)).toBe(0.5);
   });
 
-  it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {
+  it('leaves the pair and the dim to the platform on iOS, which fades a disabled switch itself', () => {
     native.os = 'ios';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
@@ -305,6 +307,8 @@ describe('Switch', () => {
     expect(props.accessibilityState?.disabled).toBe(true);
     expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
     expect(props.thumbColor).toBe(lightColors.primaryForeground);
+    expect(props.style).toBeUndefined();
+    expect(nodeOpacity(props)).toBeUndefined();
   });
 
   it('keeps a caller pair on a disabled switch', () => {
@@ -319,5 +323,6 @@ describe('Switch', () => {
     );
     expect(props.trackColor).toEqual({ false: '#222222', true: '#111111' });
     expect(props.thumbColor).toBe('#333333');
+    expect(nodeOpacity(props)).toBe(0.5);
   });
 });

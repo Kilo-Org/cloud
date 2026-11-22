@@ -40,6 +40,10 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => h.permission,
 }));
+// The plan refusal reads the reader's membership list, a module chain the
+// mounted project cannot load (see `vitest.setup.ts`). The billing step is not
+// under test here, so the slot's hook answers with none.
+vi.mock('@/lib/trial-refusal', () => ({ useBillingAction: () => undefined }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },

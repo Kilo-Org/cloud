@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
 import { RepoBindingsAddForm } from '@/components/profiles/repo-bindings-add-form';
@@ -24,7 +24,7 @@ import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { GitBranch, Plus } from '@/components/ui/icons';
+import { CreditCard, GitBranch, Plus } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
@@ -39,7 +39,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 import { connectedServicesHref } from '@/lib/profile-navigation';
 import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
-import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
+import { billingHrefFor, trialRefusalCopyKey } from '@/lib/trial-refusal';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -190,11 +190,11 @@ export function RepoBindingsScreen({
   // A viewer who cannot add is told the rule instead of an action the screen
   // withholds. The plan ends writes for a manager too, and this empty state is
   // the whole surface then: the slot that states the plan sits inside the list
-  // branch, so the description carries the sentence here. That reader holds a
-  // role that can change the plan, so the sentence names the step at kilo.ai
-  // instead of sending them to an owner who is themselves.
+  // branch, so the state carries the refusal here. That reader holds a role that
+  // can change the plan, so the state pairs the `'offered'` sentence with the
+  // billing step under it.
   const planEnded = profilePermission === 'plan-ended';
-  const planEndedDescription = planEnded ? t(trialRefusalCopyKey(true, 'absent')) : undefined;
+  const planEndedDescription = planEnded ? t(trialRefusalCopyKey(true, 'offered')) : undefined;
   const roleDescription =
     profilePermission === 'read-only' ? t('profiles.organizationRoleRequired') : undefined;
   const withheldDescription = planEndedDescription ?? roleDescription;
@@ -230,6 +230,19 @@ export function RepoBindingsScreen({
           // member cannot add a default, so its state names the role instead.
           description={
             canManage ? t('profiles.repoBindings.emptyDescription') : withheldDescription
+          }
+          // The plan state carries its own way out: the billing screen where the
+          // reader can end the state, so the blocking state is not a dead end.
+          action={
+            planEnded ? (
+              <StateAction
+                label={t('organization.hub.manageBilling')}
+                icon={CreditCard}
+                onPress={() => {
+                  router.push(billingHrefFor(organizationId));
+                }}
+              />
+            ) : undefined
           }
         />
       ) : (

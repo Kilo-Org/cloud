@@ -283,8 +283,9 @@ export function ProfileOverviewScreen({
             {/* A member sees the metadata form, the default switch, Import and
                 Delete disabled or absent, so the statement naming who may
                 change the profile sits above them, where the manager's action
-                would be. A manager's slot renders nothing. */}
-            <ProfileManageSlot permission={permission} />
+                would be. The slot renders nothing for a manager whose plan is
+                live, and the plan refusal for one whose plan ended. */}
+            <ProfileManageSlot permission={permission} organizationId={organizationId} />
             <ProfileMetadataForm
               key={metadataFormKey(profile)}
               profile={profile}

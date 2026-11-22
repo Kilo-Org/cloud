@@ -172,7 +172,7 @@ export function ProfileMcpScreen({
         description={null}
         placement="top"
         action={
-          <ProfileManageSlot permission={permission}>
+          <ProfileManageSlot permission={permission} organizationId={organizationId}>
             <StateAction label={t('profiles.mcp.add')} icon={Plus} onPress={handleStartAdd} />
           </ProfileManageSlot>
         }
@@ -228,7 +228,7 @@ export function ProfileMcpScreen({
             );
           })}
         </RowGroup>
-        <ProfileManageSlot permission={permission}>
+        <ProfileManageSlot permission={permission} organizationId={organizationId}>
           {atServerCap ? (
             <AccessibleStatus
               message={t('profiles.mcp.limitReached', { max: MAX_PROFILE_MCP_SERVERS })}

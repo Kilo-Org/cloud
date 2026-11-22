@@ -10,8 +10,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { PreferenceRow } from './preference-row';
 
 const schemeState = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
-// The shared switch paints its own neutral pair on Android only: iOS fades a
-// disabled `UISwitch` itself, so the row's light override yields on both.
+// Platform only, to reach the native switch node: the row's light override no
+// longer depends on it.
 const platformState = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
 
 vi.mock('react-native', () => ({
@@ -113,6 +113,27 @@ function contrast(a: string, b: string): number {
     number,
   ];
   return (high + 0.05) / (low + 0.05);
+}
+
+/**
+ * The opacity the native switch node paints in its style array, so the row's
+ * tests can see the dim the shared component applies. `undefined` means no
+ * part of the array carries one.
+ */
+function switchOpacity(toggle: TestRenderer.ReactTestInstance): number | undefined {
+  const style: unknown = toggle.props.style;
+  const parts: unknown[] = Array.isArray(style) ? style : [];
+  for (const part of parts) {
+    if (
+      typeof part === 'object' &&
+      part !== null &&
+      'opacity' in part &&
+      typeof part.opacity === 'number'
+    ) {
+      return part.opacity;
+    }
+  }
+  return undefined;
 }
 
 describe('PreferenceRow', () => {
@@ -441,43 +462,38 @@ describe('PreferenceRow', () => {
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
   });
 
-  it('paints an unavailable row with each hue at reduced opacity', () => {
-    // A dimmed title beside a full-strength accent track reads as both
-    // unavailable and on, and Android folds the colours into the switch
-    // drawables with no unavailable appearance of its own. The row therefore
-    // yields the light override and lets the shared switch keep each half's own
-    // hue at reduced opacity, so the stored value still reads.
+  it('keeps the light pair on an unavailable row and leaves the dim to the switch', () => {
+    // The shared `Switch` dims the whole control while it is disabled, so the
+    // dim already marks the row unavailable and this row keeps the pair it
+    // paints while live.
     schemeState.current = 'light';
     platformState.os = 'android';
     const root = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
     const trackColor = toggle.props.trackColor as { false: string; true: string };
 
-    expect(trackColor.true).toBe('rgba(79, 90, 16, 0.7)');
-    expect(trackColor.false).toBe('rgba(169, 163, 154, 0.8)');
-    expect(trackColor.true).not.toBe(trackColor.false);
-    expect(trackColor.true).not.toBe(lightColors.primary);
-    // The grip is `ink2`, never a live grip: this row's own enabled off pair is
-    // `mutedForeground` under a white thumb.
-    expect(toggle.props.thumbColor).toBe(lightColors.ink2);
-    expect(toggle.props.thumbColor).not.toBe(lightColors.primaryForeground);
+    expect(trackColor.true).toBe(lightColors.primary);
+    expect(trackColor.false).toBe(lightColors.mutedForeground);
+    expect(toggle.props.thumbColor).toBe(lightColors.primaryForeground);
+    expect(switchOpacity(toggle)).toBe(0.5);
   });
 
-  it('paints the same reduced hues on a dark unavailable row', () => {
+  it('leaves the dark unavailable row to the shared pair, dimmed by the switch', () => {
     schemeState.current = 'dark';
     platformState.os = 'android';
     const disabledOn = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
     const onToggle = disabledOn.find(node => Object.is(node.type, 'Switch'));
     const onTrack = onToggle.props.trackColor as { false: string; true: string };
-    expect(onTrack.true).toBe('rgba(100, 114, 20, 0.45)');
-    expect(onTrack.false).toBe('rgba(138, 134, 128, 0.65)');
-    expect(onToggle.props.thumbColor).toBe(darkColors.mutedForeground);
-    expect(onToggle.props.thumbColor).not.toBe(darkColors.foreground);
+    expect(onTrack.true).toBe(darkColors.selection);
+    expect(onTrack.false).toBe(darkColors.mutedForeground);
+    expect(onToggle.props.thumbColor).toBe(darkColors.selectionForeground);
+    expect(switchOpacity(onToggle)).toBe(0.5);
 
     const disabledOff = renderRow({ value: false, disabled: true, onValueChange: () => undefined });
     const offToggle = disabledOff.find(node => Object.is(node.type, 'Switch'));
     expect(offToggle.props.trackColor).toEqual(onTrack);
-    expect(offToggle.props.thumbColor).toBe(darkColors.mutedForeground);
+    expect(offToggle.props.thumbColor).toBe(darkColors.foreground);
+    expect(switchOpacity(offToggle)).toBe(0.5);
   });
 });
 

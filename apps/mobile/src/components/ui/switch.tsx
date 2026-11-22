@@ -9,18 +9,9 @@ import {
 
 import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { resolveAlphaColor } from '@/lib/theme-color';
 
-/**
- * How much of a disabled control's own hue its track keeps. The olive needs
- * less in dark, where the near-black page floods the track before the pair
- * reaches its floor, and the off neutral needs a little less there too so it
- * still separates from the row.
- */
-const DISABLED_ON_TRACK_ALPHA = { light: 0.7, dark: 0.45 } as const;
-
-/** The off hue keeps more of its strength, less of it in dark. */
-const DISABLED_OFF_TRACK_ALPHA = { light: 0.8, dark: 0.65 } as const;
+/** How much of itself a disabled control keeps. The repo's standard disabled dim. */
+const DISABLED_OPACITY = 0.5;
 
 /**
  * The native `Switch`, painted with the app palette, with its disabled state
@@ -45,46 +36,18 @@ const DISABLED_OFF_TRACK_ALPHA = { light: 0.8, dark: 0.65 } as const;
  * `mutedForeground` with a `foreground` grip in dark. A caller that wants
  * another pair still wins: its own props are applied last.
  *
- * A disabled switch still has to say which position it holds. Android folds
- * the colours into the track and thumb drawables and only sets `isEnabled`, so
- * the platform draws no unavailable appearance of its own; without these
- * colours a row whose title dims for "not available" keeps a full-strength
- * accent track beside it and reads as both unavailable and on.
- *
- * So the disabled control keeps each half's own hue at reduced opacity: the
- * enabled on track at `DISABLED_ON_TRACK_ALPHA` and the enabled off track at
- * `DISABLED_OFF_TRACK_ALPHA`. A read-only row therefore still says which value
- * it stores, in the colour that value carries when it is live. Neither grip is
- * a live grip: `ink2` in light, `mutedForeground` in dark. A disabled row
- * differs from its live counterpart by the grip even where its track keeps the
- * position's hue — light's `PreferenceRow` enabled off row is
- * `mutedForeground` under a white thumb — and both grips read where Android's
- * thumb, wider than the track, lets its outer arc overhang onto the row, which
- * dark's near-black `primaryForeground` did not (1.1:1 there, with no shadow in
- * the dark scheme to outline it, so the pill read as a blank grey bar).
- *
- * Two things separate a disabled control from a live one, and
- * `use-theme-colors.contrast.test.ts` asserts both. The GRIP is never a live
- * grip and reads on both disabled tracks and on the row, in every scheme. The
- * TRACK distance from the live track is measured on `PreferenceRow`'s light row,
- * whose override makes its live off track `mutedForeground` — light gives 1.83
- * on↔off, 3.33 on the row, 1.82 off the row, 3.02 and 5.53 grip on each track,
- * 1.94 against the live on track, 2.55 against that live off track and 11.67
- * against either live grip; dark gives 1.69, 1.60, 2.71, 2.83, 1.67, 1.93, 1.67
- * and 3.18. On a host that keeps the shared light off pair the disabled off
- * track is that same token at reduced opacity, so it sits close to its live twin
- * by construction; there only the grip separates the two, and the suite pins
- * that case too: the shared off track stays under the floor and the grip clears
- * it. A disabled half deliberately keeps its position's live hue, so no
- * cross-position distance is claimed. An olive accent track was rejected
- * earlier, when it read as active (`app-notifications` gate, 2026-11-18);
- * keeping the hue at reduced opacity is what separates an unavailable row from a
- * live one now.
- *
- * Both halves once took the `ringTrack` ink, so the positions looked alike
- * (Android critic, 2026-11-19), and before that `mutedSoft` under the
- * `foreground` grip painted a near-black grip in light, the darkest mark in its
- * card.
+ * A disabled control paints the same thumb and track colours it paints when it
+ * is live, and the whole control carries {@link DISABLED_OPACITY}. The position
+ * therefore still reads — a dimmed olive track with its white thumb in light,
+ * the muted olive with its `selectionForeground` thumb in dark — and the dim
+ * says the control cannot change. `use-theme-colors.contrast.test.ts` measures
+ * the dimmed pair on the `secondary` row it sits in. Track against row, then
+ * thumb against its own dimmed track: light gives 2.23 and 2.42 on the on
+ * position, 1.95 and 2.11 on `PreferenceRow`'s off position, 1.42 and 1.54 on
+ * the shared off pair; dark gives 1.72 and 2.70 on, 2.15 and 2.16 off. Each
+ * dimmed track also stays at least 1.51:1 from its own live track (2.89 light
+ * on, 2.37 light off, 1.51 light off on the shared pair, 1.80 dark on, 2.11
+ * dark off).
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
  * pair there would dim the control twice. Android is the platform that needs
@@ -143,39 +106,27 @@ export function Switch({
   const enabledOnGrip = dark ? colors.selectionForeground : colors.primaryForeground;
   const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
-  // A disabled control keeps each half's own hue at reduced opacity, so a
-  // read-only row still says which value it stores, under one neutral grip.
-  // Nothing here is resolved unless the control is disabled, and a stub palette
-  // that carries no hue passes through untouched rather than crashing.
-  const scheme = dark ? 'dark' : 'light';
-  const reducedOnTrack =
-    inactive && enabledOnTrack
-      ? resolveAlphaColor(enabledOnTrack, DISABLED_ON_TRACK_ALPHA[scheme])
-      : enabledOnTrack;
-  const reducedOffTrack =
-    inactive && enabledOffTrack
-      ? resolveAlphaColor(enabledOffTrack, DISABLED_OFF_TRACK_ALPHA[scheme])
-      : enabledOffTrack;
-  // One grip per scheme, and neither is a live grip: `ink2` in light, the mid
-  // neutral in dark. A disabled row differs from its live counterpart by this
-  // grip even where its track keeps the position's own hue — light's
-  // `PreferenceRow` enabled off row is `mutedForeground` under a white thumb —
-  // and both grips read where the thumb's arc overhangs the row.
-  const schemeGrip = dark ? colors.mutedForeground : colors.ink2;
-  const disabledGrip = inactive ? schemeGrip : undefined;
-  const onGrip = disabledGrip ?? enabledOnGrip;
-  const offGrip = disabledGrip ?? enabledOffGrip;
+  // A disabled control keeps the live pair and dims as a whole, so its position
+  // still reads under the dim that says it cannot change.
   const boxSize = useRef({ width: 0, height: 0 });
 
   const control = (
     <NativeSwitch
       {...props}
-      style={ios ? undefined : [{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]}
+      style={
+        ios
+          ? undefined
+          : [
+              { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP },
+              inactive ? { opacity: DISABLED_OPACITY } : null,
+              style,
+            ]
+      }
       // The switch claims the JS responder, so a tap on it never reaches the touch box too.
       onStartShouldSetResponder={ios ? () => true : undefined}
       value={value}
-      trackColor={trackColor ?? { false: reducedOffTrack, true: reducedOnTrack }}
-      thumbColor={thumbColor ?? (value ? onGrip : offGrip)}
+      trackColor={trackColor ?? { false: enabledOffTrack, true: enabledOnTrack }}
+      thumbColor={thumbColor ?? (value ? enabledOnGrip : enabledOffGrip)}
       disabled={resolvedDisabled}
       accessibilityState={
         ios ? { ...accessibilityState, disabled: resolvedDisabled } : accessibilityState

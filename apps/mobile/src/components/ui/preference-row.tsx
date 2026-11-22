@@ -75,20 +75,16 @@ export function PreferenceRow({
   // overrides both halves with the muted ink `#6F6A61` (4.6:1 on the row) under
   // the white grip (5.2:1 over that track). The dark scheme passes nothing and
   // takes the shared pair.
-  // An unavailable row must not read as both dimmed and on: a full-strength
-  // accent track beside the muted title says the control is live. While the row
-  // is disabled the light override yields, so the shared `Switch` paints each
-  // half's own hue at reduced opacity there — `primary` at 0.7 on, `mutedSoft`
-  // at 0.8 off in light, `selection` at 0.45 and `mutedForeground` at 0.65 in
-  // dark — under one quiet grip per scheme: `ink2` in light,
-  // `mutedForeground` in dark. iOS fades the control itself.
-  const switchColors =
-    isDark || disabled
-      ? undefined
-      : {
-          thumbColor: colors.primaryForeground,
-          trackColor: { false: colors.mutedForeground, true: colors.primary },
-        };
+  // The override holds while the row is disabled too: the shared `Switch` dims
+  // the whole control there, so the dim already marks the row unavailable and
+  // the pair keeps the colours it paints when live. iOS fades the control
+  // itself.
+  const switchColors = isDark
+    ? undefined
+    : {
+        thumbColor: colors.primaryForeground,
+        trackColor: { false: colors.mutedForeground, true: colors.primary },
+      };
   // Both ways of moving the switch flip the same value: a tap on the row and a
   // tap on the thumb can arrive in either order, and a burst must not build one
   // flip from the rendered value and the next from the native thumb state.

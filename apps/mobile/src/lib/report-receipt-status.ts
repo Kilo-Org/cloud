@@ -1,9 +1,10 @@
 import { i18n } from '@/i18n';
 
 /**
- * The key each triage status the report server reports is shown under, shared by
- * the receipt screen and the list of the reader's own reports so one status
- * reads the same on both.
+ * The words a receipt uses: the triage status, appeal status, reported item and
+ * reason for report the server reports, each under the key it is shown by. The
+ * receipt screen and the list of the reader's own reports share it, so one
+ * status reads the same on both.
  */
 export const TRIAGE_KEYS = {
   received: 'profile.reportReceipt.triageReceived',
@@ -17,6 +18,22 @@ export const APPEAL_KEYS = {
   submitted: 'profile.reportReceipt.appealSubmitted',
   accepted: 'profile.reportReceipt.appealAccepted',
   rejected: 'profile.reportReceipt.appealRejected',
+} as const;
+
+/** What the report was filed against, as the server names it. */
+export const TARGET_KEYS = {
+  message: 'profile.reportReceipt.targetMessage',
+  comment: 'profile.reportReceipt.targetComment',
+  user: 'profile.reportReceipt.targetUser',
+} as const;
+
+/** Why the reader says they reported it, as the server names it. */
+export const REASON_KEYS = {
+  harmful: 'profile.reportReceipt.reasonHarmful',
+  illegal: 'profile.reportReceipt.reasonIllegal',
+  harassment: 'profile.reportReceipt.reasonHarassment',
+  spam: 'profile.reportReceipt.reasonSpam',
+  other: 'profile.reportReceipt.reasonOther',
 } as const;
 
 /**

@@ -16,6 +16,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
@@ -241,13 +242,15 @@ export function StoredSessionRow({
   const spokenMeta = isScheduled ? scheduledWake : storedSpokenMeta;
 
   // Provenance subtitle: list rows show "branch · #N", card rows keep the
-  // branch-only subtitle. The spoken label mirrors this: branch text plus
-  // the "pull request N" phrase, with the PR phrase only on the list variant.
+  // branch-only subtitle. The branch decodes once, and the spoken label reuses
+  // that value (branch text plus the "pull request N" phrase, with the PR
+  // phrase only on the list variant).
+  const branchLabel = sessionBranchLabel(session.git_branch);
   const subtitle =
     variant === 'card'
-      ? session.git_branch
+      ? branchLabel
       : composeSessionProvenanceSubtitle({
-          branch: session.git_branch,
+          branchLabel,
           prNumber: session.associatedPr?.number,
         });
   const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
@@ -300,7 +303,7 @@ export function StoredSessionRow({
         statusKind: isScheduled ? 'scheduled' : null,
         badge: agentLabel,
         meta: spokenMeta,
-        subtitle: session.git_branch,
+        subtitle: branchLabel,
         prNumber: spokenPrNumber,
         platform: a11yPlatform,
       })}

@@ -11,7 +11,7 @@
  * admission, where the DO rebuilds it and refuses if the session moved on.
  */
 import type { BalanceOnlyResult } from '../balance-validation.js';
-import { fetchOrgIdForSession, validateBalanceOnly } from '../balance-validation.js';
+import { defaultValidatePromptBalance } from './prompt-balance.js';
 import type { SandboxSessionV2 } from '../control-plane/session/session-do.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import type { Env } from '../types.js';
@@ -40,19 +40,9 @@ export type AnswerAdmissionOutcome =
   /** Nothing waited on this interaction, or the session moved past it. */
   | { outcome: 'not_pending' }
   /** The payer balance refused the new turn; the interaction stays pending. */
-  | { outcome: 'balance'; status: 402 | 500; message: string }
+  | { outcome: 'balance'; status: 402 | 404 | 500 | 503; message: string }
   /** The caller holds no verified bearer, so the preflight cannot run. */
   | { outcome: 'unavailable' };
-
-async function defaultValidatePromptBalance(params: {
-  env: Env;
-  authToken: string;
-  userId: string;
-  cloudAgentSessionId: string;
-}): Promise<BalanceOnlyResult> {
-  const orgId = await fetchOrgIdForSession(params.env, params.userId, params.cloudAgentSessionId);
-  return validateBalanceOnly(params.authToken, orgId, params.env);
-}
 
 /**
  * Answers a question or permission. A live turn takes the answer directly in

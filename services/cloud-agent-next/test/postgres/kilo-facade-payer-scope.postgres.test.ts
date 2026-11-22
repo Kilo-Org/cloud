@@ -11,6 +11,7 @@ import {
 import { eq, inArray } from 'drizzle-orm';
 import type { DurableAdmissionAck } from '../../src/execution/types.js';
 import type { KiloFacadeRequestDeps } from '../../src/kilo-facade/user-kilo-facade.js';
+import { publicCloudAgentDirectory } from '../../src/kilo-facade/public-sdk-projection.js';
 import type { Env } from '../../src/types.js';
 
 vi.mock('cloudflare:workers', () => ({
@@ -199,6 +200,97 @@ afterAll(async () => {
   await client.db.delete(organizations).where(inArray(organizations.id, [organizationId]));
   await client.db.delete(kilocode_users).where(eq(kilocode_users.id, callerId));
   await client.pool.end();
+});
+
+/**
+ * A settled answer becomes a new turn, so the same payer preflight runs before
+ * the Session DO admits it. The stub answers the way the DO does: a settled
+ * reply returns the continuation intent, and the admit call writes it.
+ */
+function postAnswer(params: {
+  reply: unknown;
+  answer: () => Promise<unknown>;
+  admitAnswerContinuation: () => Promise<'sent' | 'not_connected'>;
+}) {
+  const stub = {
+    getMetadata: async () => sessionMetadata(personalCloudAgentSessionId, null),
+    answer: vi.fn(params.answer),
+    admitAnswerContinuation: vi.fn(params.admitAnswerContinuation),
+  };
+  const env = {
+    ...envStub(),
+    SANDBOX_SESSION: { idFromName: (name: string) => name, get: () => stub },
+  } as unknown as Env;
+  return {
+    stub,
+    response: handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(personalKiloSessionId))}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params.reply),
+        }
+      ),
+      env,
+      userId: callerId,
+      authToken,
+      // Only root resolution is stubbed; the payer read and balance call are real.
+      deps: { resolveRootSessionForKiloSession: resolveRoot },
+    }),
+  };
+}
+
+const CONTINUATION = {
+  messageId: 'msg_018f1e2d3c4bAnswerGateAbCdEf',
+  turn: { type: 'prompt' as const, prompt: 'Blue' },
+  agent: { mode: 'code', model: 'kilo/anthropic/claude-sonnet-4' },
+};
+
+describe('facade answer admission against PostgreSQL', () => {
+  it('reads the payer balance before it admits a settled answer', async () => {
+    const { stub, response } = postAnswer({
+      reply: { answers: [['Blue']] },
+      answer: async () => ({ result: 'continuation', intent: CONTINUATION }),
+      admitAnswerContinuation: async () => 'sent',
+    });
+
+    expect((await response).status).toBe(200);
+    const [balance] = balanceRequests();
+    expect(new URL(balance.url).pathname).toBe('/api/profile/balance');
+    expect(balance.headers['x-kilocode-organizationid']).toBeUndefined();
+    expect(stub.admitAnswerContinuation).toHaveBeenCalledOnce();
+    expect(recorded.some(entry => new URL(entry.url).pathname.endsWith('/models/validate'))).toBe(
+      true
+    );
+  });
+
+  it('refuses a depleted payer and never admits the answer', async () => {
+    balanceAnswer = { balance: 0, isDepleted: true };
+    const { stub, response } = postAnswer({
+      reply: { answers: [['Blue']] },
+      answer: async () => ({ result: 'continuation', intent: CONTINUATION }),
+      admitAnswerContinuation: async () => 'sent',
+    });
+
+    expect((await response).status).toBe(402);
+    expect(stub.admitAnswerContinuation).not.toHaveBeenCalled();
+    expect(recorded.some(entry => new URL(entry.url).pathname.endsWith('/models/validate'))).toBe(
+      false
+    );
+  });
+
+  it('answers a live question turn without reading the balance', async () => {
+    const { stub, response } = postAnswer({
+      reply: { answers: [['Blue']] },
+      answer: async () => 'sent',
+      admitAnswerContinuation: async () => 'sent',
+    });
+
+    expect((await response).status).toBe(200);
+    expect(balanceRequests()).toEqual([]);
+    expect(stub.admitAnswerContinuation).not.toHaveBeenCalled();
+  });
 });
 
 describe('facade prompt payer scope against PostgreSQL', () => {

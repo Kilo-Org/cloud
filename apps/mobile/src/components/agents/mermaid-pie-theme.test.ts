@@ -64,7 +64,7 @@ const MAX_LIGHTNESS = 0.8;
 const MAX_LIGHTNESS_SPREAD = 0.14;
 
 /**
- * The largest CIE76 ΔE, in CIELAB (D65), any two of the twelve fills may sit
+ * The smallest CIE76 ΔE, in CIELAB (D65), any two of the twelve fills may sit
  * apart.
  *
  * Mermaid paints `pie1..pie12` in slice order, so a pie with fewer than twelve
@@ -76,11 +76,17 @@ const MAX_LIGHTNESS_SPREAD = 0.14;
  * measures relative luminance alone, so two fills with different hues and
  * similar lightness score about 1.00:1 while reading as clearly different
  * colours, and two fills of the same hue can score well over 1.00:1 while
- * reading as one. Measured on this palette, `pie3` `#AFC195` against `pie10`
- * `#D4AFD0` scores 1.00:1 contrast at ΔE 45.8: the luminance metric calls that
- * pair identical, which is exactly the defect the ramp is checked for.
+ * reading as one. On the ramp below, `pie2` `#CCC5AF` against `pie8` `#A3CBD2`
+ * scores 1.01:1 contrast at ΔE 22.3: the luminance metric calls that pair
+ * identical, which is exactly the defect the ramp is checked for.
+ *
+ * The floor sits one ΔE under the 16 the ramp documents in
+ * `mermaid-pie-fills.ts`: close enough that an edit taking a pair into the
+ * 13–15 band fails here rather than quietly breaking that promise, and far
+ * enough under the shipped ramp's measured 16.5 minimum that rounding a hex
+ * value does not trip it.
  */
-const MAX_PAIR_LAB_DISTANCE = 12;
+const MIN_PAIR_LAB_DISTANCE = 15;
 
 /** WCAG 2.x contrast of two colours the shipped luminance helper parses. */
 function contrastRatio(foreground: string, background: string): number {
@@ -306,8 +312,8 @@ describe('dark pie fills', () => {
     // A pie has no axis or scale to fall back on: a wedge's colour is the only
     // thing that says which slice it is, and a six-slice chart paints just
     // `pie1..pie6`. WCAG contrast cannot make this call, because it measures
-    // luminance alone: `pie3` `#AFC195` against `pie10` `#D4AFD0` scores
-    // 1.00:1 there while being 45.8 ΔE apart. CIE76 ΔE in CIELAB is the
+    // luminance alone: `pie2` `#CCC5AF` against `pie8` `#A3CBD2` scores
+    // 1.01:1 there while being 22.3 ΔE apart. CIE76 ΔE in CIELAB is the
     // distance a reader sees.
     for (const [first, second] of allIndexPairs()) {
       const firstFill = darkFillAt(first);
@@ -315,8 +321,8 @@ describe('dark pie fills', () => {
       const distance = labDistance(firstFill, secondFill);
       expect(
         distance,
-        `pie${first + 1} ${firstFill} and pie${second + 1} ${secondFill} are only ${distance.toFixed(1)} ΔE apart, below the ${MAX_PAIR_LAB_DISTANCE} ΔE perceptual bar`
-      ).toBeGreaterThanOrEqual(MAX_PAIR_LAB_DISTANCE);
+        `pie${first + 1} ${firstFill} and pie${second + 1} ${secondFill} are only ${distance.toFixed(1)} ΔE apart, below the ${MIN_PAIR_LAB_DISTANCE} ΔE perceptual floor`
+      ).toBeGreaterThanOrEqual(MIN_PAIR_LAB_DISTANCE);
     }
   });
 });

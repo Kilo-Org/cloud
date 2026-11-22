@@ -25,7 +25,7 @@ import { OwnedKeyboardLift } from './owned-keyboard-lift';
 import { SessionHistoryScreen } from './session-history-screen';
 
 type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
-  Partial<Pick<StoredSession, 'git_url' | 'created_on_platform'>>;
+  Partial<Pick<StoredSession, 'git_url' | 'created_on_platform' | 'updated_at'>>;
 
 const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
@@ -310,11 +310,19 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
     },
     useRecentAgentRepositories: (options: Parameters<typeof useRecentAgentRepositories>[0]) => {
       listState.repositoryQuery(options);
+      // The hook asks for repositories updated in the last 30 days, so an older
+      // session's repository never reaches the recent set. A session without
+      // `updated_at` counts as recent, which keeps the other tests unchanged.
+      const windowStart = Date.now() - 30 * 24 * 60 * 60 * 1000;
       return {
         data: {
-          repositories: listState.storedSessions.flatMap(session =>
-            session.git_url ? [{ gitUrl: session.git_url }] : []
-          ),
+          repositories: listState.storedSessions.flatMap(session => {
+            if (!session.git_url) {
+              return [];
+            }
+            const updatedAt = session.updated_at ? Date.parse(session.updated_at) : Date.now();
+            return updatedAt >= windowStart ? [{ gitUrl: session.git_url }] : [];
+          }),
         },
       };
     },
@@ -569,8 +577,56 @@ describe('SessionHistoryScreen', () => {
     });
 
     const modal = findNodeByType(renderer, 'SessionFilterModal');
-    const options = modal.props.projectOptions as { gitUrl: string }[];
-    expect(options.map(option => option.gitUrl)).toEqual(gitUrls);
+    const options = modal.props.projectOptions as { displayName: string }[];
+    expect(options.map(option => option.displayName)).toEqual([
+      'kilo/alpha',
+      'kilo/beta',
+      'kilo/delta',
+      'kilo/epsilon',
+      'kilo/gamma',
+    ]);
+  });
+
+  it('offers a project row for a repository whose sessions are older than the recent window', async () => {
+    // The recent-repositories query covers 30 days only, so every repository
+    // here is old and none of them reaches that query: the rows must still
+    // supply the sheet's project options.
+    const oldUpdatedAt = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+    listState.storedSessions = [
+      {
+        session_id: 's1',
+        organization_id: null,
+        git_url: 'https://github.com/kilo/old-two.git',
+        created_on_platform: 'cloud-agent',
+        updated_at: oldUpdatedAt,
+      },
+      {
+        session_id: 's2',
+        organization_id: null,
+        git_url: 'https://github.com/kilo/old-one.git',
+        created_on_platform: 'cloud-agent',
+        updated_at: oldUpdatedAt,
+      },
+      {
+        session_id: 's3',
+        organization_id: null,
+        git_url: 'https://github.com/kilo/old-three.git',
+        created_on_platform: 'cloud-agent',
+        updated_at: oldUpdatedAt,
+      },
+    ];
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { displayName: string }[];
+    expect(options.map(option => option.displayName)).toEqual([
+      'kilo/old-one',
+      'kilo/old-three',
+      'kilo/old-two',
+    ]);
   });
 
   it('keeps Retry busy until the history refetch settles', async () => {

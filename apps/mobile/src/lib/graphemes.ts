@@ -109,8 +109,10 @@ export function graphemePrefixWithin(value: string, maxCodeUnits: number): strin
   }
   // The walk stopped at its bound while still inside a run, so this start's own
   // pairing is unknown: cut there rather than report a boundary that may split
-  // a pair.
-  const anchored = !isRegionalIndicatorEndingAt(value, start);
+  // a pair. Nothing is segmented, because no boundary of this window is trusted.
+  if (isRegionalIndicatorEndingAt(value, start)) {
+    return value.slice(0, start);
+  }
   const window = value.slice(start, Math.min(value.length, maxCodeUnits + CUT_WINDOW));
   const budget = maxCodeUnits - start;
   let index = 0;
@@ -124,9 +126,6 @@ export function graphemePrefixWithin(value: string, maxCodeUnits: number): strin
     if ((start === 0 || count > 1) && index <= budget) {
       end = index;
     }
-  }
-  if (!anchored) {
-    return value.slice(0, start);
   }
   return value.slice(0, end === -1 ? start : start + end);
 }

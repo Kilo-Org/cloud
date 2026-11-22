@@ -82,11 +82,15 @@ describe('enableReasoningSummaries', () => {
 });
 
 describe('addCacheBreakpoints', () => {
-  test('breaks last on a Messages text block, never on a thinking block', () => {
+  test('breaks before environment details, never on a trailing reasoning block', () => {
+    // The block before <environment_details> is a thinking block, and the content also ends on a
+    // thinking block. So the fallback must skip reasoning twice: a plain "last block" fallback
+    // would land on the trailing reasoning block instead of the environment-details text.
     const request = messagesRequest([
+      { type: 'text', text: 'prompt' },
       { type: 'thinking', thinking: 'reasoning', signature: 'sig' },
-      { type: 'text', text: 'hello <environment_details>x</environment_details>' },
-      { type: 'text', text: 'after' },
+      { type: 'text', text: '<environment_details>x</environment_details>' },
+      { type: 'thinking', thinking: 'more reasoning', signature: 'sig2' },
     ]);
 
     addCacheBreakpoints(request);
@@ -95,6 +99,7 @@ describe('addCacheBreakpoints', () => {
     expect(blocks[2]).toHaveProperty('cache_control');
     expect(blocks[0]).not.toHaveProperty('cache_control');
     expect(blocks[1]).not.toHaveProperty('cache_control');
+    expect(blocks[3]).not.toHaveProperty('cache_control');
   });
 
   test('breaks on the block before environment details when it is cacheable', () => {

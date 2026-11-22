@@ -8,7 +8,7 @@ import {
   visibleIntegrationProviders,
 } from '@/lib/integrations/provider-catalog';
 import { type SettingsPath, type SettingsSearchSource } from '@/lib/settings-search/definitions';
-import { INTEGRATION_PROVIDER_SETTINGS } from '@/lib/settings-search/integration-provider-settings';
+import { integrationProviderSetting } from '@/lib/settings-search/integration-provider-settings';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -64,7 +64,7 @@ function buildIntegrationSearchSource(
     context: [INTEGRATION_SETTINGS_CONTEXT],
     path: INTEGRATION_SETTINGS_PATH,
     settings: visibleIntegrationProviders('personal', installedIntegrationProviders(statuses)).map(
-      provider => INTEGRATION_PROVIDER_SETTINGS[provider]
+      provider => integrationProviderSetting(provider)
     ),
   };
 }

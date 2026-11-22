@@ -42,7 +42,7 @@ import {
 } from '@/lib/integrations/provider-catalog';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { type SettingsTargetProps } from '@/lib/settings-search/definitions';
-import { INTEGRATION_PROVIDER_SETTINGS } from '@/lib/settings-search/integration-provider-settings';
+import { integrationProviderSetting } from '@/lib/settings-search/integration-provider-settings';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
 /**
@@ -250,10 +250,7 @@ export function IntegrationsScreen({ organizationId, settingsTarget }: Integrati
           {rows.length > 0 ? (
             <RowGroup leadingTile>
               {rows.map(row => (
-                <SettingsTarget
-                  key={row.provider}
-                  item={INTEGRATION_PROVIDER_SETTINGS[row.provider]}
-                >
+                <SettingsTarget key={row.provider} item={integrationProviderSetting(row.provider)}>
                   <IntegrationProviderRow
                     row={row}
                     scope={scope}

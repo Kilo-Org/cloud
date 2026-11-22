@@ -357,10 +357,13 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
       Keyboard.dismiss();
       settingsSearch.clear();
       if (entry.path) {
+        // Expo Router's per-route Href union cannot associate this union of
+        // static pathnames with a single arm. SettingsPath excludes routes
+        // whose params are required, so each indexed pathname accepts this shape.
         router.push({
           pathname: entry.path,
           params: { ...entry.params, settingsTarget: entry.id },
-        });
+        } as Href);
         return;
       }
       setSettingsTarget(entry.id);

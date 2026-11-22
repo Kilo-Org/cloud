@@ -167,11 +167,16 @@ export function openAiChatGptOwnerWhere(owner: OpenAiChatGptOwner): SQL {
 export type OpenAiChatGptDatabase = DrizzleConnection;
 
 /**
- * Reads the raw connection row. `options.forUpdate` takes a `SELECT ... FOR
- * UPDATE` row lock, used inside a transaction so a concurrent refresh in
- * another process cannot interleave. `is_enabled` is read with the payload: a
- * person can disable the row through the ordinary BYOK toggle without touching
- * the stored status, so the payload alone cannot decide eligibility.
+ * Reads the connection row for its payload. A disconnect retains the row for
+ * its fingerprint but clears the credentials, and such a row reads as absent
+ * here: every caller uses this helper to obtain a connection, and none of them
+ * may treat a cleared row as connected. A future read of the retained rows
+ * must query the table directly instead. `is_enabled` is only meaningful for a
+ * row that still has a payload, because a person can disable the row through
+ * the ordinary BYOK toggle without touching the stored status.
+ *
+ * `options.forUpdate` takes a `SELECT ... FOR UPDATE` row lock, used inside a
+ * transaction so a concurrent refresh in another process cannot interleave.
  * `options.onlyWithUsageLimit` matches only a row that records a usage limit, so
  * a locking read of a row without one takes no lock.
  */
@@ -337,6 +342,22 @@ function openAiChatGptAccountFingerprint({ issuer, subject }: OpenAiChatGptConne
     .digest('hex');
 }
 
+const MAX_CAUSE_DEPTH = 5;
+
+/** The SQLSTATE of a failed statement, when the driver reported one. */
+function postgresErrorCode(error: unknown): string | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
+    if (current === null || typeof current !== 'object') return undefined;
+    const candidate = current as { code?: unknown; cause?: unknown };
+    if (typeof candidate.code === 'string' && /^[0-9A-Z]{5}$/.test(candidate.code)) {
+      return candidate.code;
+    }
+    current = candidate.cause;
+  }
+  return undefined;
+}
+
 /**
  * Writes the owner's connection payload over the owner's row. The caller's
  * connection is used on purpose, so a refresh can write inside the transaction
@@ -361,6 +382,11 @@ export async function writeOpenAiChatGptConnection(
  * unique index, so reconnecting never leaves a second row behind. The row is
  * always left enabled and connected with any previous error state cleared.
  * `createdBy` is the acting person and is recorded on organization rows.
+ *
+ * The statement is sent through `pool.query` instead of `db` so the parameter
+ * values never reach Drizzle's query logger. It is deliberately
+ * non-transactional: it commits on its own and never joins a caller's
+ * transaction.
  */
 export async function saveOpenAiChatGptConnection(
   owner: OpenAiChatGptOwner,
@@ -405,8 +431,14 @@ export async function saveOpenAiChatGptConnection(
   try {
     // Do not send the fingerprint through Drizzle's query logger or parameter tracing.
     await pool.query(query, params);
-  } catch {
-    throw new Error('Failed to save the ChatGPT connection');
+  } catch (error) {
+    // The message and the parameters stay out of the report; the SQLSTATE keeps
+    // a retryable failure distinguishable from a data or constraint failure.
+    const code = postgresErrorCode(error);
+    throw new Error(
+      'Failed to save the ChatGPT connection',
+      code ? { cause: { code } } : undefined
+    );
   }
 }
 

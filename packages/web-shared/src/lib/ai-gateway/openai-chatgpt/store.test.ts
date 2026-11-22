@@ -209,8 +209,35 @@ describe('openai-chatgpt connection store', () => {
     expect(stored?.refresh_token).toBe('refresh-token-2');
   });
 
-  it('does not propagate database errors that can include the write parameters', async () => {
+  it('reports the SQLSTATE without the write parameters', async () => {
+    const storageError = Object.assign(new Error('query parameters: secret-access-token'), {
+      code: '23505',
+    });
+    (pool.query as jest.Mock).mockRejectedValueOnce(storageError);
+
+    const rejection = await saveOpenAiChatGptConnection(
+      USER_OWNER,
+      buildConnection(),
+      TEST_USER_ID
+    ).catch((error: unknown) => error);
+
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toBe('Failed to save the ChatGPT connection');
+    expect((rejection as Error).cause).toEqual({ code: '23505' });
+  });
+
+  it('replaces an error that has no SQLSTATE', async () => {
     (pool.query as jest.Mock).mockRejectedValueOnce(new Error('query parameters'));
+
+    await expect(
+      saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID)
+    ).rejects.toEqual(new Error('Failed to save the ChatGPT connection'));
+  });
+
+  it('handles a cyclic cause chain without recursing', async () => {
+    const cyclic = new Error('query parameters');
+    cyclic.cause = cyclic;
+    (pool.query as jest.Mock).mockRejectedValueOnce(cyclic);
 
     await expect(
       saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID)

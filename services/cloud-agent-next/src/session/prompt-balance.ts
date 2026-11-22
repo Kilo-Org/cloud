@@ -78,12 +78,6 @@ function logPromptPayerScopeFailure(
 }
 
 /**
- * Resolves the payer from the stored session ownership record, the same source
- * the tRPC balance middleware uses, so a facade prompt and a tRPC prompt check
- * one payer. A failed read is repeated within a bound; a read that still fails
- * answers closed, is recorded once, and the caller may retry.
- */
-/**
  * The payer balance preflight shared by prompt, command and answer admission.
  * It resolves the payer from the session ownership record, so one session has
  * one payer on every surface.

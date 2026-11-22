@@ -212,6 +212,73 @@ describe('answerQuestion', () => {
     }
   });
 
+  it('reports an unreachable payer scope as a missing session', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    requireCurrentSessionAccessMock.mockReset();
+    requireCurrentSessionAccessMock.mockResolvedValueOnce({
+      kiloSessionId: 'kilo_root',
+      organizationId: null,
+    });
+    requireCurrentSessionAccessMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+    );
+    const harness = setup();
+    harness.stub.answer.mockResolvedValue({
+      result: 'continuation',
+      intent: {
+        messageId: 'msg_answer_1',
+        turn: { type: 'prompt', prompt: 'yes' },
+        agent: { mode: 'code', model: 'test/model' },
+      },
+    });
+
+    await expect(
+      harness.caller.answerQuestion({
+        sessionId: SESSION_ID,
+        questionId: 'q_1',
+        answers: [['yes']],
+      })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Cloud Agent session was not found',
+    });
+    // The access gate, then the single payer read a denial ends at once.
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a temporary payer scope read failure as retryable', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    requireCurrentSessionAccessMock.mockReset();
+    requireCurrentSessionAccessMock.mockResolvedValueOnce({
+      kiloSessionId: 'kilo_root',
+      organizationId: null,
+    });
+    requireCurrentSessionAccessMock.mockRejectedValueOnce(new Error('payer read unavailable'));
+    requireCurrentSessionAccessMock.mockRejectedValueOnce(new Error('payer read unavailable'));
+    const harness = setup();
+    harness.stub.answer.mockResolvedValue({
+      result: 'continuation',
+      intent: {
+        messageId: 'msg_answer_1',
+        turn: { type: 'prompt', prompt: 'yes' },
+        agent: { mode: 'code', model: 'test/model' },
+      },
+    });
+
+    await expect(
+      harness.caller.answerQuestion({
+        sessionId: SESSION_ID,
+        questionId: 'q_1',
+        answers: [['yes']],
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session access is temporarily unavailable; retry the request',
+    });
+    // The access gate, then the two payer read attempts.
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(3);
+  });
+
   it('rejects a legacy session before reading metadata or resolving its DO', async () => {
     const harness = setup();
     requireCurrentSessionAccessMock.mockResolvedValue({

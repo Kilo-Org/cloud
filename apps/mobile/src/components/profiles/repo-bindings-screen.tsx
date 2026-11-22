@@ -186,9 +186,15 @@ export function RepoBindingsScreen({
   // the Add action, and a member's state says why it has none instead of a
   // second sentence under the copy.
   const emptySurface = isEmpty && !isAdding;
-  // A read-only viewer is told the rule instead of an action the screen withholds.
-  const readOnlyDescription =
+  // A viewer who cannot add is told the rule instead of an action the screen
+  // withholds. The plan ends writes for a manager too, and this empty state is
+  // the whole surface then: the slot that states the plan sits inside the list
+  // branch, so the description carries the sentence here.
+  const planEndedDescription =
+    profilePermission === 'plan-ended' ? t('common.organizationTrialEnded') : undefined;
+  const roleDescription =
     profilePermission === 'read-only' ? t('profiles.organizationRoleRequired') : undefined;
+  const readOnlyDescription = planEndedDescription ?? roleDescription;
 
   return (
     <View className="flex-1 bg-background">

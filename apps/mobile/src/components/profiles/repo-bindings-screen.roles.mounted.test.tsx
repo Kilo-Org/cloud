@@ -55,7 +55,7 @@ const mutationState = vi.hoisted(() => ({
 }));
 const routerPush = vi.hoisted(() => vi.fn<(href: string) => void>());
 const permissionState = vi.hoisted(() => ({
-  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only' | 'plan-ended',
 }));
 
 vi.mock('@/lib/hooks/use-repo-bindings', () => ({
@@ -125,6 +125,7 @@ const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDef
 
 const ADD_LABEL = 'Add default';
 const ROLE_SENTENCE = i18n.t('profiles.organizationRoleRequired');
+const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEnded');
 
 function buttonLabels(root: ReactTestInstance): string[] {
   return findAll(root, 'Button')
@@ -226,6 +227,20 @@ describe('RepoBindingsScreen roles', () => {
     expect(
       pressableLabels(renderer.root).filter(label => label.startsWith('Unbind '))
     ).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('plan-ended with no bindings: states the ended plan and offers no action', async () => {
+    permissionState.permission = 'plan-ended';
+    bindingsState.bindingsQuery.bindings = [];
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    // The empty list is the whole surface, so its description is where a
+    // manager learns why the action is absent.
+    expect(findOne(renderer.root, 'EmptyState').props.description).toBe(PLAN_ENDED_SENTENCE);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
 
     unmount();
   });

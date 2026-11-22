@@ -10,6 +10,7 @@ import {
   useOrganizationGroupsDrawerStack,
 } from '@/components/organizations/groups/drawer/OrganizationGroupsDrawerStack';
 import { organizationGroupPolicyDefinition } from '@/components/organizations/groups/policies/registry.client';
+import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { OrganizationPageHeader } from '@/components/organizations/OrganizationPageHeader';
 import {
   AlertDialog,
@@ -48,11 +49,13 @@ function GroupsPageContent({
     ...trpc.organizations.groups.getPolicySettings.queryOptions({ organizationId }),
     enabled: canViewSettings,
   });
+  const organizationQuery = useOrganizationWithMembers(organizationId);
+  const isEnterprise = organizationQuery.data?.plan === 'enterprise';
   const namedPolicies = useQuery({
     ...trpc.organizations.groups.adminPermissionPolicy.list.queryOptions({ organizationId }),
-    enabled: canViewSettings,
+    enabled: canViewSettings && isEnterprise,
   });
-  const showNamedPolicies = canViewSettings && namedPolicies.data?.managed === true;
+  const showNamedPolicies = canViewSettings && isEnterprise && namedPolicies.data?.managed === true;
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: trpc.organizations.groups.pathKey() });
   }
@@ -150,7 +153,7 @@ function GroupsPageContent({
                   </Button>
                   <Button
                     variant="ghost"
-                    onClick={() => drawer.open({ type: 'named-policy-library' })}
+                    onClick={() => drawer.open({ type: 'named-policy-library', canManage })}
                   >
                     Policies
                   </Button>

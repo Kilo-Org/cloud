@@ -14,7 +14,7 @@ export type OrganizationGroupsDrawerRef =
       appliesTo: string;
       canEdit: boolean;
     }
-  | { type: 'named-policy-library' }
+  | { type: 'named-policy-library'; canManage: boolean }
   | {
       type: 'named-policy-editor';
       policyId: string | null;

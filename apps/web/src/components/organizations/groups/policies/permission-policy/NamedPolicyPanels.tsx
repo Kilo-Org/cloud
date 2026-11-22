@@ -185,7 +185,7 @@ export function NamedPolicyAssignmentsPanel({
       <Button
         variant="outline"
         className="w-fit"
-        onClick={() => helpers.push({ type: 'named-policy-library' })}
+        onClick={() => helpers.push({ type: 'named-policy-library', canManage: canEdit })}
       >
         Manage policies
       </Button>
@@ -195,9 +195,11 @@ export function NamedPolicyAssignmentsPanel({
 
 export function NamedPolicyLibraryPanel({
   organizationId,
+  canManage,
   helpers,
 }: {
   organizationId: string;
+  canManage: boolean;
   helpers: DrawerStackHelpers<OrganizationGroupsDrawerRef>;
 }) {
   const { api, list } = useNamedPolicies(organizationId);
@@ -234,7 +236,7 @@ export function NamedPolicyLibraryPanel({
     );
   }
 
-  const editable = list.data.writesEnabled;
+  const editable = canManage && list.data.writesEnabled;
   return (
     <div className="grid gap-4 p-5">
       {editable && (

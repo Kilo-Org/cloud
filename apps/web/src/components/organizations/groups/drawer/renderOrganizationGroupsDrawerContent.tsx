@@ -34,7 +34,13 @@ export function renderOrganizationGroupsDrawerContent(
     case 'named-policy-library':
       return {
         header: <h2 className="type-body font-medium">Policies</h2>,
-        body: <NamedPolicyLibraryPanel organizationId={organizationId} helpers={helpers} />,
+        body: (
+          <NamedPolicyLibraryPanel
+            organizationId={organizationId}
+            canManage={entry.canManage}
+            helpers={helpers}
+          />
+        ),
       };
     case 'named-policy-editor':
       return {

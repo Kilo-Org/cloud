@@ -120,6 +120,7 @@
     "connectBitbucket": "Bitbucketと連携",
     "connectGitlab": "GitLabと連携",
     "connectProvider": "プロバイダーを接続",
+"providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "内容の一部を省略しています",
     "copyLink": "リンクをコピー",
     "couldNotLoadOrganizations": "組織を読み込めませんでした。",

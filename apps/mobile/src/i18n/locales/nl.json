@@ -120,6 +120,7 @@
     "connectBitbucket": "Bitbucket koppelen",
     "connectGitlab": "GitLab koppelen",
     "connectProvider": "Platform koppelen",
+"providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "Inhoud ingekort",
     "copyLink": "Link kopiëren",
     "couldNotLoadOrganizations": "De organisaties konden niet worden geladen.",

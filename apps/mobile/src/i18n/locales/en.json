@@ -212,6 +212,7 @@
     "connectBitbucket": "Connect Bitbucket",
     "connectGitlab": "Connect GitLab",
     "connectProvider": "Connect a provider",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Content truncated",
     "copyLink": "Copy link",
     "couldNotLoadOrganizations": "Could not load organizations",

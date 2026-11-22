@@ -120,6 +120,7 @@
     "connectBitbucket": "Tengja Bitbucket",
     "connectGitlab": "Tengja GitLab",
     "connectProvider": "Tengdu þjónustuveitanda",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Innihald stytt",
     "copyLink": "Afrita tengil",
     "couldNotLoadOrganizations": "Tókst ekki að sækja fyrirtæki.",

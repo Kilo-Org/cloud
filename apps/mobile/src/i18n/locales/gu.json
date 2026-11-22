@@ -120,6 +120,7 @@
     "connectBitbucket": "Bitbucket જોડો",
     "connectGitlab": "GitLab જોડો",
     "connectProvider": "સેવા પ્રદાતા જોડો",
+"providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "સામગ્રીનો અમુક ભાગ જ બતાવ્યો છે",
     "copyLink": "લિંક કૉપિ કરો",
     "couldNotLoadOrganizations": "સંસ્થાઓ લોડ કરી શકાઈ નહીં.",

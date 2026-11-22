@@ -120,6 +120,7 @@
     "connectBitbucket": "Ampifandraiso ny Bitbucket",
     "connectGitlab": "Ampifandraiso ny GitLab",
     "connectProvider": "Ampifandraiso ny mpanome tolotra",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Nohafohy ny votoaty",
     "copyLink": "Adikao ny rohy",
     "couldNotLoadOrganizations": "Tsy tafiditra ny fikambanana.",

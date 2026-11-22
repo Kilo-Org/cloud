@@ -120,6 +120,7 @@
     "connectBitbucket": "Bitbucket সংযুক্ত করুন",
     "connectGitlab": "GitLab সংযুক্ত করুন",
     "connectProvider": "একটি প্রোভাইডার সংযুক্ত করুন",
+"providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "বিষয়বস্তু আংশিক দেখানো হয়েছে",
     "copyLink": "লিঙ্ক কপি করুন",
     "couldNotLoadOrganizations": "সংস্থাগুলো লোড করা যায়নি।",

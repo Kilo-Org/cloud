@@ -120,6 +120,7 @@
     "connectBitbucket": "Bitbucket کو منسلک کریں",
     "connectGitlab": "GitLab کو منسلک کریں",
     "connectProvider": "فراہم کنندہ منسلک کریں",
+"providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "مواد مکمل نہیں دکھایا گیا",
     "copyLink": "لنک کاپی کریں",
     "couldNotLoadOrganizations": "تنظیمیں لوڈ نہیں ہو سکیں۔",

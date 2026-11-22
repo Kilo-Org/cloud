@@ -120,6 +120,7 @@
     "connectBitbucket": "Bitbucket-ті қосу",
     "connectGitlab": "GitLab-ты қосу",
     "connectProvider": "Провайдерді қосу",
+"providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "Мазмұн қысқартылды",
     "copyLink": "Сілтемені көшіру",
     "couldNotLoadOrganizations": "Ұйымдарды жүктеу мүмкін болмады.",

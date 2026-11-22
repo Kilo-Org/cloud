@@ -120,6 +120,7 @@
     "connectBitbucket": "Σύνδεση με το Bitbucket",
     "connectGitlab": "Σύνδεση με το GitLab",
     "connectProvider": "Σύνδεση παρόχου",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Το περιεχόμενο έχει περικοπεί",
     "copyLink": "Αντιγραφή συνδέσμου",
     "couldNotLoadOrganizations": "Δεν ήταν δυνατή η φόρτωση των οργανισμών.",

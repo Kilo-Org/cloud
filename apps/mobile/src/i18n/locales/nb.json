@@ -120,6 +120,7 @@
     "connectBitbucket": "Koble til Bitbucket",
     "connectGitlab": "Koble til GitLab",
     "connectProvider": "Koble til en leverandør",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Innholdet er forkortet",
     "copyLink": "Kopier lenke",
     "couldNotLoadOrganizations": "Kunne ikke laste inn organisasjonene.",

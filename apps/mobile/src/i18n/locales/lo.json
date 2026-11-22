@@ -120,6 +120,7 @@
     "connectBitbucket": "ເຊື່ອມຕໍ່ Bitbucket",
     "connectGitlab": "ເຊື່ອມຕໍ່ GitLab",
     "connectProvider": "ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "ສະແດງເນື້ອຫາບໍ່ຄົບ",
     "copyLink": "ຄັດລອກລິ້ງ",
     "couldNotLoadOrganizations": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນໄດ້.",

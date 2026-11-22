@@ -121,6 +121,7 @@
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
     "connectProvider": "Poveži platformu",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Sadržaj je skraćen",
     "copyLink": "Kopiraj link",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",

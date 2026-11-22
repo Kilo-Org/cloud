@@ -120,6 +120,7 @@
     "connectBitbucket": "Hono ki Bitbucket",
     "connectGitlab": "Hono ki GitLab",
     "connectProvider": "Honohonotia tētahi kaiwhakarato",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Kua poroa te ihirangi",
     "copyLink": "Tāruatia te hononga",
     "couldNotLoadOrganizations": "Kāore i taea te uta i ngā rōpū",

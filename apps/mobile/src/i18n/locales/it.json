@@ -121,6 +121,7 @@
     "connectBitbucket": "Collega Bitbucket",
     "connectGitlab": "Collega GitLab",
     "connectProvider": "Connetti una piattaforma",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Contenuto troncato",
     "copyLink": "Copia link",
     "couldNotLoadOrganizations": "Impossibile caricare le organizzazioni.",

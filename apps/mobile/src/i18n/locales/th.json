@@ -120,6 +120,7 @@
     "connectBitbucket": "เชื่อมต่อ Bitbucket",
     "connectGitlab": "เชื่อมต่อ GitLab",
     "connectProvider": "เชื่อมต่อผู้ให้บริการ",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "เนื้อหาถูกตัดทอน",
     "copyLink": "คัดลอกลิงก์",
     "couldNotLoadOrganizations": "ไม่สามารถโหลดรายชื่อองค์กรได้",

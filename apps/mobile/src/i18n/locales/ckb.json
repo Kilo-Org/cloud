@@ -120,6 +120,7 @@
     "connectBitbucket": "بەستنەوەی Bitbucket",
     "connectGitlab": "بەستنەوەی GitLab",
     "connectProvider": "پەیوەندی بە دابینکەرێک بکە",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "ناوەڕۆک کورتکراوەتەوە",
     "copyLink": "کۆپیکردنی بەستەر",
     "couldNotLoadOrganizations": "نەتوانرا ڕێکخراوەکان بار بکرێن.",

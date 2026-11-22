@@ -98,7 +98,8 @@ export function IntegrationProviderRow({
   } else if (row.accountLabel) {
     subtitle = t('integrations.connectedTo', { account: row.accountLabel });
   }
-  const namedAction = (action: string) => [action, label].join(t('common.sentenceJoiner'));
+  const namedAction = (action: string) =>
+    t('common.providerActionName', { action, provider: label });
 
   // The row's one action lives in its trailing cell: the contract allows one
   // primary action per screen, and a hub of four filled buttons read as four of

@@ -120,6 +120,7 @@
     "connectBitbucket": "Поврзи Bitbucket",
     "connectGitlab": "Поврзи GitLab",
     "connectProvider": "Поврзи платформа",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Содржината е скратена",
     "copyLink": "Копирај врска",
     "couldNotLoadOrganizations": "Организациите не се вчитаа.",

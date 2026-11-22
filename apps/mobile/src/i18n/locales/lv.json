@@ -121,6 +121,7 @@
     "connectBitbucket": "Pievienot Bitbucket",
     "connectGitlab": "Pievienot GitLab",
     "connectProvider": "Pievieno pakalpojuma sniedzēju",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Saturs saīsināts",
     "copyLink": "Kopēt saiti",
     "couldNotLoadOrganizations": "Neizdevās ielādēt organizācijas.",

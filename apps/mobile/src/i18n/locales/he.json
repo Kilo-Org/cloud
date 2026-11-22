@@ -121,6 +121,7 @@
     "connectBitbucket": "חיבור ל-Bitbucket",
     "connectGitlab": "חיבור ל-GitLab",
     "connectProvider": "חיבור ספק",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "התוכן קוצר",
     "copyLink": "העתקת קישור",
     "couldNotLoadOrganizations": "לא הצלחנו לטעון את הארגונים.",

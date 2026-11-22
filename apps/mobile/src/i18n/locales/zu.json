@@ -120,6 +120,7 @@
     "connectBitbucket": "Xhuma i-Bitbucket",
     "connectGitlab": "Xhuma i-GitLab",
     "connectProvider": "Xhuma umhlinzeki",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Okuqukethwe kunqanyuliwe",
     "copyLink": "Kopisha isixhumanisi",
     "couldNotLoadOrganizations": "Asikwazanga ukulayisha izinhlangano.",

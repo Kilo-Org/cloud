@@ -120,6 +120,7 @@
     "connectBitbucket": "Bitbucket hesabını bağla",
     "connectGitlab": "GitLab hesabını bağla",
     "connectProvider": "Bir sağlayıcı bağla",
+"providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "İçerik kısaltıldı",
     "copyLink": "Bağlantıyı kopyala",
     "couldNotLoadOrganizations": "Kuruluşlar yüklenemedi.",

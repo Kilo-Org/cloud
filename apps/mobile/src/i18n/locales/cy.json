@@ -124,6 +124,7 @@
     "connectBitbucket": "Cysylltu â Bitbucket",
     "connectGitlab": "Cysylltu â GitLab",
     "connectProvider": "Cysylltu darparwr",
+"providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Cynnwys wedi'i gwtogi",
     "copyLink": "Copïo dolen",
     "couldNotLoadOrganizations": "Doedd dim modd llwytho'r sefydliadau.",

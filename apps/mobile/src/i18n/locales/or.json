@@ -120,6 +120,7 @@
     "connectBitbucket": "Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ",
     "connectGitlab": "GitLab ସହ ସଂଯୋଗ କରନ୍ତୁ",
     "connectProvider": "ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ",
+"providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "ବିଷୟବସ୍ତୁର କିଛି ଅଂଶ ଦେଖାଯାଉଛି",
     "copyLink": "ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
     "couldNotLoadOrganizations": "ସଂଗଠନର ତାଲିକା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",

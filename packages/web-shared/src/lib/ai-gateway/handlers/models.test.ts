@@ -135,7 +135,7 @@ describe('GET /api/openrouter/models', () => {
     mockedTagClaudeBillingByokModels.mockImplementation(
       (_owner: unknown, models: OpenRouterModel[]) => models
     );
-    mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
+    mockedGetAvailableModelsForOrganization.mockResolvedValue({ data: [] });
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
     mockedListUsableCustomRouters.mockResolvedValue([]);

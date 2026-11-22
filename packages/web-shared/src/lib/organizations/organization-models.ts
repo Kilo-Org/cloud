@@ -71,11 +71,15 @@ export async function getAvailableModelsForOrganization(
      * Null lists every custom LLM, for callers that do not serve a request. */
     countryCode: string | null;
   }
-): Promise<OpenRouterModelsResponse | null> {
+): Promise<OpenRouterModelsResponse> {
   const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
+  // `getOrganizationByokProviderIds` and `getAllowedDirectByokCatalogModelIds` read the
+  // replica on purpose even when the caller injects `fromDb`, so the returned catalog
+  // mixes connections. BYOK key state only tags availability and decides no membership or
+  // entitlement, so replica lag delays a tag rather than granting access.
   const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
     getEnhancedOpenRouterModels({ countryCode, fromDb }),
     getOrganizationByokProviderIds(readDb, organizationId),

@@ -145,7 +145,12 @@ describe('TriggerDetailScreen read-only values', () => {
 
   it('names a model the catalogue carries', async () => {
     state.models = [
-      { id: 'kilo/fake-deterministic', name: 'Fake Deterministic', variants: [], isPreferred: false },
+      {
+        id: 'kilo/fake-deterministic',
+        name: 'Fake Deterministic',
+        variants: [],
+        isPreferred: false,
+      },
     ];
 
     const root = await mount();

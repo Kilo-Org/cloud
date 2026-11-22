@@ -23,10 +23,10 @@ import { Text } from '@/components/ui/text';
 import { type CloudTriggerDetail } from '@/lib/cloud-triggers/trigger-draft';
 import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useCloudTrigger } from '@/lib/cloud-triggers/use-cloud-triggers';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { resolveCatalogModelName } from '@/lib/model-display-name';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 
 import { TriggerDeliveries } from './trigger-deliveries';
@@ -80,7 +80,7 @@ function ReadOnlyTrigger({
       <KvRow
         label={t('common.model')}
         value={
-          model === '' ? t('common.unknown') : resolveCatalogModelName(model, modelCatalogue.models)
+          model === '' ? t('common.unknown') : modelLabelFromCatalogue(modelCatalogue.models, model)
         }
         valueFace="text"
       />

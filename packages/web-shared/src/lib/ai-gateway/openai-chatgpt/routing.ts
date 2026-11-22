@@ -537,9 +537,12 @@ export function buildOpenAiChatGptProvider(
 /**
  * Resolves the ChatGPT connection as a provider, a reconnect requirement, or
  * null when the request is not eligible or cannot be served. A `reconnect`
- * result is returned when the person's enabled credential is terminally dead:
- * the request must fail readably instead of silently running on another billing
- * path. Callers keep the standard abuse and organization policy checks
+ * result is returned when the person's enabled credential is terminally dead
+ * and the deployment can serve the route at all: the request must fail readably
+ * instead of silently running on another billing path. Without the partner key
+ * the deployment is not configured for token sharing, so every request takes
+ * the ordinary gateway route instead and no stored credential is consulted.
+ * Callers keep the standard abuse and organization policy checks
  * (`bypassAccessCheck: false`), but skip the zero-balance paid-model block:
  * the ChatGPT plan pays for the request, not Kilo credits.
  */
@@ -569,6 +572,8 @@ export async function checkOpenAiChatGptByok(
     // and let a later candidate (the caller's own connection) be tried.
     if (outcome.kind !== 'access_token') continue;
 
+    // The key is present, so this never returns null; the guard stays because the
+    // builder's type admits it, and it keeps the ordinary route if that changes.
     const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, upstreamModel, owner);
     if (!provider) return null;
 

@@ -24,6 +24,7 @@ vi.mock('expo-iap', () => ({
     AlreadyOwned: 'already-owned',
     BillingUnavailable: 'billing-unavailable',
     DeferredPayment: 'deferred-payment',
+    NotPrepared: 'not-prepared',
     Pending: 'pending',
     UserCancelled: 'user-cancelled',
   },
@@ -259,6 +260,48 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('returns the store connection copy when the store is not prepared', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      // A store with no live billing connection never received the request, so
+      // the person must read the connection sentence, not a purchase failure.
+      requestPurchase: vi.fn().mockRejectedValue({
+        code: 'not-prepared',
+        message: 'Billing client not ready',
+      }),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.purchase(creditPack)).toEqual({
+      started: false,
+      failure: { kind: 'purchase-refused', messageKey: 'kiloPass.couldNotConnectToAppStore' },
+    });
+    // The owner publishes the failure inline; it never toasts from here.
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('returns the Play store connection copy on the Play storefront', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      requestPurchase: vi.fn().mockRejectedValue({
+        code: 'not-prepared',
+        message: 'Billing client not ready',
+      }),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.purchase({ ...creditPack, storeProductId: GOOGLE_PRODUCT_ID })).toEqual({
+      started: false,
+      failure: { kind: 'purchase-refused', messageKey: 'kiloPass.couldNotConnectToPlay' },
+    });
+    expect(showError).not.toHaveBeenCalled();
   });
 
   it('recovers the outstanding transaction when the store says the pack is already owned', async () => {
@@ -917,6 +960,23 @@ describe('getStoreCreditPurchaseErrorMessageKey', () => {
     expect(
       getStoreCreditPurchaseErrorMessageKey(new Error(STORE_PURCHASE_PENDING_MESSAGE), 'play')
     ).toBeNull();
+  });
+
+  it('maps a store that is not prepared to the store connection copy', () => {
+    // The store has no live billing connection, so nothing reached it. The copy
+    // names the connection, not the purchase.
+    expect(
+      getStoreCreditPurchaseErrorMessageKey(
+        { code: 'not-prepared', message: 'Billing client not ready' },
+        'app_store'
+      )
+    ).toBe('kiloPass.couldNotConnectToAppStore');
+    expect(
+      getStoreCreditPurchaseErrorMessageKey(
+        { code: 'not-prepared', message: 'Billing client not ready' },
+        'play'
+      )
+    ).toBe('kiloPass.couldNotConnectToPlay');
   });
 
   it('surfaces the Play account-mismatch key on an Android completion failure', async () => {

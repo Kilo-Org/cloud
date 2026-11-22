@@ -2148,11 +2148,11 @@ describe('CreditNativeIapOwner', () => {
       expect(await handle.value?.purchase(creditPack)).toBe(false);
       await flushPromises();
 
-      // The request never reached the store: it is released with the generic
-      // copy, and the connection is restored so the next tap can buy.
+      // The request never reached the store, so its row is released. The tile
+      // names the store connection, and the reconnect lets the next tap buy.
       expect(mockedIap.reconnect).toHaveBeenCalledTimes(1);
       expect(handle.value?.completingProductId).toBeNull();
-      expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
+      expect(handle.value?.errorMessageKey).toBe('kiloPass.couldNotConnectToPlay');
     });
   });
 });

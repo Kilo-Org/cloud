@@ -8,7 +8,11 @@ import { z } from 'zod';
 import { isStoreDeadlineError, withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { type StoreCreditProduct } from './store-products';
-import { STORE_TIMEOUT_KEY, STORE_TIMEOUT_PLAY_KEY } from './store-products-loader';
+import {
+  getStoreUnavailableCopyKeys,
+  STORE_TIMEOUT_KEY,
+  STORE_TIMEOUT_PLAY_KEY,
+} from './store-products-loader';
 
 /**
  * The purchase's outcome as the owner publishes it. `messageKey` is a catalog
@@ -377,6 +381,13 @@ export function getStoreCreditPurchaseErrorMessageKey(
   }
   if (readTrpcErrorField(error, 'message') === STORE_PURCHASE_PENDING_MESSAGE) {
     return null;
+  }
+
+  // The store has no live billing connection, so nothing reached the store and
+  // the same tap succeeds after `reconnect()`. Name the connection, not the
+  // purchase.
+  if (isStoreNotReadyError(error)) {
+    return getStoreUnavailableCopyKeys(storefront).failureBodyKey;
   }
 
   const ownedByAnotherAccountKey =

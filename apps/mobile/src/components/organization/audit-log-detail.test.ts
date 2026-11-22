@@ -10,8 +10,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { AuditDetail } from '@kilocode/app-shared/organizations';
-import { AUDIT_DETAIL_IDS } from '@kilocode/app-shared/organizations';
+import { AUDIT_DETAIL_IDS, type AuditDetail } from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';
 import { auditEntryDetail } from './audit-log-detail';
@@ -108,7 +107,7 @@ describe('auditEntryDetail', () => {
     expect(regionOnly).not.toContain(i18n.t('organization.auditLog.detail.enabled'));
   });
 
-  it('has a template for every event id the shared contract defines', async () => {
+  it('has a template for every event id the shared contract defines', () => {
     // The renderer's map is keyed by `AuditDetail['id']`, so a union member
     // without a case fails the type check. This asserts the runtime half: each
     // id either renders a line or is one of the ids that deliberately does not.

@@ -404,16 +404,15 @@ describe('code-review command guard policy', () => {
 });
 
 describe('security-remediation push command guard policy', () => {
-  it('denies every forced push spelling while allowing the plain push forms', () => {
+  it('requires a push that carries an option or a forcing refspec to be denied', () => {
     const policy = getCommandGuardPolicy('security-remediation', 'github');
     if (!policy) throw new Error('Expected security-remediation command guard policy');
 
     const permissions = buildCommandGuardBashPermissions(policy);
 
-    // The broad push allow rules are installed first and a forced push deny
-    // follows each of them, so the deny is the last matching rule and decides.
-    // Every forced spelling must therefore resolve to deny while the plain push
-    // forms keep resolving to allow.
+    // A push rewrites remote history through an option or a `+` before a
+    // refspec. The reachable push allow is installed first and these denies
+    // follow it, so each form below resolves to deny.
     for (const command of [
       'git push --force',
       'git push -f',
@@ -422,6 +421,9 @@ describe('security-remediation push command guard policy', () => {
       'git push --mirror',
       'git push origin --mirror',
       'git push --mirror origin',
+      'git push --mirro origin',
+      'git push origin --mirr',
+      'git push --m origin',
       'git push --force-with-lease',
       'git push --force-with-lease=main:abc origin HEAD:main',
       'git push origin --force-with-lease=main:abc HEAD',
@@ -431,6 +433,7 @@ describe('security-remediation push command guard policy', () => {
       'git push origin +main',
       'git push +HEAD:refs/heads/x',
       'git push origin main +HEAD:main',
+      'git push -u origin feature/tidy',
       'git push -fu origin main',
       'git push -vfu origin main',
       'git push origin main -fv',
@@ -440,9 +443,17 @@ describe('security-remediation push command guard policy', () => {
       'git push origin main -6f',
       'git push -df origin old',
       'git push origin main -ff',
+      'git push -uvnf origin main',
+      'git push -uvnfq46d origin main',
+      'git push --tags origin',
+      'git push --dry-run origin main',
+      'git push --follow-tags origin main',
+      'git push --delete origin old',
       'git -C . push --force',
       'git -C /tmp/repo push --force-with-lease',
       'git -c core.pager=cat push --force',
+      'git --git-dir=/tmp/repo.git push --force',
+      'git --no-pager push -uvf origin main',
       'git -C . push origin --mirror',
       'git -C . push origin +main',
       'git -C . push -f origin main',
@@ -456,24 +467,18 @@ describe('security-remediation push command guard policy', () => {
       'git push origin main',
       'git push origin HEAD:refs/heads/branch',
       'git push origin main:refs/heads/branch',
-      'git push -u origin feature/tidy',
-      'git push origin feature/fix-the-thing',
-      'git push --follow-tags origin main',
-      'git push --no-force origin main',
-      'git push --dry-run origin main',
-      'git push --set-upstream origin branch-2',
-      'git push origin refs/tags/v1.0.0',
-      'git push --tags origin',
+      'git push upstream main',
       'git push origin HEAD',
       'git -C . push origin main',
-      'git -C . push -u origin tidy',
+      'git --no-pager push origin main',
+      'git push origin feature/fix-the-thing',
       'git push origin feature/force-fix',
       'git push origin a+b',
-      'git push --delete origin old',
       'git push origin :old',
+      'git commit -m "reject push --force"',
+      'git commit -m "push -uvf docs"',
       'git status',
       'git diff --stat',
-      'git commit -m "handle push in the retry path"',
       'git log --oneline -5',
       'git fetch origin main',
       'git switch -c fix/thing',

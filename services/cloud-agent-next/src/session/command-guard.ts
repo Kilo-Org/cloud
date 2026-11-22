@@ -317,28 +317,24 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
   'rm',
 ];
 
-// A rule is anchored at both ends of the whole command text and the matcher has
-// no character class, so a forced push needs one rule per spelling. Git accepts
-// `--force`, `--force-with-lease[=<ref>[:<expect>]]`, `--force-if-includes` and
-// `--mirror`, so `*--force*` and `*--mirror*` cover every long form at any
-// position with or without `=`. A `+` before a refspec forces that update and
-// may lead the arguments, so it keeps a rule of its own. A short `-f` also rides
-// in a bundle, and git accepts the bundles that these leading options form, so
-// each leading letter keeps a rule too. The denies are installed after the
-// `git push` allow, and the last matching rule decides. A ref deletion
-// (`--delete`, or an empty source in the refspec) removes a remote branch rather
-// than rewriting one, so these rules do not cover it.
-const SECURITY_REMEDIATION_PUSH_HEADS = ['git push', 'git * push'];
+// This policy admits the plain push, and requires every other push form to
+// resolve to deny. A push rewrites remote history only when it carries an
+// option or a `+` before a refspec, and a rule is anchored at both ends of the
+// whole command text with neither a character class nor a way to see one
+// argument token. So the requirement is stated as one rule per position: a push
+// that carries an option, and a push that carries a `+` refspec.
+//
+// A global option before the subcommand is spelled `git -…`. A subcommand
+// cannot start with a dash, so the second head names a global option and cannot
+// reach an argument.
+//
+// The denies are installed after the `git push` allow, and the last matching
+// rule decides. A ref that is deleted by name, with `--delete` or with an empty
+// source in the refspec, is not a rewrite; the plain empty-source form carries
+// no option, so these rules keep it.
+const SECURITY_REMEDIATION_PUSH_HEADS = ['git push', 'git -?* push'];
 
-const SECURITY_REMEDIATION_PUSH_DENIED_SUFFIXES = [
-  ' *--force*',
-  ' *--mirror*',
-  ' +*',
-  ' * +*',
-  ' -f*',
-  ' * -f*',
-  ...['d', 'f', 'n', 'q', 'u', 'v', '4', '6'].flatMap(lead => [` -${lead}f*`, ` * -${lead}f*`]),
-];
+const SECURITY_REMEDIATION_PUSH_DENIED_SUFFIXES = [' -*', ' * -*', ' +*', ' * +*'];
 
 const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = SECURITY_REMEDIATION_PUSH_HEADS.flatMap(head =>
   SECURITY_REMEDIATION_PUSH_DENIED_SUFFIXES.map(suffix => head + suffix)

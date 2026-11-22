@@ -25,31 +25,49 @@ test('the unpacked build is listed with developer mode on', async ({}, testInfo)
 
     // The manager is a nested shadow-DOM tree: chrome://extensions > extensions-manager
     // > shadowRoot > extensions-toolbar > shadowRoot > #devMode (a cr-toggle).
-    await page.evaluate(`(() => {
-      const toolbar = document.querySelector('extensions-manager')?.shadowRoot?.querySelector('extensions-toolbar');
-      const toggle = toolbar?.shadowRoot?.querySelector('#devMode');
-      if (toggle && toggle.getAttribute('aria-checked') !== 'true') { toggle.click(); }
-    })()`);
+    //
+    // The manager builds its toolbar and item list from `chrome.developerPrivate` after the load event that
+    // `goto` waits on, so both are read in one poll: a single read can catch an empty shadow tree and fail
+    // On scheduling instead of on the build.
+    const managerStateSchema = z.object({
+      itemId: z.string().nullable(),
+      name: z.string(),
+      toggled: z.string().nullable(),
+    });
 
-    const managerState = await page.evaluate(`(() => {
-      const toolbar = document.querySelector('extensions-manager')?.shadowRoot?.querySelector('extensions-toolbar');
-      const toggle = toolbar?.shadowRoot?.querySelector('#devMode');
-      const list = document.querySelector('extensions-manager')?.shadowRoot?.querySelector('extensions-item-list');
-      const item = list?.shadowRoot?.querySelector('extensions-item');
-      const name = item?.shadowRoot?.querySelector('#name');
-      return {
-        itemId: item?.getAttribute('id') ?? null,
-        name: (name?.textContent ?? '').trim(),
-        toggled: toggle?.getAttribute('aria-checked') ?? null
-      };
-    })()`);
+    const readManager = async () => {
+      await page.evaluate(`(() => {
+        const toolbar = document.querySelector('extensions-manager')?.shadowRoot?.querySelector('extensions-toolbar');
+        const toggle = toolbar?.shadowRoot?.querySelector('#devMode');
+        if (toggle && toggle.getAttribute('aria-checked') !== 'true') { toggle.click(); }
+      })()`);
 
-    const parsed = z
-      .object({ itemId: z.string().nullable(), name: z.string(), toggled: z.string().nullable() })
-      .parse(managerState);
+      return managerStateSchema.parse(
+        await page.evaluate(`(() => {
+          const manager = document.querySelector('extensions-manager');
+          const toolbar = manager?.shadowRoot?.querySelector('extensions-toolbar');
+          const toggle = toolbar?.shadowRoot?.querySelector('#devMode');
+          const list = manager?.shadowRoot?.querySelector('extensions-item-list');
+          const item = list?.shadowRoot?.querySelector('extensions-item');
+          const name = item?.shadowRoot?.querySelector('#name');
+          return {
+            itemId: item?.getAttribute('id') ?? null,
+            name: (name?.textContent ?? '').trim(),
+            toggled: toggle?.getAttribute('aria-checked') ?? null
+          };
+        })()`)
+      );
+    };
 
-    expect(parsed.toggled).toBe('true');
-    expect(parsed.name).toBe('Kilo Code');
+    // Polls until the manager has rendered both, so a slow manager fails on its own state rather than on scheduling.
+    await expect
+      .poll(async () => JSON.stringify(await readManager()), { timeout: 30_000 })
+      .toBe(JSON.stringify({ itemId: expect.anything(), name: 'Kilo Code', toggled: 'true' }));
+
+    const managerState = await readManager();
+
+    expect(managerState.toggled).toBe('true');
+    expect(managerState.name).toBe('Kilo Code');
 
     await page.screenshot({
       fullPage: true,

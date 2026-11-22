@@ -7,6 +7,7 @@
       "spendAlert": "Vaša útrata si vyžaduje pozornosť",
       "securityFinding": "Nájdený bezpečnostný problém si vyžaduje pozornosť",
       "securityUpdate": "Bezpečnostná kontrola má aktualizáciu",
+      "agentBriefing": "Váš prehľad agenta je pripravený",
       "activeAgentsGlanceable": "Aktívni agenti majú aktualizáciu"
     }
   },

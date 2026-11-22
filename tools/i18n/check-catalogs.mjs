@@ -1820,8 +1820,11 @@ function checkPushLocaleRegistry({ root, catalog, present, supported }) {
     return problems;
   }
   const entry = parseSourceEntry(root, root, localeModule, read.text);
-  for (const problem of entry.problems) {
-    problems.push(problem);
+  if (entry.problems.length > 0) {
+    // The tree a failed parse yields is not the one the walk below reads, so
+    // "no push locale registry" would repeat the cause the parse error already
+    // names.
+    return [...problems, ...entry.problems];
   }
 
   const imported = new Map();

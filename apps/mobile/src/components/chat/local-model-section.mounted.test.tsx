@@ -113,6 +113,38 @@ describe('the on-device model row', () => {
     ]);
   });
 
+  it('joins each list with the catalog separator, never a literal comma', () => {
+    // Two items on each line: `join` inserts nothing for one, so a single-item
+    // list would pass whatever separator the row used. The mock's joiner is
+    // ` + `, which a literal comma cannot produce.
+    const notes = rows([
+      appleStatus({
+        kind: 'some',
+        tools: ['time', 'settings_set'],
+        arguments: [
+          { tool: 'lookup', argument: 'filter' },
+          { tool: 'mcp_kilo_read-file', argument: 'where.lat' },
+        ],
+      }),
+    ]);
+    expect(notes.map(node => node.props.children)).toEqual([
+      [
+        'modelChat.localModels.cannotUse',
+        [
+          isolateBidiText('modelChat.localModels.tools.time'),
+          isolateBidiText('modelChat.localModels.tools.settingsSet'),
+        ].join(' + '),
+      ],
+      [
+        'modelChat.localModels.cannotUseOptions',
+        [
+          isolateBidiText('lookup (filter)'),
+          isolateBidiText('mcp_kilo_read-file (where.lat)'),
+        ].join(' + '),
+      ],
+    ]);
+  });
+
   it('draws only the tool line when the model takes every argument', () => {
     const notes = rows([appleStatus({ kind: 'some', tools: ['settings_list'], arguments: [] })]);
     expect(notes.map(node => [node.props.testID, node.props.children])).toEqual([

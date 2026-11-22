@@ -106,10 +106,10 @@ const QUERY_PREFIX = 'mobile agent chat tool card labels truncation fixture case
 const REGIONAL_FLAG = '\u{1F1F7}\u{1F1F8}';
 const WEBSEARCH_QUERY = `${QUERY_PREFIX}${REGIONAL_FLAG} release notes`;
 
-// 4. The task row shows `Summarise …team café`: 57 ASCII, so `e` sits at index
-//    57 and its combining acute at 58, and the cut keeps the letter and drops
-//    the accent.
-const PROMPT_PREFIX = 'Summarise the release checklist for the whole QA team caf';
+// 4. The task row shows `Summarise …squads café`: 59 ASCII, so `e` sits at
+//    index 59 and its combining acute at 60, and the base cut keeps the letter
+//    and drops the accent while the grapheme cut keeps both.
+const PROMPT_PREFIX = 'Summarise the release checklist for the whole QA squads caf';
 const COMBINING_ACUTE = '\u0301';
 const TASK_PROMPT = `${PROMPT_PREFIX}e${COMBINING_ACUTE} and the rest of the sentence`;
 

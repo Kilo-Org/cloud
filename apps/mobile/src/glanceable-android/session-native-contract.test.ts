@@ -168,6 +168,17 @@ describe('SessionNotifications', () => {
     expect(MODULE).toContain('SessionNotifications.restore(context, sessionId)');
   });
 
+  it('retires an earlier card before this post builds its own records', () => {
+    // The retirement acts only on records the earlier build left, so it runs
+    // before the post that builds this session's own records.
+    const post = body(NOTIFICATIONS, 'fun post(');
+    const retirement = post.indexOf('cancelLegacy(context, card.sessionId, card)');
+    const build = post.indexOf('val builder = builder(');
+    expect(retirement).toBeGreaterThan(-1);
+    expect(build).toBeGreaterThan(-1);
+    expect(retirement).toBeLessThan(build);
+  });
+
   it('starts restoration even when registration loads after the app became active', () => {
     expect(REGISTER).toMatch(
       /if \(AppState\.currentState === 'active'\) \{\s+void sessionFollowStorage\(\)\.restoreFollowedSessionCardsFromStorage\(\)/

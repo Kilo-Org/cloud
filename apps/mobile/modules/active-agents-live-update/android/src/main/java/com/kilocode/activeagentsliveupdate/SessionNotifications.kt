@@ -239,11 +239,13 @@ internal object SessionNotifications {
       .edit()
       .putString(KEY_PREFIX + card.sessionId, stored.toString())
       .commitOrReport("Cannot persist the followed session card")
+    // Retire the earlier build's records before this post builds its own, so
+    // the retirement can only act on what the earlier build left behind.
+    cancelLegacy(context, card.sessionId, card)
     val builder = builder(context, card.shownAt(nowMs))
     if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
       builder.setTimeoutAfter(timeoutMs)
     }
-    cancelLegacy(context, card.sessionId, card)
     manager(context).notify(
       SessionNotificationIdentity.tag(card.sessionId),
       SessionNotificationIdentity.NOTIFICATION_ID,

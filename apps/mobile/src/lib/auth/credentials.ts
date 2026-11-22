@@ -62,10 +62,12 @@ type RefreshRefused = {
 /**
  * A failure the next attempt can recover from: the stored set is untouched, or
  * a rotation advanced it partway or fully to the pair the server just issued
- * before a later key write failed. No state it can leave behind is unreadable,
- * because every one of them still presents a refresh token the server accepts
- * — the untouched previous one inside its lost-rotation grace, or the issued
- * replacement, which was never consumed.
+ * before a later key write failed. One such failure always leaves a refresh
+ * token the next attempt can present: the issued replacement, which was never
+ * consumed, or the previous one, which the server recovers once inside its
+ * lost-rotation grace. A second failure that keeps the previous token uses that
+ * recovery up, and the server's reuse protection then ends the session — the
+ * outcome left when the device cannot store a replacement.
  */
 type RefreshTransient = {
   kind: 'transient';

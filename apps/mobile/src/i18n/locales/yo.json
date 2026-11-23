@@ -4338,7 +4338,15 @@
       "download": "Gba awoṣe lórí ẹ̀rọ sílẹ̀",
       "downloading": "Ó ń gbà sílẹ̀…",
       "downloadProgress": "Ó ń gbà sílẹ̀… {{percent}}%",
-      "downloadFailed": "Ìgbàsílẹ̀ náà kò parí. Ṣàyẹ̀wò ìsopọ̀ rẹ àti àyè ìpamọ́ tó ṣófo, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i."
+      "downloadFailed": "Ìgbàsílẹ̀ náà kò parí. Ṣàyẹ̀wò ìsopọ̀ rẹ àti àyè ìpamọ́ tó ṣófo, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
+      "cannotUse": "Kò lè ṣiṣẹ́: {{items}}.",
+      "cannotUseOptions": "Kò lè kún: àwọn àṣàyàn irinṣẹ́ kan.",
+      "limitations": "Ààlà",
+      "tools": {
+        "time": "Àkókò",
+        "settingsList": "Fi ètò hàn",
+        "settingsSet": "Yí ètò padà"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"

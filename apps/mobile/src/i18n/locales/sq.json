@@ -4338,7 +4338,15 @@
       "download": "Shkarko modelin në pajisje",
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
-      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri."
+      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri.",
+      "cannotUse": "Nuk mund të ekzekutohet: {{items}}.",
+      "cannotUseOptions": "Nuk mund të plotësohen: disa opsione mjeti.",
+      "limitations": "Kufizimet",
+      "tools": {
+        "time": "Koha",
+        "settingsList": "Shfaq cilësimet",
+        "settingsSet": "Ndrysho cilësimet"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"

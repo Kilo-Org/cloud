@@ -4338,7 +4338,15 @@
       "download": "Moodeela meeshaa irratti buufadhu",
       "downloading": "Buufamaa jira…",
       "downloadProgress": "Buufamaa jira… {{percent}}%",
-      "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali."
+      "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali.",
+      "cannotUse": "Hojjechuu hin danda'u: {{items}}.",
+      "cannotUseOptions": "Guutuu hin danda'u: filannoo meeshaa muraasa.",
+      "limitations": "Daangaa",
+      "tools": {
+        "time": "Yeroo",
+        "settingsList": "Qindaa'ina agarsiisi",
+        "settingsSet": "Qindaa'ina jijjiiri"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"

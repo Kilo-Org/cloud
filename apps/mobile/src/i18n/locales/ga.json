@@ -4575,7 +4575,15 @@
       "download": "Íoslódáil an tsamhail ar an ngléas",
       "downloading": "Á híoslódáil…",
       "downloadProgress": "Á híoslódáil… {{percent}}%",
-      "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as."
+      "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as.",
+      "cannotUse": "Ní féidir {{items}} a rith.",
+      "cannotUseOptions": "Ní féidir roinnt roghanna uirlise a líonadh isteach.",
+      "limitations": "Teorainneacha",
+      "tools": {
+        "time": "Am",
+        "settingsList": "Taispeáin socruithe",
+        "settingsSet": "Athraigh socruithe"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"

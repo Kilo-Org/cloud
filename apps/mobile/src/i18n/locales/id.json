@@ -4338,7 +4338,15 @@
       "download": "Unduh model di perangkat",
       "downloading": "Mengunduh…",
       "downloadProgress": "Mengunduh… {{percent}}%",
-      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi."
+      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi.",
+      "cannotUse": "Tidak dapat dijalankan: {{items}}.",
+      "cannotUseOptions": "Tidak dapat diisi: beberapa opsi alat.",
+      "limitations": "Batasan",
+      "tools": {
+        "time": "Waktu",
+        "settingsList": "Tampilkan pengaturan",
+        "settingsSet": "Ubah pengaturan"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"

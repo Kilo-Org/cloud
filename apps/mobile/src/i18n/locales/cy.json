@@ -4654,7 +4654,15 @@
       "download": "Llwytho'r model ar y ddyfais i lawr",
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
-      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni."
+      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni.",
+      "cannotUse": "Methu rhedeg: {{items}}.",
+      "cannotUseOptions": "Methu llenwi: rhai opsiynau offeryn.",
+      "limitations": "Cyfyngiadau",
+      "tools": {
+        "time": "Amser",
+        "settingsList": "Dangos gosodiadau",
+        "settingsSet": "Newid gosodiadau"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"

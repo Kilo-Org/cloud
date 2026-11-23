@@ -4338,7 +4338,15 @@
       "download": "Qurilmadagi modelni yuklab olish",
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
-      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
+      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining.",
+      "cannotUse": "Ishga tushirib bo'lmaydi: {{items}}.",
+      "cannotUseOptions": "To'ldirib bo'lmaydi: ba'zi vosita variantlari.",
+      "limitations": "Cheklovlar",
+      "tools": {
+        "time": "Vaqt",
+        "settingsList": "Sozlamalarni ko‘rsatish",
+        "settingsSet": "Sozlamalarni o‘zgartirish"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"

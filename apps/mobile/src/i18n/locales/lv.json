@@ -4417,7 +4417,15 @@
       "download": "Lejupielādēt ierīces modeli",
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
-      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz."
+      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz.",
+      "cannotUse": "Nevar palaist: {{items}}.",
+      "cannotUseOptions": "Nevar aizpildīt: dažas rīka opcijas.",
+      "limitations": "Ierobežojumi",
+      "tools": {
+        "time": "Laiks",
+        "settingsList": "Rādīt iestatījumus",
+        "settingsSet": "Mainīt iestatījumus"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"

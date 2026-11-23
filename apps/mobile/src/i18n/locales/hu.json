@@ -4338,7 +4338,15 @@
       "download": "Eszközön futó modell letöltése",
       "downloading": "Letöltés…",
       "downloadProgress": "Letöltés… {{percent}}%",
-      "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra."
+      "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra.",
+      "cannotUse": "Nem futtatható: {{items}}.",
+      "cannotUseOptions": "Nem tölthetők ki: bizonyos eszközbeállítások.",
+      "limitations": "Korlátozások",
+      "tools": {
+        "time": "Idő",
+        "settingsList": "Beállítások megjelenítése",
+        "settingsSet": "Beállítások módosítása"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"

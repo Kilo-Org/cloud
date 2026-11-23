@@ -4363,7 +4363,15 @@
       "download": "Download on-device model",
       "downloading": "Downloading…",
       "downloadProgress": "Downloading… {{percent}}%",
-      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again."
+      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again.",
+      "cannotUse": "Can't run: {{items}}.",
+      "cannotUseOptions": "Can't fill in: some tool options.",
+      "limitations": "Limitations",
+      "tools": {
+        "time": "Time",
+        "settingsList": "Show settings",
+        "settingsSet": "Change settings"
+      }
     },
     "webSearch": {
       "title": "Search the web",

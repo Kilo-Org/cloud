@@ -4417,7 +4417,15 @@
       "download": "Descarcă modelul pe dispozitiv",
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",
-      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou."
+      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou.",
+      "cannotUse": "Nu se poate rula: {{items}}.",
+      "cannotUseOptions": "Nu se pot completa: unele opțiuni ale instrumentului.",
+      "limitations": "Limitări",
+      "tools": {
+        "time": "Timp",
+        "settingsList": "Arată setările",
+        "settingsSet": "Modifică setările"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"

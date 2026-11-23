@@ -4338,7 +4338,15 @@
       "download": "Laai model op die toestel af",
       "downloading": "Laai tans af…",
       "downloadProgress": "Laai tans af… {{percent}}%",
-      "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer."
+      "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer.",
+      "cannotUse": "Kan nie die volgende uitvoer nie: {{items}}.",
+      "cannotUseOptions": "Kan nie sekere hulpmiddelopsies invul nie.",
+      "limitations": "Beperkinge",
+      "tools": {
+        "time": "Tyd",
+        "settingsList": "Wys instellings",
+        "settingsSet": "Verander instellings"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"

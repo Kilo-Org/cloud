@@ -4338,7 +4338,15 @@
       "download": "Tải xuống mô hình trên thiết bị",
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",
-      "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại."
+      "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại.",
+      "cannotUse": "Không thể chạy: {{items}}.",
+      "cannotUseOptions": "Không thể điền: một số tùy chọn công cụ.",
+      "limitations": "Hạn chế",
+      "tools": {
+        "time": "Thời gian",
+        "settingsList": "Hiển thị cài đặt",
+        "settingsSet": "Thay đổi cài đặt"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"

@@ -4338,7 +4338,15 @@
       "download": "Pakua modeli ya kwenye kifaa",
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",
-      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena."
+      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena.",
+      "cannotUse": "Haiwezi kuendeshwa: {{items}}.",
+      "cannotUseOptions": "Haiwezi kujazwa: baadhi ya chaguo za kifaa.",
+      "limitations": "Vikwazo",
+      "tools": {
+        "time": "Muda",
+        "settingsList": "Onyesha mipangilio",
+        "settingsSet": "Badilisha mipangilio"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"

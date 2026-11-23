@@ -4417,7 +4417,15 @@
       "download": "Baixa el model al dispositiu",
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
-      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar.",
+      "cannotUse": "No es pot executar: {{items}}.",
+      "cannotUseOptions": "No es poden emplenar: algunes opcions d'eina.",
+      "limitations": "Limitacions",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostra la configuració",
+        "settingsSet": "Canvia la configuració"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"

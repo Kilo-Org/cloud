@@ -4338,7 +4338,15 @@
       "download": "Download model til enheden",
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
-      "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen."
+      "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen.",
+      "cannotUse": "Kan ikke køre: {{items}}.",
+      "cannotUseOptions": "Kan ikke udfylde: nogle værktøjsvalgmuligheder.",
+      "limitations": "Begrænsninger",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Vis indstillinger",
+        "settingsSet": "Ændr indstillinger"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"

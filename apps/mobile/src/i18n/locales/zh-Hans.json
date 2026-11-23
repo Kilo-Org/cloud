@@ -4338,7 +4338,15 @@
       "download": "下载本机模型",
       "downloading": "正在下载…",
       "downloadProgress": "正在下载… {{percent}}%",
-      "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。"
+      "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。",
+      "cannotUse": "无法运行：{{items}}。",
+      "cannotUseOptions": "无法填写：部分工具选项。",
+      "limitations": "限制",
+      "tools": {
+        "time": "时间",
+        "settingsList": "显示设置",
+        "settingsSet": "更改设置"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"

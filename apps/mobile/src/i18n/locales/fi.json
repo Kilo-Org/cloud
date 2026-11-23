@@ -4338,7 +4338,15 @@
       "download": "Lataa laitteessa toimiva malli",
       "downloading": "Ladataan…",
       "downloadProgress": "Ladataan… {{percent}} %",
-      "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen."
+      "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen.",
+      "cannotUse": "Ei voi suorittaa: {{items}}.",
+      "cannotUseOptions": "Ei voi täyttää: joitakin työkalun valintoja.",
+      "limitations": "Rajoitukset",
+      "tools": {
+        "time": "Aika",
+        "settingsList": "Näytä asetukset",
+        "settingsSet": "Muuta asetuksia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"

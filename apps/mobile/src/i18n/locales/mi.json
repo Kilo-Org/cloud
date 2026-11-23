@@ -4338,7 +4338,15 @@
       "download": "Tikiake i te tauira i te pūrere",
       "downloading": "Kei te tikiake…",
       "downloadProgress": "Kei te tikiake… {{percent}}%",
-      "downloadFailed": "Kāore i oti te tikiake. Tirohia tō hononga me te wāhi rokiroki wātea, kātahi ka ngana anō."
+      "downloadFailed": "Kāore i oti te tikiake. Tirohia tō hononga me te wāhi rokiroki wātea, kātahi ka ngana anō.",
+      "cannotUse": "Kāore e taea te whakahaere: {{items}}.",
+      "cannotUseOptions": "Kāore e taea te whakakī: ētahi kōwhiringa taputapu.",
+      "limitations": "Ngā here",
+      "tools": {
+        "time": "Wā",
+        "settingsList": "Whakaatu tautuhinga",
+        "settingsSet": "Whakarerekē tautuhinga"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ka tautoko tēnei tauira i te kaha whakaaro"

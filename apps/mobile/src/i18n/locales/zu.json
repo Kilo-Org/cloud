@@ -4338,7 +4338,15 @@
       "download": "Dawuniloda imodeli esedivayisini",
       "downloading": "Iyadawuniloda…",
       "downloadProgress": "Iyadawuniloda… {{percent}}%",
-      "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi."
+      "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi.",
+      "cannotUse": "Akukwazeki ukuqalisa: {{items}}.",
+      "cannotUseOptions": "Akukwazeki ukugcwalisa ezinye izinketho zethuluzi.",
+      "limitations": "Imikhawulo",
+      "tools": {
+        "time": "Isikhathi",
+        "settingsList": "Bonisa izilungiselelo",
+        "settingsSet": "Shintsha izilungiselelo"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Le modeli isekela umzamo wokucabanga"

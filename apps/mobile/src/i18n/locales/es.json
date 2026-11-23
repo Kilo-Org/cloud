@@ -4417,7 +4417,15 @@
       "download": "Descargar modelo en el dispositivo",
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
-      "downloadFailed": "La descarga no se completó. Revisa tu conexión y el espacio libre, y vuelve a intentarlo."
+      "downloadFailed": "La descarga no se completó. Revisa tu conexión y el espacio libre, y vuelve a intentarlo.",
+      "cannotUse": "No se puede ejecutar: {{items}}.",
+      "cannotUseOptions": "No se pueden rellenar: algunas opciones de herramienta.",
+      "limitations": "Limitaciones",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar ajustes",
+        "settingsSet": "Cambiar ajustes"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esfuerzo de razonamiento"

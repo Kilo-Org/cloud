@@ -4575,7 +4575,15 @@
       "download": "Niżżel il-mudell fuq l-apparat",
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
-      "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova."
+      "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova.",
+      "cannotUse": "Ma jistax jiġi eżegwit: {{items}}.",
+      "cannotUseOptions": "Ma jistgħux jimtlew: xi għażliet tal-għodda.",
+      "limitations": "Limitazzjonijiet",
+      "tools": {
+        "time": "Ħin",
+        "settingsList": "Uri l-impostazzjonijiet",
+        "settingsSet": "Biddel l-impostazzjonijiet"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"

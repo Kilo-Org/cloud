@@ -77,6 +77,7 @@ const statusWith = (availability: NativeAvailability): LocalModelStatus => ({
   targetId: 'local:android',
   nameKey: 'modelChat.localModels.android',
   availability,
+  toolUse: { kind: 'unknown' },
 });
 
 const question: ModelRequest = {

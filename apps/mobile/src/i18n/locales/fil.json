@@ -4338,7 +4338,15 @@
       "download": "I-download ang modelong nasa device",
       "downloading": "Nagda-download…",
       "downloadProgress": "Nagda-download… {{percent}}%",
-      "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli."
+      "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli.",
+      "cannotUse": "Hindi mapatakbo: {{items}}.",
+      "cannotUseOptions": "Hindi mapupunan: ilang opsyon ng tool.",
+      "limitations": "Mga limitasyon",
+      "tools": {
+        "time": "Oras",
+        "settingsList": "Ipakita ang mga setting",
+        "settingsSet": "Baguhin ang mga setting"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"

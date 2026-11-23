@@ -4338,7 +4338,15 @@
       "download": "በመሣሪያ ላይ የሚሠራውን ሞዴል ያውርዱ",
       "downloading": "በመውረድ ላይ…",
       "downloadProgress": "በመውረድ ላይ… {{percent}}%",
-      "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
+      "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
+      "cannotUse": "ማስኬድ አይችልም፦ {{items}}።",
+      "cannotUseOptions": "መሙላት አይችልም፦ አንዳንድ የመሣሪያ አማራጮች።",
+      "limitations": "ገደቦች",
+      "tools": {
+        "time": "ጊዜ",
+        "settingsList": "ቅንብሮችን አሳይ",
+        "settingsSet": "ቅንብሮችን ቀይር"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"

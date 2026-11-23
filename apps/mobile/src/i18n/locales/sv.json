@@ -4338,7 +4338,15 @@
       "download": "Ladda ned modell till enheten",
       "downloading": "Laddar ned…",
       "downloadProgress": "Laddar ned… {{percent}} %",
-      "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen."
+      "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen.",
+      "cannotUse": "Kan inte köra: {{items}}.",
+      "cannotUseOptions": "Kan inte fylla i: vissa verktygsalternativ.",
+      "limitations": "Begränsningar",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Visa inställningar",
+        "settingsSet": "Ändra inställningar"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"

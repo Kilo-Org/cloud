@@ -4338,7 +4338,15 @@
       "download": "Sauke samfurin da ke kan na'ura",
       "downloading": "Ana saukewa…",
       "downloadProgress": "Ana saukewa… {{percent}}%",
-      "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa."
+      "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa.",
+      "cannotUse": "Ba za a iya gudanar da {{items}} ba.",
+      "cannotUseOptions": "Ba za a iya cika wasu zaɓuɓɓukan kayan aiki ba.",
+      "limitations": "Iyaka",
+      "tools": {
+        "time": "Lokaci",
+        "settingsList": "Nuna saituna",
+        "settingsSet": "Canza saituna"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Wannan samfurin yana goyon bayan matakin tunani"

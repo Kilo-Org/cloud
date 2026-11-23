@@ -2227,7 +2227,7 @@
       "submitting": "正在提交……",
       "sendAnswers": "发送答案",
       "unreadableTitle": "无法显示此问题",
-      "unreadableBody": "Agent 正在等待一个此应用无法显示的问题，因此不会显示对应的回答卡片。请在 CLI 中回答此问题以继续。"
+      "unreadableBody": "Agent 正在等待一个此应用无法显示的问题。请在 CLI 中回答此问题以继续。"
     },
     "blockingCard": {
       "questionUnavailable": "此问题已失效。",

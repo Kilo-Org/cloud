@@ -2789,7 +2789,7 @@
       "submitting": "Ana aikawa…",
       "sendAnswers": "Aika amsoshi",
       "unreadableTitle": "Ba a iya nuna wannan tambayar ba",
-      "unreadableBody": "Wakilin yana jiran tambayar da wannan manhajar ba za ta iya nunawa ba, don haka ba a nuna wani kati na amsa dominta. Amsa tambayar a cikin CLI domin ci gaba."
+      "unreadableBody": "Wakilin yana jiran tambayar da wannan manhajar ba za ta iya nunawa ba. Amsa tambayar a cikin CLI domin ci gaba."
     },
     "blockingCard": {
       "questionUnavailable": "An daina samun wannan tambayar.",

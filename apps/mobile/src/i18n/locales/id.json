@@ -2227,7 +2227,7 @@
       "submitting": "Mengirim…",
       "sendAnswers": "Kirim jawaban",
       "unreadableTitle": "Pertanyaan ini tidak dapat ditampilkan",
-      "unreadableBody": "Agen sedang menunggu pertanyaan yang tidak dapat ditampilkan oleh aplikasi ini, sehingga tidak ada kartu jawaban yang muncul untuk pertanyaan tersebut. Jawab pertanyaan tersebut di CLI untuk melanjutkan."
+      "unreadableBody": "Agen sedang menunggu pertanyaan yang tidak dapat ditampilkan oleh aplikasi ini. Jawab pertanyaan itu di CLI untuk melanjutkan."
     },
     "blockingCard": {
       "questionUnavailable": "Pertanyaan ini tidak lagi tersedia.",

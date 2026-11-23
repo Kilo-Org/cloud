@@ -2227,7 +2227,7 @@
       "submitting": "Wird gesendet…",
       "sendAnswers": "Antworten senden",
       "unreadableTitle": "Diese Frage konnte nicht angezeigt werden",
-      "unreadableBody": "Der Agent wartet auf eine Frage, die diese App nicht anzeigen kann, sodass dafür keine Antwortkarte angezeigt wird. Beantworte die Frage in der CLI, um fortzufahren."
+      "unreadableBody": "Der Agent wartet auf eine Frage, die diese App nicht anzeigen kann. Beantworte die Frage in der CLI, um fortzufahren."
     },
     "blockingCard": {
       "questionUnavailable": "Diese Frage ist nicht mehr verfügbar.",

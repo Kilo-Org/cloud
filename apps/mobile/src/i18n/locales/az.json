@@ -2789,7 +2789,7 @@
       "submitting": "Göndərilir…",
       "sendAnswers": "Cavabları göndər",
       "unreadableTitle": "Bu sual göstərilə bilmədi",
-      "unreadableBody": "Agent bu tətbiqin göstərə bilmədiyi sualı gözləyir, ona görə də həmin sual üçün cavab kartı görünmür. Davam etmək üçün suala CLI-də cavab verin."
+      "unreadableBody": "Agent bu tətbiqin göstərə bilmədiyi sualı gözləyir. Davam etmək üçün suala CLI-də cavab verin."
     },
     "blockingCard": {
       "questionUnavailable": "Bu sual artıq mövcud deyil.",

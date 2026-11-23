@@ -2948,7 +2948,7 @@
       "submitting": "Qed jibgħat…",
       "sendAnswers": "Ibgħat it-tweġibiet",
       "unreadableTitle": "Din il-mistoqsija ma setgħetx tintwera",
-      "unreadableBody": "L-agent qed jistenna mistoqsija li din l-app ma tistax turi, għalhekk ma tidhirx karta tat-tweġiba għaliha. Wieġeb il-mistoqsija fil-CLI biex tkompli."
+      "unreadableBody": "L-agent qed jistenna mistoqsija li din l-app ma tistax turi. Wieġeb għaliha fil-CLI biex tkompli."
     },
     "blockingCard": {
       "questionUnavailable": "Din il-mistoqsija m'għadhiex disponibbli.",

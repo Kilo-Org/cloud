@@ -2227,7 +2227,7 @@
       "submitting": "Đang gửi…",
       "sendAnswers": "Gửi câu trả lời",
       "unreadableTitle": "Không hiển thị được câu hỏi này",
-      "unreadableBody": "Tác nhân đang chờ một câu hỏi mà ứng dụng này không thể hiển thị, vì vậy không có thẻ trả lời nào xuất hiện cho câu hỏi đó. Hãy trả lời câu hỏi trong CLI để tiếp tục."
+      "unreadableBody": "Tác nhân đang chờ một câu hỏi mà ứng dụng này không thể hiển thị. Hãy trả lời câu hỏi trong CLI để tiếp tục."
     },
     "blockingCard": {
       "questionUnavailable": "Câu hỏi này không còn hiệu lực.",

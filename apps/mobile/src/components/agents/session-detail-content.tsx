@@ -53,9 +53,8 @@ import { MessageErrorBoundary } from '@/components/agents/message-error-boundary
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
-import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { QuestionCard } from '@/components/agents/question-card';
-import { QuestionUnreadableNotice } from '@/components/agents/question-unreadable-notice';
+import { UnreadableRequestNotices } from '@/components/agents/unreadable-request-notices';
 import {
   type ContextSheetIdentity,
   getContextSheetMountState,
@@ -3278,8 +3277,15 @@ export function SessionDetailContent({
         {/* The blocking cards sit beside the side insets the transcript and
             the composer clear. */}
         <View className="shrink" style={sideInsetStyle}>
-          {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
-          {unreadableQuestions.length > 0 ? <QuestionUnreadableNotice /> : null}
+          {/* No card is drawn for either unreadable request: the boundary never
+              read what it asked for, so a card would describe a scope or a
+              question nobody parsed, and the notice points the user at the CLI
+              that can still answer it. One host covers both so the iOS
+              announcement is read once instead of twice. */}
+          <UnreadableRequestNotices
+            hasPermissions={unreadablePermissions.length > 0}
+            hasQuestions={unreadableQuestions.length > 0}
+          />
 
           {blockingInteraction === 'question' && activeQuestion ? (
             <QuestionCard

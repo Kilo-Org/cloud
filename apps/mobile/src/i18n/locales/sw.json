@@ -2789,7 +2789,7 @@
       "submitting": "Inawasilisha…",
       "sendAnswers": "Tuma majibu",
       "unreadableTitle": "Swali hili halikuweza kuonyeshwa",
-      "unreadableBody": "Wakala anasubiri swali ambalo programu hii haiwezi kuonyesha, kwa hivyo hakuna kadi ya jibu inayoonekana kwa swali hilo. Jibu swali hilo kwenye CLI ili kuendelea."
+      "unreadableBody": "Wakala anasubiri swali ambalo programu hii haiwezi kuonyesha. Jibu swali hilo kwenye CLI ili kuendelea."
     },
     "blockingCard": {
       "questionUnavailable": "Swali hili halipatikani tena.",

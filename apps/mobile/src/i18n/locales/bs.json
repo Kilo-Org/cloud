@@ -2842,7 +2842,7 @@
       "submitting": "Slanje…",
       "sendAnswers": "Pošalji odgovore",
       "unreadableTitle": "Ovo pitanje nije moguće prikazati",
-      "unreadableBody": "Agent čeka na pitanje koje ova aplikacija ne može prikazati, tako da se za njega ne prikazuje nikakva kartica za odgovor. Odgovorite na pitanje u CLI-ju da biste nastavili."
+      "unreadableBody": "Agent čeka na pitanje koje ova aplikacija ne može prikazati. Odgovorite na pitanje u CLI-ju da biste nastavili."
     },
     "blockingCard": {
       "questionUnavailable": "Ovo pitanje više nije dostupno.",

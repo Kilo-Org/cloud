@@ -2789,7 +2789,7 @@
       "submitting": "Küldés…",
       "sendAnswers": "Válaszok küldése",
       "unreadableTitle": "Nem sikerült megjeleníteni a kérdést",
-      "unreadableBody": "Az ügynök egy kérdésre vár, amelyet ez az alkalmazás nem tud megjeleníteni, ezért nem jelenik meg hozzá válaszkártya. Válaszoljon a kérdésre a CLI-ben a folytatáshoz."
+      "unreadableBody": "Az ügynök egy kérdésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Válaszoljon rá a CLI-ben a folytatáshoz."
     },
     "blockingCard": {
       "questionUnavailable": "Ez a kérdés már nem érhető el.",

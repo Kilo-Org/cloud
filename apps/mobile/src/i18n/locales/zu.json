@@ -2789,7 +2789,7 @@
       "submitting": "Kuyathunyelwa…",
       "sendAnswers": "Thumela izimpendulo",
       "unreadableTitle": "Umbuzo awukwazile ukuboniswa",
-      "unreadableBody": "I-agent ilinde umbuzo ongakwazi ukuboniswa kule app, ngakho asikho ikhadi lempendulo elivelayo kuwo. Phendula umbuzo ku-CLI ukuze uqhubeke."
+      "unreadableBody": "I-agent ilinde umbuzo ongakwazi ukuboniswa kule app. Phendula umbuzo ku-CLI ukuze uqhubeke."
     },
     "blockingCard": {
       "questionUnavailable": "Lo mbuzo awusatholakali.",

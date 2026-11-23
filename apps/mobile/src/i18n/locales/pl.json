@@ -2281,7 +2281,7 @@
       "submitting": "Wysyłanie…",
       "sendAnswers": "Wyślij odpowiedzi",
       "unreadableTitle": "Nie można wyświetlić tego pytania",
-      "unreadableBody": "Agent czeka na pytanie, którego ta aplikacja nie może pokazać, więc nie pojawia się dla niego żadna karta odpowiedzi. Odpowiedz na pytanie w CLI, aby kontynuować."
+      "unreadableBody": "Agent czeka na pytanie, którego ta aplikacja nie może pokazać. Odpowiedz na pytanie w CLI, aby kontynuować."
     },
     "blockingCard": {
       "questionUnavailable": "To pytanie nie jest już dostępne.",

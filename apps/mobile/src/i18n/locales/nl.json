@@ -2227,7 +2227,7 @@
       "submitting": "Verzenden…",
       "sendAnswers": "Antwoorden verzenden",
       "unreadableTitle": "Deze vraag kon niet worden weergegeven",
-      "unreadableBody": "De agent wacht op een vraag die deze app niet kan tonen, dus er verschijnt geen antwoordkaart. Beantwoord de vraag in de CLI om door te gaan."
+      "unreadableBody": "De agent wacht op een vraag die deze app niet kan tonen. Beantwoord hem in de CLI om door te gaan."
     },
     "blockingCard": {
       "questionUnavailable": "Deze vraag is niet meer beschikbaar.",

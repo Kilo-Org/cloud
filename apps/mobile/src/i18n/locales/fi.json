@@ -2789,7 +2789,7 @@
       "submitting": "Lähetetään…",
       "sendAnswers": "Lähetä vastaukset",
       "unreadableTitle": "Kysymystä ei voitu näyttää",
-      "unreadableBody": "Agentti odottaa kysymystä, jota tämä sovellus ei voi näyttää, joten siitä ei näy vastauskorttia. Vastaa kysymykseen CLI:ssä jatkaaksesi."
+      "unreadableBody": "Agentti odottaa kysymystä, jota tämä sovellus ei voi näyttää. Vastaa kysymykseen CLI:ssä jatkaaksesi."
     },
     "blockingCard": {
       "questionUnavailable": "Tämä kysymys ei ole enää käytettävissä.",

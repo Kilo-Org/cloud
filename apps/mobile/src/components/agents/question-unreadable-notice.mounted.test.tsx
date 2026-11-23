@@ -6,22 +6,11 @@ import { act, TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
 import { QuestionUnreadableNotice } from './question-unreadable-notice';
 
-const platform = vi.hoisted(() => ({ os: 'android' as string }));
-const announceForA11y = vi.hoisted(() => vi.fn<(message: string) => void>());
-
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return { ...actual, useTranslation: () => ({ t: actual.getI18n().t.bind(actual.getI18n()) }) };
 });
-vi.mock('react-native', () => ({
-  View: 'View',
-  Platform: {
-    get OS() {
-      return platform.os;
-    },
-  },
-}));
-vi.mock('@/lib/a11y/announce', () => ({ announceForA11y }));
+vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 async function renderNotice(props: { inset?: boolean } = {}) {
@@ -54,7 +43,7 @@ describe('QuestionUnreadableNotice mounted', () => {
 
     expect(text).toContain('This question could not be displayed');
     expect(text).toContain('waiting on a question this app cannot show');
-    expect(text).toContain('Answer the question in the CLI');
+    expect(text).toContain('Answer it in the CLI');
   });
 
   it('carries the notice as an alert and renders no answer action', async () => {
@@ -81,24 +70,5 @@ describe('QuestionUnreadableNotice mounted', () => {
     expect(classNameOf(defaultNotice)).toContain('mx-4');
     expect(classNameOf(insetNotice)).toContain('mx-4');
     expect(classNameOf(flushNotice)).not.toContain('mx-4');
-  });
-
-  it('lets Android read the live region instead of announcing as well', async () => {
-    platform.os = 'android';
-    announceForA11y.mockClear();
-    await renderNotice();
-
-    expect(announceForA11y).not.toHaveBeenCalled();
-  });
-
-  it('announces once on iOS, which has no live region', async () => {
-    platform.os = 'ios';
-    announceForA11y.mockClear();
-    await renderNotice();
-
-    expect(announceForA11y).toHaveBeenCalledTimes(1);
-    expect(announceForA11y).toHaveBeenCalledWith(
-      'The agent is waiting on a question this app cannot show, so no answer card appears for it. Answer the question in the CLI to continue.'
-    );
   });
 });

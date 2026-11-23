@@ -2895,7 +2895,7 @@
       "submitting": "Odosiela sa…",
       "sendAnswers": "Odoslať odpovede",
       "unreadableTitle": "Túto otázku sa nepodarilo zobraziť",
-      "unreadableBody": "Agent čaká na otázku, ktorú táto aplikácia nedokáže zobraziť, takže sa pre ňu nezobrazuje žiadna karta s odpoveďou. Odpovedzte na otázku v CLI, aby ste mohli pokračovať."
+      "unreadableBody": "Agent čaká na otázku, ktorú táto aplikácia nedokáže zobraziť. Odpovedzte na otázku v CLI, aby ste mohli pokračovať."
     },
     "blockingCard": {
       "questionUnavailable": "Táto otázka už nie je dostupná.",

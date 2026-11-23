@@ -2248,7 +2248,7 @@
       "submitting": "Enviando…",
       "sendAnswers": "Enviar respostas",
       "unreadableTitle": "Não foi possível exibir esta pergunta",
-      "unreadableBody": "O agente está aguardando uma pergunta que este app não consegue exibir, então nenhum card de resposta aparece para ela. Responda à pergunta no CLI para continuar."
+      "unreadableBody": "O agente está aguardando uma pergunta que este app não consegue exibir. Responda à pergunta no CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pergunta não está mais disponível.",

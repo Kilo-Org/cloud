@@ -2895,7 +2895,7 @@
       "submitting": "Pošiljanje…",
       "sendAnswers": "Pošlji odgovore",
       "unreadableTitle": "Vprašanja ni bilo mogoče prikazati",
-      "unreadableBody": "Agent čaka na vprašanje, ki ga ta aplikacija ne more prikazati, zato se zanj ne prikaže kartica za odgovor. Odgovorite na vprašanje v CLI, da nadaljujete."
+      "unreadableBody": "Agent čaka na vprašanje, ki ga ta aplikacija ne more prikazati. Odgovorite na vprašanje v CLI, da nadaljujete."
     },
     "blockingCard": {
       "questionUnavailable": "To vprašanje ni več na voljo.",

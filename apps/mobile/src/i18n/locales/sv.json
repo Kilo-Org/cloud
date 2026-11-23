@@ -2789,7 +2789,7 @@
       "submitting": "Skickar…",
       "sendAnswers": "Skicka svar",
       "unreadableTitle": "Frågan kunde inte visas",
-      "unreadableBody": "Agenten väntar på en fråga som den här appen inte kan visa, så inget svarskort visas för den. Svara på frågan i CLI för att fortsätta."
+      "unreadableBody": "Agenten väntar på en fråga som den här appen inte kan visa. Svara på frågan i CLI för att fortsätta."
     },
     "blockingCard": {
       "questionUnavailable": "Den här frågan är inte längre tillgänglig.",

@@ -2227,7 +2227,7 @@
       "submitting": "Gönderiliyor…",
       "sendAnswers": "Yanıtları gönder",
       "unreadableTitle": "Bu soru görüntülenemedi",
-      "unreadableBody": "Aracı, bu uygulamanın gösteremediği bir soruyu bekliyor; bu yüzden o soru için yanıt kartı gösterilmiyor. Devam etmek için soruyu CLI'de yanıtla."
+      "unreadableBody": "Aracı, bu uygulamanın gösteremediği bir soruyu bekliyor. Devam etmek için soruyu CLI'de yanıtla."
     },
     "blockingCard": {
       "questionUnavailable": "Bu soru artık kullanılamıyor.",

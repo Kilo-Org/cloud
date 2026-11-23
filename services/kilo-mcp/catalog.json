@@ -4024,6 +4024,37 @@
     ],
     "searchBlob": "byok.create Add a new bring-your-own-key (BYOK) API key for an AI provider, either for the current user or for an organization. Stores the key securely so the user's own provider credentials are used for inference. byok create organizationid provider_id api_key organizationId provider_id api_key"
   },
+  "byok.credentialMethod": {
+    "path": "byok.credentialMethod",
+    "kind": "query",
+    "summary": "Look up the credential method used by one of your saved BYOK provider keys, such as whether an Amazon Bedrock key authenticates with access keys or an API key. Use it to check how an existing stored key is configured for a user or organization; the method is null when it cannot be determined.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "byok",
+      "credentialmethod",
+      "organizationid",
+      "id"
+    ],
+    "searchBlob": "byok.credentialMethod Look up the credential method used by one of your saved BYOK provider keys, such as whether an Amazon Bedrock key authenticates with access keys or an API key. Use it to check how an existing stored key is configured for a user or organization; the method is null when it cannot be determined. byok credentialmethod organizationid id organizationId id"
+  },
   "byok.delete": {
     "path": "byok.delete",
     "kind": "mutation",

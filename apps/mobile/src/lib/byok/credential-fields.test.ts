@@ -8,7 +8,7 @@ import {
   credentialPayload,
   credentialProblem,
   type CredentialValues,
-  firstMissingField,
+  missingFields,
   type ModelMapping,
   readStructuredCredential,
 } from './credential-fields';
@@ -62,18 +62,18 @@ describe('credentialForm', () => {
   });
 });
 
-describe('firstMissingField', () => {
+describe('missingFields', () => {
   const form = credentialForm('vertex', 'apiKey');
 
-  it('names the first field the form still needs', () => {
+  it('names every field the form still needs, in the order the form shows them', () => {
     if (!form) {
       throw new Error('missing the Vertex form');
     }
     const values: CredentialValues = { project: 'p', location: '  ' };
-    expect(firstMissingField(form, values)).toBe('location');
+    expect(missingFields(form, values)).toEqual(['location', 'clientEmail', 'privateKey']);
   });
 
-  it('accepts a complete form', () => {
+  it('asks nothing of a complete form', () => {
     if (!form) {
       throw new Error('missing the Vertex form');
     }
@@ -83,7 +83,7 @@ describe('firstMissingField', () => {
       clientEmail: 'service@example.test',
       privateKey: 'pem',
     };
-    expect(firstMissingField(form, values)).toBeNull();
+    expect(missingFields(form, values)).toEqual([]);
   });
 });
 
@@ -193,6 +193,22 @@ describe('readStructuredCredential', () => {
 
   it('reads a key file the gateway can sign with as ready', () => {
     expect(readVertex(PEM_KEY)).toMatchObject({ tag: 'ready' });
+  });
+
+  it('reports every empty field, so each gets its own message', () => {
+    const form = credentialForm('bedrock', 'accessKeys');
+    if (!form) {
+      throw new Error('missing the Bedrock access-key form');
+    }
+    expect(
+      readStructuredCredential({
+        providerId: 'bedrock',
+        mode: 'accessKeys',
+        form,
+        values: { accessKeyId: '  ' },
+        rows: [],
+      })
+    ).toEqual({ tag: 'missing', fields: ['accessKeyId', 'secretAccessKey', 'region'] });
   });
 
   it('refuses an encrypted key with the passphrase cause on the private-key field', () => {

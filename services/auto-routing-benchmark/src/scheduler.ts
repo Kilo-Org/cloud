@@ -338,11 +338,13 @@ export async function scheduleRunChunks(
   // chunk of this lane already schedules is never written again, so its counters and its
   // terminal status survive wherever the plan puts it.
   const materializedRows = await db
-    .prepare('SELECT model, variant, rep, case_ids FROM scheduler_chunks WHERE run_id = ?')
+    .prepare('SELECT id, model, variant, rep, case_ids FROM scheduler_chunks WHERE run_id = ?')
     .bind(run.runId)
-    .all<{ model: string; variant: string; rep: number; case_ids: string }>();
+    .all<{ id: string; model: string; variant: string; rep: number; case_ids: string }>();
   const materialized = new Map<string, Set<string>>();
+  const takenIds = new Set<string>();
   for (const row of materializedRows.results) {
+    takenIds.add(row.id);
     const laneKey = JSON.stringify([row.model, row.variant, row.rep]);
     const cases = materialized.get(laneKey) ?? new Set<string>();
     for (const caseId of JSON.parse(row.case_ids) as string[]) cases.add(caseId);
@@ -374,28 +376,40 @@ export async function scheduleRunChunks(
       const laneCaseIds = run.laneCaseIds ? run.laneCaseIds.get(laneKey) : run.caseIds;
       if (!laneCaseIds || laneCaseIds.length === 0) continue;
       const chunks = Math.ceil(laneCaseIds.length / run.chunkSize);
-      const start = resumeAt.get(laneKey) ?? 0;
+      // The resume prefix assumes the lane's cases did not move, which holds for a catalog
+      // lane: `caseIds` is the immutable ordered catalog list. A plan-driven lane reorders
+      // and regroups between passes instead, so it rescans and lets the case guard skip what
+      // is already scheduled — a paid request's lane is small, and correctness comes first.
+      const start = run.laneCaseIds ? 0 : (resumeAt.get(laneKey) ?? 0);
+      // Chunk ids are positions. A residual chunk (some of its cases already scheduled) is
+      // written with only its new cases, and only onto an id no row holds: the plan's own
+      // last index and up are free for a non-empty plan, and a collision moves it on.
+      let nextFree = chunks;
       for (let chunk = start; chunk < chunks; chunk++) {
         const offset = chunk * run.chunkSize;
         const laneCases = laneCaseIds.slice(offset, offset + run.chunkSize);
         const scheduled = materialized.get(laneKey);
-        // Every case in this chunk must be new. A partly-scheduled chunk is skipped whole:
-        // re-emitting it would put a case that already has a row into a second one.
-        if (scheduled && laneCases.some(caseId => scheduled.has(caseId))) continue;
-        const caseIds = JSON.stringify(laneCases);
+        // A case that already has a row keeps it: its attempts, its deferral budgets and its
+        // terminal status are the block's budget. Only the cases without a row are written,
+        // so an existing case never lands in a second row and a new case beside one is never
+        // dropped. Nothing is left to write when every case is already scheduled.
+        const newCases = scheduled ? laneCases.filter(caseId => !scheduled.has(caseId)) : laneCases;
+        if (newCases.length === 0) continue;
+        let position = chunk;
+        if (takenIds.has(JSON.stringify([run.runId, entry.model, variant, rep, position]))) {
+          while (takenIds.has(JSON.stringify([run.runId, entry.model, variant, rep, nextFree])))
+            nextFree += 1;
+          position = nextFree;
+        }
+        const chunkId = JSON.stringify([run.runId, entry.model, variant, rep, position]);
+        takenIds.add(chunkId);
+        const caseIds = JSON.stringify(newCases);
         statements.push(
           db
             .prepare(SCHEDULER_INSERT_CHUNK_SQL)
-            .bind(
-              JSON.stringify([run.runId, entry.model, variant, rep, chunk]),
-              run.runId,
-              entry.model,
-              variant,
-              rep,
-              chunk,
-              caseIds
-            )
+            .bind(chunkId, run.runId, entry.model, variant, rep, position, caseIds)
         );
+        for (const caseId of newCases) scheduled?.add(caseId);
         if (statements.length < SCHEDULER_MATERIALIZE_BATCH) continue;
         if (!(await writeBatch(false)) || Date.now() >= deadline) return false;
       }

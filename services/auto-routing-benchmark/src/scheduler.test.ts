@@ -1997,6 +1997,12 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
       .prepare("UPDATE scheduler_chunks SET status = 'failed', attempts = 1 WHERE id = ?")
       .run(chunkC.id);
     expect(storedChunks(sqlite)).toHaveLength(2);
+    // A re-plan can only reach the initializer while its pass is unfinished: the marker
+    // commits with the last batch, and every later call returns immediately. Clearing it
+    // models the interrupted pass a re-plan resumes from.
+    const interruptInitialization = () =>
+      sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'regrouped'").run();
+    interruptInitialization();
 
     // The plan now regroups: [b,c] and [a]. case-b was in [a,b] and case-c was failed on its
     // own, so both new groupings contain a scheduled case and neither may be written. Only a
@@ -2017,11 +2023,39 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
       [JSON.stringify(['case-c']), 'failed', 1],
     ]);
     // A regrouped case never becomes claimable again: case-c has no second row to claim.
-    expect(
-      (await claimMany(db, schedulerConfig('{"slots":3}'), 3, 'after-regroup', NOW + 10)).map(
-        claim => claim.case_ids
-      )
-    ).toEqual([JSON.stringify(['case-a', 'case-b'])]);
+    // (Claims are checked once at the end, so no chunk is already live when they run.)
+
+    // The plan now puts a NEW case beside an existing one: [a,b] stays, and [c,case-d] adds
+    // case-d. Filtering the whole chunk on its existing case would silently drop case-d and
+    // it would never be benchmarked, so only case-d may be written — at an id no row holds,
+    // because the plan's own index 1 already belongs to the failed [case-c] chunk.
+    interruptInitialization();
+    await scheduleRunChunks(db, {
+      runId: 'regrouped',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c', 'case-d'],
+      chunkSize: 2,
+      laneCaseIds: new Map([[laneKey, ['case-a', 'case-b', 'case-c', 'case-d']]]),
+    });
+
+    const after = storedChunks(sqlite).map(row => [row.case_ids, row.status, row.attempts]);
+    // case-d gets exactly one row, holding only itself; case-c keeps its failed row and the
+    // attempt it spent, and case-a/case-b keep their untouched pending row.
+    expect(after).toEqual([
+      [JSON.stringify(['case-a', 'case-b']), 'pending', 0],
+      [JSON.stringify(['case-c']), 'failed', 1],
+      [JSON.stringify(['case-d']), 'pending', 0],
+    ]);
+    const claimable = (
+      await claimMany(db, schedulerConfig('{"slots":4}'), 4, 'after-new-case', NOW + 20)
+    ).map(claim => claim.case_ids);
+    // Both live cases are claimable exactly once, and the spent case is not: the cap still
+    // follows the case, not the position.
+    expect(claimable.sort()).toEqual([
+      JSON.stringify(['case-a', 'case-b']),
+      JSON.stringify(['case-d']),
+    ]);
   });
 
   it('keeps the same chunk id when a larger chunk size changes nothing for one case', async () => {

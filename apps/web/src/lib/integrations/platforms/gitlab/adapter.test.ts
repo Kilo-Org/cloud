@@ -1248,6 +1248,24 @@ describe('deleteProjectWebhook', () => {
       expect.any(Function)
     );
   });
+
+  it('treats an absent hook as already removed', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: async () => 'Not found',
+    });
+
+    await expect(deleteProjectWebhook('test-token', 123, 456)).resolves.toBeUndefined();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/123/hooks/456',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer test-token' },
+      })
+    );
+  });
 });
 
 describe('createProjectWebhook', () => {

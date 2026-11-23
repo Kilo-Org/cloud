@@ -78,6 +78,7 @@ describe('syncWebhooksForRepositories', () => {
     });
 
     expect(mockCreateProjectWebhook).not.toHaveBeenCalled();
+    expect(mockDeleteProjectWebhook).not.toHaveBeenCalled();
     expect(result.created).toEqual([]);
     expect(result.updated).toEqual([]);
     expect(result.errors).toEqual([]);
@@ -97,6 +98,80 @@ describe('syncWebhooksForRepositories', () => {
     expect(mockDeleteProjectWebhook).toHaveBeenCalledTimes(1);
     expect(result.deleted).toEqual([{ projectId: 123, hookId: 42 }]);
     expect(updatedWebhooks).toEqual({});
+  });
+
+  it('a delete failure keeps the stored handle and reports its hook id', async () => {
+    mockDeleteProjectWebhook.mockRejectedValueOnce(new Error('GitLab delete webhook failed: 403'));
+
+    const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [],
+      [123],
+      { '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' } }
+    );
+
+    expect(result.deleted).toEqual([]);
+    expect(result.errors).toEqual([
+      {
+        projectId: 123,
+        operation: 'delete',
+        hookId: 42,
+        error: expect.stringContaining('403'),
+      },
+    ]);
+    expect(updatedWebhooks['123']).toEqual({
+      hook_id: 42,
+      created_at: '2025-12-01T00:00:00.000Z',
+    });
+  });
+
+  it('a later save retries the kept removal when only the stored map names the project', async () => {
+    mockDeleteProjectWebhook.mockResolvedValueOnce(undefined);
+
+    const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [],
+      [],
+      { '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' } }
+    );
+
+    expect(mockDeleteProjectWebhook).toHaveBeenCalledTimes(1);
+    expect(mockDeleteProjectWebhook).toHaveBeenCalledWith('token', 123, 42, 'https://gitlab.com');
+    expect(result.deleted).toEqual([{ projectId: 123, hookId: 42 }]);
+    expect(result.errors).toEqual([]);
+    expect(updatedWebhooks).toEqual({});
+  });
+
+  it('a 404 removal drops the entry because the adapter treats an absent hook as removed', async () => {
+    mockDeleteProjectWebhook.mockResolvedValueOnce(undefined);
+
+    const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [],
+      [],
+      { '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' } }
+    );
+
+    expect(updatedWebhooks['123']).toBeUndefined();
+    expect(result.deleted).toEqual([{ projectId: 123, hookId: 42 }]);
+  });
+
+  it('a stored entry for a project that stays selected is never deleted', async () => {
+    const stored = { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' };
+
+    const { updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [123],
+      [123],
+      { '123': stored }
+    );
+
+    expect(mockDeleteProjectWebhook).not.toHaveBeenCalled();
+    expect(updatedWebhooks['123']).toEqual(stored);
   });
 
   it('asks the user to reconnect when GitLab rejects the credential', async () => {

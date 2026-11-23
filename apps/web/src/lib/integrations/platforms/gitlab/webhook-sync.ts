@@ -37,7 +37,13 @@ export type WebhookSyncResult = {
   created: Array<{ projectId: number; hookId: number }>;
   updated: Array<{ projectId: number; hookId: number }>;
   deleted: Array<{ projectId: number; hookId: number }>;
-  errors: Array<{ projectId: number; error: string; operation: 'create' | 'update' | 'delete' }>;
+  errors: Array<{
+    projectId: number;
+    error: string;
+    operation: 'create' | 'update' | 'delete';
+    /** Set on a delete failure: the stored handle the platform kept for a retry. */
+    hookId?: number;
+  }>;
 };
 
 export async function syncWebhooksForRepositories(
@@ -61,16 +67,19 @@ export async function syncWebhooksForRepositories(
   const updatedWebhooks: Record<string, ConfiguredWebhook> = { ...configuredWebhooks };
 
   // A selected repository needs a Kilo webhook unless the stored configuration
-  // already records one for it. A create that failed records nothing, so the
-  // next save that carries the same selection must attempt it again instead of
-  // treating it as unchanged; the rotate path passes an empty previous
-  // selection for the same reason. Removals still diff against the previous
-  // selection, which is what deletes a hook for a repository that was dropped.
+  // already records one, so a create that failed is attempted again. A removal
+  // keeps its stored handle, so the next save retries a delete that failed.
   const addedRepos = selectedRepositoryIds.filter(
     id => !previousRepositoryIds.includes(id) || configuredWebhooks[String(id)] === undefined
   );
 
-  const removedRepos = previousRepositoryIds.filter(id => !selectedRepositoryIds.includes(id));
+  // A removal is any stored handle whose project left the selection. A delete
+  // that failed keeps its stored handle so the next save retries it, and the
+  // stored map is then the only place that still names the project.
+  const selectedRepositoryIdSet = new Set(selectedRepositoryIds);
+  const removedRepos = Object.keys(configuredWebhooks)
+    .map(projectId => Number.parseInt(projectId, 10))
+    .filter(projectId => Number.isFinite(projectId) && !selectedRepositoryIdSet.has(projectId));
 
   logExceptInTest('[syncWebhooksForRepositories] Starting sync', {
     selectedCount: selectedRepositoryIds.length,
@@ -179,9 +188,8 @@ export async function syncWebhooksForRepositories(
         projectId,
         error: errorMessage,
         operation: 'delete',
+        hookId: webhookInfo.hook_id,
       });
-
-      delete updatedWebhooks[String(projectId)];
 
       logExceptInTest('[syncWebhooksForRepositories] Failed to delete webhook', {
         projectId,
@@ -221,23 +229,4 @@ export async function createWebhooksForRepositories(
     result,
     configuredWebhooks: updatedWebhooks,
   }));
-}
-
-export async function deleteAllWebhooks(
-  accessToken: string,
-  configuredWebhooks: Record<string, ConfiguredWebhook>,
-  instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<WebhookSyncResult> {
-  const projectIds = Object.keys(configuredWebhooks).map(id => parseInt(id, 10));
-
-  const { result } = await syncWebhooksForRepositories(
-    accessToken,
-    '', // Secret not needed for deletion
-    [], // No selected repos (delete all)
-    projectIds, // All previous repos
-    configuredWebhooks,
-    instanceUrl
-  );
-
-  return result;
 }

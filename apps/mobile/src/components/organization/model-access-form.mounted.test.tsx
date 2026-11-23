@@ -28,10 +28,15 @@ import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
 
 /**
- * The window and the keyboard the form reads. The lift's pad is a clamp against
- * the room the list has, so a suite that asserts the pad drives both numbers.
+ * The keyboard the form reads and the window's font scale. The lift is the
+ * keyboard's own measured height less the bottom inset the footer already pads,
+ * so a suite that asserts the pad drives the keyboard and that inset; the status
+ * slot's reserve follows the font scale, so the same fixture drives that too.
  */
-const geometry = vi.hoisted(() => ({ windowHeight: 800, keyboardHeight: 0 }));
+const geometry = vi.hoisted(() => ({ keyboardHeight: 0, fontScale: 1 }));
+
+/** The window's bottom inset, which the pinned footer's own padding covers. */
+const insets = vi.hoisted(() => ({ bottom: 0 }));
 
 /**
  * What the durable draft answers. Both states carry `save`/`clear`: the real
@@ -75,9 +80,16 @@ vi.mock('@/lib/persist/drafts', () => ({
 
 vi.mock('react-native', () => ({
   View: 'View',
-  // The list-band clamp compares a frame against the window it was measured in,
-  // so this suite serves the window a test sets and nothing else.
-  useWindowDimensions: () => ({ width: 400, height: geometry.windowHeight }),
+  // The status slot reads the font scale from this window (the live scale
+  // module has no native module here, so it falls back to it). The height is a
+  // fixed one no test drives: the lift is the keyboard's own height, never a
+  // measured frame, so a suite that changed it would prove nothing.
+  useWindowDimensions: () => ({ width: 400, height: 800, fontScale: geometry.fontScale }),
+}));
+// The pinned footer pads the bottom inset itself, so the lift subtracts it. A
+// suite that asserts the subtraction drives this one number.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: insets.bottom, left: 0 }),
 }));
 // The form reads one keyboard number: this store drives it, as the real
 // `useKeyboardState` selector would deliver it.
@@ -287,6 +299,29 @@ function statusMessage(root: ReactTestInstance): unknown {
   return root.findByType('AccessibleStatus' as never).props.message;
 }
 
+/** The reserve view around the footer status: the slot the actions sit above. */
+function statusSlot(root: ReactTestInstance): ReactTestInstance {
+  const slot = root.findByType('AccessibleStatus' as never).parent;
+  if (slot === null || String(slot.type) !== 'View') {
+    throw new Error('the status line does not sit in the reserve view');
+  }
+  return slot;
+}
+
+/** The slot's reserved height in dp, read through the same style object the
+ *  form hands the layout pass. */
+function statusSlotMinHeight(root: ReactTestInstance): number {
+  const style: unknown = statusSlot(root).props.style;
+  if (typeof style !== 'object' || style === null || !('minHeight' in style)) {
+    throw new Error('the status slot sets no minHeight');
+  }
+  const { minHeight } = style;
+  if (typeof minHeight !== 'number') {
+    throw new TypeError('the status slot sets a non-numeric minHeight');
+  }
+  return minHeight;
+}
+
 /** The one button that carries `label`, so a state's way out is unambiguous. */
 function buttonWithLabel(root: ReactTestInstance, label: string) {
   const button = root
@@ -298,53 +333,6 @@ function buttonWithLabel(root: ReactTestInstance, label: string) {
     throw new Error(`button ${label} missing`);
   }
   return button;
-}
-
-/** A host view's layout reporter, as the form's measuring views take one. */
-type LayoutHandler = (event: { nativeEvent: { layout: { height: number } } }) => void;
-
-/** The form's frame view: the `View` that directly wraps the keyboard lift, so
- *  no class string or second laid-out view can retarget the lookup. */
-function frameLayout(root: ReactTestInstance) {
-  const node = root.findByType(KeyboardLiftView as never).parent;
-  if (node === null || String(node.type) !== 'View' || !('onLayout' in node.props)) {
-    throw new Error('the frame view that wraps the keyboard lift carries no onLayout');
-  }
-  return node.props.onLayout as LayoutHandler;
-}
-
-/** The form's header block, which it measures itself: the one laid-out view
- *  between the tab control and the keyboard lift, the inset wrapper around the
- *  padded header. */
-function headerLayout(root: ReactTestInstance) {
-  const chain: ReactTestInstance[] = [];
-  for (
-    let node: ReactTestInstance | null = root.findByType('SegmentedControl' as never);
-    node !== null && node.type !== KeyboardLiftView;
-    node = node.parent
-  ) {
-    chain.push(node);
-  }
-  const reporters = chain.filter(node => 'onLayout' in node.props);
-  const [wrapper] = reporters;
-  if (reporters.length !== 1 || wrapper === undefined) {
-    throw new Error(
-      `the header inside the keyboard lift needs one onLayout, found ${reporters.length}`
-    );
-  }
-  return wrapper.props.onLayout as LayoutHandler;
-}
-
-/** The pinned bar below the list, which the form measures itself. */
-function footerLayout(root: ReactTestInstance) {
-  return root.findByType('ScreenFooter' as never).props.onLayout as LayoutHandler;
-}
-
-/** Report a laid-out height, the way the native layout pass does. */
-function layout(handler: LayoutHandler, height: number) {
-  act(() => {
-    handler({ nativeEvent: { layout: { height } } });
-  });
 }
 
 /** The lift the form asks for: the pad its `KeyboardLiftView` reserves. */
@@ -360,8 +348,9 @@ afterEach(() => {
   draftStore.value = null;
   draftStore.save.mockReset();
   draftStore.clear.mockReset();
-  geometry.windowHeight = 800;
   geometry.keyboardHeight = 0;
+  geometry.fontScale = 1;
+  insets.bottom = 0;
 });
 
 describe('ModelAccessForm save', () => {
@@ -473,15 +462,45 @@ describe('ModelAccessForm save', () => {
     expect(root.findAllByType('ScreenFooter' as never)).toHaveLength(0);
   });
 
-  it('clamps the footer status to the slot so a long sentence cannot raise the actions', () => {
-    const root = render(undefined);
-    const footer = root.findByType('ScreenFooter' as never);
+  // The slot's reserve and the status's own scale cap come from one number, so
+  // a two-line refusal reserves exactly what the text may occupy on that
+  // device and the action pair above never moves.
+  function denyEveryModel(root: ReactTestInstance) {
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, setModelsAllowed(draft, ['anthropic/claude', 'openai/gpt'], false));
+  }
 
-    // The slot is one fixed height — two `text-sm` lines. A sentence that needs
-    // a third must truncate inside it rather than grow the bar and lift the
-    // actions above it, in any shipped locale.
-    const status = footer.findByType('AccessibleStatus' as never);
+  it('reserves two text-sm lines at the default scale and caps the status there', () => {
+    geometry.fontScale = 1;
+    const root = render(undefined);
+    denyEveryModel(root);
+
+    // The status is a real refusal, not the empty line: the reserve is what the
+    // sentence may take on this device.
+    expect(statusMessage(root)).toBe(i18n.t('organizationModelAccess.emptyModelList'));
+    const status = root.findByType('AccessibleStatus' as never);
     expect(status.props.numberOfLines).toBe(2);
+    expect(status.props.maxFontSizeMultiplier).toBe(1.4);
+    expect(statusSlotMinHeight(root)).toBe(35);
+  });
+
+  it('holds the reserve at the cap when the system scale is past it', () => {
+    geometry.fontScale = 2;
+    const root = render(undefined);
+    denyEveryModel(root);
+
+    // Two 17.5dp lines at the 1.4 cap: 49dp, the same bar as at scale 1.4,
+    // because the text is clamped to that scale too.
+    expect(statusSlotMinHeight(root)).toBe(49);
+    expect(root.findByType('AccessibleStatus' as never).props.maxFontSizeMultiplier).toBe(1.4);
+  });
+
+  it('follows the scale down below 1, shrinking the reserve with the text', () => {
+    geometry.fontScale = 0.85;
+    const root = render(undefined);
+    denyEveryModel(root);
+
+    expect(statusSlotMinHeight(root)).toBeCloseTo(17.5 * 2 * 0.85);
   });
 });
 
@@ -1214,36 +1233,62 @@ describe('ModelAccessForm durable draft', () => {
 });
 
 describe('ModelAccessForm keyboard lift', () => {
-  it("caps the pad at the list's own band, because the header and the bar claim part of the frame", () => {
-    // A 272pt form with a 162pt keyboard. Clamped against the whole frame the
-    // pad would be the entire band (162 < 272 - 88), and the header and the
-    // 104pt bar would then leave the list nothing at all. The band the list
-    // has is 272 - 60 - 104 = 108, so the pad stops at 108 - 88 = 20 and the
-    // list keeps the shared viewport minimum (`@/lib/body-viewport`).
-    geometry.keyboardHeight = 162;
-    const root = render(undefined);
-    layout(frameLayout(root), 272);
-    layout(headerLayout(root), 60);
-    layout(footerLayout(root), 104);
+  it("lifts by the keyboard's own height, with no bottom inset to subtract", () => {
+    // The pinned footer is `keyboard="host"`, so this pad is its only lift: it
+    // has to be the whole keyboard band, or the bar spans the IME on a short
+    // window (272pt tall with a 162pt keyboard left it 20pt of the 104pt bar).
+    geometry.keyboardHeight = 300;
+    insets.bottom = 0;
 
-    expect(liftPad(root)).toBe(20);
+    expect(liftPad(render(undefined))).toBe(300);
   });
 
-  it('gives the bar its points back to the list on the Gateways tab, which draws no footer', () => {
-    // The bar unmounts on the Gateways tab, so it never reports a height of
-    // zero and its last measurement must not keep shrinking the band the list
-    // has: the band there is the whole 272 - 60 = 212 points between the header
-    // and the bottom edge, so the pad can spend the band down to the shared
-    // viewport minimum instead of stopping where the missing bar would end.
-    geometry.keyboardHeight = 162;
+  it('subtracts the bottom inset the footer already pads itself', () => {
+    // The provider's Android height spans the translucent navigation bar, and
+    // the bar below the list pads that inset already: an unreduced pad would
+    // float the actions a navigation-bar height above the keyboard.
+    geometry.keyboardHeight = 300;
+    insets.bottom = 34;
+
+    expect(liftPad(render(undefined))).toBe(266);
+  });
+
+  it('never pads negatively when the inset is taller than the keyboard', () => {
+    geometry.keyboardHeight = 20;
+    insets.bottom = 34;
+
+    expect(liftPad(render(undefined))).toBe(0);
+  });
+
+  it('reads no frame, header or footer layout: the pad follows the keyboard alone', () => {
+    // A measured frame is what forced the old clamp: the pad had to fit inside
+    // the band the header and the bar left. The body above the bar now takes
+    // whatever room is left and scrolls, so nothing in this form is measured
+    // for the lift, and a layout pass that never lands cannot strand it.
     const root = render(undefined);
-    layout(frameLayout(root), 272);
-    layout(headerLayout(root), 60);
-    layout(footerLayout(root), 104);
-    expect(liftPad(root)).toBe(20);
+    const lift = root.findByType(KeyboardLiftView as never);
+
+    expect(lift.findAll(node => 'onLayout' in node.props)).toHaveLength(0);
+    expect(lift.parent?.props).not.toHaveProperty('onLayout');
+
+    geometry.keyboardHeight = 300;
+    const driven = rerender(undefined);
+
+    expect(liftPad(driven)).toBe(300);
+  });
+
+  it('lifts by the same band on the Gateways tab, which draws no footer', () => {
+    // The Gateways tab saves each control as it changes and renders no bar, but
+    // the keyboard still covers the same band: the lift is the keyboard's, not
+    // the footer's, so switching tabs cannot change it.
+    geometry.keyboardHeight = 300;
+    insets.bottom = 20;
+    const root = render(undefined);
+
+    expect(liftPad(root)).toBe(280);
 
     selectTab(root, 'gateways');
 
-    expect(liftPad(root)).toBe(124);
+    expect(liftPad(root)).toBe(280);
   });
 });

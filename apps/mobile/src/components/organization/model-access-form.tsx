@@ -1,11 +1,10 @@
 /* eslint-disable max-lines -- one form owns the draft, both list policies and the leave guard; the Providers tab's display names add a prop to that whole, and splitting it would duplicate the shared state. */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type LayoutChangeEvent, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { clampLiftPad, type LiftFrameMeasurement } from '@/components/agents/owned-keyboard-lift';
 import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { ModelDenyList, ProviderAllowList } from '@/components/organization/model-access-lists';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
@@ -15,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type OrgGatewaySettings,
@@ -47,6 +47,22 @@ import { orgModelAccessFormDraftKey } from '@/lib/persist/drafts';
 import { useFormDraft } from '@/lib/persist/use-form-draft';
 
 type Tab = 'models' | 'providers' | 'gateways';
+
+/**
+ * The largest font scale the footer's status line honours.
+ *
+ * The status slot reserves two `text-sm` line boxes at this cap and the status
+ * text is clamped by the same number, so the bar has one height per device and
+ * the Cancel/Save pair above it cannot move at any system font scale. 1.4 is
+ * the bounded-footer precedent (`CONSENT_DISCLOSURE_MAX_FONT_SCALE`).
+ */
+export const STATUS_MAX_FONT_SCALE = 1.4;
+
+/**
+ * One `text-sm` line box at scale 1, in dp: `text-sm` is 0.875rem with a
+ * 1.25rem line height at the app's 14pt rem.
+ */
+const TEXT_SM_LINE_HEIGHT_DP = 17.5;
 
 /** The reason a save is refused, by the refusal `modelAccessSave` returned. */
 const BLOCKING_ISSUE_KEYS = {
@@ -106,54 +122,19 @@ export function ModelAccessForm({
 }>) {
   const { t } = useTranslation();
   // The pinned footer rides the keyboard: the lift around the body and the bar
-  // is the keyboard's own measured height, less the bottom inset the footer
-  // already pads, so the actions sit just above the IME. The pad is clamped by
-  // the room the list has, not by the whole form: the header block and the
-  // pinned bar already claim part of the measured frame, so the clamp bounds the
-  // pad by what is left once they are taken out, which keeps
-  // `MIN_BODY_VIEWPORT` of the list on screen (`@/lib/body-viewport`).
+  // is the keyboard's own measured height less the bottom inset the footer
+  // already pads, so the actions sit just above the IME in every window. The
+  // body above them takes the room that is left and scrolls, so a short window
+  // leaves the list reachable instead of needing a reserve taken out of the pad.
   const { bottom } = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
+  // The status slot reserves two `text-sm` lines at the capped scale, so the
+  // reserve and the text are bounded by the same number.
+  const statusSlotMinHeight =
+    TEXT_SM_LINE_HEIGHT_DP * 2 * Math.min(fontScale, STATUS_MAX_FONT_SCALE);
   const keyboardHeight = useKeyboardState(state => state.height);
-  const [frame, setFrame] = useState<LiftFrameMeasurement | null>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
-  const [footerHeight, setFooterHeight] = useState(0);
-  const handleFrameLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const { height } = event.nativeEvent.layout;
-      setFrame(previous =>
-        previous?.height === height && previous.windowHeight === windowHeight
-          ? previous
-          : { height, windowHeight }
-      );
-    },
-    [windowHeight]
-  );
-  const handleHeaderLayout = useCallback((event: LayoutChangeEvent) => {
-    const { height } = event.nativeEvent.layout;
-    setHeaderHeight(previous => (previous === height ? previous : height));
-  }, []);
-  const handleFooterLayout = useCallback((event: LayoutChangeEvent) => {
-    const { height } = event.nativeEvent.layout;
-    setFooterHeight(previous => (previous === height ? previous : height));
-  }, []);
+  const keyboardLiftPad = Math.max(0, keyboardHeight - bottom);
   const [tab, setTab] = useState<Tab>('models');
-  // The list's own band: the frame with the header above it and the pinned bar
-  // below it taken out. Those two already claim their points of the frame, so
-  // clamping the pad against the frame alone would spend the viewport minimum
-  // on them and leave the list at zero height. The Gateways tab commits each
-  // control as it changes and renders no bar, and an unmounted bar never
-  // reports a height of zero, so its last measurement would keep reserving
-  // room the list has back: the band counts the bar only while it is drawn.
-  const footerBand = tab === 'gateways' ? 0 : footerHeight;
-  const bodyBand = frame === null ? null : Math.max(0, frame.height - headerHeight - footerBand);
-  const keyboardLiftPad = clampLiftPad(
-    Math.max(0, keyboardHeight - bottom),
-    frame === null || bodyBand === null
-      ? null
-      : { height: bodyBand, windowHeight: frame.windowHeight },
-    windowHeight
-  );
   // The lists carry the window side insets on their own style; the header above
   // them takes the same ones, so the controls and the rows stay in one column
   // on a landscape display cutout.
@@ -359,16 +340,16 @@ export function ModelAccessForm({
   const denyRows = denyListModels({ catalog, available: models, denyList: draft.modelDenyList });
 
   return (
-    <View className="flex-1" onLayout={handleFrameLayout}>
+    <View className="flex-1">
       {/* The keyboard lifts the whole surface, not just the bar: the body shrinks
           and the pinned footer rises with it. The lift is the keyboard's own
-          measured height less the bottom inset the footer already pads, and it
+          measured height less the bottom inset the footer already pads, so it
           follows the keyboard instead of depending on a frame the platform
           reports late — the same reasoning as the new-session form. */}
       <KeyboardLiftView className="flex-1" height={keyboardLiftPad}>
         {/* The inset rides on this wrapper: inline padding on the padded block
             would replace the page gutter its class draws. */}
-        <View style={sideInsetStyle} onLayout={handleHeaderLayout}>
+        <View style={sideInsetStyle}>
           <View className="gap-3 px-4 pt-3">
             {/* The warning tile marks missing data; the message takes the body
                 ink, because the muted neutral fails body-text contrast on it. */}
@@ -467,7 +448,7 @@ export function ModelAccessForm({
             The bar pins itself to the bottom edge, because the Providers tab
             renders no `flex-1` list while its rows are missing. */}
         {tab === 'gateways' ? null : (
-          <ScreenFooter keyboard="host" className="mt-auto" onLayout={handleFooterLayout}>
+          <ScreenFooter keyboard="host" className="mt-auto">
             <View className="gap-3">
               <View className="flex-row gap-2">
                 <Button
@@ -502,24 +483,24 @@ export function ModelAccessForm({
                   actions, as the consent footer's does, because a reserve above
                   them leaves a band of empty page under the list's last row, and
                   the row card then reads as clipped short of the bar.
-                  `min-h-10` is exactly two `text-sm` lines — 2.5 rem at the app's
-                  14pt rem — and the status is clamped to those same two lines, so
-                  the slot is one fixed height and the action row above it cannot
-                  move in any shipped locale, whatever the message: one that needs
-                  a third line ends in the tail ellipsis instead of raising the
-                  pair. The clamp is a fixed slot, never a per-sentence size — the
-                  catalogue-outage refusal already takes three rows in German, and
-                  a save the server refused can reach longer copy still. No
-                  message loses its meaning to it: `useStatusAnnouncement`
-                  announces the whole sentence to assistive technology whatever the
-                  rendered height, a refused save also shows its full copy in the
-                  mutation's own error toast, and the outage itself is named, with
-                  its Retry, in the notice above the tabs. */}
-              <View className="min-h-10 justify-center">
+                  The reserve and the text share one font-scale cap, so the bar is
+                  one height per device at every system font scale: two `text-sm`
+                  line boxes, both the slot's `minHeight` and the status's
+                  `maxFontSizeMultiplier` off `STATUS_MAX_FONT_SCALE`. At scale 1
+                  the reserve equals the old `min-h-10` floor, and above it the cap
+                  holds, so the action pair above cannot move whatever the message:
+                  one that needs a third line ends in the tail ellipsis instead of
+                  raising the pair. `useStatusAnnouncement` still announces the
+                  whole sentence to assistive technology whatever the rendered
+                  height, a refused save also shows its full copy in the mutation's
+                  own error toast, and the outage itself is named, with its Retry,
+                  in the notice above the tabs. */}
+              <View className="justify-center" style={{ minHeight: statusSlotMinHeight }}>
                 <AccessibleStatus
                   message={statusMessage}
                   tone={feedback.status === 'failed' ? 'error' : 'status'}
                   numberOfLines={2}
+                  maxFontSizeMultiplier={STATUS_MAX_FONT_SCALE}
                   className="text-sm"
                 />
               </View>

@@ -2,8 +2,12 @@
  * The trigger form, shared by the create screen and the edit screen.
  *
  * The draft is owned by the screen, so a save can post exactly what the fields
- * show and a refusal can leave the draft untouched. This component owns only
- * which picker sheet is presented, and the band a save failure renders in.
+ * show and a refusal can leave the draft untouched. Each field reports its edit
+ * as a functional update, so two edits that land in one commit — a queued text
+ * change and a switch the reader just tapped — each rewrite only their own
+ * fields instead of overwriting the other with the render's snapshot. This
+ * component owns only which picker sheet is presented, and the band a save
+ * failure renders in.
  */
 
 import { type ReactNode, useState } from 'react';
@@ -13,7 +17,11 @@ import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
+import {
+  type TriggerDraft,
+  type TriggerDraftChange,
+  type TriggerDraftProblems,
+} from '@/lib/cloud-triggers/trigger-draft';
 import { type TriggerFormFailure } from '@/lib/cloud-triggers/trigger-save-failure';
 
 import { type TriggerAgentSheet, TriggerFormAgent } from './trigger-form-agent';
@@ -25,7 +33,7 @@ type TriggerFormProps = Readonly<{
   organizationId?: string;
   draft: TriggerDraft;
   problems: TriggerDraftProblems;
-  onDraftChange: (next: TriggerDraft) => void;
+  onDraftChange: TriggerDraftChange;
   /** Whether the worker already holds a secret for this trigger. */
   authConfigured: boolean;
   /** Bumped by a screen after a save, so the secret field remounts empty. */

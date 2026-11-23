@@ -13,7 +13,7 @@ import { createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { createTriggerDraft } from '@/lib/cloud-triggers/trigger-draft';
+import { createTriggerDraft, type TriggerDraftChange } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -105,8 +105,13 @@ const FIELD = 'FormField' as ElementType;
 const MODEL_SELECTOR = 'ModelSelector' as ElementType;
 
 /** A draft change the suite under test never makes. */
-const noop = () => {
+const noop: TriggerDraftChange = () => {
   // not changed by this suite
+};
+
+/** A control callback the suite under test never drives. */
+const ignore = () => {
+  // not driven by this suite
 };
 
 beforeEach(() => {
@@ -197,7 +202,7 @@ describe('trigger form gated problems', () => {
         problems: { name: 'required', repository: 'repositoryRequired' },
         onDraftChange: noop,
         repositoryPickerOpen: false,
-        onRepositoryPickerOpenChange: noop,
+        onRepositoryPickerOpenChange: ignore,
       })
     );
     const root = view.renderer.root;
@@ -252,7 +257,7 @@ describe('trigger form gated problems', () => {
         problems: { model: 'modelRequired' },
         onDraftChange: noop,
         openSheet: null,
-        onOpenSheetChange: noop,
+        onOpenSheetChange: ignore,
       })
     );
     const root = view.renderer.root;

@@ -22,7 +22,11 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
-import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
+import {
+  type TriggerDraft,
+  type TriggerDraftChange,
+  type TriggerDraftProblems,
+} from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
 import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 import {
@@ -41,7 +45,7 @@ type TriggerFormAgentProps = Readonly<{
   organizationId?: string;
   draft: TriggerDraft;
   problems: TriggerDraftProblems;
-  onDraftChange: (next: TriggerDraft) => void;
+  onDraftChange: TriggerDraftChange;
   openSheet: TriggerAgentSheet;
   onOpenSheetChange: (sheet: TriggerAgentSheet) => void;
 }>;
@@ -109,7 +113,7 @@ export function TriggerFormAgent({
           required
           defaultValue={draft.agent}
           onChangeText={agent => {
-            onDraftChange({ ...draft, agent });
+            onDraftChange(current => ({ ...current, agent }));
           }}
           autoCapitalize="none"
           autoCorrect={false}
@@ -127,7 +131,7 @@ export function TriggerFormAgent({
           acceptsVariant
           presentation="field"
           onSelect={(model, variant) => {
-            onDraftChange({ ...draft, model, variant });
+            onDraftChange(current => ({ ...current, model, variant }));
           }}
           onOpen={() => {
             markTouched('model');
@@ -175,7 +179,7 @@ export function TriggerFormAgent({
         options={agentOptions}
         selected={isCustomAgent ? null : draft.agent}
         onSelect={value => {
-          onDraftChange({ ...draft, agent: value ?? '' });
+          onDraftChange(current => ({ ...current, agent: value ?? '' }));
         }}
         onClose={() => {
           onOpenSheetChange(null);
@@ -193,7 +197,7 @@ export function TriggerFormAgent({
         ]}
         selected={draft.environmentId}
         onSelect={value => {
-          onDraftChange({ ...draft, environmentId: value });
+          onDraftChange(current => ({ ...current, environmentId: value }));
         }}
         onClose={() => {
           onOpenSheetChange(null);
@@ -211,7 +215,7 @@ export function TriggerFormAgent({
         ]}
         selected={draft.profileId}
         onSelect={value => {
-          onDraftChange({ ...draft, profileId: value });
+          onDraftChange(current => ({ ...current, profileId: value }));
         }}
         onClose={() => {
           onOpenSheetChange(null);

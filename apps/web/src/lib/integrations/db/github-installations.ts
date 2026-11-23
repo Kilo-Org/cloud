@@ -33,6 +33,7 @@ import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-
 import {
   cancelActiveCodeReviewsForIntegration,
   settleCancelledReviews,
+  type CancelledReviewRow,
 } from '@/lib/code-reviews/db/code-reviews';
 import { assertGitHubInstallationDeletable } from '@/lib/integrations/platforms/github/protected-installation';
 
@@ -643,93 +644,165 @@ export async function disconnectGitHubInstallation(
   await settleCancelledReviews(cancelledReviews, 'user_cancelled');
 }
 
-export async function uninstallExclusiveGitHubInstallation(input: {
+type ExclusiveUninstallIdentity = { installationId: string; appType: 'standard' | 'lite' };
+
+/**
+ * Commits the local half of an exclusive uninstall in its own transaction.
+ * It performs no provider call, so a repeat is safe. The installation identity
+ * lock serializes it against every other writer for the same installation.
+ */
+async function completeUninstallAfterUpstreamDelete(input: {
   owner: Owner;
   integrationId: string;
-  deleteUpstream: (installationId: string, appType: 'standard' | 'lite') => Promise<void>;
-}): Promise<void> {
-  const cancelledReviews = await db.transaction(async tx => {
-    const [identity] = await tx
-      .select({
-        installationId: platform_integrations.platform_installation_id,
-        appType: platform_integrations.github_app_type,
-        role: platform_integrations.github_connection_role,
-      })
-      .from(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.id, input.integrationId),
-          eq(platform_integrations.platform, PLATFORM.GITHUB),
-          ownerCondition(input.owner)
-        )
-      )
-      .limit(1);
-    if (!identity?.installationId) throw new Error('GitHub connection not found');
-    if (identity.role !== 'workflow')
-      throw new Error('GitHub installation must be disconnected locally');
-    // Refused before any local write, so a fixture app installation keeps its association too.
-    assertGitHubInstallationDeletable(identity.installationId);
-    const appType = identity.appType ?? 'standard';
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${identity.installationId}`}))`
-    );
-    const [lockedTarget] = await tx
-      .select({ id: platform_integrations.id })
-      .from(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.id, input.integrationId),
-          eq(platform_integrations.platform, PLATFORM.GITHUB),
-          ownerCondition(input.owner)
-        )
-      )
-      .for('update');
-    if (!lockedTarget) throw new Error('GitHub connection not found');
-    // Legacy associations can be unbound, so lock and check siblings by upstream identity.
-    await tx
-      .select({ id: github_app_installations.id })
-      .from(github_app_installations)
-      .where(
-        and(
-          eq(github_app_installations.installation_id, identity.installationId),
-          eq(github_app_installations.github_app_type, appType)
-        )
-      )
-      .for('update');
-    const otherConnectedAssociations = await tx
-      .select({ id: platform_integrations.id })
-      .from(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.platform, PLATFORM.GITHUB),
-          eq(platform_integrations.platform_installation_id, identity.installationId),
-          effectiveAppTypeCondition(appType),
-          isNull(platform_integrations.github_disconnected_at),
-          ne(platform_integrations.id, input.integrationId)
-        )
-      )
-      .for('update');
-    if (otherConnectedAssociations.length > 0) {
-      throw new Error('GitHub installation must be disconnected locally');
-    }
-
-    // Terminalize this association's own active review work before it is
-    // deleted below: the FK is ON DELETE SET NULL, not cascade, so without
-    // this a still-queued/running review would just lose its integration
-    // reference and never reach a terminal status.
+  identity: ExclusiveUninstallIdentity;
+}): Promise<CancelledReviewRow[]> {
+  return db.transaction(async tx => {
+    await lockGitHubInstallationIdentity(tx, input.identity.appType, input.identity.installationId);
     const cancelled = await cancelActiveCodeReviewsForIntegration(
       { owner: input.owner, platform: PLATFORM.GITHUB, integrationId: input.integrationId },
       tx
     );
-
-    await input.deleteUpstream(identity.installationId, appType);
     await observeGitHubInstallationLifecycle(
-      { installationId: identity.installationId, appType, state: 'deleted' },
+      {
+        installationId: input.identity.installationId,
+        appType: input.identity.appType,
+        state: 'deleted',
+      },
       tx
     );
     await tx.delete(platform_integrations).where(eq(platform_integrations.id, input.integrationId));
     return cancelled;
   });
+}
+
+/**
+ * Runs the completion transaction, retrying once when the failure is a
+ * transient lock or timeout condition, which the shared SQLSTATE helper
+ * already classifies. Any other failure is final.
+ */
+async function completeUninstallWithRetry(input: {
+  owner: Owner;
+  integrationId: string;
+  identity: ExclusiveUninstallIdentity;
+}): Promise<CancelledReviewRow[]> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await completeUninstallAfterUpstreamDelete(input);
+    } catch (error) {
+      const sqlState = getPostgresErrorCode(error);
+      if (attempt === 0 && sqlState !== null && RETRYABLE_TRANSACTION_SQLSTATES.has(sqlState)) {
+        continue;
+      }
+      logExceptInTest('[uninstallExclusiveGitHubInstallation] local cleanup did not complete', {
+        integrationId: input.integrationId,
+        sqlState,
+      });
+      throw error;
+    }
+  }
+}
+
+export async function uninstallExclusiveGitHubInstallation(input: {
+  owner: Owner;
+  integrationId: string;
+  deleteUpstream: (installationId: string, appType: 'standard' | 'lite') => Promise<void>;
+}): Promise<void> {
+  let deletedUpstream: ExclusiveUninstallIdentity | null = null;
+  let cancelledReviews: CancelledReviewRow[];
+  try {
+    cancelledReviews = await db.transaction(async tx => {
+      const [identity] = await tx
+        .select({
+          installationId: platform_integrations.platform_installation_id,
+          appType: platform_integrations.github_app_type,
+          role: platform_integrations.github_connection_role,
+        })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.id, input.integrationId),
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            ownerCondition(input.owner)
+          )
+        )
+        .limit(1);
+      if (!identity?.installationId) throw new Error('GitHub connection not found');
+      if (identity.role !== 'workflow')
+        throw new Error('GitHub installation must be disconnected locally');
+      // Refused before any local write, so a fixture app installation keeps its association too.
+      assertGitHubInstallationDeletable(identity.installationId);
+      const appType = identity.appType ?? 'standard';
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${identity.installationId}`}))`
+      );
+      const [lockedTarget] = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.id, input.integrationId),
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            ownerCondition(input.owner)
+          )
+        )
+        .for('update');
+      if (!lockedTarget) throw new Error('GitHub connection not found');
+      // Legacy associations can be unbound, so lock and check siblings by upstream identity.
+      await tx
+        .select({ id: github_app_installations.id })
+        .from(github_app_installations)
+        .where(
+          and(
+            eq(github_app_installations.installation_id, identity.installationId),
+            eq(github_app_installations.github_app_type, appType)
+          )
+        )
+        .for('update');
+      const otherConnectedAssociations = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            eq(platform_integrations.platform_installation_id, identity.installationId),
+            effectiveAppTypeCondition(appType),
+            isNull(platform_integrations.github_disconnected_at),
+            ne(platform_integrations.id, input.integrationId)
+          )
+        )
+        .for('update');
+      if (otherConnectedAssociations.length > 0) {
+        throw new Error('GitHub installation must be disconnected locally');
+      }
+
+      // Terminalize this association's own active review work before it is
+      // deleted below: the FK is ON DELETE SET NULL, not cascade, so without
+      // this a still-queued/running review would just lose its integration
+      // reference and never reach a terminal status.
+      const cancelled = await cancelActiveCodeReviewsForIntegration(
+        { owner: input.owner, platform: PLATFORM.GITHUB, integrationId: input.integrationId },
+        tx
+      );
+
+      await input.deleteUpstream(identity.installationId, appType);
+      deletedUpstream = { installationId: identity.installationId, appType };
+      await observeGitHubInstallationLifecycle(
+        { installationId: identity.installationId, appType, state: 'deleted' },
+        tx
+      );
+      await tx
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.id, input.integrationId));
+      return cancelled;
+    });
+  } catch (error) {
+    if (deletedUpstream === null) throw error;
+    cancelledReviews = await completeUninstallWithRetry({
+      owner: input.owner,
+      integrationId: input.integrationId,
+      identity: deletedUpstream,
+    });
+  }
   // Settle only after this transaction has committed — see the
   // settleCancelledReviews doc comment for why.
   await settleCancelledReviews(cancelledReviews, 'user_cancelled');

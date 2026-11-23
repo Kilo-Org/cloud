@@ -24,6 +24,8 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
+  // The tap guard reads the route's focus; this suite does not exercise a return.
+  useFocusEffect: () => undefined,
 }));
 // The picker rows push through the guarded hook; the plain rows keep `useRouter`,
 // so both resolve to the same spy and the assertions observe one call each.
@@ -115,6 +117,7 @@ function findConfigureRow(renderer: ReactTestRenderer, title: string) {
 function findStateNodes(renderer: ReactTestRenderer, type: 'QueryError' | 'RowSkeleton') {
   return renderer.root.findAll(node => String(node.type) === type);
 }
+
 function settingsTargetAncestors(node: ReactTestInstance): ReactTestInstance[] {
   const ancestors: ReactTestInstance[] = [];
   for (let parent = node.parent; parent !== null; parent = parent.parent) {

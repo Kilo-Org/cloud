@@ -64,7 +64,12 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permissionState.permission,
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
+// The screen's tap guard reads the route's focus; this suite does not exercise
+// a return, so the effect stays unregistered.
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: routerPush }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),

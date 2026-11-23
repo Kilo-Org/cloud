@@ -46,6 +46,9 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
+// The screen's tap guard reads the route's focus. This suite drives the sheet's
+// own guard, not a return from a pushed child, so the effect stays inert.
+vi.mock('expo-router', () => ({ useFocusEffect: () => undefined }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileKiloCommands: () => h.query,
   useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),

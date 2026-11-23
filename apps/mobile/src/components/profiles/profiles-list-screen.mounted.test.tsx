@@ -62,6 +62,8 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
+  // The tap guard reads the route's focus; this suite does not exercise a return.
+  useFocusEffect: () => undefined,
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({

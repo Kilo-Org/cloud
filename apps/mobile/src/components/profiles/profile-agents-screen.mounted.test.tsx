@@ -35,6 +35,9 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+// The screen's tap guard reads the route's focus. This suite drives the sheet's
+// own guard, not a return from a pushed child, so the effect stays inert.
+vi.mock('expo-router', () => ({ useFocusEffect: () => undefined }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileAgents: () => h.query,
   useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),

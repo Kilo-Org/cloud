@@ -29,7 +29,12 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: h.push }) }));
+// The screen's tap guard reads the route's focus; this suite does not exercise
+// a return, so the effect stays unregistered.
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: h.push }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getNewProfilePath: (stack: 'app' | 'profileTab') =>
     stack === 'app' ? '/app-stack/profiles/new' : '/(app)/(tabs)/(3_profile)/profiles/new',

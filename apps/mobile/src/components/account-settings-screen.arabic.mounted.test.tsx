@@ -24,6 +24,9 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
+  // The screen's tap guard asks for the route's focus; this suite does not
+  // exercise a return, so the effect stays unregistered.
+  useFocusEffect: () => undefined,
 }));
 // The Language row opens the picker through the guarded hook, so the push spy is
 // what both the router mock and the hook mock return.

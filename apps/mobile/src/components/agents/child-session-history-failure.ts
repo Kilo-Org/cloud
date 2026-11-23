@@ -5,6 +5,16 @@ import { i18n } from '@/i18n';
 import { describeTerminalFailure, type SessionTerminalError } from './session-terminal-error';
 
 /**
+ * The sub-agent sheet's copy for the two history kinds a retry cannot recover.
+ * Keyed by the kind rather than a fallthrough, so a failure kind added later
+ * fails the type check here instead of borrowing unreadable-data wording.
+ */
+const TERMINAL_HISTORY_COPY = {
+  too_large: 'agentChat.childSessionSheet.historyTooLarge',
+  invalid_data: 'agentChat.childSessionSheet.historyUnavailable',
+} as const satisfies Record<Exclude<SessionSnapshotFailureKind, 'retryable_failure'>, string>;
+
+/**
  * The reader's copy and retryability for a child session's failed first-page
  * load. The typed history kind decides both: a retryable failure names the
  * outage and keeps its Retry, while a terminal kind — an oversize or unreadable
@@ -24,28 +34,18 @@ export function describeChildHistoryFailure(state: {
   message: string;
 }): SessionTerminalError {
   const { kind, message } = state;
-  if (kind === null) {
+  if (kind == null) {
     return describeTerminalFailure(message);
-  }
-  if (kind === 'retryable_failure') {
-    return {
-      variant: 'server',
-      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
-      message: i18n.t('agentChat.childSessionSheet.historyTemporarilyUnavailable'),
-      retryable: true,
-      retryWith: 'session',
-      detail: message,
-    };
   }
   return {
     variant: 'server',
     title: i18n.t('agentChat.session.couldNotLoadThisSession'),
     message: i18n.t(
-      kind === 'too_large'
-        ? 'agentChat.childSessionSheet.historyTooLarge'
-        : 'agentChat.childSessionSheet.historyUnavailable'
+      kind === 'retryable_failure'
+        ? 'agentChat.childSessionSheet.historyTemporarilyUnavailable'
+        : TERMINAL_HISTORY_COPY[kind]
     ),
-    retryable: false,
+    retryable: kind === 'retryable_failure',
     retryWith: 'session',
     detail: message,
   };

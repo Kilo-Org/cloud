@@ -43,6 +43,7 @@ type CloudAgentTerminalResult = {
 
 const RESIZE_DEBOUNCE_MS = 150;
 const MAX_PENDING_RAW_INPUT = 1024;
+const MAX_RESTORED_PTY_RETRIES = 1;
 
 /**
  * How one connection streams. A Kilo v2 terminal opens with a snapshot and
@@ -234,6 +235,7 @@ export function useCloudAgentTerminal({
     let writing = false;
     let restoredPty: string | null = null;
     let reachedPty: string | null = null;
+    let connectionReplaced = false;
 
     function updateStatus(next: TerminalStatus, text: string) {
       if (disposed) return;
@@ -248,19 +250,28 @@ export function useCloudAgentTerminal({
       onPtyIdChangeRef.current?.(ptyId);
     }
 
-    /**
-     * A restored PTY that never answered is gone, for example after a sandbox
-     * restart, so the terminal starts a new one instead of an error.
-     */
-    function replaceUnreachedRestoredPty(term: Terminal, fitAddon: FitAddon): boolean {
+    function isUnreachedRestoredPty(): boolean {
       const ptyId = ptyIdRef.current;
-      if (!ptyId || ptyId !== restoredPty || reachedPty === ptyId) return false;
+      return ptyId !== null && ptyId === restoredPty && ptyId !== reachedPty;
+    }
+
+    function replaceUnreachedRestoredPty(term: Terminal, fitAddon: FitAddon) {
       restoredPty = null;
-      closeTerminal({ cloudAgentSessionId: capturedSessionId, ptyId });
+      pendingRawInput = [];
       setPtyId(null);
       reconnectAttemptsRef.current = 0;
       void createAndConnect(term, fitAddon);
-      return true;
+    }
+
+    function retirePty() {
+      const ptyId = ptyIdRef.current;
+      setPtyId(null);
+      if (ptyId) closeTerminal({ cloudAgentSessionId: capturedSessionId, ptyId });
+    }
+
+    function stopInput(term: Terminal) {
+      pendingRawInput = [];
+      term.options.disableStdin = true;
     }
 
     function sendResize(cols: number, rows: number) {
@@ -291,8 +302,11 @@ export function useCloudAgentTerminal({
         if (effect.type === 'resize') term.resize(effect.size.cols, effect.size.rows);
         else if (effect.type === 'write') writeOutput(term, effect.data);
         else if (effect.type === 'send') sendFrame(effect.frame);
-        else {
-          term.options.disableStdin = true;
+        else if (effect.type === 'exited') {
+          stopInput(term);
+          updateStatus('exited', 'Terminal exited');
+        } else {
+          stopInput(term);
           updateStatus('error', 'Terminal service is outdated');
         }
       }
@@ -360,7 +374,7 @@ export function useCloudAgentTerminal({
       reconnectTimerRef.current = null;
       reconnectAttemptsRef.current = 0;
       setPtyId(null);
-      term.options.disableStdin = true;
+      stopInput(term);
       const ws = wsRef.current;
       wsRef.current = null;
       ws?.close(1000, 'Terminal sleeping');
@@ -372,6 +386,7 @@ export function useCloudAgentTerminal({
       fitAddon: FitAddon,
       status: SandboxLifecycleStatus
     ) {
+      if (connectionReplaced) return;
       if (status === 'sleeping') {
         enterSleeping(term);
         return;
@@ -394,11 +409,10 @@ export function useCloudAgentTerminal({
       wsRef.current = ws;
       mode = 'pending';
       protocol = createPersistentTerminalProtocol();
-      pendingRawInput = [];
 
       ws.onopen = () => {
-        if (disposed) return;
-        reconnectAttemptsRef.current = 0;
+        if (disposed || wsRef.current !== ws) return;
+        connectionReplaced = false;
         sleepingRef.current = false;
         resumeWhenActiveRef.current = false;
         term.options.disableStdin = false;
@@ -408,6 +422,7 @@ export function useCloudAgentTerminal({
       ws.onmessage = event => {
         if (disposed || wsRef.current !== ws) return;
         if (mode === 'pending') {
+          reconnectAttemptsRef.current = 0;
           reachedPty = ptyIdRef.current;
           startStream(term, fitAddon, event.data);
         }
@@ -425,8 +440,8 @@ export function useCloudAgentTerminal({
       };
 
       ws.onclose = event => {
-        if (disposed) return;
-        if (wsRef.current === ws) wsRef.current = null;
+        if (disposed || wsRef.current !== ws) return;
+        wsRef.current = null;
         if (sleepingRef.current) {
           updateStatus('sleeping', SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped);
           return;
@@ -435,29 +450,47 @@ export function useCloudAgentTerminal({
           updateStatus('disconnected', 'Disconnected');
           return;
         }
-        if (replaceUnreachedRestoredPty(term, fitAddon)) return;
-
         const decision = classifyTerminalSocketClose({
           code: event.code,
           reason: event.reason,
         });
+
+        if (decision.kind === 'replaced') {
+          connectionReplaced = true;
+          stopInput(term);
+          updateStatus('error', decision.statusText);
+          return;
+        }
+
+        if (protocol.hasExited()) {
+          retirePty();
+          return;
+        }
+
+        if (
+          isUnreachedRestoredPty() &&
+          (decision.kind === 'exited' ||
+            (decision.kind === 'retry' && reconnectAttemptsRef.current >= MAX_RESTORED_PTY_RETRIES))
+        ) {
+          // A failed WebSocket upgrade hides the HTTP status. Do not delete a potentially live PTY.
+          replaceUnreachedRestoredPty(term, fitAddon);
+          return;
+        }
 
         if (decision.kind === 'retry') {
           scheduleReconnect(term, fitAddon, decision.statusText);
           return;
         }
 
-        const previousPtyId = ptyIdRef.current;
-        setPtyId(null);
-        if (previousPtyId) {
-          closeTerminal({ cloudAgentSessionId: capturedSessionId, ptyId: previousPtyId });
-        }
-
+        if (!connectionReplaced) retirePty();
+        stopInput(term);
         updateStatus(decision.kind === 'exited' ? 'exited' : 'error', decision.statusText);
       };
 
       ws.onerror = () => {
-        if (!disposed) updateStatus('reconnecting', 'Connection issue');
+        if (!disposed && wsRef.current === ws && !protocol.hasExited()) {
+          updateStatus('reconnecting', 'Connection issue');
+        }
       };
     }
 
@@ -488,12 +521,18 @@ export function useCloudAgentTerminal({
           enterSleeping(term);
           return;
         }
-        if (replaceUnreachedRestoredPty(term, fitAddon)) return;
-        if (decision.kind === 'retry') {
+        if (
+          decision.kind === 'retry' &&
+          (!isUnreachedRestoredPty() || reconnectAttemptsRef.current < MAX_RESTORED_PTY_RETRIES)
+        ) {
           scheduleReconnect(term, fitAddon, decision.statusText);
           return;
         }
-        updateStatus('error', decision.statusText);
+        stopInput(term);
+        updateStatus(
+          'error',
+          decision.kind === 'retry' ? 'Terminal connection failed' : decision.statusText
+        );
       }
     }
 
@@ -579,6 +618,12 @@ export function useCloudAgentTerminal({
         reconnectTimerRef.current = null;
         reconnectAttemptsRef.current = 0;
         intentionalCloseRef.current = false;
+        if (protocol.hasExited() && ptyIdRef.current) retirePty();
+        const ws = wsRef.current;
+        wsRef.current = null;
+        ws?.close(1000, 'Terminal reconnecting');
+        mode = 'pending';
+        if (!sleepingRef.current) term.options.disableStdin = false;
         void reconnectTerminal(term, fitAddon);
       };
 
@@ -620,7 +665,7 @@ export function useCloudAgentTerminal({
       resizeObserverRef.current?.disconnect();
       wsRef.current?.close(1000, 'Terminal closed');
       const ptyId = ptyIdRef.current;
-      if (ptyId) {
+      if (ptyId && !connectionReplaced) {
         closeTerminal({ cloudAgentSessionId: capturedSessionId, ptyId });
       }
       wsRef.current = null;

@@ -17,6 +17,7 @@ export type PersistentTerminalEffect =
   /** Write terminal output, such as a checkpoint after a reset. */
   | { type: 'write'; data: Uint8Array }
   | { type: 'send'; frame: Uint8Array<ArrayBuffer> }
+  | { type: 'exited' }
   /** The PTY service does not speak the size-prefixed input protocol. */
   | { type: 'outdated' };
 
@@ -121,8 +122,7 @@ function hold(pending: Uint8Array[], data: Uint8Array): Uint8Array[] {
 }
 
 /**
- * Input held until the pane had a size, or else a size frame, which takes
- * control of the PTY at this pane's size.
+ * Input held until the controlling pane had a size, or else a size frame.
  */
 function goLive(size: TerminalSize, pending: Uint8Array[]): PersistentTerminalEffect[] {
   if (pending.length === 0) return [{ type: 'send', frame: persistentTerminalFrame(size) }];
@@ -152,7 +152,7 @@ export function createPersistentTerminalProtocol() {
         attachmentId: message.attachmentID,
         controller: message.role === 'controller',
         desired: state.desired,
-        pending: state.pending,
+        pending: message.role === 'controller' ? state.pending : [],
       };
       return [{ type: 'resize', size: message.info.size }];
     }
@@ -169,7 +169,7 @@ export function createPersistentTerminalProtocol() {
 
     if (message.type === 'exited') {
       state = { status: 'exited' };
-      return [];
+      return [{ type: 'exited' }];
     }
 
     if (message.type === 'replay_complete') {
@@ -180,13 +180,13 @@ export function createPersistentTerminalProtocol() {
         return [];
       }
       state = { status: 'live', attachmentId, controller, size: desired, pending: [] };
-      return goLive(desired, pending);
+      return controller ? goLive(desired, pending) : [];
     }
 
     if (message.type !== 'controller_changed') return [];
-    const controller = message.attachmentID === state.attachmentId;
+    const controller = message.attachmentID != null && message.attachmentID === state.attachmentId;
     if (controller === state.controller) return [];
-    state = { ...state, controller };
+    state = { ...state, controller, pending: [] };
     return state.status === 'live' && controller && state.size
       ? [{ type: 'send', frame: persistentTerminalFrame(state.size) }]
       : [];
@@ -201,6 +201,8 @@ export function createPersistentTerminalProtocol() {
     /** Encoded user input, without the replies the emulator makes while writing. */
     input(data: Uint8Array): PersistentTerminalEffect[] {
       if (data.byteLength === 0) return [];
+      if (state.status !== 'restoring' && (!('controller' in state) || !state.controller))
+        return [];
       if (state.status === 'restoring' || state.status === 'replaying') {
         state = { ...state, pending: hold(state.pending, data) };
         return [];
@@ -222,6 +224,7 @@ export function createPersistentTerminalProtocol() {
       const first = state.size === undefined;
       const pending = state.pending;
       state = { ...state, size, pending: [] };
+      if (!state.controller) return [];
       return first
         ? goLive(size, pending)
         : [{ type: 'send', frame: persistentTerminalFrame(size) }];
@@ -230,6 +233,10 @@ export function createPersistentTerminalProtocol() {
     /** Output still reaches the screen until the attachment fails; an exited shell's last output too. */
     acceptsOutput(): boolean {
       return state.status !== 'outdated';
+    },
+
+    hasExited(): boolean {
+      return state.status === 'exited';
     },
   };
 }

@@ -118,6 +118,15 @@ describe('classifyTerminalCreateError', () => {
 });
 
 describe('classifyTerminalSocketClose', () => {
+  it('does not retry when another browser connection takes over', () => {
+    expect(
+      classifyTerminalSocketClose({ code: 4000, reason: 'Terminal connection replaced' })
+    ).toEqual({
+      kind: 'replaced',
+      statusText: 'Terminal is open in another window',
+    });
+  });
+
   it('treats normal PTY completion as shell exit', () => {
     expect(classifyTerminalSocketClose({ code: 1000, reason: 'PTY session ended' })).toEqual({
       kind: 'exited',

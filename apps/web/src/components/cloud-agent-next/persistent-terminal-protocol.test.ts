@@ -140,18 +140,29 @@ describe('createPersistentTerminalProtocol', () => {
     ).toEqual([64 * 1024, 64 * 1024, 22 * 1024]);
   });
 
-  it('takes control again when it becomes the controller', () => {
+  it('does not send input or resize while another attachment controls the PTY', () => {
     const protocol = attach();
     protocol.size({ cols: 80, rows: 24 });
     protocol.message(REPLAY_COMPLETE);
     expect(
       protocol.message(JSON.stringify({ type: 'controller_changed', attachmentID: 'att_2' }))
     ).toEqual([]);
+    expect(protocol.input(encoder.encode('a'))).toEqual([]);
+    expect(protocol.size({ cols: 120, rows: 32 })).toEqual([]);
     expect(
       describeEffects(
         protocol.message(JSON.stringify({ type: 'controller_changed', attachmentID: 'att_1' }))
       )
-    ).toEqual([{ send: { input: false, cols: 80, rows: 24, data: '' } }]);
+    ).toEqual([{ send: { input: false, cols: 120, rows: 32, data: '' } }]);
+  });
+
+  it('does not flush input or size when replay completes as an observer', () => {
+    const protocol = createPersistentTerminalProtocol();
+    protocol.message(snapshot());
+    protocol.size({ cols: 90, rows: 30 });
+    protocol.input(encoder.encode('a'));
+    protocol.message(attached({ role: 'observer' }));
+    expect(protocol.message(REPLAY_COMPLETE)).toEqual([]);
   });
 
   it('fails an attachment without the size-prefixed input protocol', () => {
@@ -168,7 +179,10 @@ describe('createPersistentTerminalProtocol', () => {
     const protocol = attach();
     protocol.size({ cols: 80, rows: 24 });
     protocol.message(REPLAY_COMPLETE);
-    protocol.message(JSON.stringify({ type: 'exited', exitCode: 0 }));
+    expect(protocol.message(JSON.stringify({ type: 'exited', exitCode: 0 }))).toEqual([
+      { type: 'exited' },
+    ]);
+    expect(protocol.hasExited()).toBe(true);
     expect(protocol.input(encoder.encode('a'))).toEqual([]);
     expect(protocol.acceptsOutput()).toBe(true);
   });

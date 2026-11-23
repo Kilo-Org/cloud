@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { isDestructiveTouchPending, useDestructiveAdmission } from '@/lib/sheet-touch-guard';
+import { isDestructiveTouchPending, useDestructiveHold } from '@/lib/sheet-touch-guard';
 
 export type DestructiveConfirmDialogProps = {
   title: string;
@@ -83,7 +83,7 @@ export function DestructiveConfirmDialog({
   // dismissal.
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
-  const destructiveAdmitted = useDestructiveAdmission();
+  useDestructiveHold();
 
   const dismiss = useCallback((action: () => void) => {
     if (pendingAction.current !== null) {
@@ -137,8 +137,9 @@ export function DestructiveConfirmDialog({
             // does: while its sheet is still moving, a press aimed at Cancel can
             // land here, and a sign-out from that press is worse than one more
             // press on the control the reader meant. The safe choices below never
-            // wait. See `@/lib/sheet-touch-guard`.
-            disabled={!destructiveAdmitted}
+            // wait, and the paint never changes — the control looks the same
+            // whether or not it is admitting presses. See
+            // `@/lib/sheet-touch-guard`.
             onPress={() => {
               if (isDestructiveTouchPending()) {
                 return;

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 
 /**
  * How long a sheet is given to hand touch over to its own window — when it
@@ -154,22 +154,13 @@ export function holdDestructiveTouch(): () => void {
 }
 
 /**
- * Whether a destructive control on a freshly presented sheet may answer a press
- * yet. False for `DESTRUCTIVE_TOUCH_ADMISSION_MS` from mount, then true; the
- * safe controls beside it never wait. Reported as state, so the control paints
- * its own disabled appearance and assistive technology announces it, and read
- * again at press time by the guard below so a press cannot slip through in the
- * render that follows the timer.
+ * Keeps a destructive control declining presses for
+ * `DESTRUCTIVE_TOUCH_ADMISSION_MS` from mount. It paints nothing: the control
+ * looks the same whether or not it is admitting presses, because a button that
+ * greys out and re-enables as the sheet arrives is a visible flash on every
+ * destructive confirm in the app. The choice reads `isDestructiveTouchPending()`
+ * at press time instead.
  */
-export function useDestructiveAdmission(): boolean {
-  const [admitted, setAdmitted] = useState(false);
-  useEffect(() => {
-    const release = holdDestructiveTouch();
-    const timer = setTimeout(() => setAdmitted(true), DESTRUCTIVE_TOUCH_ADMISSION_MS);
-    return () => {
-      clearTimeout(timer);
-      release();
-    };
-  }, []);
-  return admitted;
+export function useDestructiveHold(): void {
+  useEffect(() => holdDestructiveTouch(), []);
 }

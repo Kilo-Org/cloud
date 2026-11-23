@@ -3551,11 +3551,13 @@ export const createBrowserRuntime = ({
               toolName: stepToolName,
             };
 
-            // Identical bindings appear once: the two differ only in what the approval was issued with.
+            // The record answers only on the tab the approval was issued for: an identical call on another tab is a
+            // New step that needs its own approval. On that tab it adds the element the gate classified and the
+            // Origin it bound, so it is a second candidate exactly when those differ.
             if (
-              issued.tabId !== gateBinding.tabId ||
-              issued.origin !== gateBinding.origin ||
-              (issued.element ?? '') !== (gateBinding.element ?? '')
+              rememberedBinding.tabId === gateBinding.tabId &&
+              (issued.origin !== gateBinding.origin ||
+                (issued.element ?? '') !== (gateBinding.element ?? ''))
             ) {
               candidates.push(issued);
             }

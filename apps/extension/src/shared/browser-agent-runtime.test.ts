@@ -991,6 +991,92 @@ describe('agent browser calls', () => {
     expect(suggested).toStrictEqual([51, 52]);
   });
 
+  it('keeps a download approval to the tab it was issued for', async () => {
+    // A granted `downloads` permission and no hold is the legacy tier: a call no approval covers runs one guard.
+    const downloads = createFakeDownloads();
+    const otherTab = TAB_ID + 6;
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    // Both tabs are the session's, so the same call may be sent on either.
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: otherTab });
+
+    /** The presses that reached the page, and the file each one started. */
+    const started: number[] = [];
+    let nextFileId = 61;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': (params, target) => {
+        // A click is a press and a release; the press is the event that starts the file.
+        if (params?.['type'] === 'mousePressed') {
+          const id = nextFileId;
+
+          nextFileId += 1;
+          started.push(id);
+          // The file starts on the tab the call drives, and its refusal names no url.
+          downloads.emit({ id, tabId: target?.tabId ?? TAB_ID });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (tabId: number, sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId,
+        toolName: 'browser_click',
+      });
+
+    // The first click starts one file, and the guard stops it before it is saved.
+    const refused = await click(TAB_ID, []);
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect([started, downloads.cancelled]).toStrictEqual([[61], [61]]);
+
+    // The approval that refusal issued buys the file on the tab it answered for: the repeat is accepted there.
+    const approved = await click(TAB_ID, [expectStepToken(refused)]);
+
+    expect(approved.kind).toBe('result');
+    expect([started, downloads.cancelled]).toStrictEqual([[61, 62], [61]]);
+
+    // Another click on that tab starts a further file: its refusal issues an approval of its own.
+    const otherRefusal = await click(TAB_ID, []);
+
+    expect(otherRefusal).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect([started, downloads.cancelled]).toStrictEqual([
+      [61, 62, 63],
+      [61, 63],
+    ]);
+
+    // The same call on another tab is a new step, so that approval does not carry over and its file is stopped.
+    const otherToken = expectStepToken(otherRefusal);
+    const otherTabRepeat = await click(otherTab, [otherToken]);
+
+    expect(otherTabRepeat).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect([started, downloads.cancelled]).toStrictEqual([
+      [61, 62, 63, 64],
+      [61, 63, 64],
+    ]);
+    // Nothing was kept: the stopped files were interrupted, so the downloads folder holds none of them.
+    expect(downloads.removed).toStrictEqual([]);
+    // The refusal asks for the other tab's own approval, never the one the call presented.
+    expect(expectStepToken(otherTabRepeat)).not.toBe(otherToken);
+  });
+
   it('gives the file a step-approved submit starts its own approval', async () => {
     // A granted `downloads` permission and no hold is the legacy tier.
     const downloads = createFakeDownloads();

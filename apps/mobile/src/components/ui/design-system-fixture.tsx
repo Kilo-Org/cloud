@@ -60,10 +60,13 @@ export function DesignSystemFixture() {
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
+        {/* This one action ends in the shared chevron, so the fixture paints
+            both action shapes: this row and the text-only ones below. */}
         <Section
           label="Section header"
           icon={<Inbox size={14} color={colors.mutedForeground} />}
           actionLabel="Action"
+          actionChevron
           actionTestID="fixture-section-action"
           onActionPress={() => undefined}
         >

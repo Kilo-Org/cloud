@@ -40,6 +40,9 @@ vi.mock('@/lib/format', () => ({
 vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LATIN_DISPLAY: 'uppercase' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The header action ends in the shared chevron; the suite reads whether it is
+// there, not how it is painted.
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
 // The section-header action asks the interface direction for its display
 // treatment, so the stub carries it (the same shape the briefing-card suite
 // uses).
@@ -100,7 +103,9 @@ describe('Organization usage availability', () => {
         expect(text).toContain(i18n.t(key));
       }
       expect(text.filter(value => value === '—')).toHaveLength(4);
-      expect(text).not.toContain(i18n.t('usage.viewDetails'));
+      // No destination: no header action copy and no chevron beside it.
+      expect(text).not.toContain(i18n.t('usage.title'));
+      expect(renderer.root.findAllByType('RowChevron' as never)).toHaveLength(0);
       expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
       // The offline wording only when the device is confirmed offline.
       expect(text).toContain(
@@ -152,15 +157,15 @@ describe('Organization usage availability', () => {
     // Two controls, one destination: the header link and the grid it names.
     const pressables = renderer.root.findAllByType('Pressable');
     expect(pressables).toHaveLength(2);
-    const button = pressables.find(
-      node => node.props.accessibilityLabel !== i18n.t('usage.viewDetails')
-    );
+    const button = pressables.find(node => node.props.accessibilityLabel !== i18n.t('usage.title'));
     if (button === undefined) {
       throw new Error('the grid is not one pressable');
     }
     expect(button.props.accessibilityRole).toBe('button');
     expect(button.props.accessibilityHint).toBe(i18n.t('usage.viewDetails'));
     expect(button.findAllByType('Text').length).toBeGreaterThan(0);
+    // The chevron belongs to the header link, not to the grid it names.
+    expect(button.findAllByType('RowChevron' as never)).toHaveLength(0);
     act(() => {
       (button.props.onPress as () => void)();
     });
@@ -199,8 +204,9 @@ describe('Organization usage availability', () => {
 
     // No header link either: the informational grid keeps the header it had.
     expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(renderer.root.findAllByType('RowChevron' as never)).toHaveLength(0);
     const text = renderer.root.findAllByType('Text').map(node => node.props.children);
-    expect(text).not.toContain(i18n.t('usage.viewDetails'));
+    expect(text).not.toContain(i18n.t('usage.title'));
     expect(text).toEqual(
       expect.arrayContaining(['\u2066$2\u2069', '12', 'compact:34', 'compact:56'])
     );
@@ -301,7 +307,7 @@ describe('Organization usage stats accessibility', () => {
     unmount();
   });
 
-  it('paints the grid destination as a header link for a sighted member too', async () => {
+  it('paints the grid destination as a header link, chevron and all, for a sighted member too', async () => {
     query.data = {
       totalCost: 2_000_000,
       totalRequestCount: 12,
@@ -314,19 +320,26 @@ describe('Organization usage stats accessibility', () => {
     );
 
     const pressables = renderer.root.findAllByType('Pressable');
-    const action = pressables.find(
-      node => node.props.accessibilityLabel === i18n.t('usage.viewDetails')
-    );
+    const action = pressables.find(node => node.props.accessibilityLabel === i18n.t('usage.title'));
     if (action === undefined) {
       throw new Error('the section header carries no usage link');
     }
     expect(action.props.accessibilityRole).toBe('button');
     expect(action.props.testID).toBe('org-usage-action');
     // The copy is painted, not only announced: that is the affordance a
-    // sighted member needed.
+    // sighted member needed. It is the screen's own title, short enough to stay
+    // on the eyebrow's line at 360 dp.
     expect(
-      action.findAllByType('Text').some(node => node.props.children === i18n.t('usage.viewDetails'))
+      action.findAllByType('Text').some(node => node.props.children === i18n.t('usage.title'))
     ).toBe(true);
+    // The link ends in the chevron the hub's other destinations carry, and the
+    // grid it names does not: the mark belongs to the header alone.
+    expect(action.findAllByType('RowChevron' as never)).toHaveLength(1);
+    expect(
+      pressables
+        .filter(node => node !== action)
+        .flatMap(node => node.findAllByType('RowChevron' as never))
+    ).toHaveLength(0);
     // The link sits in the header, before the grid it names in render order,
     // and it does not wrap it: the grid keeps its own button.
     expect(pressables[0]).toBe(action);

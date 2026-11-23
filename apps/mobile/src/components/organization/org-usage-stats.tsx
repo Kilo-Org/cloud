@@ -103,11 +103,16 @@ type OrgUsageStatsProps = {
  * the grid once, not a text stop per tile followed by the control that opens
  * the screen.
  *
- * The pressable grid also carries a visible destination in the section header
- * (`usage.viewDetails`), because the grid's hint is announced to a screen
- * reader and invisible to a sighted member, who would otherwise see four
- * read-only-looking cards. The header action is painted only in the pressable
- * state, so the informational grid keeps the header and the geometry it has.
+ * The pressable grid also carries a visible destination in the section header —
+ * the usage screen's own title (`usage.title`), painted in the section action —
+ * because the grid's hint is announced to a screen reader and invisible to a
+ * sighted member, who would otherwise see four read-only-looking cards. The
+ * action ends in the chevron the hub's other destinations carry, so the header
+ * reads as one more way out of the screen. It is the screen's title rather than
+ * "view details" because that copy rendered 145 dp wide and pushed a 360 dp
+ * compact header onto two lines, away from the eyebrow it belongs to. The
+ * header action is painted only in the pressable state, so the informational
+ * grid keeps the header and the geometry it has.
  */
 export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
@@ -186,7 +191,8 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
   return (
     <Section
       label={t('organization.usageStats.orgLast30Days')}
-      actionLabel={opensUsage ? t('usage.viewDetails') : undefined}
+      actionLabel={opensUsage ? t('usage.title') : undefined}
+      actionChevron
       onActionPress={onPress}
       actionTestID={opensUsage ? 'org-usage-action' : undefined}
     >

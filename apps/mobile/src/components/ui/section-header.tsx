@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { RowChevron } from '@/components/ui/row-chevron';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { SECTION_ACTION_BOX_CLASS, SECTION_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
@@ -21,6 +22,14 @@ type SectionHeaderProps = {
    */
   actionLabel?: string;
   onActionPress?: () => void;
+  /**
+   * Ends the action in the shared `RowChevron` that the destination rows of
+   * the same screen carry, for an action that leaves the screen. Opt-in: an
+   * in-place action (Home's `SEE ALL` opening a sheet, Credits' `ADD CREDITS`)
+   * keeps its text-only look, because no row of those screens ends in a
+   * chevron either.
+   */
+  actionChevron?: boolean;
   /**
    * Test handle for the action control itself, for a native E2E script that
    * taps the section's link.
@@ -62,6 +71,7 @@ export function SectionHeader({
   icon,
   actionLabel,
   onActionPress,
+  actionChevron = false,
   actionTestID,
   actionHidden = false,
   actionDisabled = false,
@@ -162,6 +172,9 @@ export function SectionHeader({
             // 2026-11-18). On a wrapped line the auto margin still puts the
             // action on that line's end, never at its start.
             'ms-auto max-w-full shrink-0 flex-row items-center justify-center active:opacity-70',
+            // Only the chevron mode pays for the pair's gap: a text-only action
+            // keeps the box it had, down to its own width.
+            actionChevron && 'gap-1',
             actionHidden && 'opacity-0'
           )}
         >
@@ -181,6 +194,9 @@ export function SectionHeader({
           >
             {actionLabel}
           </Text>
+          {/* The chevron names nothing: the button around it already carries the
+              action's label, so a reader hears the destination once. */}
+          {actionChevron ? <RowChevron /> : null}
         </Pressable>
       ) : null}
     </View>

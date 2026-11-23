@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "तपशील उपलब्ध नाहीत.",
+      "detailsUnavailableDescription": "हा घटक आता सत्रात नाही.",
       "textDisplay": "मजकूर प्रदर्शन",
       "thinking": "विचार करत आहे",
       "thought": "विचार",
@@ -4929,8 +4930,8 @@
     "estimateSpendLimitTooLow": "हा सारांश तयार करता यावा यासाठी खर्च मर्यादा वाढवा.",
     "saved": "आढावा सेटिंग्ज जतन झाल्या.",
     "selectedSessions": "निवडलेली सत्रे",
-    "snapshotPullRequests": "निवडलेल्या सत्रांतील PRs",
-    "snapshotBlockers": "निवडलेल्या सत्रांतील अडथळे",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "अडथळे",
     "capturedAt": "{{time}} वाजता नोंदवले",
     "snapshotHint": "नियोजित सकाळच्या वेळी नोंदवलेला, सत्रांच्या नवीनतम उपलब्ध स्थितीचा शक्य तितका अचूक स्नॅपशॉट. संख्या निवडलेल्या सत्रांची माहिती दर्शवतात, रात्रभरातील संपूर्ण क्रियाकलापांची नाही.",
     "snapshotTruncated": "या स्नॅपशॉटचा आकार मर्यादित ठेवण्यासाठी काही सत्रे किंवा पुरावे वगळले आहेत.",

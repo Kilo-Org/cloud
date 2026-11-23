@@ -2724,6 +2724,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Informacija nepasiekiama",
+      "detailsUnavailableDescription": "Šio elemento sesijoje nebėra",
       "textDisplay": "Teksto rodymas",
       "thinking": "Mąstoma",
       "thought": "Mintis",
@@ -5109,8 +5110,8 @@
     "estimateSpendLimitTooLow": "Padidinkite išlaidų apsaugą, kad leistumėte šią santrauką.",
     "saved": "Suvestinės nustatymai išsaugoti",
     "selectedSessions": "Atrinktos sesijos",
-    "snapshotPullRequests": "PR atrinktose sesijose",
-    "snapshotBlockers": "Trukdžiai atrinktose sesijose",
+    "snapshotPullRequests": "PR",
+    "snapshotBlockers": "Trukdžiai",
     "capturedAt": "Užfiksuota {{time}}",
     "snapshotHint": "Pagal turimus duomenis parengta naujausios prieinamos sesijų būsenos suvestinė, užfiksuota suplanuotu ryto laiku. Skaičiai apibūdina atrinktas sesijas, o ne visą nakties veiklą.",
     "snapshotTruncated": "Kai kurios sesijos ar įrodymai neįtraukti, kad suvestinės apimtis liktų ribota.",

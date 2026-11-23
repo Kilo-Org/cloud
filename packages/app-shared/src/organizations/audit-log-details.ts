@@ -1,5 +1,7 @@
 import * as z from 'zod';
 
+import { ORGANIZATION_ROLES, type OrganizationRole } from './roles';
+
 /**
  * The structured payload an organization audit row carries beside its English
  * `message`.
@@ -22,9 +24,15 @@ import * as z from 'zod';
  * action cannot name the event; the id does.
  */
 
-/** A server vocabulary the catalog names, never echoed as English. */
-export const AUDIT_ROLE_TAGS = ['owner', 'admin', 'billing_manager', 'member'] as const;
-export type AuditRoleTag = (typeof AUDIT_ROLE_TAGS)[number];
+/**
+ * A role, as the audit reader names it.
+ *
+ * `roles.ts` holds the single source. This module builds its validator from
+ * `ORGANIZATION_ROLES`, so a role added to the canonical list is accepted here
+ * the day it is added — the alternative, restating the list, would silently
+ * drop a new role's detail back to the event name.
+ */
+export type AuditRoleTag = OrganizationRole;
 
 /**
  * The inference region an organization can pin.
@@ -77,7 +85,7 @@ export type AuditGuardrailTargetTag = (typeof AUDIT_GUARDRAIL_TARGET_TAGS)[numbe
 export const AUDIT_DEFAULT_BEHAVIOR_TAGS = ['global', 'specific', 'auto'] as const;
 export type AuditDefaultBehaviorTag = (typeof AUDIT_DEFAULT_BEHAVIOR_TAGS)[number];
 
-const RoleTag = z.enum(AUDIT_ROLE_TAGS);
+const RoleTag = z.enum(ORGANIZATION_ROLES);
 const RegionTag = z.enum(AUDIT_REGION_TAGS);
 const PlatformTag = z.enum(AUDIT_PLATFORM_TAGS);
 const DataCollectionTag = z.enum(AUDIT_DATA_COLLECTION_TAGS);

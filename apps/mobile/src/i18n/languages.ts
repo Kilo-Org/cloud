@@ -3,6 +3,10 @@
  * the catalog loader, the picker, and the push notification catalog in
  * `packages/notifications`, so a token locale and a channel name always resolve
  * to the same tag.
+ *
+ * The Expo config loader evaluates this module through `app.config.ts`, and
+ * `scripts/generate-language-search-names.mjs` imports it under Node with no
+ * bundler, so it must stay import-free and free of module-scope side effects.
  */
 export const SUPPORTED_LANGUAGES = [
   'af',

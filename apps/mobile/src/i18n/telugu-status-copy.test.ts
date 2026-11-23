@@ -8,8 +8,10 @@ import { i18n } from '@/i18n';
  * shown beside a control and so carries no closing period, the environment
  * failures say that something could not happen instead of addressing a
  * compiler-like "we", and the run target names the Cloud Agent rather than
- * instructing the reader to run in it. This branch changes catalog values
- * only: no key, placeholder, or plural category moves.
+ * instructing the reader to run in it. The composer's select-model prompt is
+ * a one-line instruction whose canonical entry ends without a full stop, so
+ * its value ends there too. This branch changes catalog values only: no key,
+ * placeholder, or plural category moves.
  */
 
 beforeAll(async () => {
@@ -113,6 +115,10 @@ const CASES: Case[] = [
   {
     key: 'agentChat.composer.preparingPlaceholder',
     value: 'వాతావరణాన్ని సిద్ధం చేస్తోంది…',
+  },
+  {
+    key: 'agentChat.composer.selectModelBeforeSending',
+    value: 'పంపడానికి ముందు మోడల్‌ను ఎంచుకోండి',
   },
 ];
 

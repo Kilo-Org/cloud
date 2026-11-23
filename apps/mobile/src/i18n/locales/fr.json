@@ -1978,6 +1978,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Les détails ne sont pas disponibles",
+      "detailsUnavailableDescription": "Cet élément ne fait plus partie de la session",
       "textDisplay": "Affichage du texte",
       "thinking": "Réflexion en cours",
       "thought": "Réflexion",
@@ -5019,8 +5020,8 @@
     "estimatePermissionUnavailable": "Vous n’avez pas l’autorisation d’utiliser le solde de ce contexte. Demandez à un propriétaire d’organisation de l’activer.",
     "saved": "Paramètres du briefing enregistrés",
     "selectedSessions": "Sessions sélectionnées",
-    "snapshotPullRequests": "PRs des sessions sélectionnées",
-    "snapshotBlockers": "Blocages des sessions sélectionnées",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Blocages",
     "capturedAt": "Capturé {{time}}",
     "snapshotHint": "Instantané non exhaustif du dernier état disponible des sessions, figé à l’heure matinale prévue. Les chiffres portent sur les sessions sélectionnées, pas sur toute l’activité de la nuit.",
     "snapshotTruncated": "Certaines sessions ou preuves ont été omises pour limiter la taille de cet instantané.",

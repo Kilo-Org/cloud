@@ -18,6 +18,7 @@ import {
 } from '@kilocode/db/schema-types';
 import {
   describeModelAccessPolicyWriteRefusal,
+  OrganizationGroupNameSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPolicySchema,
@@ -490,6 +491,28 @@ function counted(count: number, singular: string, plural: string) {
 }
 
 /**
+ * The group name a create or rename stores: trimmed, and refused with a typed
+ * `BAD_REQUEST` when it carries nothing a reader can see.
+ *
+ * `assertGroupNameAvailable` compares trimmed names, and the table's
+ * `char_length(btrim(name))` check counts zero-width characters, so neither
+ * stops a name of `\u200B` from saving as a nameless row. The rule lives here
+ * as well as in the router input, because tests and other procedures call this
+ * module directly: a `ZodError` thrown inside a procedure body would answer
+ * `INTERNAL_SERVER_ERROR`, not the `BAD_REQUEST` the client can explain.
+ */
+function parseGroupName(name: string): string {
+  const parsed = OrganizationGroupNameSchema.safeParse(name);
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: parsed.error.issues[0]?.message ?? 'Group name is required',
+    });
+  }
+  return parsed.data;
+}
+
+/**
  * Reject a group name that collides (case- and whitespace-insensitively) with
  * an existing group in the same organization, so both create and rename return
  * a typed `CONFLICT` instead of surfacing the
@@ -617,7 +640,7 @@ export async function createOrganizationGroup(params: {
         });
       }
 
-      const canonicalName = params.name.trim();
+      const canonicalName = parseGroupName(params.name);
       await assertGroupNameAvailable(tx, params.organizationId, canonicalName);
 
       const [group] = await tx
@@ -636,6 +659,7 @@ export async function createOrganizationGroup(params: {
       await createAuditLog({
         action: 'organization.group.create',
         ...actorAudit(params.actor),
+        details: { id: 'group.identity', name: group.name },
         message: `Created group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision)}`,
         organization_id: params.organizationId,
         tx,
@@ -657,18 +681,14 @@ export async function updateOrganizationGroupMetadata(params: {
     params.actor.id,
     async ({ tx }) => {
       const existing = await getGroupForUpdate(tx, params.organizationId, params.groupId);
-      if (params.name !== undefined) {
-        await assertGroupNameAvailable(
-          tx,
-          params.organizationId,
-          params.name.trim(),
-          params.groupId
-        );
+      const canonicalName = params.name === undefined ? undefined : parseGroupName(params.name);
+      if (canonicalName !== undefined) {
+        await assertGroupNameAvailable(tx, params.organizationId, canonicalName, params.groupId);
       }
       const [updated] = await tx
         .update(organization_groups)
         .set({
-          ...(params.name !== undefined ? { name: params.name.trim() } : {}),
+          ...(canonicalName !== undefined ? { name: canonicalName } : {}),
           ...(params.description !== undefined ? { description: params.description } : {}),
           updated_at: sql`now()`,
         })
@@ -682,6 +702,7 @@ export async function updateOrganizationGroupMetadata(params: {
       await createAuditLog({
         action: 'organization.group.update',
         ...actorAudit(params.actor),
+        details: { id: 'group.identity', name: existing.name },
         message: `Updated group "${existing.name}" (${existing.id})`,
         organization_id: params.organizationId,
         tx,
@@ -705,7 +726,8 @@ export async function updateOrganizationGroupDetails(params: {
     params.actor.id,
     async ({ tx, pendingPolicyRevision }) => {
       const existing = await getGroupForUpdate(tx, params.organizationId, params.groupId);
-      await assertGroupNameAvailable(tx, params.organizationId, params.name.trim(), params.groupId);
+      const canonicalName = parseGroupName(params.name);
+      await assertGroupNameAvailable(tx, params.organizationId, canonicalName, params.groupId);
       const userIds = [...new Set(params.userIds)];
       await assertDirectMembers(tx, params.organizationId, userIds);
       const currentMemberIds = await listOrganizationGroupMemberIds(
@@ -724,7 +746,7 @@ export async function updateOrganizationGroupDetails(params: {
       const [group] = await tx
         .update(organization_groups)
         .set({
-          name: params.name.trim(),
+          name: canonicalName,
           description: params.description ?? null,
           updated_at: sql`now()`,
         })
@@ -745,6 +767,7 @@ export async function updateOrganizationGroupDetails(params: {
       await createAuditLog({
         action: 'organization.group.update',
         ...actorAudit(params.actor),
+        details: { id: 'group.members', name: existing.name, count: userIds.length },
         message: `Updated group "${existing.name}" (${existing.id}) with ${counted(userIds.length, 'member', 'members')}${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
@@ -789,6 +812,7 @@ export async function setOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.policy.set',
         ...actorAudit(params.actor),
+        details: { id: 'group.policySet', name: group.name, policyType: params.policy.type },
         message: policyStateChanged
           ? `Set ${params.policy.type} policy for group "${group.name}" (${group.id}) at revision ${pendingPolicyRevision}`
           : `Set ${params.policy.type} policy for group "${group.name}" (${group.id})`,
@@ -829,6 +853,7 @@ export async function removeOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.policy.remove',
         ...actorAudit(params.actor),
+        details: { id: 'group.policyRemoved', name: group.name, policyType: params.policyType },
         message: policyStateChanged
           ? `Removed ${params.policyType} policy from group "${group.name}" (${group.id}) at revision ${pendingPolicyRevision}`
           : `Removed ${params.policyType} policy from group "${group.name}" (${group.id})`,
@@ -877,6 +902,7 @@ export async function setOrganizationGroupMembers(params: {
       await createAuditLog({
         action: 'organization.group.members.set',
         ...actorAudit(params.actor),
+        details: { id: 'group.members', name: group.name, count: userIds.length },
         message: `Set ${counted(userIds.length, 'member', 'members')} for group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
@@ -951,12 +977,14 @@ export async function setOrganizationMemberGroups(params: {
         namedPolicies
       );
       let auditTarget = `organization member (${params.userId})`;
+      let memberEmail: string | undefined;
       if (namedPolicies.length === 0) {
         const [member] = await tx
           .select({ email: kilocode_users.google_user_email })
           .from(kilocode_users)
           .where(eq(kilocode_users.id, params.userId))
           .limit(1);
+        memberEmail = member?.email ?? undefined;
         auditTarget = `organization member ${member?.email ?? params.userId} (${params.userId})`;
       }
       if (memberGroupDiff.removed.length > 0) {
@@ -987,6 +1015,11 @@ export async function setOrganizationMemberGroups(params: {
       await createAuditLog({
         action: 'organization.group.member_groups.set',
         ...actorAudit(params.actor),
+        details: {
+          id: 'group.memberGroups',
+          count: groupIds.length,
+          ...(memberEmail === undefined ? {} : { email: memberEmail }),
+        },
         message: `Set ${counted(groupIds.length, 'group', 'groups')} for ${auditTarget}${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
@@ -1034,6 +1067,7 @@ async function releaseEnkryptInputGuardrailGroup(
   await createAuditLog({
     action: 'organization.settings.change',
     ...actorAudit(actor),
+    details: { id: 'guardrail.config', enabled: inputGuardrail.enabled },
     message: `Updated AI guardrails: input guardrails now apply to all members because group "${group.name}" (${group.id}) was deleted`,
     organization_id: organizationId,
     tx,
@@ -1074,6 +1108,7 @@ export async function deleteOrganizationGroup(params: {
       await createAuditLog({
         action: 'organization.group.delete',
         ...actorAudit(params.actor),
+        details: { id: 'group.identity', name: group.name },
         message: `Deleted group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, pendingPolicyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
@@ -1107,6 +1142,7 @@ export async function setDefaultOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.default_policy.set',
         ...actorAudit(params.actor),
+        details: { id: 'group.defaultPolicySet', policyType: params.policy.type },
         message: policyStateChanged
           ? `Set default ${params.policy.type} group policy at revision ${pendingPolicyRevision}`
           : `Set default ${params.policy.type} group policy`,
@@ -1141,6 +1177,7 @@ export async function removeDefaultOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.default_policy.remove',
         ...actorAudit(params.actor),
+        details: { id: 'group.defaultPolicyRemoved', policyType: params.policyType },
         message: policyStateChanged
           ? `Removed default ${params.policyType} group policy at revision ${pendingPolicyRevision}`
           : `Removed default ${params.policyType} group policy`,

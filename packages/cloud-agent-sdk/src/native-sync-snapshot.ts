@@ -6,12 +6,14 @@ import {
   type Kilo2Session,
 } from '@kilocode/session-ingest-contracts';
 import {
-  hasUndisplayableKilo2Assets,
+  hasUnresolvedKilo2Assets,
+  hasIncompleteKilo2Assets,
   kilo2AssetKey,
   readKilo2FileReferences,
   readKilo2Messages,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
+import { NATIVE_SYNC_REQUEST_DEADLINE_MS } from './limits';
 import type { NativeSnapshotBlob, NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import type { SessionSnapshot } from './types';
 
@@ -149,6 +151,12 @@ export type NativeSnapshot = {
   entities: NativeEntity[];
   /** Resolved authorized bytes, keyed by kilo2AssetKey(display ID, native URI, MIME). */
   assetURLs?: Record<string, string>;
+  /**
+   * Keys no authorization can bind, in kilo2AssetKey form. The producer stores a message
+   * and its asset mappings together, so these attachments never resolve; readers report
+   * them instead of failing the transcript or waiting for a later snapshot.
+   */
+  unavailableAssetKeys?: string[];
 };
 
 export type NativeSnapshotProjection = {
@@ -168,20 +176,36 @@ export function projectNativeSnapshot(snapshot: NativeSnapshot): NativeSnapshotP
     });
   }
   const session = withDisplayLocation(snapshot.session);
+  const unavailable = new Set(snapshot.unavailableAssetKeys ?? []);
   const messages: Kilo2Message[] = [];
   const incompleteMessageIDs: string[] = [];
   for (const item of snapshot.messages) {
-    if (item.incomplete) incompleteMessageIDs.push(item.message.id);
-    // A message with no possible display is dropped, not reported as missing data.
-    else if (!hasUndisplayableKilo2Assets(item.message, snapshot.assetURLs)) {
-      messages.push(item.message);
+    if (item.incomplete) {
+      incompleteMessageIDs.push(item.message.id);
+      continue;
     }
+    // A reference a later snapshot can still authorize withholds the message: this reader
+    // has no retry, so it reports the message instead of showing it half-authorized.
+    if (hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs, unavailable)) {
+      incompleteMessageIDs.push(item.message.id);
+      continue;
+    }
+    // A message whose attachment content storage was expected to provide still displays its
+    // text, reasoning and tool output; its withheld attachment is reported, never hidden.
+    // An absolute `http(s)` reference is never fetched on purpose, so it is not reported
+    // unless the snapshot declared its key unavailable.
+    if (hasIncompleteKilo2Assets(item.message, snapshot.assetURLs, unavailable))
+      incompleteMessageIDs.push(item.message.id);
+    messages.push(item.message);
   }
   return {
     session,
     position: snapshot.position,
     revision: snapshot.revision,
-    messages: readKilo2Messages(session, messages, { assetURLs: snapshot.assetURLs }),
+    messages: readKilo2Messages(session, messages, {
+      assetURLs: snapshot.assetURLs,
+      unavailable,
+    }),
     incompleteMessageIDs,
   };
 }
@@ -286,7 +310,7 @@ async function resolveSnapshotAssets(
   path: string,
   blobs: SnapshotBlobStore,
   readAsset?: NativeAssetReader
-): Promise<Record<string, string>> {
+): Promise<{ assetURLs: Record<string, string>; unavailable: Set<string> }> {
   const mappings = new Map<string, z.infer<typeof assetMappingSchema>>();
   for (const item of resolved) {
     if (item.entity.kind !== 'asset') continue;
@@ -299,6 +323,10 @@ async function resolveSnapshotAssets(
   }
   const wants: { file: Kilo2FileReference; hash: string; bytes: number }[] = [];
   const assetURLs: Record<string, string> = {};
+  // Keys no authorization can bind. The producer writes a message and its asset mappings in
+  // one batch, so an absent or mismatched mapping never arrives later: this attachment stays
+  // unavailable while the rest of the transcript is still readable.
+  const unavailable = new Set<string>();
   const missing: { hash: string; bytes: number }[] = [];
   const queuedHashes = new Set<string>();
   const claimedBytes = new Map<string, number>();
@@ -325,12 +353,8 @@ async function resolveSnapshotAssets(
         mapping.mime !== file.mime ||
         (file.uri.startsWith('media:') && file.uri !== `media:${mapping.blob.hash}`)
       ) {
-        throw Object.assign(
-          new Error(`Native attachment ${file.id} has no matching authorized asset`),
-          {
-            code: 'native_asset_not_found',
-          }
-        );
+        unavailable.add(kilo2AssetKey(file.id, file.uri, file.mime));
+        continue;
       }
       if (!readAsset) {
         throw Object.assign(
@@ -354,7 +378,7 @@ async function resolveSnapshotAssets(
       wants.push({ file, hash: mapping.blob.hash, bytes: advertised });
     }
   }
-  if (!readAsset) return assetURLs;
+  if (!readAsset) return { assetURLs, unavailable };
   await readWithBoundedConcurrency(
     SNAPSHOT_ASSET_READ_CONCURRENCY,
     missing.map(({ hash, bytes }) => async () => {
@@ -376,7 +400,7 @@ async function resolveSnapshotAssets(
     assetURLs[kilo2AssetKey(want.file.id, want.file.uri, want.file.mime)] =
       `data:${want.file.mime};base64,${cached.base64}`;
   }
-  return assetURLs;
+  return { assetURLs, unavailable };
 }
 
 function reconstructMessages(
@@ -549,7 +573,8 @@ async function readSnapshot(
     entities,
   };
   const assetURLs = await resolveSnapshotAssets(snapshot, resolved, path, blobs, readAsset);
-  if (Object.keys(assetURLs).length > 0) snapshot.assetURLs = assetURLs;
+  if (Object.keys(assetURLs.assetURLs).length > 0) snapshot.assetURLs = assetURLs.assetURLs;
+  if (assetURLs.unavailable.size > 0) snapshot.unavailableAssetKeys = [...assetURLs.unavailable];
   return snapshot;
 }
 
@@ -594,7 +619,7 @@ export async function fetchNativeSnapshot(
       const requestTimeout = setTimeout(() => {
         failure = new Error('Native snapshot request timed out');
         controller.abort();
-      }, 15_000);
+      }, NATIVE_SYNC_REQUEST_DEADLINE_MS);
       const abort = () => {
         clearTimeout(requestTimeout);
         reject(failure);

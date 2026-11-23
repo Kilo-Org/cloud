@@ -21,12 +21,7 @@ import {
   CATALOG_NO_TOOL_SUPPORT_REASON,
   benchmarkPairUnavailability,
 } from './platform-models';
-import {
-  PROFILE_FAILURE_BUDGET,
-  PROFILE_MODEL_FAILURE_BUDGET,
-  unsupportedRejection,
-  type ProfileFailure,
-} from './profile-failure';
+import { unsupportedRejection, type ProfileFailure } from './profile-failure';
 import { refreshCurrentProfiles } from './profile-refresh';
 import { computeEngineIdentity, dispatchScheduler } from './run';
 import {
@@ -154,7 +149,7 @@ describe('profile failure transitions (production migrations and real SQLite)', 
     expect(await requeue(T0 + 48 * HOUR)).toBe(0);
   });
 
-  it('retries a model-transient failure only after its backoff and stops at the model budget', async () => {
+  it('retries a model-transient failure after its backoff without ending at a row-count budget', async () => {
     await failedRun('run-1', providerDown, T0);
     expect(stored()).toMatchObject({
       status: 'failed',
@@ -183,46 +178,45 @@ describe('profile failure transitions (production migrations and real SQLite)', 
     expect(await requeue(T0 + 4 * HOUR)).toBe(1);
 
     await failedRun('run-3', providerDown, T0 + 5 * HOUR);
-    expect(PROFILE_MODEL_FAILURE_BUDGET).toBe(3);
+    // A row counter is not proof of a failed run: only the attempt history can make a
+    // retryable failure permanent, so three model-transient failures stay retryable.
     expect(stored()).toMatchObject({
-      status: 'unavailable',
+      status: 'failed',
       failure_attempts: 3,
       model_failure_attempts: 3,
-      retry_after: null,
+      retry_after: iso(T0 + 9 * HOUR),
     });
-    expect(await requeue(T0 + 100 * HOUR)).toBe(0);
-    expect((await listCurrentFailedProfiles(db, current))[0]?.failure).toMatchObject({
-      kind: 'permanent',
-      cause: 'model_budget_exhausted',
-      attempts: 3,
-      firstFailedAt: iso(T0),
-      lastFailedAt: iso(T0 + 5 * HOUR),
-    });
+    expect(await requeue(T0 + 9 * HOUR)).toBe(1);
+    expect(await listCurrentFailedProfiles(db, current)).toEqual([]);
   });
 
-  it('never charges infrastructure failures to the model, but ends them at the overall budget', async () => {
+  it('never makes a retryable row permanent from its own counter, whatever the count', async () => {
     let at = T0;
-    const failures = [providerDown, providerDown, ambiguous, ambiguous];
+    const failures = [
+      providerDown,
+      providerDown,
+      ambiguous,
+      ambiguous,
+      ambiguous,
+      ambiguous,
+      ambiguous,
+    ];
     for (const [index, failure] of failures.entries()) {
       await failedRun(`run-${index}`, failure, at);
       expect(stored().status).toBe('failed');
       at += 48 * HOUR;
       expect(await requeue(at)).toBe(1);
     }
-    expect(stored()).toMatchObject({ failure_attempts: 4, model_failure_attempts: 2 });
-
-    await failedRun('run-last', ambiguous, at);
-    expect(PROFILE_FAILURE_BUDGET).toBe(5);
     expect(stored()).toMatchObject({
-      status: 'unavailable',
-      failure_class: 'ambiguous_execution',
-      failure_attempts: 5,
+      status: 'pending',
+      failure_attempts: 7,
       model_failure_attempts: 2,
     });
-    expect((await listCurrentFailedProfiles(db, current))[0]?.failure).toMatchObject({
-      kind: 'permanent',
-      cause: 'infrastructure_budget_exhausted',
-    });
+    // One more leaves the counter far past the proven-attempt budget and it is still
+    // retryable: without attempt-history proof nothing is invalidated.
+    await failedRun('run-final', ambiguous, at);
+    expect(stored()).toMatchObject({ status: 'failed', failure_attempts: 8 });
+    expect(await requeue(at + 48 * HOUR)).toBe(1);
   });
 
   it('counts an orphaned claim as a retryable infrastructure failure', async () => {
@@ -625,6 +619,10 @@ describe('settled run classification (production migrations and real SQLite)', (
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
+    // The scheduler's paid-cutover fence fails closed without this row.
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('1970-01-01T00:00:00.000Z');
     env = {
       BENCH_DB: sqliteD1(sqlite),
       BENCH_QUEUE: { send: async () => {} },
@@ -645,9 +643,9 @@ describe('settled run classification (production migrations and real SQLite)', (
       .prepare(
         `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, min_accuracy,
           switch_cost_factor, max_concurrency, repetitions, engine_identity, benchmark_user_id,
-          benchmark_org_id)
+          benchmark_org_id, admission_marker)
          VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, ?,
-          'bot-internal-benchmark', 'benchmark-org')`
+          'bot-internal-benchmark', 'benchmark-org', 'e2f3d4c5-0000-4000-8000-000000000001')`
       )
       .run(RUN_ID, now, engineIdentity);
     sqlite.prepare('INSERT INTO scheduler_runs (run_id) VALUES (?)').run(RUN_ID);
@@ -697,6 +695,17 @@ describe('settled run classification (production migrations and real SQLite)', (
         failureClass,
       });
     }
+    // A run that reached the scheduler owes exactly what its chunks hold. The dead lane
+    // materialized its cases and then died, so it is unfinished and fails with its most
+    // severe recorded cause; the other two lanes hold results (zero-inference reuse
+    // shape) and settle independently.
+    sqlite
+      .prepare(
+        `INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
+          case_ids, status)
+         VALUES ('dead-chunk', ?, 'lane/dead', '', '[]', 0, 0, ?, 'failed')`
+      )
+      .run(RUN_ID, JSON.stringify(DECIDER_CASES.map(benchCase => benchCase.id)));
 
     await dispatchScheduler(env);
 
@@ -742,12 +751,16 @@ describe('catalog load deferrals (production migrations and real SQLite)', () =>
   it('refunds the attempt, counts the deferral and holds every dispatch until the cooldown ends', async () => {
     const sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('1970-01-01T00:00:00.000Z');
     const db = sqliteD1(sqlite);
     sqlite
       .prepare(
         `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, min_accuracy,
-          switch_cost_factor, max_concurrency, repetitions, engine_identity)
-         VALUES ('run', 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 4, 1, 'engine')`
+          switch_cost_factor, max_concurrency, repetitions, engine_identity, admission_marker)
+         VALUES ('run', 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 4, 1, 'engine',
+          'e2f3d4c5-0000-4000-8000-000000000001')`
       )
       .run(iso(NOW));
     await scheduleRunChunks(db, {

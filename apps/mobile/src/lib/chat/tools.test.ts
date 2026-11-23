@@ -86,15 +86,6 @@ beforeEach(() => {
   webSearch.enabled.clear();
 });
 
-/**
- * What a chat offers the model.
- *
- * Two tools of its own, the clock and web search, and the app-settings tools
- * behind one group switch. The switch is the whole of the gate: off means the
- * names are not in the list at all, so the model is never offered a tool that
- * would refuse it.
- */
-
 describe('the tools a chat offers', () => {
   it('is the clock, web search and the settings tools while the group switch is on', () => {
     expect(namesOf(chatTools())).toEqual(['time', 'web_search', 'settings_list', 'settings_set']);

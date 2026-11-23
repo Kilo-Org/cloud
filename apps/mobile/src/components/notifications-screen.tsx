@@ -929,6 +929,7 @@ export function NotificationsScreen({ settingsTarget }: Readonly<SettingsTargetP
                           ? t('notifications.previewFullDescription')
                           : t('notifications.previewGenericDescription')
                       }
+                      subtitleNumberOfLines={2}
                       variant="action"
                       disabled={previewDisabled}
                       trailing={

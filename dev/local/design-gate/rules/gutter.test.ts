@@ -309,6 +309,19 @@ test('gutter: content a native sheet hosts is measured from the sheet root', () 
   assert.equal(run(presentedContent(21), LANDSCAPE)[0]?.measured, 21);
 });
 
+test('gutter: a box the platform reports unseen stands on no page column', () => {
+  // A hidden measurement copy at the surface's own origin, arriving from an
+  // accessibility snapshot that carries no style.
+  const hidden: ProbeNode = {
+    parent: 0,
+    tag: 'Paragraph',
+    rect: [0, 0, 0.76, 1.14],
+    invisible: true,
+  };
+  assert.deepEqual(run([hidden]), []);
+  assert.equal(run([{ ...hidden, invisible: undefined }])[0]?.measured, 0);
+});
+
 /**
  * A landscape empty state: the page box starts at the 47 dp inset, and the
  * state's block is centred in the *window*, so its own edge lands 1 dp outside

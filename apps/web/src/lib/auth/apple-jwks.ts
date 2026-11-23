@@ -234,10 +234,6 @@ export async function verifyAppleJwtWithJwks(
     }
   }
 
-  // Report the outage once, the first time a verification consumes the
-  // fallback key set, unless an earlier request already handed this failure to
-  // a route. A failure that propagates instead is reported by the receiving
-  // route.
   if (lastRefreshError !== null && !refreshOutageReported) {
     refreshOutageReported = true;
     captureException(lastRefreshError, { tags: { source: 'apple_jwks_refresh' } });

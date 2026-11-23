@@ -5,6 +5,7 @@ import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
 import { TAB_SCREEN_TRAILING_GAP } from '@/components/tab-screen';
+import { type DenyListModel, denyListRowNote } from '@/lib/organization/model-access';
 
 import { ModelDenyList, ProviderAllowList } from './model-access-lists';
 
@@ -60,17 +61,14 @@ vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurf
 
 const DRAFT = { providerAllowList: [], modelDenyList: [] };
 
+/** The props every mount shares: an empty draft, enabled rows, a no-op save. */
+const LIST_PROPS = { draft: DRAFT, onChange: () => undefined, disabled: false };
+
 let renderer: ReactTestRenderer | undefined = undefined;
 
 async function mount(providers: readonly string[], names: Readonly<Record<string, string>> = {}) {
   const view = await renderWithProviders(
-    createElement(ProviderAllowList, {
-      providers,
-      names,
-      draft: DRAFT,
-      onChange: () => undefined,
-      disabled: false,
-    })
+    createElement(ProviderAllowList, { ...LIST_PROPS, providers, names })
   );
   renderer = view.renderer;
   return view.renderer.root;
@@ -78,25 +76,21 @@ async function mount(providers: readonly string[], names: Readonly<Record<string
 
 const DENY_MODELS = [{ id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' }];
 
+/** The deny list alone, over the rows a case names. */
+async function mountDenyList(models: readonly DenyListModel[]) {
+  const view = await renderWithProviders(createElement(ModelDenyList, { ...LIST_PROPS, models }));
+  renderer = view.renderer;
+  return view.renderer.root;
+}
+
 /** Both lists of the Providers and models tab, as the form renders them. */
 async function mountBothLists() {
   const view = await renderWithProviders(
     createElement(
       Fragment,
       null,
-      createElement(ProviderAllowList, {
-        providers: ['anthropic'],
-        names: {},
-        draft: DRAFT,
-        onChange: () => undefined,
-        disabled: false,
-      }),
-      createElement(ModelDenyList, {
-        models: DENY_MODELS,
-        draft: DRAFT,
-        onChange: () => undefined,
-        disabled: false,
-      })
+      createElement(ProviderAllowList, { ...LIST_PROPS, providers: ['anthropic'], names: {} }),
+      createElement(ModelDenyList, { ...LIST_PROPS, models: DENY_MODELS })
     )
   );
   renderer = view.renderer;
@@ -134,6 +128,13 @@ function rows(root: ReactTestRenderer['root']) {
       title: node.props.title as unknown,
       subtitle: node.props.subtitle as unknown,
     }));
+}
+
+/** Each rendered row's note, in order, which `rows` leaves out on purpose. */
+function rowNotes(root: ReactTestRenderer['root']) {
+  return root
+    .findAll(node => Object.is(node.type, 'PreferenceRow'))
+    .map(node => node.props.note as unknown);
 }
 
 beforeEach(() => {
@@ -237,6 +238,36 @@ describe('ProviderAllowList rows', () => {
     typeQuery(root, 'router');
 
     expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: undefined }]);
+  });
+});
+
+describe('ModelDenyList rows', () => {
+  it('titles a model whose name equals its id without repeating it', async () => {
+    const root = await mountDenyList([
+      { id: 'fixture-anthropic/model', name: 'fixture-anthropic/model' },
+    ]);
+
+    expect(rows(root)).toEqual([{ title: 'fixture-anthropic/model', subtitle: undefined }]);
+  });
+
+  it('draws the id as the second line when the name says something else', async () => {
+    const root = await mountDenyList([{ id: 'fake-deterministic', name: 'Fake Deterministic' }]);
+
+    expect(rows(root)).toEqual([{ title: 'Fake Deterministic', subtitle: 'fake-deterministic' }]);
+  });
+
+  it('keeps the retirement note of a row whose name equals its id', async () => {
+    const model = {
+      id: 'fixture-anthropic/model',
+      name: 'fixture-anthropic/model',
+      retiresOn: '2026-11-20',
+    };
+    const root = await mountDenyList([model]);
+
+    // The note is a fact of its own, so dropping the duplicate subtitle must
+    // not cost the row its retirement date.
+    expect(rows(root)).toEqual([{ title: 'fixture-anthropic/model', subtitle: undefined }]);
+    expect(rowNotes(root)).toEqual([denyListRowNote(model, i18n.t)]);
   });
 });
 

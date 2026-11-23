@@ -54,8 +54,9 @@ export const ARTIFACT_DOWNLOAD_TIMEOUT_MS = 300_000;
  * The only network origin family a stored artifact URL may name: R2's S3 API
  * host, which is what every Kilo presign client mints
  * (`https://<account id>.r2.cloudflarestorage.com/<bucket>/<key>`). A stored URL
- * names a hosted artifact only on that family; any other origin reports
- * `unsupported`, so the mirror skips it and makes no request for it.
+ * names a hosted artifact only on that family; a URL on any other origin is
+ * reported as a terminal `missing` cause, so the mirror skips it and makes no
+ * request for it.
  */
 const ARTIFACT_HOST_SUFFIX = '.r2.cloudflarestorage.com';
 
@@ -689,10 +690,6 @@ export async function materializeArtifact(
     return { ok: false, reason: downloadUrl.failure };
   }
 
-  // Reject an oversized artifact from its declared length before the body is
-  // written: the post-download check below only runs once the whole response
-  // has already reached device storage. A probe that reports nothing is not a
-  // reason to skip the download; the size check still catches it afterwards.
   const declaredSize = await resolved.probeContentLength(downloadUrl.url);
   if (declaredSize !== null && declaredSize > MAX_ARTIFACT_BYTES) {
     return { ok: false, reason: { cause: 'too-large', kind: 'terminal', status: null } };
@@ -874,7 +871,6 @@ function collectPartArtifacts(part: LoosePart, artifacts: CrawledArtifact[]): vo
   }
 }
 
-/** The live sink's attachment predicate: images always, other files via send_file. */
 function keepsAttachment(part: LoosePart, attachment: LooseAttachment): boolean {
   return attachment.mime.startsWith('image/') || part.tool === 'send_file';
 }

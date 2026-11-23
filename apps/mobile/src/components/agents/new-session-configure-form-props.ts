@@ -8,6 +8,7 @@ import {
 import { type CloudCreateFailure } from '@/components/agents/use-new-session-creator';
 import { type RemoteSpawnFailure } from '@/components/agents/use-remote-spawn-dispatch';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type ModelSelectionFailure } from '@/components/agents/new-session-prompt-types';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import {
@@ -35,6 +36,8 @@ export type NewSessionConfigureFormProps = {
   model: string;
   variant: string;
   modelOptions: (ModelOption | SessionModelOption)[];
+  /** The organization-default read's failure while no model is selected, or null. */
+  modelSelectionFailure?: ModelSelectionFailure | null;
   onChangeText: (text: string) => void;
   onModeChange: (mode: AgentMode) => void;
   onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;

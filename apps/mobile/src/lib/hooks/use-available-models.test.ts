@@ -198,9 +198,6 @@ describe('model-catalog read failures', () => {
     );
   });
 
-  // A 401 is the answer a locked keychain or a sign-out teardown produces, so
-  // the shared network policy treats it as an expected answer: warning level,
-  // and `report: 'none'` because the global fetch wrapper already records it.
   it('files an expected 401 models answer as a warning, not an app error', async () => {
     fetchMock.mockResolvedValueOnce(refusal(401, 'Unauthorized'));
 

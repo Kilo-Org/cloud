@@ -36,42 +36,42 @@ export const SESSION_HISTORY_FAILURES = {
 export type SessionHistoryFailureKind = keyof typeof SESSION_HISTORY_FAILURES;
 
 /**
- * The failures a retry cannot recover: the stored page is oversize or
- * unreadable, so the same read answers the same way every time. A retryable
- * failure is absent by design — offering Retry for it is correct.
+ * The reader copy key for each kind a retry cannot recover, keyed by the kind
+ * so a kind added later fails the type check here instead of borrowing the
+ * unreadable-data line.
  */
-export const TERMINAL_SESSION_HISTORY_FAILURE_KINDS: readonly SessionHistoryFailureKind[] = [
-  'too_large',
-  'invalid_data',
-];
+const TERMINAL_HISTORY_COPY_KEY = {
+  too_large: 'agentChat.session.historyTooLarge',
+  invalid_data: 'agentChat.session.historyUnavailable',
+} as const;
 
 /** A kind a retry cannot recover. */
-export type TerminalSessionHistoryFailureKind =
-  (typeof TERMINAL_SESSION_HISTORY_FAILURE_KINDS)[number];
-
-/**
- * True when the failure kind is one a retry cannot recover. A missing kind
- * (`null`/`undefined`) is not one: the read never answered with a typed kind,
- * so the transport store classifies its sentence instead.
- */
-export function isTerminalSessionHistoryFailure(
-  kind: SessionHistoryFailureKind | null | undefined
-): kind is TerminalSessionHistoryFailureKind {
-  return kind != null && TERMINAL_SESSION_HISTORY_FAILURE_KINDS.includes(kind);
-}
+type TerminalSessionHistoryFailureKind = keyof typeof TERMINAL_HISTORY_COPY_KEY;
 
 /**
  * The reader copy key for a failure kind, so the terminal state names the
- * failure from its type instead of matching the wire's English message. Only
- * a terminal kind has one; a retryable failure never resolves through it.
- * The English `message` stays the wire identity of the row itself.
+ * failure from its type instead of matching the wire's English message. The
+ * English `message` stays the wire identity of the row itself.
  */
-export function sessionHistoryFailureCopyKey(
+function sessionHistoryFailureCopyKey(
   kind: TerminalSessionHistoryFailureKind
-): 'agentChat.session.historyTooLarge' | 'agentChat.session.historyUnavailable' {
-  return kind === 'too_large'
-    ? 'agentChat.session.historyTooLarge'
-    : 'agentChat.session.historyUnavailable';
+): (typeof TERMINAL_HISTORY_COPY_KEY)[TerminalSessionHistoryFailureKind] {
+  return TERMINAL_HISTORY_COPY_KEY[kind];
+}
+
+/**
+ * The reader's copy and retryability for a typed transcript-read failure. The
+ * retryable kind names this app's own temporary outage and keeps its Retry;
+ * a terminal kind names a stored page a retry re-reads unchanged. The raw
+ * string stays in `detail` for Copy.
+ */
+export function sessionHistoryFailureCopy(kind: SessionHistoryFailureKind): {
+  copyKey: string;
+  retryable: boolean;
+} {
+  return kind === 'retryable_failure'
+    ? { copyKey: 'agentChat.session.historyTemporarilyUnavailable', retryable: true }
+    : { copyKey: sessionHistoryFailureCopyKey(kind), retryable: false };
 }
 
 /**

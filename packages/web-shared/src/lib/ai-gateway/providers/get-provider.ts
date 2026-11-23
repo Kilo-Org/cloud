@@ -453,7 +453,8 @@ function requestsUnsupportedReasoningEffort(
  */
 async function resolvePartnerRoute(
   partner: PartnerCustomLlm,
-  input: GetProviderInput
+  input: GetProviderInput,
+  isFree: boolean
 ): Promise<ProviderRoute | PartnerSkipReason> {
   const { definition } = partner;
   if (!getCustomLlmApiKinds(definition).includes(input.request.kind)) {
@@ -500,7 +501,7 @@ async function resolvePartnerRoute(
       inferenceProviderId: definition.partner.inference_provider,
     },
     userByok: null,
-    isFree: isFreeModel(input.requestedModel),
+    isFree,
     bypassAccessCheck: false,
     customLlmPricing: definition.pricing,
     ...(session ? { onUpstreamFailure: () => rememberPartnerUpstreamError(session) } : {}),
@@ -510,7 +511,7 @@ async function resolvePartnerRoute(
 function gatewayRoutedByokRoute(
   step: VercelByokPlanStep | GatewayByokPlanStep,
   key: BYOKResult,
-  requestedModel: string
+  isFree: boolean
 ): ProviderRoute {
   return {
     provider:
@@ -520,7 +521,7 @@ function gatewayRoutedByokRoute(
           ? createUserVercelAiGatewayProvider(key.decryptedAPIKey)
           : createUserOpenRouterProvider(key.decryptedAPIKey),
     userByok: [key],
-    isFree: isFreeModel(requestedModel),
+    isFree,
     bypassAccessCheck: false,
   };
 }
@@ -532,6 +533,13 @@ export type GetProviderInput = {
   organizationId: string | undefined;
   /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
   botId?: string | undefined;
+  /**
+   * Serve only the route Kilo pays for: no stored key, no ChatGPT connection, no Claude
+   * billing connection, no partner route. A measurement run needs one identical transport for
+   * every payer, and a payer's own key would both change what is measured and bill a
+   * different account. Organization model and provider policy still apply.
+   */
+  managedRoutesOnly?: boolean;
   /** The provider routing settings, from the organization or group policy and otherwise the
    * request's own `provider`. Decides whether the Vercel AI Gateway key serves and which gateway
    * Kilo's route uses. Direct BYOK and custom LLM routes do not use it. */
@@ -560,6 +568,9 @@ export type GetProviderInput = {
   onDecision?: (decision: ProviderRoutingDecision) => void;
 };
 
+/** The model a request is served and billed as, and that model's free class. */
+type ServedModel = { readonly id: string; readonly isFree: boolean };
+
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
   const { user, organizationId } = input;
   const decision = createRoutingDecisionRecorder({
@@ -567,7 +578,12 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     api_kind: input.request.kind,
     owner_type: isAnonymousContext(user) ? 'anonymous' : organizationId ? 'organization' : 'user',
   });
-  const result = await selectProvider(input, decision);
+  // The free class belongs to the model that is served and billed, which a `~` alias names by its target.
+  const servedModel = await resolveOpenRouterModelAlias(input.requestedModel);
+  const result = await selectProvider(input, decision, {
+    id: servedModel,
+    isFree: isFreeModel(servedModel),
+  });
   if (input.onDecision) {
     const decided =
       result.kind === 'provider'
@@ -597,11 +613,36 @@ type ByokSkippedKey = { providerId: UserByokProviderId; reason: ByokCandidateSki
  * key metadata; only the key that takes the request is decrypted, and the ChatGPT connection is
  * read only when routing reaches it.
  */
+/**
+ * Kilo's own route for a managed-only call. It keeps the gateway choice the organization's
+ * settings imply and never reaches a partner route, so every payer of a case is measured on the
+ * same transport with the same effort.
+ */
+async function kiloRouteFor(
+  input: GetProviderInput,
+  requestedModel: string,
+  isFree: boolean
+): Promise<GetProviderResult> {
+  const { kiloIgnoredProviders = [], boundedSpending = false, openRouterDisabled = false } = input;
+  const routesToVercel = await shouldRouteToVercel(
+    { requestedModel, boundedSpending, openRouterDisabled },
+    async () => withIgnoredProviders(await input.getRoutingProviderConfig(), kiloIgnoredProviders)
+  );
+  return servedBy({
+    provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
+    userByok: null,
+    isFree,
+    bypassAccessCheck: false,
+  });
+}
+
 async function selectProvider(
   input: GetProviderInput,
-  decision: RoutingDecisionRecorder
+  decision: RoutingDecisionRecorder,
+  served: ServedModel
 ): Promise<GetProviderResult> {
   const { requestedModel, request, user, organizationId, botId } = input;
+  const isFree = served.isFree;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
     const localFakeProvider = getLocalFakeLlmProvider();
@@ -627,6 +668,12 @@ async function selectProvider(
     );
   }
   decision.step({ step: 'custom-llm', outcome: 'skipped', reason: 'no-match' });
+  if (input.managedRoutesOnly) {
+    // A measurement run must use one identical transport for every payer: no stored key, no
+    // ChatGPT connection, no Claude billing connection, no partner route. Straight to Kilo's
+    // own route, whose organization policy still applies.
+    return kiloRouteFor(input, requestedModel, isFree);
+  }
   if (model.kind === 'direct-byok-model') {
     const result = await resolveDirectByokModel(model.provider, model.model, input, decision);
     if (result) return result;
@@ -657,7 +704,7 @@ async function selectProvider(
     return servedBy({
       provider: claudeBilling.provider,
       userByok: null,
-      isFree: isFreeModel(requestedModel),
+      isFree,
       bypassAccessCheck: false,
       skipBalanceCheck: true,
     });
@@ -701,7 +748,7 @@ async function selectProvider(
     const credential = await decryptKey(step);
     return step.route === 'direct-byok'
       ? directByokRoute(step.provider, step.model, credential, request, true)
-      : gatewayRoutedByokRoute(step, credential, requestedModel);
+      : gatewayRoutedByokRoute(step, credential, isFree);
   };
 
   /** The serving keys after `planIndex`, then the key the request ignores. */
@@ -760,7 +807,7 @@ async function selectProvider(
       userByok,
       bypassAccessCheck,
       skipBalanceCheck,
-      isFree: isFreeModel(requestedModel),
+      isFree,
     });
   };
 
@@ -821,7 +868,7 @@ async function selectProvider(
         const kiloRoute: ProviderRoute = {
           provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
           userByok: null,
-          isFree: isFreeModel(requestedModel),
+          isFree,
           bypassAccessCheck: false,
         };
         const kiloStep = {
@@ -832,15 +879,13 @@ async function selectProvider(
           kilo_ignored_providers: kiloIgnoredProviders,
         } as const;
         // A `~` latest alias reaches the partner of the catalog model it currently points at.
-        const partner = await findPartnerCustomLlm(
-          await resolveOpenRouterModelAlias(requestedModel)
-        );
+        const partner = await findPartnerCustomLlm(served.id);
         if (!partner) {
           decision.step(kiloStep);
           return servedBy(kiloRoute);
         }
         const inferenceProvider = partner.definition.partner.inference_provider;
-        const partnerRoute = await resolvePartnerRoute(partner, input);
+        const partnerRoute = await resolvePartnerRoute(partner, input, isFree);
         if (typeof partnerRoute === 'string') {
           decision.step({
             step: 'partner',

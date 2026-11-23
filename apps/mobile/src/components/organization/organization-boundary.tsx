@@ -12,6 +12,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useContextPicker } from '@/components/context-control';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
@@ -70,6 +71,7 @@ export function OrganizationBoundary({
   icon = Building2,
 }: OrganizationBoundaryProps = {}) {
   const router = useRouter();
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId, org, orgs, isResolving, isError, isFetching, refetch } =
@@ -111,7 +113,10 @@ export function OrganizationBoundary({
         label={t('organization.boundary.backToProfile')}
         icon={DirectionalArrowLeft}
         onPress={() => {
-          router.replace(PROFILE_TAB_HREF);
+          // Leaving for Profile swaps this boundary's screen out, so it goes
+          // through the push-then-retire hook: a literal `router.replace` swaps
+          // both in one native-stack commit and crashes Android Fabric.
+          stackSafeRouter.replace(PROFILE_TAB_HREF);
         }}
       />
     );

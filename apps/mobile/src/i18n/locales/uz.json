@@ -91,6 +91,7 @@
     "draft": "Qoralama",
     "enabled": "Yoqilgan",
     "github": "GitHub",
+    "image": "Rasm",
     "imageUnavailable": "Rasmni ko‘rsatib bo‘lmaydi.",
     "loading": "Yuklanmoqda…",
     "loadMore": "Yana yuklash",
@@ -122,10 +123,10 @@
     "connectProvider": "Provayderni ulash",
     "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
     "copyLink": "Havolani nusxalash",
+    "couldNotLoad": "Yuklab bo‘lmadi.",
+    "couldNotLoadMore": "Qolganlarini yuklab bo‘lmadi.",
     "couldNotLoadOrganizations": "Tashkilotlarni yuklab bo‘lmadi.",
     "couldNotLoadSessions": "Seanslarni yuklab bo‘lmadi.",
-    "couldnTLoad": "Yuklab bo‘lmadi.",
-    "couldnTLoadMore": "Qolganlarini yuklab bo‘lmadi.",
     "deviceSessions": "Qurilma seanslari",
     "disabled": "O‘chirilgan",
     "email": "Elektron pochta",
@@ -399,7 +400,7 @@
       "title": "Provayder kalitlari",
       "rowSubtitle": "O'z provayderingiz orqali to'lash",
       "orgDescription": "Bu kalitlar tashkilotdagi barcha a'zolar bilan ulashiladi va to'lov tashkilotning provayder hisoblaridan olinadi.",
-      "viewOnly": "Tashkilot kalitlarini faqat uning egasi, administratori yoki to'lovlar menejeri o'zgartira oladi.",
+      "viewOnly": "Tashkilot kalitlarini faqat uning egasi, administratori yoki to'lov menejeri o'zgartira oladi.",
       "description": "Bu kalitlar orqali yuborilgan so'rovlar uchun to'lov Kilo balansingizdan emas, provayder hisobingizdan olinadi.",
       "managedByPlan": "Kodlash tarifingiz orqali boshqariladi",
       "enableKey": "{{provider}} kalitini yoqish",
@@ -1238,6 +1239,7 @@
     "needsInputAction": {
       "approved": "So‘rov tasdiqlandi",
       "replied": "Javob yuborildi",
+      "empty": "Javob yozing, so‘ngra yuboring.",
       "failed": "Javob berilmadi. Qayta urinish uchun yana bosing.",
       "unavailable": "Bu so‘rov endi kutmaydi."
     }
@@ -1502,7 +1504,9 @@
       "githubError": "GitHubni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "gitlabAccount": "GitLab hisobi",
       "gitlabError": "GitLabni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang."
+      "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang.",
+      "notConnectedTitle": "{{platform}} ulanmagan",
+      "githubAdminOnlyDescription": "Faqat tashkilot egalar va administratorlar uni ulashi mumkin."
     },
     "overview": {
       "allAreas": "Barcha yo'nalishlar",
@@ -1588,7 +1592,7 @@
       "empty": "Statistikasi bor koʻrib chiqishlar hozircha yoʻq",
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
       "offTitle": "{{platform}} uchun statistika oʻchirilgan",
-      "offDescription": "Tashkilotning billing rollari — egalar, administratorlar va billing menejerlari — tugallangan koʻrib chiqishlarni qayd etish uchun statistikani vebdagi tashkilot sozlamalarida yoqishi mumkin.",
+      "offDescription": "Tashkilotning to'lov rollari — egalar, administratorlar va to'lov menejerlari — tugallangan koʻrib chiqishlarni qayd etish uchun statistikani vebdagi tashkilot sozlamalarida yoqishi mumkin.",
       "couldNotLoad": "Statistikani yuklab boʻlmadi",
       "trackedReviewsCaption": "Bu davrda statistika yoqilgan holda tugallangan koʻrib chiqishlar. Jarayondagi va muvaffaqiyatsiz yakunlangan koʻrib chiqishlar hech qachon hisobga olinmaydi.",
       "trackedReviewsUncounted": "Hisobga olinmagan: {{displayCount}} / {{displayTotal}} tashkilotdagi tugallangan ko’rib chiqishning, ularning natijasi qayd etilmagan.",
@@ -2251,6 +2255,7 @@
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "historyTooLarge": "Bu sessiya transkripti yuklash uchun juda katta.",
       "historyUnavailable": "Bu sessiya transkriptini o'qish mumkin emas.",
+      "historyTemporarilyUnavailable": "Bu sessiya transkripti vaqtincha mavjud emas.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
       "notEnoughCredits": "Bu so'rov uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali yakunlanmoqda. Biroz kuting.",
@@ -2613,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Tafsilotlar mavjud emas.",
+      "detailsUnavailableDescription": "Bu element endi sessiyada yo'q.",
       "textDisplay": "Matn ko'rinishi",
       "thinking": "Fikrlamoqda",
       "thought": "Fikr",
@@ -2656,6 +2662,7 @@
     "filePart": {
       "loadingImage": "Rasm yuklanmoqda",
       "imageUnavailableRetry": "Rasm yuklanmadi, qayta yuklash",
+      "imageUnavailableRetryWithAlt": "Rasm yuklanmadi, {{alt}}, qayta yuklash",
       "imagePreviewUnavailableInSession": "Bu sessiyada rasmni oldindan ko'rib bo'lmaydi.",
       "viewImage": "Rasmni ko'rish",
       "viewImageWithAlt": "{{alt}} rasmini ko'rish",
@@ -2787,7 +2794,9 @@
       "skip": "O'tkazib yuborish",
       "retrySkip": "Qayta o'tkazib yuborish",
       "submitting": "Yuborilmoqda…",
-      "sendAnswers": "Javoblarni yuborish"
+      "sendAnswers": "Javoblarni yuborish",
+      "unreadableTitle": "Savolni ko'rsatib bo'lmadi",
+      "unreadableBody": "Agent bu ilova ko'rsata olmaydigan savolni kutmoqda. Davom etish uchun savolga CLI'da javob bering."
     },
     "blockingCard": {
       "questionUnavailable": "Bu savol endi mavjud emas.",
@@ -2805,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Ichma-ich sessiyalar soni ruxsat etilgan chegaraga yetdi.",
+      "maxNestingDepth": "Ichma-ich sessiyalarning maksimal chuqurligiga yetdi.",
       "modelAccessibility": "Model nomi: {{modelLabel}}",
       "openHint": "Yordamchi agent sessiyasini ochish",
       "subagent": "Yordamchi agent",
@@ -2814,6 +2823,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Yordamchi agent sessiyasini yuklab bo'lmadi.",
+      "historyTooLarge": "Bu yordamchi agentning tarixi yuklash uchun juda katta.",
+      "historyUnavailable": "Bu yordamchi agentning tarixi mavjud emas.",
+      "historyTemporarilyUnavailable": "Bu yordamchi agentning tarixi vaqtincha mavjud emas.",
       "failed": "Yordamchi agent sessiyasida xatolik yuz berdi.",
       "noMessages": "Yordamchi agentdan xabar yo'q",
       "noMessagesDescription": "Bu yordamchi agent sessiyasi yozishmalarsiz yakunlandi.",
@@ -2983,7 +2995,7 @@
       "windowUnavailable": "Kontekst oynasining hajmi noma'lum",
       "tapToViewDetails": " Kontekst tafsilotlarini ko'rish uchun bosing.",
       "costClause": ", xarajat {{cost}}",
-      "loadingCostSpoken": "xarajati {{cost}}.",
+      "loadingCostSpoken": "hozirgacha xarajati {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} ta token, oyna hajmi noma'lum{{costClause}}.",
       "tokensUsage": "Kontekst: {{window}} ta tokendan {{used}} tasi ishlatilgan, {{percentage}}{{costClause}}.",
       "title": "Kontekstdan foydalanish",
@@ -3392,6 +3404,8 @@
     "voiceTranscriptionWho": "Qurilmangiz, siz tanlagan transkripsiya modeli bilan Kilo Gateway yoki onlayn tanib olish uchun Apple yoki Google.",
     "installAttributionPromptTitle": "O'rnatish manbasini aniqlashga ruxsat berilsinmi?",
     "installAttributionPromptMessage": "Kilo Apple tizimidagi kuzatish ruxsatidan faqat ilovani qaysi manba orqali topganingizni bilish uchun foydalanadi. Bunda so'rovlaringiz va suhbatlaringiz hech qachon ishlatilmaydi.",
+    "installAttributionRequestFailedTitle": "Kuzatish so'rovini ko'rsatib bo'lmadi",
+    "installAttributionRequestFailedMessage": "Kilo tizim so'rovini ko'rsata olmadi, shu sababli o'rnatish manbasini aniqlash o'chiq qoladi.",
     "what": "Qaysi ma'lumotlar",
     "why": "Nima uchun",
     "who": "Kimga"
@@ -3407,7 +3421,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit jurnali",
-      "permissionDenied": "Audit jurnalini faqat Enterprise tarifidagi tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
+      "permissionDenied": "Audit jurnalini faqat Enterprise tarifidagi tashkilot egasi, administratori yoki to'lov menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Audit hodisalari yo'q",
       "emptyDescription": "Bu tashkilotda bajarilgan amallar shu yerda ko'rinadi.",
       "truncated": "Eng so'nggi hodisalar ko'rsatilmoqda.",
@@ -3457,11 +3471,147 @@
         "guardrailUpdate": "Himoya qoidalari yangilandi",
         "guardrailRemove": "Himoya qoidalari olib tashlandi",
         "unknown": "Audit hodisasi"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Rejim \"{{name}}\" (identifikator: {{slug}})",
+        "modeUpdate": "Rejim \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Avtomatik marshrutlash",
+          "defaultModel": "Standart model"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} {{role}} sifatida qo'shildi",
+        "memberRemoved": "{{email}} olib tashlandi",
+        "memberParentAdded": "{{email}} {{parent}} ota tashkilotidan qo'shildi",
+        "memberParentRemoved": "{{email}} {{parent}} ota tashkilotidan olib tashlandi",
+        "inviteSent": "{{email}} {{role}} sifatida",
+        "inviteRevoked": "{{email}} uchun taklif bekor qilindi",
+        "inviteAccepted": "{{email}} qabul qilindi",
+        "groupIdentity": "Guruh \"{{name}}\"",
+        "groupMembers": "Guruh \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} guruh",
+        "groupMemberGroups_one": "{{displayCount}} guruh",
+        "groupMemberGroups_other": "{{displayCount}} guruh",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} guruh",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} guruh",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} guruh",
+        "groupPolicySet": "Guruh \"{{name}}\": {{policy}} qoidasi belgilandi",
+        "groupPolicyRemoved": "Guruh \"{{name}}\": {{policy}} qoidasi olib tashlandi",
+        "groupDefaultPolicySet": "Standart {{policy}} qoidasi belgilandi",
+        "groupDefaultPolicyRemoved": "Standart {{policy}} qoidasi olib tashlandi",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AI himoya to'siqlari {{state}}",
+        "guardrailConfigGroup": "\"{{group}}\" guruhi uchun {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO domen {{domain}}",
+        "ssoDomainChanged": "{{domain}} (avvalgi: {{previous}})",
+        "ssoDomainRemoved": "SSO domen {{domain}} olib tashlandi",
+        "fundsPurchased": "{{amount}} {{method}} orqali",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} sho'ba tashkilotga {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} sho’ba tashkilotga {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} sho'ba tashkilotga {{amount}}",
+        "fundsReceived": "{{parent}}dan {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} konfiguratsiyasi",
+        "reviewAgentConfigStyle": "{{platform}}: {{style}} uslubi",
+        "reviewAgentSecretsUpdated": "{{displayCount}} yangilandi",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} yangilandi",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} yangilandi",
+        "reviewAgentSecretsFailed": "{{displayCount}} xato",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} xato",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} xato",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Xulosa chiqarish hududi: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Rejim \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Umumiy standart",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Ruxsat etilgan",
+          "denied": "Taqiqlangan",
+          "followSetting": "Kengaytma sozlamasiga amal qiladi"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Loyiha UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} {{emails}}ga",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Tavsiyalar dayjesti {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: ruxsat etilgan manbalar yoʻq",
+        "settingName": "{{previous}} nomidan {{next}} nomiga o'zgartirildi",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Foydalanishdan oldin skanerlash yoqilgan",
+        "scanBeforeUseOff": "Foydalanishdan oldin skanerlash o'chirilgan",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Olib tashlandi: {{models}}",
+        "browserPolicyOff": "Brauzerdan foydalanish to'silgan",
+        "browserPolicyAllow": "Faqat ruxsat etilgan manbalar",
+        "browserPolicyPlaywrightOnly": "Faqat brauzerdan foydalanish",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "SI modellari o'zgartirildi: {{values}}",
+        "integrationConnected": "{{integration}} ulandi",
+        "integrationDisconnected": "{{integration}} uzildi",
+        "integrationRefreshed": "{{integration}} yangilandi",
+        "integrationCancelled": "{{integration}} bekor qilindi",
+        "integrationModelUpdated": "{{integration}}: SI modeli {{model}}",
+        "integrationKeyAdded": "{{provider}} uchun kalit qo'shildi",
+        "integrationKeyUpdated": "{{provider}} uchun kalit yangilandi",
+        "integrationKeyDeleted": "{{provider}} uchun kalit olib tashlandi",
+        "integrationKeyToggled": "{{provider}} uchun kalit: {{state}}",
+        "namedPolicyCreated": "{{kind}} siyosati {{id}} yaratildi",
+        "namedPolicyUpdated": "{{kind}} siyosati {{id}} yangilandi",
+        "namedPolicyDeleted": "{{kind}} siyosati {{id}} olib tashlandi",
+        "namedPolicyLinked": "{{kind}} siyosati {{next}} bilan bog'landi",
+        "webhookTriggerUpdated": "Ishga tushiruvchi {{trigger}}",
+        "organizationRenamed": "Tashkilot nomi {{previous}}dan {{next}}ga o'zgartirildi",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "O'z API kalitingiz"
+        }
       }
     },
     "billing": {
       "title": "To'lovlar",
-      "permissionDenied": "To'lovlarni faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
+      "permissionDenied": "To'lovlarni faqat tashkilot egasi, administratori yoki to'lov menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Obuna",
       "state": "Holat",
       "stateNone": "Obuna yo'q",
@@ -3539,11 +3689,11 @@
       "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
       "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi.",
       "seatsFull": "Barcha o'rinlar band ({{used}}/{{total}}). Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang.",
-      "seatsFullCanInviteBilling": "Barcha o'rinlar band ({{used}}/{{total}}). Siz hali ham o'rin egallamaydigan hisob-kitob menejerlarini taklif qilishingiz mumkin.",
+      "seatsFullCanInviteBilling": "Barcha o'rinlar band ({{used}}/{{total}}). Siz hali ham o'rin egallamaydigan to'lov menejerlarini taklif qilishingiz mumkin.",
       "noSeatsAvailable": "Barcha o'rinlar band. Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang."
     },
     "invoices": {
-      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",
+      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hisob-fakturalar har bir hisob-kitob davrida avtomatik yaratiladi. Tashkilotingizga to'lov hisobi chiqarilgach, ular shu yerda ko'rinadi.",
       "emptyTitle": "Hisob-fakturalar yo'q",
       "invoiceFallback": "Hisob-faktura",
@@ -3623,7 +3773,6 @@
       "usageDetails": "Foydalanish tafsilotlari",
       "providersAndModels": "Provayderlar va modellar",
       "groups": "Guruhlar",
-      "guardrails": "Himoya qoidalari",
       "byok": "O'z kalitingizdan foydalanish",
       "ssoAndDomain": "SSO va domen",
       "dataCollection": "Ma'lumotlar yig'ish",
@@ -3638,7 +3787,7 @@
       "emptyDescription": "Oldingi so'rovlarni ko'rish uchun «Oldingi soat» tugmasidan foydalaning.",
       "emptyBoundDescription": "So'rovlar jurnali bundan oldingi vaqtni qamrab olmaydi.",
       "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
-      "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
+      "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lov menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} kirish · {{output}} chiqish",
       "byok": "BYOK"
     },
@@ -3743,7 +3892,7 @@
     "signupStepUpApple": "Hisob yaratishni yakunlash uchun '$t(login.signInWithApple)' dan foydalaning.",
     "signupStepUpGoogle": "Hisob yaratishni yakunlash uchun '$t(login.signInWithGoogle)' dan foydalaning.",
     "signupStepUpBack": "Hisob yaratishni yakunlash uchun orqaga qayting va '$t(login.moreSignInOptions)' dan foydalaning.",
-    "invalidCode": "Bu kod noto‘g‘ri yoki muddati o‘tgan. Qayta urinib ko‘ring yoki '$t(login.resendCode)' dan foydalaning.",
+    "invalidCode": "Bu kod noto‘g‘ri yoki muddati o‘tgan. Yoki '$t(login.resendCode)' dan, yoki '$t(login.moreSignInOptions)' dan foydalaning.",
     "codeInProgress": "Kodingiz tekshirilmoqda. Biroz kuting va qayta urinib ko'ring.",
     "tooManyAttempts": "Juda ko'p urinish bo'ldi. Yangi kod so'rang.",
     "invalidToken": "Hisobga kirib bo‘lmadi. Qayta urinib ko‘ring.",
@@ -3908,7 +4057,10 @@
     "list": {
       "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
       "new": "Yangi chat",
-      "deleteTitle": "Bu chat oʻchirilsinmi?"
+      "deleteTitle": "Bu chat oʻchirilsinmi?",
+      "resetNoticeTitle": "Mahalliy chatlar va qoralamalar tozalandi",
+      "resetNoticeBody": "Kilo bu qurilmada saqlangan chatlarni ocha olmadi. Bulutdagi seanslaringizga esa taʼsir qilmadi.",
+      "resetNoticeDismiss": "Bildirishnomani e’tiborsiz qoldirish"
     },
     "rename": {
       "title": "Chat nomini o‘zgartirish",
@@ -3958,6 +4110,9 @@
       "fieldName": "Koʻrsatiladigan nom",
       "fieldUrl": "Server URL manzili",
       "fieldUrlInvalid": "Toʻgʻri server URL manzilini kiriting.",
+      "fieldUrlCredentials": "Manzildan foydalanuvchi nomi va parolni olib tashlang.",
+      "fieldUrlFragment": "Manzildagi # qismini olib tashlang.",
+      "fieldUrlInsecure": "https manzilini kiriting, http faqat localhost uchun ruxsat etiladi.",
       "duplicateUrl": "Bu URL allaqachon saqlangan.",
       "serverNotFound": "Bu server boshqa saqlanmaydi.",
       "enableServer": "Bu serverni yoqish: {{name}}",
@@ -3983,6 +4138,7 @@
       "app": {
         "label": "Vosita interfeysi",
         "failed": "Ushbu vositanning interfeysini yuklab bo‘lmadi.",
+        "tooLarge": "Ushbu vositaning interfeysi {{size}} chegarasidan kattaroq.",
         "empty": "Ushbu vositanning interfeysida ko‘rsatish uchun hech narsa yo‘q."
       }
     },
@@ -4050,6 +4206,8 @@
       "discoveryNoModels": "Ulanish manzili hech qanday model koʻrsatmadi. Modellarni qoʻlda kiriting.",
       "connectionIncomplete": "Model javob berdi, lekin tugatmadi. Qaytadan urinib koʻring yoki model ID si va protokolni tekshiring.",
       "invalidInput": "Server nomi, yaroqli sarlavhalar va takrorlanmaydigan ID hamda nomga ega kamida bitta modelni kiriting. Token chegaralari musbat butun sonlar boʻlishi kerak.",
+      "invalidApiKey": "API kaliti yuborib boʻlmaydigan belgini oʻz ichiga oladi. Faqat harflar, raqamlar va standart belgilardan foydalaning, qator uzilishlarisiz.",
+      "invalidHeaders": "Maxsus sarlavhani yuborib boʻlmaydi. Uning nomini tekshirib, faqat harflar, raqamlar va standart belgilardan foydalaning, qator uzilishlarisiz.",
       "invalidUrl": "Kirish maʼlumotlari, soʻrov parametrlari yoki fragmentsiz HTTP yoki HTTPS API asosiy manzilini kiriting.",
       "publicHttp": "Ommaviy HTTP ulanish manzillariga ruxsat berilmaydi. HTTPS yoki xususiy mahalliy ulanish manzilidan foydalaning.",
       "httpApprovalRequired": "Saqlash yoki ulanishdan oldin bu mahalliy HTTP ulanish manzilini tasdiqlang.",
@@ -4098,6 +4256,7 @@
         "network": "Yuklab olish tugallanmadi. Ulanishni tekshirib, qayta urinib ko‘ring.",
         "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi.",
         "checksum": "Yuklab olingan fayl e’lon qilingan nazorat summasiga mos kelmaydi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring.",
+        "unreadable": "Bu qurilma yuklab olingan faylni tekshira olmadi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring.",
         "writeFailed": "Bu qurilma modelni saqlay olmadi. Qayta yuklab olib ko‘ring."
       }
     },
@@ -4183,7 +4342,15 @@
       "download": "Qurilmadagi modelni yuklab olish",
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
-      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
+      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining.",
+      "cannotUse": "Ishga tushirib bo'lmaydi: {{items}}.",
+      "cannotUseOptions": "To'ldirib bo'lmaydi: ba'zi vosita variantlari.",
+      "limitations": "Cheklovlar",
+      "tools": {
+        "time": "Vaqt",
+        "settingsList": "Sozlamalarni ko‘rsatish",
+        "settingsSet": "Sozlamalarni o‘zgartirish"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
@@ -4362,6 +4529,7 @@
     "instructionSaveFailed": "Ko'rsatmani saqlab bo'lmadi",
     "instructionDeleteFailed": "Ko'rsatmani o'chirib bo'lmadi",
     "instructionToggleFailed": "Ko'rsatmani yangilab bo'lmadi",
+    "instructionViewTitle": "Ko'rsatma fayli",
     "instructionLimitReached": "Profilga {{max}} tagacha ko'rsatma sig'adi. Boshqasini qo'shish uchun bittasini o'chiring.",
     "mcp": {
       "title": "MCP serverlari",
@@ -4532,10 +4700,20 @@
     "history": {
       "activityUnavailable": "Kredit harakatini yuklab bo‘lmadi.",
       "appStoreReceipt": "Chek App Store’da",
+      "deduction": {
+        "adminCancel": "Balans administrator tomonidan yopilgan",
+        "adminDebit": "Kreditlar administrator tomonidan olib tashlangan",
+        "codingPlan": "Kodlash tarifi: {{plan}}",
+        "correction": "Balansni tuzatish",
+        "dispute": "To‘lov bo‘yicha nizo",
+        "refundAppStore": "App Store’dan kredit paketi qaytarilishi",
+        "refundGooglePlay": "Google Play’dan kredit paketi qaytarilishi"
+      },
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
       "expiredGrant": "Muddati tugagan: {{description}}",
+      "expiredStatus": "Muddati tugagan",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
         "adjustment": "Tuzatish",
@@ -4562,7 +4740,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
       "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
-      "voidedGrant": "Bekor qilingan: {{description}}"
+      "voidedGrant": "Bekor qilingan: {{description}}",
+      "voidedStatus": "Bekor qilingan"
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
@@ -4734,7 +4913,7 @@
     "defaultModel": "Kilo standart modelidan foydalanish",
     "duration": "Vaqt cheklovi (daqiqa)",
     "spendLimit": "Xarajat cheklovi (USD)",
-    "invalidSafeguards": "Musbat, cheklangan vaqt va xarajat limitlarini kiriting.",
+    "invalidSafeguards": "Ruxsat etilgan oraliqda musbat son kiriting.",
     "estimate": "Taxminiy hisob {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu sozlamalar uchun pullik xulosa mavjud emas. Modelni yoki chegaralarni o‘zgartiring, yoki keyinroq qayta urinib ko‘ring.",
     "confirmPaid": "{{context}} uchun pullik xulosalar yoqilsinmi?",
@@ -4751,8 +4930,8 @@
     "estimateSpendLimitTooLow": "Bu xulosani yaratishga imkon berish uchun xarajat cheklovini oshiring.",
     "saved": "Brifing sozlamalari saqlandi",
     "selectedSessions": "Tanlangan seanslar",
-    "snapshotPullRequests": "Tanlangan seanslardagi PRlar",
-    "snapshotBlockers": "Tanlangan seanslardagi to‘siqlar",
+    "snapshotPullRequests": "PRlar",
+    "snapshotBlockers": "To‘siqlar",
     "capturedAt": "{{time}} da qayd etilgan",
     "snapshotHint": "Rejalashtirilgan tonggi vaqtda mavjud bo‘lgan eng so‘nggi seans holatining imkon qadar to‘liq qayd etilgan nusxasi. Sonlar tun davomidagi barcha faoliyatni emas, tanlangan seanslarni aks ettiradi.",
     "snapshotTruncated": "Bu holat nusxasi hajmini cheklash uchun ayrim seanslar yoki dalillar kiritilmadi.",
@@ -4791,6 +4970,7 @@
   },
   "usage": {
     "title": "Foydalanish",
+    "personalTitle": "Shaxsiy hisob foydalanishi",
     "orgTitle": "Tashkilot foydalanishi",
     "entrySubtitle": "Xarajat, so'rovlar va tokenlar",
     "rangePicker": "Vaqt oralig'i",
@@ -4804,7 +4984,8 @@
     "unavailableTitle": "Foydalanish mavjud emas",
     "unavailableDescription": "Bu Workspace uchun foydalanish sozlanmagan. Agar bu yerda foydalanish ma'lumotlarini ko'rishni kutsangiz, qo'llab-quvvatlash xizmatiga murojaat qiling.",
     "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
-    "viewDetails": "Foydalanish tafsilotlarini ko'rish"
+    "viewDetails": "Foydalanish tafsilotlarini ko'rish",
+    "orgSelfEntryTitle": "Sizning foydalanishingiz"
   },
   "integrations": {
     "title": "Integratsiyalar",
@@ -4900,6 +5081,8 @@
       "autoCommit": "Ishga tushirish tugagach oʻzgarishlarni qayd etish",
       "condenseOnComplete": "Ishga tushirish tugagach kontekstni ixchamlash",
       "activeTitle": "Ishga tushirgich faol",
+      "activeSwitchA11y": "Faol ishga tushirgich: {{name}}",
+      "copyLinkA11y": "{{name}} uchun havolani nusxalash",
       "activeDescription": "Toʻxtatilgan vebhooklar 404 bilan javob beradi.",
       "runAsCreator": "Men nomimdan ishga tushirish",
       "runAsCreatorDescription": "Har bir ishga tushirish hisobingizdan foydalanadi, shuning uchun maxfiy sarlavha majburiy.",

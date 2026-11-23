@@ -25,6 +25,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'ios' },
+  I18nManager: { isRTL: false },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
   Keyboard: { dismiss: keyboardDismiss },
 }));
@@ -64,6 +65,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+// The vanished body is its own component with its own suite; here it is a
+// sentinel so the host's resolution and the sheet's branch are what the
+// assertions read.
+vi.mock('./vanished-part-state', () => ({ VanishedPartState: 'VanishedPartState' }));
 const cachedUri = vi.hoisted(() => ({ value: undefined as string | undefined }));
 vi.mock('./tool-card-image-cache', () => ({
   isToolCardImagePending: () => false,
@@ -289,7 +294,7 @@ describe('PartDetailSheetHost mounted', () => {
     expect((refreshedPart as ToolPart).state.status).toBe('completed');
   });
 
-  it('shows Details unavailable when the open part id does not resolve', async () => {
+  it('shows the vanished-part state when the open part id does not resolve', async () => {
     const renderer = await mountHost([makeMessage('m1', [makeBashPart('bash-1', 'echo one')])]);
 
     await act(async () => {
@@ -298,14 +303,10 @@ describe('PartDetailSheetHost mounted', () => {
     });
 
     expect(sheetTitle(renderer)).toBe('Details');
-    const unavailable = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        propOf(node, 'children') === 'Details unavailable'
-    );
-    expect(unavailable).toHaveLength(1);
-    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
+    // The state block is the whole sheet body: not wrapped in a second
+    // CenteredState, and not inside the scroll branch.
+    expect(findByType(renderer.root, 'VanishedPartState')).toHaveLength(1);
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(0);
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
   });
 

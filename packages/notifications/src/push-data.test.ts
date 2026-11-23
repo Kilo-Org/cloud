@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { pushDataSchema } from './push-data';
+import { ANSWER_DRAFT_MAX_LENGTH, pushDataSchema } from './push-data';
 
 describe('pushDataSchema agent_briefing', () => {
   it('accepts only the privacy-minimal available-report list route', () => {
@@ -324,6 +324,44 @@ describe('pushDataSchema cloud_agent_session', () => {
     };
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });
+
+  it('round-trips the answerDraft of an undelivered inline reply', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'question',
+      answerDraft: 'Use the staging bucket for the export.',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('accepts an answer draft at the length the schema declares', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      answerDraft: 'x'.repeat(ANSWER_DRAFT_MAX_LENGTH),
+    };
+
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('refuses an answer draft past the schema bound', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'cloud_agent_session',
+        cliSessionId: 'cli1',
+        answerDraft: 'x'.repeat(ANSWER_DRAFT_MAX_LENGTH + 1),
+      }).success
+    ).toBe(false);
+  });
+
+  it('parses a session without an answerDraft and keeps the field absent', () => {
+    const payload = { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' };
+    const parsed = pushDataSchema.parse(payload);
+    expect(parsed).toEqual(payload);
+    expect('answerDraft' in parsed).toBe(false);
+  });
 });
 
 describe('pushDataSchema unknown type', () => {
@@ -453,6 +491,30 @@ describe('pushDataSchema active_agents_glanceable snapshot shape', () => {
     });
     expect('organizationBound' in parsed).toBe(true);
     expect('accountEpoch' in parsed).toBe(false);
+  });
+
+  it('refuses a contradictory newest-result pair and accepts the corrected one', () => {
+    // The push member applies the shared newest-result refiner, so a body that
+    // names a kind without its instant, or the reverse, is refused here too.
+    const contradictory = [
+      { ...fullSnapshot, newestResultAt: null },
+      { ...fullSnapshot, newestResultKind: null },
+    ];
+    for (const body of contradictory) {
+      const result = pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...body });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map(issue => issue.path)).toContainEqual(['newestResultAt']);
+      }
+    }
+
+    // Both fields set, or both absent, describes a line the card can draw.
+    expect(
+      pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...fullSnapshot }).success
+    ).toBe(true);
+    const { newestResultKind: _kind, newestResultAt: _at, ...withoutPair } = fullSnapshot;
+    const omitted = pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...withoutPair });
+    expect(omitted.success).toBe(true);
   });
 });
 

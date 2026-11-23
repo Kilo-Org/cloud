@@ -91,9 +91,6 @@ export function DestructiveConfirmDialog({
     setVisible(false);
   }, []);
 
-  // The caller's one-shot "put it away" edge. `dismiss` is a no-op while an
-  // action or a dismissal is already pending, so this only ever starts the
-  // dismissal — it never overrides a choice the person made.
   useEffect(() => {
     if (dismissRequested) {
       dismiss(onCancelRef.current);
@@ -145,9 +142,6 @@ export function DestructiveConfirmDialog({
               variant="secondary"
               className="w-full"
               onPress={() => {
-                // Dismiss first, run after: the same hand-off Cancel and the
-                // destructive confirm use, so the reader is back on the screen
-                // — and sees whatever it reports — instead of under a sheet.
                 dismiss(extraAction.onPress);
               }}
             >

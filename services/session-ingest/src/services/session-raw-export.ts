@@ -26,6 +26,10 @@ export const sessionRawExportRequestSchema = z.object({
   // Opaque caller-side identifier for the audit line, so one export can be
   // traced back to the job that asked for it.
   exportId: z.string().min(1).max(128).optional(),
+  // Opt-in cleanup for a session that stores nothing at all: the export resets
+  // the Durable Object's storage instead of leaving an empty object behind.
+  // `false` (the default) keeps the export read-only.
+  deleteIfEmpty: z.boolean().optional(),
 });
 
 export type SessionRawExportRequest = z.infer<typeof sessionRawExportRequestSchema>;
@@ -37,10 +41,13 @@ export type SessionRawExportResult =
 /**
  * Stream a session's stored rows as NDJSON for an internal export.
  *
- * Read-only: the gate query only selects, and the Durable Object method it calls
- * only selects, so this is safe against a live session. No user credential is
- * involved — authorization is the route's dedicated export token — and the
- * caller is trusted to have established that the pair belongs in the export.
+ * The gate query and the export itself only select, so a plain export is safe
+ * against a live session. With `deleteIfEmpty` an object that stores nothing is
+ * also scheduled for a storage reset: the Durable Object writes a cleanup marker
+ * and arms the alarm that applies the reset, so this path mutates storage. No
+ * user credential is involved — authorization is the route's dedicated export
+ * token — and the caller is trusted to have established that the pair belongs in
+ * the export.
  */
 export async function getSessionRawExport(
   env: Env,
@@ -63,7 +70,7 @@ export async function getSessionRawExport(
 
   const stream = await withDORetry(
     () => getSessionIngestDO(env, { kiloUserId: input.kiloUserId, sessionId: input.sessionId }),
-    stub => stub.exportSessionRowsStream(),
+    stub => stub.exportSessionRowsStream({ deleteIfEmpty: input.deleteIfEmpty === true }),
     'SessionIngestDO.exportSessionRowsStream'
   );
 

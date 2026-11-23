@@ -39,8 +39,6 @@ const POPULATED_CATALOG: RemoteModelCatalogV1 = {
   ],
 };
 
-// A connected provider with an empty `models` record: schema-valid, but it
-// projects to zero options and must not become an enabled empty picker.
 const ZERO_MODEL_CATALOG: RemoteModelCatalogV1 = {
   protocolVersion: 1,
   truncated: false,

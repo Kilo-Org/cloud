@@ -741,5 +741,13 @@ export type CustomRoutingTableRequest = z.input<typeof CustomRoutingTableRequest
 
 export const CustomRoutingTableResponseSchema = z.object({
   table: CustomRoutingTableSchema.nullable(),
+  // Entry key -> concrete gateway target this pool entry dispatches because its serving pin still
+  // has a usable measurement. A pinned entry whose target is gone is absent: its live alias target
+  // serves instead. Optional so a not-yet-redeployed worker still parses.
+  servingPins: z.record(z.string(), z.string()).optional(),
+  // Entry keys whose saved pin names a concrete target the worker's catalog no longer has, so the
+  // pool serves the live alias target with a warning. Never set for a retired target the saved pin
+  // no longer names, and never for a pin whose target still exists. Optional during deploy overlap.
+  servingFallback: z.array(z.string().min(1)).optional(),
 });
 export type CustomRoutingTableResponse = z.infer<typeof CustomRoutingTableResponseSchema>;

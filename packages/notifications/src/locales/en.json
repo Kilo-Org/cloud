@@ -7,6 +7,7 @@
       "spendAlert": "Your spend needs attention",
       "securityFinding": "A security finding needs attention",
       "securityUpdate": "A security check has an update",
+      "agentBriefing": "Your agent brief is ready",
       "activeAgentsGlanceable": "Active agents have an update"
     }
   },

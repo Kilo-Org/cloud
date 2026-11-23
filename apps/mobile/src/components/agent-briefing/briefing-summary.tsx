@@ -7,11 +7,13 @@ import { briefingMoney } from '@/lib/agent-briefing-format';
 import { briefingSummaryStatusKey } from '@/lib/agent-briefing-state';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { resolveCatalogModelName } from '@/lib/model-display-name';
+import { useBriefingLocale } from './briefing-locale';
 
 export function BriefingSummary({ report }: { readonly report: BriefingReport }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   const catalog = useAvailableModels(report.context.organizationId ?? undefined);
-  const cost = briefingMoney(report.summary.costMicrodollars, i18n.language);
+  const cost = briefingMoney(report.summary.costMicrodollars, locale);
   return (
     <Card>
       <Text variant="heading">{t('agentBriefing.summary')}</Text>

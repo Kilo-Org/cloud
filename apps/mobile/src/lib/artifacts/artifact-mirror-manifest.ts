@@ -219,7 +219,6 @@ function uniqueArtifactDisplayName(file: ArtifactMirrorFile, used: ReadonlySet<s
   return safeArtifactDisplayName({ id: file.id, name: '', mime: file.mime });
 }
 
-/** The stem and extension (with the dot) of a sanitized display name. */
 type ArtifactDisplayNameParts = {
   extension: string;
   stem: string;

@@ -6,6 +6,114 @@ import { captureException, startSpan } from '@sentry/nextjs';
 
 const posthogClient = PostHogClient();
 
+/**
+ * How long one resolved flag value serves every read of the same key.
+ *
+ * This bound also governs `isReleaseToggleEnabled`, which gates authorization
+ * decisions: disabling the native Apple nonce relaxation or the organization
+ * auto-model write gate in PostHog is honored on each warm instance within this
+ * window, not on the next request. The window was chosen for that trade: a
+ * disable applies within 30 seconds, and the flags these reads gate change
+ * rarely enough that the saving is worth it. A failed read never extends a
+ * grant, because a failure serves the caller's default (`false` for release
+ * toggles) instead of the last enabled answer.
+ */
+const FLAG_CACHE_TTL_MS = 30_000;
+
+/**
+ * Upper bound on one flag read, as the caller waits for it. posthog-node takes no
+ * per-call signal. The SDK's stateless default flag request deadline is 3000 ms and
+ * the stateful client's default is 10000 ms; the shared client in `posthog.ts` sets
+ * 2000 ms, so an abandoned read releases its socket one second after this 1000 ms
+ * caller deadline.
+ */
+const FLAG_READ_TIMEOUT_MS = 1_000;
+
+/**
+ * Window a second consecutive miss of the same key opens. Reads of that key
+ * answer with their caller's default for this window, so an unreachable PostHog
+ * costs one deadline per key per window instead of one per request, and reports
+ * one failure per flag name per window instead of one per failed check.
+ */
+const FLAG_FAILURE_BACKOFF_MS = 30_000;
+
+/**
+ * Window the first miss of a key opens. One slow PostHog response must not mask
+ * a key for the whole window above, because release toggles fail closed: a
+ * single 1-2 s response would otherwise read as disabled for 30 seconds and look
+ * like rollout flapping. A second consecutive miss means the upstream is not
+ * merely slow, so it opens `FLAG_FAILURE_BACKOFF_MS` instead.
+ */
+const FLAG_FIRST_FAILURE_BACKOFF_MS = 10_000;
+
+/**
+ * Keys carry a distinct id and optionally person properties, so a user- or
+ * email-keyed flag would otherwise grow this map without limit in a long-lived
+ * isolate. Settled entries are evicted first, least recently used key first; an
+ * in-flight read is kept unless every key is in flight.
+ */
+const MAX_CACHED_FLAGS = 500;
+
+/**
+ * Cap on the flag names tracked for failure reporting. The repo reads a small
+ * fixed flag set, so this only bounds a caller that passes arbitrary names.
+ */
+const MAX_REPORTED_FLAGS = 100;
+
+/** A resolved PostHog flag value; `undefined` means the flag has no value. */
+type FlagValue = string | boolean | undefined;
+
+/** One read attempt, settled: either the SDK's answer or the reason there is none. */
+type FlagReadResult = { ok: true; value: FlagValue } | { ok: false; error: unknown };
+
+/** One key's cache state. A key is in exactly one of these states. */
+type FlagCacheEntry =
+  | { kind: 'fresh'; value: FlagValue; readAt: number }
+  | { kind: 'failed'; retryAfterMs: number; misses: number }
+  | { kind: 'reading'; result: Promise<FlagReadResult> };
+
+/** Sentinel for the deadline race; a symbol cannot collide with a flag value. */
+const READ_TIMED_OUT = Symbol('flag-read-timed-out');
+
+const flagCache = new Map<string, FlagCacheEntry>();
+
+/**
+ * Epoch ms of the last reported failure per flag name, so one outage costs one
+ * `console.error` and one `captureException` per flag name per window. A report
+ * per cache key would multiply by the number of distinct ids: the survey and
+ * data-export flags are keyed by user id and email, so `MAX_CACHED_FLAGS` keys
+ * of one flag could otherwise produce that many exception events and forwarded
+ * `console.error` logs in each window. The map is pruned of expired names before
+ * it reaches `MAX_REPORTED_FLAGS`, which no real flag set approaches.
+ */
+const flagLastReportedAt = new Map<string, number>();
+
+/** Whether this miss of `flagName` is the one to report, recording it if so. */
+function shouldReportFailure(flagName: string, now: number): boolean {
+  const lastReportedAt = flagLastReportedAt.get(flagName);
+  if (lastReportedAt !== undefined && now - lastReportedAt < FLAG_FAILURE_BACKOFF_MS) {
+    return false;
+  }
+  flagLastReportedAt.delete(flagName);
+  if (flagLastReportedAt.size >= MAX_REPORTED_FLAGS) {
+    // Pruning expired names first keeps the cap from dropping a name whose
+    // window has not passed, so a busy flag set still reports each name once.
+    for (const [candidate, reportedAt] of flagLastReportedAt) {
+      if (now - reportedAt >= FLAG_FAILURE_BACKOFF_MS) {
+        flagLastReportedAt.delete(candidate);
+      }
+    }
+    if (flagLastReportedAt.size >= MAX_REPORTED_FLAGS) {
+      const oldest = flagLastReportedAt.keys().next();
+      if (!oldest.done) {
+        flagLastReportedAt.delete(oldest.value);
+      }
+    }
+  }
+  flagLastReportedAt.set(flagName, now);
+  return true;
+}
+
 type FlagRead = {
   flagName: string;
   distinctId: string;
@@ -21,31 +129,143 @@ type FlagRead = {
 };
 
 /**
- * Shared PostHog read-and-report wrapper. Runs the span-wrapped flag read and,
- * on error, logs and reports with the caller's tag and extra payload, then
- * returns `undefined` so each caller applies its own failure default.
+ * Canonical cache key. Person properties take part in targeting, so they take
+ * part in the key; sorting the pairs makes their order irrelevant, and
+ * `JSON.stringify` keeps the encoding injective so no two property sets can
+ * share a key. An absent and an empty object are the same key.
  */
-async function readFlag({
+function cacheKey({ flagName, distinctId, personProperties }: FlagRead): string {
+  const entries = Object.entries(personProperties ?? {}).sort(([left], [right]) =>
+    left < right ? -1 : left > right ? 1 : 0
+  );
+  const properties = entries.length > 0 ? JSON.stringify(entries) : '';
+  return `${flagName}\u0000${distinctId}\u0000${properties}`;
+}
+
+/** Store an entry as the most recently used key, keeping the map under its cap. */
+function storeEntry(key: string, entry: FlagCacheEntry): void {
+  flagCache.delete(key);
+  flagCache.set(key, entry);
+  while (flagCache.size > MAX_CACHED_FLAGS) {
+    let victim: string | undefined;
+    for (const [candidate, cached] of flagCache) {
+      if (cached.kind !== 'reading') {
+        victim = candidate;
+        break;
+      }
+    }
+    if (victim === undefined) {
+      const oldest = flagCache.keys().next();
+      if (oldest.done) break;
+      victim = oldest.value;
+    }
+    flagCache.delete(victim);
+  }
+}
+
+/**
+ * One PostHog read, bounded by `FLAG_READ_TIMEOUT_MS`. Never rejects: a deadline
+ * or a thrown error becomes `{ ok: false }` so the entry can record it once.
+ *
+ * The SDK accepts no signal, so a read that outlives the deadline keeps running;
+ * the shared client's `featureFlagsRequestTimeoutMs` releases its request one
+ * second later, and its answer is dropped here.
+ */
+async function readFromPostHog({
   flagName,
   distinctId,
-  op,
-  source,
-  logMessage,
-  extra,
   personProperties,
-}: FlagRead): Promise<string | boolean | undefined> {
+  op,
+}: FlagRead): Promise<FlagReadResult> {
+  const deadline = Promise.withResolvers<typeof READ_TIMED_OUT>();
+  const timer = setTimeout(deadline.resolve, FLAG_READ_TIMEOUT_MS, READ_TIMED_OUT);
+
   try {
-    return await startSpan({ name: flagName, op }, async () => {
-      return await posthogClient.getFeatureFlag(flagName, distinctId, { personProperties });
-    });
+    const value = await Promise.race([
+      startSpan({ name: flagName, op }, async () => {
+        return await posthogClient.getFeatureFlag(flagName, distinctId, { personProperties });
+      }),
+      deadline.promise,
+    ]);
+    if (value === READ_TIMED_OUT) {
+      return {
+        ok: false,
+        error: new Error(`PostHog flag read did not answer within ${FLAG_READ_TIMEOUT_MS}ms`),
+      };
+    }
+    return { ok: true, value };
   } catch (error) {
-    console.error(logMessage, flagName, error);
-    captureException(error, {
-      tags: { source },
-      extra,
-    });
+    return { ok: false, error };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Shared PostHog read-and-report wrapper. Reuses one resolved answer per flag,
+ * distinct id and person properties for `FLAG_CACHE_TTL_MS`, shares one read
+ * between concurrent callers, and bounds each read. On failure it logs and
+ * reports with the initiating caller's tag and extra payload — at most once per
+ * flag name per `FLAG_FAILURE_BACKOFF_MS`, so one outage cannot multiply the
+ * report by the number of distinct ids — then returns `undefined` so each caller
+ * applies its own failure default.
+ */
+async function readFlag(meta: FlagRead): Promise<FlagValue> {
+  const key = cacheKey(meta);
+  const entry = flagCache.get(key);
+  const now = Date.now();
+  // Consecutive misses this read continues: only a `failed` entry carries its
+  // count forward. A success, an eviction or a fresh key starts at zero, so the
+  // next miss is again the first and opens the shorter window.
+  const previousMisses = entry?.kind === 'failed' ? entry.misses : 0;
+
+  if (entry?.kind === 'fresh' && now - entry.readAt < FLAG_CACHE_TTL_MS) {
+    storeEntry(key, entry);
+    return entry.value;
+  }
+  if (entry?.kind === 'failed' && now < entry.retryAfterMs) {
+    storeEntry(key, entry);
     return undefined;
   }
+  if (entry?.kind === 'reading') {
+    storeEntry(key, entry);
+    const result = await entry.result;
+    return result.ok ? result.value : undefined;
+  }
+
+  const result = readFromPostHog(meta);
+  storeEntry(key, { kind: 'reading', result });
+  const settled = await result;
+
+  if (settled.ok) {
+    storeEntry(key, { kind: 'fresh', value: settled.value, readAt: Date.now() });
+    return settled.value;
+  }
+
+  if (shouldReportFailure(meta.flagName, Date.now())) {
+    console.error(meta.logMessage, meta.flagName, settled.error);
+    captureException(settled.error, {
+      tags: { source: meta.source },
+      extra: meta.extra,
+    });
+  }
+  const misses = previousMisses + 1;
+  storeEntry(key, {
+    kind: 'failed',
+    misses,
+    retryAfterMs:
+      Date.now() + (misses >= 2 ? FLAG_FAILURE_BACKOFF_MS : FLAG_FIRST_FAILURE_BACKOFF_MS),
+  });
+  return undefined;
+}
+
+/**
+ * Drops every cached flag read and every recorded failure report. Tests call
+ * this between cases.
+ */
+export function resetFeatureFlagCache(): void {
+  flagCache.clear();
+  flagLastReportedAt.clear();
 }
 
 /**

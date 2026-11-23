@@ -349,15 +349,19 @@ describe('TourScreen', () => {
 
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(routerBack).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledTimes(1);
-    expect(routerReplace).toHaveBeenCalledWith(HOME_TAB_ROOT);
+    // The dismiss swap goes through the stack-safe replace its caller passes
+    // in; a literal `router.replace` there is the Android Fabric `addViewAt`
+    // crash.
+    expect(stackSafeReplace).toHaveBeenCalledTimes(1);
+    expect(stackSafeReplace).toHaveBeenCalledWith(HOME_TAB_ROOT);
+    expect(routerReplace).not.toHaveBeenCalled();
 
     // Hardware Back dismisses through the same guarded path.
     act(() => {
       backHandler.press();
     });
     expect(routerBack).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledTimes(2);
+    expect(stackSafeReplace).toHaveBeenCalledTimes(2);
 
     unmount();
   });

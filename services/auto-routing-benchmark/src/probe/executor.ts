@@ -1,5 +1,15 @@
 import type { ProbeCase } from '../datasets/probe-cases';
-import { DECIDER_CLI_TIMEOUT_MS, type CliRunResult } from '../cli-runner';
+import {
+  DECIDER_CLI_TIMEOUT_MS,
+  PROBE_GATEWAY_ENDPOINTS,
+  fetchProbeThroughRunner,
+  trustedCaseStop,
+  type BenchmarkCaseStop,
+  type CliRunResult,
+  type CaseInferenceProxy,
+  type PaidLaunchExecutionKey,
+  type ProbeGatewayEndpoint,
+} from '../cli-runner';
 import { catalogUsageCostUsd, type CatalogModel } from '../platform-models';
 import { probeFamily } from './family';
 import { parseProbeStream, type ProbeReply } from './reply';
@@ -103,7 +113,11 @@ function emptyTools() {
 }
 
 /** A reply-less result the existing unbilled/transient classification understands. */
-function unbilledFailure(stderr: string, latencyMs: number): CliRunResult {
+function unbilledFailure(
+  stderr: string,
+  latencyMs: number,
+  stop?: BenchmarkCaseStop
+): CliRunResult {
   return {
     text: '',
     costUsd: 0,
@@ -118,6 +132,7 @@ function unbilledFailure(stderr: string, latencyMs: number): CliRunResult {
     lastEventTypes: ['error'],
     tools: emptyTools(),
     timedOut: false,
+    ...(stop === undefined ? {} : { stop }),
   };
 }
 
@@ -240,14 +255,30 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
     if (!isTimeout(error, signal)) throw error;
     return { ...unbilledFailure(PROBE_TIMEOUT_DIAGNOSTIC, Date.now() - startedAt), timedOut: true };
   }
+  // A Worker refusal carries a trusted stop; an admitted upstream reply never does, so a
+  // provider body cannot stop a case. Reading it here is what keeps a payment refusal from
+  // being graded as a model failure: without the stop, the caller below sees an ordinary
+  // unbilled HTTP failure and records a zero against the model.
+  const stop = trustedCaseStop(response);
   if (!response.ok) {
     const detail = (await response.text().catch(() => '')).slice(0, 400);
     const latencyMs = Date.now() - startedAt;
     const stderr = `HTTP ${response.status} ${detail}`;
+    // A stop names why the Worker ended the case, so it wins over the status heuristic:
+    // `model_permanently_failed` must never be reported as an unknown-model retry, and a
+    // refusal must not depend on which status happened to carry it.
+    if (stop !== null) return unbilledFailure(stderr, latencyMs, stop);
     if (UNKNOWN_MODEL_STATUS.has(response.status)) {
       return { ...unbilledFailure(stderr, latencyMs), unavailableModelId: request.model };
     }
     return unbilledFailure(stderr, latencyMs);
+  }
+
+  if (stop !== null) {
+    // A Worker refusal is never a measurement, whatever status carried it. This cannot
+    // happen on the current wire (refusals are non-2xx), but grading it as a reply would
+    // silently convert a funding stop into a model outcome, so it fails closed here too.
+    return unbilledFailure(`HTTP ${response.status}`, Date.now() - startedAt, stop);
   }
 
   const read = await readStream(response);
@@ -291,3 +322,90 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
 /** The timeout a probe request honours, shared with the CLI container path. */
 export const PROBE_TIMEOUT_MS = DECIDER_CLI_TIMEOUT_MS;
 const PROBE_TIMEOUT_DIAGNOSTIC = `probe request timed out after ${PROBE_TIMEOUT_MS}ms`;
+
+const GATEWAY_PATHS: Record<ProbeGatewayEndpoint, string> = {
+  'chat/completions': '/api/gateway/v1/chat/completions',
+  responses: '/api/gateway/v1/responses',
+  messages: '/api/gateway/v1/messages',
+};
+
+function probeEndpointForPath(pathname: string): ProbeGatewayEndpoint | null {
+  for (const endpoint of PROBE_GATEWAY_ENDPOINTS) {
+    if (GATEWAY_PATHS[endpoint] === pathname) return endpoint;
+  }
+  return null;
+}
+
+// The runner object cannot be handed an AbortSignal. Its generation controller is reached
+// through `cancelDeciderCase`; this only relays the caller's own timeout so the result is
+// classified the same way it was when the probe fetched the gateway directly.
+function abortable<T>(answer: Promise<T>, signal: AbortSignal | null | undefined): Promise<T> {
+  if (signal === null || signal === undefined) return answer;
+  if (signal.aborted) {
+    return Promise.reject(signal.reason ?? new DOMException('aborted', 'AbortError'));
+  }
+  const { promise, resolve, reject } = Promise.withResolvers<T>();
+  const abort = () => reject(signal.reason ?? new DOMException('aborted', 'AbortError'));
+  signal.addEventListener('abort', abort, { once: true });
+  answer.then(
+    value => {
+      signal.removeEventListener('abort', abort);
+      resolve(value);
+    },
+    error => {
+      signal.removeEventListener('abort', abort);
+      reject(error);
+    }
+  );
+  return promise;
+}
+
+export type CancellableProbeRequest = ProbeRunRequest & {
+  instanceName: string;
+  execution: PaidLaunchExecutionKey;
+  /** Same case-scoped transport the CLI proxy uses; no provider credential is passed. */
+  inference: CaseInferenceProxy;
+};
+
+/**
+ * Runs one probe case through the worker's case-inference route, proxied by the per-slot
+ * runner Durable Object so the paid generation can be cancelled from another isolate.
+ *
+ * `instanceName` and `execution` are the same pair `cancelDeciderCase` receives, so a pause
+ * aborts this exact request. `inference` is the capability envelope the scheduler issued
+ * from the canonical claim (same issue path as the CLI), so the request is attributable to
+ * the same generation and cap, and neither the executor's template headers nor any provider
+ * token reach the gateway. The object checks the canonical paid generation before fetching,
+ * failing closed. A cancelled probe throws `BenchmarkCaseCancelledError`; a probe whose
+ * generation is no longer live, or whose admission cannot be verified, throws
+ * `BenchmarkCaseNotStartedError` with no provider work. Both are terminal for the paid
+ * start; a caller timeout still classifies as a timed-out probe.
+ */
+export async function runCancellableProbeCase(
+  env: Env,
+  params: CancellableProbeRequest
+): Promise<CliRunResult> {
+  const { instanceName, execution, inference, ...request } = params;
+  return runProbeCaseViaGateway({
+    ...request,
+    fetchImpl: async (input, init) => {
+      const url = new URL(
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      );
+      const endpoint = probeEndpointForPath(url.pathname);
+      if (endpoint === null) throw new Error(`probe endpoint not allowed: ${url.pathname}`);
+      const body = init?.body;
+      if (typeof body !== 'string') throw new Error('probe body must be serialized JSON');
+      return abortable(
+        fetchProbeThroughRunner(env, {
+          instanceName,
+          execution,
+          endpoint,
+          inference,
+          body,
+        }),
+        init?.signal
+      );
+    },
+  });
+}

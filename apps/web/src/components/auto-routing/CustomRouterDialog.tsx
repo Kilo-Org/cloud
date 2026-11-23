@@ -17,7 +17,7 @@ import {
   type CustomRouterSummary,
 } from '@kilocode/auto-routing-contracts';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import React, { useId, useMemo, useState } from 'react';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -43,6 +43,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
+import { useTRPC } from '@/lib/trpc/utils';
+import { benchmarkRequestErrorCopy, blockedModelCopy } from './benchmark-display';
 import {
   BASE_ROUTER_OPTIONS,
   MODE_OPTIONS,
@@ -103,8 +105,12 @@ type Props = {
 
 export function CustomRouterDialog({ scope, organizationId, router, onClose, onSaved }: Props) {
   const idPrefix = useId();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft>(() => initialDraft(router));
   const [addModelId, setAddModelId] = useState<string | undefined>();
+  const [addFailure, setAddFailure] = useState<string | null>(null);
+  const [checkingAdd, setCheckingAdd] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const modelsQuery = useModelSelectorList(organizationId);
   const measurementsQuery = useQuery({
@@ -192,8 +198,36 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
   const atEntryLimit = draft.entries.length >= MAX_CUSTOM_ROUTER_ENTRIES;
   const pending = saveMutation.isPending;
 
-  const addModel = () => {
-    if (!addModelId || atEntryLimit) return;
+  /**
+   * A permanently failed pair cannot enter a pool. The lookup is read-only and
+   * never admits a benchmark; a transport failure refuses the add rather than
+   * letting an unchecked model in, and the same click retries safely.
+   */
+  const addModel = async () => {
+    if (!addModelId || atEntryLimit || checkingAdd) return;
+    setAddFailure(null);
+    setCheckingAdd(true);
+    let blockedCopy: string | null = null;
+    try {
+      const result = await queryClient.fetchQuery(
+        trpc.customRouterBenchmarks.blockedModels.queryOptions({
+          models: [addModelId],
+          baseRouter: draft.baseRouter,
+          organizationId,
+        })
+      );
+      if (result.blocked.length > 0) blockedCopy = result.blocked.map(blockedModelCopy).join(' ');
+    } catch (error) {
+      const failure = benchmarkRequestErrorCopy(error);
+      setAddFailure(`${failure.title}. ${failure.description}`);
+      return;
+    } finally {
+      setCheckingAdd(false);
+    }
+    if (blockedCopy !== null) {
+      setAddFailure(blockedCopy);
+      return;
+    }
     const entry: CustomRouterEntry = { kind: 'gateway', model: addModelId };
     setDraft(current => ({
       ...current,
@@ -298,9 +332,10 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
               <Select
                 value={draft.baseRouter}
                 disabled={pending}
-                onValueChange={value =>
-                  setDraft(current => ({ ...current, baseRouter: AutoRouterSchema.parse(value) }))
-                }
+                onValueChange={value => {
+                  setDraft(current => ({ ...current, baseRouter: AutoRouterSchema.parse(value) }));
+                  setAddFailure(null);
+                }}
               >
                 <SelectTrigger id={fieldId('base')} aria-describedby={fieldId('base-help')}>
                   <SelectValue />
@@ -483,7 +518,10 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                   label="Add model"
                   models={modelOptions}
                   value={addModelId}
-                  onValueChange={setAddModelId}
+                  onValueChange={value => {
+                    setAddModelId(value);
+                    setAddFailure(null);
+                  }}
                   isLoading={modelsQuery.isLoading}
                   disabled={pending || atEntryLimit}
                   modal
@@ -494,12 +532,17 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                 variant="secondary"
                 size="sm"
                 className="sm:mb-0.5"
-                disabled={pending || !addModelId || atEntryLimit}
-                onClick={addModel}
+                disabled={pending || !addModelId || atEntryLimit || checkingAdd}
+                onClick={() => void addModel()}
               >
-                Add model
+                {checkingAdd ? 'Checking model…' : 'Add model'}
               </Button>
             </div>
+            {addFailure !== null ? (
+              <div role="alert" className="text-destructive text-sm">
+                {addFailure}
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">

@@ -91,13 +91,18 @@ export function inheritedParentMembershipJoinCondition(
 /**
  * Join condition for the caller's membership in the row's organization.
  * Pair it with {@link activeOrganizationJoinCondition} so a soft-deleted
- * organization cannot satisfy the membership join.
+ * organization cannot satisfy the membership join. Both parameters admit a
+ * column, so the names state which role each one plays.
  */
-export function organizationMembershipJoinCondition(
-  kiloUserId: string | AnyPgColumn,
-  organizationIdColumn: OrganizationIdColumn
-): SQL {
-  return membershipCondition(organization_memberships, organizationIdColumn, kiloUserId);
+export function organizationMembershipJoinCondition(params: {
+  kiloUserId: string | AnyPgColumn;
+  organizationIdColumn: OrganizationIdColumn;
+}): SQL {
+  return membershipCondition(
+    organization_memberships,
+    params.organizationIdColumn,
+    params.kiloUserId
+  );
 }
 
 /**
@@ -308,14 +313,19 @@ export async function findEffectiveOrganizationMemberRole(
     .from(organizations)
     .leftJoin(
       organization_memberships,
-      organizationMembershipJoinCondition(params.kiloUserId, organizations.id)
+      organizationMembershipJoinCondition({
+        kiloUserId: params.kiloUserId,
+        organizationIdColumn: organizations.id,
+      })
     )
     .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
     .leftJoin(
       parentOrganizationMembershipsTable,
       parentOrganizationMembershipJoinCondition(params.kiloUserId)
     )
-    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
+    .where(
+      and(eq(organizations.id, params.organizationId), liveOrganizationCondition(organizations))
+    )
     .limit(1);
 
   const row = rows[0];

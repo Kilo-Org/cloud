@@ -466,7 +466,6 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
   await runTurn(sessionId, { skippable: false }, async () => {
     const current = resolveSessionId(sessionId);
     await openIn(place, current);
-    /* Both flags are read inside the open's turn, after any earlier tap. */
     await ensureFlags(current);
   });
 }
@@ -557,7 +556,6 @@ function runTurn<T>(
   return done;
 }
 
-/** A close opens every waiting gate as "skipped", so nothing it interrupts waits on it. */
 function skipWaitingTurns(sessionId: string): void {
   for (const ticket of turnOf(sessionId).waiting) {
     if (ticket.skippable) {
@@ -789,9 +787,6 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
-      /* The slot's question names the kept record it asks again, when it is a
-         retry: that record is the bubble, so it stays in the transcript where
-         it was said and the slot draws no second one. */
       askedFrom: asked?.from ?? null,
       askedAnswer: asked?.answer ?? null,
       displaced: kept,
@@ -868,9 +863,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     return;
   }
   /* The bubble goes on screen first, so a refused write cannot take it away
-     from the reader. The identifier is made here rather than read from the
-     list: a question the list does not hold yet cannot take one another
-     question already has. */
+     from the reader. */
   const stored: Displaced = {
     id: newKeptId(),
     text: held.asked,
@@ -1203,7 +1196,7 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
     }
     return Effect.void;
   }).pipe(
-    Effect.provideService(questionSearches, { used: 0 }),
+    Effect.provideService(questionSearches, { used: 0, attempts: 0, answered: 0 }),
     Effect.matchCauseEffect({
       onFailure: (cause: Cause.Cause<unknown>) =>
         Effect.promise(async () => {
@@ -1380,9 +1373,6 @@ async function settle(
     Math.max(0, turns.length - held.turns.length)
   );
   if (failure !== null) {
-    /* The question keeps its place in the slot, so the reason it failed is
-       written beside it: a chat opened again then says why, instead of reading
-       as a message the person stopped. */
     await keepAskedFailure(sessionId, failure.key);
   } else if (kept !== held.displaced) {
     /* The list is written before the slot's record goes: a refused write leaves
@@ -1804,10 +1794,6 @@ async function ontoForUse(sessionId: string, target: ChatTarget, chat: Chat): Pr
     ...target,
     ...(tools === undefined ? {} : { tools }),
   });
-  /* The move copies the chat, so the intent is acknowledged on the object it
-     installed — and only when it is the same change: a newer one raised while
-     the move ran must survive to the next use. A move that failed throws
-     before this, leaving the intent for the retry. */
   const installed = chats.get(moved);
   if (
     installed?.tools.kind === 'pending' &&

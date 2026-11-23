@@ -89,9 +89,6 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
               replayCompletedPage(page);
               return;
             }
-            // Typed failure: surface via onError and mark the session as
-            // stopped with `error` so the UI doesn't appear to load
-            // forever.
             const failure = sessionSnapshotFailureMessage(page.kind);
             fail(failure.message, failure);
           }, failFromFetch);

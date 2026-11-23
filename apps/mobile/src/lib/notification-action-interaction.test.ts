@@ -881,7 +881,7 @@ describe('runNeedsInputInteraction', () => {
       expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
 
-    it('returns retryable for a reply with no answer text, before building a manager', async () => {
+    it('returns empty for a reply with no answer text, before building a manager', async () => {
       const createManager = vi.fn();
 
       const outcome = await runNeedsInputInteraction({
@@ -891,11 +891,11 @@ describe('runNeedsInputInteraction', () => {
         deps: { createManager },
       });
 
-      expect(outcome).toBe('retryable');
+      expect(outcome).toBe('empty');
       expect(createManager).not.toHaveBeenCalled();
     });
 
-    it('returns retryable for a reply of only invisible characters, before building a manager', async () => {
+    it('returns empty for a reply of only invisible characters, before building a manager', async () => {
       const createManager = vi.fn();
 
       const outcome = await runNeedsInputInteraction({
@@ -905,7 +905,7 @@ describe('runNeedsInputInteraction', () => {
         deps: { createManager },
       });
 
-      expect(outcome).toBe('retryable');
+      expect(outcome).toBe('empty');
       expect(createManager).not.toHaveBeenCalled();
     });
   });

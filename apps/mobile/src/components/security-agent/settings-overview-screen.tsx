@@ -292,6 +292,7 @@ export function SettingsOverviewScreen({
                   ? t('securityAgent.repositories.noRepositoriesDescription')
                   : undefined
               }
+              subtitleNumberOfLines={2}
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
               }}

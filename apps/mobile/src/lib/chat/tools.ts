@@ -44,10 +44,8 @@ export function chatTools(organizationId?: string): readonly Tool[] {
 /**
  * The base tools, the Kilo MCP tools, and every enabled remote server's tools.
  *
- * This is the registry's view of what a session may name. It is read when a
- * session opens, not when the runtime is built, because the servers' tools
- * arrive while the app runs: a tool discovered after the runtime was built
- * still reaches the next session.
+ * This is the registry's view of what a session may name. A tool discovered
+ * after the runtime was built still reaches the next session.
  */
 export function chatToolsWithMcp(organizationId?: string): readonly Tool[] {
   return [...chatTools(organizationId), ...kiloMcpTools(), ...remoteServerTools()];

@@ -250,6 +250,32 @@ describe('buildSessionLiveActivityContentState', () => {
     expect(kept.permissionCommand).toBe('pnpm test');
   });
 
+  it('drops the remembered command when the approval key changes', () => {
+    const waiting = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_12',
+        status: 'permission',
+        currentStep: { verb: 'running', target: 'schema.ts' },
+        plan: { done: 2, total: 4, current: 'Write the migration' },
+        permissionCommand: 'pnpm test',
+      },
+      options
+    );
+    expect(waiting.permissionCommand).toBe('pnpm test');
+
+    // A new request arrives with no command the row can state: the key advances
+    // and the command the old request ran does not follow it.
+    const next = buildSessionLiveActivityContentState(
+      { id: 'ses_12', status: 'permission' },
+      { ...options, approvalKey: 'b'.repeat(64), previous: waiting }
+    );
+    expect(next).toMatchObject({ awaitingPermission: true, approvalKey: 'b'.repeat(64) });
+    expect(next.permissionCommand).toBeNull();
+    // The facts that answer no single request still carry.
+    expect(next.currentStep).toEqual(waiting.currentStep);
+    expect(next.plan).toEqual(waiting.plan);
+  });
+
   it('drops the permission command with the key it belongs to', () => {
     const question = buildSessionLiveActivityContentState(
       { id: 'ses_3', status: 'question', permissionCommand: 'rm -rf build' },

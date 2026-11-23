@@ -190,8 +190,6 @@ const pendingPersists = new Map<Promise<void>, number>();
 /** Tracks one fire-and-forget store write until it settles or ages out. */
 function trackPersist(write: Promise<void>): void {
   const dispatchedAt = Date.now();
-  // Drop the writes a sign-out would already have abandoned: a store whose
-  // writes never settle would otherwise grow this map for the whole session.
   for (const [tracked, trackedAt] of pendingPersists) {
     if (dispatchedAt - trackedAt >= TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS) {
       pendingPersists.delete(tracked);
@@ -429,9 +427,6 @@ function startHydration(): void {
   void (async () => {
     try {
       const entries = await readStoredTranslationsWithinTimeout();
-      // A reset that ran while the read was in flight already cleared the
-      // cache this read was started for; its entries are the signed-out
-      // account's, so the read must neither seed nor notify.
       if (epochAtStart !== accountResetEpoch) {
         return;
       }
@@ -451,10 +446,8 @@ function startHydration(): void {
         emit();
       }
     } catch {
-      // Memory-only: a store read failure settles hydration as a no-op.
+      // Intentionally empty; the docblock above states why.
     } finally {
-      // The flush is released either way, so translation never waits on the
-      // cache.
       hydrated = true;
       flush();
     }
@@ -574,7 +567,6 @@ function remember(resolved: ResolvedTranslation[]): void {
   for (const { key, text, translation } of resolved) {
     makeCacheRoom();
     cache.set(key, { translation, text, expiresAt });
-    // Resolved: it is no longer a retry candidate.
     retryable.delete(key);
     failureCounts.delete(key);
   }
@@ -610,8 +602,6 @@ function takeBatch(): FlushBatch | null {
   const owned: QueueItem[] = [];
   for (const item of current) {
     if (isFreshCacheEntry(item.key, item.text, now)) {
-      // Resolved through hydration or a duplicate request while this item
-      // waited: no retry memory is needed for a summary already translated.
       retryable.delete(item.key);
     } else if (inFlight.has(item.key)) {
       // A retry re-queued this row while the attempt it races is still
@@ -683,9 +673,6 @@ async function runBatch(batch: FlushBatch): Promise<void> {
       isCurrentAuthEpoch(batch.authEpoch),
   };
   batchControllers.add(controller);
-  // One token for the whole request: a config change clears the map and a
-  // replacement request for a key may already own its slot, so the `finally`
-  // below only deletes entries that are still this request's.
   const token = Symbol(batch.language);
   for (const item of batch.items) {
     inFlight.set(item.key, token);
@@ -763,8 +750,6 @@ async function runBatch(batch: FlushBatch): Promise<void> {
   } finally {
     activeBatches -= 1;
     batchControllers.delete(controller);
-    // Delete only this request's entries: a config change clears the map and a
-    // replacement request for the same key may already own the slots.
     for (const item of batch.items) {
       if (inFlight.get(item.key) === token) {
         inFlight.delete(item.key);
@@ -776,8 +761,6 @@ async function runBatch(batch: FlushBatch): Promise<void> {
 
 function flush(): void {
   if (!hydrated) {
-    // The disk read has not settled: dispatching now could re-request a
-    // summary the store already holds. Hydration re-enters here when it does.
     startHydration();
     return;
   }
@@ -835,7 +818,6 @@ export function ensureTranslation(input: {
   // in-flight and queued guards return.
   forgetSupersededEntries(language, model.id, itemId, key);
   if (isFreshCacheEntry(key, text, Date.now())) {
-    // Resolved: no retry memory is needed for a summary already translated.
     return;
   }
   const item: QueueItem = {
@@ -906,10 +888,6 @@ export function releaseTranslationInterest(input: {
     // Another mounted surface still renders this text: it is not superseded.
     return;
   }
-  // The last surface stopped showing this key. A failed attempt must not stay
-  // in the retry memory, or a reconnect edge or deep link would re-send a
-  // summary no row shows any more; a copy still waiting for a slot is dropped
-  // from the queue for the same reason.
   retryable.delete(key);
   failureCounts.delete(key);
   if (queued.delete(key)) {

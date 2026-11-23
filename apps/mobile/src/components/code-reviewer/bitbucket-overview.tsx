@@ -319,6 +319,8 @@ export function BitbucketOverview({
                     icon={row.icon}
                     title={row.title}
                     subtitle={row.subtitle}
+                    // Focus areas is a comma list; short values like "Set" stay on one line.
+                    subtitleNumberOfLines={2}
                     onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}

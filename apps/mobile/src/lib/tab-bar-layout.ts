@@ -18,10 +18,11 @@ export const TAB_ICON_FORWARD_FONT_SCALE = 2;
  * Floor for a tab label's shrink-to-fit, honoured on iOS only: RN implements
  * `Text`'s `minimumFontScale` on iOS, while Android's `adjustsFontSizeToFit`
  * floors at RN's own platform minimum. The cap is a residual guard, not the
- * legibility rule — `shouldShowTabLabel` drops the labels as soon as one
- * full-size label would not fit its tab, so a label that renders never needs to
- * shrink that far on either platform, and the one-line/tail-truncate behaviour
- * is the same on both.
+ * legibility rule — `shouldShowTabLabel` drops the labels only at and above
+ * `TAB_ICON_FORWARD_FONT_SCALE`, so the cap is never what removes a label.
+ * Width does not remove one either: a label wider than its tab stays on one
+ * line and tail-truncates, or takes a reserved second line through
+ * `tabLabelLines`, and that behaviour is the same on both platforms.
  */
 export const TAB_LABEL_MINIMUM_FONT_SCALE = 0.75;
 const TAB_ICON_BASE_SIZE = 22;
@@ -37,29 +38,40 @@ const MONO_ADVANCE_EM = 0.6;
 /** CJK/Kana/Hangul/fullwidth glyphs render one em wide in the same stack. */
 const FULL_WIDTH_ADVANCE_EM = 1;
 /**
- * RTL-script glyphs (Arabic and Hebrew) render in the system fallback font, not
- * the mono family (`Text` drops `font-mono*` for RTL-script copy —
- * `withoutMonoFamily`), and a proportional glyph of either script averages
- * roughly half an em at this size. Counting those glyphs at the mono advance
- * inflated the width estimate until the width rule dropped every label in
- * Arabic at phone widths (الملف الشخصي measured wider than its tab while
- * fitting comfortably on screen), so the bar rendered icon-only with no labels.
- * The value bounds the true advance the same way the full-width class does: a
- * stray over-estimate hides the labels slightly early rather than leaving a
- * clipped label on screen.
+ * Glyphs of the scripts whose glyphs render in the system fallback font — the
+ * right-to-left blocks (`RTL_SCRIPT`: Arabic and Hebrew) and the joined scripts
+ * (`JOINED_SCRIPT`: the Brahmic blocks, Thai, Lao, Myanmar, Khmer) — are not
+ * drawn by the mono family (`Text` drops `font-mono*` for that copy —
+ * `withoutMonoFamily`), and a proportional glyph of those scripts averages
+ * roughly half an em at this size. Counting them at the mono advance inflated
+ * the width estimate until the width rule dropped every label in Arabic at
+ * phone widths (الملف الشخصي measured wider than its tab while fitting
+ * comfortably on screen), so the bar rendered icon-only with no labels. The
+ * value bounds the true advance the same way the full-width class does: a
+ * stray over-estimate only reserves a second line or leans on the label's tail
+ * truncation, and never leaves a clipped label on screen.
  */
 const RTL_SCRIPT_ADVANCE_EM = 0.55;
 /**
- * The script blocks whose glyphs take the fallback advance: the Hebrew block
- * and its presentation forms, then Arabic, Arabic Supplement, Arabic
- * Extended-B, Arabic Extended-A, and the Arabic Presentation Forms-A and -B.
- * Mirrors `RTL_SCRIPT` in `rtl-text.ts` — the class `hasRtlScript` uses to drop
- * the mono family, so the measure and the renderer agree on which copy is
+ * The right-to-left script blocks whose glyphs take the fallback advance: the
+ * Hebrew block and its presentation forms, then Arabic, Arabic Supplement,
+ * Arabic Extended-B, Arabic Extended-A, and the Arabic Presentation Forms-A and
+ * -B. Mirrors `RTL_SCRIPT` in `rtl-text.ts` — the class `hasRtlScript` uses to
+ * drop the mono family, so the measure and the renderer agree on which copy is
  * proportional. Inlined because that module imports react-native, which this
  * node-side module must not (`tab-bar-layout.test.ts` runs untransformed).
  */
 const RTL_SCRIPT =
   /[\u0590-\u05FF\uFB1D-\uFB4F\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+/**
+ * The joined script blocks whose glyphs also take the fallback advance: the
+ * Brahmic blocks (Devanagari through Sinhala), Thai and Lao, Myanmar, Khmer.
+ * Mirrors `JOINED_SCRIPT` in `rtl-text.ts` — the class `containsJoinedScript`
+ * uses to drop the mono family, so the measure and the renderer agree on which
+ * copy is proportional. Inlined for the same reason as `RTL_SCRIPT`.
+ */
+const JOINED_SCRIPT =
+  /[\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0900-\u0DFF\u0E00-\u0EFF\u1000-\u109F\u1780-\u17FF]/;
 /**
  * react-navigation's vertical tab item (`tabVerticalUiKit: { padding: 5 }` in
  * `BottomTabItem`), so a tab's label box is `tabWidth - 10`.
@@ -202,8 +214,9 @@ export function shouldShowTabLabel(fontScale = 1): boolean {
  * Characters the tab label's monospace stack draws one em wide: CJK
  * ideographs, Kana, Hangul and fullwidth forms/punctuation. A conservative
  * class — it only bounds the glyph advance, so a stray match over-estimates
- * the width and hides the labels slightly earlier rather than leaving a
- * mid-word break on screen. Ranges mirror the `is-fullwidth-code-point` class.
+ * the width and reserves a second line or leans on tail truncation rather than
+ * leaving a mid-word break on screen. Ranges mirror the
+ * `is-fullwidth-code-point` class.
  */
 const FULL_WIDTH_CHARACTER =
   /[\u1100-\u115F\u2329\u232A\u2E80-\u3247\u3250-\u4DBF\u4E00-\uA4C6\uA960-\uA97C\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6\u{1F200}-\u{1F251}\u{20000}-\u{3FFFD}]/u;
@@ -213,26 +226,31 @@ function isFullWidthCharacter(character: string): boolean {
 }
 
 /**
- * Estimated rendered width (dp) of the widest line of a tab label. A label is
- * one line (`tabLabelNumberOfLines`), except copy that carries its own break,
- * whose wider line is the one that has to fit. Only an explicit
- * break starts a new line: an ordinary space stays on the same one line and
- * counts toward its width (the renderer tail-ellipsizes, it does not wrap on a
- * space). The estimate is deliberately
- * conservative: it only decides whether the labels are dropped, so
- * over-estimating hides them slightly early and never leaves a clipped label
- * on screen. Per-glyph advances: full-width glyphs one em, RTL-script glyphs
- * (Arabic and Hebrew — the fallback font the label renders in, see
- * `RTL_SCRIPT_ADVANCE_EM`) about half an em, every other glyph the mono
+ * Advance in em of one glyph of a tab label. Full-width glyphs take one em;
+ * glyphs of the scripts that render in the system fallback font (the RTL
+ * scripts, Arabic and Hebrew, and the joined scripts — see
+ * `RTL_SCRIPT_ADVANCE_EM`) about half an em; every other glyph the mono
  * advance.
  */
 function glyphAdvanceEm(character: string): number {
   if (isFullWidthCharacter(character)) {
     return FULL_WIDTH_ADVANCE_EM;
   }
-  return RTL_SCRIPT.test(character) ? RTL_SCRIPT_ADVANCE_EM : MONO_ADVANCE_EM;
+  return RTL_SCRIPT.test(character) || JOINED_SCRIPT.test(character)
+    ? RTL_SCRIPT_ADVANCE_EM
+    : MONO_ADVANCE_EM;
 }
 
+/**
+ * Estimated rendered width (dp) of the widest line of a tab label. A label is
+ * one line (`tabLabelNumberOfLines`), except copy that carries its own break,
+ * whose wider line is the one that has to fit. Only an explicit break starts a
+ * new line: an ordinary space stays on the same one line and counts toward its
+ * width (the renderer tail-ellipsizes, it does not wrap on a space). The
+ * estimate is deliberately conservative: it decides the line count and the fit
+ * check only, so an over-estimate reserves a second line or leans on the tail
+ * truncation and never leaves a clipped label on screen.
+ */
 export function tabLabelWidth(label: string, fontScale = 1): number {
   let widest = 0;
   for (const line of label.split('\n')) {

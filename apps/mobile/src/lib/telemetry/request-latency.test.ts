@@ -399,7 +399,6 @@ describe('createLatencyFetch', () => {
     await expect(result.json()).resolves.toEqual({ result: 1 });
     expect(recorded).toHaveLength(1);
 
-    // The one sample belongs to the one read the caller can make.
     await expect(result.text()).rejects.toThrow();
     expect(recorded).toHaveLength(1);
   });

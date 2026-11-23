@@ -14,6 +14,7 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 import { trpcClient } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
+import { whenGlanceableAckHydrationSettled } from './ack-hydration';
 import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
 import { rankApprovableSessions } from './front-approval';
 import { setHomeWidgetDetails } from './home-widget-data';
@@ -275,14 +276,23 @@ async function approveVisiblePermission(
  * blanked back on screen. `blankEpochAtStart` is the epoch the action saw when
  * it started, so an epoch that advanced before this press (an earlier
  * sign-out, long since republished) never silences it.
+ *
+ * The derive waits (bounded) for the session-attention store to hydrate: this
+ * press runs in a fresh headless process, so before hydrating the store reads
+ * every raise the person answered in an earlier launch as unanswered.
  */
 async function republishTray(scope: WidgetScope, blankEpochAtStart: number): Promise<void> {
   if (scope.userId === null) {
     return;
   }
-  const { sessions } = await trpcClient.activeSessions.list.query(
-    buildActiveSessionsTrayInput(scope.organizationId)
-  );
+  // The press runs in a fresh headless process, so the ack store has not read
+  // its KV yet and would count a raise answered in an earlier launch as waiting.
+  // The bounded wait races the tray read, so it costs nothing when the read is
+  // the slower of the two.
+  const [{ sessions }] = await Promise.all([
+    trpcClient.activeSessions.list.query(buildActiveSessionsTrayInput(scope.organizationId)),
+    whenGlanceableAckHydrationSettled(),
+  ]);
   // Checked after the read, not before: the tray fetch is another window in
   // which a blank can land, and it owns the surface over this republish.
   if (isGlanceableOrgLost() || getTerminalBlankEpoch() !== blankEpochAtStart) {

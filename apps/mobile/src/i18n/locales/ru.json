@@ -93,6 +93,7 @@
     "draft": "Черновик",
     "enabled": "Включено",
     "github": "GitHub",
+    "image": "Изображение",
     "imageUnavailable": "Изображение недоступно.",
     "loading": "Загрузка…",
     "loadMore": "Показать ещё",
@@ -124,10 +125,10 @@
     "connectProvider": "Подключение сервиса",
     "contentTruncated": "Содержимое обрезано",
     "copyLink": "Скопировать ссылку",
+    "couldNotLoad": "Не удалось загрузить.",
+    "couldNotLoadMore": "Не удалось загрузить следующие записи.",
     "couldNotLoadOrganizations": "Не удалось загрузить организации.",
     "couldNotLoadSessions": "Не удалось загрузить сеансы.",
-    "couldnTLoad": "Не удалось загрузить.",
-    "couldnTLoadMore": "Не удалось загрузить следующие записи.",
     "deviceSessions": "Сеансы на устройствах",
     "disabled": "Отключено",
     "email": "Электронная почта",
@@ -401,7 +402,7 @@
       "title": "Ключи провайдеров",
       "rowSubtitle": "Оплата через ваш аккаунт провайдера",
       "orgDescription": "Эти ключи доступны всем участникам организации, а оплата идёт через её аккаунты провайдеров.",
-      "viewOnly": "Изменять ключи организации может только её владелец, администратор или менеджер по оплате.",
+      "viewOnly": "Изменять ключи организации может только её владелец, администратор или ответственный за оплату.",
       "description": "Запросы с этими ключами оплачиваются через ваш аккаунт провайдера, а не с баланса Kilo.",
       "managedByPlan": "Управляется вашим тарифом для кодинга",
       "enableKey": "Включить ключ {{provider}}",
@@ -680,6 +681,7 @@
     "needsInputAction": {
       "approved": "Запрос одобрен",
       "replied": "Ответ отправлен",
+      "empty": "Напишите ответ, затем отправьте его.",
       "failed": "Не удалось ответить. Нажмите ещё раз, чтобы повторить.",
       "unavailable": "Этот запрос больше не ждёт."
     }
@@ -821,6 +823,8 @@
     },
     "providerConnect": {
       "description": "Настройте подключение Kilo — {{label}} — для автоматической проверки пул-реквестов.",
+      "notConnectedTitle": "{{platform}} не подключён",
+      "githubAdminOnlyDescription": "Подключить его могут только владельцы и администраторы организации.",
       "githubApp": "приложение GitHub",
       "githubError": "Не удалось открыть настройку GitHub. Попробуйте снова.",
       "gitlabAccount": "аккаунт GitLab",
@@ -1032,7 +1036,7 @@
       "empty": "Пока нет проверок с аналитикой",
       "emptyDescription": "Аналитика записывает завершенные проверки, пока она включена для организации.",
       "offTitle": "Аналитика для {{platform}} отключена",
-      "offDescription": "Владельцы, администраторы и менеджеры по выставлению счетов могут включить аналитику в настройках организации в веб-версии, чтобы записывать завершенные проверки.",
+      "offDescription": "Владельцы, администраторы и ответственные за оплату могут включить аналитику в настройках организации в веб-версии, чтобы записывать завершенные проверки.",
       "couldNotLoad": "Не удалось загрузить аналитику",
       "trackedReviewsCaption": "Завершенные проверки, закончившиеся за этот период при включенной аналитике. Выполняющиеся и неудачные проверки никогда не учитываются.",
       "trackedReviewsUncounted": "Не учтено: {{displayCount}} из {{displayTotal}} завершенных проверок организации, их результат не был зафиксирован.",
@@ -1735,6 +1739,7 @@
       "couldNotLoadThisSession": "Не удалось загрузить этот сеанс.",
       "historyTooLarge": "Транскрипт этого сеанса слишком велик для загрузки.",
       "historyUnavailable": "Не удалось прочитать транскрипт этого сеанса.",
+      "historyTemporarilyUnavailable": "Транскрипт этого сеанса временно недоступен.",
       "cloneFailedRetry": "Не удалось клонировать этот сеанс. Попробуйте снова.",
       "notEnoughCredits": "Недостаточно кредитов для выполнения этого запроса. Пополните баланс и попробуйте снова.",
       "previousTaskFinishing": "Предыдущая задача ещё не завершена. Немного подождите.",
@@ -2105,6 +2110,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Сведения недоступны.",
+      "detailsUnavailableDescription": "Этого элемента больше нет в сеансе.",
       "textDisplay": "Отображение текста",
       "thinking": "Обдумывание",
       "thought": "Рассуждения",
@@ -2148,6 +2154,7 @@
     "filePart": {
       "loadingImage": "Загрузка изображения",
       "imageUnavailableRetry": "Изображение недоступно, повторите загрузку",
+      "imageUnavailableRetryWithAlt": "Изображение недоступно, {{alt}}, повторите загрузку",
       "imagePreviewUnavailableInSession": "В этом сеансе недоступен предварительный просмотр изображения.",
       "viewImage": "Просмотреть изображение",
       "viewImageWithAlt": "Просмотреть изображение {{alt}}",
@@ -2279,7 +2286,9 @@
       "skip": "Пропустить",
       "retrySkip": "Пропустить ещё раз",
       "submitting": "Отправка…",
-      "sendAnswers": "Отправить ответы"
+      "sendAnswers": "Отправить ответы",
+      "unreadableTitle": "Не удалось показать этот вопрос",
+      "unreadableBody": "Агент ожидает вопрос, который это приложение не может показать. Ответьте на вопрос в CLI, чтобы продолжить."
     },
     "blockingCard": {
       "questionUnavailable": "Этот вопрос больше недоступен.",
@@ -2306,6 +2315,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Не удалось загрузить сеанс субагента.",
+      "historyTooLarge": "История этого субагента слишком велика для загрузки.",
+      "historyUnavailable": "История этого субагента недоступна.",
+      "historyTemporarilyUnavailable": "История этого субагента временно недоступна.",
       "failed": "Сеанс субагента завершился с ошибкой.",
       "noMessages": "Нет сообщений субагента",
       "noMessagesDescription": "Сеанс субагента завершился без переписки.",
@@ -2483,7 +2495,7 @@
       "windowUnavailable": "Размер контекстного окна неизвестен",
       "tapToViewDetails": " Нажмите, чтобы просмотреть сведения о контексте.",
       "costClause": ", стоимость {{cost}}",
-      "loadingCostSpoken": "стоимость {{cost}}.",
+      "loadingCostSpoken": "стоимость на данный момент {{cost}}.",
       "tokensWindowUnavailable": "Токенов в контексте: {{used}}, размер контекстного окна неизвестен{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} из {{window}} токенов, использовано {{percentage}}{{costClause}}.",
       "title": "Использование контекста",
@@ -2906,6 +2918,8 @@
     "why": "Зачем",
     "who": "Кто получает данные",
     "installAttributionPromptMessage": "Kilo запрашивает разрешение Apple на отслеживание только для определения источника установки. Ваши запросы и переписка для этого никогда не используются.",
+    "installAttributionRequestFailedTitle": "Не удалось показать запрос на отслеживание",
+    "installAttributionRequestFailedMessage": "Kilo не удалось показать системную подсказку, поэтому определение источника установки остаётся отключённым.",
     "installAttributionPromptTitle": "Разрешить определение источника установки?"
   },
   "prReview": {
@@ -3525,7 +3539,7 @@
   "organization": {
     "auditLog": {
       "title": "Журнал аудита",
-      "permissionDenied": "Журнал аудита организации на плане Enterprise доступен только владельцу, администратору или менеджеру по оплате.",
+      "permissionDenied": "Журнал аудита организации на плане Enterprise доступен только владельцу, администратору или ответственному за оплату. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Нет событий аудита",
       "emptyDescription": "Здесь отображаются действия, выполненные в этой организации.",
       "truncated": "Показаны последние события.",
@@ -3575,11 +3589,157 @@
         "guardrailUpdate": "Ограничение обновлено",
         "guardrailRemove": "Ограничение удалено",
         "unknown": "Событие аудита"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Режим «{{name}}» (идентификатор: {{slug}})",
+        "modeUpdate": "Режим «{{name}}»: {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Автоматическая маршрутизация",
+          "defaultModel": "Модель по умолчанию"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} добавлен как {{role}}",
+        "memberRemoved": "{{email}} удалён",
+        "memberParentAdded": "{{email}} добавлен из родительской организации {{parent}}",
+        "memberParentRemoved": "{{email}} удалён из родительской организации {{parent}}",
+        "inviteSent": "{{email}} как {{role}}",
+        "inviteRevoked": "Приглашение для {{email}} отозвано",
+        "inviteAccepted": "{{email}} принял приглашение",
+        "groupIdentity": "Группа «{{name}}»",
+        "groupMembers": "Группа «{{name}}»: {{members}}",
+        "groupMemberGroups": "{{displayCount}} группы",
+        "groupMemberGroups_few": "{{displayCount}} группы",
+        "groupMemberGroups_many": "{{displayCount}} групп",
+        "groupMemberGroups_one": "{{displayCount}} группа",
+        "groupMemberGroups_other": "{{displayCount}} группы",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} группы",
+        "groupMemberGroupsOf_few": "{{email}}: {{displayCount}} группы",
+        "groupMemberGroupsOf_many": "{{email}}: {{displayCount}} групп",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} группа",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} группы",
+        "groupPolicySet": "Группа «{{name}}»: политика {{policy}} задана",
+        "groupPolicyRemoved": "Группа «{{name}}»: политика {{policy}} удалена",
+        "groupDefaultPolicySet": "Политика {{policy}} по умолчанию задана",
+        "groupDefaultPolicyRemoved": "Политика {{policy}} по умолчанию удалена",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Ограничители ИИ: {{state}}",
+        "guardrailConfigGroup": "{{state}} для группы «{{group}}»",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Домен SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (ранее: {{previous}})",
+        "ssoDomainRemoved": "Домен SSO {{domain}} очищен",
+        "fundsPurchased": "{{amount}} через {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} для {{displayCount}} дочерней организации",
+        "fundsDistributed_few": "{{amount}} для {{displayCount}} дочерних организаций",
+        "fundsDistributed_many": "{{amount}} для {{displayCount}} дочерних организаций",
+        "fundsDistributed_one": "{{amount}} для {{displayCount}} дочерней организации",
+        "fundsDistributed_other": "{{amount}} для {{displayCount}} дочерней организации",
+        "fundsReceived": "{{amount}} от {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Конфигурация {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: стиль {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} обновлено",
+        "reviewAgentSecretsUpdated_few": "{{displayCount}} обновлено",
+        "reviewAgentSecretsUpdated_many": "{{displayCount}} обновлено",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} обновлена",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} обновлено",
+        "reviewAgentSecretsFailed": "{{displayCount}} ошибки",
+        "reviewAgentSecretsFailed_few": "{{displayCount}} ошибки",
+        "reviewAgentSecretsFailed_many": "{{displayCount}} ошибок",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} ошибка",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} ошибки",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter: {{state}}",
+        "settingAdvancedPoliciesRegion": "Регион инференса: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Режим «{{mode}}»: {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Глобальное значение по умолчанию",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Разрешено",
+          "denied": "Запрещено",
+          "followSetting": "Как в настройках расширения"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Проект UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} для {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Дайджест рекомендаций: {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: нет разрешённых источников",
+        "settingName": "Переименовано с {{previous}} на {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Сканирование перед использованием: включено",
+        "scanBeforeUseOff": "Сканирование перед использованием: отключено",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Удалено: {{models}}",
+        "browserPolicyOff": "Использование браузера заблокировано",
+        "browserPolicyAllow": "Только разрешённые источники",
+        "browserPolicyPlaywrightOnly": "Только использование браузера",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Модели изменены: {{values}}",
+        "integrationConnected": "{{integration}} подключён",
+        "integrationDisconnected": "{{integration}} отключён",
+        "integrationRefreshed": "{{integration}} обновлён",
+        "integrationCancelled": "{{integration}} отменён",
+        "integrationModelUpdated": "{{integration}}: модель {{model}}",
+        "integrationKeyAdded": "Ключ добавлен для {{provider}}",
+        "integrationKeyUpdated": "Ключ обновлён для {{provider}}",
+        "integrationKeyDeleted": "Ключ удалён для {{provider}}",
+        "integrationKeyToggled": "Ключ для {{provider}}: {{state}}",
+        "namedPolicyCreated": "Создана политика {{kind}} {{id}}",
+        "namedPolicyUpdated": "Политика {{kind}} {{id}} обновлена",
+        "namedPolicyDeleted": "Политика {{kind}} {{id}} удалена",
+        "namedPolicyLinked": "Политика {{kind}} {{next}} привязана",
+        "webhookTriggerUpdated": "Триггер {{trigger}}",
+        "organizationRenamed": "Организация переименована с {{previous}} на {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Собственный ключ API"
+        }
       }
     },
     "billing": {
       "title": "Оплата",
-      "permissionDenied": "Платёжную информацию организации могут просматривать только владелец, администратор или менеджер по оплате.",
+      "permissionDenied": "Платёжную информацию организации могут просматривать только владелец, администратор или ответственный за оплату. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Подписка",
       "state": "Статус",
       "stateNone": "Нет подписки",
@@ -3669,11 +3829,11 @@
       "pendingInvitation": "Для этого адреса электронной почты уже есть ожидающее приглашение.",
       "alreadyMember": "Этот человек уже является участником этой организации.",
       "seatsFull": "Все места заняты ({{used}}/{{total}}). Попросите владельца организации добавить места, прежде чем приглашать новых участников.",
-      "seatsFullCanInviteBilling": "Все места заняты ({{used}}/{{total}}). Вы по-прежнему можете приглашать менеджеров по оплате, которые не занимают место.",
+      "seatsFullCanInviteBilling": "Все места заняты ({{used}}/{{total}}). Вы по-прежнему можете приглашать ответственных за оплату, которые не занимают место.",
       "noSeatsAvailable": "Все места заняты. Попросите владельца организации добавить места, прежде чем приглашать новых участников."
     },
     "invoices": {
-      "downloadA11y": "Скачать счёт {{number}}",
+      "downloadA11y": "Скачать счёт {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Счета формируются автоматически за каждый расчётный период. Они появятся здесь, когда вашей организации выставят счёт.",
       "emptyTitle": "Нет счетов",
       "invoiceFallback": "Счёт",
@@ -3753,7 +3913,6 @@
       "usageDetails": "Сведения об использовании",
       "providersAndModels": "Провайдеры и модели",
       "groups": "Группы",
-      "guardrails": "Ограничения",
       "byok": "Собственный ключ",
       "ssoAndDomain": "SSO и домен",
       "dataCollection": "Сбор данных",
@@ -3768,7 +3927,7 @@
       "emptyDescription": "Нажмите «Предыдущий час», чтобы увидеть более ранние запросы.",
       "emptyBoundDescription": "Более ранние журналы запросов недоступны.",
       "loadError": "Не удалось загрузить журналы запросов.",
-      "permissionDenied": "Журналы запросов организации доступны только владельцу, администратору или менеджеру по оплате.",
+      "permissionDenied": "Журналы запросов организации доступны только владельцу, администратору или ответственному за оплату. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} вх. · {{output}} исх.",
       "byok": "BYOK"
     },
@@ -3873,7 +4032,7 @@
     "signupStepUpApple": "Чтобы завершить создание аккаунта, выберите «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Чтобы завершить создание аккаунта, выберите «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Чтобы завершить создание аккаунта, вернитесь назад и выберите «$t(login.moreSignInOptions)».",
-    "invalidCode": "Код неверный или срок его действия истёк. Попробуйте ещё раз или нажмите «$t(login.resendCode)».",
+    "invalidCode": "Код неверный или срок его действия истёк. Используйте «$t(login.resendCode)» или «$t(login.moreSignInOptions)».",
     "codeInProgress": "Код проверяется. Подождите немного и попробуйте снова.",
     "tooManyAttempts": "Слишком много попыток. Запросите новый код.",
     "invalidToken": "Не удалось войти. Попробуйте ещё раз.",
@@ -4054,7 +4213,10 @@
     "list": {
       "loadFailed": "Не удалось загрузить историю чата.",
       "new": "Новый чат",
-      "deleteTitle": "Удалить этот чат?"
+      "deleteTitle": "Удалить этот чат?",
+      "resetNoticeTitle": "Локальные чаты и черновики удалены",
+      "resetNoticeBody": "Kilo не удалось открыть чаты, сохранённые на этом устройстве. Ваши сеансы в облаке не затронуты.",
+      "resetNoticeDismiss": "Отклонить уведомление"
     },
     "rename": {
       "title": "Переименовать чат",
@@ -4104,6 +4266,9 @@
       "fieldName": "Отображаемое имя",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Введите действительный URL сервера.",
+      "fieldUrlCredentials": "Удалите имя пользователя и пароль из URL.",
+      "fieldUrlFragment": "Удалите часть URL, начинающуюся с #.",
+      "fieldUrlInsecure": "Введите https-URL, а http — только для localhost.",
       "duplicateUrl": "Этот URL уже сохранён.",
       "serverNotFound": "Этот сервер больше не сохранён.",
       "enableServer": "Включить этот сервер: {{name}}",
@@ -4131,6 +4296,7 @@
       "app": {
         "label": "Интерфейс инструмента",
         "failed": "Не удалось загрузить интерфейс этого инструмента.",
+        "tooLarge": "Интерфейс этого инструмента превышает предел {{size}}.",
         "empty": "В интерфейсе этого инструмента нечего показать."
       }
     },
@@ -4198,6 +4364,8 @@
       "discoveryNoModels": "Адрес API не вернул ни одной модели. Добавьте модели вручную.",
       "connectionIncomplete": "Модель ответила, но не завершила запрос. Повторите попытку или проверьте идентификатор модели и протокол.",
       "invalidInput": "Введите имя сервера, корректные заголовки и добавьте хотя бы одну модель с уникальными идентификатором и именем. Ограничения числа токенов должны быть положительными целыми числами.",
+      "invalidApiKey": "Ключ API содержит символ, который невозможно отправить. Используйте только буквы, цифры и стандартные символы, без переносов строк.",
+      "invalidHeaders": "Пользовательский заголовок невозможно отправить. Проверьте его имя и используйте только буквы, цифры и стандартные символы, без переносов строк.",
       "invalidUrl": "Введите корневой URL API с HTTP или HTTPS без учётных данных, параметров запроса и фрагмента.",
       "publicHttp": "Общедоступные адреса HTTP не допускаются. Используйте HTTPS или адрес в частной локальной сети.",
       "httpApprovalRequired": "Разрешите использование этого локального адреса HTTP перед сохранением или подключением.",
@@ -4246,6 +4414,7 @@
         "network": "Скачивание не завершилось. Проверьте подключение и попробуйте снова.",
         "invalidFile": "Скачанный файл — не модель, которую может запустить это приложение, поэтому он был удалён.",
         "checksum": "Скачанный файл не совпадает с опубликованной контрольной суммой, поэтому он был удалён. Попробуйте скачать его снова.",
+        "unreadable": "Это устройство не смогло проверить скачанный файл, поэтому он был удалён. Попробуйте скачать его снова.",
         "writeFailed": "Это устройство не смогло сохранить модель. Попробуйте скачать её снова."
       }
     },
@@ -4331,7 +4500,15 @@
       "download": "Загрузить модель на устройство",
       "downloading": "Загрузка…",
       "downloadProgress": "Загрузка… {{percent}}%",
-      "downloadFailed": "Загрузка не завершилась. Проверьте подключение и свободное место, затем повторите попытку."
+      "downloadFailed": "Загрузка не завершилась. Проверьте подключение и свободное место, затем повторите попытку.",
+      "cannotUse": "Нельзя запустить: {{items}}.",
+      "cannotUseOptions": "Нельзя заполнить: некоторые параметры инструмента.",
+      "limitations": "Ограничения",
+      "tools": {
+        "time": "Время",
+        "settingsList": "Показать настройки",
+        "settingsSet": "Изменить настройки"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Эта модель поддерживает уровень рассуждений"
@@ -4520,6 +4697,7 @@
     "instructionSaveFailed": "Не удалось сохранить инструкцию",
     "instructionDeleteFailed": "Не удалось удалить инструкцию",
     "instructionToggleFailed": "Не удалось обновить инструкцию",
+    "instructionViewTitle": "Файл инструкции",
     "instructionLimitReached": "В профиле может быть до {{max}} инструкций. Удалите одну, чтобы добавить другую.",
     "mcp": {
       "title": "MCP-серверы",
@@ -4692,10 +4870,20 @@
     "history": {
       "activityUnavailable": "Не удалось загрузить кредитную активность.",
       "appStoreReceipt": "Чек в App Store",
+      "deduction": {
+        "adminCancel": "Баланс закрыт администратором",
+        "adminDebit": "Кредиты списаны администратором",
+        "codingPlan": "План кодинга: {{plan}}",
+        "correction": "Корректировка баланса",
+        "dispute": "Спор по платежу",
+        "refundAppStore": "Возврат за пакет кредитов из App Store",
+        "refundGooglePlay": "Возврат за пакет кредитов из Google Play"
+      },
       "deductionFallback": "Списание кредитов",
       "emptyDescription": "Здесь появятся покупки кредитов, чеки и расход.",
       "emptyTitle": "Истории кредитов нет",
       "expiredGrant": "Срок истёк: {{description}}",
+      "expiredStatus": "Срок истёк",
       "googlePlayReceipt": "Чек в Google Play",
       "kind": {
         "adjustment": "Корректировка",
@@ -4722,7 +4910,8 @@
       "receiptA11y": "Открыть чек: {{description}}, {{amount}}, от {{date}}",
       "receiptUnavailable": "Чек для этой покупки недоступен.",
       "retentionLimit": "Показана последняя история кредитов.",
-      "voidedGrant": "Аннулирован: {{description}}"
+      "voidedGrant": "Аннулирован: {{description}}",
+      "voidedStatus": "Аннулирован"
     },
     "title": "Купить кредиты",
     "description": "Кредиты — это разовая покупка, которая добавляется на ваш баланс Kilo для проведения ИИ-сессий кодинга в Kilo App. Магазин списывает средства с вашего аккаунта, и кредиты начисляются после подтверждения оплаты магазином.",
@@ -4902,7 +5091,7 @@
     "defaultModel": "Модель Kilo по умолчанию",
     "duration": "Лимит времени (минуты)",
     "spendLimit": "Лимит расходов (USD)",
-    "invalidSafeguards": "Введите положительные конечные лимиты времени и расходов.",
+    "invalidSafeguards": "Введите положительное число в допустимом диапазоне.",
     "estimate": "Оценка {{estimate}} · максимум {{maximum}}",
     "estimateUnavailable": "Платное резюме недоступно для этих настроек. Измените модель или лимиты либо попробуйте позже.",
     "confirmPaid": "Включить платные резюме для {{context}}?",
@@ -4921,8 +5110,8 @@
     "estimateSpendLimitTooLow": "Повышайте лимит расходов, чтобы разрешить это резюме.",
     "saved": "Настройки сводки сохранены",
     "selectedSessions": "Выбранные сессии",
-    "snapshotPullRequests": "PRs в выбранных сессиях",
-    "snapshotBlockers": "Блокеры в выбранных сессиях",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Блокеры",
     "capturedAt": "Зафиксировано {{time}}",
     "snapshotHint": "Снимок последнего доступного состояния сессий, зафиксированный в запланированное утреннее время. Данные могут быть неполными. Числа относятся к выбранным сессиям, а не ко всей активности за ночь.",
     "snapshotTruncated": "Часть сессий или материалов не включена, чтобы ограничить объём сводки.",
@@ -4969,6 +5158,7 @@
   },
   "usage": {
     "title": "Использование",
+    "personalTitle": "Использование личного аккаунта",
     "orgTitle": "Использование организации",
     "entrySubtitle": "Расходы, запросы и токены",
     "rangePicker": "Период",
@@ -4982,7 +5172,8 @@
     "unavailableTitle": "Использование недоступно",
     "unavailableDescription": "Использование не настроено для этого рабочего пространства. Обратитесь в службу поддержки, если ожидаете увидеть здесь данные об использовании.",
     "orgSelfNotice": "Показано ваше собственное использование в этой организации.",
-    "viewDetails": "Подробнее об использовании"
+    "viewDetails": "Подробнее об использовании",
+    "orgSelfEntryTitle": "Ваше использование"
   },
   "integrations": {
     "title": "Интеграции",
@@ -5078,6 +5269,8 @@
       "autoCommit": "Фиксировать изменения по завершении запуска",
       "condenseOnComplete": "Сжимать контекст по завершении запуска",
       "activeTitle": "Триггер активен",
+      "activeSwitchA11y": "Активный триггер: {{name}}",
+      "copyLinkA11y": "Скопировать ссылку: {{name}}",
       "activeDescription": "Приостановленные вебхуки отвечают кодом 404.",
       "runAsCreator": "Запускать от моего имени",
       "runAsCreatorDescription": "Каждый запуск использует вашу учётную запись, поэтому секретный заголовок обязателен.",

@@ -129,26 +129,31 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   const [scrollViewportHeight, setScrollViewportHeight] = useState(0);
   const isHalfDetent = scrollViewportHeight > 0 && scrollViewportHeight < windowHeight * 0.65;
   const noMethodsAllowed = methodOptions.length === 0;
-  const { isMutating, inlineError, inlineErrorKind, handleConfirmPress, dialog } = usePrMergeSubmit(
-    {
-      owner,
-      repoName,
-      number,
-      headSha,
-      prNodeId,
-      mode,
-      prRef,
-      method,
-      noMethodsAllowed,
-      showDeleteBranchToggle,
-      deleteBranch,
-      titleRef,
-      messageRef,
-      clearMergeDraft,
-      onRefetch,
-      onDismiss,
-    }
-  );
+  const {
+    isMutating,
+    inlineError,
+    inlineErrorKind,
+    clearReconnectError,
+    handleConfirmPress,
+    dialog,
+  } = usePrMergeSubmit({
+    owner,
+    repoName,
+    number,
+    headSha,
+    prNodeId,
+    mode,
+    prRef,
+    method,
+    noMethodsAllowed,
+    showDeleteBranchToggle,
+    deleteBranch,
+    titleRef,
+    messageRef,
+    clearMergeDraft,
+    onRefetch,
+    onDismiss,
+  });
 
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => {
@@ -209,6 +214,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
               onDeleteBranchChange={setDeleteBranch}
               inlineError={inlineError}
               inlineErrorKind={inlineErrorKind}
+              onConnectionRestored={clearReconnectError}
               submitLabel={
                 mode === 'merge' ? t('prReview.merge.merge') : t('prReview.merge.enableAutoMerge')
               }

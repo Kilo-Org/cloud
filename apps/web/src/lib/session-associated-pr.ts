@@ -159,10 +159,11 @@ export const associatedPrSchema = z.object({
   observations: prObservationSummarySchema.nullable(),
   lastSyncedAt: z.string(),
   reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
-  // True when the server has flagged this PR for an async review-decision
-  // fetch (see batch-review-decisions.ts) and the result has not landed yet.
-  // Clients can poll the list endpoint while any row reports pending=true to
-  // surface review-decision badges shortly after they become available.
+  // True when this PR's review decision has not landed yet: either the webhook
+  // flagged the cache row for an async fetch, or the row is a pending partial
+  // built without a cache row (true by default). Clients can poll the list
+  // endpoint while any row reports pending=true to surface review-decision
+  // badges shortly after they become available.
   reviewDecisionPending: z.boolean(),
   // Host platform of the linked PR (e.g. 'github'). Always present when an
   // associatedPr is returned.
@@ -323,9 +324,7 @@ function pendingPartialFromSession(
     return null;
   }
   if (session.pr_link_verified_at === null) {
-    // An unverified link must name the session's repository; a stored link to
-    // another repo is no evidence and is never surfaced. A verified link has
-    // already passed that check against GitHub, so it needs no re-check here.
+    // A verified link already passed this check against GitHub.
     if (!pullRequestUrlMatchesRepo(session.pr_url, session.git_url)) {
       return null;
     }
@@ -361,8 +360,7 @@ function pendingPartialFromSession(
  * Compare two PR URLs as the same pull request, ignoring trailing subpath,
  * query, fragment, and trailing slash. A stored link like
  * `.../pull/7/files` names the same PR as the canonical cache URL
- * `.../pull/7`. Returns `false` when either URL is not a parseable GitHub PR
- * URL.
+ * `.../pull/7`.
  */
 export function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
   if (sessionUrl === cacheUrl) return true;

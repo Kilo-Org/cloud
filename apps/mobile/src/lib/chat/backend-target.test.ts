@@ -286,6 +286,7 @@ describe('persisted chat backend targets', () => {
       provider: 'apple',
       targetId: 'local:apple',
       nameKey: 'modelChat.localModels.apple',
+      toolUse: { kind: 'unknown' },
     } as const;
     expect(localModelOptions([{ ...status, availability: undefined }], i18n.t)).toEqual([]);
     expect(

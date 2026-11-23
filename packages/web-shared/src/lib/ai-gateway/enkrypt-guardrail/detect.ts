@@ -77,6 +77,11 @@ export type EnkryptScanCoverage = {
 export type EnkryptScanContext = {
   sessionId: string | null;
   microdollarUsageId?: string;
+  /**
+   * The request is an authenticated benchmark case. Its guardrail spend is a measurement cost,
+   * which must never start an automatic purchase for the paying organization.
+   */
+  benchmarkCase?: boolean;
   organizationId: string;
   kiloUserId: string;
   apiKind: EnkryptGuardrailApiKind;
@@ -497,6 +502,7 @@ export async function scanRequest(
       kiloUserId: scan.kiloUserId,
       sessionId: scan.sessionId,
       microdollarUsageId: scan.microdollarUsageId,
+      benchmarkCase: scan.benchmarkCase,
       apiKind: scan.apiKind,
       decision: attemptDecision(attempt, config),
       creditsCost: attempt.creditsCost,

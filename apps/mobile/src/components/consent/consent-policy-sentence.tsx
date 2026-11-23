@@ -4,6 +4,7 @@ import { Text } from '@/components/ui/text';
 import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_LINE_GAP_CLASS,
+  INLINE_LINK_NEIGHBOUR_RESERVE_CLASS,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
 } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -26,11 +27,19 @@ type ConsentPolicySentenceProps = {
  * because a nested link's press region is its glyphs: the whole target would be
  * the 17.5dp `text-sm` line. As a node of its own the link carries
  * `{@link INLINE_LINK_BOX_CLASS}`, a real 28dp box the control-size audit can
- * read, plus the shared 8dp vertical slop for `DESIGN.md:364`'s 44pt region.
+ * read, plus the shared 9dp vertical slop: the box measures 27.8dp on Android,
+ * so 9dp a side carries `DESIGN.md:364`'s 44pt region where 8dp landed at
+ * 43.8dp.
  * The prefix can wrap, so the row wraps with it; the link and the closing period
  * move together, and the row's wrapped lines keep
  * `{@link INLINE_LINK_LINE_GAP_CLASS}` so the link box's overflow past its own
  * line never reaches the prose on the line above or below it.
+ * The row also carries `{@link INLINE_LINK_NEIGHBOUR_RESERVE_CLASS}`: the box
+ * overflows its 17.5dp line by 5.25dp below, so in the consent review card —
+ * where the action button sits one `gap-3` under this sentence — the button
+ * would own every pixel from 5.25dp under the box (measured 5.7dp) and take the
+ * downward band of the link's slop instead of the link. The reserve grows that
+ * gap to 10.5dp, which delivers the whole band.
  */
 export function ConsentPolicySentence({
   prefix,
@@ -39,7 +48,13 @@ export function ConsentPolicySentence({
   maxFontSizeMultiplier,
 }: ConsentPolicySentenceProps) {
   return (
-    <View className={cn('flex-row flex-wrap items-center', INLINE_LINK_LINE_GAP_CLASS)}>
+    <View
+      className={cn(
+        'flex-row flex-wrap items-center',
+        INLINE_LINK_LINE_GAP_CLASS,
+        INLINE_LINK_NEIGHBOUR_RESERVE_CLASS
+      )}
+    >
       <Text className="text-sm text-muted-foreground" maxFontSizeMultiplier={maxFontSizeMultiplier}>
         {prefix}{' '}
       </Text>

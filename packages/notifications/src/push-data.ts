@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  glanceableAgentsSnapshotShape,
+  refineNewestResultPair,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
@@ -88,6 +91,13 @@ function refineSessionLiveUpdate(
 }
 
 /**
+ * Longest answer a result notification may carry for a reply that could not be
+ * delivered. The field is read back only by this app, so the cap is a
+ * payload-size bound, not a display rule.
+ */
+export const ANSWER_DRAFT_MAX_LENGTH = 2000;
+
+/**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
  * Zod-parsed by the mobile notification handler before use.
@@ -111,6 +121,13 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // the session belongs to. Optional so a push from an older producer in a
     // rolling deploy still validates; absent means Personal.
     organizationId: nonEmptyStringSchema.optional(),
+    // The answer text someone typed into the notification's inline Reply when
+    // that reply could not be delivered. Only an app-posted result
+    // notification sets it; no server producer does, so its presence never
+    // changes what the push means. The bound lives here, where the payload is
+    // validated, so a longer answer is refused rather than silently carried
+    // into a notification the OS may truncate.
+    answerDraft: nonEmptyStringSchema.max(ANSWER_DRAFT_MAX_LENGTH).optional(),
   }),
   z.object({
     type: z.literal('agent_briefing'),
@@ -124,9 +141,6 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // amount, an email, or the configured threshold: this blob crosses the OS
   // lock screen, so the generic preview copy in `genericPushContentForPushData`
   // (`./push-copy.ts`) must stay content-free.
-  // The tap routes by the scope, so the scope and its id must agree: an
-  // organization alert without its id would open the personal spend view, and
-  // a personal alert naming an organization would open one that did not send.
   z
     .object({
       type: z.literal('spend_alert'),
@@ -148,13 +162,21 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // travel beside it for background Home widget updates and are never copied
   // into Live Activity/ongoing content-state. Older producers omit them.
   //
-  // Derived from the one snapshot schema so a field, its bound and its default
+  // Built from the one snapshot shape so a field, its bound and its default
   // exist once. `accountEpoch` is left out deliberately: it is client-set (see
   // the shared schema's comment), and a server has no value to push for it.
-  glanceableAgentsSnapshotSchema.omit({ accountEpoch: true }).extend({
-    type: z.literal('active_agents_glanceable'),
-    homeWidgetDetails: homeWidgetDetailsSchema.optional(),
-  }),
+  // The variant applies the shared newest-result refiner because reshaping
+  // cannot carry a refinement.
+  z
+    .object({
+      ...glanceableAgentsSnapshotShape,
+    })
+    .omit({ accountEpoch: true })
+    .extend({
+      type: z.literal('active_agents_glanceable'),
+      homeWidgetDetails: homeWidgetDetailsSchema.optional(),
+    })
+    .superRefine(refineNewestResultPair),
   // One followed session's Android ongoing notification; see
   // `sessionLiveUpdateSchema` above.
   sessionLiveUpdateSchema.superRefine(refineSessionLiveUpdate),

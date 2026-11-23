@@ -35,6 +35,13 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), dismissTo: vi.fn() }),
 }));
 
+// The findings list's covered-source retire is asserted in its own route suite
+// (`findings/index.mounted.test.tsx`); the navigator it reads is not part of
+// this harness, which mounts the routes for their scope decision.
+vi.mock('@/lib/navigation/retire-covered-source', () => ({
+  useRetireCoveredSource: vi.fn(),
+}));
+
 function screenMock(name: string) {
   return (props: { scope: string }) => {
     mounted.screens.push(`${name}:${props.scope}`);

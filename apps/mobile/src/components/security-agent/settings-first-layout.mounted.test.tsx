@@ -90,7 +90,13 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }),
-  useNavigation: () => ({ dispatch: vi.fn(), goBack: vi.fn() }),
+  useNavigation: () => ({
+    dispatch: vi.fn(),
+    goBack: vi.fn(),
+    // `useSettledReplace` hears the navigator's transition events; this suite's
+    // config is enabled, so the bounce never dispatches.
+    addListener: () => () => undefined,
+  }),
   useFocusEffect: (effect: () => void) => {
     useEffect(effect, [effect]);
   },

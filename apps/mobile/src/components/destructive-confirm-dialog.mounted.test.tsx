@@ -143,10 +143,6 @@ describe('DestructiveConfirmDialog', () => {
   it('keeps the header spaced the same above and below its title', () => {
     const root = mount();
 
-    // The card draws no handle and no page chrome, so the header's own padding
-    // is the whole band over the title: the body's `pt-3` there matches the
-    // divider's `pb-3` under it, instead of the default `pt-4` that left the
-    // title top-heavy.
     const header = root.find(node => isType(node, 'View') && node.props.collapsable === false);
     const classes = classNameOf(header).split(' ');
     expect(classes).toContain('pt-3');
@@ -199,10 +195,6 @@ describe('DestructiveConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  // The extra choice is a save-and-stay, not a decision about the removal, so
-  // the sheet goes either way: the reader lands on the screen the save was
-  // about and reads the outcome there, and a second press cannot queue another
-  // save behind a sheet that never left.
   it('dismisses the sheet before running the extra action', () => {
     const onExtra = vi.fn<() => void>();
     const root = mount({ extraAction: { label: 'Save changes', onPress: onExtra } });

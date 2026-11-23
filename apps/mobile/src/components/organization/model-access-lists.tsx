@@ -209,6 +209,11 @@ export function ProviderAllowList({
  * unfiltered catalog, so a model the policy already denies still renders and
  * can be allowed again. It can run to hundreds of models, so a search field and
  * the web page's denied-only filter narrow it.
+ *
+ * A row is titled with the catalog name and shows the model id as its second
+ * line only when the name differs from the id. A row whose name equals its id
+ * (every entry the deny list synthesises for an id no catalog carries) shows
+ * the title alone.
  */
 export function ModelDenyList({
   models,
@@ -241,7 +246,7 @@ export function ModelDenyList({
       >
         <PreferenceRow
           title={item.name}
-          subtitle={item.id}
+          subtitle={item.id === item.name ? undefined : item.id}
           note={denyListRowNote(item, t)}
           value={!draft.modelDenyList.includes(item.id)}
           disabled={disabled}

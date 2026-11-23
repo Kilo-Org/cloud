@@ -312,6 +312,9 @@ describe('buildScoreboard', () => {
       best_accuracy_switch_threshold: 0.05,
       production_token_profile: JSON.stringify(profile),
       switch_horizon_turns: 3,
+      // A live table published before the paid cutover records no desired membership; the
+      // scoreboard reads the artifact, never the membership.
+      desired_pairs: null,
       source: 'benchmark',
     });
     const candidateRow = LiveScoreboardCandidateRowSchema.parse({
@@ -348,6 +351,7 @@ describe('buildScoreboard', () => {
       min_accuracy: 0.5,
       switch_cost_factor: 2,
       best_accuracy_switch_threshold: 0.05,
+      desired_pairs: null,
       source: 'benchmark',
     };
     expect(LiveScoreboardTableRowSchema.parse(row).router).toBe('efficient');

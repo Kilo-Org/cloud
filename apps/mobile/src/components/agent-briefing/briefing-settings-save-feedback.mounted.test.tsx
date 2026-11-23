@@ -46,6 +46,8 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
   }),
 }));
 vi.mock('@tanstack/react-query', () => ({
+  // The context card hands this to the real hook, which the mock replaces.
+  keepPreviousData: (previous: unknown) => previous,
   useMutation: (options: Record<string, unknown>) => {
     h.mutationOptions.push(options);
     return { mutate: h.mutate, isPending: false };
@@ -150,7 +152,9 @@ describe('briefing schedule save confirmation', () => {
     const renderer = mount(createElement(ScheduleSettings, { preferences }));
     pressSave(renderer);
     expect(h.mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ nightStart: '22:00', morningStart: '08:00', morningEnd: '12:00' })
+      expect.objectContaining({ nightStart: '22:00', morningStart: '08:00', morningEnd: '12:00' }),
+      // The card's own attempt settles on this call's outcome.
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) })
     );
     expect(h.success).not.toHaveBeenCalled();
     confirmSaved();

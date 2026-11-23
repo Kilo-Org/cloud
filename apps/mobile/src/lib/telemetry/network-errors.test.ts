@@ -341,11 +341,6 @@ describe('isAbortError', () => {
     expect(isAbortError({ message: 'wrapped', cause })).toBe(true);
   });
 
-  // Production shape: Expo's `FetchError.createFromError` rebuilds the native
-  // cancel as `new FetchError(error.message)`, and `FetchError` does
-  // `super(\`fetch failed: ${message}\`)` while the native exception's message
-  // is exactly `Fetch request has been canceled`. Neither `name` nor `code`
-  // survives the wrap, so only the message can identify the abort.
   it('is true for the production FetchError message without the class name', () => {
     const error = new Error('fetch failed: Fetch request has been canceled');
     expect(error.name).toBe('Error');
@@ -435,10 +430,8 @@ describe('createNetworkErrorFetch', () => {
     expect(events).toHaveLength(0);
   });
 
-  // Production shape: the native cancel is rebuilt as
-  // `Error('fetch failed: Fetch request has been canceled')`, with neither
-  // `name` nor `code` surviving the wrap. These are the shapes the store build
-  // reports as KILO-APP-GX; they must not emit a warning event.
+  // The shapes the store build reports as KILO-APP-GX; they must not emit a
+  // warning event.
   it('(b3) does not report the production FetchError message and re-throws it', async () => {
     const cancel = new Error('fetch failed: Fetch request has been canceled');
     const wrapped = createNetworkErrorFetch(rejectingFetch(cancel), { source: 'trpc' });

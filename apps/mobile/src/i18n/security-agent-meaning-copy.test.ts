@@ -68,7 +68,7 @@ const CASES: Case[] = [
   {
     locale: 'hi',
     key: 'securityAgent.commands.remediationsQueued',
-    value: 'मौजूदा सुधार कतार में जोड़े गए।',
+    value: 'मौजूदा सुधार कतार में जोड़े गए',
   },
 
   // Review SLA assignment, not deadlines already set.

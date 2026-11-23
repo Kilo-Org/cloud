@@ -354,11 +354,6 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   // session: every record of a session is a keychain item.
   const signedOut = isSignOutTeardownActive() || isSignOutActive();
   if (!token && !isProtectedDataAvailable() && !signedOut) {
-    // The keychain supplied no bearer because it refuses every read while the
-    // device is locked: wait for the unlock rather than send a request the
-    // server would refuse as unauthenticated, then read the token again. A
-    // held token never takes this path, so an already-authenticated request
-    // is not delayed.
     unlockWaitStartMs = Date.now();
     await waitForProtectedData();
     token = await getAuthTokenForRequest();

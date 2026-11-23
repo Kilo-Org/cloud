@@ -192,7 +192,6 @@ describe('containsJoinedScript', () => {
   });
 
   it('leaves a nested element to its own run', () => {
-    // A nested Text is a separate run and applies its own letter spacing.
     expect(containsJoinedScript(createElement('Text', null, 'التفصيلات'))).toBe(false);
   });
 });
@@ -221,11 +220,6 @@ describe('contentTextDirection', () => {
   const LTR = { direction: 'ltr', writingDirection: 'ltr' };
   const RTL = { direction: 'rtl', writingDirection: 'rtl' };
 
-  // Copy the app did not write takes the direction of its own first letter, so
-  // an English sentence keeps its left edge inside an Arabic interface, and an
-  // Arabic one still aligns to the right. The node's layout `direction` is
-  // named too: iOS resolves a paragraph's alignment from it, not from
-  // `writingDirection`.
   it.each([false, true])('names English content left to right (isRTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     expect(contentTextDirection('1. Prototype pollution: لا')).toEqual(LTR);
@@ -238,9 +232,6 @@ describe('contentTextDirection', () => {
     );
   });
 
-  // Hebrew, and the right-to-left scripts the app has no glyphs for, still
-  // arrive in content: Syriac, Thaana, NKo, Samaritan, Mandaic, Adlam, and the
-  // supplementary scripts Unicode classes R — Cypriot, Lydian, Meroitic.
   it.each(['שלום', 'ܫܠܡܐ', 'ދިވެހި', 'ߒߞߏ', 'ࠀࠁ', 'ࡀࡁ', '𞤀𞤁', '𐠀𐠁', '𐤠𐤡', '𐦀𐦁'])(
     'names %s content right to left',
     text => {
@@ -292,8 +283,6 @@ describe('rtlBaseMarkedChildren', () => {
     expect(rtlBaseMarkedChildren(MIXED, true)).toBe(MIXED);
   });
 
-  // The caller's script scan decides whether the tree holds an Arabic or Hebrew
-  // letter: with no such letter there is no interface direction to name.
   it('leaves the copy alone when the caller scanned no right-to-left script', () => {
     i18nManager.isRTL = true;
     expect(rtlBaseMarkedChildren(MIXED, false)).toBe(MIXED);
@@ -326,15 +315,11 @@ describe('pinsTextDirection', () => {
     expect(pinsTextDirection({ textAlign: 'right', letterSpacing: 0 })).toBe(false);
   });
 
-  // Neither value names a direction: `inherit` follows the parent's layout and
-  // `auto` resolves from the first strong character, which is what the mark
-  // decides. A shared style carrying either must not suppress the mark.
   it('reports no pin for a value that leaves the direction open', () => {
     expect(pinsTextDirection({ direction: 'inherit' })).toBe(false);
     expect(pinsTextDirection({ writingDirection: 'auto' })).toBe(false);
   });
 
-  // A style array is flattened before the read, so a pin in any entry counts.
   it('reads a pin inside a style array', () => {
     expect(pinsTextDirection([{ letterSpacing: 0 }, [{ direction: 'ltr' }]])).toBe(true);
     expect(pinsTextDirection([{ letterSpacing: 0 }, undefined, false])).toBe(false);
@@ -386,8 +371,6 @@ describe('codeFieldTextStyle', () => {
     });
   });
 
-  // The mono face draws the `--` of a flag as one long dash, so a command read
-  // off the screen shows a dash the shell does not accept.
   it('turns the family ligatures off so a flag keeps its hyphens', () => {
     expect(codeFieldTextStyle().fontVariant).toEqual([
       'no-common-ligatures',

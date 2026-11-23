@@ -430,6 +430,18 @@ export async function shareClaudeBillingConnection(
       if (!source || source.connection.status !== ClaudeBillingConnectionStatus.Connected) {
         throw new ClaudeBillingShareError('source_unavailable');
       }
+      // The lock proves the payer existed when it was taken. A hard delete of the
+      // account that owns it cascades past that lock, so ask again before granting
+      // this payer to another scope: a grant naming a deleted payer would fail on
+      // the foreign key instead of answering as an unavailable source.
+      const [livePayer] = await tx
+        .select({ id: claude_billing_connections.id })
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, source.connection.id))
+        .limit(1);
+      if (!livePayer) {
+        throw new ClaudeBillingShareError('source_unavailable');
+      }
       if (sourceOwner.kind === 'organization' && source.connection.created_by !== createdBy) {
         // A grant that names both a person and an organization was written by the
         // retired member scope and is not live, so it cannot authorize a share.

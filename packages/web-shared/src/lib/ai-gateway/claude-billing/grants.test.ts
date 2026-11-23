@@ -11,6 +11,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   type ClaudeBillingShareError,
+  claudeBillingEffectiveConnection,
   describeClaudeBillingSharing,
   getGrantedClaudeBillingConnection,
   insertClaudeBillingProfile,
@@ -19,6 +20,7 @@ import {
   shareClaudeBillingConnection,
   type ClaudeBillingOwner,
 } from './store';
+import { claudeBillingOwnerMatches } from './owner';
 
 async function connectedPayer(kiloUserId: string | null, organizationId: string | null = null) {
   const [row] = await db
@@ -491,5 +493,41 @@ describe('Claude billing grants', () => {
       .from(claude_billing_connections)
       .where(eq(claude_billing_connections.id, removedTarget.id));
     expect(retainedOldRows).toHaveLength(1);
+  });
+
+  it('keeps the connector on the payer row apart from the person who wrote the grant', async () => {
+    const alice = await insertTestUser();
+    const bob = await insertTestUser();
+    const organization = await createTestOrganization('Claude grant audit', alice.id, 0);
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: bob.id,
+      role: 'admin',
+    });
+    const payer = await connectedPayer(alice.id);
+    await db.insert(claude_billing_connection_grants).values({
+      payer_connection_id: payer.id,
+      kilo_user_id: null,
+      organization_id: organization.id,
+      created_by: bob.id,
+    });
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
+      organizationId: organization.id,
+    };
+
+    const granted = await getGrantedClaudeBillingConnection(organizationOwner);
+    expect(granted).toMatchObject({
+      connection: { id: payer.id, created_by: alice.id, kilo_user_id: alice.id },
+      grant: { created_by: bob.id, kilo_user_id: null, organization_id: organization.id },
+    });
+    if (!granted) throw new Error('Missing resolved grant fixture');
+    expect(claudeBillingOwnerMatches(granted.connection, organizationOwner)).toBe(false);
+    expect(claudeBillingEffectiveConnection(granted)).toMatchObject({
+      id: payer.id,
+      kilo_user_id: null,
+      organization_id: organization.id,
+      created_by: bob.id,
+    });
   });
 });

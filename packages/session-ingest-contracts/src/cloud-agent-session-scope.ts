@@ -31,9 +31,6 @@ export const containedKiloSessionIdSchema = z
     )
   );
 
-export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
-export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
-
 /**
  * The shape this system mints a Cloud Agent session id in. This is the issuing
  * contract, not the rule a reader of a stored id may apply: a row keeps the id

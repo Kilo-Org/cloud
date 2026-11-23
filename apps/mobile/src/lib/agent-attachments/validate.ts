@@ -153,16 +153,36 @@ type ClassifiedAttachment =
 
 type AttachmentCandidate = { name: string; size: number };
 
+/** A candidate that passed every check that does not depend on its byte size. */
+export type ClassifiedAttachmentExceptSize =
+  | { ok: true; kind: 'image' | 'document'; extension: AgentAttachmentExtension }
+  | { ok: false; reason: 'denied' | 'empty' };
+
 /**
- * Classify a candidate attachment for the cloud-agent composer.
+ * The one attachment size cap.
+ *
+ * It applies to the bytes that will actually be sent, not to the file the
+ * picker measured: the composer re-encodes an image without its metadata
+ * first, and that smaller file is what uploads. A caller that measures a
+ * different file than it classifies applies this rule to the file it sends.
+ */
+export function withinAttachmentSizeCap(size: number): boolean {
+  return size <= AGENT_ATTACHMENT_MAX_BYTES;
+}
+
+/**
+ * Run the candidate checks that do not depend on the byte size: the empty
+ * check, the deny list, then the kind and extension resolution, in that
+ * order. The size cap is deliberately absent; apply
+ * {@link withinAttachmentSizeCap} to the bytes the composer will send.
  *
  * The picker `mimeType` is intentionally ignored: the extension is the
  * single source of truth for both the deny list and the MIME we send to
- * the server. `size` is the **measured** local byte size (see
- * `getInfoAsync` in `use-agent-attachment-upload`); the picker-reported
- * size is unreliable on iOS and must not be trusted.
+ * the server.
  */
-export function classifyAttachment(candidate: AttachmentCandidate): ClassifiedAttachment {
+export function classifyAttachmentExceptSize(
+  candidate: AttachmentCandidate
+): ClassifiedAttachmentExceptSize {
   if (candidate.size <= 0) {
     return { ok: false, reason: 'empty' };
   }
@@ -170,15 +190,31 @@ export function classifyAttachment(candidate: AttachmentCandidate): ClassifiedAt
   if (AGENT_ATTACHMENT_DENIED_EXTENSIONS.has(extension)) {
     return { ok: false, reason: 'denied' };
   }
-  if (candidate.size > AGENT_ATTACHMENT_MAX_BYTES) {
-    return { ok: false, reason: 'too-large' };
-  }
   return {
     ok: true,
     kind: IMAGE_EXTENSIONS.has(extension) ? 'image' : 'document',
     extension,
-    size: candidate.size,
   };
+}
+
+/**
+ * Classify a candidate attachment for the cloud-agent composer.
+ *
+ * Composes {@link classifyAttachmentExceptSize} with
+ * {@link withinAttachmentSizeCap}, so the order stays empty, then denied,
+ * then too-large. `size` is the **measured** local byte size (see
+ * `getInfoAsync` in `use-agent-attachment-upload`); the picker-reported
+ * size is unreliable on iOS and must not be trusted.
+ */
+export function classifyAttachment(candidate: AttachmentCandidate): ClassifiedAttachment {
+  const classified = classifyAttachmentExceptSize(candidate);
+  if (!classified.ok) {
+    return classified;
+  }
+  if (!withinAttachmentSizeCap(candidate.size)) {
+    return { ok: false, reason: 'too-large' };
+  }
+  return { ...classified, size: candidate.size };
 }
 
 type AttachmentAcceptance = {

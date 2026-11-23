@@ -215,6 +215,26 @@ describe('extractSessionArtifacts', () => {
     ]);
   });
 
+  it('skips a malformed attachment beside a valid one without throwing', () => {
+    const messages = [
+      message([
+        toolPart('tool-1', [
+          { mime: undefined, url: DATA_URL },
+          { mime: 'image/png' },
+          { mime: 'image/png', url: '' },
+          { mime: 'image/png', url: DATA_URL },
+        ]),
+      ]),
+    ];
+
+    expect(() => extractSessionArtifacts(messages)).not.toThrow();
+    // The id keeps the stored position, so a skipped entry never renumbers the
+    // attachments that follow it.
+    expect(extractSessionArtifacts(messages)).toEqual([
+      { id: 'tool-1-3', mime: 'image/png', url: DATA_URL },
+    ]);
+  });
+
   it('reads no parts at all as no artifacts', () => {
     expect(extractSessionArtifacts([message([]), message([])])).toEqual([]);
   });

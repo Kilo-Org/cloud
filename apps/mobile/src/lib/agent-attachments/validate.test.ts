@@ -9,10 +9,12 @@ import {
 import {
   canAddAttachments,
   classifyAttachment,
+  classifyAttachmentExceptSize,
   describeClassificationFailure,
   mimeForExtension,
   normalizeAttachmentExtension,
   sanitizeAttachmentFilename,
+  withinAttachmentSizeCap,
 } from './validate';
 import { utf8ByteLength } from '../utf8-utils';
 
@@ -299,6 +301,34 @@ describe('classifyAttachment', () => {
       ok: false,
       reason: 'empty',
     });
+  });
+});
+
+describe('classifyAttachmentExceptSize', () => {
+  it('accepts an over-cap PNG without a size decision', () => {
+    expect(
+      classifyAttachmentExceptSize({ name: 'big.PNG', size: AGENT_ATTACHMENT_MAX_BYTES + 1 })
+    ).toEqual({ ok: true, kind: 'image', extension: 'png' });
+  });
+
+  it('keeps empty before denied', () => {
+    expect(classifyAttachmentExceptSize({ name: 'virus.exe', size: 0 })).toEqual({
+      ok: false,
+      reason: 'empty',
+    });
+  });
+
+  it('rejects a denied extension whatever the size', () => {
+    expect(
+      classifyAttachmentExceptSize({ name: 'virus.exe', size: AGENT_ATTACHMENT_MAX_BYTES + 1 })
+    ).toEqual({ ok: false, reason: 'denied' });
+  });
+});
+
+describe('withinAttachmentSizeCap', () => {
+  it('is inclusive at the cap', () => {
+    expect(withinAttachmentSizeCap(AGENT_ATTACHMENT_MAX_BYTES)).toBe(true);
+    expect(withinAttachmentSizeCap(AGENT_ATTACHMENT_MAX_BYTES + 1)).toBe(false);
   });
 });
 

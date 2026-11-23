@@ -2,8 +2,9 @@ import { i18n } from '@/i18n';
 
 import {
   canAddAttachments,
-  classifyAttachment,
+  classifyAttachmentExceptSize,
   describeClassificationFailure,
+  withinAttachmentSizeCap,
 } from '@/lib/agent-attachments/validate';
 import { hasVisibleComposerText } from '@/lib/composer-text';
 import { type SharePayload } from '@/lib/share-payload';
@@ -56,8 +57,9 @@ type MeasuredFileInput = {
 
 /**
  * Pure pre-flight over already-measured file sizes. Injectable so unit tests
- * need no filesystem. Reuses classifyAttachment / canAddAttachments /
- * describeClassificationFailure — no second limit or allow-list.
+ * need no filesystem. Reuses classifyAttachmentExceptSize /
+ * withinAttachmentSizeCap / canAddAttachments / describeClassificationFailure
+ * — no second limit or allow-list.
  */
 export function validateMeasuredShareFiles(input: {
   text: string;
@@ -68,15 +70,23 @@ export function validateMeasuredShareFiles(input: {
   const classifiedAccepted: AcceptedShareFile[] = [];
 
   for (const file of input.files) {
-    const classified = classifyAttachment({ name: file.name, size: file.measuredSize });
+    const classified = classifyAttachmentExceptSize({
+      name: file.name,
+      size: file.measuredSize,
+    });
+    // An image is re-encoded by the composer before it uploads, so its
+    // measured size is not final here: the composer applies the cap to the
+    // stripped file. A document keeps the measured-size rule.
     if (!classified.ok) {
       rejectedNotes.push({ name: file.name, reason: classified.reason });
+    } else if (classified.kind !== 'image' && !withinAttachmentSizeCap(file.measuredSize)) {
+      rejectedNotes.push({ name: file.name, reason: 'too-large' });
     } else {
       const accepted: AcceptedShareFile = {
         name: file.name,
         uri: file.uri,
-        measuredSize: classified.size,
-        size: classified.size,
+        measuredSize: file.measuredSize,
+        size: file.measuredSize,
         kind: classified.kind,
       };
       if (file.mimeType !== undefined) {

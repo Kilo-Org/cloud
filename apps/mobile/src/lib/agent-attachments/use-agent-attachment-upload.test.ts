@@ -24,6 +24,7 @@ import {
   type UploadPendingResult,
   useAgentAttachmentUpload,
 } from './use-agent-attachment-upload';
+import { describeClassificationFailure } from './validate';
 // Tests import pure helpers from their owning module (not the hook barrel).
 
 // ---- Row 3.3 hook-test mocks ----
@@ -1362,6 +1363,40 @@ describe('selection-time image upload (Step 2)', () => {
 
     expect(result).toEqual(expect.objectContaining({ ok: true }));
     expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it('applies the size cap to the stripped image, not the measured original', async () => {
+    // First call measures the picked photo (over the cap); the second call
+    // measures the stripped re-encode, which is what actually uploads.
+    hoisted.measureLocalSize.mockResolvedValueOnce(AGENT_ATTACHMENT_MAX_BYTES + 5_000_000);
+    hoisted.measureLocalSize.mockResolvedValueOnce(1024);
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+
+    expect(hoisted.measureLocalSize).toHaveBeenCalledTimes(2);
+    const chip = hookApi().attachments[0];
+    expect(chip?.size).toBe(1024);
+    expect(chip?.status).toBe('uploading');
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it('refuses a document whose measured size is over the cap', async () => {
+    vi.mocked(toast.error).mockClear();
+    hoisted.measureLocalSize.mockResolvedValueOnce(AGENT_ATTACHMENT_MAX_BYTES + 1);
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([{ name: 'doc.pdf', uri: 'file:///cache/doc.pdf' }]);
+    });
+
+    expect(hookApi().attachments).toEqual([]);
+    expect(toast.error).toHaveBeenCalledWith(describeClassificationFailure('too-large'));
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
     renderer.unmount();
   });
 });

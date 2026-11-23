@@ -98,6 +98,20 @@ describe('validateMeasuredShareFiles', () => {
     }
   });
 
+  it('defers an image size to the composer strip but refuses an over-cap document', () => {
+    const overCap = AGENT_ATTACHMENT_MAX_BYTES + 1;
+    const result = validateMeasuredShareFiles({
+      text: '',
+      files: [file('big.png', overCap), file('big.pdf', overCap)],
+    });
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.accepted.map(f => f.name)).toEqual(['big.png']);
+      expect(result.accepted[0]?.kind).toBe('image');
+      expect(result.rejectedNotes).toEqual([{ name: 'big.pdf', reason: 'too-large' }]);
+    }
+  });
+
   it('whitespace-only text is not usable', () => {
     const result = validateMeasuredShareFiles({
       text: '   \n\t  ',

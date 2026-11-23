@@ -16,11 +16,12 @@ import {
 } from '@/lib/agent-attachments/constants';
 import {
   canAddAttachments,
-  classifyAttachment,
+  classifyAttachmentExceptSize,
   describeClassificationFailure,
   mimeForExtension,
   normalizeAttachmentExtension,
   sanitizeAttachmentFilename,
+  withinAttachmentSizeCap,
 } from '@/lib/agent-attachments/validate';
 import {
   type AgentAttachment,
@@ -514,7 +515,9 @@ export function useAgentAttachmentUpload(
 
       const additions: AgentAttachment[] = [];
       for (const { candidate, size } of measured) {
-        const classified = classifyAttachment({ name: candidate.name, size });
+        // The size cap is checked later, against the bytes that will be
+        // sent: an image is measured again after its metadata strip.
+        const classified = classifyAttachmentExceptSize({ name: candidate.name, size });
         if (!classified.ok) {
           toast.error(describeClassificationFailure(classified.reason));
         } else if (delivery === 'local' && classified.kind !== 'image') {
@@ -522,13 +525,14 @@ export function useAgentAttachmentUpload(
         } else {
           let ext = classified.extension;
           let localUri = candidate.uri;
-          let finalSize = classified.size;
+          let finalSize = size;
           let localFileOwned = false;
           let metadataStripFailed = false;
           if (classified.kind === 'image') {
             // Strip EXIF/GPS/maker notes before measuring so `size` reflects
-            // the stripped file. A failure marks the chip so the composer can
-            // warn; the original URI is never used as an attachment.
+            // the stripped file, which is what the size cap applies to. A
+            // failure marks the chip so the composer can warn; the original
+            // URI is never used as an attachment.
             // eslint-disable-next-line no-await-in-loop -- each candidate's strip must complete before its size is measured
             const stripped = await stripImageMetadata(candidate.uri, ext);
             if (stripped.ok) {
@@ -549,6 +553,16 @@ export function useAgentAttachmentUpload(
           } else {
             // Documents come from `copyToCacheDirectory`, so the app owns the file.
             localFileOwned = true;
+          }
+          // The cap applies to the bytes that will be sent: the stripped image,
+          // or the measured document. A failed strip already becomes a terminal
+          // error chip that never uploads, so it is not re-checked here.
+          if (!metadataStripFailed && !withinAttachmentSizeCap(finalSize)) {
+            toast.error(describeClassificationFailure('too-large'));
+            if (localFileOwned) {
+              deleteCacheOwnedFile(localUri);
+            }
+            continue;
           }
           const filename = storedAttachmentFilename(candidate.name, ext);
           // A strip-failed image is a terminal error chip: it never uploads,

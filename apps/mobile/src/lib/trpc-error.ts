@@ -213,6 +213,17 @@ const NON_ACCESS_TERMINAL_TRPC_CODES = {
 } as const satisfies Record<NonAccessTerminalTrpcCode, true>;
 
 /**
+ * True only for the terminal codes that name a state of their own rather than
+ * an access outcome or a removed item: `BAD_REQUEST`, `CONFLICT` and
+ * `UNPROCESSABLE_CONTENT`. These are exactly the codes
+ * {@link trpcErrorVariant} maps to `terminal`, and the shared source for that
+ * set, so no reader has to restate the list.
+ */
+export function isNonAccessTerminalTrpcCode(code: string | undefined): boolean {
+  return code !== undefined && Object.hasOwn(NON_ACCESS_TERMINAL_TRPC_CODES, code);
+}
+
+/**
  * True when the error's tRPC message names the unconfigured usage source
  * (`USAGE_SOURCE_NOT_CONFIGURED_MESSAGE`). The wire carries only the code and
  * message, so the string is the one signal a client has; the constant is
@@ -285,7 +296,7 @@ export function isControlPlaneTimeout(error: unknown): boolean {
  * name, an input the server will not accept. Retrying sends the identical
  * request and gets the identical refusal, so the surface must explain what it
  * is and offer no Retry (`isTerminalTrpcCode` decides the same set, and
- * `NON_ACCESS_TERMINAL_TRPC_CODES` names this subset of it).
+ * `isNonAccessTerminalTrpcCode` names this subset of it).
  *
  * Everything else stays `server`: an `INTERNAL_SERVER_ERROR`, an unknown code
  * and a failure with no code at all may succeed on the next attempt.
@@ -301,7 +312,7 @@ export function trpcErrorVariant(error: unknown): TrpcErrorVariant {
   if (code === 'NOT_FOUND') {
     return 'not-found';
   }
-  if (code !== undefined && Object.hasOwn(NON_ACCESS_TERMINAL_TRPC_CODES, code)) {
+  if (isNonAccessTerminalTrpcCode(code)) {
     return 'terminal';
   }
   return 'server';

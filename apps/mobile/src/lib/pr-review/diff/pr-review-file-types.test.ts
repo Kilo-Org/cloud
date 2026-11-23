@@ -33,4 +33,24 @@ describe('normalizePrReviewFile', () => {
     const { patchMissingCause: _omitted, ...older } = file;
     expect(normalizePrReviewFile(older as PrReviewFile).patchMissingCause).toBeNull();
   });
+
+  it('maps a pre-PR provider word into the closed status set', () => {
+    // An older web deployment sends GitLab's raw `deleted`; the closed status
+    // record has no icon for it, so an unnormalized word paints undefined.
+    const older = { ...file, status: 'deleted' } as unknown as PrReviewFile;
+    expect(normalizePrReviewFile(older).status).toBe('removed');
+  });
+
+  it('keeps every status the contract allows', () => {
+    for (const status of [
+      'added',
+      'removed',
+      'modified',
+      'renamed',
+      'copied',
+      'changed',
+    ] as const) {
+      expect(normalizePrReviewFile({ ...file, status }).status).toBe(status);
+    }
+  });
 });

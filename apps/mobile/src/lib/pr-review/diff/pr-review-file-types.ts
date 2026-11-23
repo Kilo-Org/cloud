@@ -4,6 +4,7 @@
 
 import {
   type ProviderPrFilePatchMissingCause,
+  providerPrFileStatus,
   type ProviderPrFileStatus,
 } from '@kilocode/app-shared/provider-review';
 
@@ -23,9 +24,18 @@ export type PrReviewFile = {
  * `undefined`, which is not `null` — so every file would read as patch-missing
  * and lose its hunks. Folding an absent cause to `null` here keeps that
  * version skew to the one boundary every page crosses.
+ *
+ * `status` crosses the same boundary: an older deployment sends a raw provider
+ * word (`deleted`), and the closed status record has no entry for it, so the
+ * row would render an undefined icon. Mapping it through the contract's own
+ * normalizer keeps a pre-PR server readable at every row.
  */
 export function normalizePrReviewFile<T extends PrReviewFile>(file: T): T {
-  return { ...file, patchMissingCause: file.patchMissingCause ?? null };
+  return {
+    ...file,
+    status: providerPrFileStatus(file.status),
+    patchMissingCause: file.patchMissingCause ?? null,
+  };
 }
 
 export const PR_REVIEW_MAX_LISTED_FILES = 3000;

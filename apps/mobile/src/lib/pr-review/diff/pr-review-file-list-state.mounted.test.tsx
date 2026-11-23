@@ -77,8 +77,8 @@ function current(holder: { current: Result | null }): Result {
 
 // The hook normalizes every file at the payload boundary, so a read's file
 // carries its (possibly absent) cause as an explicit null.
-const FILE_A = { path: 'a.ts', patchMissingCause: null };
-const FILE_B = { path: 'b.ts', patchMissingCause: null };
+const FILE_A = { path: 'a.ts', status: 'modified', patchMissingCause: null };
+const FILE_B = { path: 'b.ts', status: 'modified', patchMissingCause: null };
 
 beforeEach(() => {
   queryFnMock.mockReset();

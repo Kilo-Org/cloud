@@ -24,14 +24,16 @@ import { OrgFormActions } from '@/components/organization/org-form-actions';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { AlertCircle } from '@/components/ui/icons';
 import { SearchField } from '@/components/ui/search-field';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type OrgGroup,
   useOrgGroupMutations,
@@ -162,6 +164,7 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const mutations = useOrgGroupMutations(organizationId, canManageBilling);
   const orgWithMembers = useOrgWithMembers(organizationId);
   // A create can only be refused by the group count, so only a create reads the
@@ -174,6 +177,9 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
   const limitGroups = groupsQuery.data?.access === 'manager' ? groupsQuery.data.groups : null;
   const atGroupLimit =
     group === undefined && limitGroups !== null && limitGroups.length >= MAX_ORGANIZATION_GROUPS;
+  const limitCopy = atGroupLimit
+    ? t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })
+    : null;
   const initial =
     group === undefined
       ? null
@@ -350,10 +356,10 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
     }
     const payload = { name, description: description.length === 0 ? null : description };
     if (group === undefined) {
-      // At the cap nothing can be created, and the notice above the actions
-      // already says why. A list that landed under the cap before the server
-      // counted the last group still sends the create, and the refusal lands as
-      // the localized toast.
+      // At the cap nothing can be created, and the warning block above the
+      // fields already says why. A list that landed under the cap before the
+      // server counted the last group still sends the create, and the refusal
+      // lands as the localized toast.
       if (atGroupLimit) {
         return;
       }
@@ -422,14 +428,22 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        {/* The intro line under the header: the cap notice, when the manager has
-            already reached it. The fields and Save below are disabled with it,
-            so a create form reads as blocked from the start. */}
-        {atGroupLimit ? (
-          <Text variant="muted" testID="org-group-limit">
-            {t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })}
-          </Text>
-        ) : null}
+        {/* The cap warning block, once the manager has reached the group limit.
+            The fields and Save below are disabled with it, so the blocked form
+            must not read as an ordinary create form. */}
+        {limitCopy === null ? null : (
+          <View className="flex-row items-start gap-2 rounded-lg border border-warn-tile-border bg-warn-tile-bg px-3 py-2.5">
+            <View className="pt-0.5">
+              <AlertCircle size={16} color={colors.warn} />
+            </View>
+            <AccessibleStatus
+              message={limitCopy}
+              tone="status"
+              className="min-w-0 flex-1 text-sm text-foreground"
+              testID="org-group-limit"
+            />
+          </View>
+        )}
         {/* Keyed by the applied draft: a remount re-reads every `defaultValue`
             from the refs and re-arms the search, which a live uncontrolled
             input would ignore. */}

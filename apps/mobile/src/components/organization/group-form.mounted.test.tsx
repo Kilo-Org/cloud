@@ -177,7 +177,7 @@ vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
   return { Text: 'Text', TextClassContext: createContext(undefined) };
 });
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', Search: 'Search' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 // The icon barrels reach `react-native-svg`, whose Flow-derived ESM output the
 // Node transform cannot parse; the suite reads icons through host elements.
@@ -331,7 +331,11 @@ function saveControl(root: ReactTestInstance): WidgetProps {
 
 /** The visible text of the block carrying `testID`, or undefined while it is absent. */
 function textWithTestID(root: ReactTestInstance, testID: string): string | undefined {
-  const found = root.findAll(node => (node.props as WidgetProps).testID === testID).at(0);
+  // A status component forwards the handle to the `Text` it renders, so the
+  // component node matches before that `Text`: read the node that holds the copy.
+  const found = root
+    .findAll(node => (node.props as WidgetProps).testID === testID)
+    .find(node => typeof (node.props as WidgetProps).children === 'string');
   const children: unknown = found?.props.children;
   return typeof children === 'string' ? children : undefined;
 }

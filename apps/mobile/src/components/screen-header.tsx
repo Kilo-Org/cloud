@@ -143,44 +143,90 @@ export function shouldStackHeaderActions(
 const MAX_TITLE_LINES = 3;
 
 /**
- * The two widths the title-fit check compares (see `measuresTitleFit`), in dp.
- * The natural width belongs to one layout (`naturalKey`); the box width is the
- * visible title's latest, in whichever row it sits. `cutKey` is the layout in
- * which the title was found cut beside the inline cluster.
+ * The two widths the title-fit check compares (see `measureTitleFit`), in dp,
+ * each with the layout (`naturalKey`, `boxKey`) that reported it. The natural
+ * width comes from a copy outside the row; the box width from the visible
+ * title, in whichever row it sits. `cutKey` is the layout in which the title
+ * was found cut beside the inline cluster. `probeKey` is the layout whose
+ * first cut report is held back until that same layout measures again, and
+ * `probePass` remounts the copy and the box around the title for that second
+ * measurement.
  */
 type TitleFit = {
   naturalKey: string | null;
   naturalWidth: number;
+  boxKey: string | null;
   boxWidth: number;
   cutKey: string | null;
+  probeKey: string | null;
+  probePass: number;
 };
 
 const UNMEASURED_TITLE_FIT: TitleFit = {
   naturalKey: null,
   naturalWidth: Number.NaN,
+  boxKey: null,
   boxWidth: Number.NaN,
   cutKey: null,
+  probeKey: null,
+  probePass: 0,
 };
 
 /**
- * Records measured widths and, while the cluster shares the title's row,
- * decides whether the title is cut there. Both widths sit on the pixel grid,
- * so a cut title's box is at least a pixel narrower than its natural width;
- * half a pixel is the margin for float noise. A report that changes nothing
- * keeps the state's identity, so it costs no render.
+ * Records measured widths and decides whether the title is cut beside the
+ * inline cluster. The decision is re-taken while the cluster shares the row,
+ * and never outside it: once the cluster has moved, the wider room the title
+ * gets says nothing about the row, so reporting it neither cuts the title nor
+ * moves the cluster back. It is also only ever taken from a pair measured in
+ * the same layout, so a new layout's box is never compared with the width the
+ * previous layout's copy reported (and a layout whose copy has not reported
+ * yet decides nothing). Both widths sit on the pixel grid, so a cut title's
+ * box is at least a pixel narrower than its natural width; half a pixel is the
+ * margin for float noise.
+ *
+ * A cut takes two measurements of the same layout to count. One frame can
+ * report a box a fraction of a dp too narrow while the rest of the row is
+ * still settling — the account picker pinned beside the Chat title did — and
+ * stacking on that frame would latch the cluster onto its own row for the rest
+ * of the layout. So the first cut report only marks the layout as a suspect:
+ * it bumps `probePass`, which remounts both measurement nodes (the hidden copy
+ * and the box around the visible title) and drops the box width it compared,
+ * so the copied width alone can never decide. The next box width from that
+ * layout does: the same cut stacks the cluster, a box that has grown to the
+ * title's natural width leaves it inline. Remounting the box is what delivers
+ * that second report on a device — remounting the copy alone cannot, because a
+ * copy outside the row changes nothing about the room the box gets, so its
+ * `onLayout` would never fire again. The synchronous read arms and then
+ * confirms the same layout, both passes before the frame paints, so the first
+ * frame still decides — it just decides on a measurement taken after the row
+ * settled, not on the transient.
+ *
+ * The loop is bounded: arming needs `next.cutKey !== layout.key`, and the
+ * confirming pass sets `cutKey` to this layout (stacked) or `null` (inline) and
+ * clears `probeKey`, so a layout arms at most once and never remounts twice. A
+ * report that changes nothing keeps the state's identity, so it costs no
+ * render.
  */
 function measureTitleFit(
   previous: TitleFit,
-  measured: Partial<Omit<TitleFit, 'cutKey'>>,
+  measured: Partial<Omit<TitleFit, 'cutKey' | 'probeKey' | 'probePass'>>,
   layout: { key: string; inRow: boolean }
 ): TitleFit {
   const next = { ...previous, ...measured };
-  if (
-    layout.inRow &&
-    next.naturalKey === layout.key &&
-    next.naturalWidth - next.boxWidth >= 0.5 / PixelRatio.get()
-  ) {
-    next.cutKey = layout.key;
+  if (layout.inRow && next.naturalKey === layout.key && next.boxKey === layout.key) {
+    const cut = next.naturalWidth - next.boxWidth >= 0.5 / PixelRatio.get();
+    if (next.probeKey === layout.key) {
+      // The layout has measured twice, so this pair decides it.
+      next.cutKey = cut ? layout.key : null;
+      next.probeKey = null;
+    } else if (!cut) {
+      next.cutKey = null;
+    } else if (next.cutKey !== layout.key) {
+      // The first cut report: hold it back and measure this layout once more.
+      next.probeKey = layout.key;
+      next.probePass += 1;
+      next.boxKey = null;
+    }
   }
   const changed = (Object.keys(next) as (keyof TitleFit)[]).some(
     field => !Object.is(next[field], previous[field])
@@ -619,16 +665,27 @@ export function ScreenHeader({
   // while the capped title beside it ended in an ellipsis.
   //
   // The decision is kept per layout (title, window width, font scale) and only
-  // taken while the cluster shares the title's row: once the cluster moves,
-  // the wider room the title gets says nothing about the row, so the title
-  // never moves back and forth. A new layout (another language, a rotation)
-  // returns the cluster to the row until the remounted copy measures again.
+  // taken while the cluster shares the title's row, from a pair of widths that
+  // layout reported itself: once the cluster moves, the wider room the title
+  // gets says nothing about the row, so the title never moves back and forth,
+  // and a box read on one frame is never compared with a copy measured for
+  // another layout. A new layout (another language, a rotation) returns the
+  // cluster to the row until the remounted copy measures again.
+  //
+  // A cut measured on a layout's first report is confirmed by one more
+  // measurement of that layout before it moves anything (see
+  // `measureTitleFit`): the row can be a fraction of a dp too narrow while the
+  // cluster is still settling, and stacking on that frame would keep the
+  // cluster on its own row for the rest of the layout.
   const measuresTitleFit = inlineActions ? title != null && !titleContent && !largeFont : false;
   const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
   const [titleFit, setTitleFit] = useState<TitleFit>(UNMEASURED_TITLE_FIT);
   const titleNaturalRef = useRef<TextInstance>(null);
   const titleBoxRef = useRef<ViewInstance>(null);
   const titleOverflows = measuresTitleFit && titleFit.cutKey === titleFitKey;
+  // The probe's extra pass remounts the hidden copy through this key, which
+  // leaves `titleFitKey` free to keep its one-meaning-per-layout role.
+  const titleProbeKey = `${titleFitKey}#${titleFit.probePass}`;
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word. At
@@ -653,7 +710,7 @@ export function ScreenHeader({
     setTitleFit(previous => measureTitleFit(previous, measured, titleFitLayout));
   };
   const onTitleBoxLayout = (event: LayoutChangeEvent) => {
-    const measured = { boxWidth: event.nativeEvent.layout.width };
+    const measured = { boxKey: titleFitKey, boxWidth: event.nativeEvent.layout.width };
     setTitleFit(previous => measureTitleFit(previous, measured, titleFitLayout));
   };
   // A layout's first decision is read synchronously, before the frame that
@@ -675,12 +732,17 @@ export function ScreenHeader({
     const measured = {
       naturalKey: titleFitKey,
       naturalWidth: natural.getBoundingClientRect().width,
+      boxKey: titleFitKey,
       boxWidth: box.getBoundingClientRect().width,
     };
+    // Both widths are read together, and this effect runs again when the probe
+    // arms (`probePass`), so the suspected cut is confirmed by a second read of
+    // the settled row — both before the frame paints. Without that second read
+    // a row whose box reported once and then stopped would never decide.
     setTitleFit(previous =>
       measureTitleFit(previous, measured, { key: titleFitKey, inRow: !stackInlineActions })
     );
-  }, [measuresTitleFit, titleFitKey, stackInlineActions]);
+  }, [measuresTitleFit, titleFitKey, stackInlineActions, titleFit.probePass]);
   // A caller that turns the reflow off keeps its inline controls beside the
   // title while the title fits, so on that row the title is the primary text
   // and the controls (a tab root's account picker) are secondary: they truncate
@@ -799,10 +861,20 @@ export function ScreenHeader({
         {title}
       </Text>
     );
-    // The fit check (see `measuresTitleFit`) reads the room the row gives the
-    // title from this box, which the title fills.
+    // The fit check (see `measureTitleFit`) reads the room the row gives the
+    // title from this box, which the title fills. The box is remounted for the
+    // probe's confirming pass: a fresh title lays out once more in the same
+    // row, which is the second measurement a suspected cut needs on a device.
+    // Re-keying only the hidden copy would not do it — remounting a zero-ink
+    // copy outside the row cannot change this box, so no `onLayout` would
+    // report and a genuinely cut title would wait forever.
     const titleLabel = measuresTitleFit ? (
-      <View ref={titleBoxRef} className="min-w-0 shrink" onLayout={onTitleBoxLayout}>
+      <View
+        key={titleProbeKey}
+        ref={titleBoxRef}
+        className="min-w-0 shrink"
+        onLayout={onTitleBoxLayout}
+      >
         {titleLabelText}
       </View>
     ) : (
@@ -1279,7 +1351,7 @@ export function ScreenHeader({
     >
       <Text
         ref={titleNaturalRef}
-        key={titleFitKey}
+        key={titleProbeKey}
         className={titleClass}
         numberOfLines={titleLines}
         onLayout={onTitleNaturalLayout}

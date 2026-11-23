@@ -67,6 +67,7 @@ import {
 } from '@/components/agents/session-detail-content';
 import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
+import { SessionFollowButton } from '@/components/agents/session-follow-button';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { formatSessionCostBadge } from '@/components/agents/session-list-helpers';
@@ -1364,6 +1365,22 @@ function findReservedBand(header: ReactTestInstance) {
   return header.findByProps({ className: 'w-0 overflow-hidden' });
 }
 
+/**
+ * The element the session header passes as its `inlineActions` cluster: the
+ * context pill and the Follow control, which the header shares the title's row
+ * with only while the title fits there.
+ */
+function headerInlineActions(header: ReactTestInstance): ReactElement<{
+  className?: string;
+  children?: ReactNode;
+}> {
+  const passed: unknown = header.props.inlineActions;
+  if (!isValidElement<{ className?: string; children?: ReactNode }>(passed)) {
+    throw new Error('the session header renders no inline actions cluster');
+  }
+  return passed;
+}
+
 function pressHeaderBack(renderer: ReactTestRenderer) {
   const { onPress } = renderer.root.findByProps({ accessibilityLabel: 'Go back' }).props as {
     onPress: () => void;
@@ -2055,7 +2072,9 @@ describe('SessionDetailContent header title', () => {
     );
   });
 
-  // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
+  // `ScreenHeader` measures the title against its `inlineActions` cluster: the
+  // cluster shares the title's row only while the title fits there, and drops
+  // to its own row under the title when it would cut it. RN's default
   // flexShrink is 0: unless the cluster and the pill opt in, their children
   // keep their natural width and paint past the row's right edge, off-screen.
   // The route seeds the header with the cached list title it opened from. A
@@ -2075,11 +2094,11 @@ describe('SessionDetailContent header title', () => {
 
   it('lets the trailing header cluster shrink instead of spilling off-screen', async () => {
     const { renderer } = await mountDetails();
-    const headerRight = renderer.root.findByType(ScreenHeader).props.headerRight as {
-      props: { className: string };
-    };
-    expect(headerRight.props.className).toContain('min-w-0');
-    expect(headerRight.props.className).toContain('shrink');
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.props.headerRight).toBeUndefined();
+    const cluster = headerInlineActions(header);
+    expect(cluster.props.className).toContain('min-w-0');
+    expect(cluster.props.className).toContain('shrink');
     const metricsClassName = (
       renderer.root.findByProps({ testID: 'session-context-metrics' }).props as {
         className?: string;
@@ -2090,8 +2109,8 @@ describe('SessionDetailContent header title', () => {
   });
 });
 
-describe('session detail header right cluster', () => {
-  it('caps the right cluster inside the header slot and renders no copy control', async () => {
+describe('session detail header inline actions cluster', () => {
+  it('passes the cluster as the inline actions and renders no copy control', async () => {
     const { renderer } = await mountDetails([]);
     const header = renderer.root.findByType(ScreenHeader);
     // The copy-link action left the header in #6343 (7fad4e808) and now lives
@@ -2099,40 +2118,39 @@ describe('session detail header right cluster', () => {
     // captured cannot paint here any more.
     expect(header.findAll(node => Object.is(node.type, 'Link2'))).toHaveLength(0);
 
-    // The header caps its right slot at half the row...
-    const slot = header.findAll(
-      node =>
-        typeof node.props.className === 'string' && node.props.className.includes('max-w-[50%]')
-    );
-    expect(slot).toHaveLength(1);
-    expect(slot[0]?.props.className).toContain('min-w-0');
-    expect(slot[0]?.props.className).toContain('shrink');
+    // The cluster is the header's inline actions, so the header reflows it
+    // under the title once the title no longer fits beside it.
+    expect(header.props.headerRight).toBeUndefined();
+    const cluster = headerInlineActions(header);
+    expect(cluster.props.className).toContain('min-w-0');
+    expect(cluster.props.className).toContain('shrink');
+    // It holds the context pill and the Follow control and nothing else: the PR
+    // badge now shares the goal row instead. The pill leads and the Follow
+    // control ends the row, so a reading that arrives widens the pill into the
+    // header's free space instead of moving the control beside it.
+    const children = cluster.props.children;
+    expect(Array.isArray(children)).toBe(true);
+    if (!Array.isArray(children)) {
+      throw new TypeError('expected the cluster children');
+    }
+    expect(children).toHaveLength(2);
+    const [pill, follow] = children as ReactNode[];
+    if (!isValidElement(pill) || !isValidElement(follow)) {
+      throw new TypeError('expected the cluster to hold two elements');
+    }
+    expect(pill.type).toBe(SessionContextMetrics);
+    expect(follow.type).toBe(SessionFollowButton);
 
-    // ...and the cluster inside it shrinks into that cap, so it can never paint
-    // past the slot edge. It holds the context pill and the Follow control and
-    // nothing else: the PR badge now shares the goal row instead. The pill
-    // leads and the Follow control ends the row, so a reading that arrives
-    // widens the pill into the header's free space instead of moving the
-    // control beside it.
-    const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
-    expect(cluster?.props.className).toContain('min-w-0');
-    expect(cluster?.props.className).toContain('shrink');
-    expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
-    expect(cluster?.children).toHaveLength(2);
-    const [leading] = cluster?.children ?? [];
-    expect(typeof leading).toBe('object');
-    expect((leading as ReactTestInstance | undefined)?.type).toBe(SessionContextMetrics);
-
-    // The pill is the flexible part of the cluster: it shrinks into the cap
-    // with it, so the cluster can never paint past the slot edge.
+    // The pill is the flexible part of the cluster: it shrinks with it, so the
+    // cluster can never paint past its slot.
     const metrics = header.findByProps({ testID: 'session-context-metrics' });
     expect(metrics.props.className).toContain('min-w-0');
     expect(metrics.props.className).toContain('shrink');
   });
 
   // The cost is the only unbounded string in the cluster: a long total must
-  // truncate inside the capped pill instead of crossing the gutter.
-  it('truncates a long cost inside the capped pill', async () => {
+  // truncate inside the pill instead of crossing the gutter.
+  it('truncates a long cost inside the pill', async () => {
     const priced = assistantMessage('msg-priced');
     if (priced.info.role !== 'assistant') {
       throw new Error('expected an assistant message');

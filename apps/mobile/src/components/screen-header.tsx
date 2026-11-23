@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   type TextInstance,
+  type TextLayoutEvent,
   useWindowDimensions,
   View,
   type ViewInstance,
@@ -173,16 +174,29 @@ const UNMEASURED_TITLE_FIT: TitleFit = {
 };
 
 /**
+ * The line count the visible title reported for one layout (`titleFitKey`),
+ * read from its `onTextLayout`. Only a title capped at several lines wraps: a
+ * one-line title is cut instead, which the width pair above decides.
+ */
+type TitleWrap = { key: string; count: number };
+
+/** No layout has reported yet: no key matches, and one line is not a wrap. */
+const UNMEASURED_TITLE_WRAP: TitleWrap = { key: '', count: 1 };
+
+/**
  * Records measured widths and decides whether the title is cut beside the
- * inline cluster. The decision is re-taken while the cluster shares the row,
- * and never outside it: once the cluster has moved, the wider room the title
- * gets says nothing about the row, so reporting it neither cuts the title nor
- * moves the cluster back. It is also only ever taken from a pair measured in
- * the same layout, so a new layout's box is never compared with the width the
- * previous layout's copy reported (and a layout whose copy has not reported
- * yet decides nothing). Both widths sit on the pixel grid, so a cut title's
- * box is at least a pixel narrower than its natural width; half a pixel is the
- * margin for float noise.
+ * inline cluster. Only a one-line cap is decided this way: a title capped at
+ * several lines reports its line count instead (see `TitleWrap`), because a
+ * line of prose that did not wrap can still overrun its box by a physical
+ * pixel. The decision is re-taken while the cluster shares the row, and never
+ * outside it: once the cluster has moved, the wider room the title gets says
+ * nothing about the row, so reporting it neither cuts the title nor moves the
+ * cluster back. It is also only ever taken from a pair measured in the same
+ * layout, so a new layout's box is never compared with the width the previous
+ * layout's copy reported (and a layout whose copy has not reported yet decides
+ * nothing). Both widths sit on the pixel grid, so a cut title's box is at
+ * least a pixel narrower than its natural width; half a pixel is the margin
+ * for float noise.
  *
  * A cut takes two measurements of the same layout to count. One frame can
  * report a box a fraction of a dp too narrow while the rest of the row is
@@ -677,12 +691,28 @@ export function ScreenHeader({
   // `measureTitleFit`): the row can be a fraction of a dp too narrow while the
   // cluster is still settling, and stacking on that frame would keep the
   // cluster on its own row for the rest of the layout.
+  //
+  // A title capped at several lines is decided by the line count it reports
+  // instead: a prose title that wraps reports more than one line, while a
+  // single-line title is cut. A line that did not wrap can overrun its box by
+  // one physical pixel, and that must not move the cluster.
+  //
+  // One cap for the Text and the reserved box: a title capped deeper than the
+  // reserve would shift the body the moment it reached the extra line. A large
+  // font scale raises the floor to two lines (see `titleNumberOfLines`).
+  const titleLines = Math.min(Math.max(titleNumberOfLines, largeFont ? 2 : 1), MAX_TITLE_LINES);
   const measuresTitleFit = inlineActions ? title != null && !titleContent && !largeFont : false;
   const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
   const [titleFit, setTitleFit] = useState<TitleFit>(UNMEASURED_TITLE_FIT);
+  const [titleWrap, setTitleWrap] = useState<TitleWrap>(UNMEASURED_TITLE_WRAP);
   const titleNaturalRef = useRef<TextInstance>(null);
   const titleBoxRef = useRef<ViewInstance>(null);
-  const titleOverflows = measuresTitleFit && titleFit.cutKey === titleFitKey;
+  // The count is kept per layout, like the widths, so a report from the
+  // previous layout never decides this one.
+  const titleWraps = titleWrap.key === titleFitKey && titleWrap.count > 1;
+  const titleOverflows =
+    measuresTitleFit &&
+    (titleLines === 1 ? titleFit.cutKey === titleFitKey : titleWraps);
   // The probe's extra pass remounts the hidden copy through this key, which
   // leaves `titleFitKey` free to keep its one-meaning-per-layout role.
   const titleProbeKey = `${titleFitKey}#${titleFit.probePass}`;
@@ -712,6 +742,20 @@ export function ScreenHeader({
   const onTitleBoxLayout = (event: LayoutChangeEvent) => {
     const measured = { boxKey: titleFitKey, boxWidth: event.nativeEvent.layout.width };
     setTitleFit(previous => measureTitleFit(previous, measured, titleFitLayout));
+  };
+  // The visible title's line count decides a multi-line cap (see
+  // `titleWraps`). It is read only while the cluster shares the title's row,
+  // for the same reason the width pair is: on its own row the title gets the
+  // full width and re-lays out to one line, and consulting that report would
+  // return the cluster to the row, wrap the title again, and loop.
+  const onTitleTextLayout = (event: TextLayoutEvent) => {
+    if (stackInlineActions) {
+      return;
+    }
+    const report = { key: titleFitKey, count: event.nativeEvent.lines.length };
+    setTitleWrap(previous =>
+      previous.key === report.key && previous.count === report.count ? previous : report
+    );
   };
   // A layout's first decision is read synchronously, before the frame that
   // mounts it paints: the cut title and the cluster beside it otherwise
@@ -814,11 +858,6 @@ export function ScreenHeader({
 
   const titleClass = size === 'large' ? SCREEN_HEADER_LARGE_TITLE_CLASS : SCREEN_HEADER_TITLE_CLASS;
 
-  // One cap for the Text and the reserved box: a title capped deeper than the
-  // reserve would shift the body the moment it reached the extra line. A large
-  // font scale raises the floor to two lines (see `titleNumberOfLines`).
-  const titleLines = Math.min(Math.max(titleNumberOfLines, largeFont ? 2 : 1), MAX_TITLE_LINES);
-
   // The title's touch area stays inside its own column. The free side beside
   // the heading is the row's gap to the trailing slot, and a trailing control
   // may carry a slop that reaches into that gap from the other side, so a
@@ -852,6 +891,9 @@ export function ScreenHeader({
         numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
+        // A one-line cap is decided by the width pair alone, so only a deeper
+        // cap needs the line count the text itself reports.
+        onTextLayout={measuresTitleFit && titleLines > 1 ? onTitleTextLayout : undefined}
       >
         {title}
       </Text>

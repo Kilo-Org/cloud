@@ -909,6 +909,91 @@ describe('ScreenHeader mounted', () => {
     });
   });
 
+  describe('a multi-line title the inline cluster would squeeze', () => {
+    // A session name is prose under a 3-line cap: it wraps instead of being
+    // cut, so its own line count decides the reflow. The width pair must not:
+    // the Android gate measured this title's paragraph 0.38dp — one physical
+    // pixel at 2.625 — wider than its box on a line that did NOT wrap.
+    const session: ScreenHeaderProps = {
+      title: 'Markdown libraries fixture',
+      titleNumberOfLines: 3,
+      inlineActions: slotView(),
+    };
+    /** The gate's reading, in dp: a paragraph one physical pixel wider than its box. */
+    const overhang = { natural: 210.67, box: 210.29 };
+    const reportedLines = (renderer: TestRenderer.ReactTestRenderer, count: number) => {
+      const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+      const onTextLayout = title.props.onTextLayout;
+      if (typeof onTextLayout !== 'function') {
+        throw new TypeError('expected the title to report its line count');
+      }
+      act(() => {
+        (onTextLayout as (event: { nativeEvent: { lines: unknown[] } }) => void)({
+          nativeEvent: { lines: Array.from({ length: count }, () => ({})) },
+        });
+      });
+    };
+    /** The visible title's box and the hidden copy, as the fit check reads them. */
+    const fitTargets = (renderer: TestRenderer.ReactTestRenderer) => {
+      const box = renderer.root.findByProps({ accessibilityRole: 'header' }).parent;
+      const copy = renderer.root
+        .findAll(isHiddenTitleCopy)[0]
+        ?.findAll(node => typeof node.type === 'string' && node.props.onLayout !== undefined)[0];
+      if (!box || !copy) {
+        throw new TypeError('expected the measured title box and its hidden copy');
+      }
+      return { box, copy };
+    };
+    const reportWidth = (node: TestInstance, width: number) => {
+      const onLayout = node.props.onLayout;
+      if (typeof onLayout !== 'function') {
+        throw new TypeError('expected a layout reporter');
+      }
+      act(() => {
+        (onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+          nativeEvent: { layout: { width } },
+        });
+      });
+    };
+    /**
+     * Reports the overhang the way a device does: the box, the copy, then the
+     * probe's fresh box, which is the second report a suspected cut waits for.
+     */
+    const reportOverhang = (renderer: TestRenderer.ReactTestRenderer) => {
+      const first = fitTargets(renderer);
+      reportWidth(first.box, overhang.box);
+      reportWidth(first.copy, overhang.natural);
+      reportWidth(fitTargets(renderer).box, overhang.box);
+    };
+
+    it('moves the cluster under a title that reported two lines', () => {
+      const renderer = renderHeader(session);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      reportedLines(renderer, 2);
+      const stacked = renderer.root.findAll(isStackedActionsRow);
+      expect(stacked).toHaveLength(1);
+      expect(stacked[0]?.children).toHaveLength(1);
+
+      // On its own row the title gets the full width and re-lays out to one
+      // line; that report must not return the cluster to the row.
+      reportedLines(renderer, 1);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    it('keeps the cluster on the row for a one-pixel overhang of a single line', () => {
+      const renderer = renderHeader(session);
+      reportOverhang(renderer);
+      reportedLines(renderer, 1);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+      // The same measured pair IS a cut under a one-line cap, where the title
+      // cannot wrap: that is the signal this cap replaces, not a new threshold.
+      const oneLine = renderHeader({ ...session, titleNumberOfLines: 1 });
+      reportOverhang(oneLine);
+      expect(oneLine.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+  });
+
   it('lets a pinned picker give way before the title it sits beside', () => {
     // Compact Chat: the BETA pill, the backend control and a long account name
     // shared the row, and the heading's zero basis gave the picker its full

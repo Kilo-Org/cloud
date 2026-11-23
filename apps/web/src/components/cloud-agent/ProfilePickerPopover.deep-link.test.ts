@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import type { ProfileSummaryWithOwner } from '@/hooks/useCloudAgentProfiles';
 import type { ProfilePickerPopover as ProfilePickerPopoverComponent } from './ProfilePickerPopover';
+import type { ProfilesListDialog } from './ProfilesListDialog';
 
 const mockSetSection = jest.fn();
 const mockClearSection = jest.fn();
-const mockProfilesListDialogProps: Array<{ onOpenChange?: (open: boolean) => void }> = [];
+const mockProfilesListDialogProps: React.ComponentProps<typeof ProfilesListDialog>[] = [];
+const mockTopProfile = jest.fn<() => ProfileSummaryWithOwner | null>();
 
 jest.mock('@/components/cloud-agent-next/settings/useCloudAgentSettingsDeepLink', () => ({
   useCloudAgentSettingsDeepLink: () => ({
@@ -26,12 +29,12 @@ jest.mock('@/hooks/useSessionProfileLayers', () => ({
     refetchProfiles: jest.fn(),
     layers: {},
     baseProfile: null,
-    topProfile: null,
+    topProfile: mockTopProfile(),
   }),
 }));
 
 jest.mock('@/components/cloud-agent/ProfilesListDialog', () => ({
-  ProfilesListDialog: (props: { onOpenChange?: (open: boolean) => void }) => {
+  ProfilesListDialog: (props: React.ComponentProps<typeof ProfilesListDialog>) => {
     mockProfilesListDialogProps.push(props);
     return null;
   },
@@ -72,23 +75,29 @@ const { ProfilePickerPopover } = require('./ProfilePickerPopover') as {
 describe('ProfilePickerPopover settings deep link', () => {
   let root: Root;
 
+  function renderPicker(organizationId?: string) {
+    act(() => {
+      root.render(
+        createElement(ProfilePickerPopover, {
+          organizationId,
+          selectedOverrideProfileId: null,
+          onOverrideProfileSelect: jest.fn(),
+        })
+      );
+    });
+  }
+
   beforeEach(() => {
     mockSetSection.mockReset();
     mockClearSection.mockReset();
+    mockTopProfile.mockReset().mockReturnValue(null);
     mockProfilesListDialogProps.length = 0;
     const container = domDocument.getElementById('root');
     if (!container) throw new Error('Missing profile picker test root');
     act(() => {
       root = createRoot(container);
     });
-    act(() => {
-      root.render(
-        createElement(ProfilePickerPopover, {
-          selectedOverrideProfileId: null,
-          onOverrideProfileSelect: jest.fn(),
-        })
-      );
-    });
+    renderPicker();
   });
 
   afterEach(() => {
@@ -106,11 +115,42 @@ describe('ProfilePickerPopover settings deep link', () => {
     expect(mockSetSection).toHaveBeenCalledWith('profiles');
   });
 
+  it('opens Personal profiles to edit a personal profile in an organization workspace', () => {
+    mockTopProfile.mockReturnValue({
+      id: 'personal-profile',
+      name: 'My Profile',
+      ownerType: 'user',
+      description: null,
+      isDefault: true,
+      createdAt: '2026-04-29T00:00:00.000Z',
+      updatedAt: '2026-04-29T00:00:00.000Z',
+      varCount: 0,
+      commandCount: 0,
+      mcpServerCount: 0,
+      skillCount: 0,
+      agentCount: 0,
+      kiloCommandCount: 0,
+      instructionCount: 0,
+    });
+    renderPicker('org-1');
+    const edit = domDocument.querySelector<HTMLButtonElement>('button[title="Edit profile"]');
+    if (!edit) throw new Error('Missing Edit profile button');
+
+    act(() => edit.click());
+
+    expect(mockSetSection).toHaveBeenCalledWith('personal-profiles');
+    expect(mockProfilesListDialogProps.at(-1)).toMatchObject({
+      open: true,
+      initialSection: 'personal-profiles',
+      initialSelectedProfileId: 'personal-profile',
+    });
+  });
+
   it('clears the settings query when the profile dialog closes', () => {
     const dialog = mockProfilesListDialogProps[0];
     if (!dialog) throw new Error('Missing ProfilesListDialog');
 
-    act(() => dialog.onOpenChange?.(false));
+    act(() => dialog.onOpenChange(false));
 
     expect(mockClearSection).toHaveBeenCalled();
   });

@@ -44,6 +44,7 @@ import { WebSearchSection } from './WebSearchSection';
 export type SettingsSection =
   | 'general'
   | 'profiles'
+  | 'personal-profiles'
   | 'environments'
   | 'compute'
   | 'sidebar'
@@ -57,6 +58,7 @@ type CloudAgentSettingsDialogProps = {
   onSetupStarted?: () => void;
   onSectionChange?: (section: SettingsSection) => void;
   onProfileSelect?: (profileId: string) => void;
+  orgProfilesOnly?: boolean;
   openToNewProfile?: boolean;
   initialSelectedProfileId?: string | null;
 };
@@ -95,10 +97,13 @@ function CloudAgentSettings({
   onSetupStarted,
   onSectionChange,
   onProfileSelect,
+  orgProfilesOnly,
   openToNewProfile,
   initialSelectedProfileId,
 }: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'>) {
-  const [section, setSection] = useState(initialSection);
+  const resolvedInitialSection =
+    initialSection === 'personal-profiles' && !organizationId ? 'profiles' : initialSection;
+  const [section, setSection] = useState(resolvedInitialSection);
   const [environmentsVisited, setEnvironmentsVisited] = useState(initialSection === 'environments');
   const changeSection = (next: SettingsSection) => {
     setSection(next);
@@ -136,6 +141,7 @@ function CloudAgentSettings({
         {organizationId &&
         settings &&
         !settings.canManage &&
+        activeSection !== 'personal-profiles' &&
         activeSection !== 'sidebar' &&
         activeSection !== 'preferences' ? (
           <DialogDescription className="mt-1 flex items-center gap-1.5">
@@ -155,6 +161,7 @@ function CloudAgentSettings({
           if (
             value === 'general' ||
             value === 'profiles' ||
+            (value === 'personal-profiles' && organizationId) ||
             value === 'environments' ||
             value === 'sidebar' ||
             value === 'preferences' ||
@@ -208,6 +215,15 @@ function CloudAgentSettings({
           <NavGroupLabel icon={User} className="md:mt-3">
             You
           </NavGroupLabel>
+          {organizationId && (
+            <TabsTrigger
+              value="personal-profiles"
+              className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
+            >
+              <FolderCog className="size-4 shrink-0" aria-hidden />
+              Personal profiles
+            </TabsTrigger>
+          )}
           <TabsTrigger
             value="preferences"
             className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
@@ -301,12 +317,35 @@ function CloudAgentSettings({
           className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col data-[state=inactive]:hidden"
         >
           <ProfilesManager
+            owner={organizationId ? 'organization' : 'user'}
             organizationId={organizationId}
             onProfileSelect={onProfileSelect}
-            openToNewProfile={openToNewProfile}
-            initialSelectedProfileId={initialSelectedProfileId}
+            openToNewProfile={resolvedInitialSection === 'profiles' ? openToNewProfile : undefined}
+            initialSelectedProfileId={
+              resolvedInitialSection === 'profiles' ? initialSelectedProfileId : undefined
+            }
           />
         </TabsContent>
+        {organizationId && (
+          <TabsContent
+            value="personal-profiles"
+            className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col data-[state=inactive]:hidden"
+          >
+            <ProfilesManager
+              owner="user"
+              organizationId={organizationId}
+              onProfileSelect={orgProfilesOnly ? undefined : onProfileSelect}
+              openToNewProfile={
+                resolvedInitialSection === 'personal-profiles' ? openToNewProfile : undefined
+              }
+              initialSelectedProfileId={
+                resolvedInitialSection === 'personal-profiles'
+                  ? initialSelectedProfileId
+                  : undefined
+              }
+            />
+          </TabsContent>
+        )}
         <TabsContent
           value="sidebar"
           className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"

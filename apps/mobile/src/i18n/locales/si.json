@@ -91,6 +91,7 @@
     "draft": "කෙටුම්පත",
     "enabled": "සක්‍රීයයි",
     "github": "GitHub",
+    "image": "රූපය",
     "imageUnavailable": "රූපය ලබාගත නොහැක.",
     "loading": "පූරණය වෙමින්…",
     "loadMore": "තවත් පූරණය කරන්න",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "රූපය පූරණය වෙමින්",
       "imageUnavailableRetry": "රූපය ලබා ගත නොහැක. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
+      "imageUnavailableRetryWithAlt": "රූපය ලබා ගත නොහැක. {{alt}}. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "imagePreviewUnavailableInSession": "මෙම සැසියේදී රූප පෙරදසුන ලබාගත නොහැක.",
       "viewImage": "රූපය බලන්න",
       "viewImageWithAlt": "{{alt}} රූපය බලන්න",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithApple)' භාවිත කරන්න.",
     "signupStepUpGoogle": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithGoogle)' භාවිත කරන්න.",
     "signupStepUpBack": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට ආපසු ගොස් '$t(login.moreSignInOptions)' භාවිත කරන්න.",
-    "invalidCode": "එම කේතය වැරදියි හෝ කල් ඉකුත් වී ඇත. කරුණාකර නැවත උත්සාහ කරන්න, නැතහොත් '$t(login.resendCode)' භාවිත කරන්න.",
+    "invalidCode": "එම කේතය වැරදියි හෝ කල් ඉකුත් වී ඇත. කරුණාකර '$t(login.resendCode)' භාවිත කරන්න හෝ නැතහොත් '$t(login.moreSignInOptions)' භාවිත කරන්න.",
     "codeInProgress": "ඔබේ කේතය සකසනු ලැබේ. මොහොතක් රැඳී සිට නැවත උත්සාහ කරන්න.",
     "tooManyAttempts": "උත්සාහ කළ වාර ගණන වැඩියි. කරුණාකර නව කේතයක් ඉල්ලන්න.",
     "invalidToken": "පිවිසීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "උපදෙස සුරැකීමට නොහැකි විය",
     "instructionDeleteFailed": "උපදෙස මැකීමට නොහැකි විය",
     "instructionToggleFailed": "උපදෙස යාවත්කාලීන කිරීමට නොහැකි විය",
+    "instructionViewTitle": "උපදෙස් ගොනුව",
     "instructionLimitReached": "පැතිකඩකට උපදෙස් {{max}}ක් දක්වා තබා ගත හැක. තවත් එකක් එකතු කිරීමට එකක් මකන්න.",
     "mcp": {
       "title": "MCP සේවාදායකයන්",

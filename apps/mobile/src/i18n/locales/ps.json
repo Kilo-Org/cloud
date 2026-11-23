@@ -91,6 +91,7 @@
     "draft": "مسوده",
     "enabled": "فعال",
     "github": "GitHub",
+    "image": "انځور",
     "imageUnavailable": "انځور نشته",
     "loading": "بارېږي…",
     "loadMore": "نور بار کړئ",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "انځور بارېږي",
       "imageUnavailableRetry": "انځور د لاسرسي وړ نه دی، د بارولو بیا هڅه وکړئ",
+      "imageUnavailableRetryWithAlt": "انځور د لاسرسي وړ نه دی، {{alt}}، د بارولو بیا هڅه وکړئ",
       "imagePreviewUnavailableInSession": "په دې ناسته کې د انځور مخکتنه د لاسرسي وړ نه ده.",
       "viewImage": "انځور وګورئ",
       "viewImageWithAlt": "د {{alt}} انځور وګورئ",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "د خپل حساب د جوړولو بشپړولو لپاره '$t(login.signInWithApple)' وکاروئ.",
     "signupStepUpGoogle": "د خپل حساب د جوړولو بشپړولو لپاره '$t(login.signInWithGoogle)' وکاروئ.",
     "signupStepUpBack": "د خپل حساب د جوړولو بشپړولو لپاره بېرته لاړ شئ او '$t(login.moreSignInOptions)' وکاروئ.",
-    "invalidCode": "دا کوډ سم نه دی یا یې موده پای ته رسېدلې ده. مهرباني وکړئ بیا هڅه وکړئ یا '$t(login.resendCode)' وکاروئ.",
+    "invalidCode": "دا کوډ سم نه دی یا یې موده پای ته رسېدلې ده. '$t(login.resendCode)' وکاروئ یا '$t(login.moreSignInOptions)' وکاروئ.",
     "codeInProgress": "ستاسو کوډ پروسس کېږي. لږ تم شئ او بیا هڅه وکړئ.",
     "tooManyAttempts": "ډېرې هڅې وشوې. مهرباني وکړئ د نوي کوډ غوښتنه وکړئ.",
     "invalidToken": "ننوتل ناکام شو. مهرباني وکړئ بیا هڅه وکړئ.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "لارښوونه ونه ساتل شوه",
     "instructionDeleteFailed": "لارښوونه ونه ړنګېده",
     "instructionToggleFailed": "لارښوونه ونه نویول شوه",
+    "instructionViewTitle": "د لارښوونې فایل",
     "instructionLimitReached": "یو پروفایل تر {{max}} لارښوونو پورې ساتلی شي. د بلې زیاتولو لپاره یوه ړنګه کړه.",
     "mcp": {
       "title": "MCP سرورونه",

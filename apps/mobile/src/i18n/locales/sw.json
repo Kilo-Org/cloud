@@ -91,6 +91,7 @@
     "draft": "Rasimu",
     "enabled": "Imewashwa",
     "github": "GitHub",
+    "image": "Picha",
     "imageUnavailable": "Picha haipatikani.",
     "loading": "Inapakia…",
     "loadMore": "Pakia zaidi",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Inapakia picha",
       "imageUnavailableRetry": "Picha haipatikani, jaribu tena kupakia",
+      "imageUnavailableRetryWithAlt": "Picha haipatikani, {{alt}}, jaribu tena kupakia",
       "imagePreviewUnavailableInSession": "Onyesho la awali la picha halipatikani kwenye kikao hiki.",
       "viewImage": "Tazama picha",
       "viewImageWithAlt": "Tazama picha {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Ili kukamilisha kuunda akaunti yako, rudi nyuma kisha utumie '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Msimbo huo si sahihi au muda wake umeisha. Tafadhali jaribu tena au tumia '$t(login.resendCode)'.",
+    "invalidCode": "Msimbo huo si sahihi au muda wake umeisha. Tumia '$t(login.resendCode)' au '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Msimbo wako unachakatwa. Subiri kidogo kisha ujaribu tena.",
     "tooManyAttempts": "Majaribio mengi mno. Tafadhali omba msimbo mpya.",
     "invalidToken": "Kuingia kumeshindikana. Tafadhali jaribu tena.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Imeshindwa kuhifadhi elekezo",
     "instructionDeleteFailed": "Imeshindwa kufuta elekezo",
     "instructionToggleFailed": "Imeshindwa kusasisha elekezo",
+    "instructionViewTitle": "Faili ya elekezo",
     "instructionLimitReached": "Wasifu unaweza kubeba elekezo {{max}} kwa juu. Futa moja ili kuongeza nyingine.",
     "mcp": {
       "title": "seva za MCP",

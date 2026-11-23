@@ -1490,8 +1490,6 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * (50) when omitted so the request is always bounded before reaching the DO.
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
- * `before` is capped at `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized
- * value never reaches the decoder.
  *
  * `kiloSessionId` takes `storedSessionIdSchema`, not `sessionIdSchema`: the
  * store still addresses sessions created before the canonical id shape was
@@ -1520,11 +1518,9 @@ export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
  * worker RPC). Sharing the schema keeps tRPC-level validation identical to
  * the worker's own bounded reader.
  *
- * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and defaults
- * to `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE` when omitted, so the request is
- * always bounded before it reaches the session store. `cursor` is the opaque
- * continuation cursor validated by `validateKiloSdkMessagesCursor`; a caller
- * receives one from a previous page and passes it back to walk older history.
+ * `cursor` is the opaque continuation cursor validated by
+ * `validateKiloSdkMessagesCursor`; a caller receives one from a previous page
+ * and passes it back to walk older history.
  *
  * `session_id` takes `storedSessionIdSchema`, the same rule the worker reader
  * applies. The boundary accepts exactly the ids the reader addresses: bounded,

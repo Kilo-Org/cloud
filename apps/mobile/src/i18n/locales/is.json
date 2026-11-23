@@ -91,6 +91,7 @@
     "draft": "Drög",
     "enabled": "Virkt",
     "github": "GitHub",
+    "image": "Mynd",
     "imageUnavailable": "Myndin er ekki tiltæk.",
     "loading": "Hleðsla í gangi…",
     "loadMore": "Sækja meira",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Hleður myndinni",
       "imageUnavailableRetry": "Myndin er ekki tiltæk, reyna að hlaða henni aftur",
+      "imageUnavailableRetryWithAlt": "Myndin er ekki tiltæk, {{alt}}, reyna að hlaða henni aftur",
       "imagePreviewUnavailableInSession": "Ekki er hægt að forskoða myndir í þessari lotu.",
       "viewImage": "Skoða mynd",
       "viewImageWithAlt": "Skoða mynd {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Veldu „$t(login.signInWithApple)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpGoogle": "Veldu „$t(login.signInWithGoogle)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpBack": "Farðu til baka og veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
-    "invalidCode": "Þessi kóði er rangur eða útrunninn. Reyndu aftur eða veldu „$t(login.resendCode)“.",
+    "invalidCode": "Þessi kóði er rangur eða útrunninn. Notaðu „$t(login.resendCode)“ eða „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Kóðinn þinn er í vinnslu. Bíddu í smá stund og reyndu aftur.",
     "tooManyAttempts": "Of margar tilraunir. Biddu um nýjan kóða.",
     "invalidToken": "Innskráning mistókst. Reyndu aftur.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Gat ekki vistað leiðbeininguna",
     "instructionDeleteFailed": "Gat ekki eytt leiðbeiningunni",
     "instructionToggleFailed": "Gat ekki uppfært leiðbeininguna",
+    "instructionViewTitle": "Leiðbeiningarskrá",
     "instructionLimitReached": "Snið getur haft allt að {{max}} leiðbeiningar. Eyða einni til að bæta við annarri.",
     "mcp": {
       "title": "MCP netþjóna",

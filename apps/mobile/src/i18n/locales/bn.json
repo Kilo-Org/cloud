@@ -91,6 +91,7 @@
     "draft": "খসড়া",
     "enabled": "চালু",
     "github": "GitHub",
+    "image": "ছবি",
     "imageUnavailable": "ছবিটি পাওয়া যাচ্ছে না।",
     "loading": "লোড হচ্ছে…",
     "loadMore": "আরও লোড করুন",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ছবি লোড হচ্ছে",
       "imageUnavailableRetry": "ছবি পাওয়া যাচ্ছে না, লোড করার জন্য আবার চেষ্টা করুন",
+      "imageUnavailableRetryWithAlt": "ছবি পাওয়া যাচ্ছে না, {{alt}}, লোড করার জন্য আবার চেষ্টা করুন",
       "imagePreviewUnavailableInSession": "এই সেশনে ছবির প্রিভিউ দেখা যায় না।",
       "viewImage": "ছবি দেখুন",
       "viewImageWithAlt": "{{alt}} ছবিটি দেখুন",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "আপনার অ্যাকাউন্ট তৈরি সম্পূর্ণ করতে '$t(login.signInWithApple)' ব্যবহার করুন।",
     "signupStepUpGoogle": "আপনার অ্যাকাউন্ট তৈরি সম্পূর্ণ করতে '$t(login.signInWithGoogle)' ব্যবহার করুন।",
     "signupStepUpBack": "আপনার অ্যাকাউন্ট তৈরি সম্পূর্ণ করতে পেছনে ফিরে যান এবং '$t(login.moreSignInOptions)' ব্যবহার করুন।",
-    "invalidCode": "কোডটি সঠিক নয় অথবা এর মেয়াদ শেষ হয়ে গেছে। অনুগ্রহ করে আবার চেষ্টা করুন অথবা '$t(login.resendCode)' ব্যবহার করুন।",
+    "invalidCode": "কোডটি সঠিক নয় অথবা এর মেয়াদ শেষ হয়ে গেছে। '$t(login.resendCode)' অথবা '$t(login.moreSignInOptions)' ব্যবহার করুন।",
     "codeInProgress": "আপনার কোডটি যাচাই করা হচ্ছে। একটু অপেক্ষা করে আবার চেষ্টা করুন।",
     "tooManyAttempts": "অতিরিক্তবার চেষ্টা করা হয়েছে। নতুন কোডের অনুরোধ করুন।",
     "invalidToken": "সাইন ইন করা যায়নি। আবার চেষ্টা করুন।",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "নির্দেশনা সংরক্ষণ করা যায়নি",
     "instructionDeleteFailed": "নির্দেশনা মোছা যায়নি",
     "instructionToggleFailed": "নির্দেশনা আপডেট করা যায়নি",
+    "instructionViewTitle": "নির্দেশনার ফাইল",
     "instructionLimitReached": "একটি প্রোফাইলে সর্বোচ্চ {{max}}টি নির্দেশনা থাকতে পারে। আরেকটি যোগ করতে একটি মুছুন।",
     "mcp": {
       "title": "MCP সার্ভার",

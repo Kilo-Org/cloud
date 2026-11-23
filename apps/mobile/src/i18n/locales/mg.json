@@ -91,6 +91,7 @@
     "draft": "Volavola",
     "enabled": "Mandeha",
     "github": "GitHub",
+    "image": "Sary",
     "imageUnavailable": "Tsy azo aseho ny sary.",
     "loading": "Mampiditra…",
     "loadMore": "Ampidiro ny manaraka",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Maka sary",
       "imageUnavailableRetry": "Tsy azo aseho ny sary, andramo alaina indray",
+      "imageUnavailableRetryWithAlt": "Tsy azo aseho ny sary, {{alt}}, andramo alaina indray",
       "imagePreviewUnavailableInSession": "Tsy azo jerena mialoha ny sary amin'ity fotoam-piasana ity.",
       "viewImage": "Jereo ny sary",
       "viewImageWithAlt": "Jereo ny sary {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Ampiasao ny '$t(login.signInWithApple)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpGoogle": "Ampiasao ny '$t(login.signInWithGoogle)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpBack": "Mba hamitana ny famoronana ny kaontinao, miverena any aoriana ary ampiasao ny '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Andramo indray na ampiasao ny '$t(login.resendCode)'.",
+    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Ampiasao ny '$t(login.resendCode)' na ny '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mbola karakaraina ny kaodinao. Miandrasa kely ary andramo indray.",
     "tooManyAttempts": "Betsaka loatra ny andrana. Mangataha kaody vaovao azafady.",
     "invalidToken": "Tsy nahomby ny fidirana. Andramo indray azafady.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Tsy afaka nitahiry ny torolalana",
     "instructionDeleteFailed": "Tsy afaka namafa ny torolalana",
     "instructionToggleFailed": "Tsy afaka nanavao ny torolalana",
+    "instructionViewTitle": "Rakitra torolalana",
     "instructionLimitReached": "Ny profil iray dia mahazaka torolalana hatramin'ny {{max}}. Fafao ny iray hanampiana ny hafa.",
     "mcp": {
       "title": "Mpizara MCP",

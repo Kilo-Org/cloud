@@ -91,6 +91,7 @@
     "draft": "मस्यौदा",
     "enabled": "चालु",
     "github": "GitHub",
+    "image": "तस्बिर",
     "imageUnavailable": "तस्बिर उपलब्ध छैन।",
     "loading": "लोड हुँदै…",
     "loadMore": "थप लोड गर्नुहोस्",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "तस्बिर लोड गर्दै",
       "imageUnavailableRetry": "तस्बिर उपलब्ध छैन, लोड गर्न पुनः प्रयास गर्नुहोस्",
+      "imageUnavailableRetryWithAlt": "तस्बिर उपलब्ध छैन, {{alt}}, लोड गर्न पुनः प्रयास गर्नुहोस्",
       "imagePreviewUnavailableInSession": "यो सत्रमा तस्बिरको पूर्वावलोकन उपलब्ध छैन।",
       "viewImage": "तस्बिर हेर्नुहोस्",
       "viewImageWithAlt": "{{alt}} तस्बिर हेर्नुहोस्",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "आफ्नो खाता सिर्जना पूरा गर्न '$t(login.signInWithApple)' प्रयोग गर्नुहोस्।",
     "signupStepUpGoogle": "आफ्नो खाता सिर्जना पूरा गर्न '$t(login.signInWithGoogle)' प्रयोग गर्नुहोस्।",
     "signupStepUpBack": "आफ्नो खाता सिर्जना पूरा गर्न पछाडि जानुहोस् र '$t(login.moreSignInOptions)' प्रयोग गर्नुहोस्।",
-    "invalidCode": "त्यो कोड गलत छ वा यसको म्याद सकिएको छ। कृपया फेरि प्रयास गर्नुहोस् वा '$t(login.resendCode)' प्रयोग गर्नुहोस्।",
+    "invalidCode": "त्यो कोड गलत छ वा यसको म्याद सकिएको छ। कृपया '$t(login.resendCode)' प्रयोग गर्नुहोस् वा '$t(login.moreSignInOptions)' प्रयोग गर्नुहोस्।",
     "codeInProgress": "तपाईंको कोड जाँचिँदै छ। केही क्षण पर्खेर फेरि प्रयास गर्नुहोस्।",
     "tooManyAttempts": "धेरै पटक प्रयास गरियो। कृपया नयाँ कोडको अनुरोध गर्नुहोस्।",
     "invalidToken": "साइन इन असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "निर्देशन सुरक्षित गर्न सकिएन",
     "instructionDeleteFailed": "निर्देशन मेट्न सकिएन",
     "instructionToggleFailed": "निर्देशन अद्यावधिक गर्न सकिएन",
+    "instructionViewTitle": "निर्देशन फाइल",
     "instructionLimitReached": "एउटा प्रोफाइलमा बढीमा {{max}} निर्देशन राख्न सकिन्छ। अर्को थप्न एउटा मेट्नुहोस्।",
     "mcp": {
       "title": "MCP सर्भरहरू",

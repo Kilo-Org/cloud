@@ -93,6 +93,7 @@
     "draft": "Osnutek",
     "enabled": "Omogočeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika ni na voljo.",
     "loading": "Nalaganje…",
     "loadMore": "Naloži več",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Nalaganje slike",
       "imageUnavailableRetry": "Slika ni na voljo, poskusi jo znova naložiti",
+      "imageUnavailableRetryWithAlt": "Slika ni na voljo, {{alt}}, poskusi jo znova naložiti",
       "imagePreviewUnavailableInSession": "Predogled slike v tej seji ni na voljo.",
       "viewImage": "Prikaži sliko",
       "viewImageWithAlt": "Prikaži sliko {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithApple)«.",
     "signupStepUpGoogle": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithGoogle)«.",
     "signupStepUpBack": "Za dokončanje ustvarjanja računa se vrni nazaj in izberi »$t(login.moreSignInOptions)«.",
-    "invalidCode": "Ta koda ni pravilna ali je potekla. Poskusi znova ali uporabi »$t(login.resendCode)«.",
+    "invalidCode": "Ta koda ni pravilna ali je potekla. Uporabi »$t(login.resendCode)« ali »$t(login.moreSignInOptions)«.",
     "codeInProgress": "Tvoja koda se obdeluje. Počakaj trenutek in poskusi znova.",
     "tooManyAttempts": "Preveč poskusov. Zahtevaj novo kodo.",
     "invalidToken": "Prijava ni uspela. Poskusi znova.",
@@ -4693,6 +4695,7 @@
     "instructionSaveFailed": "Navodila ni bilo mogoče shraniti",
     "instructionDeleteFailed": "Navodila ni bilo mogoče izbrisati",
     "instructionToggleFailed": "Navodila ni bilo mogoče posodobiti",
+    "instructionViewTitle": "Datoteka z navodili",
     "instructionLimitReached": "Profil lahko vsebuje največ {{max}} navodil. Izbrišite eno, da dodate drugo.",
     "mcp": {
       "title": "MCP strežniki",

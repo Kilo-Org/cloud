@@ -91,6 +91,7 @@
     "draft": "வரைவு",
     "enabled": "இயக்கப்பட்டது",
     "github": "GitHub",
+    "image": "படம்",
     "imageUnavailable": "படம் கிடைக்கவில்லை.",
     "loading": "ஏற்றுகிறது…",
     "loadMore": "மேலும் ஏற்றவும்",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "படம் ஏற்றப்படுகிறது",
       "imageUnavailableRetry": "படம் கிடைக்கவில்லை. மீண்டும் ஏற்ற முயற்சிக்கவும்",
+      "imageUnavailableRetryWithAlt": "படம் கிடைக்கவில்லை. {{alt}}. மீண்டும் ஏற்ற முயற்சிக்கவும்",
       "imagePreviewUnavailableInSession": "இந்த அமர்வில் பட முன்னோட்டம் கிடைக்கவில்லை.",
       "viewImage": "படத்தைப் பார்க்கவும்",
       "viewImageWithAlt": "{{alt}} படத்தைப் பார்க்கவும்",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "உங்கள் கணக்கை உருவாக்குவதை முடிக்க '$t(login.signInWithApple)' என்பதைப் பயன்படுத்தவும்.",
     "signupStepUpGoogle": "உங்கள் கணக்கை உருவாக்குவதை முடிக்க '$t(login.signInWithGoogle)' என்பதைப் பயன்படுத்தவும்.",
     "signupStepUpBack": "உங்கள் கணக்கை உருவாக்குவதை முடிக்க பின்னால் சென்று '$t(login.moreSignInOptions)' என்பதைப் பயன்படுத்தவும்.",
-    "invalidCode": "அந்தக் குறியீடு தவறானது அல்லது காலாவதியானது. மீண்டும் முயற்சிக்கவும் அல்லது '$t(login.resendCode)' என்பதைப் பயன்படுத்தவும்.",
+    "invalidCode": "அந்தக் குறியீடு தவறானது அல்லது காலாவதியானது. இதற்கு '$t(login.resendCode)' என்பதையோ அல்லது '$t(login.moreSignInOptions)' என்பதையோ பயன்படுத்தவும்.",
     "codeInProgress": "உங்கள் குறியீடு செயலாக்கப்படுகிறது. சிறிது நேரம் காத்திருந்து மீண்டும் முயற்சிக்கவும்.",
     "tooManyAttempts": "முயற்சிகளின் வரம்பை மீறிவிட்டீர்கள். புதிய குறியீட்டைக் கோரவும்.",
     "invalidToken": "உள்நுழைவு தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "அறிவுறுத்தலைச் சேமிக்க முடியவில்லை",
     "instructionDeleteFailed": "அறிவுறுத்தலை நீக்க முடியவில்லை",
     "instructionToggleFailed": "அறிவுறுத்தலைப் புதுப்பிக்க முடியவில்லை",
+    "instructionViewTitle": "அறிவுறுத்தல் கோப்பு",
     "instructionLimitReached": "ஒரு சுயவிவரத்தில் {{max}} அறிவுறுத்தல்கள் வரை இருக்கலாம். மற்றொன்றைச் சேர்க்க ஒன்றை நீக்கவும்.",
     "mcp": {
       "title": "MCP சேவையகங்கள்",

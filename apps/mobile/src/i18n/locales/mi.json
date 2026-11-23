@@ -91,6 +91,7 @@
     "draft": "Hukihuki",
     "enabled": "Kua whakahohea",
     "github": "GitHub",
+    "image": "Atahanga",
     "imageUnavailable": "Kāore te whakaahua i te wātea",
     "loading": "Kei te uta…",
     "loadMore": "Utaina ētahi atu",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Kei te uta i te atahanga",
       "imageUnavailableRetry": "Kāore e wātea ana te atahanga, whakamātau anō ki te uta",
+      "imageUnavailableRetryWithAlt": "Kāore e wātea ana te atahanga, {{alt}}, whakamātau anō ki te uta",
       "imagePreviewUnavailableInSession": "Kāore e wātea ana te arokite o te atahanga i tēnei wātū.",
       "viewImage": "Tirohia te atahanga",
       "viewImageWithAlt": "Tirohia te atahanga {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Hei whakaoti i te hanga o tō pūkete, whakamahia '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Hei whakaoti i te hanga o tō pūkete, whakamahia '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Hei whakaoti i te hanga o tō pūkete, hoki atu ki muri, ā, whakamahia '$t(login.moreSignInOptions)'.",
-    "invalidCode": "He hē taua waehere, kua pau rānei tōna wā. Whakamātau anō, whakamahia rānei '$t(login.resendCode)'.",
+    "invalidCode": "He hē taua waehere, kua pau rānei tōna wā. Whakamahia i '$t(login.resendCode)', i '$t(login.moreSignInOptions)' rānei.",
     "codeInProgress": "Kei te tukatukahia tō waehere. Tatari mō tētahi wā poto, ka whakamātau anō.",
     "tooManyAttempts": "He nui rawa ngā whakamātau. Tonoa he waehere hou.",
     "invalidToken": "I rahua te takiuru. Tēnā koa whakamātau anō.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Kāore i taea te tiaki i te tohutohu",
     "instructionDeleteFailed": "Kāore i taea te muku i te tohutohu",
     "instructionToggleFailed": "Kāore i taea te whakahou i te tohutohu",
+    "instructionViewTitle": "Kōnae tohutohu",
     "instructionLimitReached": "Ka taea e tētahi kōtaha te pupuri kia {{max}} tohutohu. Mukua tētahi kia tāpiri ai i tētahi atu.",
     "mcp": {
       "title": "Tūmau MCP",

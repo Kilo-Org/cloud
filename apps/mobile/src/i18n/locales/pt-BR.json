@@ -93,6 +93,7 @@
     "draft": "Rascunho",
     "enabled": "Ativado",
     "github": "GitHub",
+    "image": "Imagem",
     "imageUnavailable": "A imagem não está disponível.",
     "loading": "Carregando…",
     "loadMore": "Carregar mais",
@@ -2119,6 +2120,7 @@
     "filePart": {
       "loadingImage": "Carregando imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
+      "imageUnavailableRetryWithAlt": "Imagem indisponível, {{alt}}, tentar carregar novamente",
       "imagePreviewUnavailableInSession": "A prévia da imagem não está disponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Para concluir a criação da sua conta, use '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para concluir a criação da sua conta, use '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para concluir a criação da sua conta, volte e use '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Esse código está incorreto ou expirou. Tente novamente ou use '$t(login.resendCode)'.",
+    "invalidCode": "Esse código está incorreto ou expirou. Use '$t(login.resendCode)' ou '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Seu código está sendo processado. Aguarde um momento e tente novamente.",
     "tooManyAttempts": "Muitas tentativas. Solicite um novo código.",
     "invalidToken": "Não foi possível entrar. Tente novamente.",
@@ -4693,6 +4695,7 @@
     "instructionSaveFailed": "Não foi possível salvar a instrução",
     "instructionDeleteFailed": "Não foi possível excluir a instrução",
     "instructionToggleFailed": "Não foi possível atualizar a instrução",
+    "instructionViewTitle": "Arquivo de instrução",
     "instructionLimitReached": "Um perfil pode ter até {{max}} instruções. Exclua uma para adicionar outra.",
     "mcp": {
       "title": "Servidores MCP",

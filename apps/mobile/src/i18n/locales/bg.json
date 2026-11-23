@@ -91,6 +91,7 @@
     "draft": "Чернова",
     "enabled": "Включено",
     "github": "GitHub",
+    "image": "Изображение",
     "imageUnavailable": "Изображението е недостъпно.",
     "loading": "Зареждане…",
     "loadMore": "Зареди още",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Зареждане на изображението",
       "imageUnavailableRetry": "Изображението е недостъпно. Опитай да го заредиш отново",
+      "imageUnavailableRetryWithAlt": "Изображението е недостъпно. {{alt}}. Опитай да го заредиш отново",
       "imagePreviewUnavailableInSession": "Прегледът на изображението е недостъпен в тази сесия.",
       "viewImage": "Прегледай изображението",
       "viewImageWithAlt": "Прегледай изображението {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "За да завършиш създаването на акаунта си, върни се назад и използвай „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Кодът е неправилен или е изтекъл. Опитай отново или използвай „$t(login.resendCode)“.",
+    "invalidCode": "Кодът е неправилен или е изтекъл. Използвай „$t(login.resendCode)“ или „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Кодът ти се обработва. Изчакай малко и опитай отново.",
     "tooManyAttempts": "Твърде много опити. Поискай нов код.",
     "invalidToken": "Влизането беше неуспешно. Опитай отново.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Инструкцията не можа да се запази",
     "instructionDeleteFailed": "Инструкцията не можа да се изтрие",
     "instructionToggleFailed": "Инструкцията не можа да се обнови",
+    "instructionViewTitle": "Файл с инструкции",
     "instructionLimitReached": "Профилът може да съдържа до {{max}} инструкции. Изтрийте една, за да добавите друга.",
     "mcp": {
       "title": "MCP сървъри",

@@ -91,6 +91,7 @@
     "draft": "Burador",
     "enabled": "Naka-enable",
     "github": "GitHub",
+    "image": "Larawan",
     "imageUnavailable": "Hindi maipakita ang larawan.",
     "loading": "Naglo-load…",
     "loadMore": "Magpakita pa",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Naglo-load ng larawan",
       "imageUnavailableRetry": "Hindi maipakita ang larawan, subukang i-load muli",
+      "imageUnavailableRetryWithAlt": "Hindi maipakita ang larawan, {{alt}}, subukang i-load muli",
       "imagePreviewUnavailableInSession": "Hindi maipakita ang paunang tingin sa larawan sa sesyong ito.",
       "viewImage": "Tingnan ang larawan",
       "viewImageWithAlt": "Tingnan ang larawan: {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para matapos ang paggawa ng iyong account, bumalik at gamitin ang '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mali o expired na ang code na iyon. Pakisubukan muli o gamitin ang '$t(login.resendCode)'.",
+    "invalidCode": "Mali o expired na ang code na iyon. Gamitin ang '$t(login.resendCode)' o ang '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Pinoproseso ang iyong code. Maghintay ng sandali at subukan muli.",
     "tooManyAttempts": "Masyado nang maraming pagsubok. Humiling ng bagong code.",
     "invalidToken": "Hindi makapag-sign in. Pakisubukan muli.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Hindi na-save ang tagubilin",
     "instructionDeleteFailed": "Hindi nabura ang tagubilin",
     "instructionToggleFailed": "Hindi na-update ang tagubilin",
+    "instructionViewTitle": "File ng tagubilin",
     "instructionLimitReached": "Hanggang {{max}} tagubilin lamang ang maaaring taglayin ng isang profile. Burahin ang isa para magdagdag ng panibago.",
     "mcp": {
       "title": "Mga MCP server",

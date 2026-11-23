@@ -91,6 +91,7 @@
     "draft": "მონახაზი",
     "enabled": "ჩართულია",
     "github": "GitHub",
+    "image": "სურათი",
     "imageUnavailable": "სურათი მიუწვდომელია.",
     "loading": "იტვირთება…",
     "loadMore": "მეტის ჩატვირთვა",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "სურათის ჩატვირთვა",
       "imageUnavailableRetry": "სურათი მიუწვდომელია. სცადეთ ხელახლა ჩატვირთვა",
+      "imageUnavailableRetryWithAlt": "სურათი მიუწვდომელია. {{alt}}. სცადეთ ხელახლა ჩატვირთვა",
       "imagePreviewUnavailableInSession": "ამ სესიაში სურათის წინასწარი ნახვა შეუძლებელია.",
       "viewImage": "სურათის ნახვა",
       "viewImageWithAlt": "სურათის ნახვა: {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "ანგარიშის შექმნის დასასრულებლად დაბრუნდი უკან და გამოიყენე „$t(login.moreSignInOptions)“.",
-    "invalidCode": "ეს კოდი არასწორია ან ვადა გაუვიდა. ხელახლა სცადე ან გამოიყენე „$t(login.resendCode)“.",
+    "invalidCode": "ეს კოდი არასწორია ან ვადა გაუვიდა. გამოიყენე „$t(login.resendCode)“ ან „$t(login.moreSignInOptions)“.",
     "codeInProgress": "შენი კოდი მუშავდება. ცოტა მოიცადე და ხელახლა სცადე.",
     "tooManyAttempts": "მცდელობების რაოდენობა გადაჭარბებულია. მოითხოვე ახალი კოდი.",
     "invalidToken": "შესვლა ვერ მოხერხდა. ხელახლა სცადე.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "ინსტრუქციის შენახვა ვერ მოხერხდა",
     "instructionDeleteFailed": "ინსტრუქციის წაშლა ვერ მოხერხდა",
     "instructionToggleFailed": "ინსტრუქციის განახლება ვერ მოხერხდა",
+    "instructionViewTitle": "ინსტრუქციის ფაილი",
     "instructionLimitReached": "პროფილს შეიძლება ჰქონდეს მაქსიმუმ {{max}} ინსტრუქცია. წაშალეთ ერთი, რომ დაამატოთ სხვა.",
     "mcp": {
       "title": "MCP სერვერები",

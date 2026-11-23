@@ -93,6 +93,7 @@
     "draft": "Juodraštis",
     "enabled": "Įjungta",
     "github": "GitHub",
+    "image": "Paveikslėlis",
     "imageUnavailable": "Paveikslėlis nepasiekiamas",
     "loading": "Įkeliama…",
     "loadMore": "Įkelti daugiau",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Įkeliamas paveikslėlis",
       "imageUnavailableRetry": "Paveikslėlis nepasiekiamas, bandyti įkelti iš naujo",
+      "imageUnavailableRetryWithAlt": "Paveikslėlis nepasiekiamas, {{alt}}, bandyti įkelti iš naujo",
       "imagePreviewUnavailableInSession": "Paveikslėlio peržiūra šioje sesijoje nepasiekiama.",
       "viewImage": "Peržiūrėti paveikslėlį",
       "viewImageWithAlt": "Peržiūrėti paveikslėlį „{{alt}}“",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Kad užbaigtum paskyros kūrimą, grįžk atgal ir pasirink „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Kodas neteisingas arba nebegalioja. Bandyk dar kartą arba pasirink „$t(login.resendCode)“.",
+    "invalidCode": "Kodas neteisingas arba nebegalioja. Naudok „$t(login.resendCode)“ arba „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tavo kodas apdorojamas. Palauk akimirką ir bandyk dar kartą.",
     "tooManyAttempts": "Per daug bandymų. Paprašyk naujo kodo.",
     "invalidToken": "Nepavyko prisijungti. Bandyk dar kartą.",
@@ -4693,6 +4695,7 @@
     "instructionSaveFailed": "Nepavyko išsaugoti instrukcijos",
     "instructionDeleteFailed": "Nepavyko ištrinti instrukcijos",
     "instructionToggleFailed": "Nepavyko atnaujinti instrukcijos",
+    "instructionViewTitle": "Instrukcijos failas",
     "instructionLimitReached": "Profilis gali turėti iki {{max}} instrukcijų. Ištrinkite vieną, kad galėtumėte pridėti kitą.",
     "mcp": {
       "title": "MCP serveriai",

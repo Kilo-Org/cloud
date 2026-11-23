@@ -91,6 +91,7 @@
     "draft": "Piszkozat",
     "enabled": "Engedélyezve",
     "github": "GitHub",
+    "image": "Kép",
     "imageUnavailable": "A kép nem érhető el",
     "loading": "Betöltés…",
     "loadMore": "Továbbiak betöltése",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Kép betöltése",
       "imageUnavailableRetry": "A kép nem érhető el, próbáld újra a betöltést",
+      "imageUnavailableRetryWithAlt": "A kép nem érhető el, {{alt}}, próbáld újra a betöltést",
       "imagePreviewUnavailableInSession": "A kép előnézete nem érhető el ebben a munkamenetben.",
       "viewImage": "Kép megtekintése",
       "viewImageWithAlt": "Kép megtekintése: {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "A fiókod létrehozásának befejezéséhez lépj vissza, és válaszd ezt: „$t(login.moreSignInOptions)”.",
-    "invalidCode": "A kód helytelen vagy lejárt. Próbáld újra, vagy válaszd ezt: „$t(login.resendCode)”.",
+    "invalidCode": "A kód helytelen vagy lejárt. Használd ezt: „$t(login.resendCode)”, vagy ezt: „$t(login.moreSignInOptions)”.",
     "codeInProgress": "A kód feldolgozása folyamatban van. Várj egy pillanatot, majd próbáld újra.",
     "tooManyAttempts": "Túl sok próbálkozás történt. Kérj új kódot.",
     "invalidToken": "Nem sikerült bejelentkezni. Próbáld újra.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Nem sikerült menteni az utasítást",
     "instructionDeleteFailed": "Nem sikerült törölni az utasítást",
     "instructionToggleFailed": "Nem sikerült frissíteni az utasítást",
+    "instructionViewTitle": "Utasításfájl",
     "instructionLimitReached": "Egy profil legfeljebb {{max}} utasítást tartalmazhat. Törölj egyet az új hozzáadásához.",
     "mcp": {
       "title": "MCP szerverek",

@@ -91,6 +91,7 @@
     "draft": "សេចក្តីព្រាង",
     "enabled": "បានបើក",
     "github": "GitHub",
+    "image": "រូបភាព",
     "imageUnavailable": "មិនអាចបង្ហាញរូបភាពបានទេ។",
     "loading": "កំពុងផ្ទុក…",
     "loadMore": "ផ្ទុកបន្ថែម",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "កំពុងផ្ទុករូបភាព",
       "imageUnavailableRetry": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត",
+      "imageUnavailableRetryWithAlt": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត {{alt}}",
       "imagePreviewUnavailableInSession": "មិនអាចមើលរូបភាពជាមុនក្នុងវគ្គនេះបានទេ។",
       "viewImage": "មើលរូបភាព",
       "viewImageWithAlt": "មើលរូបភាព {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithApple)'។",
     "signupStepUpGoogle": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithGoogle)'។",
     "signupStepUpBack": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក សូមត្រឡប់ក្រោយ ហើយប្រើ '$t(login.moreSignInOptions)'។",
-    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ។ សូមព្យាយាមម្តងទៀត ឬប្រើ '$t(login.resendCode)'។",
+    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ។ សូមប្រើ '$t(login.resendCode)' ឬប្រើ '$t(login.moreSignInOptions)'។",
     "codeInProgress": "លេខកូដរបស់អ្នកកំពុងត្រូវបានដំណើរការ។ រង់ចាំមួយភ្លែត ហើយព្យាយាមម្តងទៀត។",
     "tooManyAttempts": "ការព្យាយាមច្រើនពេកហើយ។ សូមស្នើសុំលេខកូដថ្មី។",
     "invalidToken": "មិនអាចចូលគណនីបានទេ។ សូមព្យាយាមម្តងទៀត។",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "មិនអាចរក្សាទុកការណែនាំបានទេ",
     "instructionDeleteFailed": "មិនអាចលុបការណែនាំបានទេ",
     "instructionToggleFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពការណែនាំបានទេ",
+    "instructionViewTitle": "ឯកសារការណែនាំ",
     "instructionLimitReached": "profile មួយអាចផ្ទុកការណែនាំបានរហូតដល់ {{max}}។ លុបមួយ ដើម្បីបន្ថែមមួយទៀត។",
     "mcp": {
       "title": "ម៉ាស៊ីនមេ MCP",

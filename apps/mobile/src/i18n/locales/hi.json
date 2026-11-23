@@ -91,6 +91,7 @@
     "draft": "ड्राफ़्ट",
     "enabled": "चालू",
     "github": "GitHub",
+    "image": "छवि",
     "imageUnavailable": "तस्वीर उपलब्ध नहीं है।",
     "loading": "लोड हो रहा है…",
     "loadMore": "और लोड करें",
@@ -2054,6 +2055,7 @@
     "filePart": {
       "loadingImage": "छवि लोड हो रही है",
       "imageUnavailableRetry": "छवि उपलब्ध नहीं, फिर से लोड करें",
+      "imageUnavailableRetryWithAlt": "छवि उपलब्ध नहीं, {{alt}}, फिर से लोड करें",
       "viewImage": "छवि देखें",
       "viewImageWithAlt": "छवि देखें: {{alt}}",
       "imageOutput": "आउटपुट की छवि",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "अपना खाता बनाना पूरा करने के लिए '$t(login.signInWithApple)' का उपयोग करें।",
     "signupStepUpGoogle": "अपना खाता बनाना पूरा करने के लिए '$t(login.signInWithGoogle)' का उपयोग करें।",
     "signupStepUpBack": "अपना खाता बनाना पूरा करने के लिए वापस जाएँ और '$t(login.moreSignInOptions)' का उपयोग करें।",
-    "invalidCode": "यह कोड गलत है या इसकी समय-सीमा समाप्त हो गई है। फिर से कोशिश करें या '$t(login.resendCode)' का उपयोग करें।",
+    "invalidCode": "यह कोड गलत है या इसकी समय-सीमा समाप्त हो गई है। '$t(login.resendCode)' या '$t(login.moreSignInOptions)' का उपयोग करें।",
     "codeInProgress": "आपके कोड पर कार्रवाई जारी है। थोड़ा इंतज़ार करें और फिर से कोशिश करें।",
     "tooManyAttempts": "आपने बहुत बार कोशिश की है। कृपया नया कोड माँगें।",
     "invalidToken": "साइन इन नहीं हो सका। कृपया फिर से कोशिश करें।",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "निर्देश सहेजा नहीं जा सका",
     "instructionDeleteFailed": "निर्देश हटाया नहीं जा सका",
     "instructionToggleFailed": "निर्देश अपडेट नहीं हो सका",
+    "instructionViewTitle": "निर्देश फ़ाइल",
     "instructionLimitReached": "एक प्रोफ़ाइल में अधिकतम {{max}} निर्देश रखे जा सकते हैं। और जोड़ने के लिए एक हटाएँ।",
     "mcp": {
       "title": "MCP सर्वर",

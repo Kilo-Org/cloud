@@ -91,6 +91,7 @@
     "draft": "Okusalungiswa",
     "enabled": "Kuvuliwe",
     "github": "GitHub",
+    "image": "Isithombe",
     "imageUnavailable": "Isithombe asitholakali.",
     "loading": "Kuyalayishwa…",
     "loadMore": "Layisha okwengeziwe",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Isithombe siyalayishwa",
       "imageUnavailableRetry": "Isithombe asitholakali, zama ukusilayisha futhi",
+      "imageUnavailableRetryWithAlt": "Isithombe asitholakali, {{alt}}, zama ukusilayisha futhi",
       "imagePreviewUnavailableInSession": "Ukubuka kuqala isithombe akutholakali kule seshini.",
       "viewImage": "Buka isithombe",
       "viewImageWithAlt": "Buka isithombe {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Ukuze uqedele ukudala i-akhawunti yakho, sebenzisa '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Ukuze uqedele ukudala i-akhawunti yakho, sebenzisa '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Ukuze uqedele ukudala i-akhawunti yakho, buyela emuva bese usebenzisa '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Leyo khodi ayilungile noma isiphelelwe yisikhathi. Zama futhi noma usebenzise '$t(login.resendCode)'.",
+    "invalidCode": "Leyo khodi ayilungile noma isiphelelwe yisikhathi. Usebenzise '$t(login.resendCode)' noma '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Ikhodi yakho iyacubungulwa. Linda isikhashana bese uzama futhi.",
     "tooManyAttempts": "Imizamo eminingi kakhulu. Sicela ucele ikhodi entsha.",
     "invalidToken": "Ukungena kwehlulekile. Sicela uzame futhi.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Ayikwazekanga ukugcina umyalo",
     "instructionDeleteFailed": "Ayikwazekanga ukususa umyalo",
     "instructionToggleFailed": "Ayikwazekanga ukubuyekeza umyalo",
+    "instructionViewTitle": "Ifayela lomyalo",
     "instructionLimitReached": "Iphrofayela ingagcina imiyalelo efinyelela ku-{{max}}. Susa owodwa ukuze wengeze omunye.",
     "mcp": {
       "title": "Amaseva e-MCP",

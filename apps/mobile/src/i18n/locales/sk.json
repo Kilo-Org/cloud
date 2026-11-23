@@ -93,6 +93,7 @@
     "draft": "Koncept",
     "enabled": "Zapnuté",
     "github": "GitHub",
+    "image": "Obrázok",
     "imageUnavailable": "Obrázok nie je dostupný.",
     "loading": "Načítava sa…",
     "loadMore": "Načítať viac",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Načítava sa obrázok",
       "imageUnavailableRetry": "Obrázok nie je dostupný, skúsiť ho znova načítať",
+      "imageUnavailableRetryWithAlt": "Obrázok nie je dostupný, {{alt}}, skúsiť ho znova načítať",
       "imagePreviewUnavailableInSession": "Náhľad obrázka nie je v tejto relácii dostupný.",
       "viewImage": "Zobraziť obrázok",
       "viewImageWithAlt": "Zobraziť obrázok {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Na dokončenie vytvorenia účtu sa vráť späť a použi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Skús to znova alebo použi „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Použi „$t(login.resendCode)“ alebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kód sa spracúva. Chvíľu počkaj a skús to znova.",
     "tooManyAttempts": "Príliš veľa pokusov. Vyžiadaj si nový kód.",
     "invalidToken": "Prihlásenie zlyhalo. Skús to znova.",
@@ -4693,6 +4695,7 @@
     "instructionSaveFailed": "Pokyn sa nepodarilo uložiť",
     "instructionDeleteFailed": "Pokyn sa nepodarilo odstrániť",
     "instructionToggleFailed": "Pokyn sa nepodarilo aktualizovať",
+    "instructionViewTitle": "Súbor pokynu",
     "instructionLimitReached": "Profil môže obsahovať najviac {{max}} pokynov. Ak chcete pridať ďalší, jeden odstráňte.",
     "mcp": {
       "title": "servery MCP",

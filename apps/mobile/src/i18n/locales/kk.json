@@ -91,6 +91,7 @@
     "draft": "Нобай",
     "enabled": "Қосылған",
     "github": "GitHub",
+    "image": "Сурет",
     "imageUnavailable": "Сурет қолжетімсіз.",
     "loading": "Жүктелуде…",
     "loadMore": "Тағы жүктеу",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Сурет жүктелуде",
       "imageUnavailableRetry": "Сурет қолжетімсіз, жүктеуді қайталаңыз",
+      "imageUnavailableRetryWithAlt": "Сурет қолжетімсіз, {{alt}}, жүктеуді қайталаңыз",
       "imagePreviewUnavailableInSession": "Бұл сессияда суретті алдын ала қарау мүмкін емес.",
       "viewImage": "Суретті қарау",
       "viewImageWithAlt": "{{alt}} суретін қарау",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Тіркелгіні жасауды аяқтау үшін «$t(login.signInWithApple)» тармағын таңдаңыз.",
     "signupStepUpGoogle": "Тіркелгіні жасауды аяқтау үшін «$t(login.signInWithGoogle)» тармағын таңдаңыз.",
     "signupStepUpBack": "Тіркелгіні жасауды аяқтау үшін артқа қайтып, «$t(login.moreSignInOptions)» тармағын таңдаңыз.",
-    "invalidCode": "Бұл код дұрыс емес немесе оның мерзімі өтіп кеткен. Қайталап көріңіз немесе «$t(login.resendCode)» түймесін басыңыз.",
+    "invalidCode": "Бұл код дұрыс емес немесе оның мерзімі өтіп кеткен. «$t(login.resendCode)» немесе «$t(login.moreSignInOptions)» түймесін пайдаланыңыз.",
     "codeInProgress": "Кодыңыз өңделуде. Сәл күтіп, қайталап көріңіз.",
     "tooManyAttempts": "Тым көп әрекет жасалды. Жаңа код сұраңыз.",
     "invalidToken": "Кіру мүмкін болмады. Қайталап көріңіз.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Нұсқаулықты сақтау мүмкін болмады",
     "instructionDeleteFailed": "Нұсқаулықты жою мүмкін болмады",
     "instructionToggleFailed": "Нұсқаулықты жаңарту мүмкін болмады",
+    "instructionViewTitle": "Нұсқаулық файлы",
     "instructionLimitReached": "Профильде {{max}} нұсқаулыққа дейін болуы мүмкін. Тағы қосу үшін біреуін жойыңыз.",
     "mcp": {
       "title": "MCP серверлері",

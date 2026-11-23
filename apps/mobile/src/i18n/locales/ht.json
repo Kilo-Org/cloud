@@ -91,6 +91,7 @@
     "draft": "Bwouyon",
     "enabled": "Aktive",
     "github": "GitHub",
+    "image": "Imaj",
     "imageUnavailable": "Imaj la pa disponib.",
     "loading": "Ap chaje…",
     "loadMore": "Chaje plis",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ap chaje imaj la",
       "imageUnavailableRetry": "Imaj la pa disponib, eseye chaje li ankò",
+      "imageUnavailableRetryWithAlt": "Imaj la pa disponib, {{alt}}, eseye chaje li ankò",
       "imagePreviewUnavailableInSession": "Apèsi imaj la pa disponib nan sesyon sa a.",
       "viewImage": "Gade imaj la",
       "viewImageWithAlt": "Gade imaj {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Pou fini kreye kont ou a, itilize '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Pou fini kreye kont ou a, itilize '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Pou fini kreye kont ou a, retounen dèyè epi itilize '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kòd sa a pa kòrèk oswa li ekspire. Eseye ankò oswa itilize '$t(login.resendCode)'.",
+    "invalidCode": "Kòd sa a pa kòrèk oswa li ekspire. Itilize '$t(login.resendCode)' oswa '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kòd ou a ap trete. Tann yon ti moman epi eseye ankò.",
     "tooManyAttempts": "Twòp tantativ. Tanpri mande yon nouvo kòd.",
     "invalidToken": "Koneksyon an echwe. Tanpri eseye ankò.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Pa t kapab sovgade enstriksyon an",
     "instructionDeleteFailed": "Pa t kapab efase enstriksyon an",
     "instructionToggleFailed": "Pa t kapab mete enstriksyon an ajou",
+    "instructionViewTitle": "Fichye enstriksyon",
     "instructionLimitReached": "Yon pwofil ka kenbe jiska {{max}} enstriksyon. Efase youn pou ajoute yon lòt.",
     "mcp": {
       "title": "MCP serveurs",

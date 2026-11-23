@@ -91,6 +91,7 @@
     "draft": "Àkọsílẹ̀ àkọ́kọ́",
     "enabled": "A ti mú ṣiṣẹ́",
     "github": "GitHub",
+    "image": "Àwòrán",
     "imageUnavailable": "Àwòrán kò sí.",
     "loading": "Ń gbé dátà wọlé…",
     "loadMore": "Gbé síi wọlé",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ń gbé àwòrán wọlé",
       "imageUnavailableRetry": "Àwòrán kò sí, gbìyànjú láti tún un gbé wọlé",
+      "imageUnavailableRetryWithAlt": "Àwòrán kò sí, {{alt}}, gbìyànjú láti tún un gbé wọlé",
       "imagePreviewUnavailableInSession": "A kò lè fi àwòrán hàn ṣáájú nínú ìgbà iṣẹ́ yìí.",
       "viewImage": "Wo àwòrán",
       "viewImageWithAlt": "Wo àwòrán {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, padà sẹ́yìn kí o sì lo '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kóòdù yẹn kò tọ́ tàbí ó ti kọjá àkókò rẹ̀. Tún gbìyànjú tàbí lo '$t(login.resendCode)'.",
+    "invalidCode": "Kóòdù yẹn kò tọ́ tàbí ó ti kọjá àkókò rẹ̀. Lo '$t(login.resendCode)' tàbí lo '$t(login.moreSignInOptions)'.",
     "codeInProgress": "À ń ṣe àyẹ̀wò kóòdù rẹ. Dúró díẹ̀ kí o tún gbìyànjú.",
     "tooManyAttempts": "Àwọn ìgbìyànjú pọ̀ jù. Jọ̀wọ́ béèrè fún kóòdù tuntun.",
     "invalidToken": "Ìwọlé kùnà. Jọ̀wọ́ tún gbìyànjú.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Kò lè fi ìlànà náà pamọ́",
     "instructionDeleteFailed": "Kò lè pa ìlànà náà rẹ́",
     "instructionToggleFailed": "Kò lè ṣàtúnṣe ìlànà náà",
+    "instructionViewTitle": "Fáìlì ìlànà",
     "instructionLimitReached": "Profáìlì kan lè gba ìlànà tó pọ̀ jù {{max}}. Pa ọ̀kan rẹ́ kí o lè fi òmíràn kún.",
     "mcp": {
       "title": "Awọn olupin MCP",

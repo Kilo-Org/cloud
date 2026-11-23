@@ -95,6 +95,7 @@
     "draft": "Drafft",
     "enabled": "Wedi'i alluogi",
     "github": "GitHub",
+    "image": "Delwedd",
     "imageUnavailable": "Nid yw'r ddelwedd ar gael.",
     "loading": "Yn llwytho…",
     "loadMore": "Llwytho mwy",
@@ -2872,6 +2873,7 @@
     "filePart": {
       "loadingImage": "Yn llwytho delwedd",
       "imageUnavailableRetry": "Nid yw'r ddelwedd ar gael, ceisio ei llwytho eto",
+      "imageUnavailableRetryWithAlt": "Nid yw'r ddelwedd ar gael, {{alt}}, ceisio ei llwytho eto",
       "imagePreviewUnavailableInSession": "Nid yw rhagolwg y ddelwedd ar gael yn y sesiwn hon.",
       "viewImage": "Gweld delwedd",
       "viewImageWithAlt": "Gweld delwedd {{alt}}",
@@ -4170,7 +4172,7 @@
     "signupStepUpApple": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "I orffen creu'ch cyfrif, ewch yn ôl a defnyddiwch '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Rhowch gynnig eto neu ddefnyddiwch '$t(login.resendCode)'.",
+    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Defnyddiwch '$t(login.resendCode)' neu ddefnyddiwch '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mae'ch cod yn cael ei brosesu. Arhoswch ychydig a rhowch gynnig eto.",
     "tooManyAttempts": "Rydych wedi rhoi cynnig gormod o weithiau. Gofynnwch am god newydd.",
     "invalidToken": "Methodd y mewngofnodi. Rho gynnig arall arni.",
@@ -4861,6 +4863,7 @@
     "instructionSaveFailed": "Methu cadw'r cyfarwyddyd",
     "instructionDeleteFailed": "Methu dileu'r cyfarwyddyd",
     "instructionToggleFailed": "Methu diweddaru'r cyfarwyddyd",
+    "instructionViewTitle": "Ffeil cyfarwyddyd",
     "instructionLimitReached": "Gall proffil gynnwys hyd at {{max}} cyfarwyddyd. Dilëwch un i ychwanegu un arall.",
     "mcp": {
       "title": "gweinyddwyr MCP",

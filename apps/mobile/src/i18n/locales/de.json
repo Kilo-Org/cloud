@@ -91,6 +91,7 @@
     "draft": "Entwurf",
     "enabled": "Aktiviert",
     "github": "GitHub",
+    "image": "Bild",
     "imageUnavailable": "Das Bild ist nicht verfügbar.",
     "loading": "Wird geladen…",
     "loadMore": "Mehr laden",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Bild wird geladen",
       "imageUnavailableRetry": "Bild nicht verfügbar, erneut laden",
+      "imageUnavailableRetryWithAlt": "Bild nicht verfügbar, {{alt}}, erneut laden",
       "imagePreviewUnavailableInSession": "In dieser Sitzung ist keine Bildvorschau verfügbar.",
       "viewImage": "Bild ansehen",
       "viewImageWithAlt": "Bild „{{alt}}“ ansehen",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Wähle „$t(login.signInWithApple)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpGoogle": "Wähle „$t(login.signInWithGoogle)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpBack": "Um die Erstellung deines Kontos abzuschließen, geh zurück und wähle „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Versuche es erneut oder wähle „$t(login.resendCode)“.",
+    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Verwende „$t(login.resendCode)“ oder wähle „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Dein Code wird verarbeitet. Warte einen Moment und versuche es erneut.",
     "tooManyAttempts": "Du hast zu viele Versuche unternommen. Bitte fordere einen neuen Code an.",
     "invalidToken": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Anweisung konnte nicht gespeichert werden",
     "instructionDeleteFailed": "Anweisung konnte nicht gelöscht werden",
     "instructionToggleFailed": "Anweisung konnte nicht aktualisiert werden",
+    "instructionViewTitle": "Anweisungsdatei",
     "instructionLimitReached": "Ein Profil kann bis zu {{max}} Anweisungen enthalten. Lösche eine, um eine weitere hinzuzufügen.",
     "mcp": {
       "title": "MCP-Server",

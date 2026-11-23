@@ -92,6 +92,7 @@
     "draft": "Nacrt",
     "enabled": "Omogućeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika nije dostupna.",
     "loading": "Učitavanje…",
     "loadMore": "Učitaj više",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Učitavanje slike",
       "imageUnavailableRetry": "Slika nije dostupna, pokušaj je ponovo učitati",
+      "imageUnavailableRetryWithAlt": "Slika nije dostupna, {{alt}}, pokušaj je ponovo učitati",
       "imagePreviewUnavailableInSession": "Pregled slike nije dostupan u ovoj sesiji.",
       "viewImage": "Pogledaj sliku",
       "viewImageWithAlt": "Pogledaj sliku {{alt}}",
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Za dovršetak kreiranja računa odaberi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Za dovršetak kreiranja računa odaberi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Za dovršetak kreiranja računa vrati se nazad i odaberi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Kod nije ispravan ili je istekao. Pokušaj ponovo ili odaberi „$t(login.resendCode)“.",
+    "invalidCode": "Kod nije ispravan ili je istekao. Koristi „$t(login.resendCode)“ ili „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kod se obrađuje. Sačekaj trenutak i pokušaj ponovo.",
     "tooManyAttempts": "Previše pokušaja. Zatraži novi kod.",
     "invalidToken": "Prijava nije uspjela. Pokušaj ponovo.",
@@ -4609,6 +4611,7 @@
     "instructionSaveFailed": "Uputstvo nije moguće sačuvati",
     "instructionDeleteFailed": "Uputstvo nije moguće izbrisati",
     "instructionToggleFailed": "Uputstvo nije moguće ažurirati",
+    "instructionViewTitle": "Datoteka uputstva",
     "instructionLimitReached": "Profil može sadržavati najviše {{max}} uputstava. Izbrišite jedno da biste dodali novo.",
     "mcp": {
       "title": "MCP serveri",

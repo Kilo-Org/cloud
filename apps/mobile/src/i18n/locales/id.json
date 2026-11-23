@@ -91,6 +91,7 @@
     "draft": "Draf",
     "enabled": "Aktif",
     "github": "GitHub",
+    "image": "Gambar",
     "imageUnavailable": "Gambar tidak tersedia.",
     "loading": "Memuat…",
     "loadMore": "Muat lebih banyak",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Memuat gambar",
       "imageUnavailableRetry": "Gambar tidak tersedia, coba muat ulang",
+      "imageUnavailableRetryWithAlt": "Gambar tidak tersedia, {{alt}}, coba muat ulang",
       "imagePreviewUnavailableInSession": "Pratinjau gambar tidak tersedia di sesi ini.",
       "viewImage": "Lihat gambar",
       "viewImageWithAlt": "Lihat gambar {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Untuk menyelesaikan pembuatan akunmu, kembali lalu gunakan '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Coba lagi atau gunakan '$t(login.resendCode)'.",
+    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Gunakan '$t(login.resendCode)' atau '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kodemu sedang diproses. Tunggu sebentar dan coba lagi.",
     "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
     "invalidToken": "Gagal masuk. Coba lagi.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Gagal menyimpan instruksi",
     "instructionDeleteFailed": "Gagal menghapus instruksi",
     "instructionToggleFailed": "Gagal memperbarui instruksi",
+    "instructionViewTitle": "File instruksi",
     "instructionLimitReached": "Satu profil dapat memuat hingga {{max}} instruksi. Hapus satu untuk menambah lagi.",
     "mcp": {
       "title": "server MCP",

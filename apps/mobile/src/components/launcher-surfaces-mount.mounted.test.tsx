@@ -23,6 +23,12 @@ const sessionsMock = vi.hoisted(() => ({
 
 const translate = vi.hoisted(() => (key: string) => key);
 
+// The ack store's phase, as the mocked module hands it to the mount. A case
+// drives it to `loading` and then settles it, which re-renders the mount.
+const attentionHydration = vi.hoisted(() => ({
+  current: 'ready' as 'loading' | 'ready' | 'failed',
+}));
+
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }));
 // Stubbed like the other ambient helpers: the real module pulls in the i18n
 // instance (and its catalog backend), which this DOM-free harness does not need.
@@ -44,7 +50,11 @@ vi.mock('@/lib/organization-context', () => ({
 vi.mock('@/lib/session-attention', () => ({
   isAttentionAcked: () => false,
   reconcileSessionAttention: vi.fn(),
-  shouldShowNeedsInput: () => true,
+  // The phase is a variable so a case can drive the hold: the mount reads it
+  // through the hook, and settling re-renders it.
+  shouldShowNeedsInput: (input: { hydration: 'loading' | 'ready' | 'failed' }) =>
+    input.hydration !== 'loading',
+  useSessionAttentionHydration: () => attentionHydration.current,
   useSessionAttentionRevision: () => 0,
 }));
 
@@ -71,6 +81,7 @@ function mount(): ReactTestRenderer {
 beforeEach(() => {
   nativeMock.publishLauncherSurfaces.mockClear();
   nativeMock.clearLauncherSurfaces.mockClear();
+  attentionHydration.current = 'ready';
 });
 
 describe('LauncherSurfacesMount', () => {
@@ -138,6 +149,30 @@ describe('LauncherSurfacesMount', () => {
 
     act(() => {
       second.unmount();
+    });
+  });
+
+  it('publishes nothing while the ack store loads, then publishes once it settles', () => {
+    // While the store loads it answers "not acked" for every raise, so the
+    // derived list would drop a shortcut the person already answered. The last
+    // published set has to survive, exactly as it does before the first
+    // successful read.
+    attentionHydration.current = 'loading';
+    const renderer = mount();
+
+    expect(renderer.toJSON()).toBeNull();
+    expect(nativeMock.publishLauncherSurfaces).not.toHaveBeenCalled();
+
+    attentionHydration.current = 'ready';
+    act(() => {
+      renderer.update(<LauncherSurfacesMount />);
+    });
+
+    expect(nativeMock.publishLauncherSurfaces).toHaveBeenCalledOnce();
+    expect(nativeMock.publishLauncherSurfaces).toHaveBeenCalledWith(expectedPayload);
+
+    act(() => {
+      renderer.unmount();
     });
   });
 });

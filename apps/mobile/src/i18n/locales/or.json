@@ -91,6 +91,7 @@
     "draft": "ଖସଡ଼ା",
     "enabled": "ଚାଲୁ",
     "github": "GitHub",
+    "image": "ଛବି",
     "imageUnavailable": "ଛବି ଉପଲବ୍ଧ ନାହିଁ।",
     "loading": "ଲୋଡ୍ ହେଉଛି…",
     "loadMore": "ଆହୁରି ଦେଖନ୍ତୁ",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ଛବି ଲୋଡ୍ ହେଉଛି",
       "imageUnavailableRetry": "ଛବି ଉପଲବ୍ଧ ନାହିଁ, ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
+      "imageUnavailableRetryWithAlt": "ଛବି ଉପଲବ୍ଧ ନାହିଁ, {{alt}}, ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
       "imagePreviewUnavailableInSession": "ଏହି ସେସନରେ ଛବିର ପୂର୍ବଦର୍ଶନ ଉପଲବ୍ଧ ନାହିଁ।",
       "viewImage": "ଛବି ଦେଖନ୍ତୁ",
       "viewImageWithAlt": "{{alt}} ଛବି ଦେଖନ୍ତୁ",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ତିଆରି ସମ୍ପୂର୍ଣ୍ଣ କରିବାକୁ '$t(login.signInWithApple)' ବ୍ୟବହାର କରନ୍ତୁ।",
     "signupStepUpGoogle": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ତିଆରି ସମ୍ପୂର୍ଣ୍ଣ କରିବାକୁ '$t(login.signInWithGoogle)' ବ୍ୟବହାର କରନ୍ତୁ।",
     "signupStepUpBack": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ତିଆରି ସମ୍ପୂର୍ଣ୍ଣ କରିବାକୁ ପଛକୁ ଯାଇ '$t(login.moreSignInOptions)' ବ୍ୟବହାର କରନ୍ତୁ।",
-    "invalidCode": "କୋଡ୍‌ଟି ଭୁଲ୍ ଅଛି କିମ୍ବା ଏହାର ମିଆଦ ଶେଷ ହୋଇଯାଇଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ କିମ୍ବା '$t(login.resendCode)' ବ୍ୟବହାର କରନ୍ତୁ।",
+    "invalidCode": "କୋଡ୍‌ଟି ଭୁଲ୍ ଅଛି କିମ୍ବା ଏହାର ମିଆଦ ଶେଷ ହୋଇଯାଇଛି। ଅଥବା '$t(login.resendCode)' ବା '$t(login.moreSignInOptions)' ବ୍ୟବହାର କରନ୍ତୁ।",
     "codeInProgress": "ଆପଣଙ୍କ କୋଡ୍‌ର ପ୍ରକ୍ରିୟାକରଣ ଚାଲିଛି। କିଛି ସମୟ ଅପେକ୍ଷା କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "tooManyAttempts": "ଅତ୍ୟଧିକ ଥର ଚେଷ୍ଟା କରିଛନ୍ତି। ଏକ ନୂଆ କୋଡ୍ ପାଇଁ ଅନୁରୋଧ କରନ୍ତୁ।",
     "invalidToken": "ସାଇନ୍ ଇନ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "ନିର୍ଦ୍ଦେଶ ସେଭ ହୋଇପାରିଲା ନାହିଁ",
     "instructionDeleteFailed": "ନିର୍ଦ୍ଦେଶ ଡିଲିଟ ହୋଇପାରିଲା ନାହିଁ",
     "instructionToggleFailed": "ନିର୍ଦ୍ଦେଶ ଅପଡେଟ ହୋଇପାରିଲା ନାହିଁ",
+    "instructionViewTitle": "ନିର୍ଦ୍ଦେଶ ଫାଇଲ",
     "instructionLimitReached": "ଏକ ପ୍ରୋଫାଇଲରେ ସର୍ବାଧିକ {{max}} ନିର୍ଦ୍ଦେଶ ରଖାଯାଇପାରେ। ଆଉଟି ଯୋଡ଼ିବା ପାଇଁ ଗୋଟିଏ ଡିଲିଟ କରନ୍ତୁ।",
     "mcp": {
       "title": "MCP ସର୍ଭରଗୁଡ଼ିକ।",

@@ -91,6 +91,7 @@
     "draft": "ສະບັບຮ່າງ",
     "enabled": "ເປີດໃຊ້ແລ້ວ",
     "github": "GitHub",
+    "image": "ຮູບພາບ",
     "imageUnavailable": "ບໍ່ສາມາດສະແດງຮູບໄດ້.",
     "loading": "ກຳລັງໂຫຼດ…",
     "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ກຳລັງໂຫຼດຮູບພາບ",
       "imageUnavailableRetry": "ສະແດງຮູບພາບບໍ່ໄດ້, ລອງໂຫຼດໃໝ່",
+      "imageUnavailableRetryWithAlt": "ສະແດງຮູບພາບບໍ່ໄດ້, {{alt}}, ລອງໂຫຼດໃໝ່",
       "imagePreviewUnavailableInSession": "ບໍ່ສາມາດເບິ່ງຕົວຢ່າງຮູບພາບໃນເຊດຊັນນີ້ໄດ້.",
       "viewImage": "ເບິ່ງຮູບພາບ",
       "viewImageWithAlt": "ເບິ່ງຮູບພາບ {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ໃຊ້ '$t(login.signInWithApple)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpGoogle": "ໃຊ້ '$t(login.signInWithGoogle)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpBack": "ກັບຄືນໄປ ແລ້ວໃຊ້ '$t(login.moreSignInOptions)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
-    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ກະລຸນາລອງອີກຄັ້ງ ຫຼື ໃຊ້ '$t(login.resendCode)'.",
+    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ໃຊ້ '$t(login.resendCode)' ຫຼື ໃຊ້ '$t(login.moreSignInOptions)'.",
     "codeInProgress": "ກຳລັງປະມວນຜົນລະຫັດຂອງທ່ານ. ລໍຖ້າຈັກໜ້ອຍແລ້ວລອງອີກຄັ້ງ.",
     "tooManyAttempts": "ທ່ານລອງຫຼາຍຄັ້ງເກີນໄປແລ້ວ. ກະລຸນາຂໍລະຫັດໃໝ່.",
     "invalidToken": "ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ. ກະລຸນາລອງໃໝ່.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳແນະນຳໄດ້",
     "instructionDeleteFailed": "ບໍ່ສາມາດລຶບຄຳແນະນຳໄດ້",
     "instructionToggleFailed": "ບໍ່ສາມາດອັບເດດຄຳແນະນຳໄດ້",
+    "instructionViewTitle": "ໄຟລ໌ຄຳແນະນຳ",
     "instructionLimitReached": "ໜຶ່ງໂປຣໄຟລ໌ເກັບໄດ້ສູງສຸດ {{max}} ຄຳແນະນຳ. ລຶບອັນໜຶ່ງເພື່ອເພີ່ມອັນໃໝ່.",
     "mcp": {
       "title": "ເຊີບເວີ MCP",

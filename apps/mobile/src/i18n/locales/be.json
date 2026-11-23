@@ -93,6 +93,7 @@
     "draft": "Чарнавік",
     "enabled": "Уключана",
     "github": "GitHub",
+    "image": "Выява",
     "imageUnavailable": "Выява недаступная.",
     "loading": "Загрузка…",
     "loadMore": "Загрузіць яшчэ",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Загрузка выявы",
       "imageUnavailableRetry": "Выява недаступная. Паўтарыць загрузку",
+      "imageUnavailableRetryWithAlt": "Выява недаступная. {{alt}}. Паўтарыць загрузку",
       "imagePreviewUnavailableInSession": "Папярэдні прагляд выявы недаступны ў гэтым сеансе.",
       "viewImage": "Праглядзець выяву",
       "viewImageWithAlt": "Праглядзець выяву «{{alt}}»",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Каб завяршыць стварэнне ўліковага запісу, вярніся назад і выберы «$t(login.moreSignInOptions)».",
-    "invalidCode": "Гэты код няправільны або тэрмін яго дзеяння скончыўся. Паспрабуй яшчэ раз або выберы «$t(login.resendCode)».",
+    "invalidCode": "Гэты код няправільны або тэрмін яго дзеяння скончыўся. Выкарыстай «$t(login.resendCode)» або «$t(login.moreSignInOptions)».",
     "codeInProgress": "Твой код апрацоўваецца. Крыху пачакай і паспрабуй яшчэ раз.",
     "tooManyAttempts": "Занадта шмат спроб. Запытай новы код.",
     "invalidToken": "Не атрымалася ўвайсці. Паспрабуй яшчэ раз.",
@@ -4693,6 +4695,7 @@
     "instructionSaveFailed": "Не ўдалося захаваць інструкцыю",
     "instructionDeleteFailed": "Не ўдалося выдаліць інструкцыю",
     "instructionToggleFailed": "Не ўдалося абнавіць інструкцыю",
+    "instructionViewTitle": "Файл інструкцыі",
     "instructionLimitReached": "Профіль можа змяшчаць да {{max}} інструкцый. Выдаліце адну, каб дадаць яшчэ.",
     "mcp": {
       "title": "MCP серверы",

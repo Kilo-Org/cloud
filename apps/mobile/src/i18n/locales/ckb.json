@@ -91,6 +91,7 @@
     "draft": "ڕەشنووس",
     "enabled": "چالاک",
     "github": "GitHub",
+    "image": "وێنە",
     "imageUnavailable": "وێنەکە بەردەست نییە.",
     "loading": "بار دەکرێت…",
     "loadMore": "بارکردنی زیاتر",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "بارکردنی وێنە",
       "imageUnavailableRetry": "وێنەکە بەردەست نییە، دووبارە هەوڵ بدەرەوە بۆ بارکردنی",
+      "imageUnavailableRetryWithAlt": "وێنەکە بەردەست نییە، {{alt}}، دووبارە هەوڵ بدەرەوە بۆ بارکردنی",
       "imagePreviewUnavailableInSession": "پێشاندانی پێشەکیی وێنە لەم سێشنەدا بەردەست نییە.",
       "viewImage": "بینینی وێنە",
       "viewImageWithAlt": "بینینی وێنەی {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "بۆ تەواوکردنی دروستکردنی هەژمارەکەت، «$t(login.signInWithApple)» بەکار بهێنە.",
     "signupStepUpGoogle": "بۆ تەواوکردنی دروستکردنی هەژمارەکەت، «$t(login.signInWithGoogle)» بەکار بهێنە.",
     "signupStepUpBack": "بۆ تەواوکردنی دروستکردنی هەژمارەکەت، بگەڕێوە دواوە و «$t(login.moreSignInOptions)» بەکار بهێنە.",
-    "invalidCode": "ئەو کۆدە هەڵەیە یان بەسەرچووە. دووبارە هەوڵ بدەوە یان «$t(login.resendCode)» بەکار بهێنە.",
+    "invalidCode": "ئەو کۆدە هەڵەیە یان بەسەرچووە. «$t(login.resendCode)» یان «$t(login.moreSignInOptions)» بەکار بهێنە.",
     "codeInProgress": "کۆدەکەت پرۆسێس دەکرێت. کەمێک چاوەڕێ بکە و دووبارە هەوڵ بدەوە.",
     "tooManyAttempts": "زۆر جار هەوڵت داوە. تکایە داوای کۆدێکی نوێ بکە.",
     "invalidToken": "چوونەژوورەوە سەرکەوتوو نەبوو. تکایە دووبارە هەوڵ بدەوە.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "نەتوانرا ڕێنماییەکە پاشەکەوت بکرێت",
     "instructionDeleteFailed": "نەتوانرا ڕێنماییەکە بسڕدرێتەوە",
     "instructionToggleFailed": "نەتوانرا ڕێنماییەکە نوێ بکرێتەوە",
+    "instructionViewTitle": "فایلی ڕێنمایی",
     "instructionLimitReached": "پرۆفایلێک دەتوانێت تا {{max}} ڕێنمایی هەڵبگرێت. یەکێک بسڕەوە بۆ زیادکردنی یەکێکی تر.",
     "mcp": {
       "title": "سێرڤەرەکانی MCP",

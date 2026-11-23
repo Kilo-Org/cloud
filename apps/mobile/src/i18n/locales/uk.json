@@ -93,6 +93,7 @@
     "draft": "Чернетка",
     "enabled": "Увімкнено",
     "github": "GitHub",
+    "image": "Зображення",
     "imageUnavailable": "Зображення недоступне.",
     "loading": "Завантаження…",
     "loadMore": "Завантажити ще",
@@ -2152,6 +2153,7 @@
     "filePart": {
       "loadingImage": "Завантаження зображення",
       "imageUnavailableRetry": "Зображення недоступне, повторіть завантаження",
+      "imageUnavailableRetryWithAlt": "Зображення недоступне, {{alt}}, повторіть завантаження",
       "imagePreviewUnavailableInSession": "Попередній перегляд зображення недоступний у цьому сеансі.",
       "viewImage": "Переглянути зображення",
       "viewImageWithAlt": "Переглянути зображення {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Щоб завершити створення облікового запису, поверніться назад і виберіть «$t(login.moreSignInOptions)».",
-    "invalidCode": "Код неправильний або термін його дії минув. Спробуйте ще раз або натисніть «$t(login.resendCode)».",
+    "invalidCode": "Код неправильний або термін його дії минув. Скористайтеся «$t(login.resendCode)» або «$t(login.moreSignInOptions)».",
     "codeInProgress": "Ваш код опрацьовується. Зачекайте трохи та спробуйте ще раз.",
     "tooManyAttempts": "Забагато спроб. Надішліть запит на новий код.",
     "invalidToken": "Не вдалося ввійти. Спробуй ще раз.",
@@ -4693,6 +4695,7 @@
     "instructionSaveFailed": "Не вдалося зберегти інструкцію",
     "instructionDeleteFailed": "Не вдалося видалити інструкцію",
     "instructionToggleFailed": "Не вдалося оновити інструкцію",
+    "instructionViewTitle": "Файл інструкції",
     "instructionLimitReached": "Профіль може містити до {{max}} інструкцій. Видаліть одну, щоб додати іншу.",
     "mcp": {
       "title": "MCP сервери",

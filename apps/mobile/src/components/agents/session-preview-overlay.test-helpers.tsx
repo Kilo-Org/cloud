@@ -262,6 +262,37 @@ vi.mock('@/components/agents/part-detail-sheet', async () => {
   };
 });
 
+/**
+ * The ack store's phase, controllable per case. The overlay reads the real
+ * `needsInputVisibility` rule, so a case can present the store as still
+ * loading (the affordance is held) or settled (the rule answers). Declared with
+ * `vi.hoisted` because the mock factory below reads it, and exported through a
+ * plain alias because a hoisted binding cannot itself be exported.
+ */
+const attentionPhaseHolder = vi.hoisted(
+  (): { current: 'loading' | 'ready' | 'failed'; acked: boolean } => ({
+    current: 'ready',
+    acked: false,
+  })
+);
+export const attentionPhase = attentionPhaseHolder;
+
+// The fake's rule lives in its own module so it cannot drift into a second
+// hand-written copy. A `vi.mock` factory is hoisted above this file's imports,
+// so the module is imported inside the factory: this is the test-boundary case
+// where a static import cannot work, because the factory runs before it.
+vi.mock('@/lib/session-attention', async () => {
+  const fake = await import('@/test/session-attention-fake');
+  return {
+    isAttentionAcked: () => attentionPhase.acked,
+    needsInputVisibility: fake.fakeNeedsInputVisibility,
+    sessionNeedsInput: fake.fakeSessionNeedsInput,
+    shouldShowNeedsInput: fake.fakeShouldShowNeedsInput,
+    useSessionAttentionHydration: () => attentionPhase.current,
+    useSessionAttentionRevision: () => 0,
+  };
+});
+
 export const BASE_TARGET: SessionPreviewTarget = {
   onOpen: () => undefined,
   sessionId: 'ses-1',
@@ -313,6 +344,8 @@ export function openPreview(target: SessionPreviewTarget): void {
 }
 
 export function resetPreviewHolder(): void {
+  attentionPhase.current = 'ready';
+  attentionPhase.acked = false;
   holder.transcript.data = undefined;
   holder.transcript.isLoading = false;
   holder.transcript.isError = false;

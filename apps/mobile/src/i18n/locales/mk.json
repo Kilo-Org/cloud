@@ -91,6 +91,7 @@
     "draft": "Нацрт",
     "enabled": "Овозможено",
     "github": "GitHub",
+    "image": "Слика",
     "imageUnavailable": "Сликата е недостапна.",
     "loading": "Се вчитува…",
     "loadMore": "Вчитај повеќе",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Вчитување слика",
       "imageUnavailableRetry": "Сликата не е достапна. Вчитај ја повторно",
+      "imageUnavailableRetryWithAlt": "Сликата не е достапна. {{alt}}. Вчитај ја повторно",
       "imagePreviewUnavailableInSession": "Прегледот на сликата е недостапен во оваа сесија.",
       "viewImage": "Погледни ја сликата",
       "viewImageWithAlt": "Погледни ја сликата {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "За да го завршиш создавањето на сметката, врати се назад и избери „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Кодот е неточен или истечен. Обиди се повторно или избери „$t(login.resendCode)“.",
+    "invalidCode": "Кодот е неточен или истечен. Користи „$t(login.resendCode)“ или „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Твојот код се обработува. Почекај малку и обиди се повторно.",
     "tooManyAttempts": "Премногу обиди. Побарај нов код.",
     "invalidToken": "Најавата не успеа. Обиди се повторно.",
@@ -4525,6 +4527,7 @@
     "instructionSaveFailed": "Не можеше да се зачува инструкцијата",
     "instructionDeleteFailed": "Не можеше да се избрише инструкцијата",
     "instructionToggleFailed": "Не можеше да се ажурира инструкцијата",
+    "instructionViewTitle": "Датотека со инструкции",
     "instructionLimitReached": "Профилот може да содржи до {{max}} инструкции. Избришете една за да додадете друга.",
     "mcp": {
       "title": "MCP сервери",

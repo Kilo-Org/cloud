@@ -58,6 +58,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { spendAlertsFormDraftKey } from '@/lib/persist/drafts';
 import { useFormDraft } from '@/lib/persist/use-form-draft';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import {
   type SettingDefinition,
   type SettingsPath,
@@ -152,7 +153,13 @@ function isSpendAlertsFormDraft(value: unknown): value is SpendAlertsFormDraft {
 function useSpendAlertSettings(organizationId: string | undefined, enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.spendAlerts.get.queryOptions(organizationId == null ? {} : { organizationId }, { enabled })
+    trpc.spendAlerts.get.queryOptions(organizationId == null ? {} : { organizationId }, {
+      enabled,
+      // The screen shows a skeleton until this answers. A paused read neither
+      // answers nor fails, so the skeleton would never resolve; settling it
+      // reaches the load-error state with its retry instead.
+      ...SETTLE_WHILE_OFFLINE,
+    })
   );
 }
 

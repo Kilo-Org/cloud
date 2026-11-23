@@ -14,6 +14,7 @@ import { useMemo } from 'react';
 
 import { type RepoOption } from '@/components/profiles/repo-bindings-model';
 import { type EnvironmentSummaryRow } from '@/lib/cloud-environments/environment-selection';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 /** The GitHub repositories a trigger can run in, in the picker's option shape. */
@@ -27,6 +28,10 @@ export function useTriggerRepositories(organizationId: string | undefined, enabl
           forceRefresh: false,
         })),
     enabled,
+    // Every picker here reports `isLoading` until its read answers. A paused
+    // read answers and fails neither, so the picker would load forever; each
+    // read below settles instead, and the reconnect refetch comes with it.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const repositories = useMemo<RepoOption[]>(
     () =>
@@ -65,7 +70,7 @@ export function useTriggerEnvironments(organizationId: string | undefined, repos
         repository: { platform: 'github', fullName: repository },
         ...(organizationId === undefined ? {} : { organizationId }),
       },
-      { enabled }
+      { enabled, ...SETTLE_WHILE_OFFLINE }
     )
   );
   const environments: EnvironmentSummaryRow[] = enabled ? (query.data ?? []) : [];
@@ -87,6 +92,7 @@ export function useTriggerProfiles(organizationId: string | undefined, enabled: 
   const query = useQuery(
     trpc.agentProfiles.list.queryOptions(organizationId === undefined ? {} : { organizationId }, {
       enabled,
+      ...SETTLE_WHILE_OFFLINE,
     })
   );
   const profiles = useMemo<TriggerProfileOption[]>(

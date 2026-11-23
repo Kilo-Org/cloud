@@ -16,6 +16,7 @@ import {
   isLatestMutationGeneration,
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 import { type CloudTriggerListRow } from './trigger-draft';
@@ -42,7 +43,13 @@ function triggerListInput(organizationId: string | undefined) {
 export function useCloudTriggers(organizationId: string | undefined, enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.webhookTriggers.list.queryOptions(triggerListInput(organizationId), { enabled })
+    trpc.webhookTriggers.list.queryOptions(triggerListInput(organizationId), {
+      enabled,
+      // The list screen's skeleton waits on this read. A paused one never
+      // answers and never fails, so it would keep the skeleton and offer no
+      // retry; it settles instead, and the reconnect refetch comes with it.
+      ...SETTLE_WHILE_OFFLINE,
+    })
   );
 }
 
@@ -57,7 +64,7 @@ export function useCloudTrigger(
       { triggerId, ...triggerScope(organizationId) },
       // A trigger whose configuration the worker answers 404 for has no retry
       // that helps: the screen shows its own not-found state instead.
-      { enabled, retry: false }
+      { enabled, retry: false, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }
@@ -71,7 +78,9 @@ export function useTriggerDeliveries(
   return useQuery(
     trpc.webhookTriggers.listRequests.queryOptions(
       { triggerId, limit: 20, ...triggerScope(organizationId) },
-      { enabled }
+      // The deliveries screen shows a skeleton until this answers; a paused
+      // read would hold it there.
+      { enabled, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }

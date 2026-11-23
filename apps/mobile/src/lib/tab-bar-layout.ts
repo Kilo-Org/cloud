@@ -18,10 +18,11 @@ export const TAB_ICON_FORWARD_FONT_SCALE = 2;
  * Floor for a tab label's shrink-to-fit, honoured on iOS only: RN implements
  * `Text`'s `minimumFontScale` on iOS, while Android's `adjustsFontSizeToFit`
  * floors at RN's own platform minimum. The cap is a residual guard, not the
- * legibility rule — `shouldShowTabLabel` drops the labels as soon as one
- * full-size label would not fit its tab, so a label that renders never needs to
- * shrink that far on either platform, and the one-line/tail-truncate behaviour
- * is the same on both.
+ * legibility rule — `shouldShowTabLabel` drops the labels only at and above
+ * `TAB_ICON_FORWARD_FONT_SCALE`, so the cap is never what removes a label.
+ * Width does not remove one either: a label wider than its tab stays on one
+ * line and tail-truncates, or takes a reserved second line through
+ * `tabLabelLines`, and that behaviour is the same on both platforms.
  */
 export const TAB_LABEL_MINIMUM_FONT_SCALE = 0.75;
 const TAB_ICON_BASE_SIZE = 22;
@@ -47,8 +48,8 @@ const FULL_WIDTH_ADVANCE_EM = 1;
  * phone widths (الملف الشخصي measured wider than its tab while fitting
  * comfortably on screen), so the bar rendered icon-only with no labels. The
  * value bounds the true advance the same way the full-width class does: a
- * stray over-estimate hides the labels slightly early rather than leaving a
- * clipped label on screen.
+ * stray over-estimate only reserves a second line or leans on the label's tail
+ * truncation, and never leaves a clipped label on screen.
  */
 const RTL_SCRIPT_ADVANCE_EM = 0.55;
 /**
@@ -213,8 +214,9 @@ export function shouldShowTabLabel(fontScale = 1): boolean {
  * Characters the tab label's monospace stack draws one em wide: CJK
  * ideographs, Kana, Hangul and fullwidth forms/punctuation. A conservative
  * class — it only bounds the glyph advance, so a stray match over-estimates
- * the width and hides the labels slightly earlier rather than leaving a
- * mid-word break on screen. Ranges mirror the `is-fullwidth-code-point` class.
+ * the width and reserves a second line or leans on tail truncation rather than
+ * leaving a mid-word break on screen. Ranges mirror the
+ * `is-fullwidth-code-point` class.
  */
 const FULL_WIDTH_CHARACTER =
   /[\u1100-\u115F\u2329\u232A\u2E80-\u3247\u3250-\u4DBF\u4E00-\uA4C6\uA960-\uA97C\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6\u{1F200}-\u{1F251}\u{20000}-\u{3FFFD}]/u;
@@ -224,18 +226,11 @@ function isFullWidthCharacter(character: string): boolean {
 }
 
 /**
- * Estimated rendered width (dp) of the widest line of a tab label. A label is
- * one line (`tabLabelNumberOfLines`), except copy that carries its own break,
- * whose wider line is the one that has to fit. Only an explicit
- * break starts a new line: an ordinary space stays on the same one line and
- * counts toward its width (the renderer tail-ellipsizes, it does not wrap on a
- * space). The estimate is deliberately
- * conservative: it only decides whether the labels are dropped, so
- * over-estimating hides them slightly early and never leaves a clipped label
- * on screen. Per-glyph advances: full-width glyphs one em, glyphs of the
- * scripts that render in the system fallback font (the RTL scripts, Arabic and
- * Hebrew, and the joined scripts — see `RTL_SCRIPT_ADVANCE_EM`) about half an
- * em, every other glyph the mono advance.
+ * Advance in em of one glyph of a tab label. Full-width glyphs take one em;
+ * glyphs of the scripts that render in the system fallback font (the RTL
+ * scripts, Arabic and Hebrew, and the joined scripts — see
+ * `RTL_SCRIPT_ADVANCE_EM`) about half an em; every other glyph the mono
+ * advance.
  */
 function glyphAdvanceEm(character: string): number {
   if (isFullWidthCharacter(character)) {
@@ -246,6 +241,16 @@ function glyphAdvanceEm(character: string): number {
     : MONO_ADVANCE_EM;
 }
 
+/**
+ * Estimated rendered width (dp) of the widest line of a tab label. A label is
+ * one line (`tabLabelNumberOfLines`), except copy that carries its own break,
+ * whose wider line is the one that has to fit. Only an explicit break starts a
+ * new line: an ordinary space stays on the same one line and counts toward its
+ * width (the renderer tail-ellipsizes, it does not wrap on a space). The
+ * estimate is deliberately conservative: it decides the line count and the fit
+ * check only, so an over-estimate reserves a second line or leans on the tail
+ * truncation and never leaves a clipped label on screen.
+ */
 export function tabLabelWidth(label: string, fontScale = 1): number {
   let widest = 0;
   for (const line of label.split('\n')) {

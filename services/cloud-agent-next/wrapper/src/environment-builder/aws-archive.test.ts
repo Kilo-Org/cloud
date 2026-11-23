@@ -108,7 +108,7 @@ describe.skipIf(process.platform !== 'linux')('AWS builder archive upload', () =
     try {
       f.cancelAfterVerification();
       await rejects(f.archive.captureAndUpload(), {
-        message: 'Environment archive capture or upload failed',
+        message: 'Environment archive capture or upload failed (synthetic build cancelled)',
       });
       expect(f.verified()).toBe(true);
       expect(f.stored()).toBeDefined();
@@ -133,7 +133,7 @@ describe.skipIf(process.platform !== 'linux')('AWS builder archive upload', () =
     try {
       f.foreignGrant();
       await rejects(f.archive.captureAndUpload(), {
-        message: 'Environment archive capture or upload failed',
+        message: 'Environment archive capture or upload failed (Invalid archive upload capability)',
       });
       expect(f.requests()).toBe(0);
       expect(f.stored()).toBeUndefined();
@@ -147,7 +147,8 @@ describe.skipIf(process.platform !== 'linux')('AWS builder archive upload', () =
     try {
       f.failVerification();
       await rejects(f.archive.captureAndUpload(), {
-        message: 'Environment archive capture or upload failed',
+        message:
+          'Environment archive capture or upload failed (Synthetic HEAD verification failure)',
       });
       expect(f.stored()).toBeDefined();
       expect(f.verified()).toBe(false);

@@ -45,9 +45,11 @@ export async function createAwsFilesystemBuildArchive(input: {
         const descriptor = await captureRootFilesystem(location);
         const grant = await input.client.prepareArchiveUpload(descriptor, input.signal);
         input.signal.throwIfAborted();
-        const url = new URL(grant.url);
+        // A parse error can repeat the signed URL, so it never reaches the log.
+        const url = URL.canParse(grant.url) ? new URL(grant.url) : null;
         const checksum = Buffer.from(descriptor.sha256, 'hex').toString('base64');
         if (
+          !url ||
           url.protocol !== 'https:' ||
           url.host !== `${base.bucket}.s3.${base.region}.amazonaws.com` ||
           url.username ||
@@ -87,8 +89,11 @@ export async function createAwsFilesystemBuildArchive(input: {
         // HEAD verification reconciles a lost success/412 reply and checks the stored checksum and size.
         await input.client.completeArchiveUpload(input.signal);
         input.signal.throwIfAborted();
-      } catch {
-        throw new Error('Environment archive capture or upload failed');
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'unknown';
+        throw new Error(`Environment archive capture or upload failed (${reason})`, {
+          cause: error,
+        });
       }
     },
     async dispose() {

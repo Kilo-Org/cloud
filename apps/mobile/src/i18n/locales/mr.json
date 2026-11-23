@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "ऑडिट लॉग",
-      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "कोणत्याही ऑडिट घटना नाहीत",
       "emptyDescription": "या संस्थेत केलेल्या कृती येथे दिसतात.",
       "truncated": "सर्वात अलीकडील घटना दाखवत आहे.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "बिलिंग",
-      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच पाहू शकतात. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच पाहू शकतात. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "सदस्यता",
       "state": "स्थिती",
       "stateNone": "सदस्यता नाही",
@@ -3715,7 +3715,7 @@
       "limitLabel": "मर्यादा (प्रतिदिन USD)",
       "memberNotFound": "सदस्य सापडला नाही.",
       "noLimitPlaceholder": "मर्यादा नाही",
-      "permissionDenied": "फक्त संस्थेचा मालक किंवा अ‍ॅडमिन वापराच्या मर्यादा व्यवस्थापित करू शकतात.",
+      "permissionDenied": "फक्त संस्थेचा मालक किंवा प्रशासक वापराच्या मर्यादा व्यवस्थापित करू शकतात.",
       "removeLimit": "मर्यादा काढा",
       "title": "दररोजच्या वापराची मर्यादा",
       "blankError": "रक्कम द्या किंवा खालील मर्यादा काढा हे बटण वापरा.",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "आधीच्या विनंत्या पाहण्यासाठी 'मागील तास' वापरा.",
       "emptyBoundDescription": "विनंत्यांच्या नोंदी इथपर्यंतच मागे उपलब्ध आहेत.",
       "loadError": "विनंती लॉग लोड करता आले नाहीत.",
-      "permissionDenied": "संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "संस्थेचा मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
       "byok": "BYOK"
     },

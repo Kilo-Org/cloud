@@ -3751,7 +3751,7 @@
       "shareInviteLink": "Raba mahaɗin gayyata",
       "resendInviteError": "Ba a iya sake aika gayyata ba.",
       "inviteNotResendable": "Ba za a iya sake aika wannan gayyatar ba.",
-      "ownerAuthority": "Mai mulkin ƙungiya ne kaɗai zai iya sarrafa masu mulki.",
+      "ownerAuthority": "Mai ƙungiya ne kaɗai zai iya sarrafa masu mulki.",
       "ownRoleChange": "Ba za ka iya canza matsayin kanka ba.",
       "inviteExpired": "Wannan gayyatar ta ƙare.",
       "inviteAccepted": "An riga an karɓi wannan gayyatar."
@@ -4964,7 +4964,7 @@
     "disconnectNeedsSupport": "Kilo ya kasa karanta damar Slack da aka ajiye don wannan haɗin. Tuntuɓi masu tallafi don kammala cire haɗin.",
     "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
     "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
-    "managedByOwner": "Ka roƙi mamallakin ƙungiya ya canza haɗin da ba za ka iya canza ba.",
+    "managedByOwner": "Ka roƙi mai ƙungiya ya canza haɗin da ba za ka iya canza ba.",
     "managedByOwnerOrAdmin": "Ka roƙi Mai ƙungiya ko Mai gudanarwa ya canza haɗin da ba za ka iya canza ba.",
     "managedByOwnerOrBilling": "Ka roƙi Mai ƙungiya ko Manajan biyan kuɗi ya canza haɗin da ba za ka iya canza ba.",
     "managedByOwnerAdminOrBilling": "Ka roƙi Mai ƙungiya, Mai gudanarwa, ko Manajan biyan kuɗi ya canza haɗin da ba za ka iya canza ba.",
@@ -5121,7 +5121,7 @@
   },
   "organizationGuardrails": {
     "title": "Shingayen Tsaro na Basirar Wucin Gadi",
-    "permissionDenied": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Masu ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Ba a kunna Shingayen Tsaro na Basirar Wucin Gadi ba",
     "unavailable": "Kilo na kunna Shingayen Tsaro na Basirar Wucin Gadi ga ƙungiya bisa buƙata. Tuntuɓi {{supportEmail}}, sannan ƙungiyar Kilo za ta kunna ta ga kungiyarka.",
     "contactSupport": "Tuntuɓi masu tallafi",
@@ -5263,7 +5263,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Siffa ta manyan kamfanoni",
     "enterpriseOnly": "Masu bayarwa da samfura suna samuwa a shirin Enterprise.",
-    "readOnly": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya canza waɗannan saitunan.",
+    "readOnly": "Masu ƙungiya da masu gudanarwa ne kawai za su iya canza waɗannan saitunan.",
     "loadError": "Ba a iya loda masu bayarwa da samfura ba",
     "tabModels": "Samfura",
     "tabProviders": "Masu bayarwa",

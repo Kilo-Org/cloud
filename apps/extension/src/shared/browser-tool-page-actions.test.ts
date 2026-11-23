@@ -16,7 +16,12 @@ import type {
   BrowserToolPageActionSession,
   BrowserToolPageTabsApi,
 } from './browser-tool-page-actions';
-import type { BrowserTabInfo, EvalTabResult, WebMcpDiscoveryResult } from './tab-debugger';
+import type {
+  BrowserTabInfo,
+  EvalTabResult,
+  WebMcpDiscoveryResult,
+  WebMcpToolDescriptor,
+} from './tab-debugger';
 
 type SendHandler = (
   method: string,
@@ -1160,6 +1165,130 @@ describe('browser-tool-page-actions', () => {
       );
 
       expect(result.ok).toBe(false);
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('lists only the tools an agent caller may read', async () => {
+      const discover = vi.fn(async () => ({
+        documentId: 'document-1',
+        tools: [
+          ...discovery.tools,
+          {
+            description: 'Hidden from the caller',
+            inputSchema: { properties: {}, type: 'object' },
+            name: 'hidden_thing',
+            origin: 'https://bank.example.com',
+            title: 'Hidden thing',
+          },
+          {
+            description: 'Names no origin',
+            inputSchema: { properties: {}, type: 'object' },
+            name: 'originless_thing',
+            origin: '',
+            title: 'Originless thing',
+          },
+        ],
+      }));
+
+      const scoped = await runPageBrowserTool('kilo_browser_webmcp_list', {}, undefined, {
+        agentScope: { readableOrigins: ['https://example.com'] },
+        tabId: 1,
+        webMcpDiscover: discover,
+      });
+
+      // A withheld tool leaves no trace: no count, no origin, nothing to notice.
+      expect(scoped).toStrictEqual({
+        ok: true,
+        value: { tools: [discovery.tools[0]] },
+      });
+
+      const unscoped = await runPageBrowserTool('kilo_browser_webmcp_list', {}, undefined, {
+        tabId: 1,
+        webMcpDiscover: discover,
+      });
+
+      expect(unscoped).toStrictEqual({
+        ok: true,
+        value: {
+          tools: [
+            discovery.tools[0],
+            {
+              description: 'Hidden from the caller',
+              inputSchema: { properties: {}, type: 'object' },
+              name: 'hidden_thing',
+              origin: 'https://bank.example.com',
+              title: 'Hidden thing',
+            },
+            {
+              description: 'Names no origin',
+              inputSchema: { properties: {}, type: 'object' },
+              name: 'originless_thing',
+              origin: '',
+              title: 'Originless thing',
+            },
+          ],
+        },
+      });
+    });
+
+    it('refuses a WebMCP call that carries an argument the tool does not take', async () => {
+      const discover = vi.fn(async () => discovery);
+      const execute = vi.fn(async () => ({ ok: true, value: 'never' }) as EvalTabResult);
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_webmcp_call',
+        { frame: 'main', name: 'do_thing' },
+        undefined,
+        { tabId: 1, webMcpDiscover: discover, webMcpExecute: execute }
+      );
+
+      expect(result).toStrictEqual({
+        error: 'browser_webmcp_call does not take "frame"; it takes a tool name and its params.',
+        ok: false,
+      });
+      expect(discover).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('keeps the tool-name wording for a call with no name', async () => {
+      const result = await runPageBrowserTool('kilo_browser_webmcp_call', { name: '' }, undefined, {
+        tabId: 1,
+        webMcpDiscover: vi.fn(async () => discovery),
+        webMcpExecute: vi.fn(),
+      });
+
+      expect(result).toStrictEqual({
+        error: 'browser_webmcp_call needs a tool name.',
+        ok: false,
+      });
+    });
+
+    it('refuses a WebMCP call whose tool names no origin', async () => {
+      const originless = {
+        description: 'Does a thing',
+        inputSchema: { properties: {}, type: 'object' },
+        name: 'do_thing',
+        origin: '',
+        title: 'Do thing',
+      } satisfies WebMcpToolDescriptor;
+      const discover = vi.fn(async () => ({
+        documentId: 'document-1',
+        tools: [originless],
+      }));
+      const execute = vi.fn(async () => ({ ok: true, value: 'never' }) as EvalTabResult);
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_webmcp_call',
+        { name: 'do_thing' },
+        undefined,
+        { tabId: 1, webMcpDiscover: discover, webMcpExecute: execute }
+      );
+
+      expect(result).toStrictEqual({
+        error:
+          'WebMCP tool "do_thing" does not name the origin it belongs to, so the call was refused.',
+        ok: false,
+      });
       expect(execute).not.toHaveBeenCalled();
     });
   });

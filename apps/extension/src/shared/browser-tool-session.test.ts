@@ -1938,6 +1938,135 @@ describe('browser tool session scripting backend', () => {
     );
   });
 
+  it('withholds a WebMCP tool an agent caller cannot read, and one that names no origin', async () => {
+    const executeScript = vi.fn<BrowserScriptingApi['executeScript']>().mockResolvedValueOnce([
+      {
+        documentId: 'doc-1',
+        result: [
+          {
+            description: 'Readable',
+            inputSchema: { type: 'object' },
+            name: 'readable',
+            origin: 'https://example.com',
+            title: 'Readable',
+          },
+          {
+            description: 'Hidden',
+            inputSchema: { type: 'object' },
+            name: 'hidden',
+            origin: 'https://bank.example.com',
+            title: 'Hidden',
+          },
+          {
+            description: 'Originless',
+            inputSchema: { type: 'object' },
+            name: 'originless',
+            origin: '',
+            title: 'Originless',
+          },
+        ],
+      },
+    ]);
+    const tabsApi = createTabsApi();
+    const session = createBrowserToolSession({
+      scriptingApi: { executeScript },
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    });
+
+    // A withheld tool is not reported: no count, and no origin echoed for the ones kept out.
+    await expect(
+      session.callTool('kilo_browser_webmcp_list', {}, { readableOrigins: ['https://example.com'] })
+    ).resolves.toStrictEqual({ ok: true, value: '- readable: Readable — Readable' });
+  });
+
+  it('prints every WebMCP tool when the caller has no read scope', async () => {
+    const executeScript = vi.fn<BrowserScriptingApi['executeScript']>().mockResolvedValueOnce([
+      {
+        documentId: 'doc-1',
+        result: [
+          {
+            description: 'Readable',
+            inputSchema: { type: 'object' },
+            name: 'readable',
+            origin: 'https://example.com',
+            title: 'Readable',
+          },
+          {
+            description: 'Hidden',
+            inputSchema: { type: 'object' },
+            name: 'hidden',
+            origin: 'https://bank.example.com',
+            title: 'Hidden',
+          },
+        ],
+      },
+    ]);
+    const tabsApi = createTabsApi();
+    const session = createBrowserToolSession({
+      scriptingApi: { executeScript },
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    });
+
+    await expect(session.callTool('kilo_browser_webmcp_list', {})).resolves.toStrictEqual({
+      ok: true,
+      value: '- readable: Readable — Readable\n- hidden: Hidden — Hidden',
+    });
+  });
+
+  it('refuses a WebMCP call that carries an argument it does not take', async () => {
+    const executeScript = vi.fn<BrowserScriptingApi['executeScript']>();
+    const tabsApi = createTabsApi();
+    const session = createBrowserToolSession({
+      scriptingApi: { executeScript },
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    });
+
+    // The vendored contract still advertises `frame`; the handler reads it nowhere, so a call carrying one is refused by name instead of dropping it.
+    await expect(
+      session.callTool('kilo_browser_webmcp_call', { frame: 'main', name: 'do_thing' })
+    ).resolves.toStrictEqual({
+      error: 'browser_webmcp_call does not take "frame"; it takes a tool name and its params.',
+      ok: false,
+    });
+    expect(executeScript).not.toHaveBeenCalled();
+  });
+
+  it('refuses a WebMCP call whose tool names no origin', async () => {
+    const executeScript = vi.fn<BrowserScriptingApi['executeScript']>().mockResolvedValueOnce([
+      {
+        documentId: 'doc-1',
+        result: [
+          {
+            description: 'Do it',
+            inputSchema: { type: 'object' },
+            name: 'do_thing',
+            origin: '',
+            title: 'Do',
+          },
+        ],
+      },
+    ]);
+    const tabsApi = createTabsApi();
+    const session = createBrowserToolSession({
+      scriptingApi: { executeScript },
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    });
+
+    await expect(
+      session.callTool('kilo_browser_webmcp_call', { name: 'do_thing' })
+    ).resolves.toStrictEqual({
+      error:
+        'WebMCP tool "do_thing" does not name the origin it belongs to, so the call was refused.',
+      ok: false,
+    });
+    // Only the discovery script ran: the refusal came before anything executed the tool.
+    expect(executeScript.mock.calls.map(call => call[0].args)).toStrictEqual([[]]);
+  });
+
   it('runs a supported tool through the scripting API and surfaces its value', async () => {
     const { scriptApi, session } = createScriptingSession({
       result: () => 'Clicked #submit with the left button.',

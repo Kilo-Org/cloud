@@ -1,7 +1,94 @@
 import { z } from 'zod';
+import type { WebMcpToolCallEvent } from './agent-conversation';
+import { originPatternMatches } from './browser-agent-checks';
 import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
 import type { KiloGatewayToolDefinition, WebMcpGatewayToolName } from './kilo-gateway-chat-client';
-import type { WebMcpToolDescriptor } from './tab-debugger';
+import { discoverWebMcpToolsInTab, executeWebMcpToolInTab } from './tab-debugger';
+import type {
+  BrowserScriptingApi,
+  EvalTabResult,
+  WebMcpDiscoveryResult,
+  WebMcpToolDescriptor,
+} from './tab-debugger';
+
+const webMcpDiscoveryValueSchema = z.object({
+  documentId: z.string(),
+  tools: z.array(
+    z.object({
+      description: z.string(),
+      inputSchema: z.unknown(),
+      name: z.string(),
+      origin: z.string(),
+      title: z.string(),
+    })
+  ),
+});
+
+/**
+ * The two WebMCP hooks the page-family handlers take for
+ * `browser_webmcp_list`/`browser_webmcp_call`, wired to the same injected
+ * discovery/execution helpers the standalone WebMCP messages use, so the panel,
+ * a workflow and a CLI agent all reach the page the same way. The execution
+ * hook is signature-checked inside the page before anything runs there. Both
+ * are `undefined` when the tab scripting API is missing.
+ */
+export interface WebMcpDispatchHooks {
+  readonly webMcpDiscover:
+    | ((tabId: number) => Promise<WebMcpDiscoveryResult | undefined>)
+    | undefined;
+  readonly webMcpExecute: ((event: WebMcpToolCallEvent) => Promise<EvalTabResult>) | undefined;
+}
+
+export const webMcpDispatchHooks = (
+  scriptingApi: BrowserScriptingApi | undefined
+): WebMcpDispatchHooks => ({
+  webMcpDiscover:
+    scriptingApi === undefined
+      ? undefined
+      : async (tabId: number): Promise<WebMcpDiscoveryResult | undefined> => {
+          const discovery = await discoverWebMcpToolsInTab({ scriptingApi, tabId });
+
+          if (!discovery.ok) {
+            return undefined;
+          }
+
+          const parsed = webMcpDiscoveryValueSchema.safeParse(discovery.value);
+
+          return parsed.success ? parsed.data : undefined;
+        },
+  webMcpExecute:
+    scriptingApi === undefined
+      ? undefined
+      : (event: WebMcpToolCallEvent): Promise<EvalTabResult> =>
+          executeWebMcpToolInTab({
+            arguments: JSON.stringify(event.arguments),
+            definitionSignature: event.definitionSignature,
+            documentId: event.documentId,
+            scriptingApi,
+            tabId: event.tabId,
+            toolName: event.name,
+          }),
+});
+
+/**
+ * The WebMCP tools a caller may see. An agent caller sees only the descriptors
+ * that name an origin it holds `read` for, and one naming no origin is withheld:
+ * the list is page text, shown under the origin the page claims and withheld
+ * when that origin cannot be read. A caller without readable origins supplied
+ * (`undefined`, a panel) sees every tool, as with a snapshot. Both list paths
+ * filter here, so a withheld tool is never reported with its count.
+ */
+export const readableWebMcpTools = (
+  tools: readonly WebMcpToolDescriptor[],
+  readableOrigins: readonly string[] | undefined
+): readonly WebMcpToolDescriptor[] =>
+  readableOrigins === undefined
+    ? tools
+    : tools.filter(
+        tool =>
+          tool.origin !== '' &&
+          readableOrigins.some(pattern => originPatternMatches(pattern, tool.origin))
+      );
 
 export interface WebMcpToolRoute {
   readonly tabId: number;

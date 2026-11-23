@@ -82,6 +82,7 @@ const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOp
 
 const pageToolOptions = (options: BrowserToolDispatchOptions): BrowserToolPageActionOptions => ({
   ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
+  ...(options.agentScope === undefined ? {} : { agentScope: options.agentScope }),
   ...(options.noteTabCreated === undefined ? {} : { noteTabCreated: options.noteTabCreated }),
   ...(options.now === undefined ? {} : { now: options.now }),
   ...(options.tabId === undefined ? {} : { tabId: options.tabId }),
@@ -108,8 +109,8 @@ const pageEntries: [string, BrowserToolHandler][] = PAGE_BROWSER_TOOL_NAMES.map(
 /**
  * One handler per upstream `browser_*` tool, keyed by the upstream name. The
  * read, interact and page families each contribute their tools; the page
- * family's cross-frame `browser_webmcp_list` overrides the read family's
- * main-frame variant, which is what collapses 8 + 8 + 11 family entries onto
+ * family's `browser_webmcp_list`, which reads the live page, overrides the read
+ * family's variant, which is what collapses 8 + 8 + 11 family entries onto
  * the contract's 26 tools.
  */
 export const BROWSER_TOOL_HANDLERS: Record<string, BrowserToolHandler> = Object.fromEntries([

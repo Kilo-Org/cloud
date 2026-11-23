@@ -2,7 +2,13 @@
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { TAB_TAKEN_ERROR } from './browser-caller';
-import { dropPathsSchema, dropTargetSchema, STALE_REF_ERROR } from './browser-agent-checks';
+import {
+  dropPathsSchema,
+  dropTargetSchema,
+  STALE_REF_ERROR,
+  webMcpCallArgumentError,
+  webMcpCallArgumentsSchema,
+} from './browser-agent-checks';
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
 import { MAIN_FRAME_ID, readIsolatedFrames } from './browser-agent-isolated-probe';
 import type { IsolatedAgentProbe, IsolatedFrameTree } from './browser-agent-isolated-probe';
@@ -24,7 +30,7 @@ import {
   getInspectableTab,
   getViewportScreenshotWithTabsApi,
 } from './tab-debugger';
-import { buildWebMcpDefinitionSignature } from './web-mcp-tools';
+import { buildWebMcpDefinitionSignature, readableWebMcpTools } from './web-mcp-tools';
 import type {
   BrowserScriptingApi,
   BrowserTabInfo,
@@ -516,6 +522,14 @@ export interface BrowserToolSession {
     scope?: BrowserToolCallScope
   ) => Promise<BrowserToolCallResult>;
   readonly consoleMessages: () => BrowserConsoleMessage[];
+  /**
+   * The WebMCP tools the tab's top-level document registers: the cached
+   * discovery when the session already holds one, otherwise a fresh one.
+   * `undefined` when the page cannot report its tools (no scripting API, a
+   * failed discovery, a malformed answer) and never a throw, because the agent
+   * gate reads this before the call runs and the handler still answers.
+   */
+  readonly discoverWebMcpTools: () => Promise<readonly WebMcpToolDescriptor[] | undefined>;
   /**
    * Idempotent. Clears state, unsubscribes, and detaches the debugger; an
    * attach already in flight is awaited and its debugger released.
@@ -1473,10 +1487,6 @@ const browserToolSelectOptionArgsSchema = z.object({
 const browserToolPressKeyArgsSchema = z.object({ key: z.string().min(1) });
 const browserToolNavigateArgsSchema = z.object({ url: z.string().min(1) });
 const browserToolResizeArgsSchema = z.object({ height: z.number(), width: z.number() });
-const browserToolWebMcpCallArgsSchema = z.object({
-  name: z.string().min(1),
-  params: z.union([z.record(z.string(), z.unknown()), z.undefined()]).optional(),
-});
 const browserToolConsoleMessagesArgsSchema = z.object({
   all: z.boolean().optional(),
   level: z.enum(['debug', 'error', 'info', 'warning']).optional(),
@@ -3239,26 +3249,41 @@ export const createBrowserToolSession = ({
     }, 'The page did not navigate.');
   };
 
-  const discoverPageWebMcpTools = async (): Promise<BrowserToolCallResult> => {
+  /**
+   * The WebMCP tools the tab's top-level document registers, discovered once per
+   * document and cached. `undefined` when the page cannot report them — no
+   * scripting API, a failed discovery, or a malformed answer — so a caller
+   * answers with its own "not available" error. Never throws: the agent gate
+   * reads this before a call runs.
+   */
+  const discoverWebMcpTools = async (): Promise<readonly WebMcpToolDescriptor[] | undefined> => {
+    if (webMcpDiscovery !== undefined) {
+      return webMcpDiscovery.tools;
+    }
+
     if (scriptingApi === undefined) {
-      return { error: 'WebMCP discovery API is unavailable.', ok: false };
+      return undefined;
     }
 
-    const discovery = await discoverWebMcpToolsInTab({ scriptingApi, tabId });
+    try {
+      const discovery = await discoverWebMcpToolsInTab({ scriptingApi, tabId });
 
-    if (!discovery.ok) {
-      return { error: discovery.error, ok: false };
+      if (!discovery.ok) {
+        return undefined;
+      }
+
+      const parsed = browserToolWebMcpDiscoverySchema.safeParse(discovery.value);
+
+      if (!parsed.success) {
+        return undefined;
+      }
+
+      webMcpDiscovery = parsed.data;
+
+      return parsed.data.tools;
+    } catch {
+      return undefined;
     }
-
-    const parsed = browserToolWebMcpDiscoverySchema.safeParse(discovery.value);
-
-    if (!parsed.success) {
-      return { error: 'WebMCP discovery returned an invalid result.', ok: false };
-    }
-
-    webMcpDiscovery = parsed.data;
-
-    return { ok: true, value: parsed.data };
   };
 
   const runDebuggerOnlyTool = async (
@@ -3823,30 +3848,36 @@ export const createBrowserToolSession = ({
       }
 
       case 'browser_webmcp_call': {
-        const parsed = browserToolWebMcpCallArgsSchema.safeParse(args);
+        const parsed = webMcpCallArgumentsSchema.safeParse(args);
 
         if (!parsed.success) {
-          return { error: 'browser_webmcp_call needs a tool name.', ok: false };
+          return { error: webMcpCallArgumentError(parsed.error), ok: false };
         }
 
         if (scriptingApi === undefined) {
           return { error: 'WebMCP execution API is unavailable.', ok: false };
         }
 
-        if (webMcpDiscovery === undefined) {
-          const discovery = await discoverPageWebMcpTools();
+        // Discovery and execution both run in the tab's top-level document, so a descriptor that names another origin is refused here too: the handler is the last door, not the first.
+        const tools = await discoverWebMcpTools();
+        const discovery = webMcpDiscovery;
 
-          if (!discovery.ok) {
-            return discovery;
-          }
+        if (tools === undefined || discovery === undefined) {
+          return { error: 'WebMCP discovery returned an invalid result.', ok: false };
         }
 
-        const list = webMcpDiscovery;
-        const tool = list?.tools.find(candidate => candidate.name === parsed.data.name);
+        const tool = tools.find(candidate => candidate.name === parsed.data.name);
 
-        if (list === undefined || tool === undefined) {
+        if (tool === undefined) {
           return {
             error: `WebMCP tool "${parsed.data.name}" is not available. List the page's WebMCP tools first.`,
+            ok: false,
+          };
+        }
+
+        if (tool.origin === '') {
+          return {
+            error: `WebMCP tool "${parsed.data.name}" does not name the origin it belongs to, so the call was refused.`,
             ok: false,
           };
         }
@@ -3855,7 +3886,7 @@ export const createBrowserToolSession = ({
         const result = await executeWebMcpToolInTab({
           arguments: JSON.stringify(parsed.data.params ?? {}),
           definitionSignature: signature,
-          documentId: list.documentId,
+          documentId: discovery.documentId,
           scriptingApi,
           tabId,
           toolName: parsed.data.name,
@@ -3865,21 +3896,25 @@ export const createBrowserToolSession = ({
       }
 
       case 'browser_webmcp_list': {
-        const discovery = await discoverPageWebMcpTools();
-
-        if (!discovery.ok) {
-          return discovery;
+        if (scriptingApi === undefined) {
+          return { error: 'WebMCP discovery API is unavailable.', ok: false };
         }
 
-        const list = browserToolWebMcpDiscoverySchema.safeParse(discovery.value);
+        const tools = await discoverWebMcpTools();
 
-        if (!list.success || list.data.tools.length === 0) {
+        if (tools === undefined) {
+          return { error: 'WebMCP discovery returned an invalid result.', ok: false };
+        }
+
+        const shown = readableWebMcpTools(tools, call.scope?.readableOrigins);
+
+        if (shown.length === 0) {
           return { ok: true, value: 'No WebMCP tools are available on this page.' };
         }
 
         return {
           ok: true,
-          value: list.data.tools
+          value: shown
             .map(
               tool =>
                 `- ${tool.name}: ${tool.title}${tool.description === '' ? '' : ` — ${tool.description}`}`
@@ -3986,6 +4021,7 @@ export const createBrowserToolSession = ({
       },
       childFrames: () => new Map(childFrames),
       consoleMessages: () => [...consoleBuffer],
+      discoverWebMcpTools,
       // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
       dispose: () => {
         refs.clear();
@@ -4048,6 +4084,7 @@ export const createBrowserToolSession = ({
     captureViewportImage,
     childFrames: () => new Map(childFrames),
     consoleMessages: () => [...consoleBuffer],
+    discoverWebMcpTools,
     dispose,
     disposeCaller: callerKey => {
       refsByCaller.get(callerKey)?.clear();

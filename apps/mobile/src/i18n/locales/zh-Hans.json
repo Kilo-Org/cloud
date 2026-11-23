@@ -1213,7 +1213,8 @@
       "severityCriticalOnly": "仅严重级",
       "severityHighAndAbove": "高危及以上",
       "severityMediumAndAbove": "中危及以上",
-      "title": "自动化"
+      "title": "自动化",
+      "queued_one": "已将 {{displayCount}} 个现有安全问题加入分析队列。"
     },
     "dashboard": {
       "actFirst": "优先处理",
@@ -2261,7 +2262,8 @@
       "omitted_other": "无法显示此会话中的 {{displayCount}} 项较早内容。",
       "couldNotLoad": "无法加载较早的消息。",
       "unavailable": "无法查看较早的消息。",
-      "tooLarge": "较早的消息数据量过大，无法加载。"
+      "tooLarge": "较早的消息数据量过大，无法加载。",
+      "omitted_one": "无法显示此会话中的部分较早内容。"
     },
     "sessionFilter": {
       "title": "筛选会话",
@@ -2988,7 +2990,8 @@
       "commentEditFailed": "无法保存你的评论。请检查网络连接后重试。",
       "commentEditUnavailable": "无法编辑此评论。它可能已被删除。",
       "commentDeleteFailed": "无法删除你的评论。请检查网络连接后重试。",
-      "commentDeleteUnavailable": "无法删除此评论。"
+      "commentDeleteUnavailable": "无法删除此评论。",
+      "comment_one": "1 条评论"
     },
     "entry": {
       "noRecentPrs": "暂无最近审查",
@@ -3270,7 +3273,8 @@
       "submitCountOfTotal_other": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
       "submitReview": "提交审查意见",
       "blockedRequestChanges": "请填写总结或添加至少一条评论，才能要求更改。",
-      "blockedComment": "请填写总结或添加至少一条评论，才能提交评论类型的审查。"
+      "blockedComment": "请填写总结或添加至少一条评论，才能提交评论类型的审查。",
+      "pendingComment_one": "条待提交的评论"
     },
     "fileStatus": {
       "changed": "已更改",
@@ -3283,7 +3287,8 @@
       "discussionAccessibility": "{{title}}：{{displayCount}} 条评论",
       "discussionAccessibility_other": "{{title}}：{{displayCount}} 条评论",
       "files": "文件",
-      "overview": "概览"
+      "overview": "概览",
+      "discussionAccessibility_one": "{{title}}：1 条评论"
     },
     "diff": {
       "selectedTapToChange": "已选择 {{label}}，点按更改选择",
@@ -3800,7 +3805,8 @@
       "paymentPending": "付款待处理",
       "processingBlocked": "处理受阻",
       "processingNeedsReview": "处理情况需要审核",
-      "retryHint": "重新加载 Kilo Pass 状态。"
+      "retryHint": "重新加载 Kilo Pass 状态。",
+      "paidSeat_one": "{{displayCount}} 个已付费席位"
     }
   },
   "feedback": {

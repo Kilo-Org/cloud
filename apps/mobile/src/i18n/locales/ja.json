@@ -1213,7 +1213,8 @@
       "severityCriticalOnly": "重大のみ",
       "severityHighAndAbove": "高以上",
       "severityMediumAndAbove": "中以上",
-      "title": "自動化"
+      "title": "自動化",
+      "queued_one": "{{displayCount}}件の既存の検出結果を分析キューに追加しました。"
     },
     "dashboard": {
       "actFirst": "優先対応",
@@ -2261,7 +2262,8 @@
       "omitted_other": "このセッションの以前の項目{{displayCount}}件を表示できませんでした。",
       "couldNotLoad": "以前のメッセージを読み込めませんでした。",
       "unavailable": "以前のメッセージは利用できません。",
-      "tooLarge": "以前のメッセージはデータ量が多すぎて読み込めません。"
+      "tooLarge": "以前のメッセージはデータ量が多すぎて読み込めません。",
+      "omitted_one": "このセッションの以前の項目の一部を表示できませんでした。"
     },
     "sessionFilter": {
       "title": "セッションの絞り込み",
@@ -2988,7 +2990,9 @@
       "commentEditFailed": "コメントを保存できませんでした。接続を確認して、もう一度お試しください。",
       "commentEditUnavailable": "このコメントは編集できません。削除された可能性があります。",
       "commentDeleteFailed": "コメントを削除できませんでした。接続を確認して、もう一度お試しください。",
-      "commentDeleteUnavailable": "このコメントは削除できません。"
+      "commentDeleteUnavailable": "このコメントは削除できません。",
+      "comment_one": "1件のコメント",
+      "reaction_one": "件"
     },
     "entry": {
       "noRecentPrs": "最近のレビューはありません",
@@ -3088,7 +3092,9 @@
       "expandLines_other": "{{displayCount}}行を展開（{{start}}–{{end}}）",
       "expandLinesOfContext_other": "前後の{{displayCount}}行を展開",
       "expandMoreLines_other": "さらに{{displayCount}}行を展開（{{start}}–{{end}}）",
-      "loadedOfTotalFiles_other": "{{total}}件中{{loaded}}件のファイルを読み込み済み"
+      "loadedOfTotalFiles_other": "{{total}}件中{{loaded}}件のファイルを読み込み済み",
+      "fileLoadedCount_one": "{{displayCount}}件のファイルを読み込み済み",
+      "fileLoadedOfTotalCount_one": "{{total}}件中{{displayCount}}件のファイルを読み込み済み"
     },
     "inbox": {
       "couldNotLoad": "受信トレイを読み込めませんでした。",
@@ -3283,7 +3289,8 @@
       "discussionAccessibility": "{{title}}：{{displayCount}}件のコメント",
       "discussionAccessibility_other": "{{title}}：{{displayCount}}件のコメント",
       "files": "ファイル",
-      "overview": "概要"
+      "overview": "概要",
+      "discussionAccessibility_one": "{{title}}：1件のコメント"
     },
     "diff": {
       "selectedTapToChange": "{{label}}を選択中。タップして選択を変更",

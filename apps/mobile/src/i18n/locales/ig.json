@@ -691,7 +691,9 @@
       "expandLines_other": "Gosi ahịrị {{displayCount}} ({{start}}–{{end}})",
       "expandLinesOfContext_other": "Gosi ahịrị {{displayCount}} gbara ya gburugburu",
       "expandMoreLines_other": "Gosi ahịrị {{displayCount}} ọzọ ({{start}}–{{end}})",
-      "loadedOfTotalFiles_other": "Ebudatala faịlụ {{loaded}} n'ime {{total}}"
+      "loadedOfTotalFiles_other": "Ebudatala faịlụ {{loaded}} n'ime {{total}}",
+      "fileLoadedCount_one": "ebudatala faịlụ {{displayCount}}",
+      "fileLoadedOfTotalCount_one": "ebudatala faịlụ {{displayCount}} n'ime {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ enweghị ahịrị ọhụrụ na njedebe faịlụ",
@@ -899,7 +901,8 @@
       "commentEditFailed": "Enweghị ike ichekwa okwu gị. Lelee njikọ gị ma nwaa ọzọ.",
       "commentEditUnavailable": "Enweghị ike idezi okwu a. O nwere ike ịbụ na ehichapụrụ ya.",
       "commentDeleteFailed": "Enweghị ike ihichapụ okwu gị. Lelee njikọ gị ma nwaa ọzọ.",
-      "commentDeleteUnavailable": "Enweghị ike ihichapụ okwu a."
+      "commentDeleteUnavailable": "Enweghị ike ihichapụ okwu a.",
+      "comment_one": "okwu 1"
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala ngwa GitHub",
     "installKiloGitHubApp": "Tinye ngwa Kilo GitHub",
@@ -1018,7 +1021,8 @@
       "partialPostedStale": "Okwu {{displayStaleCount}} na-ezo aka na ndekọ mgbanwe ochie ma na-anọgide na ndepụta okwu gị na-eche iziga.",
       "partialPostedStale_other": "Okwu {{displayStaleCount}} na-ezo aka na ndekọ mgbanwe ochie ma na-anọgide na ndepụta okwu gị na-eche iziga.",
       "blockedRequestChanges": "Tinye nchịkọta ma ọ bụ ma ọ dịkarịa ala otu okwu ka ị rịọ mgbanwe.",
-      "blockedComment": "Tinye nchịkọta ma ọ bụ ma ọ dịkarịa ala otu okwu ka ị bipụta nyocha nke okwu."
+      "blockedComment": "Tinye nchịkọta ma ọ bụ ma ọ dịkarịa ala otu okwu ka ị bipụta nyocha nke okwu.",
+      "pendingComment_one": "okwu na-eche iziga"
     },
     "reconnectNotice": {
       "title": "Oge njikọ GitHub agwụla.",
@@ -1074,7 +1078,8 @@
       "files": "Faịlụ",
       "discussion": "Mkparịta ụka",
       "discussionAccessibility": "{{title}}: okwu {{displayCount}}",
-      "discussionAccessibility_other": "{{title}}: okwu {{displayCount}}"
+      "discussionAccessibility_other": "{{title}}: okwu {{displayCount}}",
+      "discussionAccessibility_one": "{{title}}: okwu 1"
     },
     "fileStatus": {
       "modified": "Agbanwere",
@@ -1662,7 +1667,8 @@
       "severityAll": "Ogo njọ niile",
       "confidenceHighOnly": "Naanị ntụkwasị obi dị elu",
       "confidenceMediumOrHigher": "Etiti ma ọ bụ karịa",
-      "confidenceAny": "Ntụkwasị obi ọ bụla"
+      "confidenceAny": "Ntụkwasị obi ọ bụla",
+      "queued_one": "E tinyela ihe achọpụtara {{displayCount}} dịbu n'ahịrị nchere maka nyocha."
     },
     "analysis": {
       "couldNotLoad": "Enweghị ike ibudata nyocha.",
@@ -1816,7 +1822,8 @@
       "notificationsCount": "{{displayCount}} n'ime 2 gbanyere",
       "disabledNoManage": "A gbanyụrụ onye nnọchi anya nchebe. Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ịgbanye ya.",
       "disabledNoRepo": "Họrọ opekata mpe otu ebe nchekwa tupu ịgbanye onye nnọchi anya nchebe.",
-      "disabledPrompt": "Gbanye onye nnọchi anya nchebe iji mekọrịta data ọkwa Dependabot, họrọ ebe nchekwa ma hazie ọrụ akpaaka."
+      "disabledPrompt": "Gbanye onye nnọchi anya nchebe iji mekọrịta data ọkwa Dependabot, họrọ ebe nchekwa ma hazie ọrụ akpaaka.",
+      "repositoriesCount_one": "Ebe nchekwa {{displayCount}} ahọpụtara"
     },
     "remediation": {
       "cancellationRequested": "Arịọla ka a kagbuo",
@@ -2047,7 +2054,8 @@
       "dueTomorrow": "Oge ga-eru echi",
       "dueInDays_other": "Oge ga-eru n'ụbọchị {{count}}",
       "overdue": "Oge gafere ụbọchị {{count}}",
-      "dueInDays": "Oge ga-eru n'ụbọchị {{count}}"
+      "dueInDays": "Oge ga-eru n'ụbọchị {{count}}",
+      "overdue_one": "Gafere oge site n'ụbọchị {{count}}"
     },
     "remediationStatus": {
       "notStarted": "Amalitebeghị",
@@ -2797,7 +2805,8 @@
       "omitted_other": "Enweghị ike igosi ihe {{displayCount}} gara aga na nnọkọ a.",
       "couldNotLoad": "Enweghị ike ibudata ozi gara aga.",
       "unavailable": "Ozi gara aga adịghị.",
-      "tooLarge": "Ozi gara aga buru ibu nke ukwuu nke na a pụghị ibudata ha."
+      "tooLarge": "Ozi gara aga buru ibu nke ukwuu nke na a pụghị ibudata ha.",
+      "omitted_one": "Enweghị ike igosi ụfọdụ ihe gara aga na nnọkọ a."
     },
     "sessionFilter": {
       "title": "Yọchaa nnọkọ",
@@ -3535,7 +3544,9 @@
           "slack": "$t(agentChat.sessionFilter.platformSlack)",
           "linear": "$t(agentChat.sessionFilter.platformLinear)",
           "byok": "Igodo API nke gị"
-        }
+        },
+        "groupMemberGroups_one": "Ndị otu {{displayCount}}",
+        "groupMemberGroupsOf_one": "{{email}}: Ndị otu {{displayCount}}"
       }
     },
     "billing": {
@@ -4331,7 +4342,8 @@
       "skills_other": "{{count}} nkà",
       "commands_other": "{{count}} iwu",
       "setupCommands_other": "{{count}} iwu ntọlite",
-      "agents_other": "{{count}} ndị ọrụ"
+      "agents_other": "{{count}} ndị ọrụ",
+      "agents_one": "{{count}} onye ọrụ"
     },
     "nameLabel": "Aha profaịlụ",
     "namePlaceholder": "eg. Ndozi azụ azụ",

@@ -691,7 +691,8 @@
       "expandLines_other": "ขยาย {{displayCount}} บรรทัด ({{start}}–{{end}})",
       "expandLinesOfContext_other": "ขยายบรรทัดแวดล้อม {{displayCount}} บรรทัด",
       "expandMoreLines_other": "ขยายเพิ่มอีก {{displayCount}} บรรทัด ({{start}}–{{end}})",
-      "loadedOfTotalFiles_other": "โหลดแล้ว {{loaded}} จาก {{total}} ไฟล์"
+      "loadedOfTotalFiles_other": "โหลดแล้ว {{loaded}} จาก {{total}} ไฟล์",
+      "fileLoadedCount_one": "โหลดแล้ว {{displayCount}} ไฟล์"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ไม่มีอักขระขึ้นบรรทัดใหม่ท้ายไฟล์",
@@ -899,7 +900,8 @@
       "commentEditFailed": "ไม่สามารถบันทึกความคิดเห็นของคุณได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
       "commentEditUnavailable": "ไม่สามารถแก้ไขความคิดเห็นนี้ได้ อาจถูกลบไปแล้ว",
       "commentDeleteFailed": "ไม่สามารถลบความคิดเห็นของคุณได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
-      "commentDeleteUnavailable": "ไม่สามารถลบความคิดเห็นนี้ได้"
+      "commentDeleteUnavailable": "ไม่สามารถลบความคิดเห็นนี้ได้",
+      "comment_one": "ความคิดเห็น 1 รายการ"
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
@@ -1074,7 +1076,8 @@
       "files": "ไฟล์",
       "discussion": "การสนทนา",
       "discussionAccessibility": "{{title}}: ความคิดเห็น {{displayCount}} รายการ",
-      "discussionAccessibility_other": "{{title}}: ความคิดเห็น {{displayCount}} รายการ"
+      "discussionAccessibility_other": "{{title}}: ความคิดเห็น {{displayCount}} รายการ",
+      "discussionAccessibility_one": "{{title}}: ความคิดเห็น 1 รายการ"
     },
     "fileStatus": {
       "modified": "แก้ไขแล้ว",
@@ -1662,7 +1665,8 @@
       "severityAll": "ทุกระดับ",
       "confidenceHighOnly": "เฉพาะความมั่นใจสูง",
       "confidenceMediumOrHigher": "ปานกลางขึ้นไป",
-      "confidenceAny": "ทุกระดับความมั่นใจ"
+      "confidenceAny": "ทุกระดับความมั่นใจ",
+      "queued_one": "จัดคิวข้อค้นพบที่มีอยู่ {{displayCount}} รายการเพื่อวิเคราะห์แล้ว"
     },
     "analysis": {
       "couldNotLoad": "ไม่สามารถโหลดการวิเคราะห์ได้",
@@ -1816,7 +1820,8 @@
       "notificationsCount": "เปิดอยู่ {{displayCount}} จาก 2 รายการ",
       "disabledNoManage": "เอเจนต์ความปลอดภัยปิดอยู่ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเปิดได้",
       "disabledNoRepo": "เลือกคลังโค้ดอย่างน้อยหนึ่งแห่งก่อนเปิดเอเจนต์ความปลอดภัย",
-      "disabledPrompt": "เปิดเอเจนต์ความปลอดภัยเพื่อซิงค์การแจ้งเตือน Dependabot เลือกคลังโค้ด และตั้งค่าระบบอัตโนมัติ"
+      "disabledPrompt": "เปิดเอเจนต์ความปลอดภัยเพื่อซิงค์การแจ้งเตือน Dependabot เลือกคลังโค้ด และตั้งค่าระบบอัตโนมัติ",
+      "repositoriesCount_one": "เลือกคลังโค้ดแล้ว {{displayCount}} แห่ง"
     },
     "remediation": {
       "cancellationRequested": "ส่งคำขอยกเลิกแล้ว",
@@ -2797,7 +2802,8 @@
       "omitted_other": "ไม่สามารถแสดงรายการก่อนหน้า {{displayCount}} รายการของเซสชันนี้ได้",
       "couldNotLoad": "โหลดข้อความก่อนหน้าไม่สำเร็จ",
       "unavailable": "ข้อความก่อนหน้าไม่พร้อมใช้งาน",
-      "tooLarge": "ข้อความก่อนหน้ามีขนาดใหญ่เกินไปที่จะโหลด"
+      "tooLarge": "ข้อความก่อนหน้ามีขนาดใหญ่เกินไปที่จะโหลด",
+      "omitted_one": "ไม่สามารถแสดงบางรายการก่อนหน้าของเซสชันนี้ได้"
     },
     "sessionFilter": {
       "title": "กรองเซสชัน",
@@ -2959,7 +2965,8 @@
       "stepsCount": "{{steps}} ขั้นตอน",
       "stepsCount_other": "{{steps}} ขั้นตอน",
       "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}",
-      "modelsCount_other": "โมเดล ({{displayCount}})"
+      "modelsCount_other": "โมเดล ({{displayCount}})",
+      "tokens_one": "โทเค็น"
     },
     "sessionChanges": {
       "viewChanges": "ดูการเปลี่ยนแปลง",
@@ -3808,7 +3815,8 @@
       "paymentPending": "รอการชำระเงิน",
       "processingBlocked": "การประมวลผลถูกบล็อก",
       "processingNeedsReview": "ต้องตรวจสอบการประมวลผล",
-      "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง"
+      "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
+      "paidSeat_one": "สิทธิ์ใช้งานที่ชำระเงินแล้ว {{displayCount}} สิทธิ์"
     }
   },
   "authErrors": {

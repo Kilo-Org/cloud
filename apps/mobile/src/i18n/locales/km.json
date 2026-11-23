@@ -899,7 +899,8 @@
       "commentEditFailed": "មិនអាចរក្សាទុកមតិយោបល់របស់អ្នកបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
       "commentEditUnavailable": "មតិយោបល់នេះមិនអាចកែសម្រួលបានទេ។ វាអាចត្រូវបានលុប។",
       "commentDeleteFailed": "មិនអាចលុបមតិយោបល់របស់អ្នកបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
-      "commentDeleteUnavailable": "មតិយោបល់នេះមិនអាចលុបបានទេ។"
+      "commentDeleteUnavailable": "មតិយោបល់នេះមិនអាចលុបបានទេ។",
+      "comment_one": "មតិយោបល់ 1"
     },
     "couldNotOpenGitHubAppSettings": "មិនអាចបើកការកំណត់កម្មវិធី GitHub បានទេ។",
     "installKiloGitHubApp": "ដំឡើងកម្មវិធី Kilo សម្រាប់ GitHub",
@@ -1074,7 +1075,8 @@
       "files": "ឯកសារ",
       "discussion": "ការពិភាក្សា",
       "discussionAccessibility": "{{title}}: មតិយោបល់ {{displayCount}}",
-      "discussionAccessibility_other": "{{title}}: មតិយោបល់ {{displayCount}}"
+      "discussionAccessibility_other": "{{title}}: មតិយោបល់ {{displayCount}}",
+      "discussionAccessibility_one": "{{title}}: មតិយោបល់ 1"
     },
     "fileStatus": {
       "modified": "បានកែប្រែ",
@@ -1816,7 +1818,8 @@
       "notificationsCount": "បានបើក {{displayCount}} ក្នុងចំណោម 2",
       "disabledNoManage": "ភ្នាក់ងារសុវត្ថិភាពត្រូវបានបិទ។ មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង និងអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះដែលអាចបើកវាបាន។",
       "disabledNoRepo": "ជ្រើសរើសឃ្លាំងកូដយ៉ាងហោចណាស់មួយ មុនពេលបើកភ្នាក់ងារសុវត្ថិភាព។",
-      "disabledPrompt": "បើកភ្នាក់ងារសុវត្ថិភាព ដើម្បីធ្វើសមកាលកម្មការជូនដំណឹងពី Dependabot ជ្រើសរើសឃ្លាំងកូដ និងកំណត់ស្វ័យប្រវត្តិកម្ម។"
+      "disabledPrompt": "បើកភ្នាក់ងារសុវត្ថិភាព ដើម្បីធ្វើសមកាលកម្មការជូនដំណឹងពី Dependabot ជ្រើសរើសឃ្លាំងកូដ និងកំណត់ស្វ័យប្រវត្តិកម្ម។",
+      "repositoriesCount_one": "បានជ្រើសរើសឃ្លាំងកូដចំនួន {{displayCount}}"
     },
     "remediation": {
       "cancellationRequested": "បានស្នើសុំបោះបង់ការជួសជុល",
@@ -2047,7 +2050,8 @@
       "dueTomorrow": "ដល់កំណត់ថ្ងៃស្អែក",
       "dueInDays_other": "ដល់កំណត់ក្នុងរយៈពេល {{count}} ថ្ងៃទៀត",
       "overdue": "ហួសកំណត់ {{count}} ថ្ងៃ",
-      "dueInDays": "ដល់កំណត់ក្នុងរយៈពេល {{count}} ថ្ងៃទៀត"
+      "dueInDays": "ដល់កំណត់ក្នុងរយៈពេល {{count}} ថ្ងៃទៀត",
+      "dueInDays_one": "ដល់កំណត់ក្នុង {{count}} ថ្ងៃទៀត"
     },
     "remediationStatus": {
       "notStarted": "មិនទាន់ចាប់ផ្តើម",
@@ -2440,7 +2444,8 @@
     },
     "partRenderer": {
       "updatedFileCount": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}។",
-      "updatedFileCount_other": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}។"
+      "updatedFileCount_other": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}។",
+      "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារចំនួន {{displayCount}}។"
     },
     "toolCard": {
       "accessibility": "ឧបករណ៍ {{label}}, {{status}}",
@@ -2797,7 +2802,8 @@
       "omitted_other": "មិនអាចបង្ហាញធាតុមុនៗចំនួន {{displayCount}} ពីវគ្គនេះបានទេ។",
       "couldNotLoad": "មិនអាចផ្ទុកសារមុនៗបានទេ។",
       "unavailable": "មិនអាចចូលមើលសារមុនៗបានទេ។",
-      "tooLarge": "សារមុនៗមានទំហំធំពេក មិនអាចផ្ទុកបានទេ។"
+      "tooLarge": "សារមុនៗមានទំហំធំពេក មិនអាចផ្ទុកបានទេ។",
+      "omitted_one": "ធាតុមុនៗមួយចំនួនពីវគ្គនេះមិនអាចបង្ហាញបានទេ។"
     },
     "sessionFilter": {
       "title": "ត្រងវគ្គ",
@@ -2959,7 +2965,8 @@
       "stepsCount": "ជំហាន {{steps}}",
       "stepsCount_other": "ជំហាន {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount_other": "ម៉ូដែល ({{displayCount}})"
+      "modelsCount_other": "ម៉ូដែល ({{displayCount}})",
+      "stepsCount_one": "{{steps}} ជំហាន"
     },
     "sessionChanges": {
       "viewChanges": "មើលការផ្លាស់ប្តូរ",

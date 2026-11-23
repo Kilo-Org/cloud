@@ -1213,7 +1213,8 @@
       "severityCriticalOnly": "僅嚴重",
       "severityHighAndAbove": "高以上",
       "severityMediumAndAbove": "中以上",
-      "title": "自動化"
+      "title": "自動化",
+      "queued_one": "已將 {{displayCount}} 項現有資安問題排入分析佇列。"
     },
     "dashboard": {
       "actFirst": "優先處理",
@@ -1415,7 +1416,8 @@
       "notificationsCount": "已啟用 {{displayCount}}/2 項",
       "on": "開啟",
       "repositoriesCount": "已選擇 {{displayCount}} 個存放庫",
-      "repositoriesCount_other": "已選擇 {{displayCount}} 個存放庫"
+      "repositoriesCount_other": "已選擇 {{displayCount}} 個存放庫",
+      "repositoriesCount_one": "已選取 {{displayCount}} 個存放庫"
     },
     "settingsSave": {
       "saveChanges": "儲存變更",
@@ -2261,7 +2263,8 @@
       "omitted_other": "此工作階段中的 {{displayCount}} 個較早項目無法顯示。",
       "couldNotLoad": "無法載入較早的訊息。",
       "unavailable": "無法取得較早的訊息。",
-      "tooLarge": "較早的訊息資料量過大，無法載入。"
+      "tooLarge": "較早的訊息資料量過大，無法載入。",
+      "omitted_one": "此工作階段中部分較早的項目無法顯示。"
     },
     "sessionFilter": {
       "title": "篩選工作階段",
@@ -2988,7 +2991,9 @@
       "commentEditFailed": "無法儲存你的留言。請檢查連線後再試一次。",
       "commentEditUnavailable": "無法編輯此留言。它可能已被刪除。",
       "commentDeleteFailed": "無法刪除你的留言。請檢查連線後再試一次。",
-      "commentDeleteUnavailable": "無法刪除此留言。"
+      "commentDeleteUnavailable": "無法刪除此留言。",
+      "comment_one": "1 則留言",
+      "reaction_one": "個表情反應"
     },
     "entry": {
       "noRecentPrs": "尚無最近審查",
@@ -3270,7 +3275,8 @@
       "submitCountOfTotal_other": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
       "submitReview": "送出審查",
       "blockedRequestChanges": "請先填寫摘要或新增至少一則留言，才能要求變更。",
-      "blockedComment": "請先填寫摘要或新增至少一則留言，才能送出留言型審查。"
+      "blockedComment": "請先填寫摘要或新增至少一則留言，才能送出留言型審查。",
+      "pendingComment_one": "則待送出留言"
     },
     "fileStatus": {
       "changed": "已變更",
@@ -3283,7 +3289,8 @@
       "discussionAccessibility": "{{title}}：{{displayCount}} 則留言",
       "discussionAccessibility_other": "{{title}}：{{displayCount}} 則留言",
       "files": "檔案",
-      "overview": "總覽"
+      "overview": "總覽",
+      "discussionAccessibility_one": "{{title}}：1 則留言"
     },
     "diff": {
       "selectedTapToChange": "已選取 {{label}}，點一下即可變更選取範圍",

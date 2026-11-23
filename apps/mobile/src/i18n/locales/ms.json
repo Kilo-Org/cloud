@@ -691,7 +691,9 @@
       "expandLines_other": "Paparkan {{displayCount}} baris ({{start}}–{{end}})",
       "expandLinesOfContext_other": "Paparkan {{displayCount}} baris konteks",
       "expandMoreLines_other": "Paparkan {{displayCount}} baris lagi ({{start}}–{{end}})",
-      "loadedOfTotalFiles_other": "{{loaded}} daripada {{total}} fail sudah dimuatkan"
+      "loadedOfTotalFiles_other": "{{loaded}} daripada {{total}} fail sudah dimuatkan",
+      "fileLoadedCount_one": "{{displayCount}} fail sudah dimuatkan",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} daripada {{total}} fail sudah dimuatkan"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ tiada baris baharu di hujung fail",
@@ -899,7 +901,8 @@
       "commentEditFailed": "Tidak dapat menyimpan komen anda. Semak sambungan anda dan cuba lagi.",
       "commentEditUnavailable": "Komen ini tidak boleh disunting. Ia mungkin telah dipadamkan.",
       "commentDeleteFailed": "Tidak dapat memadamkan komen anda. Semak sambungan anda dan cuba lagi.",
-      "commentDeleteUnavailable": "Komen ini tidak boleh dipadamkan."
+      "commentDeleteUnavailable": "Komen ini tidak boleh dipadamkan.",
+      "comment_one": "1 komen"
     },
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka tetapan apl GitHub.",
     "installKiloGitHubApp": "Pasang apl GitHub Kilo",
@@ -1074,7 +1077,8 @@
       "files": "Fail",
       "discussion": "Perbincangan",
       "discussionAccessibility": "{{title}}: {{displayCount}} komen",
-      "discussionAccessibility_other": "{{title}}: {{displayCount}} komen"
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komen",
+      "discussionAccessibility_one": "{{title}}: 1 komen"
     },
     "fileStatus": {
       "modified": "Diubah suai",
@@ -1662,7 +1666,8 @@
       "severityAll": "Semua tahap keterukan",
       "confidenceHighOnly": "Keyakinan tinggi sahaja",
       "confidenceMediumOrHigher": "Sederhana ke atas",
-      "confidenceAny": "Sebarang keyakinan"
+      "confidenceAny": "Sebarang keyakinan",
+      "queued_one": "{{displayCount}} penemuan sedia ada dimasukkan ke dalam baris gilir untuk dianalisis."
     },
     "analysis": {
       "couldNotLoad": "Tidak dapat memuatkan analisis.",
@@ -2797,7 +2802,8 @@
       "omitted_other": "{{displayCount}} item terdahulu dalam sesi ini tidak dapat dipaparkan.",
       "couldNotLoad": "Tidak dapat memuatkan mesej terdahulu.",
       "unavailable": "Mesej terdahulu tidak tersedia.",
-      "tooLarge": "Mesej terdahulu terlalu besar untuk dimuatkan."
+      "tooLarge": "Mesej terdahulu terlalu besar untuk dimuatkan.",
+      "omitted_one": "Beberapa item terdahulu dalam sesi ini tidak dapat dipaparkan."
     },
     "sessionFilter": {
       "title": "Tapis sesi",
@@ -3032,7 +3038,8 @@
     "toolRun": {
       "sheetTitle": "Panggilan alat",
       "condensedLabel": "{{itemCount}} item; {{last}}",
-      "condensedLabel_other": "{{itemCount}} item; {{last}}"
+      "condensedLabel_other": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elemen; {{last}}"
     }
   },
   "bootstrap": {
@@ -3808,7 +3815,8 @@
       "paymentPending": "Pembayaran belum selesai",
       "processingBlocked": "Pemprosesan disekat",
       "processingNeedsReview": "Pemprosesan memerlukan semakan",
-      "retryHint": "Mencuba untuk memuatkan semula status Kilo Pass."
+      "retryHint": "Mencuba untuk memuatkan semula status Kilo Pass.",
+      "paidSeat_one": "{{displayCount}} slot pengguna berbayar"
     }
   },
   "authErrors": {

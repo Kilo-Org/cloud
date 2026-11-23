@@ -1213,7 +1213,8 @@
       "severityCriticalOnly": "Hanya kritis",
       "severityHighAndAbove": "Tinggi ke atas",
       "severityMediumAndAbove": "Sedang ke atas",
-      "title": "Otomatisasi"
+      "title": "Otomatisasi",
+      "queued_one": "{{displayCount}} temuan yang sudah ada diantrekan untuk dianalisis."
     },
     "dashboard": {
       "actFirst": "Prioritas penanganan",
@@ -1904,7 +1905,8 @@
     },
     "partRenderer": {
       "updatedFileCount": "{{displayCount}} berkas diperbarui.",
-      "updatedFileCount_other": "{{displayCount}} berkas diperbarui."
+      "updatedFileCount_other": "{{displayCount}} berkas diperbarui.",
+      "updatedFileCount_one": "{{displayCount}} berkas telah diperbarui."
     },
     "toolCard": {
       "accessibility": "Alat {{label}}, {{status}}",
@@ -2261,7 +2263,8 @@
       "omitted_other": "{{displayCount}} item sebelumnya dari sesi ini tidak dapat ditampilkan.",
       "couldNotLoad": "Tidak dapat memuat pesan sebelumnya.",
       "unavailable": "Pesan sebelumnya tidak tersedia.",
-      "tooLarge": "Pesan sebelumnya terlalu besar untuk dimuat."
+      "tooLarge": "Pesan sebelumnya terlalu besar untuk dimuat.",
+      "omitted_one": "Beberapa item sebelumnya dari sesi ini tidak dapat ditampilkan."
     },
     "sessionFilter": {
       "title": "Saring sesi",
@@ -2496,7 +2499,8 @@
     "toolRun": {
       "sheetTitle": "Panggilan alat",
       "condensedLabel": "{{itemCount}} item; {{last}}",
-      "condensedLabel_other": "{{itemCount}} item; {{last}}"
+      "condensedLabel_other": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elemen; item {{last}}"
     }
   },
   "bootstrap": {
@@ -2988,7 +2992,8 @@
       "commentEditFailed": "Tidak dapat menyimpan komentarmu. Periksa koneksimu dan coba lagi.",
       "commentEditUnavailable": "Komentar ini tidak dapat diedit. Mungkin sudah dihapus.",
       "commentDeleteFailed": "Tidak dapat menghapus komentarmu. Periksa koneksimu dan coba lagi.",
-      "commentDeleteUnavailable": "Komentar ini tidak dapat dihapus."
+      "commentDeleteUnavailable": "Komentar ini tidak dapat dihapus.",
+      "comment_one": "1 komentar"
     },
     "entry": {
       "noRecentPrs": "Belum ada riwayat tinjauan",
@@ -3088,7 +3093,9 @@
       "expandLines_other": "Tampilkan {{displayCount}} baris ({{start}}–{{end}})",
       "expandLinesOfContext_other": "Tampilkan {{displayCount}} baris konteks",
       "expandMoreLines_other": "Tampilkan {{displayCount}} baris lagi ({{start}}–{{end}})",
-      "loadedOfTotalFiles_other": "{{loaded}} dari {{total}} file sudah dimuat"
+      "loadedOfTotalFiles_other": "{{loaded}} dari {{total}} file sudah dimuat",
+      "fileLoadedCount_one": "{{displayCount}} file sudah dimuat",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} dari {{total}} file sudah dimuat"
     },
     "inbox": {
       "couldNotLoad": "Tidak dapat memuat kotak masuk.",
@@ -3270,7 +3277,8 @@
       "submitCountOfTotal_other": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
       "submitReview": "Kirim tinjauan",
       "blockedRequestChanges": "Tambahkan ringkasan atau setidaknya satu komentar untuk meminta perubahan.",
-      "blockedComment": "Tambahkan ringkasan atau setidaknya satu komentar untuk mengirim tinjauan berupa komentar."
+      "blockedComment": "Tambahkan ringkasan atau setidaknya satu komentar untuk mengirim tinjauan berupa komentar.",
+      "pendingComment_one": "komentar dalam antrean"
     },
     "fileStatus": {
       "changed": "Diubah",
@@ -3283,7 +3291,8 @@
       "discussionAccessibility": "{{title}}: {{displayCount}} komentar",
       "discussionAccessibility_other": "{{title}}: {{displayCount}} komentar",
       "files": "Berkas",
-      "overview": "Ringkasan"
+      "overview": "Ringkasan",
+      "discussionAccessibility_one": "{{title}}: 1 komentar"
     },
     "diff": {
       "selectedTapToChange": "{{label}} dipilih, ketuk untuk mengubah pilihan",
@@ -3800,7 +3809,8 @@
       "paymentPending": "Menunggu pembayaran",
       "processingBlocked": "Pemrosesan terhambat",
       "processingNeedsReview": "Pemrosesan perlu ditinjau",
-      "retryHint": "Mencoba memuat ulang status Kilo Pass."
+      "retryHint": "Mencoba memuat ulang status Kilo Pass.",
+      "paidSeat_one": "{{displayCount}} lisensi berbayar"
     }
   },
   "feedback": {

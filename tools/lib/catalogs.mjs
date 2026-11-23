@@ -267,22 +267,33 @@ export function selectablePluralCategories(root, tag) {
 }
 
 /**
- * The plural forms a locale declares whose category the runtime never selects,
- * by family base, in catalog order: a Map from the family base to the
- * categories, in key order, that the catalog cannot reach. `selectable` is the
- * category set the rendering runtime answers with, so the caller decides what
- * "selectable" means for the catalog it audits.
+ * The plural forms a locale declares whose category the runtime never selects
+ * AND whose copy is identical to the family's `other` form, by family base:
+ * a Map from the family base to the categories, in key order.
  *
- * The walk is over the locale's own keys, so a family is judged by the member
- * forms the catalog actually ships rather than by what English declares. A
- * family whose every member is selectable is absent from the Map, so an empty
- * Map means every plural form of this locale renders somewhere.
+ * `selectable` is the category set the rendering runtime answers with, so the
+ * caller decides what "selectable" means for the catalog it audits. The copy
+ * test is what makes a report act on proof rather than on a rule: a form whose
+ * text equals its family's `other` text renders exactly the same string whether
+ * `other` or this form answers, under any plural rule, so removing it cannot
+ * change what a reader sees. A form with text of its own is left alone, because
+ * the runtime that renders it may not be the one the audit measured.
+ *
+ * `zero` is never reported: i18next consults that suffix directly at count 0, so
+ * no plural rule can say it is unreachable.
+ *
+ * A family with no unproven form is absent from the Map, so an empty Map means
+ * every plural form of this locale is either reachable or distinct copy.
  */
 export function unselectablePluralCategories(locale, selectable) {
   const unselectable = new Map();
   for (const key of locale.keys()) {
     const parts = pluralParts(key);
-    if (parts === null || selectable.has(parts.category)) {
+    if (parts === null || parts.category === 'zero' || selectable.has(parts.category)) {
+      continue;
+    }
+    const other = locale.get(`${parts.base}_other`);
+    if (other === undefined || other !== locale.get(key)) {
       continue;
     }
     const declared = unselectable.get(parts.base);

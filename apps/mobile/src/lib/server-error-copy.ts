@@ -224,7 +224,11 @@ export function knownServerErrorMessage(
   billingStep: TrialRefusalBillingStep = 'offered'
 ): string | null {
   const key = knownServerErrorCopyKey(error, canManageBilling, billingStep);
-  return key == null ? null : i18n.t(key, copyValuesFor(key));
+  if (key == null) {
+    return null;
+  }
+  const values = copyValuesFor(key);
+  return values === undefined ? i18n.t(key) : i18n.t(key, values);
 }
 
 /**

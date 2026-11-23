@@ -75,9 +75,11 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Platform: { OS: 'android', select: (options: { android: unknown }) => options.android },
   useColorScheme: () => 'light',
-  // The pinned footer reserves its own bottom band, which reads the window's
-  // font scale through `useWindowDimensions`.
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
+  // The footer's status slot sizes its reserve from the system font scale, which
+  // `useLiveFontScale` falls back to reading off `useWindowDimensions`. Without
+  // this value the reserve resolves to `NaN` here, so the tree would not be the
+  // one the app renders.
+  useWindowDimensions: () => ({ width: 400, height: 800, fontScale: 1 }),
 }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),

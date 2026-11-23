@@ -33,9 +33,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * dark) and the track clears it on `background`, `card` and `secondary` in
  * both themes (4.5:1 to 5.4:1), so the control reads as a control while it
  * says off. The light track it replaced, `mutedSoft`, left that grip at about
- * 2.5:1 on its own track and about 2.4:1 on the page. Inking the light grip
- * instead put the darkest mark in the row on a switch that says off, and
- * stopped matching the dark cell (design critic, 2026-11-23). A caller that
+ * 2.5:1 on its own track and the track at about 2.4:1 on the page. Inking the
+ * light grip instead put the darkest mark in the row on a switch that says off,
+ * and stopped matching the dark cell (design critic, 2026-11-23). A caller that
  * wants another pair still wins: its own props are applied last.
  *
  * A disabled switch paints one muted pair, at the position it still shows.

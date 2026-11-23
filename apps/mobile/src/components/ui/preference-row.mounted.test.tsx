@@ -445,7 +445,7 @@ describe('PreferenceRow', () => {
     expect(tiles[0]?.findAll(node => Object.is(node.type, Icon))).toHaveLength(0);
   });
 
-  it('keeps the light off switch at 3:1 against the row it sits on', () => {
+  it('keeps the light off track at 3:1 on the row and the grip on the track', () => {
     schemeState.current = 'light';
     const root = renderRow({ value: false, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));

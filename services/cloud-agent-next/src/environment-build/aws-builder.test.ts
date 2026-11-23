@@ -15,6 +15,7 @@ describe('awsBuilderStartFailure', () => {
   it.each([
     new ByocAwsProviderError('byoc_aws_not_ready'),
     new ByocAwsProviderError('byoc_aws_proxy_unavailable'),
+    new ByocAwsProviderError('byoc_aws_stack_unavailable'),
     new AwsRequestError(0, 'NetworkError'),
     new AwsRequestError(429, 'ThrottlingException'),
     new AwsRequestError(503, 'ServiceUnavailable'),

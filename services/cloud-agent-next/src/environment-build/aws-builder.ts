@@ -44,6 +44,7 @@ import { ProviderLifecycleError } from '../sandbox-control/provider-failure.js';
 const RETRYABLE_START_REASONS: ReadonlySet<string> = new Set([
   'byoc_aws_not_ready',
   'byoc_aws_proxy_unavailable',
+  'byoc_aws_stack_unavailable',
 ]);
 
 /**

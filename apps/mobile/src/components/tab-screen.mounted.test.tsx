@@ -12,10 +12,13 @@ import {
 import { type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import { SheetScrollView, TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
+import {
+  SheetScrollView,
+  TAB_SCREEN_TRAILING_GAP,
+  TabScreenScrollView,
+  useTabBarBottomPadding,
+} from './tab-screen';
 
-/** Mirrors `TAB_SCREEN_BOTTOM_GAP` in `tab-screen.tsx`. */
-const TAB_SCREEN_BOTTOM_GAP = 16;
 const DEFAULT_FONT_SCALE = 1.5;
 const layout = vi.hoisted(() => ({
   bottom: 16,
@@ -130,7 +133,7 @@ describe('tab screen bottom clearance', () => {
     // At 1.5 the font-scale rule alone keeps the labels (the default answer);
     // the width rule dropped them, so the clearance must match the compact bar.
     await expect(clearanceFor(false)).resolves.toBe(
-      getTabBarIconForwardHeight(layout.bottom, 'android') + TAB_SCREEN_BOTTOM_GAP
+      getTabBarIconForwardHeight(layout.bottom, 'android') + TAB_SCREEN_TRAILING_GAP
     );
   });
 
@@ -140,7 +143,7 @@ describe('tab screen bottom clearance', () => {
         bottomInset: layout.bottom,
         platform: 'android',
         fontScale: layout.fontScale,
-      }) + TAB_SCREEN_BOTTOM_GAP
+      }) + TAB_SCREEN_TRAILING_GAP
     );
   });
 
@@ -148,7 +151,7 @@ describe('tab screen bottom clearance', () => {
     // The root stack draws no bar under its own screens, so their content
     // clears the inset alone; a bar's height here would leave a blank strip.
     layout.fontScale = 2.5;
-    await expect(clearanceFor(null)).resolves.toBe(layout.bottom + TAB_SCREEN_BOTTOM_GAP);
+    await expect(clearanceFor(null)).resolves.toBe(layout.bottom + TAB_SCREEN_TRAILING_GAP);
   });
 
   it('keeps the font-scale rule for a screen rendered under neither layout', async () => {
@@ -158,7 +161,7 @@ describe('tab screen bottom clearance', () => {
         bottomInset: layout.bottom,
         platform: 'android',
         fontScale: layout.fontScale,
-      }) + TAB_SCREEN_BOTTOM_GAP
+      }) + TAB_SCREEN_TRAILING_GAP
     );
   });
 });
@@ -455,8 +458,6 @@ describe('TabScreenScrollView keyboard occlusion', () => {
       createElement(TabScreenScrollView, null, createElement('Content'))
     );
     const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
-    // 300, not 300 + the tab-bar height: `tabBarHideOnKeyboard` hides the bar, so
-    // the band is replaced while the IME is up.
     expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
     unmount();
   });

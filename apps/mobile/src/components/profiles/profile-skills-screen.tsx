@@ -28,6 +28,7 @@ import {
   useAgentProfileMutations,
   useAgentProfileSkills,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -180,7 +181,9 @@ export function ProfileSkillsScreen({
   const mixedSources = skills.some(skill => skill.sourceType !== skills[0]?.sourceType);
   // `null` = closed, the add form, or the skill being edited. The sheet and the
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
-  // what was typed instead of dropping it.
+  // what was typed instead of dropping it. The sheet renders only while the
+  // permission allows the write. A `read-only` permission closes it and clears
+  // the draft, so a remount cannot reopen it.
   const draftScope = `profiles:skills:${profileId}`;
   // The message the open sheet shows for a refused save, and whether it is a
   // failure or an expected limit, is the form's note: the mutation hook's toast
@@ -196,6 +199,8 @@ export function ProfileSkillsScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const setSaveFailure = (next: SaveFailure | null) => {
     form.setNotes({ saveFailure: next });
@@ -374,7 +379,7 @@ export function ProfileSkillsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <SkillFormSheet
           draftScope={draftScope}
           skill={form.editing}

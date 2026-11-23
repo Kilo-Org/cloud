@@ -37,6 +37,7 @@ import {
   useAgentProfileInstructions,
 } from '@/lib/hooks/use-agent-profiles';
 import { useAgentProfileInstructionMutations } from '@/lib/hooks/use-agent-profile-instruction-mutations';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -191,7 +192,10 @@ export function ProfileInstructionsScreen({
   const draftScope = `profiles:instructions:${profileId}`;
   // The open sheet's refusal is the form's note: the mutation hook's toast sits
   // behind the sheet, and opening or closing resets the note with the rest of
-  // the draft.
+  // the draft. The form and its fields are a draft (`lib/form-draft`), so a
+  // remount reopens it on what was typed. The screen offers the sheet only
+  // while the permission allows the write, and a denial closes it and drops
+  // that draft, so a remount cannot reopen it.
   const form = useProfileFormDraft(draftScope, instructions, {
     saveFailure: null as SaveFailure | null,
   });
@@ -204,6 +208,10 @@ export function ProfileInstructionsScreen({
     markSheetClosed();
     form.close();
   };
+
+  // A denial is not a dismissal: nobody pressed anything, so the guard stays
+  // unarmed and the first row press after the screen settles still reaches it.
+  useCloseEditorOnDeniedPermission(permission, form.close);
 
   const setSaveFailure = (next: SaveFailure | null) => {
     form.setNotes({ saveFailure: next });
@@ -389,7 +397,7 @@ export function ProfileInstructionsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <InstructionFormSheet
           draftScope={draftScope}
           instruction={form.editing}

@@ -409,7 +409,22 @@ describe('migrated origin permissions', () => {
       const { spec } = buildControlPlaneSessionRegistration(input, selection);
       expect(spec.permission).toMatchObject({
         question: 'deny',
-        edit: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny',
+        edit:
+          createdOnPlatform === 'security-remediation'
+            ? {
+                '*': 'allow',
+                '.git': 'deny',
+                '.git/*': 'deny',
+                '*.git': 'deny',
+                '*.git/*': 'deny',
+                '.g?t': 'deny',
+                '.g?t/*': 'deny',
+                '.g*t': 'deny',
+                '.g*t/*': 'deny',
+                '*gitconfig*': 'deny',
+                '*/.git/config*': 'deny',
+              }
+            : 'deny',
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
@@ -420,7 +435,7 @@ describe('migrated origin permissions', () => {
           ? {
               'git push': 'allow',
               'gh pr create': 'allow',
-              'git push --force': 'deny',
+              'git*push* -*': 'deny',
               curl: 'deny',
             }
           : {

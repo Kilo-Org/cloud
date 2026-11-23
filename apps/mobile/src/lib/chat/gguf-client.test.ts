@@ -242,7 +242,6 @@ describe('a vision model', () => {
 
     const events = await collect(client.stream(imageRequest));
 
-    // llama.rn requires a context that never shifts once media is in it.
     expect(init).toHaveBeenCalledWith(expect.objectContaining({ ctx_shift: false, n_ctx: 2048 }));
     expect(loaded.initMultimodal).toHaveBeenCalledWith({ path: VISION.projector, use_gpu: true });
     expect(asked[0]?.messages).toEqual([

@@ -302,8 +302,6 @@ describe('the discovered state', () => {
       stateOf(alpha, { status: 'ready', toolCount: 0, retryable: true }),
     ]);
 
-    // An empty catalog is not an answer: the next ask reconnects, and a server
-    // that has tools by then offers them.
     discovery.answer = () => Effect.succeed([tool('mcp_alpha_read')]);
     await ensureRemoteMcp(place);
 

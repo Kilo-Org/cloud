@@ -13,6 +13,7 @@ import { BriefingSessionList } from './briefing-session-list';
 import { BriefingSummary } from './briefing-summary';
 import { BriefingPeriodLabel } from './briefing-period-label';
 import { formatBriefingTimestamp } from './briefing-window';
+import { useBriefingLocale } from './briefing-locale';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -78,7 +79,8 @@ export function BriefingDetailScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   const { setOrganizationId } = useOrganization();
   const access = useBriefingAccess();
   const offline = useOfflineBannerState();
@@ -242,13 +244,9 @@ export function BriefingDetailScreen() {
                     >
                       <Card>
                         <Text>{label}</Text>
-                        <BriefingSourceDetail source={source} t={t} language={i18n.language} />
+                        <BriefingSourceDetail source={source} t={t} language={locale} />
                         <Text variant="caption">
-                          {formatBriefingTimestamp(
-                            source.occurredAt,
-                            i18n.language,
-                            report.timezone
-                          )}
+                          {formatBriefingTimestamp(source.occurredAt, locale, report.timezone).text}
                         </Text>
                       </Card>
                     </Pressable>

@@ -139,7 +139,8 @@ function Text({
   const { isRtlScript, joinedScript } = React.useMemo(
     () => ({
       // The font family is the script's, not the interface's: JetBrains Mono
-      // ships no Arabic or Hebrew glyphs, so the copy that uses either drops the
+      // draws the glyphs of neither the right-to-left blocks (`RTL_SCRIPT`) nor
+      // the joined scripts (`JOINED_SCRIPT`), so copy in either set drops the
       // family in both directions (`withoutMonoFamily`).
       isRtlScript: hasRtlScript(props.children),
       joinedScript: containsJoinedScript(props.children),
@@ -218,9 +219,15 @@ function Text({
         props.style,
       ]
     : directionStyle;
+  // The mono family is dropped for both sets of copy it cannot draw: the
+  // right-to-left blocks (`isRtlScript`, `RTL_SCRIPT`) and the joined scripts
+  // (`joinedScript`, `JOINED_SCRIPT`). Either way a fallback would set the copy
+  // glyph by glyph and lose its joins or clusters, so the family goes in both
+  // interface directions and only the size, color and weight classes stay.
+  const dropsMonoFamily = isRtlScript || joinedScript;
   return (
     <Component
-      className={isRtlScript ? withoutMonoFamily(classes) : classes}
+      className={dropsMonoFamily ? withoutMonoFamily(classes) : classes}
       role={headingA11y?.role}
       aria-level={headingA11y?.level}
       {...props}

@@ -7,13 +7,16 @@ import {
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
   CustomRouterDecideRequestSchema,
+  customRouterEntryKey,
   InternalClientEvalCaseRequestSchema,
   InternalClientEvalPlanRequestSchema,
   InternalClientEvalResultRequestSchema,
   detectRequiredInputModalities,
   estimateRoutingTokens,
+  isVirtualAutoModelId,
   normalizeClassifierInput,
   parseCustomRouterModelId,
+  poolAliasTargets,
   signAutoDecision,
   type CustomRouterDecideResponse,
   type CustomRouterDefinition,
@@ -42,7 +45,12 @@ import {
   customRouting,
   publicCustomRouterDecision,
 } from './custom-router-decision';
-import { findCustomRouter, findCustomRouterById } from './custom-router-store';
+import {
+  findServingCustomRouter,
+  findCustomRouterById,
+  type CustomRouterOwner,
+  type ServingCustomRouter,
+} from './custom-router-store';
 import { runDecision } from './decide';
 import type { HonoEnv } from './hono-env';
 import { deniedOrganizationModelIds } from './organization-policy';
@@ -130,6 +138,38 @@ async function requireEvalPayerPaidUsageBalance(caller: Caller): Promise<void> {
   throw new CustomRouterError('insufficient_balance', 'Insufficient balance');
 }
 
+/**
+ * The pool a CLI decision must route from, with the stored alias targets from the same snapshot.
+ * A pool holding a `~` alias can be repinned by an alias promotion that writes PostgreSQL without
+ * touching this isolate's definition cache or Hyperdrive's query cache, so such a pool is re-read
+ * on the database clock before any policy or ranking runs; a row that read no longer finds is a
+ * revoked pool and stays a `router_not_found`. A failed read is retryable and never falls back to
+ * the stale definition.
+ */
+async function loadServingRouter(
+  env: Env,
+  owner: CustomRouterOwner,
+  slug: string
+): Promise<ServingCustomRouter | null> {
+  try {
+    return await findServingCustomRouter(env, owner, slug);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'auto_routing_custom_router_fresh_read_failed',
+        ownerType: owner.type,
+        slug,
+        ...formatError(error),
+      })
+    );
+    throw new CustomRouterError(
+      'internal_error',
+      'Custom router definition is temporarily unavailable',
+      DEPENDENCY_RETRY_AFTER_SECONDS
+    );
+  }
+}
+
 export const publicDecideHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
   await requireCallerPaidUsageBalance(caller);
@@ -138,13 +178,29 @@ export const publicDecideHandler = publicHandler(async c => {
   const reference = parseCustomRouterModelId(request.model);
   if (!reference) throw new CustomRouterError('invalid_request', 'Not a custom router model ID');
   const owner = customRouterOwner(reference, caller);
-  const router = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
-  if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
+  const serving = owner ? await loadServingRouter(c.env, owner, reference.slug) : null;
+  if (!serving) throw new CustomRouterError('router_not_found', 'Custom router not found');
+  const router = serving.router;
   // The organization model policy filters gateway entries for any router used in that
-  // organization's context, including a member's personal router.
-  const gatewayModelIds = router.entries.flatMap(entry =>
-    entry.kind === 'gateway' ? [entry.model] : []
-  );
+  // organization's context, including a member's personal router. A gateway entry dispatches the
+  // target the entry would actually run, so the policy names every candidate that can run: the
+  // pool model, the saved pin, and the alias's stored target from this same snapshot. Those three
+  // are the only ids a pool entry can dispatch, and `poolAliasTargets` keeps the map to this
+  // router's own alias entries with concrete targets, so it can never widen the pool.
+  const aliasTargets = poolAliasTargets(router, serving.aliasTargets);
+  const gatewayModelIds = [
+    ...new Set(
+      router.entries.flatMap(entry => {
+        if (entry.kind !== 'gateway') return [];
+        const target = aliasTargets.get(entry.model);
+        return [
+          entry.model,
+          ...(target === undefined ? [] : [target]),
+          ...(entry.servingPin ? [entry.servingPin.model] : []),
+        ];
+      })
+    ),
+  ];
   const policyDeniedModelIds =
     caller.organizationId === null
       ? []
@@ -201,13 +257,59 @@ export const publicDecideHandler = publicHandler(async c => {
     customRouter: reference,
     clientEntries: request.clientEntries,
   };
-  const routing = customRouting(router, request.clientEntries, new Set(deniedModelIds));
+  const routing = customRouting(
+    router,
+    request.clientEntries,
+    new Set(deniedModelIds),
+    aliasTargets
+  );
   const run = await runDecision(
     c,
     payload,
     customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
   );
   const decision = publicCustomRouterDecision(customRouterDecision(routing, run));
+  // The verifier re-reads this pool on the primary and compares the signed dispatch with the
+  // saved entry. A gateway dispatch signs the entry it names; a retirement fallback is only
+  // meaningful with the saved pin it was proven against, so an unproven marker is never signed.
+  const entryKey = customRouterEntryKey(decision.entry);
+  const savedEntry = router.entries.find(entry => customRouterEntryKey(entry) === entryKey);
+  const savedPinModel = savedEntry?.kind === 'gateway' ? savedEntry.servingPin?.model : undefined;
+  const entryModel =
+    decision.entry.kind === 'gateway' && !isVirtualAutoModelId(decision.entry.model)
+      ? decision.entry.model
+      : undefined;
+  // The alias's stored target from the same snapshot as the pool. The verifier substitutes it for
+  // the bare alias, so a move between this signature and redemption cannot redirect the dispatch.
+  const fallbackTarget =
+    entryModel !== undefined ? serving.aliasTargets.get(entryModel) : undefined;
+  // A retirement fallback is redeemable only with the stored target it was proven against. Without
+  // one — no stored target, an unreadable alias config, a target equal to the pin (the alias never
+  // moved), or a different entry — the request is retried rather than answered with a bare alias
+  // the gateway must refuse.
+  if (
+    decision.servingFallback === true &&
+    (entryModel === undefined ||
+      savedPinModel === undefined ||
+      fallbackTarget === undefined ||
+      fallbackTarget === savedPinModel ||
+      decision.model !== entryModel)
+  ) {
+    console.warn(
+      JSON.stringify({
+        event: 'auto_routing_custom_router_fallback_unprovable',
+        customRouterId: router.id,
+        entryModel: entryModel ?? null,
+        servingPinModel: savedPinModel ?? null,
+        storedTarget: fallbackTarget ?? null,
+      })
+    );
+    throw new CustomRouterError(
+      'internal_error',
+      'Custom router alias target is temporarily unavailable',
+      DEPENDENCY_RETRY_AFTER_SECONDS
+    );
+  }
   const decisionId = await signAutoDecision(
     {
       userId: caller.userId,
@@ -216,6 +318,16 @@ export const publicDecideHandler = publicHandler(async c => {
       model: decision.model,
       variant: decision.variant,
       expiresAt: Date.now() + AUTO_DECISION_TTL_MS,
+      ...(entryModel !== undefined ? { entryModel } : {}),
+      ...(decision.servingFallback === true &&
+      savedPinModel !== undefined &&
+      fallbackTarget !== undefined
+        ? {
+            servingFallback: true as const,
+            servingPinModel: savedPinModel,
+            servingFallbackTarget: fallbackTarget,
+          }
+        : {}),
     },
     await getCachedSecret(c.env.AUTO_ROUTING_DECISION_SECRET, 'AUTO_ROUTING_DECISION_SECRET')
   );

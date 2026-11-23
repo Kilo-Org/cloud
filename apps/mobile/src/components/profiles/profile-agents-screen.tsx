@@ -24,6 +24,7 @@ import {
   useAgentProfileAgents,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -69,7 +70,9 @@ export function ProfileAgentsScreen({
   const atAgentCap = agents.length >= MAX_PROFILE_AGENTS;
   // `null` = closed, the add form, or the agent being edited. The form and the
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
-  // what was typed instead of dropping it.
+  // what was typed instead of dropping it. The screen offers the sheet only
+  // while the permission allows the write, and a denial closes it and drops
+  // that draft, so a remount cannot reopen it.
   const draftScope = `profiles:agents:${profileId}`;
   // A save the server refused leaves one note the sheet renders: a slug the
   // profile already uses shows under the slug field, a create past the cap
@@ -85,6 +88,8 @@ export function ProfileAgentsScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const saveAgent = async (
     target: AgentSource | null,
@@ -239,7 +244,7 @@ export function ProfileAgentsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <AgentFormSheet
           draftScope={draftScope}
           agent={form.editing}

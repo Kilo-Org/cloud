@@ -86,8 +86,6 @@ export function nativeRequest(request: ModelRequest, options: RequestOptions): N
       }
     }
   }
-  // Newest first, so the newest images take the request's image limit; an older
-  // one that does not fit becomes a note in place of the image.
   const offered = readsImages
     ? request.prompt.messages.flatMap(message =>
         message.role === 'user'

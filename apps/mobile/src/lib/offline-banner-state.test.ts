@@ -71,19 +71,33 @@ describe('createOfflineBannerStore', () => {
     expect(fixture.probe).not.toHaveBeenCalled();
   });
 
-  it('restarts the full delay on repeated offline reports and ignores a cancelled callback', async () => {
+  it('keeps the first deadline when a repeat report arrives inside the window', async () => {
     const { store, source, timer, probe, settle } = createStore();
     source.emit(offlineState);
     timer.advanceBy(4999);
+    // The repeat does not restart the window: the first deadline is the one
+    // that fires, and its probe is the one that decides.
     source.emit(offlineState);
-    timer.scheduled[0]?.callback();
     timer.advanceBy(1);
-    expect(store.state()).toBe('unknown');
-    expect(probe).not.toHaveBeenCalled();
-    timer.advanceBy(4999);
     await settle(0, 'offline');
-    expect(store.isOffline()).toBe(true);
     expect(probe).toHaveBeenCalledTimes(1);
+    expect(store.isOffline()).toBe(true);
+  });
+
+  it('fires exactly one probe at the first deadline while reports keep arriving', () => {
+    const { store, source, timer, probe } = createStore();
+    source.emit(offlineState);
+    for (let second = 0; second < 4; second += 1) {
+      timer.advanceBy(1000);
+      source.emit(offlineState);
+    }
+    // Five reports in, the phase is still the one window the first report
+    // opened, and nothing has been sent yet.
+    expect(store.phase().kind).toBe('confirming-offline');
+    expect(probe).not.toHaveBeenCalled();
+    timer.advanceBy(1000);
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(store.state()).toBe('unknown');
   });
 
   it.each(outcomes)('hides immediately on recovery and ignores the in-flight %s', async outcome => {
@@ -117,19 +131,20 @@ describe('createOfflineBannerStore', () => {
   );
 
   it.each(outcomes)(
-    'invalidates an in-flight %s while a newer offline delay is pending',
+    'lets the in-flight %s land when a repeat offline report arrives',
     async outcome => {
-      const { store, source, timer, changes, settle } = createStore();
+      const { store, source, timer, probe, changes, settle } = createStore();
       source.emit(offlineState);
       timer.advanceBy(5000);
+      // The repeat is the same evidence the probe is already deciding, so it
+      // neither supersedes that probe nor opens a second window.
       source.emit(offlineState);
+      const expected = outcome === 'online' ? 'online' : 'offline';
       await settle(0, outcome);
-      expect(store.state()).toBe('unknown');
-      expect(changes).toEqual([]);
-      timer.advanceBy(5000);
-      await settle(1, 'offline');
-      expect(store.state()).toBe('offline');
-      expect(changes).toEqual(['offline']);
+      expect(store.state()).toBe(expected);
+      expect(changes).toEqual([expected]);
+      timer.advanceBy(10_000);
+      expect(probe).toHaveBeenCalledTimes(1);
     }
   );
 
@@ -159,7 +174,6 @@ describe('createOfflineBannerStore', () => {
 
     source.emit(offlineState);
 
-    // The 5 s window is not evidence of a working transport, but it keeps painting online.
     expect(store.phase().kind).toBe('confirming-offline');
     expect(store.state()).toBe('online');
     expect(store.isOffline()).toBe(false);
@@ -189,7 +203,6 @@ describe('createOfflineBannerStore', () => {
 
     source.emit(offlineState);
 
-    // A repeated disconnect copies the state it found: the banner stays offline.
     expect(store.phase().kind).toBe('confirming-offline');
     expect(store.state()).toBe('offline');
     expect(store.isOffline()).toBe(true);
@@ -226,12 +239,6 @@ describe('createOfflineBannerStore', () => {
     expect(store.isOffline()).toBe(true);
     expect(changes).toEqual(['offline']);
   });
-
-  // The radio-back-without-reachability case (uxs3 spot check, e6-after-net:
-  // airplane mode → 3G while NetInfo's external probe never answers). The
-  // committed offline must not be preserved forever: the app's own probe is
-  // the decider, fired immediately without the five-second delay. The
-  // radioUpUnknownState fixture lives in the test helpers.
 
   it('probes immediately on unknown with the radio up while committed offline, and clears on a reachable probe', async () => {
     const { store, source, timer, probe, changes, settle } = createStore();

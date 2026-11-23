@@ -258,9 +258,6 @@ export async function deleteStoredValueWithRetry(key: string): Promise<void> {
       await delayMs(retryDelayMs);
     }
   }
-  // Last attempt: its rejection is reported once here with the stable delete
-  // fingerprint and propagates to the caller, which owns the recoverable
-  // outcome.
   try {
     await deleteStoredValueOnce(key);
   } catch (error) {

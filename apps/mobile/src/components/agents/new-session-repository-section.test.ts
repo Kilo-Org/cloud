@@ -2,7 +2,7 @@
 /* oxlint-disable max-lines -- one suite for the repository section: the branch row, Bitbucket restriction, connect-card collapse, one-line connect label, and post-selection compact actions all mount the same section through one hoisted preference mock */
 /* eslint-disable max-lines -- the provider connect-card states (branch row, organizations-only note, collapse, post-selection actions) and the open-label line pinning share one module-mock set */
 import { act, type TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
@@ -434,6 +434,10 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
 });
 
 describe('NewSessionRepositorySection connect card open action', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
   it('gives every provider open label the row width and pins it to one line', () => {
     const renderer = mountSection({
       // Bitbucket offers its action only in an organization scope with a
@@ -491,6 +495,30 @@ describe('NewSessionRepositorySection connect card open action', () => {
     // A provider whose flow is not running keeps its normal enabled control.
     expect(gitlabOpen?.props.disabled).toBe(false);
     expect(gitlabOpen?.props.loading).toBe(false);
+  });
+
+  it('names the Bitbucket open action with the catalog phrase in Hindi and Arabic', async () => {
+    // A sentence joiner split the name where the language puts the brand first
+    // (Hindi) or uses a sentence stop (Arabic), so the accessible name is the
+    // catalog's own phrase while the visible label stays the bare verb.
+    for (const tag of ['hi', 'ar']) {
+      await i18n.changeLanguage(tag); // eslint-disable-line no-await-in-loop -- one catalog at a time mirrors the runtime switch
+      const t = i18n.getFixedT(tag);
+      const renderer = mountSection({
+        groups: [group('github', 'repos'), group('gitlab', 'repos'), group('bitbucket', 'connect')],
+      });
+
+      const openButton = renderer.root
+        .findAllByType('Button' as never)
+        .find(node =>
+          node
+            .findAllByType('Text' as never)
+            .some(text => text.props.children === t('common.connect'))
+        );
+
+      expect(openButton?.props.accessibilityLabel, tag).toBe(t('common.connectBitbucket'));
+      expect(textNode(renderer, t('common.connect')), tag).toBeDefined();
+    }
   });
 
   it('offers no open label on the connected-empty card', () => {

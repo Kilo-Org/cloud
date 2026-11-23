@@ -263,7 +263,7 @@ describe('service state copy codes', () => {
     });
     const dataStatus = withData.getStatus();
     if (dataStatus.type !== 'autocommit') throw new Error('expected autocommit status');
-    expect(dataStatus.message).toBe('abc123 feat: add feature');
+    expect(dataStatus.message).toBe('abc123 · feat: add feature');
     expect(dataStatus.code).toBeUndefined();
   });
 

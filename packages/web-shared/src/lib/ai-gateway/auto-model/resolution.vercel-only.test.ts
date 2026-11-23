@@ -1,12 +1,29 @@
-import { describe, expect, it } from '@jest/globals';
-import { signAutoDecision, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import { beforeEach, describe, expect, it } from '@jest/globals';
+import {
+  signAutoDecision,
+  type AutoRoutingDecision,
+  type CustomRouterDefinition,
+} from '@kilocode/auto-routing-contracts';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import type * as CustomRouters from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { checkAutoDecision } from './auto-decision';
 import { resolveAutoModel } from './resolution';
 
 const VERCEL_ONLY_MODEL = 'interfaze/interfaze-beta';
+
+const pool: CustomRouterDefinition = {
+  id: '00000000-0000-4000-8000-000000000001',
+  ownerType: 'user',
+  ownerId: 'user-1',
+  slug: 'mine',
+  name: 'Mine',
+  baseRouter: 'frontier',
+  mode: 'best_accuracy',
+  entries: [{ kind: 'gateway', model: VERCEL_ONLY_MODEL }],
+  defaultEntryKey: `gateway:${VERCEL_ONLY_MODEL}`,
+};
 
 const openRouterModels: GatewayModelMap = {
   'anthropic/claude-haiku-4.5': {
@@ -44,17 +61,27 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVerc
   getVercelModelIdOverrides: jest.fn(async () => new Map()),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  findCustomRouter: jest.fn(),
+}));
+
 const SECRET = 'test-decision-secret';
 const NOW = 1_800_000_000_000;
+
+type FindCustomRouter = typeof CustomRouters.findCustomRouter;
+const { findCustomRouter: mockedFindCustomRouter } = jest.requireMock<{
+  findCustomRouter: jest.MockedFunction<FindCustomRouter>;
+}>('@kilocode/web-shared/lib/ai-gateway/custom-routers');
 
 async function checkSignedVariant(variant: string) {
   const token = await signAutoDecision(
     {
       userId: 'user-1',
       organizationId: null,
-      routerModelId: 'kilo-auto/custom/user/mine',
+      routerModelId: 'kilo-auto/custom/mine',
       model: VERCEL_ONLY_MODEL,
       variant,
+      entryModel: VERCEL_ONLY_MODEL,
       expiresAt: NOW + 60_000,
     },
     SECRET
@@ -95,10 +122,14 @@ function resolveCustomRouterVariant(variant: string) {
 }
 
 describe('variants of models only Vercel serves', () => {
+  beforeEach(() => {
+    mockedFindCustomRouter.mockResolvedValue(pool);
+  });
+
   it('serves a signed Auto decision for a variant Vercel lists', async () => {
     expect(await checkSignedVariant('medium')).toEqual({
       kind: 'ok',
-      routerModelId: 'kilo-auto/custom/user/mine',
+      routerModelId: 'kilo-auto/custom/mine',
       resolved: { model: VERCEL_ONLY_MODEL, reasoning: { enabled: true, effort: 'medium' } },
     });
   });

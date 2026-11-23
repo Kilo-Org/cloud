@@ -74,15 +74,6 @@ const mockUnsuspendIntegrationForOwner =
       installationId?: string
     ) => Promise<void>
   >();
-const mockUpdateIntegrationRepositories =
-  jest.fn<
-    (
-      platform: string,
-      installationId: string,
-      repositories: PlatformRepository[],
-      appType: GitHubAppType
-    ) => Promise<void>
-  >();
 const mockBotInitialize = jest.fn<() => Promise<void>>();
 const mockBotGetState = jest.fn<() => unknown>();
 const mockUnlinkTeamKiloUsers =
@@ -173,12 +164,6 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId?: string
   ) => mockUnsuspendIntegrationForOwner(owner, platform, appType, installationId),
   updateRepositoriesForIntegration: jest.fn(),
-  updateIntegrationRepositories: (
-    platform: string,
-    installationId: string,
-    repositories: PlatformRepository[],
-    appType: GitHubAppType
-  ) => mockUpdateIntegrationRepositories(platform, installationId, repositories, appType),
 }));
 
 jest.mock('@/lib/integrations/db/github-installations', () => ({
@@ -688,7 +673,6 @@ describe('handleInstallationRepositories', () => {
       owned_by_user_id: null,
       repositories: [{ id: 1, name: 'keep', full_name: 'acme/keep', private: false }],
     });
-    mockUpdateIntegrationRepositories.mockResolvedValue(undefined);
   });
 
   it('merges added repositories and passes the webhook app type', async () => {

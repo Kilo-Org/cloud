@@ -152,7 +152,6 @@ export function harness(
           paused();
         },
         cancel: () => {
-          // A pause already under way answers the cancel: the task reports itself paused.
           if (options.cancelRacesPause === true) {
             current.resolve(null);
             return;

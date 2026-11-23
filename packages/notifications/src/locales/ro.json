@@ -7,6 +7,7 @@
       "spendAlert": "Cheltuiala ta necesită atenție",
       "securityFinding": "O constatare de securitate necesită atenție",
       "securityUpdate": "O verificare de securitate are o actualizare",
+      "agentBriefing": "Raportul agentului tău este gata",
       "activeAgentsGlanceable": "Agenții activi au o actualizare"
     }
   },

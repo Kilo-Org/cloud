@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-review';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import { PlatformOverviewScreen } from './platform-overview-screen';
 
@@ -260,6 +260,29 @@ function collectText(node: unknown): string[] {
   return [];
 }
 
+/** The rendered Text node holding exactly `copy`, if it is mounted. */
+function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
+  return renderer.root
+    .findAllByType('Text' as never)
+    .find(node => node.children.length === 1 && node.children[0] === copy);
+}
+
+/** The heading the refused state carries for `platform`, from the catalog. */
+function refusedTitle(platform: 'github' | 'gitlab'): string {
+  return i18n.t('codeReviewer.providerConnect.notConnectedTitle', {
+    platform: i18n.t(platform === 'github' ? 'common.github' : 'common.gitlab'),
+  });
+}
+
+/** The sentence naming who may connect `platform`, from the catalog. */
+function refusedDescription(platform: 'github' | 'gitlab'): string {
+  return i18n.t(
+    platform === 'github'
+      ? 'codeReviewer.providerConnect.githubAdminOnlyDescription'
+      : 'prReview.connect.adminOnlyConnectDescription'
+  );
+}
+
 async function render(
   scope = 'personal',
   platform: 'github' | 'gitlab' = 'github'
@@ -338,12 +361,12 @@ beforeEach(() => {
 
 describe('PlatformOverviewScreen disconnected setup', () => {
   it.each([
-    ['an owner or admin', { canEdit: true, canManage: true }, true],
-    ['a billing manager', { canEdit: true, canManage: false }, false],
-    ['a member', { canEdit: false, canManage: false }, false],
+    ['an owner or admin', { canEdit: true, canManage: true }, false],
+    ['a billing manager', { canEdit: true, canManage: false }, true],
+    ['a member', { canEdit: false, canManage: false }, true],
   ] as const)(
     'offers the GitHub app install to %s only when that role may run it',
-    async (_who, capabilities, showsCard) => {
+    async (_who, capabilities, refused) => {
       provider.status = 'disconnected';
       permission.canEdit = capabilities.canEdit;
       permission.canManage = capabilities.canManage;
@@ -353,9 +376,19 @@ describe('PlatformOverviewScreen disconnected setup', () => {
 
       expect(centeredState).toHaveBeenCalledOnce();
       expect(scrollView).not.toHaveBeenCalled();
-      expect(texts).toContain('Connect GitHub');
-      const notice = "GitHub isn't connected. Only organization owners and admins can connect it.";
-      expect(texts.includes(notice)).toBe(!showsCard);
+      if (refused) {
+        // The install rule refuses the role: the state names the platform
+        // neutrally and says who may connect it, and offers no press the role
+        // cannot finish.
+        expect(texts).toContain(refusedTitle('github'));
+        expect(texts).toContain(refusedDescription('github'));
+        expect(texts).not.toContain('Connect GitHub');
+        expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
+      } else {
+        expect(texts).toContain('Connect GitHub');
+        expect(texts).not.toContain(refusedTitle('github'));
+        expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
+      }
     }
   );
 
@@ -365,25 +398,29 @@ describe('PlatformOverviewScreen disconnected setup', () => {
     permission.canManage = false;
 
     const renderer = await render('org-1', 'gitlab');
+    const texts = collectText(renderer.toJSON());
 
-    expect(collectText(renderer.toJSON())).toContain('Connect GitLab');
+    expect(texts).toContain('Connect GitLab');
+    expect(texts).not.toContain(refusedTitle('gitlab'));
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
   });
 
-  it.each([
-    ['github', "GitHub isn't connected. Only organization owners and admins can connect it."],
-    [
-      'gitlab',
-      "GitLab isn't connected. Ask an organization owner, admin, or billing manager to connect it.",
-    ],
-  ] as const)('states who can connect %s to a read-only viewer', async (platform, copy) => {
-    provider.status = 'disconnected';
-    permission.canEdit = false;
-    permission.canManage = false;
+  it.each(['github', 'gitlab'] as const)(
+    'gives a read-only viewer the neutral %s heading and no connect action',
+    async platform => {
+      provider.status = 'disconnected';
+      permission.canEdit = false;
+      permission.canManage = false;
 
-    const texts = await renderScreen(platform);
+      const renderer = await render('org-1', platform);
+      const texts = collectText(renderer.toJSON());
 
-    expect(texts).toContain(copy);
-  });
+      expect(texts).toContain(refusedTitle(platform));
+      expect(texts).toContain(refusedDescription(platform));
+      expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
+      expect(texts).not.toContain(platform === 'github' ? 'Connect GitHub' : 'Connect GitLab');
+    }
+  );
 });
 
 describe('PlatformOverviewScreen connected with unavailable config', () => {

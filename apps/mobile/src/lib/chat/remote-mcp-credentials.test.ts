@@ -7,11 +7,8 @@ import { credentialDeps } from './remote-mcp-credentials';
 import { type StoredRemoteMcpServer } from './remote-mcp-store';
 
 /**
- * The credential one server's discovery carries.
- *
- * A value is saved for one endpoint, so the accessor reads the stored entry by
- * id and endpoint: a value that belongs to another endpoint is refused rather
- * than handed to the host this discovery is talking to.
+ * The store and the OAuth provider are mocked, so the accessor is exercised
+ * without the device stores.
  */
 
 const world = vi.hoisted(() => ({ servers: [] as StoredRemoteMcpServer[] }));

@@ -574,6 +574,61 @@ describe('active-sessions-router', () => {
       });
     });
 
+    it('keeps a branch name longer than 24 characters', async () => {
+      const gitBranch = 'feature/instance-branch-with-a-long-name';
+      const instance = {
+        connectionId: 'cli-long-branch',
+        name: 'laptop-long-branch',
+        projectName: 'kilo',
+        gitBranch,
+      };
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ instances: [instance] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.listInstances();
+
+      expect(result.instances[0].gitBranch).toBe(gitBranch);
+      expect(result).toEqual({
+        instances: [
+          {
+            connectionId: 'cli-long-branch',
+            name: 'laptop-long-branch',
+            projectName: 'kilo',
+            kind: 'cli',
+            startedAt: null,
+            gitBranch,
+          },
+        ],
+      });
+    });
+
+    it('shortens a branch longer than the shared bound to 256 characters', async () => {
+      const longBranch = 'b'.repeat(257);
+      const instance = {
+        connectionId: 'cli-too-long-branch',
+        name: 'laptop-too-long-branch',
+        projectName: 'kilo',
+        gitBranch: longBranch,
+      };
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ instances: [instance] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.listInstances();
+
+      expect(result.instances[0].gitBranch).toHaveLength(256);
+      expect(result.instances[0].gitBranch).toBe('b'.repeat(256));
+    });
+
     it.each([
       { kind: 'cloud' },
       { kind: null },
@@ -581,7 +636,6 @@ describe('active-sessions-router', () => {
       { startedAt: '2026-08-28T19:30:00Z' },
       { startedAt: '2026-08-28T19:30:00.1234Z' },
       { startedAt: '2026-08-28T19:30:00.123+00:00' },
-      { gitBranch: 'a'.repeat(25) },
       { gitBranch: 42 },
     ])('rejects invalid instance metadata %j instead of returning empty', async metadata => {
       jest.spyOn(global, 'fetch').mockResolvedValue(

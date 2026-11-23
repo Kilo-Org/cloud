@@ -1746,7 +1746,21 @@ describe('callback scenario behaviour under both profiles', () => {
    */
   function installCallbackCompletion(bootMessageId: string, completionMessageId: string): void {
     mocks.fetchFakeRequests.mockImplementation(async () => ({ chatCompletions: 1 }));
-    mocks.getMessageResult.mockResolvedValue({ status: 'running' });
+    mocks.getMessageResult.mockImplementation(async (_config, _sessionId, messageId: string) =>
+      messageId === bootMessageId
+        ? {
+            status: 'completed',
+            assistant: { messageId: 'assistant_boot', text: 'warmup' },
+            branch: 'test-branch',
+            preparation: { status: 'completed' },
+          }
+        : {
+            status: 'completed',
+            assistant: { messageId: 'assistant_followup', text: 'done' },
+            branch: 'test-branch',
+            gateResult: 'pass',
+          }
+    );
     mocks.startSession.mockResolvedValue({
       cloudAgentSessionId: SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
@@ -1755,7 +1769,10 @@ describe('callback scenario behaviour under both profiles', () => {
     });
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({ messageId: completionMessageId, delivery: 'sent' });
-    const stream = fakeStream([], completedEvent(bootMessageId));
+    const stream = fakeStream(
+      [assistantMessageEvent(bootMessageId, 'assistant_boot')],
+      completedEvent(bootMessageId)
+    );
     stream.waitForTerminal.mockImplementation(async (_budget: number, messageId: string) =>
       completedEvent(messageId)
     );
@@ -1802,6 +1819,8 @@ describe('callback scenario behaviour under both profiles', () => {
       messageId: 'message_completion',
       status: 'completed',
       lastAssistantMessageText: 'done',
+      lastSeenBranch: 'test-branch',
+      gateResult: 'pass',
     });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-completion'], {
@@ -1881,10 +1900,22 @@ describe('callback scenario behaviour under both profiles', () => {
   it.each(profiles)('callback-interrupt passes in the %s profile', async profile => {
     const sink = fakeCallbackSink();
     installCallbackPacedHold('message_boot', 'message_interrupt');
+    const failure = { stage: 'interruption', code: 'user_interrupt' };
+    mocks.interruptSession.mockImplementationOnce(async () => {
+      mocks.getMessageResult.mockResolvedValue({
+        status: 'interrupted',
+        failure: { ...failure, retryable: false },
+        branch: 'test-branch',
+      });
+      return { success: true };
+    });
     sink.push({
       cloudAgentSessionId: SESSION_ID,
       messageId: 'message_interrupt',
       status: 'interrupted',
+      failure,
+      clientError: { code: 'USER_INTERRUPT', message: 'Interrupted', retryable: false },
+      lastSeenBranch: 'test-branch',
     });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-interrupt'], {

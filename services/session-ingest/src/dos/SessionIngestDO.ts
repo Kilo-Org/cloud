@@ -29,7 +29,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
+import { ingestItems, ingestMeta, sessions, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import { MAX_INGEST_ITEM_BYTES, CLONE_WINDOW_MAX_BYTES } from '../util/ingest-limits';
 import type { IngestBatch } from '../types/session-sync';
@@ -459,6 +459,10 @@ const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
  */
 const RAW_EXPORT_PAGE_ROWS = 200;
 const RAW_EXPORT_PAGE_MAX_BYTES = 4 * 1024 * 1024;
+/** Set while an empty export's reset is pending; cleared or consumed by the alarm. */
+const EMPTY_CLEANUP_KEY = 'emptyCleanupPending';
+/** Delay so the reset alarm cannot race the response of the export that asked for it. */
+const EMPTY_CLEANUP_DELAY_MS = 1000;
 
 type PartExcerptRow = {
   id: number;
@@ -2022,6 +2026,28 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /** Emits session metrics after close drain or inactivity, once per turn. */
   async alarm(): Promise<void> {
+    // Only an empty export arms an alarm on an object that stores nothing, and
+    // this marker tells that alarm apart from a metrics alarm the session armed
+    // itself. The checks and the reset share one synchronous stretch around the
+    // marker read, and deleteAll() drops the schema too, so the object is
+    // restarted and the next request runs the constructor migration.
+    if ((await this.ctx.storage.get(EMPTY_CLEANUP_KEY)) === true) {
+      if (!this.hasAnyData()) {
+        await this.ctx.storage.deleteAlarm();
+        if (!this.hasAnyData()) {
+          await this.ctx.storage.deleteAll();
+          this.ctx.abort();
+          return;
+        }
+      }
+      // The object gained data after the export asked for the reset. Drop the
+      // marker, and run metrics only when the session armed its own metrics
+      // time: this alarm belongs to the cleanup, so it must not emit with the
+      // fallback close reason or latch the emitted flag.
+      await this.ctx.storage.delete(EMPTY_CLEANUP_KEY);
+      if (readIngestMetaValue(this.db, 'metricsAlarmAt') === null) return;
+    }
+
     const metaRows = this.db
       .select()
       .from(ingestMeta)
@@ -2468,6 +2494,39 @@ export class SessionIngestDO extends DurableObject<Env> {
     return { rows: window, nextCursor, done };
   }
 
+  /** True when this object holds at least one stored item row, of any type. */
+  private hasItemRow(): boolean {
+    return (
+      this.db.select({ item_id: ingestItems.item_id }).from(ingestItems).limit(1).get() !==
+      undefined
+    );
+  }
+
+  /**
+   * True when this object holds any row in any data table. The reset deletes the
+   * whole database irreversibly, so every table the schema defines is checked;
+   * only the migrator's bookkeeping table is excluded because it is not data.
+   */
+  private hasAnyData(): boolean {
+    if (this.hasItemRow()) return true;
+    if (this.db.select({ key: ingestMeta.key }).from(ingestMeta).limit(1).get() !== undefined) {
+      return true;
+    }
+    if (
+      this.db.select({ session_id: sessions.session_id }).from(sessions).limit(1).get() !==
+      undefined
+    ) {
+      return true;
+    }
+    return (
+      this.db
+        .select({ identity: agentNotificationDispatch.identity })
+        .from(agentNotificationDispatch)
+        .limit(1)
+        .get() !== undefined
+    );
+  }
+
   /**
    * Stream every row this session stores, as NDJSON, for an authorised export.
    *
@@ -2486,10 +2545,41 @@ export class SessionIngestDO extends DurableObject<Env> {
    *
    * The three line kinds are `meta` (one per `ingest_meta` row, emitted first),
    * `row` (one per `ingest_items` row) and a final `end` carrying the row count.
+   *
+   * With `deleteIfEmpty`, an object that stores nothing at all — no row in any
+   * data table (`ingest_items`, `ingest_meta`, `sessions`,
+   * `agent_notification_dispatch`; see `hasAnyData()`), so only the
+   * constructor's migration has ever written there —
+   * is scheduled for a storage reset instead of being streamed, and the single
+   * `end` line carries `empty_cleanup_scheduled: true`. The reset runs in the
+   * alarm because `deleteAll()` drops the live instance's schema: the object
+   * restarts, the next request migrates a fresh schema, and an object that
+   * gained a row before the alarm keeps it (the flag says the cleanup was
+   * scheduled, not that the reset was applied).
    */
-  async exportSessionRowsStream(): Promise<ReadableStream<Uint8Array>> {
+  async exportSessionRowsStream({
+    deleteIfEmpty = false,
+  }: { deleteIfEmpty?: boolean } = {}): Promise<ReadableStream<Uint8Array>> {
     const db = this.db;
     const encoder = new TextEncoder();
+
+    if (deleteIfEmpty && !this.hasAnyData()) {
+      // deleteAll() also drops this instance's SQLite schema (the constructor
+      // migration runs once), so it cannot run while a caller waits on the
+      // response. The marker identifies the pending reset, and the alarm applies
+      // it once it can restart the object without racing a caller.
+      await this.ctx.storage.put(EMPTY_CLEANUP_KEY, true);
+      await this.ctx.storage.setAlarm(Date.now() + EMPTY_CLEANUP_DELAY_MS);
+      return new ReadableStream<Uint8Array>({
+        start: controller => {
+          controller.enqueue(
+            encoder.encode(ndjsonLine({ t: 'end', rows: 0, empty_cleanup_scheduled: true }))
+          );
+          controller.close();
+        },
+      });
+    }
+
     // `id` never changes and is never reused, so the highest id present now
     // freezes the set of rows this export covers.
     const maxId =

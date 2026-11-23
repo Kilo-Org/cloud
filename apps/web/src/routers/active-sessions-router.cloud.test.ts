@@ -1008,8 +1008,9 @@ describe('resolveCloudCandidateStatus', () => {
     expect(resolveCloudCandidateStatus('retry', true)).toBe('retry');
   });
 
-  it('keeps the stored status when no run is open (warm-idle window)', () => {
+  it('keeps a stored status when no run is open and reports busy without one', () => {
     expect(resolveCloudCandidateStatus('idle', false)).toBe('idle');
-    expect(resolveCloudCandidateStatus(null, false)).toBe('');
+    expect(resolveCloudCandidateStatus(null, false)).toBe('busy');
+    expect(resolveCloudCandidateStatus('', false)).toBe('busy');
   });
 });

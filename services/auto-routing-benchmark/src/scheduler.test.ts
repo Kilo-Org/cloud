@@ -1396,6 +1396,67 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(lanesPlan).not.toContain('SCAN scheduler_chunks');
   });
 
+  it('terminalizes a pending block already over its cap, for a platform and a user run', async () => {
+    // Rows an earlier build wrote can be `pending` at or above the cap this build enforces:
+    // `claimScheduledChunks` refuses them, so nothing would retire them and their run would hold
+    // a queue slot (and a paid request) forever. The recovery pass moves them to `failed`, which
+    // is where the lane-failure record and run finalization pick them up — the same terminal
+    // state the cap path produces, with no deploy script involved.
+    for (const purpose of ['platform', 'user'] as const) {
+      const runId = `over-cap-${purpose}`;
+      insertRun(sqlite, runId, { purpose });
+      await scheduleRunChunks(db, {
+        runId,
+        entries: [
+          { model: 'over/model', variant: '' },
+          { model: 'normal/model', variant: '' },
+        ],
+        repetitions: 1,
+        caseIds: ['case-a'],
+        chunkSize: 1,
+      });
+      // The old six-attempt rule left this block at 3 attempts.
+      sqlite
+        .prepare(
+          "UPDATE scheduler_chunks SET attempts = 3 WHERE run_id = ? AND model = 'over/model'"
+        )
+        .run(runId);
+
+      // It is not selectable, so a dispatch pass takes only the healthy block — and the run is
+      // still unsettled, which is exactly the wedge the recovery pass has to clear.
+      const claims = await claimMany(db, schedulerConfig('{"slots":4}'), 4, `pre-${purpose}`, NOW);
+      expect(claims.map(claim => claim.model)).toEqual(['normal/model']);
+      expect(await hasUnsettledChunks(db, runId)).toBe(true);
+
+      const failed = await recoverChunks(db, NOW + 1);
+
+      expect(
+        sqlite
+          .prepare("SELECT status FROM scheduler_chunks WHERE run_id = ? AND model = 'over/model'")
+          .get(runId)
+      ).toEqual({ status: 'failed' });
+      // Reported once for the lane-failure record, which is what lets the run finish.
+      expect(failed.filter(row => row.run_id === runId).map(row => row.model)).toEqual([
+        'over/model',
+      ]);
+      // Dispatch records the lane failure from that report; the next pass then has nothing to
+      // re-report, so a terminal block is never revisited.
+      sqlite
+        .prepare(
+          `INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, failed_at, failure_class)
+          VALUES (?, 'over/model', '', 0, 0, ?, 'unknown')`
+        )
+        .run(runId, new Date(NOW).toISOString());
+      expect(await recoverChunks(db, NOW + 2)).toEqual([]);
+      // The healthy block completes normally and the run has nothing unsettled left.
+      const healthyClaim = claims[0];
+      if (!healthyClaim) throw new Error('Expected the healthy claim');
+      expect(await startChunk(db, healthyClaim.id, healthyClaim.token, NOW + 1)).toBe(true);
+      await finishChunk(db, healthyClaim.id, healthyClaim.token);
+      expect(await hasUnsettledChunks(db, runId)).toBe(false);
+    }
+  });
+
   it('does not repeatedly report failed chunks from lanes already recorded in run_lane_failures', async () => {
     insertRun(sqlite, 'failed-lanes');
     await scheduleRunChunks(db, {
@@ -2137,6 +2198,48 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
       JSON.stringify(['case-a', 'case-b']),
       JSON.stringify(['case-d']),
     ]);
+  });
+
+  it('keeps the cap when an interrupted re-plan pass resumes, and never double-schedules a case', async () => {
+    // kilobot's shape: an interrupted pass leaves the plan fingerprint unrecorded, so the
+    // resumed pass must read the run's rows again. Without that it would resume as "unchanged"
+    // and could place a residual chunk on a free id holding a case that already has a row.
+    insertRun(sqlite, 'interrupted', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: '' };
+    const laneKey = JSON.stringify([block.model, block.variant, 0]);
+    await scheduleRunChunks(db, {
+      runId: 'interrupted',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+      laneCaseIds: new Map([[laneKey, ['case-a', 'case-b', 'case-c']]]),
+    });
+    // The pass that would have recorded the fingerprint was interrupted: no marker, and no
+    // fingerprint on the run either.
+    sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'interrupted'").run();
+    sqlite
+      .prepare("UPDATE benchmark_runs SET plan_fingerprint = NULL WHERE id = 'interrupted'")
+      .run();
+    // The re-plan prepends a new case, so every existing one moves one position: [d,a,b,c].
+    await scheduleRunChunks(db, {
+      runId: 'interrupted',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-d', 'case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+      laneCaseIds: new Map([[laneKey, ['case-d', 'case-a', 'case-b', 'case-c']]]),
+    });
+
+    // Every case has exactly one row: the new case-d is scheduled, and no existing case was
+    // written twice while its position moved.
+    const rows = storedChunks(sqlite).map(row => JSON.parse(row.case_ids) as string[]);
+    const scheduled = rows.flat();
+    expect(scheduled.sort()).toEqual(['case-a', 'case-b', 'case-c', 'case-d']);
+    // Exactly one row per case: the check above would still pass if one case held two rows
+    // and another none, so count them.
+    expect(new Set(scheduled).size).toBe(scheduled.length);
+    expect(rows.every(cases => cases.length === 1)).toBe(true);
   });
 
   it('keeps the same chunk id when a larger chunk size changes nothing for one case', async () => {

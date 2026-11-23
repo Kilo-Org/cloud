@@ -153,13 +153,16 @@ redelivers the message within about a minute. A resumed delivery skips completed
 reuses recoverable output, and never begins a ledgered paid case again. A queued lease lasts
 30 minutes; an executing lease lasts 20 minutes, beyond the queue's 15-minute invocation
 limit, and a resume keeps the running lease. The one-minute tick recovers abandoned claims;
-completion refills slots immediately without waiting for a tick. Recovery and
-infrastructure/grader waits are bounded to six claims, with 15–300 second backoff. Capacity
-and unbilled provider-throttle waits do not create model-failure rows. A provider throttle
-refunds its claim and counts against a separate budget of 16 throttle deferrals (about an
-hour of backoff), so a briefly rate-limited model is paced instead of losing its lanes; after
-that budget, the chunk falls back to the six-claim limit, so a persistent throttle still fails
-its lane. The gateway exempts only the default benchmark user (`bot-internal-benchmark`)
+completion refills slots immediately without waiting for a tick. A block's automatic attempts
+are bounded by its run's purpose — two for a platform block, one billed attempt for a user
+block — at 15–300 second backoff. A wait that made no model call is bounded separately
+(`SCHEDULER_MAX_USER_LEASE_RECLAIMS`), so a lost claim, a lease loss, an attached generation,
+an unreachable gateway or a refused launch cannot re-queue a block forever; at the bound the
+block fails with its lane. Capacity and unbilled provider-throttle waits do not create
+model-failure rows. A provider throttle refunds its claim and counts against a separate budget
+of 16 throttle deferrals (about an hour of backoff), so a briefly rate-limited model is paced
+instead of losing its lanes; after that budget the failure takes an ordinary attempt, so a
+persistent throttle still fails its lane. The gateway exempts only the default benchmark user (`bot-internal-benchmark`)
 from its free-model account limit; a `benchmarkUserId` override is limited like other accounts.
 
 A dispatch pass reads current occupancy and the next pending chunk of every lane — one
@@ -228,9 +231,10 @@ and the runtime's "The container just exited" or "The container is not running" 
 into a 503 with `errorCategory` `container_not_reached`, which takes the container-capacity
 path: the unbilled ledger row is cleared and the chunk is deferred. Other proxy failures
 ("Container suddenly disconnected", a closed port connection) can follow a delivered request
-and stay ambiguous. When a retry cannot reach its container, an empty-output first attempt is
-graded as it is, while a first attempt killed before any event is cleared and deferred the same
-way. A case the ledger refuses to open because the chunk lost its lease, its lane already failed
+and stay ambiguous. When a retry cannot reach its container, the retry's attempt and ledger
+start are refunded: an empty-output first attempt is then graded as it is, while a first attempt
+killed before any event is cleared and deferred, never graded as a zero for a case that did not
+run. A case the ledger refuses to open because the chunk lost its lease, its lane already failed
 or its run stopped is not ambiguous either: the chunk is released (`claim_lost`) without
 recording a lane failure.
 
@@ -240,8 +244,9 @@ prevents the live and recovery paths from grading the same output twice.
 Unbilled throttle, provider-outage (5xx or "temporarily unavailable") and catalog-load
 failures are cleared and deferred instead of measured, including one that ends a multi-step
 run after partial text but before any billed answer. A CLI process killed by a signal before
-its first event gets the same single retry as an empty completion; a timeout, a kill after
-events, or an invalid-request rejection stays a measured failure.
+its first event gets the same single retry as an empty completion on a platform block; a user
+block is never replayed in-process. A timeout, a kill after events, or an invalid-request
+rejection stays a measured failure.
 
 An automatic attempt is one execution of a block (a scheduler chunk) that reaches the model,
 paid or not. A platform block may use two: the first run plus one automatic retry, counted on

@@ -187,6 +187,7 @@ import {
   acquireInitializationLease,
   restartPaidCaseStatement,
   consumeRetryAttemptStatement,
+  refundRetryAttemptStatement,
   claimScheduledChunks,
   clearUnbilledCase,
   getPaidCasePromptRevision,
@@ -1776,7 +1777,9 @@ async function dispatchClaims(env: Env, config: SchedulerConfig): Promise<number
       });
     } catch (error) {
       for (const unsent of claims.slice(index)) {
-        // The claim never reached a worker, so no execution happened on it.
+        // The claim never reached a worker, so no execution happened on it. A release that
+        // reaches the no-model-call bound fails the block in place; the run's next dispatch
+        // pass records its lane failure with the other terminal chunks.
         await deferNoModelCallChunk(env.BENCH_DB, unsent.id, unsent.token, Date.now());
       }
       throw error;
@@ -2757,42 +2760,38 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
       );
       await failDeadLaneAndPaidLinks(env, claim, 'unsupported', error.reason, 'unsupported');
     } else if (error instanceof ChunkClaimLostError) {
-      // No execution of ours ran: the claim is released without spending an attempt.
-      await deferNoModelCallChunk(env.BENCH_DB, id, token, Date.now());
-    } else if (error instanceof PaidCaseAttachedError) {
-      // Another funded generation owns this case run. Nothing was inferred, so the chunk
-      // waits out a short backoff and re-reads the fence; the owner's result is adopted
-      // when it lands. Nothing reached the model, so the wait spends no attempt.
+      // No execution of ours ran: the claim is released without spending an attempt, and the
+      // block is bounded like every other no-model-call wait so a lost-claim loop ends.
+      const outcome = await deferNoModelCallChunk(env.BENCH_DB, id, token, Date.now());
+      if (outcome === 'failed') {
+        await recordTerminalChunk(env, claim, LANE_FAILURE_CLASS_BY_WAIT_REASON[reason]);
+      }
+    } else if (
+      error instanceof PaidCaseAttachedError ||
+      error instanceof BenchmarkInfraUnavailableError ||
+      error instanceof BenchmarkCaseNotStartedError
+    ) {
+      // Nothing reached the model: another funded generation owns the case, the gateway is
+      // unreachable, or the launch fence refused the start. The block re-enters normal
+      // admission on a short backoff without spending an attempt — bounded, because a
+      // generation attached to a lost executor or a permanently unreachable gateway would
+      // otherwise re-queue forever. At the bound the block fails like any other, so its run
+      // and any paid request on it can finish.
       const delaySeconds = schedulerBackoffSeconds(1);
-      await deferNoModelCallChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
-      await env.BENCH_QUEUE.send(
-        { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
-        { delaySeconds }
-      );
-    } else if (error instanceof BenchmarkInfraUnavailableError) {
-      // Infrastructure, not the model or the payer: back the lane off and re-enter normal
-      // admission. No lane failure, no catalog cooldown, no profile attempt, and no
-      // automatic attempt spent (the gateway was never reached).
-      const delaySeconds = schedulerBackoffSeconds(1);
-      await deferNoModelCallChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
-      await env.BENCH_QUEUE.send(
-        { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
-        { delaySeconds }
-      );
-    } else if (error instanceof BenchmarkCaseNotStartedError) {
-      // The launch fence refused the paid start: no provider request and no subprocess.
-      // The lane takes a normal backoff and re-admits through the fence; this is never
-      // replayed as the user's paid start. No provider request ran, so it spends no attempt.
-      await deferNoModelCallChunk(
+      const outcome = await deferNoModelCallChunk(
         env.BENCH_DB,
         id,
         token,
-        Date.now() + schedulerBackoffSeconds(1) * 1000
+        Date.now() + delaySeconds * 1000
       );
-      await env.BENCH_QUEUE.send(
-        { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
-        { delaySeconds: schedulerBackoffSeconds(1) }
-      );
+      if (outcome === 'failed') {
+        await recordTerminalChunk(env, claim, LANE_FAILURE_CLASS_BY_WAIT_REASON[reason]);
+      } else {
+        await env.BENCH_QUEUE.send(
+          { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
+          { delaySeconds }
+        );
+      }
     } else if (awaitingOutput) {
       await env.BENCH_QUEUE.send(
         {
@@ -3049,7 +3048,15 @@ export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<
   const message = parsed.data;
   if (message.kind === 'decider') {
     if (message.claimId && message.claimToken) {
-      await deferChunk(env.BENCH_DB, message.claimId, message.claimToken, Date.now(), true);
+      // A dead-lettered message never reached `startChunk`, so no model call happened: the
+      // claim is released under the no-model-call rule (bounded, never billed twice).
+      await deferNoModelCallChunk(
+        env.BENCH_DB,
+        message.claimId,
+        message.claimToken,
+        Date.now(),
+        true
+      );
     }
     if (!message.claimId && !message.schedulerWake) {
       const state = await getRunState(env, message.runId).catch(() => null);
@@ -3223,6 +3230,39 @@ async function caseInferenceProxy(
  *   the deletes match in the same transaction.
  * A crash cannot split them: either the whole batch commits or none of it does.
  */
+/**
+ * Undo a retry that provably never reached the model: the attempt it spent and the ledger
+ * start it moved. Both writes name this claim's own token, so a concurrent pass that owns the
+ * case is untouched. Best effort by design — the block is already deferring, and a failed
+ * refund must not turn a wait into a lane death.
+ */
+async function refundRetryAttempt(
+  env: Env,
+  input: {
+    execution: PaidExecutionKey & { attemptStartedAt: number };
+    /** The start the retry wrote; reverting restores `execution.attemptStartedAt`. */
+    startedAt: number;
+  }
+): Promise<void> {
+  await env.BENCH_DB.batch([
+    refundRetryAttemptStatement(env.BENCH_DB, input.execution.runId, input.execution.token),
+    restartPaidCaseStatement(
+      env.BENCH_DB,
+      { ...input.execution, attemptStartedAt: input.startedAt },
+      input.execution.attemptStartedAt
+    ),
+  ]).catch((error: unknown) => {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_retry_attempt_refund_failed',
+        runId: input.execution.runId,
+        caseId: input.execution.caseId,
+        errorCategory: benchmarkErrorCategory(error),
+      })
+    );
+  });
+}
+
 async function releaseUnbilledPaidGeneration(
   env: Env,
   input: {
@@ -3786,20 +3826,12 @@ async function processDeciderJob(
           return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
         startedAt = Math.max(Date.now(), startedAt + 1);
-        // The retry spends the block's last automatic attempt first: `attempts` is the same
-        // counter the scheduler spends on every claim and deferral, so a platform block can
-        // never exceed its cap through this in-process path either. The spend is committed
-        // before the ledger moves, so a refusal (the block already used both attempts) leaves
-        // the measured first answer standing instead of paying for a call nobody budgeted.
-        const consumed = await consumeRetryAttemptStatement(
-          env.BENCH_DB,
-          claim.id,
-          claim.token,
-          Date.now()
-        ).run();
-        if ((consumed.meta.changes ?? 0) === 0) {
-          return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
-        }
+        // The retry spends the block's last automatic attempt, but only once it is sure to
+        // happen: the spend is the last guard before the call and is refunded whenever the
+        // retry provably never reached the model. `attempts` is the same counter the scheduler
+        // spends on every claim and deferral, so a claim plus this retry can never exceed the
+        // platform cap.
+        //
         // The retry's start must move in the ledger and on the canonical fence in the same
         // transaction: RunnerCancel's live check compares `benchmark_case_runs.started_at`
         // to ISO(attemptStartedAt), so a ledger-only move would refuse every retry.
@@ -3812,6 +3844,21 @@ async function processDeciderJob(
           }),
         ]);
         if ((restarted[0]?.meta.changes ?? 0) === 0) {
+          return { result: first, retried: false, promptRevision };
+        }
+        const consumed = await consumeRetryAttemptStatement(
+          env.BENCH_DB,
+          claim.id,
+          claim.token,
+          Date.now()
+        ).run();
+        if ((consumed.meta.changes ?? 0) === 0) {
+          // The block already spent its automatic attempts: the ledger restart above is
+          // undone so the retry leaves no trace of a start that never happened.
+          await refundRetryAttempt(env, {
+            execution: { ...execution, attemptStartedAt },
+            startedAt,
+          });
           return { result: first, retried: false, promptRevision };
         }
         // The retry is a further paid call of the same generation: its capability must name
@@ -3888,10 +3935,17 @@ async function processDeciderJob(
             })
           );
           unstartedRetryAt = startedAt;
-          // The first attempt was killed before any event and the retry never reached the
-          // provider, so there is no measurement to grade: returning `first` would record a
-          // zero for a case that never ran (and count it against the model). Hand the exact
-          // not-reached signal to the chunk, which defers it through normal admission.
+          // The retry never reached the provider, so its spend is returned before anything
+          // else: a container-capacity refusal is a wait, and the block must not lose an
+          // attempt to it.
+          await refundRetryAttempt(env, {
+            execution: { ...execution, attemptStartedAt },
+            startedAt,
+          });
+          // The first attempt was killed before any event and no retry measured the case, so
+          // there is nothing to grade: returning `first` would record a zero for a case that
+          // never ran (and count it against the model). Hand the exact not-reached signal to
+          // the chunk, which defers it through normal admission.
           if (isKilledBeforeEventsResult(first)) {
             // Same atomic release: a spawned-then-killed child may still have admitted a
             // request, so only CaseStore's native-proof guard may reopen the slot, and the
@@ -3905,6 +3959,9 @@ async function processDeciderJob(
             if (retryNotReached !== null) throw retryNotReached;
             throw new ChunkClaimLostError();
           }
+          // Any other refusal still leaves the case unmeasured when the first attempt never
+          // emitted an event, so it is deferred through normal admission rather than graded.
+          if (isKilledBeforeEventsResult(first)) throw retryNotReached ?? new ChunkClaimLostError();
           return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
         addPriorAttempt(retry, first);

@@ -26,6 +26,7 @@ vi.mock('./scheduler', async importOriginal => {
     ...actual,
     claimScheduledChunks: vi.fn(),
     deferChunk: vi.fn(),
+    deferNoModelCallChunk: vi.fn(),
     getChunk: vi.fn(),
     recoverChunks: vi.fn(),
     scheduleRunChunks: vi.fn(),
@@ -45,6 +46,7 @@ import {
 import {
   claimScheduledChunks,
   deferChunk,
+  deferNoModelCallChunk,
   getChunk,
   recoverChunks,
   scheduleRunChunks,
@@ -108,6 +110,7 @@ beforeEach(() => {
   queueSend.mockResolvedValue(undefined);
   vi.mocked(getChunk).mockResolvedValue(claim);
   vi.mocked(deferChunk).mockResolvedValue('deferred');
+  vi.mocked(deferNoModelCallChunk).mockResolvedValue('deferred');
   vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
   vi.mocked(scheduleRunChunks).mockResolvedValue(true);
@@ -126,13 +129,16 @@ describe('processDeadLetter — scheduler claims', () => {
   it('defers only queued matching ownership without revoking a live execution', async () => {
     await processDeadLetter(env, deadLetterMessage());
     expect(getChunk).not.toHaveBeenCalled();
-    expect(deferChunk).toHaveBeenCalledWith(
+    // A dead-lettered message never reached the model, so the release refunds the attempt
+    // instead of spending the block's last one.
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
       env.BENCH_DB,
       claim.id,
       claim.token,
       expect.any(Number),
       true
     );
+    expect(deferChunk).not.toHaveBeenCalled();
     expect(recoverChunks).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
     expect(claimScheduledChunks).toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
@@ -143,7 +149,7 @@ describe('processDeadLetter — scheduler claims', () => {
     vi.mocked(getChunk).mockResolvedValue(null);
     await processDeadLetter(env, { ...deadLetterMessage(), claimToken: 'stale-token' });
     expect(getChunk).not.toHaveBeenCalled();
-    expect(deferChunk).toHaveBeenCalledWith(
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
       env.BENCH_DB,
       claim.id,
       'stale-token',

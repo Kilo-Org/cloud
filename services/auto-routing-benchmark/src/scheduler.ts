@@ -173,8 +173,10 @@ export const SCHEDULER_MAX_PLATFORM_ATTEMPTS = 2;
  * one serialized `(id, model, variant, rep, case_ids)` row is 292 bytes, so one statement
  * would return ~35.6 MB (average-width cases: ~31 MB). D1 caps a query result at 50 MB, the
  * Worker at 128 MB, and the whole request at 30 s, so a single read would sit at 71% of the
- * result cap with ~121k parsed strings live in the isolate. Keyset paging instead peaks at
- * 1,000 rows (~292 KB) and ~122 queries, and reads each row exactly once.
+ * result cap with ~121k parsed strings live in the isolate. Keyset paging bounds each
+ * statement to 1,000 rows (~292 KB) and ~122 queries; the case set it builds still holds every
+ * materialized case id and chunk id for the pass, which is the smaller of the two costs and
+ * the one the guard needs.
  */
 export const SCHEDULER_MATERIALIZED_PAGE_SIZE = 1_000;
 
@@ -434,18 +436,22 @@ export async function scheduleRunChunks(
     if (status?.status !== 'running') return false;
     await db.batch([
       ...statements,
-      ...(planChanged
-        ? [
-            db
-              .prepare('UPDATE benchmark_runs SET plan_fingerprint = ? WHERE id = ?')
-              .bind(planFingerprint, run.runId),
-          ]
-        : []),
+      // The fingerprint commits only with the initialization marker. A pass that flushes a
+      // batch and then stops at its deadline is not a pass that finished the plan, so the
+      // next one must still read the run's rows: recording the fingerprint early would make
+      // it resume as "unchanged" and could write a second chunk for a scheduled case.
       ...(final
         ? [
             db
               .prepare('INSERT INTO scheduler_runs (run_id) VALUES (?) ON CONFLICT DO NOTHING')
               .bind(run.runId),
+            ...(planChanged
+              ? [
+                  db
+                    .prepare('UPDATE benchmark_runs SET plan_fingerprint = ? WHERE id = ?')
+                    .bind(planFingerprint, run.runId),
+                ]
+              : []),
           ]
         : []),
     ]);
@@ -836,8 +842,8 @@ export async function finishChunk(db: D1Database, id: string, token: string): Pr
 
 /**
  * Returns a chunk to the queue, failing it instead once its block has spent every automatic
- * attempt. The budget comes from the owning run's purpose, so a platform block stops after
- * its one retry and a user block keeps the six it has always had.
+ * attempt. The budget comes from the owning run's purpose: a platform block stops after its
+ * one retry, and a user block after its single billed attempt.
  *
  * It reports which of the two happened, because that decision is made against the row's
  * current `attempts` — never a claim object read before this invocation spent an attempt of
@@ -875,17 +881,24 @@ export async function deferNoModelCallChunk(
   token: string,
   availableAt: number,
   onlyQueued = false
-): Promise<void> {
-  const refund = '1';
-  await db
+): Promise<'deferred' | 'failed'> {
+  // The wait is counted on `lease_reclaims`, the counter that already bounds automatic
+  // re-attempts for a platform block's lease losses and a user block's. A wait that made no
+  // model call is exactly as retryable as a lease loss and must end the same way; without the
+  // bound, a generation attached to a lost executor or a permanently unreachable gateway would
+  // re-queue the block forever at the constant backoff.
+  const row = await db
     .prepare(`UPDATE scheduler_chunks SET
-    status = CASE WHEN attempts - ${refund} >= ${chunkAttemptCapSql('scheduler_chunks')}
+    status = CASE WHEN lease_reclaims + 1 >= ${SCHEDULER_MAX_USER_LEASE_RECLAIMS}
       THEN 'failed' ELSE 'pending' END,
-    attempts = MAX(attempts - ${refund}, 0),
+    attempts = MAX(attempts - 1, 0),
+    lease_reclaims = lease_reclaims + 1,
     available_at = ?, slot = NULL, token = NULL, lease_until = 0
-    WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND (? = 0 OR status = 'queued')`)
+    WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND (? = 0 OR status = 'queued')
+    RETURNING status`)
     .bind(availableAt, id, token, onlyQueued ? 1 : 0)
-    .run();
+    .first<{ status: string }>();
+  return row?.status === 'failed' ? 'failed' : 'deferred';
 }
 
 export async function deferThrottledChunk(
@@ -980,6 +993,21 @@ export async function failScheduledEntry(
  * running runs, so it reads only their failed chunks rather than every failed chunk kept
  * until pruning. Exported, like the prune statements below, for the query-plan test.
  */
+/**
+ * A block whose attempts already reached its cap but is still `pending` can never be claimed
+ * again (`claimScheduledChunks` refuses it), so nothing would retire it: its run stays
+ * `running`, holds a queue slot and leaves a paid request pending. Lowering the cap makes
+ * exactly that state reachable from rows an earlier build wrote, so the recovery pass
+ * terminalizes them. They land in `failed`, where the unrecorded-failed select below records
+ * the lane failure and dispatch finalizes the run — the same terminal state the cap path
+ * produces.
+ */
+export const SCHEDULER_EXHAUSTED_PENDING_CHUNKS_SQL = `
+  UPDATE scheduler_chunks SET status = 'failed', slot = NULL, token = NULL, lease_until = 0
+  WHERE status = 'pending' AND attempts >= ${chunkAttemptCapSql('scheduler_chunks')}
+  RETURNING *
+`;
+
 export const SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL = `
   SELECT chunk.* FROM benchmark_runs AS run
   CROSS JOIN scheduler_chunks AS chunk
@@ -1085,13 +1113,14 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
       slot = NULL, token = NULL, lease_until = 0
       WHERE status IN ('queued', 'active') AND lease_until <= ?`)
       .bind(now),
+    db.prepare(SCHEDULER_EXHAUSTED_PENDING_CHUNKS_SQL),
     db.prepare(SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL),
     db.prepare(SCHEDULER_PRUNE_EXECUTIONS_SQL).bind(pruneBefore),
     db.prepare(SCHEDULER_PRUNE_CHUNKS_SQL).bind(pruneBefore),
     db.prepare(SCHEDULER_PRUNE_MARKERS_SQL).bind(pruneBefore),
     db.prepare('DELETE FROM scheduler_cooldowns WHERE until <= ?').bind(now),
   ]);
-  return results[2]?.results ?? [];
+  return results[3]?.results ?? [];
 }
 
 const UNSETTLED_CHUNK_PREDICATE = `
@@ -1353,6 +1382,18 @@ export function consumeRetryAttemptStatement(
       AND attempts + 1 <= ${chunkAttemptCapSql('scheduler_chunks')}
       AND ${retryGuardSql()}`)
     .bind(id, token, now);
+}
+
+/** Returns the attempt a retry spent when that retry never reached the model. */
+export function refundRetryAttemptStatement(
+  db: D1Database,
+  id: string,
+  token: string
+): D1PreparedStatement {
+  return db
+    .prepare(`UPDATE scheduler_chunks SET attempts = MAX(attempts - 1, 0)
+    WHERE id = ? AND token = ? AND status = 'active' AND attempts > 0`)
+    .bind(id, token);
 }
 
 export async function restartPaidCase(

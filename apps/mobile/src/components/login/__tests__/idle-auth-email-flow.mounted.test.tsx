@@ -536,7 +536,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
   });
 
-  it('keeps a wrong-code refusal and its options control when the resend succeeds', async () => {
+  it('replaces the wrong-code refusal with the sent confirmation when the resend succeeds', async () => {
     const renderer = await mountCodeStep('wrong-resend-sent@example.com');
     await refuseVerify(renderer, {
       ok: false,

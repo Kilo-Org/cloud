@@ -230,6 +230,16 @@ const sharedPoolConfig: Partial<pg.PoolConfig> = {
   idleTimeoutMillis,
 };
 
+type PoolKind = 'primary' | 'replica' | 'tagged-writer';
+
+// A total table over every pool kind, so adding a fourth kind fails to compile
+// until someone decides whether its death should end the instance.
+const EXIT_ON_POOL_ERROR: Record<PoolKind, boolean> = {
+  primary: true,
+  replica: false,
+  'tagged-writer': false,
+};
+
 // Primary pool - writes go here; script runs (IS_SCRIPT) connect to POSTGRES_SCRIPT_URL
 const primary = createDrizzleClient({
   connectionString: postgresUrl,
@@ -283,16 +293,6 @@ if (process.env.NODE_ENV !== 'test') {
     attachDatabasePool(replicaPool);
   }
 }
-
-type PoolKind = 'primary' | 'replica' | 'tagged-writer';
-
-// A total table over every pool kind, so adding a fourth kind fails to compile
-// until someone decides whether its death should end the instance.
-const EXIT_ON_POOL_ERROR: Record<PoolKind, boolean> = {
-  primary: true,
-  replica: false,
-  'tagged-writer': false,
-};
 
 /**
  * Whether an idle-client pool error should terminate the process. Pure and

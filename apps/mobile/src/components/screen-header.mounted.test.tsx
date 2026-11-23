@@ -993,6 +993,33 @@ describe('ScreenHeader mounted', () => {
       expect(oneLine.root.findAll(isStackedActionsRow)).toHaveLength(1);
     });
 
+    // Compact 360x640dp window, the session screen's own header: the title's
+    // box beside the cluster is 159.24dp while the copy outside the row lays
+    // out at 210.67dp. A device keeps reporting after the decision: the box
+    // then sits in the row the cluster left and takes its full width, which is
+    // no longer the room the decision was about. Recording it there used to
+    // clear the cut, send the cluster back beside the title, and repeat until
+    // React threw `Maximum update depth exceeded` on this very screen.
+    it('settles a wrapped title in a narrow session window', () => {
+      Object.assign(layout, { width: 360, fontScale: 1 });
+      const renderer = renderHeader(session);
+      const inRowBox = 159.24;
+      const natural = 210.67;
+
+      // One device pass: the box reports the room it has, the copy its own
+      // width. The probe's confirming pass reads both again.
+      const devicePass = () => {
+        const stacked = renderer.root.findAll(isStackedActionsRow).length > 0;
+        reportWidth(fitTargets(renderer).box, stacked ? natural : inRowBox);
+        reportWidth(fitTargets(renderer).copy, natural);
+      };
+
+      for (let pass = 0; pass < 4; pass += 1) {
+        devicePass();
+      }
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
     // The count arrives after the frame paints, so the first press of this row
     // must not wait for it: a title that wraps overruns its box by far more
     // than a physical pixel, and the measured pair alone already says so.

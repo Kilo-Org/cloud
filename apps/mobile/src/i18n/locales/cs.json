@@ -5529,12 +5529,12 @@
     "emptyDescription": "Zkuste jiný název předvolby nebo klíčové slovo.",
     "resultsStatus": "Nalezené předvolby: {{resultCount}}",
     "keywords": {
-      "signOut": "odhlášení|odhlásit se",
-      "appearance": "motiv|barevné schéma|tmavý režim",
-      "appUnlock": "biometrie|obličej|otisk prstu",
-      "language": "jazyk|překlad",
-      "notifications": "upozornění|oznámení",
-      "privacy": "analytika|sledování"
+      "signOut": ["odhlášení", "odhlásit se"],
+      "appearance": ["motiv", "barevné schéma", "tmavý režim"],
+      "appUnlock": ["biometrie", "obličej", "otisk prstu"],
+      "language": ["jazyk", "překlad"],
+      "notifications": ["upozornění", "oznámení"],
+      "privacy": ["analytika", "sledování"]
     }
   }
 }

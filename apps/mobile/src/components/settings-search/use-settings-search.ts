@@ -2,6 +2,7 @@ import { type ParseKeys, type TFunction } from 'i18next';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type TextInput } from 'react-native';
+import { z } from 'zod';
 
 import { clearComposerInput } from '@/components/agents/composer-input-clear';
 import {
@@ -56,15 +57,22 @@ const CONTEXT_SEPARATOR = ' · ';
 const NO_RESULTS: readonly SettingsSearchResult[] = [];
 
 /**
- * Split one localized keyword entry (`biometrics|face ID|fingerprint`) into its
- * distinct terms.
+ * The translator owns the catalog value, so a keyword entry enters this module
+ * as untyped data; this is the boundary that decodes it into the list the
+ * matcher needs: the trimmed, non-empty, distinct terms of an array of strings,
+ * in catalog order, and no synonyms for any other shape.
+ */
+const KEYWORD_TERMS = z
+  .array(z.string())
+  .transform(terms => [...new Set(terms.map(term => term.trim()).filter(term => term.length > 0))]);
+
+/**
+ * The localized synonyms of one keyword, read from its catalog entry
+ * (`["biometrics", "face ID", "fingerprint"]`) as a list.
  */
 function keywordTerms(t: TFunction, keyword: SettingsKeyword): readonly string[] {
-  const terms = t(KEYWORD_COPY[keyword])
-    .split('|')
-    .map(term => term.trim())
-    .filter(term => term.length > 0);
-  return [...new Set(terms)];
+  const parsed = KEYWORD_TERMS.safeParse(t(KEYWORD_COPY[keyword], { returnObjects: true }));
+  return parsed.success ? parsed.data : [];
 }
 
 /** Resolve one keyword's synonyms once and share them with every setting that names it. */

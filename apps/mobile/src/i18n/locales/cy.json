@@ -5717,12 +5717,12 @@
     "emptyDescription": "Rhowch gynnig ar enw dewis neu allweddair gwahanol.",
     "resultsStatus": "Dewisiadau wedi'u canfod: {{resultCount}}",
     "keywords": {
-      "signOut": "allgofnodi|gadael cyfrif",
-      "appearance": "thema|cynllun lliwiau",
-      "appUnlock": "biometreg|adnabod wyneb|ôl bys",
-      "language": "iaith|cyfieithu",
-      "notifications": "rhybuddion|hysbysiadau gwthio",
-      "privacy": "dadansoddeg|olrhain"
+      "signOut": ["allgofnodi", "gadael cyfrif"],
+      "appearance": ["thema", "cynllun lliwiau"],
+      "appUnlock": ["biometreg", "adnabod wyneb", "ôl bys"],
+      "language": ["iaith", "cyfieithu"],
+      "notifications": ["rhybuddion", "hysbysiadau gwthio"],
+      "privacy": ["dadansoddeg", "olrhain"]
     }
   }
 }

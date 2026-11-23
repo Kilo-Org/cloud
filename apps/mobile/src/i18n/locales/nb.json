@@ -5341,12 +5341,12 @@
     "emptyDescription": "Prøv et annet innstillingsnavn eller søkeord.",
     "resultsStatus": "Innstillinger funnet: {{resultCount}}",
     "keywords": {
-      "signOut": "logg ut|utlogging",
-      "appearance": "tema|fargeskjema|farger",
-      "appUnlock": "biometri|ansiktsgjenkjenning|fingeravtrykk",
-      "language": "språk|oversettelse",
-      "notifications": "varsler|pushvarsler",
-      "privacy": "analyse|sporing"
+      "signOut": ["logg ut", "utlogging"],
+      "appearance": ["tema", "fargeskjema", "farger"],
+      "appUnlock": ["biometri", "ansiktsgjenkjenning", "fingeravtrykk"],
+      "language": ["språk", "oversettelse"],
+      "notifications": ["varsler", "pushvarsler"],
+      "privacy": ["analyse", "sporing"]
     }
   }
 }

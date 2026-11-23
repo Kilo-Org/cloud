@@ -16,8 +16,6 @@ const copy = vi.hoisted(() => {
     'settingsSearch.noMatches': 'No matching settings',
     'settingsSearch.emptyDescription': 'Try a different setting name or keyword.',
     'settingsSearch.resultsStatus': 'Settings found: {{resultCount}}',
-    'settingsSearch.keywords.appearance': 'theme|color scheme',
-    'settingsSearch.keywords.privacy': 'analytics|tracking',
     'common.preferences': 'Preferences',
     'preferences.appearance': 'Appearance',
     'preferences.appearanceSystem': 'System',
@@ -27,9 +25,19 @@ const copy = vi.hoisted(() => {
     'consent.helpImprove': 'Help improve Kilo',
     'preferences.hideThinking': 'Hide thinking details',
   };
-  return { values };
+  const keywords: Record<string, readonly string[]> = {
+    'settingsSearch.keywords.signOut': ['logout', 'log off'],
+    'settingsSearch.keywords.appearance': ['theme', 'color scheme'],
+    'settingsSearch.keywords.appUnlock': ['biometrics', 'face ID', 'fingerprint'],
+    'settingsSearch.keywords.language': ['locale', 'translation'],
+    'settingsSearch.keywords.notifications': ['alerts', 'push notifications'],
+    'settingsSearch.keywords.privacy': ['analytics', 'tracking'],
+  };
+  return { values, keywords };
 });
 const announce = vi.hoisted(() => vi.fn());
+
+type MockOptions = Readonly<{ resultCount?: number; returnObjects?: boolean }>;
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -41,9 +49,10 @@ vi.mock('react-native', () => ({
 vi.mock('react-i18next', () => {
   // One stable `t` per language, like the real hook: the index memo must not
   // rebuild on a keystroke because the translator identity changed.
-  const t = (key: string, options?: Readonly<{ resultCount?: number }>) => {
+  const t = (key: string, options?: MockOptions) => {
     if (key.startsWith('settingsSearch.keywords.')) {
       lookups.keyword[key] = (lookups.keyword[key] ?? 0) + 1;
+      return options?.returnObjects === true ? (copy.keywords[key] ?? key) : key;
     }
     const value = copy.values[key] ?? key;
     return options?.resultCount === undefined
@@ -137,15 +146,12 @@ function render(
 }
 
 function typeQuery(root: ReactTestInstance, text: string) {
-  const field = root.findByType('SearchField');
   act(() => {
-    (field.props.onChangeText as (next: string) => void)(text);
+    (root.findByType('SearchField').props.onChangeText as (next: string) => void)(text);
   });
 }
 
-function rows(root: ReactTestInstance) {
-  return root.findAll(node => Object.is(node.type, 'RowFrame'));
-}
+const rows = (root: ReactTestInstance) => root.findAll(node => Object.is(node.type, 'RowFrame'));
 
 beforeEach(() => {
   vi.useFakeTimers();

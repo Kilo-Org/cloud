@@ -5341,12 +5341,12 @@
     "emptyDescription": "Probeer een andere naam of een ander trefwoord.",
     "resultsStatus": "Gevonden voorkeuren: {{resultCount}}",
     "keywords": {
-      "signOut": "afmelden|uitloggen",
-      "appearance": "thema|kleurenschema|donkere modus",
-      "appUnlock": "biometrie|gezichtsherkenning|vingerafdruk",
-      "language": "taal|vertaling",
-      "notifications": "waarschuwingen|pushmeldingen",
-      "privacy": "analyse|volgen|gegevens"
+      "signOut": ["afmelden", "uitloggen"],
+      "appearance": ["thema", "kleurenschema", "donkere modus"],
+      "appUnlock": ["biometrie", "gezichtsherkenning", "vingerafdruk"],
+      "language": ["taal", "vertaling"],
+      "notifications": ["waarschuwingen", "pushmeldingen"],
+      "privacy": ["analyse", "volgen", "gegevens"]
     }
   }
 }

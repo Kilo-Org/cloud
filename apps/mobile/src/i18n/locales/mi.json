@@ -5341,12 +5341,12 @@
     "emptyDescription": "Whakamātauria tētahi atu ingoa manakohanga, kupu matua rānei.",
     "resultsStatus": "Ngā manakohanga i kitea: {{resultCount}}",
     "keywords": {
-      "signOut": "takiputa|puta atu",
-      "appearance": "āhua|kaupapa|huinga tae",
-      "appUnlock": "tautuhi koiora|kanohi|tā matimati",
-      "language": "reo|whakamāoritanga",
-      "notifications": "whakamōhiotanga|matohi",
-      "privacy": "tātaritanga|aroturuki|matatapu"
+      "signOut": ["takiputa", "puta atu"],
+      "appearance": ["āhua", "kaupapa", "huinga tae"],
+      "appUnlock": ["tautuhi koiora", "kanohi", "tā matimati"],
+      "language": ["reo", "whakamāoritanga"],
+      "notifications": ["whakamōhiotanga", "matohi"],
+      "privacy": ["tātaritanga", "aroturuki", "matatapu"]
     }
   }
 }

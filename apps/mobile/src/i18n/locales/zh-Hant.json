@@ -5341,12 +5341,12 @@
     "emptyDescription": "試試其他設定名稱或關鍵字。",
     "resultsStatus": "已找到 {{resultCount}} 項偏好設定",
     "keywords": {
-      "signOut": "登出|退出帳號",
-      "appearance": "主題|配色|深色模式",
-      "appUnlock": "生物辨識|臉部辨識|指紋",
-      "language": "語言|翻譯",
-      "notifications": "提醒|推播|通知",
-      "privacy": "分析|追蹤|隱私"
+      "signOut": ["登出", "退出帳號"],
+      "appearance": ["主題", "配色", "深色模式"],
+      "appUnlock": ["生物辨識", "臉部辨識", "指紋"],
+      "language": ["語言", "翻譯"],
+      "notifications": ["提醒", "推播", "通知"],
+      "privacy": ["分析", "追蹤", "隱私"]
     }
   }
 }

@@ -5529,12 +5529,12 @@
     "emptyDescription": "Pabandykite kitą nuostatos pavadinimą arba raktažodį.",
     "resultsStatus": "Rasta nuostatų: {{resultCount}}",
     "keywords": {
-      "signOut": "atsijungti|atsijungimas",
-      "appearance": "tema|spalvų schema",
-      "appUnlock": "biometriniai duomenys|veido atpažinimas|piršto atspaudas",
-      "language": "kalba|vertimas",
-      "notifications": "įspėjimai|tiesioginiai pranešimai",
-      "privacy": "analitika|sekimas"
+      "signOut": ["atsijungti", "atsijungimas"],
+      "appearance": ["tema", "spalvų schema"],
+      "appUnlock": ["biometriniai duomenys", "veido atpažinimas", "piršto atspaudas"],
+      "language": ["kalba", "vertimas"],
+      "notifications": ["įspėjimai", "tiesioginiai pranešimai"],
+      "privacy": ["analitika", "sekimas"]
     }
   }
 }

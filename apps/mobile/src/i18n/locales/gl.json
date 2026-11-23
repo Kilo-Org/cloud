@@ -5341,12 +5341,12 @@
     "emptyDescription": "Proba con outro nome de preferencia ou palabra clave.",
     "resultsStatus": "Preferencias atopadas: {{resultCount}}",
     "keywords": {
-      "signOut": "pechar sesión|saír|desconectar",
-      "appearance": "tema|esquema de cores",
-      "appUnlock": "biometría|recoñecemento facial|pegada dixital",
-      "language": "idioma|lingua|tradución",
-      "notifications": "avisos|alertas|notificacións",
-      "privacy": "analítica|seguimento"
+      "signOut": ["pechar sesión", "saír", "desconectar"],
+      "appearance": ["tema", "esquema de cores"],
+      "appUnlock": ["biometría", "recoñecemento facial", "pegada dixital"],
+      "language": ["idioma", "lingua", "tradución"],
+      "notifications": ["avisos", "alertas", "notificacións"],
+      "privacy": ["analítica", "seguimento"]
     }
   }
 }

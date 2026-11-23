@@ -5341,12 +5341,12 @@
     "emptyDescription": "別の設定名やキーワードで検索してください。",
     "resultsStatus": "見つかった設定：{{resultCount}}件",
     "keywords": {
-      "signOut": "サインアウト|ログアウト",
-      "appearance": "テーマ|配色",
-      "appUnlock": "生体認証|顔認証|指紋認証",
-      "language": "言語|翻訳",
-      "notifications": "通知|プッシュ通知",
-      "privacy": "データ分析|トラッキング|プライバシー"
+      "signOut": ["サインアウト", "ログアウト"],
+      "appearance": ["テーマ", "配色"],
+      "appUnlock": ["生体認証", "顔認証", "指紋認証"],
+      "language": ["言語", "翻訳"],
+      "notifications": ["通知", "プッシュ通知"],
+      "privacy": ["データ分析", "トラッキング", "プライバシー"]
     }
   }
 }

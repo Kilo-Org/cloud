@@ -5341,12 +5341,12 @@
     "emptyDescription": "Proovi mõnda muud eelistuse nime või märksõna.",
     "resultsStatus": "Leitud eelistusi: {{resultCount}}",
     "keywords": {
-      "signOut": "logi välja|väljalogimine",
-      "appearance": "teema|värviskeem",
-      "appUnlock": "biomeetria|näotuvastus|sõrmejälg",
-      "language": "keel|tõlge",
-      "notifications": "märguanded|tõuketeavitused",
-      "privacy": "analüütika|jälgimine"
+      "signOut": ["logi välja", "väljalogimine"],
+      "appearance": ["teema", "värviskeem"],
+      "appUnlock": ["biomeetria", "näotuvastus", "sõrmejälg"],
+      "language": ["keel", "tõlge"],
+      "notifications": ["märguanded", "tõuketeavitused"],
+      "privacy": ["analüütika", "jälgimine"]
     }
   }
 }

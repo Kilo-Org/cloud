@@ -5435,12 +5435,12 @@
     "emptyDescription": "Pokušaj sa drugim nazivom podešavanja ili ključnom reči.",
     "resultsStatus": "Pronađena podešavanja: {{resultCount}}",
     "keywords": {
-      "signOut": "odjava|odjavi se",
-      "appearance": "tema|šema boja",
-      "appUnlock": "biometrija|prepoznavanje lica|otisak prsta",
-      "language": "jezik|prevod",
-      "notifications": "upozorenja|obaveštenja",
-      "privacy": "analitika|praćenje"
+      "signOut": ["odjava", "odjavi se"],
+      "appearance": ["tema", "šema boja"],
+      "appUnlock": ["biometrija", "prepoznavanje lica", "otisak prsta"],
+      "language": ["jezik", "prevod"],
+      "notifications": ["upozorenja", "obaveštenja"],
+      "privacy": ["analitika", "praćenje"]
     }
   }
 }

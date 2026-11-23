@@ -46,7 +46,9 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  *
  * Each entry also carries the catalog's own policy. `baseKeyOf` names how a
  * consumer appends its part to a key. `englishCopyRules` lists the checks the
- * catalog's English copy must pass. `localeRegistry` names a hand-written
+ * catalog's English copy must pass. `documentRules` lists the checks the
+ * catalog's parsed JSON must pass, in English and in every locale, for a shape
+ * the flattened values cannot carry. `localeRegistry` names a hand-written
  * module the push runtime reads its catalogs from. `calledKeyOf` reads the key
  * one translate call names, `keyPrefixOf` the static head of a key built as a
  * template literal (null when the catalog builds none), and
@@ -65,6 +67,7 @@ function catalogsOf(root) {
         checkMobileEnglishIdentical,
         checkMobileLocaleEnglishCopy,
       ],
+      documentRules: [checkSettingsKeywordLists],
       calledKeyOf: mobileCalledKey,
       keyPrefixOf: null,
       collectsDestructiveKeys: true,
@@ -919,26 +922,28 @@ function parseCatalog(file, label) {
   const read = readAuditText(file, label, 'catalog');
   problems.push(...read.problems);
   if (read.text === null) {
-    return { catalog: null, problems };
+    return { catalog: null, document: null, problems };
   }
   const text = read.text;
   const { duplicates, readable } = scanCatalogKeys(text);
   if (!readable) {
     problems.push(`${label}: cannot audit catalog: its strings and braces do not balance`);
-    return { catalog: null, problems };
+    return { catalog: null, document: null, problems };
   }
   let catalog;
+  let document;
   try {
-    catalog = flattenCatalog(JSON.parse(text));
+    document = JSON.parse(text);
+    catalog = flattenCatalog(document);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     problems.push(`${label}: cannot audit catalog: ${message}`);
-    return { catalog: null, problems };
+    return { catalog: null, document: null, problems };
   }
   for (const key of duplicates) {
     problems.push(`${label}: duplicate key "${key}"`);
   }
-  return { catalog, problems };
+  return { catalog, document, problems };
 }
 
 /**
@@ -2749,6 +2754,7 @@ function checkCatalogLocales({
     if (translated === null) {
       continue;
     }
+    problems.push(...documentRuleProblems(catalog, label, parsed.document));
     localeValues.set(tag, translated);
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
@@ -2887,6 +2893,121 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
         `${catalogName}/${tag}: "${key}" is English; translate it, or list the value in NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS under "${tag}"`
       );
     }
+  }
+  return problems;
+}
+
+/**
+ * The ids `settingsSearch.keywords` carries, each with its own list of keyword
+ * strings. This mirrors the `SettingsKeyword` union in
+ * `apps/mobile/src/lib/settings-search/definitions.ts`; the checker is a plain
+ * module and cannot import a TypeScript type, so an id added to the union is
+ * added here too.
+ */
+const SETTINGS_KEYWORDS = [
+  'signOut',
+  'appearance',
+  'appUnlock',
+  'language',
+  'notifications',
+  'privacy',
+];
+
+/** Whether a parsed value is a plain object: an array and `null` are not. */
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** What a parsed value is, named the way the keyword rule reports it. */
+function shapeOf(value) {
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return 'a list';
+  }
+  return typeof value === 'object' ? 'an object' : `a ${typeof value}`;
+}
+
+/**
+ * Every `documentRules` check of one catalog against one parsed document, in
+ * emission order. A catalog whose parse failed carries no document, and the
+ * parse already reported it, so the rules are not run.
+ */
+function documentRuleProblems(catalog, label, document) {
+  const problems = [];
+  if (document === null) {
+    return problems;
+  }
+  for (const rule of catalog.documentRules ?? []) {
+    problems.push(...rule(document, label));
+  }
+  return problems;
+}
+
+/**
+ * `settingsSearch.keywords` holds one list of keyword strings per id, and the
+ * settings search reads a list with `returnObjects`. A catalog that stores the
+ * synonyms as one `|`-joined string, which is the shape this section replaced,
+ * hands the matcher a single unusable phrase — and the flattened catalog cannot
+ * show it, because `flattenCatalog` joins an array into one comma-joined
+ * string. So the rule reads the parsed document: the section is an object whose
+ * keys are exactly the six ids, and each value is a list of keyword strings with
+ * no edge padding and none of the removed `|` separator.
+ */
+function checkSettingsKeywordLists(document, label) {
+  const problems = [];
+  const section = isPlainObject(document) ? document.settingsSearch : undefined;
+  const lists = isPlainObject(section) ? section.keywords : undefined;
+  if (!isPlainObject(lists)) {
+    problems.push(
+      `${label}: "settingsSearch.keywords" is not a plain object holding one keyword list per id`
+    );
+    return problems;
+  }
+  for (const id of SETTINGS_KEYWORDS) {
+    const key = `settingsSearch.keywords.${id}`;
+    if (!Object.hasOwn(lists, id)) {
+      problems.push(`${label}: "${key}" is missing`);
+      continue;
+    }
+    const items = lists[id];
+    if (!Array.isArray(items)) {
+      problems.push(`${label}: "${key}" is not a list of keyword strings: found ${shapeOf(items)}`);
+      continue;
+    }
+    if (items.length === 0) {
+      problems.push(`${label}: "${key}" is an empty list`);
+      continue;
+    }
+    items.forEach((item, index) => {
+      if (typeof item !== 'string') {
+        problems.push(
+          `${label}: "${key}" has ${shapeOf(item)} at index ${index}, where a keyword string belongs`
+        );
+        return;
+      }
+      if (item.trim() === '') {
+        problems.push(`${label}: "${key}" has an empty keyword at index ${index}`);
+        return;
+      }
+      if (item !== item.trim()) {
+        problems.push(
+          `${label}: "${key}" has leading or trailing space in the keyword at index ${index}`
+        );
+        return;
+      }
+      if (item.includes('|')) {
+        problems.push(
+          `${label}: "${key}" keeps the removed "|" separator in the keyword at index ${index}`
+        );
+      }
+    });
+  }
+  for (const id of Object.keys(lists)
+    .filter(id => !SETTINGS_KEYWORDS.includes(id))
+    .sort()) {
+    problems.push(`${label}: "settingsSearch.keywords.${id}" is not one of the six keyword ids`);
   }
   return problems;
 }
@@ -3100,6 +3221,7 @@ export function checkCatalogs(root = ROOT) {
     const destructiveChecks = destructiveConfirmKeys(source, english);
 
     problems.push(...checkEnglishCatalog({ catalogName, english, englishValues }));
+    problems.push(...documentRuleProblems(catalog, `${catalogName}/en`, parsedEnglish.document));
 
     const locales = checkCatalogLocales({
       catalog,

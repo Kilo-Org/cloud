@@ -5341,12 +5341,12 @@
     "emptyDescription": "请尝试其他设置名称或关键词。",
     "resultsStatus": "已找到{{resultCount}}项偏好设置",
     "keywords": {
-      "signOut": "退出登录|登出",
-      "appearance": "主题|配色|外观",
-      "appUnlock": "生物识别|人脸|指纹",
-      "language": "语言|翻译",
-      "notifications": "提醒|推送|通知",
-      "privacy": "数据分析|跟踪|隐私"
+      "signOut": ["退出登录", "登出"],
+      "appearance": ["主题", "配色", "外观"],
+      "appUnlock": ["生物识别", "人脸", "指纹"],
+      "language": ["语言", "翻译"],
+      "notifications": ["提醒", "推送", "通知"],
+      "privacy": ["数据分析", "跟踪", "隐私"]
     }
   }
 }

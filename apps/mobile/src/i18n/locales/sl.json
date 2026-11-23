@@ -5529,12 +5529,12 @@
     "emptyDescription": "Poskusi z drugim imenom nastavitve ali ključno besedo.",
     "resultsStatus": "Najdene nastavitve: {{resultCount}}",
     "keywords": {
-      "signOut": "odjava|odjavi se",
-      "appearance": "tema|barvna shema",
-      "appUnlock": "biometrija|prepoznavanje obraza|prstni odtis",
-      "language": "jezik|prevod",
-      "notifications": "opozorila|potisna obvestila",
-      "privacy": "analitika|sledenje"
+      "signOut": ["odjava", "odjavi se"],
+      "appearance": ["tema", "barvna shema"],
+      "appUnlock": ["biometrija", "prepoznavanje obraza", "prstni odtis"],
+      "language": ["jezik", "prevod"],
+      "notifications": ["opozorila", "potisna obvestila"],
+      "privacy": ["analitika", "sledenje"]
     }
   }
 }

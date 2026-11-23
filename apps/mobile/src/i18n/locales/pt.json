@@ -5529,12 +5529,12 @@
     "emptyDescription": "Experimente outro nome de preferência ou palavra-chave.",
     "resultsStatus": "Preferências encontradas: {{resultCount}}",
     "keywords": {
-      "signOut": "sair|terminar sessão",
-      "appearance": "tema|cores|modo escuro",
-      "appUnlock": "biometria|rosto|impressão digital",
-      "language": "idioma|língua|tradução",
-      "notifications": "alertas|avisos|notificações",
-      "privacy": "análise de dados|rastreio|privacidade"
+      "signOut": ["sair", "terminar sessão"],
+      "appearance": ["tema", "cores", "modo escuro"],
+      "appUnlock": ["biometria", "rosto", "impressão digital"],
+      "language": ["idioma", "língua", "tradução"],
+      "notifications": ["alertas", "avisos", "notificações"],
+      "privacy": ["análise de dados", "rastreio", "privacidade"]
     }
   }
 }

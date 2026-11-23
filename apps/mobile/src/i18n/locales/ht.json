@@ -5341,12 +5341,12 @@
     "emptyDescription": "Eseye yon lòt non preferans oswa mo kle.",
     "resultsStatus": "Preferans yo jwenn: {{resultCount}}",
     "keywords": {
-      "signOut": "dekonekte|soti|fèmen sesyon",
-      "appearance": "tèm|koulè|mòd nwa",
-      "appUnlock": "byometri|figi|anprent",
-      "language": "lang|tradiksyon",
-      "notifications": "alèt|notifikasyon",
-      "privacy": "analiz|swivi|konfidansyalite"
+      "signOut": ["dekonekte", "soti", "fèmen sesyon"],
+      "appearance": ["tèm", "koulè", "mòd nwa"],
+      "appUnlock": ["byometri", "figi", "anprent"],
+      "language": ["lang", "tradiksyon"],
+      "notifications": ["alèt", "notifikasyon"],
+      "privacy": ["analiz", "swivi", "konfidansyalite"]
     }
   }
 }

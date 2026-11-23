@@ -192,6 +192,11 @@ export function providerPrFileStatus(raw: string | null | undefined): ProviderPr
  * file is binary, the provider dropped an oversized patch, the read's endpoint
  * carries no patch at all, or the file changed without changing its content
  * (a mode or rename-only change), so there is nothing to diff.
+ *
+ * There is deliberately no `empty` cause. A provider reports an empty added or
+ * deleted file with the same zero line counts as a newly added binary asset,
+ * so one wire shape covers both and naming either would be a false cause for
+ * the other.
  */
 export type ProviderPrFilePatchMissingCause =
   | 'binary'

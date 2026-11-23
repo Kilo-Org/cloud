@@ -193,14 +193,12 @@ function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
           ? 'renamed'
           : 'modified'
   );
-  // GitLab sends a blank diff for a change with no content and a one-line
-  // placeholder for a binary file. The placeholder is tested FIRST: a file that
-  // is both renamed and binary-with-changes carries it, and treating its rename
-  // flag as "no content change" would say the opposite of the placeholder. Only
-  // a blank diff on a rename-only entry is unchanged.
-  const patchMissingCause = isBinaryPlaceholderDiff(diff.diff)
+  // `requestGitLabJson` casts the response without validating it, so `diff` may
+  // be absent; the guard keeps one such file from failing the whole page.
+  const patch = diff.diff ?? '';
+  const patchMissingCause = isBinaryPlaceholderDiff(patch)
     ? 'binary'
-    : diff.diff
+    : patch
       ? null
       : diff.renamed_file && !diff.new_file && !diff.deleted_file
         ? 'content_unchanged'

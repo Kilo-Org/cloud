@@ -355,6 +355,10 @@ type PullRequestFileInput = {
  * content change has no hunks. GitHub also reports a binary file with zero
  * line counts, which is the only signal that separates it from a dropped
  * oversized patch on a file whose counts are non-zero.
+ *
+ * An added or deleted EMPTY file is indistinguishable here: GitHub reports it
+ * with the same zero counts and no patch as a newly added binary asset, so the
+ * zero-count arm cannot name it without mislabelling every new image.
  */
 function githubPatchMissingCause(
   file: PullRequestFileInput,

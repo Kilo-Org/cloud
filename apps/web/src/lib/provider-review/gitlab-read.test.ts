@@ -525,6 +525,37 @@ describe('listChangedFiles', () => {
     });
   });
 
+  it('labels a file whose diff field is absent instead of failing the page', async () => {
+    // `requestGitLabJson` casts the response without validating it, so a body
+    // that omits `diff` reaches the mapper as undefined; one such file must not
+    // take the whole files page down.
+    fetchMock.mockImplementation((url: string) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/diffs')) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              old_path: 'src/absent.ts',
+              new_path: 'src/absent.ts',
+              new_file: false,
+              renamed_file: false,
+              deleted_file: false,
+            },
+          ])
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files[0]).toMatchObject({
+      path: 'src/absent.ts',
+      patch: null,
+      patchMissingCause: 'binary',
+    });
+  });
+
   it('arrives a GitLab `deleted` diff as the shared `removed` status', async () => {
     fetchMock.mockImplementation((url: string) => {
       const path = new URL(url).pathname;

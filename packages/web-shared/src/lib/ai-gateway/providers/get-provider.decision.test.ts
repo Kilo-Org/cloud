@@ -398,6 +398,84 @@ describe('getProvider routing decision', () => {
     });
   });
 
+  describe('with the caller’s stored keys supplied', () => {
+    async function setUpCatalogKey() {
+      const user = await insertTestUser();
+      await insertKeys(user, [{ providerId: 'zai-coding', catalogMode: true }]);
+      jest
+        .mocked(findDirectByokCatalogModels)
+        .mockResolvedValue([catalogModel('zai-coding', ['chat_completions'])]);
+      return user;
+    }
+
+    test('routes from them without reading the keys again', async () => {
+      const user = await setUpCatalogKey();
+      const stored = await jest
+        .requireActual<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok')
+        .getStoredByokKeys(db, { type: 'user', id: user.id });
+      jest.mocked(getStoredByokKeys).mockClear();
+      const loadStoredByokKeys = jest.fn(async () => stored);
+
+      const result = await getProvider(
+        getProviderInput({
+          requestedModel: MODEL,
+          request: request('chat_completions'),
+          user,
+          organizationId: undefined,
+          loadStoredByokKeys,
+        })
+      );
+
+      expect(await onlyRoute(result)).toMatchObject({
+        provider: { type: 'direct-byok' },
+        userByok: [{ providerId: 'zai-coding' }],
+      });
+      expect(loadStoredByokKeys).toHaveBeenCalledTimes(1);
+      expect(getStoredByokKeys).not.toHaveBeenCalled();
+    });
+
+    test('routes by the supplied keys, not the stored rows', async () => {
+      const user = await setUpCatalogKey();
+      jest.mocked(getStoredByokKeys).mockClear();
+      const loadStoredByokKeys = jest.fn(async () => ({
+        keys: [],
+        decrypt: async (providerId: UserByokProviderId) => {
+          throw new Error(`No enabled BYOK key for ${providerId}`);
+        },
+      }));
+
+      const result = await getProvider(
+        getProviderInput({
+          requestedModel: MODEL,
+          request: request('chat_completions'),
+          user,
+          organizationId: undefined,
+          loadStoredByokKeys,
+        })
+      );
+
+      expect((await onlyRoute(result)).userByok).toBeNull();
+      expect(getStoredByokKeys).not.toHaveBeenCalled();
+    });
+
+    test('reads the keys itself, once, when none are supplied', async () => {
+      const user = await setUpCatalogKey();
+      jest.mocked(getStoredByokKeys).mockClear();
+
+      const result = await getProvider(
+        getProviderInput({
+          requestedModel: MODEL,
+          request: request('chat_completions'),
+          user,
+          organizationId: undefined,
+        })
+      );
+
+      expect(await onlyRoute(result)).toMatchObject({ userByok: [{ providerId: 'zai-coding' }] });
+      expect(getStoredByokKeys).toHaveBeenCalledTimes(1);
+    });
+  });
+
   test('records a catalog key that serves ahead of a lower-ranked provider key', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [

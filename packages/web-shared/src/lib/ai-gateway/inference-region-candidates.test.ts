@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import {
-  getEnabledByokProviders,
   getModelUserByokProviders,
-  type ByokOwner,
+  type EnabledByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
@@ -44,7 +43,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVerc
 });
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/byok'),
-  getEnabledByokProviders: jest.fn(async () => []),
   getModelUserByokProviders: jest.fn(async () => []),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
@@ -66,8 +64,9 @@ jest.mock(
 const IN_REGION = 'anthropic/claude-sonnet-4.6';
 const OUT_OF_REGION = 'openai/gpt-5';
 const UNLISTED = 'vendor/unlisted-model';
-const owner: ByokOwner = { type: 'organization', id: 'org-1' };
 const policy = { policyRevision: 1 } as EffectiveOrganizationModelPolicy;
+
+const loadByokKeys = jest.fn(async (): Promise<readonly EnabledByokProvider[]> => []);
 
 type IneligibleParams = Parameters<typeof inferenceRegionIneligibleCandidates>[0];
 
@@ -97,11 +96,11 @@ const vercelRegions: Record<string, OrganizationDataRegion[]> = {
 };
 
 function enableByokKeys(...providerIds: string[]) {
-  jest
-    .mocked(getEnabledByokProviders)
-    .mockResolvedValue(
-      providerIds.map(providerId => ({ providerId, serveCatalogModels: false })) as never
-    );
+  loadByokKeys.mockResolvedValue(
+    providerIds.map(
+      providerId => ({ providerId, serveCatalogModels: false }) as EnabledByokProvider
+    )
+  );
 }
 
 beforeEach(() => {
@@ -113,7 +112,7 @@ beforeEach(() => {
       const regions = vercelRegions[vercelModelId];
       return regions ? new Set(regions) : null;
     });
-  jest.mocked(getEnabledByokProviders).mockReset().mockResolvedValue([]);
+  loadByokKeys.mockReset().mockResolvedValue([]);
   jest.mocked(getModelUserByokProviders).mockReset().mockResolvedValue([]);
   jest.mocked(getCatalogModeModelIds).mockReset().mockResolvedValue(new Set());
   jest.mocked(getEffectiveModelDecision).mockReset().mockResolvedValue({ allowed: true });
@@ -127,7 +126,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
       ineligible({
         region: 'eu',
         candidateIds: [IN_REGION],
-        byokOwner: null,
+        loadByokKeys: null,
       })
     ).resolves.toEqual([]);
   });
@@ -137,7 +136,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
       ineligible({
         region: 'eu',
         candidateIds: [IN_REGION, OUT_OF_REGION],
-        byokOwner: null,
+        loadByokKeys: null,
       })
     ).resolves.toEqual([OUT_OF_REGION]);
   });
@@ -147,7 +146,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
       ineligible({
         region: 'eu',
         candidateIds: [UNLISTED],
-        byokOwner: null,
+        loadByokKeys: null,
       })
     ).resolves.toEqual([UNLISTED]);
   });
@@ -157,7 +156,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
       ineligible({
         region: 'eu',
         candidateIds: ['z-ai/glm-5.2'],
-        byokOwner: null,
+        loadByokKeys: null,
       })
     ).resolves.toEqual([]);
     expect(getCachedVercelInferenceRegionsForModel).toHaveBeenCalledWith('zai/glm-5.2');
@@ -170,7 +169,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
       ineligible({
         region: 'eu',
         candidateIds: ['acme/custom', IN_REGION],
-        byokOwner: null,
+        loadByokKeys: null,
       })
     ).resolves.toEqual(['acme/custom']);
   });
@@ -180,16 +179,14 @@ describe('inferenceRegionIneligibleCandidates', () => {
       ineligible({
         region: 'eu',
         candidateIds: ['kilo-auto/balanced', 'kilo-auto/free', OUT_OF_REGION, OUT_OF_REGION],
-        byokOwner: null,
+        loadByokKeys: null,
       })
     ).resolves.toEqual([OUT_OF_REGION]);
     expect(getCachedVercelInferenceRegionsForModel).toHaveBeenCalledTimes(1);
   });
 
   it('returns nothing for no candidates', async () => {
-    await expect(ineligible({ region: 'eu', candidateIds: [], byokOwner: owner })).resolves.toEqual(
-      []
-    );
+    await expect(ineligible({ region: 'eu', candidateIds: [], loadByokKeys })).resolves.toEqual([]);
   });
 
   describe('with BYOK', () => {
@@ -203,13 +200,13 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: [OUT_OF_REGION, UNLISTED],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual([UNLISTED]);
-      expect(getEnabledByokProviders).toHaveBeenCalledWith(expect.anything(), owner);
+      expect(loadByokKeys).toHaveBeenCalledTimes(1);
     });
 
-    it('denies the same model when no BYOK owner is given', async () => {
+    it('denies the same model when no key loader is given', async () => {
       enableByokKeys('openai');
       jest.mocked(getModelUserByokProviders).mockResolvedValue(['openai']);
 
@@ -217,10 +214,9 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: [OUT_OF_REGION],
-          byokOwner: null,
+          loadByokKeys: null,
         })
       ).resolves.toEqual([OUT_OF_REGION]);
-      expect(getEnabledByokProviders).not.toHaveBeenCalled();
     });
 
     it('does not look up BYOK when every candidate is in the region', async () => {
@@ -230,10 +226,22 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: [IN_REGION],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual([]);
-      expect(getEnabledByokProviders).not.toHaveBeenCalled();
+      expect(loadByokKeys).not.toHaveBeenCalled();
+    });
+
+    it('loads the keys once for several out-of-region candidates', async () => {
+      enableByokKeys('openai');
+
+      await ineligible({
+        region: 'eu',
+        candidateIds: [OUT_OF_REGION, UNLISTED, 'vendor/other-unlisted', IN_REGION],
+        loadByokKeys,
+      });
+
+      expect(loadByokKeys).toHaveBeenCalledTimes(1);
     });
 
     it('denies an out-of-region model when the owner has no enabled keys', async () => {
@@ -241,7 +249,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: [OUT_OF_REGION],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual([OUT_OF_REGION]);
       expect(getModelUserByokProviders).not.toHaveBeenCalled();
@@ -255,7 +263,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: [OUT_OF_REGION],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual([OUT_OF_REGION]);
     });
@@ -268,11 +276,11 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: ['moonshotai/kimi-k2.6', UNLISTED],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual([UNLISTED]);
       expect(getCatalogModeModelIds).toHaveBeenCalledTimes(1);
-      expect(getEnabledByokProviders).toHaveBeenCalledTimes(1);
+      expect(loadByokKeys).toHaveBeenCalledTimes(1);
     });
 
     it('denies a custom LLM that shares its id with a catalog-mode key’s catalog model', async () => {
@@ -286,7 +294,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: ['moonshotai/kimi-k2.6'],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual(['moonshotai/kimi-k2.6']);
     });
@@ -304,7 +312,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: ['synthetic/hf:vendor/model'],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual(['synthetic/hf:vendor/model']);
     });
@@ -322,7 +330,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: ['synthetic/hf:vendor/model'],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual(expectedDenied);
     });
@@ -336,7 +344,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
         ineligible({
           region: 'eu',
           candidateIds: ['acme/custom'],
-          byokOwner: owner,
+          loadByokKeys,
         })
       ).resolves.toEqual(['acme/custom']);
     });
@@ -353,7 +361,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
           ineligible({
             region: 'eu',
             candidateIds: ['moonshotai/kimi-k2.6', 'z-ai/glm-5.2'],
-            byokOwner: owner,
+            loadByokKeys,
             policy,
           })
         ).resolves.toEqual(['moonshotai/kimi-k2.6']);
@@ -373,7 +381,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
           ineligible({
             region: 'eu',
             candidateIds: ['moonshotai/kimi-k2.6'],
-            byokOwner: owner,
+            loadByokKeys,
             policy: null,
           })
         ).resolves.toEqual([]);
@@ -398,7 +406,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
             ineligible({
               region: 'eu',
               candidateIds: ['synthetic/hf:vendor/model'],
-              byokOwner: owner,
+              loadByokKeys,
               policy,
             })
           ).resolves.toEqual(expectedDenied);
@@ -426,7 +434,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
             ineligible({
               region: 'eu',
               candidateIds: [OUT_OF_REGION],
-              byokOwner: owner,
+              loadByokKeys,
               policy,
             })
           ).resolves.toEqual(expectedDenied);
@@ -439,7 +447,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
         jest.mocked(getModelUserByokProviders).mockResolvedValue(['openai']);
 
         await expect(
-          ineligible({ region: 'eu', candidateIds: [OUT_OF_REGION], byokOwner: owner, policy })
+          ineligible({ region: 'eu', candidateIds: [OUT_OF_REGION], loadByokKeys, policy })
         ).resolves.toEqual([]);
       });
 
@@ -451,7 +459,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
           .mockResolvedValue({ allowed: false, denialSource: 'no_grant' });
 
         await expect(
-          ineligible({ region: 'eu', candidateIds: [OUT_OF_REGION], byokOwner: owner, policy })
+          ineligible({ region: 'eu', candidateIds: [OUT_OF_REGION], loadByokKeys, policy })
         ).resolves.toEqual([OUT_OF_REGION]);
       });
     });

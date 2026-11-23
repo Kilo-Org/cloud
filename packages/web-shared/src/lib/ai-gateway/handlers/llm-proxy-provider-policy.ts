@@ -18,7 +18,10 @@ import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  isInferenceProviderUserByok,
+  type StoredByokKeys,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { CustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
@@ -94,6 +97,8 @@ type ProviderPolicyInput = {
    * prove no provider call. A raw provider 402 never passes here.
    */
   markPayerRefusal?: (reason: 'payment_refused' | 'payer_unavailable') => NextResponseType<unknown>;
+  /** The caller's stored keys, read at most once per request (see `GetProviderInput`). */
+  loadStoredByokKeys?: () => Promise<StoredByokKeys>;
 };
 
 type ProviderPolicyResult =
@@ -219,6 +224,7 @@ export async function resolveProviderAndPolicy(
     openRouterDisabled: organizationGatewaySettings.openRouterDisabled,
     managedRoutesOnly: input.managedRoutesOnly,
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
+    loadStoredByokKeys: input.loadStoredByokKeys,
   });
   if (getProviderResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably

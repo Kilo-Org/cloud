@@ -336,6 +336,21 @@ export async function getStoredByokKeys(
   };
 }
 
+/** The stored keys of a caller without a BYOK owner, such as an anonymous one. */
+export const NO_STORED_BYOK_KEYS: StoredByokKeys = {
+  keys: [],
+  async decrypt(providerId) {
+    throw new Error(`No enabled BYOK key for ${providerId}`);
+  },
+};
+
+/** The enabled keys among `stored`, in the order it lists them. */
+export function enabledStoredByokKeys(stored: StoredByokKeys): EnabledByokProvider[] {
+  return stored.keys.flatMap(({ providerId, serveCatalogModels, isEnabled }) =>
+    isEnabled ? [{ providerId, serveCatalogModels }] : []
+  );
+}
+
 export async function getUserByokProviderIds(
   fromDb: ByokSourceDb,
   userId: string

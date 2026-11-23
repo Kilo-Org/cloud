@@ -1,11 +1,9 @@
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
-  getEnabledByokProviders,
   getModelUserByokProviders,
-  type ByokOwner,
+  type EnabledByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 import {
@@ -50,11 +48,10 @@ async function allowedProvidersForModel(
  * ChatGPT subscriptions and Claude billing connections are not considered.
  */
 async function candidatesServedByOwnerByok(
-  owner: ByokOwner,
+  keys: readonly EnabledByokProvider[],
   policy: EffectiveOrganizationModelPolicy | null,
   candidateIds: ReadonlyArray<string>
 ): Promise<ReadonlySet<string>> {
-  const keys = await getEnabledByokProviders(readDb, owner);
   if (keys.length === 0) return new Set();
   const enabledProviderIds = new Set(keys.map(key => key.providerId));
   const isProviderKeyAllowed = async (modelId: string, policyProviderId: string) =>
@@ -85,22 +82,28 @@ async function candidatesServedByOwnerByok(
 /**
  * The candidates an organization's inference region rules out: a model no Kilo-paid route can serve
  * pinned to the region (see `isModelServableInInferenceRegion`) fails unless the owner's own BYOK
- * key serves it. Auto routing denies these so it never picks a model the request then fails on. Without `byokOwner`, BYOK keys are not considered; `policy` is
- * the member's organization model policy, which decides which keys routing may use.
+ * key serves it. Auto routing denies these so it never picks a model the request then fails on.
+ * `loadByokKeys` returns the owner's enabled keys and is called only when a candidate is outside
+ * the region; without it, BYOK keys are not considered. `policy` is the member's organization
+ * model policy, which decides which keys routing may use.
  */
 export async function inferenceRegionIneligibleCandidates(params: {
   region: OrganizationDataRegion;
   candidateIds: ReadonlyArray<string>;
-  byokOwner: ByokOwner | null;
+  loadByokKeys: (() => Promise<readonly EnabledByokProvider[]>) | null;
   policy: EffectiveOrganizationModelPolicy | null;
 }): Promise<string[]> {
-  const { region, byokOwner, policy } = params;
+  const { region, loadByokKeys, policy } = params;
   const candidateIds = [...new Set(params.candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const eligible = await Promise.all(
     candidateIds.map(modelId => isModelServableInInferenceRegion(modelId, region))
   );
   const outsideRegion = candidateIds.filter((_modelId, index) => !eligible[index]);
-  if (outsideRegion.length === 0 || !byokOwner) return outsideRegion;
-  const servedByByok = await candidatesServedByOwnerByok(byokOwner, policy, outsideRegion);
+  if (outsideRegion.length === 0 || !loadByokKeys) return outsideRegion;
+  const servedByByok = await candidatesServedByOwnerByok(
+    await loadByokKeys(),
+    policy,
+    outsideRegion
+  );
   return outsideRegion.filter(modelId => !servedByByok.has(modelId));
 }

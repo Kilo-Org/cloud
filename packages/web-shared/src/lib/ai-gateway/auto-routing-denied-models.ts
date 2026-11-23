@@ -7,7 +7,7 @@ import { organizations } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { byokOwner, getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { getOrganizationGatewaySettings } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
@@ -202,7 +202,8 @@ async function inferenceRegionDeniedCandidatesForMember(
   return inferenceRegionIneligibleCandidates({
     region: dataRegion,
     candidateIds,
-    byokOwner: byokOwner(request.userId, request.organizationId),
+    loadByokKeys: () =>
+      getEnabledByokProviders(readDb, byokOwner(request.userId, request.organizationId)),
     policy,
   });
 }

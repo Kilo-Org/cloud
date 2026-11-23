@@ -83,6 +83,10 @@ import {
   collectDeniedAutoRoutingModelIds,
   deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
+import {
+  getStoredByokKeys,
+  type EnabledByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
 import type * as AutoRoutingDeniedModelsModule from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
@@ -251,8 +255,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => null),
   supportsCatalogMode: jest.fn(() => false),
-  createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
+  createDirectByokReferenceResolver: jest.fn(() => async (modelId: string) => modelId),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => {
+  const actual = jest.requireActual<Record<string, unknown> & { NO_STORED_BYOK_KEYS: unknown }>(
+    '@kilocode/web-shared/lib/ai-gateway/byok'
+  );
+  return { ...actual, getStoredByokKeys: jest.fn(async () => actual.NO_STORED_BYOK_KEYS) };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
@@ -427,6 +437,24 @@ const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedSupportsCatalogMode = jest.mocked(supportsCatalogMode);
 const mockedCreateDirectByokReferenceResolver = jest.mocked(createDirectByokReferenceResolver);
+const mockedGetStoredByokKeys = jest.mocked(getStoredByokKeys);
+
+function storedKeys(
+  keys: ReadonlyArray<{
+    providerId: string;
+    serveCatalogModels?: boolean;
+    isEnabled?: boolean;
+  }>
+): Awaited<ReturnType<typeof getStoredByokKeys>> {
+  return {
+    keys: keys.map(({ providerId, serveCatalogModels = false, isEnabled = true }) => ({
+      providerId,
+      serveCatalogModels,
+      isEnabled,
+    })) as never,
+    decrypt: async providerId => ({ decryptedAPIKey: 'key', providerId }),
+  };
+}
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
 const mockedLogUnrewrittenResponse = jest.mocked(logUnrewrittenResponse);
 const mockedGetDynamicRequestLoggingMode = jest.mocked(getDynamicRequestLoggingMode);
@@ -3548,7 +3576,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     jest.clearAllMocks();
     mockedGetDirectByokModel.mockResolvedValue(null);
     mockedSupportsCatalogMode.mockReturnValue(false);
-    mockedCreateDirectByokReferenceResolver.mockResolvedValue(async modelId => modelId);
+    mockedCreateDirectByokReferenceResolver.mockReturnValue(async modelId => modelId);
     setUserAuth();
 
     mockedGetProvider.mockResolvedValue(
@@ -3961,7 +3989,10 @@ describe('kilo-auto/efficient classifier billing', () => {
       model: {} as never,
     });
     mockedSupportsCatalogMode.mockReturnValue(true);
-    mockedCreateDirectByokReferenceResolver.mockResolvedValue(async () => 'moonshotai/kimi-k2.6');
+    mockedGetStoredByokKeys.mockResolvedValue(
+      storedKeys([{ providerId: 'synthetic', serveCatalogModels: true }])
+    );
+    mockedCreateDirectByokReferenceResolver.mockReturnValue(async () => 'moonshotai/kimi-k2.6');
     mockedIsModelAllowedForProviderKey.mockResolvedValueOnce(false);
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
@@ -3983,10 +4014,14 @@ describe('kilo-auto/efficient classifier billing', () => {
       makeRequest(makeBody('kilo-auto/efficient')) as never
     );
 
-    expect(mockedCreateDirectByokReferenceResolver).toHaveBeenCalledWith({
+    expect(mockedGetStoredByokKeys).toHaveBeenCalledTimes(1);
+    expect(mockedGetStoredByokKeys).toHaveBeenCalledWith(expect.anything(), {
       type: 'organization',
       id: 'org-1',
     });
+    expect(mockedCreateDirectByokReferenceResolver).toHaveBeenCalledWith([
+      { providerId: 'synthetic', serveCatalogModels: true },
+    ]);
     expect(mockedGetProvider).toHaveBeenCalledWith(
       expect.objectContaining({ requestedModel: 'moonshotai/kimi-k2.6' })
     );
@@ -5080,6 +5115,7 @@ describe('auto routing with an organization inference region', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedGetStoredByokKeys.mockResolvedValue(storedKeys([]));
     setUserAuth();
     mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     mockedGetProvider.mockResolvedValue(
@@ -5147,7 +5183,7 @@ describe('auto routing with an organization inference region', () => {
     expect(mockedInferenceRegionIneligibleCandidates).toHaveBeenCalledWith({
       region: 'eu',
       candidateIds: [inRegionModel, outOfRegionModel],
-      byokOwner: regionOwner,
+      loadByokKeys: expect.any(Function),
       policy: groupPolicy,
     });
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledTimes(1);
@@ -5210,7 +5246,7 @@ describe('auto routing with an organization inference region', () => {
     expect(mockedInferenceRegionIneligibleCandidates).toHaveBeenCalledWith({
       region: 'eu',
       candidateIds: [inRegionModel, outOfRegionModel],
-      byokOwner: regionOwner,
+      loadByokKeys: expect.any(Function),
       policy: groupPolicy,
     });
     expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
@@ -5243,7 +5279,7 @@ describe('auto routing with an organization inference region', () => {
     expect(mockedInferenceRegionIneligibleCandidates).toHaveBeenCalledWith({
       region: 'eu',
       candidateIds: [`${outOfRegionModel}:free`],
-      byokOwner: null,
+      loadByokKeys: null,
       policy: null,
     });
   });
@@ -5298,7 +5334,7 @@ describe('auto routing with an organization inference region', () => {
       expect(mockedInferenceRegionIneligibleCandidates).toHaveBeenCalledWith({
         region: 'eu',
         candidateIds: [outOfRegionModel],
-        byokOwner: regionOwner,
+        loadByokKeys: expect.any(Function),
         policy: groupPolicy,
       });
       expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(PRIMARY_DEFAULT_MODEL);
@@ -5352,6 +5388,145 @@ describe('auto routing with an organization inference region', () => {
     await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
 
     expect(mockedInferenceRegionIneligibleCandidates.mock.calls[0]?.[0].policy).toBe(groupPolicy);
+  });
+
+  describe('reading the caller’s stored BYOK keys', () => {
+    const keys = [
+      { providerId: 'openai', serveCatalogModels: false },
+      { providerId: 'anthropic', serveCatalogModels: true, isEnabled: false },
+      { providerId: 'moonshotai', serveCatalogModels: true },
+    ] as const;
+
+    /** Stands in for the real region check and `getProvider`, which both load the keys on demand. */
+    function consultKeysLikeRouting() {
+      mockedGetStoredByokKeys.mockResolvedValue(storedKeys(keys));
+      const keysSeenByRegionCheck: Array<readonly EnabledByokProvider[]> = [];
+      mockedInferenceRegionIneligibleCandidates.mockImplementation(
+        async ({ candidateIds, loadByokKeys }) => {
+          const outside = candidateIds.filter(modelId => modelId !== inRegionModel);
+          if (outside.length > 0) keysSeenByRegionCheck.push(await loadByokKeys!());
+          return outside;
+        }
+      );
+      const keysSeenByProviderSelection: Array<readonly unknown[]> = [];
+      mockedGetProvider.mockImplementation(async input => {
+        keysSeenByProviderSelection.push((await input.loadStoredByokKeys?.())?.keys ?? []);
+        return providerResult({
+          provider: vercelProvider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        });
+      });
+      return { keysSeenByRegionCheck, keysSeenByProviderSelection };
+    }
+
+    it('reads them once across model resolution and provider selection of an auto request', async () => {
+      regionEnabled();
+      const { keysSeenByRegionCheck, keysSeenByProviderSelection } = consultKeysLikeRouting();
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+      expect(response.status).toBe(200);
+      // Candidates outside the region made the region check load the keys, and routing did too.
+      expect(keysSeenByRegionCheck).toHaveLength(1);
+      expect(keysSeenByProviderSelection).toHaveLength(1);
+      expect(mockedGetStoredByokKeys).toHaveBeenCalledTimes(1);
+      expect(mockedGetStoredByokKeys).toHaveBeenCalledWith(expect.anything(), regionOwner);
+      expect(keysSeenByRegionCheck[0]).toEqual([
+        { providerId: 'openai', serveCatalogModels: false },
+        { providerId: 'moonshotai', serveCatalogModels: true },
+      ]);
+    });
+
+    it('reads them once when the region check runs several times', async () => {
+      regionEnabled();
+      const { keysSeenByRegionCheck } = consultKeysLikeRouting();
+      // The classifier picks a model outside the region after the denials were computed.
+      mockedFetchEfficientAutoDecision.mockResolvedValue({
+        decision: {
+          model: outOfRegionModel,
+          taskType: 'implementation',
+          subtaskType: 'feature_development',
+          source: 'benchmark',
+          tableVersion: 'v1',
+          sticky: false,
+        },
+        costUsd: 0,
+      });
+
+      await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+      expect(keysSeenByRegionCheck.length).toBeGreaterThan(1);
+      expect(mockedGetStoredByokKeys).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads them once for a custom router and the provider selection', async () => {
+      regionEnabled();
+      useActualResolution();
+      consultKeysLikeRouting();
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('kilo-auto/custom/regional'))
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedGetStoredByokKeys).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads them once for a non-auto request, though provider selection asks twice', async () => {
+      regionEnabled();
+      const { keysSeenByRegionCheck, keysSeenByProviderSelection } = consultKeysLikeRouting();
+      mockedGetProvider.mockImplementation(async input => {
+        await input.loadStoredByokKeys?.();
+        await input.loadStoredByokKeys?.();
+        return providerResult({
+          provider: vercelProvider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        });
+      });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(inRegionModel)));
+
+      expect(response.status).toBe(200);
+      expect(keysSeenByRegionCheck).toHaveLength(0);
+      expect(keysSeenByProviderSelection).toHaveLength(0);
+      expect(mockedGetStoredByokKeys).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads none when nothing consults them', async () => {
+      regionEnabled();
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(inRegionModel)));
+
+      expect(response.status).toBe(200);
+      expect(mockedGetProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ loadStoredByokKeys: expect.any(Function) })
+      );
+      expect(mockedGetStoredByokKeys).not.toHaveBeenCalled();
+    });
+
+    it('does not read a stored key for a caller that is not signed in', async () => {
+      setAnonymousAuth();
+      mockedGetProvider.mockImplementation(async input => {
+        expect((await input.loadStoredByokKeys?.())?.keys).toEqual([]);
+        return providerResult({
+          provider,
+          userByok: null,
+          isFree: true,
+          bypassAccessCheck: false,
+        });
+      });
+
+      await handleLlmProxyRequest(
+        makeRequest(makeBody('test/free-model:free'), { authorization: 'Bearer anonymous' })
+      );
+
+      expect(mockedGetProvider).toHaveBeenCalled();
+      expect(mockedGetStoredByokKeys).not.toHaveBeenCalled();
+    });
   });
 
   describe.each([

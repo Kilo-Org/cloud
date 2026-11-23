@@ -559,6 +559,11 @@ export type GetProviderInput = {
   taskId?: string | null;
   /** Receives the steps and BYOK candidates behind the result, when the call returns. */
   onDecision?: (decision: ProviderRoutingDecision) => void;
+  /**
+   * The caller's stored keys, for a request that already reads them before routing. Omitted, the
+   * keys are read here, at most once.
+   */
+  loadStoredByokKeys?: () => Promise<StoredByokKeys>;
 };
 
 /** The model a request is served and billed as, and that model's free class. */
@@ -705,7 +710,9 @@ async function selectProvider(
 
   let storedKeys: Promise<StoredByokKeys> | undefined;
   const loadStoredKeys = () =>
-    (storedKeys ??= getStoredByokKeys(readDb, byokOwner(user.id, organizationId)));
+    (storedKeys ??=
+      input.loadStoredByokKeys?.() ??
+      getStoredByokKeys(readDb, byokOwner(user.id, organizationId)));
   const planInputs = {
     requestedModel,
     apiKind: request.kind,

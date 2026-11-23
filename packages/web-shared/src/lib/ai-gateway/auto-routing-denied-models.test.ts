@@ -10,8 +10,10 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
+  getEnabledByokProviders,
   getOrganizationByokProviderIds,
   hasInferenceProviderUserByokForModel,
+  type EnabledByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
@@ -47,6 +49,7 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/byok'),
   getOrganizationByokProviderIds: jest.fn(async () => []),
+  getEnabledByokProviders: jest.fn(async () => []),
   hasInferenceProviderUserByokForModel: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
@@ -514,6 +517,7 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
 
   beforeEach(() => {
     jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(policy());
+    jest.mocked(getEnabledByokProviders).mockClear();
     jest.mocked(inferenceRegionIneligibleCandidates).mockReset();
     jest
       .mocked(inferenceRegionIneligibleCandidates)
@@ -533,12 +537,21 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
     expect(inferenceRegionIneligibleCandidates).toHaveBeenCalledWith({
       region: 'eu',
       candidateIds: ['anthropic/claude', 'openai/gpt-5'],
-      byokOwner: { type: 'organization', id: member.organizationId },
+      loadByokKeys: expect.any(Function),
       policy: memberPolicy,
     });
-    expect(jest.mocked(inferenceRegionIneligibleCandidates).mock.lastCall?.[0].policy).toBe(
-      memberPolicy
-    );
+    const params = jest.mocked(inferenceRegionIneligibleCandidates).mock.lastCall?.[0];
+    expect(params?.policy).toBe(memberPolicy);
+    // The key loader reads the member's organization keys, and nothing reads them before it runs.
+    expect(getEnabledByokProviders).not.toHaveBeenCalled();
+    const keys: EnabledByokProvider[] = [{ providerId: 'openai', serveCatalogModels: false }];
+    jest
+      .mocked(getEnabledByokProviders as unknown as () => Promise<EnabledByokProvider[]>)
+      .mockResolvedValue(keys);
+    expect(await params?.loadByokKeys?.()).toBe(keys);
+    expect(jest.mocked(getEnabledByokProviders).mock.calls).toEqual([
+      [readDb, { type: 'organization', id: member.organizationId }],
+    ]);
   });
 
   it('merges region denials with the group policy denials without duplicates', async () => {

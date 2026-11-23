@@ -279,8 +279,9 @@ describe('findDirectByokCatalogModels', () => {
 
 describe('createDirectByokReferenceResolver', () => {
   test('translates bespoke ids of catalog-mode keys and leaves other ids unchanged', async () => {
-    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': false }));
-    const resolve = await createDirectByokReferenceResolver({ type: 'organization', id: 'org' });
+    const resolve = createDirectByokReferenceResolver(
+      keys({ synthetic: true, 'zai-coding': false })
+    );
 
     await expect(resolve('synthetic/hf:moonshotai/kimi-k2.6-fast')).resolves.toBe(
       'moonshotai/kimi-k2.6'
@@ -288,6 +289,6 @@ describe('createDirectByokReferenceResolver', () => {
     await expect(resolve('synthetic/hf:example/finetune')).resolves.toBeNull();
     await expect(resolve('zai-coding/glm-5.2')).resolves.toBe('zai-coding/glm-5.2');
     await expect(resolve('openai/gpt-5')).resolves.toBe('openai/gpt-5');
-    expect(mockedKeys).toHaveBeenCalledWith(expect.anything(), { type: 'organization', id: 'org' });
+    expect(mockedKeys).not.toHaveBeenCalled();
   });
 });

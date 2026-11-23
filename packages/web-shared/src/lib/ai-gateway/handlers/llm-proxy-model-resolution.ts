@@ -45,7 +45,11 @@ import {
   getDirectByokModel,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { byokOwner, type ByokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  enabledStoredByokKeys,
+  type EnabledByokProvider,
+  type StoredByokKeys,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -123,6 +127,8 @@ type ModelResolutionContext = {
   callerPromise: Promise<GatewayCaller>;
   balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>;
   organizationGroupPolicyPromise: Promise<EffectiveOrganizationModelPolicy | null>;
+  /** The caller's stored keys, read at most once per request and shared with provider selection. */
+  loadStoredByokKeys: () => Promise<StoredByokKeys>;
 };
 
 type RoutingCaller = { userId: string; organizationId: string | null };
@@ -147,9 +153,12 @@ async function authenticatedRoutingCaller(
   return { caller: { userId: caller.user.id, organizationId: caller.organizationId ?? null } };
 }
 
-type InferenceRegionScope = { region: OrganizationDataRegion; byokOwner: ByokOwner };
+type InferenceRegionScope = {
+  region: OrganizationDataRegion;
+  loadByokKeys: () => Promise<readonly EnabledByokProvider[]>;
+};
 
-/** The organization's inference region, when its gateway settings set one, and the BYOK owner. */
+/** The organization's inference region, when its gateway settings set one, and the caller's keys. */
 async function resolveInferenceRegionScope(
   ctx: ModelResolutionContext
 ): Promise<InferenceRegionScope | null> {
@@ -162,7 +171,10 @@ async function resolveInferenceRegionScope(
     settings,
   });
   return dataRegion
-    ? { region: dataRegion, byokOwner: byokOwner(caller.user.id, caller.organizationId) }
+    ? {
+        region: dataRegion,
+        loadByokKeys: async () => enabledStoredByokKeys(await ctx.loadStoredByokKeys()),
+      }
     : null;
 }
 
@@ -375,7 +387,7 @@ async function resolveAutoModelId(
             await inferenceRegionIneligibleCandidates({
               region: regionScope.region,
               candidateIds: [modelId],
-              byokOwner: null,
+              loadByokKeys: null,
               policy: null,
             })
           ).length === 0
@@ -421,14 +433,14 @@ async function resolveAutoModelId(
  */
 async function catalogModeModelForRoutedModel(
   model: string,
-  callerPromise: ModelResolutionContext['callerPromise']
+  ctx: ModelResolutionContext
 ): Promise<string | null> {
   const directByok = await getDirectByokModel(model.toLowerCase());
   if (!directByok || !supportsCatalogMode(directByok.provider.id)) return null;
-  const caller = await callerPromise;
+  const caller = await ctx.callerPromise;
   if (caller.kind !== 'signed-in') return null;
-  const resolveReference = await createDirectByokReferenceResolver(
-    byokOwner(caller.user.id, caller.organizationId)
+  const resolveReference = createDirectByokReferenceResolver(
+    enabledStoredByokKeys(await ctx.loadStoredByokKeys())
   );
   const resolved = await resolveReference(model);
   return resolved === model ? null : resolved;
@@ -449,10 +461,7 @@ export async function resolveModel(ctx: ModelResolutionContext): Promise<ModelRe
   if (resolution.kind === 'routed') {
     // A router entry stored with a bespoke id keeps working when its key switches to catalog mode;
     // the catalog id then goes through the organization policy check.
-    const catalogModelId = await catalogModeModelForRoutedModel(
-      ctx.request.body.model,
-      ctx.callerPromise
-    );
+    const catalogModelId = await catalogModeModelForRoutedModel(ctx.request.body.model, ctx);
     if (catalogModelId) ctx.request.body.model = catalogModelId;
   }
   return resolution;

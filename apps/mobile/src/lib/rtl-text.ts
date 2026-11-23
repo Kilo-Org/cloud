@@ -392,23 +392,51 @@ const TABLE_DELIMITER = /^ {0,3}\|?[ \t:-]*-[ \t:-]*\|?[ \t]*$/;
  * machinery, and machinery is Latin whatever language the message is in, so a
  * message that opens with a fence or a URL still names the direction of the
  * Arabic prose after it.
+ *
+ * A code block holds the lines it runs over, exactly as the strip's walk reads
+ * one. An indented block starts after a blank line or a closed block, runs on
+ * while the lines keep its indentation, and ends at a blank or a less-indented
+ * line (`isIndentedCodeLine`); a fence closes only on its own marker at least as
+ * long as the run that opened it (`fenceAfter`). Read as one line each, a
+ * multi-line block's later lines were prose, and a `~~~` block holding a ```
+ * line ended early, so machinery's own letters named the message's direction.
  */
 function markdownProse(markdown: string): string {
   const prose: string[] = [];
-  let inFence = false;
+  let openFence: Fence | undefined = undefined;
+  let inIndentedCode = false;
   let previousBlank = true;
+  let previousEndsBlock = false;
   for (const line of markdown.split('\n')) {
-    const body = line.slice(BLOCKQUOTE_START.exec(line)?.[0].length ?? 0);
-    const opensFence = FENCE_START.test(body);
+    const quoted = BLOCKQUOTE_START.exec(line)?.[0].length ?? 0;
+    const body = line.slice(quoted);
     const blank = body.trim().length === 0;
-    const indentedCode = previousBlank && INDENTED_CODE.test(body);
-    if (!inFence && !opensFence && !indentedCode && !TABLE_DELIMITER.test(body)) {
+    const fence: Fence | undefined = fenceOf(body);
+    const inFence: boolean = openFence !== undefined;
+    // The line's content column past its own quote prefix: a quote's prefix is
+    // machinery, not indentation, so the columns it occupies do not count
+    // towards an indented code block. The strip's walk measures the same frame.
+    const contentIndent =
+      columnAt(line, pastMatch(LEADING_SPACE, line, quoted)) - columnAt(line, quoted);
+    const indentedCode: boolean =
+      !inFence &&
+      isIndentedCodeLine(contentIndent, {
+        blank,
+        previousBlank,
+        previousEndsBlock,
+        inIndentedCode,
+      });
+    if (!inFence && fence === undefined && !indentedCode && !TABLE_DELIMITER.test(body)) {
       prose.push(body);
     }
-    if (opensFence) {
-      inFence = !inFence;
-    }
+    // The blocks this walk knows are the fence and the indented code block, so a
+    // fence's last line and an indented code line are what leave a closed block
+    // above the next line.
+    const code: boolean = inFence || indentedCode;
+    openFence = fenceAfter(openFence, fence);
     previousBlank = blank;
+    previousEndsBlock = code;
+    inIndentedCode = indentedCode;
   }
   return withoutMarkup(prose.filter(line => !REFERENCE_DEFINITION.test(line)).join('\n'))
     .replace(LINK_DESTINATION, ']')
@@ -444,17 +472,97 @@ const DIRECTION_MARK_RUN = /[\u061C\u200E\u200F]+/y;
 /** A line's blockquote markers, `>` or `> `, nested. */
 const BLOCKQUOTE_START = /^(?: {0,3}>[ \t]?)+/;
 
+/** One blockquote marker and the one space or tab after it, exactly as
+ * `BLOCKQUOTE_START` spells it: read one marker at a time, so a container's
+ * content column can be found at the depth that container sits at. Sticky, so
+ * `pastMatch` walks the markers without copying the line. */
+const QUOTE_MARKER = / {0,3}>[ \t]?/y;
+
+/** The spaces or tabs a line opens on, sticky so a walk can skip them where it
+ * is: a body's own indentation, counted in columns past the quote prefix. */
+const LEADING_SPACE = /[ \t]*/y;
+
 /** A list item's marker and the space after it: a bullet, or an ordered number. */
 const LIST_START = /^ {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]+/;
 
 /** An ATX heading's marker and the space after it. */
 const HEADING_START = /^ {0,3}#{1,6}[ \t]+/;
 
-/** A fence line that opens or closes a fenced code block. */
-const FENCE_START = /^ {0,3}(?:```|~~~)/;
+/** A fence line that opens or closes a fenced code block: three or more
+ * backticks or tildes, indented by up to three spaces. */
+const FENCE_START = /^ {0,3}(?:`{3,}|~{3,})/;
 
-/** A line indented enough to be an indented code block after a blank line. */
+/** A fence line's marker character and the length of its run, and whether the
+ * line holds nothing but that run — the only shape that closes a fence. */
+type Fence = { marker: '`' | '~'; length: number; closes: boolean };
+
+/** The fence line at `body`'s start, or `undefined` when the line opens none. */
+function fenceOf(body: string): Fence | undefined {
+  const match = FENCE_START.exec(body);
+  if (match === null) {
+    return undefined;
+  }
+  const run = match[0].trimStart();
+  return {
+    marker: run.startsWith('`') ? '`' : '~',
+    length: run.length,
+    closes: body.slice(match[0].length).trim().length === 0,
+  };
+}
+
+/** The fence still open after a line, given the `open` fence above it and the
+ * fence it holds (`fence`). A line closes a fence only with the marker it opened
+ * with, at least as long, and nothing after it; any other fence line inside one
+ * is that block's own text, so a `~~~` block holds a ``` line as its text
+ * instead of ending early. With no fence open, a fence line opens one. */
+function fenceAfter(open: Fence | undefined, fence: Fence | undefined): Fence | undefined {
+  if (open === undefined) {
+    return fence;
+  }
+  const closesOpen =
+    fence !== undefined &&
+    fence.marker === open.marker &&
+    fence.length >= open.length &&
+    fence.closes;
+  return closesOpen ? undefined : open;
+}
+
+/** A line indented enough to be an indented code block after a blank line: the
+ * text form of `INDENTED_CODE_COLUMNS` below, read where a line is known to
+ * start at its container's content column and only the columns count. */
 const INDENTED_CODE = /^(?: {4}|\t)/;
+
+/** The columns past its container's content column that make a line an indented
+ * code block rather than that container's paragraph text. */
+const INDENTED_CODE_COLUMNS = 4;
+
+/**
+ * Whether a line indented `indent` columns past its container's content column is
+ * an indented code block: it needs `INDENTED_CODE_COLUMNS` columns at least, and
+ * the block starts only after a blank line or a closed block and runs on while
+ * the lines keep the indentation. An indented line under paragraph text is that
+ * paragraph's own continuation instead.
+ *
+ * `indent` is stated past the line's quote prefix, the frame the container's own
+ * column is read in, so the columns a quote prefix occupies never count as
+ * indentation. Both walks that read an indented block — this module's strip and
+ * `markdownProse` — ask this one function, so the two cannot drift apart.
+ */
+function isIndentedCodeLine(
+  indent: number,
+  state: {
+    blank: boolean;
+    previousBlank: boolean;
+    previousEndsBlock: boolean;
+    inIndentedCode: boolean;
+  }
+): boolean {
+  return (
+    indent >= INDENTED_CODE_COLUMNS &&
+    !state.blank &&
+    (state.previousBlank || state.previousEndsBlock || state.inIndentedCode)
+  );
+}
 
 /** A thematic break: three or more of one marker, spaced or not. */
 const THEMATIC_BREAK_START = /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
@@ -684,6 +792,31 @@ function columnAt(line: string, at: number): number {
     column = character === '\t' ? column + 4 - (column % 4) : column + 1;
   }
   return column;
+}
+
+/**
+ * The column the line's content starts at, seen past its first `depth` quote
+ * markers: the leading whitespace and those markers are skipped one at a time
+ * and counted in columns, so a tab there reaches the tab stop the renderer would
+ * reach, and any deeper quote's own prefix stays part of what the column
+ * measures.
+ *
+ * A container states its content column in the frame of the container around it.
+ * A list item is stated that way by its marker line, so a continuation line's
+ * column has to be read at the item's own depth and not at the line's: under
+ * `- item`, `> q` at column zero reaches column two — the quote's own content,
+ * inside the item only in that frame — while `  > q` reaches column four.
+ */
+function contentColumnAt(line: string, depth: number): number {
+  let at = pastMatch(LEADING_SPACE, line, 0);
+  for (let marker = 0; marker < depth; marker += 1) {
+    const afterMarker = pastMatch(QUOTE_MARKER, line, at);
+    if (afterMarker === at) {
+      break;
+    }
+    at = pastMatch(LEADING_SPACE, line, afterMarker);
+  }
+  return columnAt(line, at);
 }
 
 /** The offset past `from` at which `column` columns are reached, each tab
@@ -923,10 +1056,11 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
   // heading-shaped line from one the line above continues, and an underline that
   // closes the paragraph from one that stands outside its container.
   let previousParagraph: Container | undefined = undefined;
-  // Whether the previous line held an indented code block, which the lines under
-  // it continue while they keep the indentation.
+  // The fence still open, with the marker and run length that close it, and the
+  // indented code block the previous line held, which the lines under it
+  // continue while they keep the indentation.
+  let openFence: Fence | undefined = undefined;
   let inIndentedCode = false;
-  let inFence = false;
   // The terminator that closes the HTML block now open, when the previous line
   // opened one of the kinds CommonMark ends on a marker of its own, and the
   // container it opened in. Every line until that marker is the block's raw
@@ -948,19 +1082,24 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     const body = line.slice(quoted);
     const blank = body.trim().length === 0;
     // The line's own first-content column, counted from column zero: where its
-    // first character stands, past its quote prefix and any indentation. Every
-    // container is stated in that same frame, so a list item's content column
-    // compares with it directly even when a deeper quote opens inside the item
-    // and pushes its own prefix out past that column.
+    // first character stands, past its quote prefix and any indentation. An HTML
+    // block's container is stated in that same frame, so its content column
+    // compares with it directly. The list item's frame is a different one and is
+    // read where the item is asked about (`contentColumnAt`).
     const contentColumn = columnAt(line, quoted + (/^[ \t]*/.exec(body)?.[0].length ?? 0));
     // A line quoted more shallowly than a list item, or reaching short of its
     // content column, ends that item; a blank line holds it as it is. Several
-    // items may close at once when the line returns to an outer container.
+    // items may close at once when the line returns to an outer container. The
+    // reached column is read in the item's own frame, past the `open.depth`
+    // quote markers it sits under, so a quote that opens deeper inside the item
+    // measures from where that item's content starts rather than from column
+    // zero: `- item` then `> q` reaches column two at depth zero and ends the
+    // item, while `  > q` reaches two at the item's own depth and holds it.
     while (openLists.length > 0) {
       const open = openLists.at(-1);
       if (
         open === undefined ||
-        !(quotedDepth < open.depth || (!blank && contentColumn < open.indent))
+        !(quotedDepth < open.depth || (!blank && contentColumnAt(line, open.depth) < open.indent))
       ) {
         break;
       }
@@ -998,20 +1137,37 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     // raw text itself.
     const rawHtml: boolean =
       !outsideContainer && (openHtmlBlock !== undefined || openTagHtmlBlock !== undefined);
-    const opensFence = !rawHtml && FENCE_START.test(body);
+    // The fence this line holds, if any, and whether one is still open above it.
+    // A fence line inside one closes it only on its own marker at least as long:
+    // a ``` line inside a `~~~` block is that block's text, not its end.
+    const fence: Fence | undefined = rawHtml ? undefined : fenceOf(body);
+    const inFence: boolean = openFence !== undefined;
     // An indented code block starts after a blank line or after a block that has
     // closed, and runs on while the lines keep its indentation; an indented line
-    // under paragraph text is that paragraph's own continuation instead. Its
-    // indentation is counted from its container's content indent, so four spaces
-    // inside a nested list item is the item's own paragraph text. These three
-    // predicates feed each other through the walk's state, which the checker
-    // cannot infer a type for, so each says it is a boolean.
+    // under paragraph text is that paragraph's own continuation instead. Both
+    // columns are read in the body's frame, past the line's quote prefix: the
+    // container's column is `containerIndent`, converted once above, so the
+    // columns a quote prefix occupies are machinery on both sides of the
+    // comparison. Counted from the line's start instead, the prefix would pass
+    // for indentation and a paragraph two columns inside a quote opened in an
+    // item would read as code. These predicates feed each other through the
+    // walk's state, which the checker cannot infer a type for, so each says it is
+    // a boolean.
     const indentedCode: boolean =
       !rawHtml &&
       !inFence &&
-      contentColumn >= container.indent + 4 &&
-      !blank &&
-      (previousBlank || previousEndsBlock || inIndentedCode);
+      isIndentedCodeLine(
+        // The line's content column past its own quote prefix, less the
+        // container's column in that same frame: the prefix's columns cancel out
+        // on both sides, so they never pass for indentation.
+        contentColumn - columnAt(line, quoted) - containerIndent,
+        {
+          blank,
+          previousBlank,
+          previousEndsBlock,
+          inIndentedCode,
+        }
+      );
     // Code is copy in its own right: a mark inside it is part of the code.
     const code: boolean = inFence || indentedCode;
     // A fence's own lines are code, so an HTML block may not start inside one.
@@ -1100,7 +1256,7 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
         underlinesParagraph(previousParagraph, quotedDepth, body) ||
         (startsBlock && REFERENCE_DEFINITION_START.test(body));
     const stripped =
-      opensFence || htmlLine || code || blank || !startsBlock
+      fence !== undefined || htmlLine || code || blank || !startsBlock
         ? line
         : stripLineMarks(
             line,
@@ -1114,9 +1270,7 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
               inHeading: heading !== null,
             }
           );
-    if (opensFence) {
-      inFence = !inFence;
-    }
+    openFence = fenceAfter(openFence, fence);
     // The list item this line opens, from its own marker and the padding after
     // it: a line reaching that content column or deeper is inside the item, and
     // its marker line also ends every item it is a sibling or an ancestor of. An

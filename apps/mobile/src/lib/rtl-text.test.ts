@@ -344,6 +344,23 @@ describe('markdownMessageDirection', () => {
     expect(markdownMessageDirection('``a`b``')).toBeUndefined();
     expect(markdownMessageDirection('<a title="a>b">')).toBeUndefined();
   });
+
+  // An indented code block runs on while the lines keep its indentation, exactly
+  // as the strip's walk reads one. Only its first line was read as code before,
+  // so the continuation line's Arabic was taken for prose and the message named
+  // a direction it has no prose letter for.
+  it('reads a multi-line indented code block as machinery throughout', () => {
+    expect(markdownMessageDirection('    مرحبا\n    بك')).toBeUndefined();
+    expect(markdownMessageDirection('    مرحبا\n    بك\n\nLatin')).toBe('ltr');
+  });
+
+  // A fence closes only on its own marker at least as long as the run that
+  // opened it, so a ``` line inside a `~~~` block is that block's text. Toggling
+  // on any fence line ended the block there and read the Arabic under it as
+  // prose.
+  it('closes a fence only on its own marker', () => {
+    expect(markdownMessageDirection('~~~\n```\nمرحبا\n~~~')).toBeUndefined();
+  });
 });
 
 describe('withoutLeadingDirectionMarks', () => {
@@ -595,6 +612,36 @@ describe('withoutLeadingDirectionMarks', () => {
   it('holds a list item open through a quote opened inside it', () => {
     const value = '- item\n  > quoted\n\n    \u200FLatin';
     expect(withoutLeadingDirectionMarks(value)).toBe('- item\n  > quoted\n\n    Latin');
+  });
+
+  // A quote's own prefix is machinery, so the column a line reaches is read in
+  // the list item's frame, past the quote markers the item sits under. `> quoted`
+  // reaches column zero there, short of `- item`'s content column two: the item
+  // ends on that line, so the marked line under the blank line is an indented
+  // code block at the top level and keeps its mark. At the item's own column the
+  // quote is inside the item, which stays open, and the line under the blank line
+  // is a paragraph two columns past the item's content start, whose mark names
+  // that paragraph's edge.
+  it('ends a list item at a quote in column zero and holds it at the item’s column', () => {
+    const outside = '- item\n> quoted\n\n    \u200FLatin';
+    expect(withoutLeadingDirectionMarks(outside)).toBe(outside);
+    expect(withoutLeadingDirectionMarks('- item\n  > quoted\n\n    \u200FLatin')).toBe(
+      '- item\n  > quoted\n\n    Latin'
+    );
+  });
+
+  // An indented code block is measured in the frame of the line's container, so a
+  // quote's own prefix never passes for indentation. Two columns past a quote's
+  // content start inside the item is a paragraph in the quote, and its mark names
+  // that paragraph's edge; four columns is an indented code block, which keeps
+  // every character it holds. Counted from column zero the prefix was the
+  // difference, and the paragraph read as code.
+  it('measures an indented code block past the quote prefix', () => {
+    expect(withoutLeadingDirectionMarks('- item\n  > quoted\n\n  >   \u200FLatin')).toBe(
+      '- item\n  > quoted\n\n  >   Latin'
+    );
+    const code = '- item\n  > quoted\n\n  >     \u200FLatin';
+    expect(withoutLeadingDirectionMarks(code)).toBe(code);
   });
 
   // Only a known block tag, or one complete tag alone on its line, opens a

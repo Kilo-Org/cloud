@@ -165,14 +165,10 @@ describe('draft scope and entity keys', () => {
   it('isMergeDraft accepts any subset of the authored fields and rejects other shapes', () => {
     expect(isMergeDraft({ title: 'T', message: 'M' })).toBe(true);
     expect(isMergeDraft({ title: '', message: '' })).toBe(true);
-    // Every field is optional: the sheet persists only what the person authored,
-    // so a method-only tap stores `{ method }` and a text-only edit stores none.
     expect(isMergeDraft({})).toBe(true);
     expect(isMergeDraft({ title: 'T' })).toBe(true);
     expect(isMergeDraft({ message: 'M' })).toBe(true);
     expect(isMergeDraft({ method: 'squash' })).toBe(true);
-    // The method is an open string, narrowed against the pull request's allowed
-    // methods at restore, so another build's record still loads its text.
     expect(isMergeDraft({ title: 'T', message: 'M', method: 'octopus' })).toBe(true);
     expect(isMergeDraft({ title: 'T', message: 'M', method: 1 })).toBe(false);
     expect(isMergeDraft({ title: 1, message: 'M' })).toBe(false);

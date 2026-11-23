@@ -242,17 +242,21 @@ describe('sandbox allocation contract', () => {
       'vercel-small',
       'vercel-large',
       'aws-microvm-8g',
+      'aws-ecs-8g',
     ]);
     for (const allocation of SELECTABLE_SANDBOX_ALLOCATIONS) {
       expect(sandboxAllocationSchema.safeParse(allocation).success).toBe(true);
       expect(getSandboxAllocationProvider(allocation)).toMatch(
-        /^(cloudflare-containers|vercel|aws)$/
+        /^(cloudflare-containers|vercel|aws|aws-ecs)$/
       );
     }
   });
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('treats %s as selectable', allocation => {
     expect(isSelectableSandboxAllocation(allocation)).toBe(true);
+    const request = getSandboxAllocationRequest(allocation);
+    expect(selectableSandboxAllocationInputSchema.parse(request)).toEqual(request);
+    expect(selectableSandboxAllocationInputSchema.parse(allocation)).toEqual(request);
   });
 
   it('requires disabled capability results to omit all options', () => {

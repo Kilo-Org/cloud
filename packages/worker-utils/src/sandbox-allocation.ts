@@ -36,6 +36,7 @@ export const SELECTABLE_SANDBOX_ALLOCATIONS = [
   'vercel-small',
   'vercel-large',
   'aws-microvm-8g',
+  'aws-ecs-8g',
 ] as const satisfies readonly SandboxAllocation[];
 
 /** Allocation auto-routed containers sessions run when the owner picks nothing. */
@@ -106,6 +107,7 @@ function isContainersAllocationRequest(
 }
 
 const selectableSandboxAllocationRequestSchema = z.union([
+  awsEcsAllocationRequestSchema,
   awsAllocationRequestSchema,
   vercelAllocationRequestSchema,
   containersAllocationRequestSchema,

@@ -4,6 +4,7 @@ import type { EnvironmentReference } from '@kilocode/cloud-agent-profile';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type * as vercelCredentialResolver from '../byoc/vercel-credential-resolver.js';
 import type * as vercelOwner from '../byoc/vercel-owner.js';
+import type * as awsCredentialResolver from '../byoc/aws-credential-resolver.js';
 import type { Env } from '../types.js';
 
 const resolveSaved = vi.hoisted(() => vi.fn());
@@ -11,6 +12,8 @@ const fetchCredential = vi.hoisted(() => vi.fn());
 const fetchEnrollment = vi.hoisted(() => vi.fn());
 const fetchEnrollmentForUser = vi.hoisted(() => vi.fn());
 const enrolledOwner = vi.hoisted(() => vi.fn());
+const fetchAwsConnection = vi.hoisted(() => vi.fn());
+const resolveEcsConfiguration = vi.hoisted(() => vi.fn());
 
 vi.mock('../session/sandbox-allocation-resolution.js', () => ({
   resolveSavedSandboxAllocation: resolveSaved,
@@ -25,6 +28,13 @@ vi.mock('../byoc/vercel-owner.js', async importOriginal => ({
   ...(await importOriginal<typeof vercelOwner>()),
   enrolledByocVercelOwner: enrolledOwner,
 }));
+vi.mock('../byoc/aws-credential-resolver.js', async importOriginal => ({
+  ...(await importOriginal<typeof awsCredentialResolver>()),
+  fetchAwsProviderConnection: fetchAwsConnection,
+}));
+vi.mock('../byoc/aws-ecs-credential-resolver.js', () => ({
+  resolveAwsEcsByocConfiguration: resolveEcsConfiguration,
+}));
 
 import { resolveEnvironmentBuildTarget } from './target.js';
 import { resolveAwsEnvironmentBuildTarget } from './aws-build-target.js';
@@ -32,6 +42,8 @@ import {
   ByocCredentialMissingError,
   ByocCredentialResolverError,
 } from '../byoc/vercel-credential-resolver.js';
+import { awsEcsArchiveBaseImage } from '../shared/aws-archive.js';
+import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
 
 const OWNER = { type: 'organization' as const, id: '22222222-2222-4222-8222-222222222222' };
 const REFERENCE: EnvironmentReference = {
@@ -43,6 +55,7 @@ const REFERENCE: EnvironmentReference = {
 const CREDENTIAL_ID = '44444444-4444-4444-8444-444444444444';
 const ENV = {
   BYOC_VERCEL_IDS: OWNER.id,
+  BYOC_AWS_IDS: OWNER.id,
   SANDBOX_CONTAINERS: {},
   RUNTIME_STARTUP_MODE: 'downloaded',
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
@@ -98,6 +111,26 @@ describe('resolveEnvironmentBuildTarget', () => {
       ok: false,
       provider: 'aws',
       reason: 'Environment snapshots are not supported by this provider',
+    });
+  });
+
+  it('routes a saved ECS allocation to the ECS builder and pins its connection and base', async () => {
+    resolveSaved.mockResolvedValue('aws-ecs-8g');
+    fetchAwsConnection.mockResolvedValue({ credentialId: CREDENTIAL_ID, setupStatus: 'ready' });
+    resolveEcsConfiguration.mockResolvedValue(ECS_TEST_CONFIG);
+    await expect(target()).resolves.toEqual({
+      ok: true,
+      target: {
+        provider: 'aws-ecs',
+        instance: 'aws-ecs-8g',
+        credentialId: CREDENTIAL_ID,
+        baseImage: awsEcsArchiveBaseImage(CREDENTIAL_ID, ECS_TEST_CONFIG),
+      },
+    });
+    expect(fetchAwsConnection).toHaveBeenCalledWith(ENV, { organizationId: OWNER.id }, 'aws-ecs');
+    expect(resolveEcsConfiguration).toHaveBeenCalledWith(ENV, {
+      organizationId: OWNER.id,
+      credentialId: CREDENTIAL_ID,
     });
   });
 

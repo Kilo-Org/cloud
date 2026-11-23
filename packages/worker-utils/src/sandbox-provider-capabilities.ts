@@ -46,12 +46,12 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
   Record<SandboxProviderId, Readonly<Record<SandboxProviderFeature, boolean>>>
 > = {
   'aws-ecs': {
-    preview: false,
+    preview: true,
     workspaceSnapshots: false,
-    environmentSnapshots: false,
-    egressProxy: false,
-    egressProxySeesAll: false,
-    scmCliTools: false,
+    environmentSnapshots: true,
+    egressProxy: true,
+    egressProxySeesAll: true,
+    scmCliTools: true,
     meteredBilling: false,
   },
   aws: {
